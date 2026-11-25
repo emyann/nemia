@@ -353,16 +353,18 @@ export const checksContract = (checks: readonly CheckSpec[]) =>
  * pull request on GitHub and a factory that stages a local merge are both told this, and the recipe of either is its step's own note.
  * How to stage a merge, and what the session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its
  * place's skill (*Stage a landing*).
- * @param command The check's shell line, as the run froze it.
+ * An ending of several checks (`checks:`) is told each by its name and line, and which of them use no checkout (`usesCheckout: false`):
+ * they run after the checkout is given back to the next ending, and still judge the step.
+ * @param checks The step's checks, as the run froze them, in its order.
  * @param words How the place stages a merge and what the session is denied, or undefined where the place says none.
  */
-export const landingContract = (command: string, words?: LandingWords) =>
+export const landingContract = (checks: readonly CheckSpec[], words?: LandingWords) =>
   [
     '',
     '## The run checks and lands your merge',
     '',
-    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, as it executes any step's check.`,
-    'When it exits 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with',
+    ...landingChecksTold(checks),
+    `When ${checks.length > 1 ? 'every one exits' : 'it exits'} 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with`,
     "the `message` your closeout gives as the commit's message; anything else — a refusal, or a check that did not finish — and nothing",
     'lands, a merge you staged being taken back.',
     '',
@@ -373,6 +375,27 @@ export const landingContract = (command: string, words?: LandingWords) =>
     `${words?.denied.length ? `Your fence denies ${words.denied.map(codeSpan).join(' and ')}` : 'Committing it is denied you'} for that reason; a merge that commits as it merges would land it all the same, unchecked.`,
     "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
   ].join('\n');
+
+/** The checks an ending's session is told the run executes once it signs off: its one check's line, or each of several by its name. */
+const landingChecksTold = (checks: readonly CheckSpec[]) => {
+  const only = checks.length === 1 ? checks[0] : undefined;
+  if (only) return [`Once you sign off, the run executes ${codeSpan(only.run)} in this checkout, as it executes any step's check.`];
+  const free = checks.filter((c) => c.usesCheckout === false);
+  return [
+    "Once you sign off, the run executes these checks in this checkout, as it executes any step's checks, each once those it waits on passed:",
+    '',
+    ...checks.map(
+      (c) =>
+        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(c.run)}${c.usesCheckout === false ? ' (uses no checkout)' : ''}`,
+    ),
+    '',
+    ...(free.length
+      ? [
+          `Once every other check has passed, the checkout is given back to the next run's ending while ${free.map((c) => codeSpan(c.name)).join(' and ')} still ${free.length > 1 ? 'run' : 'runs'}: ${free.length > 1 ? 'they read' : 'it reads'} nothing of it, and still ${free.length > 1 ? 'judge' : 'judges'} this step.`,
+        ]
+      : []),
+  ];
+};
 
 /** What a landing session is told by its place (`landingContract`): the command that stages its merge, and the rules its fence denies. */
 export type LandingWords = { readonly stage: string; readonly denied: readonly string[] };

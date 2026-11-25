@@ -1,6 +1,7 @@
 /**
  * Which of a step's named checks the pass files now, and where the step stands on them (`checksDue`, proved by
- * contracts/checks-due.contract.ts), and where one check stands off its task (`standingOf`). Pure: the pass reads each check's task, asks
+ * contracts/checks-due.contract.ts), where one check stands off its task (`standingOf`), and
+ * where each of a step's checks stands on its current try (`checkStandings`). Pure: the pass reads each check's task, asks
  * this, and carries nothing to the next pass.
  */
 import type { CheckNode, CheckStanding, ChecksDue, ChecksDueOf } from '../../contracts/checks-due.contract.ts';
@@ -129,11 +130,17 @@ const filedPhase = (check: CheckOnRecord, phase: TaskPhase) =>
  * @param step The step, whose plan of checks is read (`stepChecks`).
  * @param phaseOf The phase of a task the engine holds, by its id: `unknown` for one it has no record of.
  */
-export const stepChecksDue = (run: Run, step: StepSpec, phaseOf: (taskId: string) => TaskPhase) => {
+export const stepChecksDue = (run: Run, step: StepSpec, phaseOf: (taskId: string) => TaskPhase) =>
+  checksDue(checkNodes(stepChecks(step), checkStandings(run, step, phaseOf)));
+
+/**
+ * Where each of a step's checks stands on its current try, by its name: `waiting` before the step's checks are on the record, and else
+ * read off its task (`standingOf`), a step's one check never `waiting` once on the record (`filedPhase`). What the pass's filing reads
+ * (`stepChecksDue`). Pure.
+ */
+const checkStandings = (run: Run, step: Pick<StepSpec, 'name'>, phaseOf: (taskId: string) => TaskPhase) => (name: string) => {
   const filed = run.steps[step.name]?.check;
-  return checksDue(
-    checkNodes(stepChecks(step), (name) =>
-      filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true),
-    ),
-  );
+  const standing: CheckStanding =
+    filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true);
+  return standing;
 };

@@ -88,13 +88,14 @@ export const PRECEDENCE =
   "Of what you are told, your instructions are layer 1, the custom instructions 2, the files of the folder you work in 3, this factory's rules 4 and this step's policy 5: where two of them say different things, the higher number wins, and what is asked of you below is above them all.";
 
 /**
- * What a step is told of what judges it before it signs off: an ending that lands on its check, the landing (`landingContract`); a step
+ * What a step is told of what judges it before it signs off: an ending that lands on its checks, the landing (`landingContract`); a step
  * with one check, its line (`checkContract`); a step with several, each by its name (`checksContract`). Nothing for a step with none.
  */
 const checksTold = (step: StepSpec, run: Run, words: LandingWords | undefined) => {
   const plan = stepChecks(step);
+  if (plan.length && landsOnCheck(step, run)) return [landingContract(plan, words)];
   const only = plan.length === 1 ? plan[0] : undefined;
-  if (only) return [landsOnCheck(step, run) ? landingContract(only.run, words) : checkContract(only.run)];
+  if (only) return [checkContract(only.run)];
   return plan.length ? [checksContract(plan)] : [];
 };
 

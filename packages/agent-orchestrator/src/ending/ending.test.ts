@@ -306,6 +306,42 @@ describe('landingOpen holds the checkout from the filing to the landing, and let
     });
 });
 
+/** ship with two checks: `receipt` in the checkout, then `base-ci`, which uses no checkout (`usesCheckout: false`). */
+const TWO_CHECK_LANDER: StepSpec = {
+  ...LANDER,
+  check: undefined,
+  checks: [
+    { name: 'receipt', run: 'land receipt', after: [] },
+    { name: 'base-ci', run: 'land base-ci', after: ['receipt'], usesCheckout: false },
+  ],
+};
+
+describe('landingOpen gives the checkout back once every check that uses it passed, a check with usesCheckout: false still running', () => {
+  const filed = atLanding({}, { check: { taskId: 't-receipt', tasks: { receipt: 't-receipt', 'base-ci': 't-base-ci' } } });
+  const rows: Array<[string, Run, StepStatus, TaskPhase | undefined, TaskPhase | undefined, MergeState['merging'], boolean]> = [
+    ['signed, its checks not filed yet', atLanding({}, { check: undefined }), 'checking', undefined, undefined, 'none', true],
+    ['its receipt runs in the checkout', filed, 'checking', 'running', undefined, 'ours', true],
+    ['its receipt passed, base-ci runs, nothing staged', filed, 'checking', 'succeeded', 'running', 'none', false],
+    ['its receipt passed, base-ci not filed yet, nothing staged', filed, 'checking', 'succeeded', undefined, 'none', false],
+    ['its receipt passed, base-ci runs, its own merge still staged', filed, 'checking', 'succeeded', 'running', 'ours', true],
+    ['its receipt passed, base-ci runs, another run staged a merge', filed, 'checking', 'succeeded', 'running', 'other', false],
+    ['its receipt refused, nothing landed yet', filed, 'checking', 'failed', undefined, 'none', true],
+    ['both passed, not yet landed', filed, 'checking', 'succeeded', 'succeeded', 'none', false],
+  ];
+  for (const [name, r, own, receipt, baseCi, merging, open] of rows)
+    test(name, () => {
+      const ph = phases({
+        't-ship': 'succeeded',
+        ...(receipt ? { 't-receipt': receipt } : {}),
+        ...(baseCi ? { 't-base-ci': baseCi } : {}),
+      });
+      assert.equal(
+        landingOpen(TWO_CHECK_LANDER, r, own, ph, () => merging),
+        open,
+      );
+    });
+});
+
 describe('landedWords says what the run did with the merge: the commit, or why none', () => {
   test('a commit, by its short sha', () =>
     assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run landed on main as 0123456'));

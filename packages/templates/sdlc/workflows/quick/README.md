@@ -87,15 +87,16 @@ sign-off spend no try and wait on a person at once, and so does a refusal after 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session
 runs the tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
 repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through the
-carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its check is the receipt that the merge happened —
+carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its checks are the receipt that the merge happened, then
+`base-ci`, which runs once the checkout is given back to the next run's ending —
 `build`'s land step to the letter but its `after:` and its gate (check, fence and budget, and its note, which is `build`'s own
 `land.md`, which the step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
 `landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, installs the merged tree's
 dependencies where the factory names its `landingInstall`, derives those files again and pushes,
 and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
 in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
-a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default), the
-receipt then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
+a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default),
+`base-ci` then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
 first, any red it judged, failing lines or not, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
 cancelled or never reported too; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 

@@ -1539,6 +1539,84 @@ describe('two runs of one repository land close together: each records the commi
   });
 });
 
+describe("an ending whose check uses no checkout gives the checkout back once its other check passed: another run's ending is filed while it runs, and it still judges its own step", () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let two!: Awaited<ReturnType<typeof twoChecksApproved>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  const CHECKS = 'checks:\n  - name: receipt\n    run: npm test\n  - name: base-ci\n    run: npm run wait\n    usesCheckout: false';
+  const twoChecksFolder = () => {
+    const dir = at.folder();
+    const file = path.join(dir, 'ship.md');
+    const text = fs.readFileSync(file, 'utf8');
+    assert.match(text, /^check: .*$/m);
+    fs.writeFileSync(file, text.replace(/^check: .*$/m, CHECKS));
+    return dir;
+  };
+  const twoChecksApproved = async () => {
+    const { e } = stage.board();
+    const repo = at.aRepo();
+    const dir = twoChecksFolder();
+    const b = await at.atTheGate({ repo, dir });
+    const a = await at.atTheGate({ repo, dir });
+    await stage.runWith(e, approveRun(b.id, 'ship'));
+    const { file } = await stage.runWith(e, approveRun(a.id, 'ship'));
+    plantRecord(ROOT, file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
+    return { repo, a, b };
+  };
+  let mergedA = '';
+  s.test("A's ending lands its result, signs off, and its receipt runs: B's ending is not filed into the checkout", async () => {
+    two = await twoChecksApproved();
+    const { repo, a, b } = two;
+    assert.deepEqual((await at.pass(a.id)).filed, ['ship'], 'the older approval takes the checkout');
+    at.mergedByHand(repo, a.branch);
+    mergedA = world().head(repo);
+    settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'its receipt is filed');
+    assert.deepEqual((await at.pass(b.id)).filed, [], "B waits while A's receipt runs");
+  });
+  s.test("A's receipt passes and its base-ci runs: B's ending is filed in the checkout on that pass", async () => {
+    const { repo, a, b } = two;
+    settle(`${a.id}-ship-check-receipt`, 'succeeded', undefined, 0);
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'its base-ci is filed');
+    assert.equal(runRecord(ROOT, a.id).steps.ship.landed, undefined, 'A has not landed while base-ci runs');
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship'], 'the checkout was given back');
+    assert.equal(runRecord(ROOT, b.id).steps.ship?.workspace, repo);
+  });
+  s.test("A's base-ci passes while B works in the checkout: A records its own merge commit", async () => {
+    const { repo, a, b } = two;
+    at.mergedByHand(repo, b.branch);
+    settle(`${a.id}-ship-check-base-ci`, 'succeeded', undefined, 0);
+    await at.pass(a.id);
+    assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
+    assert.notEqual(world().head(repo), mergedA, "B's result is on the base past it");
+    assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined, "B's landing is its own");
+  });
+  s.test("REFUSED: A's base-ci refuses once B has the checkout: A's step fails on its check, and B's ending is untouched", async () => {
+    const { repo, a, b } = await twoChecksApproved();
+    assert.deepEqual((await at.pass(a.id)).filed, ['ship']);
+    at.mergedByHand(repo, a.branch);
+    settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+    await at.pass(a.id);
+    settle(`${a.id}-ship-check-receipt`, 'succeeded', undefined, 0);
+    await at.pass(a.id);
+    assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    settle(`${a.id}-ship-check-base-ci`, 'failed', undefined, 1);
+    await at.pass(a.id);
+    const landed = runRecord(ROOT, a.id).steps.ship?.landed;
+    assert.ok(
+      landed && 'aborted' in landed && landed.aborted.includes('(exit 1)'),
+      `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`,
+    );
+    assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, "B's ending is still filed");
+    assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined);
+  });
+});
+
 describe("an ending its workflow files with no gate waits for the checkout while another run's landing check runs, and is filed on the first pass after that run lands", () => {
   let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
   let one!: Awaited<ReturnType<typeof aLandingAndAQuickRun>>;

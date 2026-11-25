@@ -15,6 +15,7 @@
 import {
   cardNames,
   cardText,
+  cardKey,
   dropRecord,
   emptyCards,
   plantCard,
@@ -95,6 +96,9 @@ const addToInbox = (opts: Parameters<typeof addToInboxVerb>[0]) => {
 
 /** The text of the card a path in the inbox names, as the store holds it, or empty where it holds none. */
 const cardAt = (file: string) => cardText(ROOT, path.basename(file, '.md')) ?? '';
+
+/** When the card `name` was filed, as its record says. */
+const filedAtOf = (name: string) => (JSON.parse(recordText(ROOT, cardKey(name)) ?? '{}') as { filedAt?: string }).filedAt;
 
 /** Whether the store holds the card a path in the inbox names. */
 const held = (file: string) => cardText(ROOT, path.basename(file, '.md')) !== null;
@@ -771,7 +775,7 @@ describe('a card becomes a run: filed with its factory and its gate, queued, it 
     "`nemia inbox queue` marks it, says its place and that it starts on its factory's repository for its workflow, and keeps the card file's time — a queue is no edit of the idea, and `--off` takes it back as old still",
     async () => {
       const filed = new Date('2026-09-16T08:00:00.000Z');
-      fs.utimesSync(file, filed, filed);
+      plantCard(ROOT, name, cardAt(file), filed.toISOString());
       const queued = await queuedBy(name);
       const when = /^queued: (.*)$/m.exec(cardAt(file))![1];
       assert.deepEqual(
@@ -783,18 +787,18 @@ describe('a card becomes a run: filed with its factory and its gate, queued, it 
         (await listedLines()).find((l) => l.startsWith(name))!,
         /  queued 1 of 1$/,
       );
-      assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'as old as it was');
+      assert.equal(filedAtOf(name), filed.toISOString(), 'as old as it was');
       await queuedBy(name, '--off');
       assert.doesNotMatch(cardAt(file), /^queued: /m, 'taken back');
-      assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and as old still');
+      assert.equal(filedAtOf(name), filed.toISOString(), 'and as old still');
       await queuedBy(name);
       assert.match(cardAt(file), /^queued: /m, 'queued again');
       const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', factory: 'solo' });
       assert.ok(
-        fs.statSync(fresh.file).mtime > filed,
+        new Date(filedAtOf(fresh.card.name) ?? 0) > filed,
         'nemia inbox add writes a card at the time it is filed: it is the queue that keeps the time',
       );
-      fs.rmSync(fresh.file);
+      dropRecord(ROOT, cardKey(fresh.card.name));
     },
   );
   s.test('at a cap of 1, with a run in flight, the queued cards wait, pass after pass', async () => {

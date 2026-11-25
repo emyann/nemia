@@ -12,7 +12,7 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
+import { cardText, keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -865,7 +865,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       ['pipao', repo, true],
       'the start says its factory and the repository it is on',
     );
-    assert.ok(fs.existsSync(card), 'the card is kept');
+    assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
   });
   s.test("a card's factory: starts it there, its workflow: found in the factory's repository; --factory is over it", async () => {
     aCard('in-pipao', '---\nworkflow: build\nfactory: pipao\n---\nBuild it.\n');
@@ -1059,7 +1059,7 @@ describe("a card and a brief work on the repository the factory's wiring names, 
       path.basename(a),
       path.basename(b),
     );
-    assert.ok(fs.existsSync(card), 'the card is kept');
+    assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
   });
   s.test("after `nemia factory attach f dev --repo <b>`, a card's run works on b; an old card's repo: is said and not read", async () => {
     await typedFrom(ROOT, ['factory', 'attach', 'f', 'dev', '--repo', path.basename(b)]);

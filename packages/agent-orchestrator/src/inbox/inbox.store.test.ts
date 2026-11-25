@@ -254,7 +254,7 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
           [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
           [byName.card.name, [], true],
         ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-        'started and broken listed; a file that is no card not, nor a hidden one or README',
+        'started and broken listed, strays not',
       );
       const lines = await listedLines();
       assert.ok(

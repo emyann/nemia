@@ -15,7 +15,7 @@ import { INBOX } from './commands.verb.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { cardKey, dropRecord, plantRecord, runKey } from '../../testing.ts';
+import { cardKey, dropRecord, plantCard, plantRecord, runKey } from '../../testing.ts';
 
 const ROOT = scratch('wf-inbox-card-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -26,9 +26,7 @@ const engine = eachTest(testEngine);
 heldUnasked(engine);
 
 const CARD = '---\nworkflow: dev\n---\nCache the engine views.\n';
-fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'inbox', 'notes'), 'a stray file, no card\n');
-fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
+plantCard(ROOT, 'notes', CARD);
 
 /** A run's record of one step, `implement`, its task `t-<id>`, started from the card `card`. */
 const runFrom = (id: string, card: string) =>
@@ -51,10 +49,10 @@ const runFrom = (id: string, card: string) =>
     }),
   );
 
-test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both; a stray file that is no card is listed beside the card of its name, never hidden", async () => {
+test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both", async () => {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'inbox', 'at-work-a1b2.md'), '---\nlabels: { team: core }\n---\nAt work.\n');
-  fs.writeFileSync(path.join(ROOT, 'inbox', 'ended-c3d4.md'), '---\nlabels: { team: core }\n---\nEnded.\n');
+  plantCard(ROOT, 'at-work-a1b2', '---\nlabels: { team: core }\n---\nAt work.\n');
+  plantCard(ROOT, 'ended-c3d4', '---\nlabels: { team: core }\n---\nEnded.\n');
   runFrom('r-at-work', 'at-work-a1b2');
   runFrom('r-ended', 'ended-c3d4');
   const own = testEngine();
@@ -72,14 +70,12 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
       cards: [
         ['at-work-a1b2', 'running'],
         ['notes', 'filed'],
-        ['notes', 'filed'],
       ],
       ended: 1,
     });
     assert.deepEqual((await listed({ all: true })).cards, [
       ['at-work-a1b2', 'running'],
       ['ended-c3d4', 'failed'],
-      ['notes', 'filed'],
       ['notes', 'filed'],
     ]);
     assert.deepEqual(await listed({ selector: ['team=core'] }), { cards: [['at-work-a1b2', 'running']], ended: 1 });

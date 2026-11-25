@@ -6,7 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
-import { cardKey, dropRecord, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { cardKey, dropRecord, plantCard, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -29,7 +29,6 @@ import type { Env } from '../config/config.store.ts';
 const ROOT = scratch('wf-adopt-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const FACTORIES = path.join(ROOT, 'factories');
-const INBOX = path.join(ROOT, 'inbox');
 const { exportTemplate, reconciled } = programsAt(ROOT);
 /** `nemia` as a person types it: a verb the client holds run onto its handler (`told`); the rest by the CLI. */
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
@@ -112,12 +111,10 @@ async function aFinished(repo: string, factory: string) {
   return id;
 }
 
-/** A card filed for the factory `factory` and the workflow `workflow`, by its file in the inbox. */
+/** A card filed for the factory `factory` and the workflow `workflow`, its record planted: its name. */
 function card(name: string, factory: string, workflow: string) {
-  fs.mkdirSync(INBOX, { recursive: true });
-  const file = path.join(INBOX, `${name}.md`);
-  fs.writeFileSync(file, `---\nworkflow: ${workflow}\nfactory: ${factory}\n---\n\nCache the views.\n`);
-  return file;
+  plantCard(ROOT, name, `---\nworkflow: ${workflow}\nfactory: ${factory}\n---\n\nCache the views.\n`);
+  return name;
 }
 
 describe('a hand-made factory taken over by a template: previewed, written, its card started, its run kept, then applied', () => {

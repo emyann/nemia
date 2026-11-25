@@ -199,6 +199,16 @@ export function storedKeys(prefix: string) {
 }
 
 /**
+ * `text` planted at `key` of the store `root`, over what is there: a record a page writes as no verb would, and takes back by its key.
+ * @param root The store's root folder.
+ * @param key The record's key.
+ * @param text What it holds.
+ */
+export function storeRecordAt(root: string, key: string, text: string) {
+  inApi('t.plantRecord(input.root, input.key, input.text);', { root, key, text });
+}
+
+/**
  * The record at `key` taken out of the seeded store, there or not.
  * @param key The record's key.
  */

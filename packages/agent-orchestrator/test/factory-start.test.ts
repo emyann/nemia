@@ -914,7 +914,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         [run.brief, run.factory, run.workflowDir, run.context, run.from],
         ['Build it by name.', 'pipao', path.join(repo, 'workflows', 'build'), [before.id], { inbox: 'by-its-name' }],
       );
-      assert.ok(fs.existsSync(card), 'the card is kept');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
       const flags = ['--factory', 'pipao', '--workflows', build, '--no-worktree'];
       const text = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
       assert.deepEqual([text.brief, 'from' in text], ['no-such-card', false], 'a name no card has stays a text brief');
@@ -938,7 +938,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         path.basename(first),
         path.basename(second),
       );
-      assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is left in the inbox');
       attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'build', repo: path.basename(second) });
       const wired = await runPlaced(startFromInbox({ name: 'in-duo', workflow: 'build', callerRepo: first, isolate: false }));
       assert.deepEqual([runRecord(ROOT, wired.run.id).repo, wired.run.factory], [second, 'duo']);
@@ -1002,7 +1002,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         '--factory <name>',
         'pipao',
       );
-      assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is left in the inbox');
     },
   );
   s.test(
@@ -1018,7 +1018,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         'pipao',
         '--factory <name>',
       );
-      assert.ok(fs.existsSync(card), 'the card stays in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card stays in the inbox');
       const flagged = runRecord(
         ROOT,
         startedId(await startTypedFrom(repo, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree'])),

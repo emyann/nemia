@@ -43,6 +43,7 @@ import {
   setStore,
   standingPass,
   store,
+  storeRecordAt,
   storeTakenUp,
   WEB,
 } from './world.ts';
@@ -154,20 +155,27 @@ export type AgentHolder = { kind: 'agent'; agent: string; factory: string | null
 
 /**
  * A standing token minted on the store `root` under `name`, its record written by hand as the package's token store writes it
- * (`mintPersonToken`): `person-tokens/<sha-256 of the token>.json`, its name, when it was minted and, for an agent's, its `holder`,
- * readable by its owner alone. With no holder it is the person's. The web imports no package. Answers the token, which the store keeps
- * only the digest of; the record is the caller's to take back.
+ * (`mintPersonToken`): its name, when it was minted and, for an agent's, its `holder`, kept by the sha-256 of the token. `asFile` drops it
+ * as a store of before the keyspace kept one, `person-tokens/<digest>.json`, readable by its owner alone, which the seed's take-up
+ * (`storeTakenUp`) imports; else it is planted at `/registry/persontokens/<digest>`, the record a page takes back by its key
+ * (`dropStoredKey`). With no holder it is the person's. The web imports no package. Answers the token, which the store keeps only the
+ * digest of.
+ * @param root The store's root folder.
+ * @param name The token's name.
+ * @param holder The agent that holds it, where it is not the person's.
+ * @param asFile Whether it is dropped as a file of before rather than planted as a record.
  */
-export function mintPersonToken(root: string, name: string, holder?: AgentHolder) {
+export function mintPersonToken(root: string, name: string, holder?: AgentHolder, asFile = false) {
   const token = crypto.randomBytes(32).toString('base64url');
+  const digest = crypto.createHash('sha256').update(token).digest('hex');
+  const record = JSON.stringify({ name, createdAt: new Date().toISOString(), ...(holder ? { holder } : {}) });
+  if (!asFile) {
+    storeRecordAt(root, `/registry/persontokens/${digest}`, record);
+    return token;
+  }
   const dir = path.join(root, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const digest = crypto.createHash('sha256').update(token).digest('hex');
-  fs.writeFileSync(
-    path.join(dir, `${digest}.json`),
-    `${JSON.stringify({ name, createdAt: new Date().toISOString(), ...(holder ? { holder } : {}) })}\n`,
-    { mode: 0o600 },
-  );
+  fs.writeFileSync(path.join(dir, `${digest}.json`), `${record}\n`, { mode: 0o600 });
   return token;
 }
 
@@ -212,7 +220,7 @@ export function seedStore(root: string) {
   seedFolder(root);
   seedFactories(root, checkout);
   seedFeed(root);
-  setSeatToken(mintPersonToken(root, SEAT_TOKEN));
+  setSeatToken(mintPersonToken(root, SEAT_TOKEN, undefined, true));
 }
 
 /**

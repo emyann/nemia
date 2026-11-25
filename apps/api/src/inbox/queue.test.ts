@@ -38,7 +38,16 @@ import {
   type StoreRoot,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
-import { cardNames, cardText as heldText, emptyCards, emptyRuns, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import {
+  cardNames,
+  cardText as heldText,
+  emptyCards,
+  emptyRuns,
+  plantCard,
+  plantRecord,
+  runKey,
+  runsNow,
+} from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
@@ -68,7 +77,6 @@ const base = git('rev-parse', 'HEAD').trim();
 
 type Ceilings = import('../gauges/ceilings.ts').Ceilings;
 
-const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** Every card, try, record, journal and the tick's ceilings gone, so each test starts from an empty store. */
@@ -270,8 +278,8 @@ describe("a person queues cards, reads their order and the tick's tries, and tak
     const older = onStore(addToInbox({ text: 'Filed an hour ago', workflow: 'dev' }));
     const newer = onStore(addToInbox({ text: 'Filed a minute ago', workflow: 'dev' }));
     const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
-    fs.utimesSync(older.file, hourAgo, hourAgo);
-    fs.utimesSync(newer.file, minuteAgo, minuteAgo);
+    plantCard(root, older.card.name, heldText(root, older.card.name) ?? '', hourAgo.toISOString());
+    plantCard(root, newer.card.name, heldText(root, newer.card.name) ?? '', minuteAgo.toISOString());
     const filedAt = async () => new Map((await listed()).map((c) => [c.metadata.name, c.metadata.creationTimestamp]));
     const before = await filedAt();
     assert.deepEqual([before.get(older.card.name), before.get(newer.card.name)], [hourAgo.toISOString(), minuteAgo.toISOString()]);
@@ -294,11 +302,7 @@ describe("a person queues cards, reads their order and the tick's tries, and tak
     async () => {
       clear();
       const about = scratch('nemia-api-queue-gone-');
-      fs.mkdirSync(inbox, { recursive: true });
-      fs.writeFileSync(
-        path.join(inbox, 'about-a-deleted-repo-k2q9.md'),
-        `---\nworkflow: dev\nrepo: ${about}\n---\nAbout a repository deleted\n`,
-      );
+      plantCard(root, 'about-a-deleted-repo-k2q9', `---\nworkflow: dev\nrepo: ${about}\n---\nAbout a repository deleted\n`);
       const card = { name: 'about-a-deleted-repo-k2q9' };
       onStore(queueInInbox(card.name));
       fs.rmSync(about, { recursive: true, force: true });
@@ -324,7 +328,7 @@ describe('the queue verbs: what a queue or a take-back refuses, writing nothing'
     const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
     plantRecord(root, runKey('started-run-k2q9'), startedFrom('started-run-k2q9', started.name));
-    fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: broken\nworkflow: dev\n---\nWait for it.\n');
+    plantCard(root, 'broken', '---\nafter: broken\nworkflow: dev\n---\nWait for it.\n');
     const before = inboxAsIs();
 
     for (const [name, status, off] of [
@@ -349,17 +353,16 @@ describe('the queue verbs: what a queue or a take-back refuses, writing nothing'
       ENV.WF_DEFAULT_FACTORY_STARTS = was;
     });
     clear();
-    fs.mkdirSync(inbox, { recursive: true });
-    fs.writeFileSync(path.join(inbox, 'loose.md'), '---\nworkflow: dev\n---\nSomewhere.\n');
-    fs.writeFileSync(path.join(inbox, 'placed.md'), '---\nworkflow: dev\nfactory: mill\n---\nIn the mill.\n');
-    fs.writeFileSync(path.join(inbox, 'older.md'), '---\nworkflow: dev\nqueued: 2026-09-16T09:01:00.000Z\n---\nQueued before the rule.\n');
+    plantCard(root, 'loose', '---\nworkflow: dev\n---\nSomewhere.\n');
+    plantCard(root, 'placed', '---\nworkflow: dev\nfactory: mill\n---\nIn the mill.\n');
+    plantCard(root, 'older', '---\nworkflow: dev\nqueued: 2026-09-16T09:01:00.000Z\n---\nQueued before the rule.\n');
     const before = inboxAsIs();
 
     const refused = await queue('loose');
     assert.equal(refused.status, 422);
     const { error } = (await refused.json()) as { error: string };
     assert.equal(error, refusalOf('loose'));
-    for (const fact of ['inbox/loose.md: ', 'names no factory', 'nemia inbox queue loose.'])
+    for (const fact of ['nemia get card loose: ', 'names no factory', 'nemia inbox queue loose.'])
       assert.ok(error.includes(fact), `${fact}: ${error}`);
     assert.ok(error.endsWith('Nothing was queued.'), error);
     assert.deepEqual(inboxAsIs(), before);

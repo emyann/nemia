@@ -607,8 +607,8 @@ is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/r
 and a name, rooted as the Factory door is: records of the keyspace (`ledgerRecords`, `/registry/revisions/<kind>/<name>`, an append
 read and written in one transaction; the files of before, `revisions/<kind>/<name>.json`, imported once by `LEDGER_FILES`) and a memory stand-in (`ledgerDoorMemory`, `src/revisions/memory.store.ts`, in `STAND_INS`), held to one
 table of walks (`test/ledger-walks.ts`). An append is checked by the model's `Revision` (`src/revisions/revisions.model.ts`) before it is
-numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a record that does not read as a list of revisions is refused
-`Invalid`, nothing numbered.
+numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a record that does not read as a list of revisions reads as an
+empty ledger, an append to it refused `Invalid`, nothing numbered.
 
 **The Feed door.** The feed is read and appended to through `FeedDoor` (`packages/agent-orchestrator/src/feed/feed.store.ts`), one
 group of lines, append-only, rooted as the Factory door is: the files (`feedFiles(home)`, `<root>/feed.jsonl`, its end the file's size

@@ -356,7 +356,7 @@ describe('POST /api/runs with `card`: what a start of a card refuses, writing no
     const { card: started } = onStore(addToInbox({ text: 'Started once' }));
     plantRecord(root, runKey('started-once-k2q9'), startedFrom('started-once-k2q9', started.name));
     const { card } = onStore(addToInbox({ text: 'Not started' }));
-    write(path.join(inbox, 'broken.md'), '---\nafer: dev\n---\nMisspelt.\n');
+    plantCard(root, 'broken', '---\nafer: dev\n---\nMisspelt.\n');
     const before = runFiles();
 
     const again = await startCard({ workflow: 'dev', card: started.name, brief: 'Do it again.' });
@@ -538,7 +538,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       assert.equal(nobodys.workflow, 'nope', 'out of a factory, a name is filed as it is: no repository is looked at to find it');
 
       const old = new Date('2026-09-01T10:00:00.000Z');
-      fs.utimesSync(filed.file, old, old);
+      plantCard(root, filed.name, cardText(root, filed.name) ?? '', old.toISOString());
       const entries = await listed();
       assert.equal(entries.length, 7);
       const bareEntry = entries.find((e) => e.name === filed.name)!;
@@ -573,7 +573,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     async () => {
       clear();
       const elsewhere = scratch('nemia-api-inbox-elsewhere-');
-      write(path.join(inbox, 'from-before-k2q9.md'), `---\nworkflow: dev\nrepo: ${elsewhere}/\n---\nFiled before repo: was retired\n`);
+      plantCard(root, 'from-before-k2q9', `---\nworkflow: dev\nrepo: ${elsewhere}/\n---\nFiled before repo: was retired\n`);
       const entry = (await listed()).find((e) => e.name === 'from-before-k2q9');
       assert.deepEqual([entry?.repo, entry?.workflow], [`${elsewhere}/`, 'dev'], 'an old card still reads, its `repo:` listed');
       const started = await startCard({ card: 'from-before-k2q9' });
@@ -585,11 +585,10 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     },
   );
   s.test(
-    'GET /api/cards lists a card that does not read with its refusal and no body, a card started with its run, an entry that is no markdown file with why, and reads the folder on each request',
+    'GET /api/cards lists a card that does not read with its refusal and no body, a card started with its run, and reads the store on each request',
     async () => {
       clear();
-      write(path.join(inbox, 'broken.md'), '---\nafter: broken\n---\nWait for it.\n');
-      write(path.join(inbox, 'notes.txt'), 'not a card\n');
+      plantCard(root, 'broken', '---\nafter: broken\n---\nWait for it.\n');
       const { card } = onStore(addToInbox({ text: 'Started at the command line' }));
       plantRecord(root, runKey('started-run-k2q9'), startedFrom('started-run-k2q9', card.name));
 
@@ -597,13 +596,6 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       const broken = entries.find((e) => e.name === 'broken')!;
       assert.match(broken.error!, /^broken\.md: `after: broken` names the card itself/);
       assert.deepEqual([broken.body, broken.title, typeof broken.filedAt], [null, null, 'string']);
-      const stray = entries.find((e) => e.name === 'notes.txt');
-      const whyGiven = typeof stray?.error === 'string';
-      assert.deepEqual(
-        [whyGiven, typeof stray?.filedAt],
-        [true, 'string'],
-        'an entry that is no markdown file is listed under its file, with why, dated when it was written',
-      );
       const started = entries.find((e) => e.name === card.name)!;
       assert.deepEqual(
         [started.startedAs, started.state],
@@ -625,8 +617,8 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     async () => {
       clear();
       const text = `---\nworkflow: dev\nrepo: ${repo}\n---\n# Cache the views\n\n- between passes\n- per task\n`;
-      write(path.join(inbox, 'cache-the-views-k2q9.md'), text);
-      write(path.join(inbox, 'bare-idea-a1b2.md'), 'A bare idea\n');
+      plantCard(root, 'cache-the-views-k2q9', text);
+      plantCard(root, 'bare-idea-a1b2', 'A bare idea\n');
       const before = inboxFiles();
 
       const res = await cardPage('cache-the-views-k2q9');
@@ -649,7 +641,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       assert.deepEqual([bare.spec.body, bare.status.source], ['A bare idea', 'A bare idea\n']);
       assert.deepEqual(Object.keys(bare.spec), ['body'], 'a card that sets no key: no key in its spec');
 
-      write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
+      plantCard(root, 'broken', '---\ncolour: red\n---\nPaint it.\n');
       const broken = (await (await cardPage('broken')).json()) as Card;
       assert.match(broken.status.error ?? '', /^broken\.md: `colour` is not a key an inbox card has/);
       assert.deepEqual(
@@ -985,8 +977,8 @@ test("a card started through its factory's namespace runs in that factory, on th
   clear();
   const { dev: acmeDev, repo: acmeRepo, gone } = acmeFactory();
   t.onTestFinished(gone);
-  write(path.join(inbox, 'by-its-own.md'), "---\nworkflow: dev\nfactory: acme\n---\nRun on the card's own workflow\n");
-  write(path.join(inbox, 'by-the-start.md'), '---\nfactory: acme\n---\nRun on the workflow the start names\n');
+  plantCard(root, 'by-its-own', "---\nworkflow: dev\nfactory: acme\n---\nRun on the card's own workflow\n");
+  plantCard(root, 'by-the-start', '---\nfactory: acme\n---\nRun on the workflow the start names\n');
   const start = (name: string, body: Record<string, unknown>) =>
     app.request(`/api/namespaces/acme/cards/${name}/start`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
 

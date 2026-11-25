@@ -20,7 +20,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
-import { cardKey, dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -29,14 +29,11 @@ const { app } = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defa
 const WatchEvent = watchEventOf(WatchedObject);
 type WatchEvent = typeof WatchEvent.Type;
 
-const inbox = path.join(root, 'inbox');
-
-/** A card filed by hand in `default`, with the labels given in its front matter. */
+/** A card filed by hand in `default`, with the labels given in its front matter, its record planted over what is there. */
 const card = (name: string, labels: Record<string, string> = {}) => {
-  fs.mkdirSync(inbox, { recursive: true });
   const keys = Object.entries(labels);
   const front = keys.length ? `---\nlabels: { ${keys.map(([k, v]) => `${k}: ${v}`).join(', ')} }\n---\n` : '';
-  fs.writeFileSync(path.join(inbox, `${name}.md`), `${front}Do ${name}.\n`);
+  plantCard(root, name, `${front}Do ${name}.\n`);
 };
 
 card('w-1', { team: 'core' });

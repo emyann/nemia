@@ -91,14 +91,18 @@ const PREFIX = '/registry/revisions/';
 /** The key a kind and name's entries are kept at, its name escaped (`encodeURIComponent`). */
 const keyOf = ({ kind, name }: RevisionOf) => `${PREFIX}${kind}/${encodeURIComponent(name)}`;
 
+/** The entries the text of a ledger's record holds, or none where it does not read as a list. */
+const listIn = (text: string) =>
+  Option.map(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text), (list) => list.filter(isRevision));
+
 /**
- * The entries the ledger at `key` holds, as `entries.of` reads them: refused `Invalid` where its record holds no list, so a ledger that
- * does not read is never numbered again from 1.
+ * The entries the ledger at `key` holds, as an append reads them: refused `Invalid` where its record holds no list, which `entries.of`
+ * reads as an empty ledger, so a ledger that does not read is never numbered again from 1.
  */
 const entriesIn = (key: string, text: string) => {
-  const read = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text);
+  const read = listIn(text);
   return Option.isSome(read)
-    ? Effect.succeed(read.value.filter(isRevision))
+    ? Effect.succeed(read.value)
     : Effect.fail(
         new Invalid({
           message: `the ledger at ${key} does not read as a list of revisions: nothing was numbered. Say so to whoever keeps this nemia.`,
@@ -119,7 +123,7 @@ export function ledgerRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effe
         Effect.gen(function* () {
           const keyspace = yield* held;
           const record = keyspace === undefined ? undefined : yield* keyspace.get(keyOf(of));
-          return record === undefined ? [] : yield* entriesIn(record.key, record.value);
+          return record === undefined ? [] : Option.getOrElse(listIn(record.value), () => []);
         }),
       append: (of, hash, at) =>
         Effect.gen(function* () {

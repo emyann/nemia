@@ -99,13 +99,31 @@ export function idle(root: string, outside: Outside[] = OUTSIDE) {
     .map(({ file, size }) => `${file} (${size})`);
 }
 
+/** The size each of the kit's type primitives draws when its tag names none. */
+const SIZED = { Display: 'large', Headline: 'large', Title: 'large', Label: 'medium', Body: 'medium' } as const;
+
+/**
+ * Each class string of `text`: every quoted one, and each type primitive's `className` with the role its tag draws written before it, as
+ * the primitive draws it (`<Label size="large" className="uppercase">` is `text-label-large uppercase`), so a weight or a face set
+ * beside a primitive's role is read as beside a role written by hand.
+ * @param text a source file's text.
+ */
+export function classStrings(text: string) {
+  const quoted = [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)].map(([, , classes]) => classes ?? '');
+  const drawn = [...text.matchAll(/<(Display|Headline|Title|Label|Body)\b((?:[^>{]|\{[^}]*\})*)>/g)].flatMap(([, primitive, attrs]) => {
+    const classes = /\bclassName="([^"]*)"/.exec(attrs ?? '')?.[1];
+    const role = primitive as keyof typeof SIZED;
+    const size = /\bsize="(small|medium|large)"/.exec(attrs ?? '')?.[1] ?? SIZED[role];
+    return classes === undefined ? [] : [`text-${role.toLowerCase()}-${size} ${classes}`];
+  });
+  return [...quoted, ...drawn];
+}
+
 const WEIGHTED = /(?<![\w-])text-(?:label|title|headline|display)-(?:small|medium|large)(?![\w-])/;
 
 /** Each class string of `text` that sets mono text in a role carrying a weight: the face has one, and the browser would draw the rest. */
 export function monoWeighted(text: string) {
-  return [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)]
-    .map(([, , classes]) => classes ?? '')
-    .filter((classes) => /(?<![\w-])font-mono(?![\w-])/.test(classes) && WEIGHTED.test(classes));
+  return classStrings(text).filter((classes) => /(?<![\w-])font-mono(?![\w-])/.test(classes) && WEIGHTED.test(classes));
 }
 
 const LABELLED = /(?<![\w-])text-(?:label|title)-(?:small|medium|large)(?![\w-])/;
@@ -113,13 +131,17 @@ const BY_HAND = /(?<![\w-])(?:font-(?:thin|extralight|light|normal|medium|semibo
 
 /** Each class string of `text` that writes a weight or a tracking beside a label or title role: the role gives both. */
 export function dressed(text: string) {
-  return [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)]
-    .map(([, , classes]) => classes ?? '')
-    .filter((classes) => LABELLED.test(classes) && BY_HAND.test(classes));
+  return classStrings(text).filter((classes) => LABELLED.test(classes) && BY_HAND.test(classes));
 }
 
 /** The class strings that keep a weight beside their role, each in its file alone, with its reason. */
-export const DRESSED: { file: string; classes: string; why: string }[] = [];
+export const DRESSED: { file: string; classes: string; why: string }[] = [
+  {
+    file: 'src/components/look/Plate.tsx',
+    classes: 'text-label-large m-0 font-label font-extrabold uppercase',
+    why: "a plate's title stands beside its numeral in the label face (Archivo, weight 800), as the Runs page settled it",
+  },
+];
 
 /** Every class string of `root`'s `src` outside the kit that `dressed` finds and `kept` lists not for its file, as `file (classes)`. */
 export function dressedIn(root: string, kept = DRESSED) {
@@ -237,6 +259,8 @@ test('REFUSED: mono text in a role that carries a weight: mono takes a body role
   assert.deepEqual(monoWeighted("cn('truncate text-title-medium font-mono', x)"), ['truncate text-title-medium font-mono']);
   assert.deepEqual(monoWeighted('<a className="font-mono text-body-small uppercase">'), []);
   assert.deepEqual(monoWeighted('<a className="font-monospace text-label-small"><b className="text-label-small">'), []);
+  assert.deepEqual(monoWeighted('<Title size="medium" component="h2" className="font-mono">'), ['text-title-medium font-mono']);
+  assert.deepEqual(monoWeighted('<Body size="small" className="font-mono">'), []);
   for (const file of sources(WEB))
     assert.deepEqual(monoWeighted(fs.readFileSync(path.join(WEB, file), 'utf8')), [], `${file}: mono text takes a body role`);
 });
@@ -244,6 +268,8 @@ test('REFUSED: mono text in a role that carries a weight: mono takes a body role
 test('REFUSED: a weight or a tracking written beside a label or title role: the role gives both', () => {
   assert.deepEqual(dressed('<a className="text-label-small font-semibold uppercase">'), ['text-label-small font-semibold uppercase']);
   assert.deepEqual(dressed("cn('tracking-wide text-label-medium', x)"), ['tracking-wide text-label-medium']);
+  assert.deepEqual(dressed('<Label component="span" className="font-bold uppercase">'), ['text-label-medium font-bold uppercase']);
+  assert.deepEqual(dressed('<Label size={size} className={cn("x")}>'), []);
   assert.deepEqual(dressed('<h2 className="text-title-small hover:font-bold tracking-[0.06em]">').length, 1);
   assert.deepEqual(
     dressed('<a className="text-label-small uppercase leading-none"><b className="text-body-small font-medium tracking-wide">'),

@@ -18,6 +18,10 @@
  * acknowledges it and writes each `notifications/resources/updated` the views publish through its `notify` (views.ts); a 2025-era
  * server lists and reads them alone.
  *
+ * A modern call that declares MCP's tasks extension, of a tool whose link says a task (`LinkTask`, `objects`), is answered as a task the
+ * caller reads with `tasks/get` (tasks.ts): followed through the endpoint that reads what the call started, keeping nothing, or asked
+ * again and held in the port's memory; every other call is answered as before, the legacy era's always.
+ *
  * The caller's token is the gate's before this is reached (`callerGate`, caller/caller.ts: `/mcp` needs a person's). While a call is
  * pending, a client that gave a progress token is told progress at once, so its answer streams from its start, and then every 30 s
  * (`PROGRESS_EVERY_MS`), so a host that ends a silent call (`nemia wait`, up to four minutes and a half) hears it is alive.
@@ -44,6 +48,19 @@ import { FILES_EXTENSION, inlined } from './files.ts';
 import { fileRead, fileUriOf, linkOf } from './links.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
+import {
+  createdOf,
+  declaresTasks,
+  followedTask,
+  HELD_KEEP_MS,
+  HELD_MOST,
+  HELD_MOST_MS,
+  type HeldTasks,
+  heldTasks,
+  servesTasks,
+  TASKS_EXTENSION,
+  taskAnswerOf,
+} from './tasks.ts';
 import { type PortTool, portTools } from './tools.ts';
 import { type FeedViews, feedViews } from './views.ts';
 
@@ -59,8 +76,11 @@ export const PORT_LIST_TTL_MS = 300_000;
 /** What the port calls a tool's endpoint through: the app it is mounted on. */
 export type Fetching = { readonly fetch: (request: Request) => Response | Promise<Response> };
 
-/** The port's knobs: how often a pending call is told as progress (`PROGRESS_EVERY_MS` unless a test gives a shorter one). */
-export type PortOptions = { readonly progressEveryMs?: number };
+/**
+ * The port's knobs: how often a pending call is told as progress (`PROGRESS_EVERY_MS` unless a test gives a shorter one), and the most
+ * tasks it holds at work and how long each asks again (`HELD_MOST` and `HELD_MOST_MS`, tasks.ts, unless a test gives others).
+ */
+export type PortOptions = { readonly progressEveryMs?: number; readonly heldMost?: number; readonly heldBoundMs?: number };
 
 /** What the server says of itself on `initialize` and `server/discover`, beside its instructions (`PORT_INSTRUCTIONS`, instructions.ts). */
 const SERVER_INFO = { name: 'nemia', version: '1' };
@@ -238,6 +258,36 @@ export async function called(tool: PortTool, args: Readonly<Record<string, unkno
 }
 
 /**
+ * A call of `tool` with `args` answered as a task: a followed tool is called as before (`called`), its error answered as it is, then the
+ * thing its answer names read once (`followedTask`) — the read `tasks/get` makes — and answered as its task, or as before where that read
+ * finds none; a tool asked again is begun in `held`, and answered as its task.
+ * @param tool The tool called, whose link says its task.
+ * @param args The call's arguments, by key.
+ * @param from The request to the port that carried the call.
+ * @param app The app whose fetch answers the call.
+ * @param held The tasks the port holds in its memory.
+ * @param signal What aborts the call.
+ */
+export async function taskCalled(
+  tool: PortTool,
+  args: Readonly<Record<string, unknown>>,
+  from: Request,
+  app: Fetching,
+  held: HeldTasks,
+  signal: AbortSignal,
+) {
+  const task = tool.task;
+  if (task === null) return called(tool, args, from, app, signal);
+  if (task.kind === 'again')
+    return createdOf(held.start(task, args, from, (sent, sender, legSignal) => called(tool, sent, sender, app, legSignal)));
+  const result = await called(tool, args, from, app, signal);
+  const id = Predicate.isObject(result.structuredContent) ? result.structuredContent[task.id] : undefined;
+  if (result.isError === true || typeof id !== 'string') return result;
+  const read = await followedTask(`${tool.name}:${id}`, task, id, from, app);
+  return read.kind === 'task' ? createdOf(read.task) : result;
+}
+
+/**
  * A tool as `tools/list` says it: its name, description, input and hints, and nothing of how the port calls it. Its input is JSON by
  * construction (`Schema.toJsonSchemaDocument`, tools.ts), which the SDK's type says as JSON values where ours says `unknown`.
  */
@@ -292,25 +342,28 @@ function servesFeed(server: Server, views: FeedViews, appOf: () => Fetching) {
  * it says what Nemia is (`PORT_INSTRUCTIONS`) on `initialize` and on `server/discover`, lists `tools` in the order given, each list
  * cacheable by its caller alone for `PORT_LIST_TTL_MS` in the modern era, and answers a call through `app` (`called`), presenting the
  * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
- * go beside these.
+ * go beside these. In the modern era it declares the tasks extension and serves its methods (`servesTasks`, tasks.ts), and a call
+ * that declares it, of a tool whose link says a task, is answered as one where `taskAnswerOf` says so (`taskCalled`).
  * @param tools The port's tools, listed in this order.
  * @param appOf What gives the app a call is answered by.
  * @param progressEveryMs How often a call that asks for progress is told it, in milliseconds.
- * @param feed The era the request speaks and the feed's views, where the feed is offered as resources; none where it is not.
+ * @param feed The era the request speaks, the feed's views and the tasks the port holds, where the feed is offered as resources and
+ *   tasks are served; none where they are not.
  */
 export function portServer(
   tools: readonly PortTool[],
   appOf: () => Fetching,
   progressEveryMs: number,
-  feed?: { readonly era: Era; readonly views: FeedViews },
+  feed?: { readonly era: Era; readonly views: FeedViews; readonly held: HeldTasks },
 ) {
+  const modern = feed?.era === 'modern' ? feed : undefined;
   const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
   const list = tools.map(listed);
   const server = new Server(SERVER_INFO, {
     capabilities: {
       tools: {},
       ...(feed === undefined ? {} : { resources: feed.era === 'modern' ? { subscribe: true } : {} }),
-      extensions: FILES_EXTENSION,
+      extensions: modern === undefined ? FILES_EXTENSION : { ...FILES_EXTENSION, ...TASKS_EXTENSION },
     },
     instructions: PORT_INSTRUCTIONS,
     cacheHints: {
@@ -319,12 +372,22 @@ export function portServer(
     },
   });
   if (feed !== undefined) servesFeed(server, feed.views, appOf);
+  if (modern !== undefined) servesTasks(server, tools, appOf, modern.held);
   server.setRequestHandler('tools/list', () => ({ tools: list }));
   server.setRequestHandler('tools/call', async ({ params }, ctx) => {
     const tool = byName.get(params.name);
     if (tool === undefined) return failed(`${params.name} is no tool of this port: list them (tools/list) and call one of those`);
     const from = ctx.http?.req;
     if (from === undefined) return failed(`${tool.name} is called over HTTP alone: POST the call to the api's /mcp`);
+    const answer = taskAnswerOf({
+      era: feed?.era ?? 'legacy',
+      declared: declaresTasks(ctx.mcpReq.envelope),
+      kind: tool.task?.kind ?? 'none',
+      held: modern?.held.live() ?? 0,
+      most: modern?.held.most ?? 0,
+    });
+    if (answer === 'task' && modern !== undefined)
+      return taskCalled(tool, params.arguments ?? {}, from, appOf(), modern.held, ctx.mcpReq.signal);
     const call = Effect.promise(() => called(tool, params.arguments ?? {}, from, appOf(), ctx.mcpReq.signal));
     const token = ctx.mcpReq._meta?.progressToken;
     if (token === undefined) return Effect.runPromise(call);
@@ -458,16 +521,21 @@ export async function listened(request: Request, handler: McpHttpHandler, views:
  * entry, made once, a fresh `portServer` for each request. A modern request (its version in `_meta`, `server/discover` among them)
  * is answered as JSON, or as a stream where its call is told progress; a legacy one (`initialize`, then each request on its own)
  * by the SDK's stateless leg, which streams; a GET or a DELETE is a 405, as the port keeps no stream or session of its own. The tools
- * are generated once, as the handler is made, in the command table's order.
+ * are generated once, as the handler is made, in the command table's order, and the tasks it holds in its memory made once beside them
+ * (`heldTasks`, tasks.ts), which `liveTasks()` counts at work.
  * @param appOf What gives the app the port is mounted on.
  */
-export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVERY_MS }: PortOptions = {}) {
+export function mcpPort(
+  appOf: () => Fetching,
+  { progressEveryMs = PROGRESS_EVERY_MS, heldMost = HELD_MOST, heldBoundMs = HELD_MOST_MS }: PortOptions = {},
+) {
   const tools = portTools(TABLE, CLI_VERBS, Api);
   const views: FeedViews = feedViews(appOf, (uri) => handler.notify.resourceUpdated(uri));
-  const handler = createMcpHandler((ctx) => portServer(tools, appOf, progressEveryMs, { era: ctx.era, views }), {
+  const held = heldTasks({ most: heldMost, boundMs: heldBoundMs, keepMs: HELD_KEEP_MS });
+  const handler = createMcpHandler((ctx) => portServer(tools, appOf, progressEveryMs, { era: ctx.era, views, held }), {
     legacy: 'stateless',
     responseMode: 'auto',
   });
   const served = (c: Context) => listened(c.req.raw, handler, views);
-  return Object.assign(served, { liveViews: () => views.live() });
+  return Object.assign(served, { liveViews: () => views.live(), liveTasks: () => held.live() });
 }

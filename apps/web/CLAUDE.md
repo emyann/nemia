@@ -102,14 +102,12 @@ here.
   which pictures them in dark alone, and `--light` beside it when a light picture is asked for on purpose (`themesOf`, `e2e/pages.ts`);
   `ci` shards every page on the round's commit. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
   --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/stories/` or a runner file beside the
-  pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
-  its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`overBound`,
-  `pastTool`, `e2e/timing.ts`).
+  pages (`visit.ts`, `checks.ts`, `contrast.ts`). A run ends by naming its slowest pages and each worker's time, and refuses none of
+  it; a whole run's own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`pastTool`,
+  `e2e/timing.ts`).
 - `npm run e2e -- --shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist round-robin in their order (`shardOf`,
-  `e2e/pages.ts`): a run of some pages like `--pages`, so no whole run and held to no bound itself. It writes its page times to
-  `pages-<i>-of-<n>.json` where the pictures go (`$WF_ARTIFACTS`, else `.e2e/`), and `node test/e2e/pages-bound.ts <dir>…` sums every
-  shard's together against `PAGES_BOUND_MS` — the bound being the whole run's and additive — refusing a shard that is missing, doubled or
-  of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`); a shard runs no look test,
+  `e2e/pages.ts`): a run of some pages like `--pages`, so no whole run. CI runs the e2e in four shards (`.github/workflows/ci.yml`),
+  each saying its slowest pages in its own log; a shard runs no look test,
   and CI's `e2e-look` job runs them once (`--look`, refused beside `--shard`), its `e2e-stories` job every story beside it.
 - `npm run e2e -- --photos --contrast` visits light, then dark, and writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.

@@ -17,7 +17,21 @@ import {
 } from '../seed.ts';
 import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredRecord, OUT, runsHeld, store, storedRecord, storedRuns, storeRecord, takeBackRuns } from '../world.ts';
+import {
+  dropStoredCard,
+  dropStoredRecord,
+  OUT,
+  runsHeld,
+  store,
+  storeCard,
+  storedCard,
+  storedCardFiled,
+  storedCardNames,
+  storedRecord,
+  storedRuns,
+  storeRecord,
+  takeBackRuns,
+} from '../world.ts';
 
 /** A card on the Inbox page, by its name. */
 const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
@@ -67,10 +81,10 @@ export default {
    * The inbox: the seeded cards, newest first, and the queue; a card filed from the box into a factory, queued, unqueued, then removed
    * with its Remove; a card's start form, in the factory picked for it, preset from the card. Each in a page of its own: a card started,
    * which opens its run's page and stays listed, started; a card started already; an older card that names a repository, retired,
-   * whose start says the factory's own; stray files and a folder, each listed with why it is no card; an empty inbox; and a start, a
-   * remove and a queue each refused behind the page's back. Every start picks its factory first, and is sent with it and no repository
-   * (`expectInFactory`); the factory is made able to start its workflow for the page (`hiringStarts`). Every write is taken back, so
-   * every page after this one, in either theme, reads the store as seeded.
+   * whose start says the factory's own; stray files and a folder, none listed and each left where it is, beside a card dropped in as a
+   * file and taken up; an empty inbox; and a start, a remove and a queue each refused behind the page's back. Every start picks its
+   * factory first, and is sent with it and no repository (`expectInFactory`); the factory is made able to start its workflow for the page
+   * (`hiringStarts`). Every write is taken back, so every page after this one, in either theme, reads the store as seeded.
    */
   name: 'inbox',
   route: '/inbox',
@@ -96,7 +110,7 @@ async function visit(page: Page) {
     const order = (p: Page) => listed(p).evaluateAll((items) => items.map((item) => item.getAttribute('data-card')));
 
     const queuedByFiling = [QUEUE.third, QUEUE.refused, QUEUE.first].map((c) => c.name);
-    await expectCount(listed(page), 3 + QUEUED.length, `a card per file in the inbox: the ${3 + QUEUED.length} the store has`);
+    await expectCount(listed(page), 3 + QUEUED.length, `a card per card the store holds: the ${3 + QUEUED.length} it has`);
     if (JSON.stringify(await order(page)) !== JSON.stringify([bare.name, rich.name, planned.name, ...queuedByFiling])) {
       throw new Refused(
         `the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${rich.name}, then ${planned.name}, then the queued cards, filed before the rest, the last filed first, ${queuedByFiling.join(', ')} — and they were listed ${(await order(page)).join(', ')}`,
@@ -153,7 +167,7 @@ async function visit(page: Page) {
     );
     await expectVisible(refusedTry.getByText('It stays queued', { exact: false }), 'and that it stays queued');
     await expectVisible(
-      cardIn(page, QUEUE.third.name).locator('[data-tried="refused"]').getByText(unfactoredWhy(store!), { exact: false }),
+      cardIn(page, QUEUE.third.name).locator('[data-tried="refused"]').getByText(unfactoredWhy(), { exact: false }),
       `${QUEUE.third.name}, queued before a queue asked for a factory, says the tick refused its start for naming none`,
     );
     for (const card of [QUEUE.first, QUEUE.refused]) {
@@ -210,9 +224,9 @@ async function visit(page: Page) {
     const {
       metadata: { name },
     } = (await filed.json()) as { metadata: { name: string } };
-    const written = path.join(inbox, `${name}.md`);
+    const written = `nemia get card ${name}`;
     try {
-      const text = fs.existsSync(written) ? fs.readFileSync(written, 'utf8') : undefined;
+      const text = storedCard(name);
       const card = `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${FACTORY}\n---\n${FILED}\n`;
       if (text !== card)
         throw new Refused(
@@ -239,7 +253,7 @@ async function visit(page: Page) {
       } = (await queued.json()) as { spec: { queued: string }; status: { place?: number } };
       if (place !== QUEUED.length + 1)
         throw new Refused(`the card queued is behind the ${QUEUED.length} queued already — the api placed it ${place}`);
-      const queuedText = fs.readFileSync(written, 'utf8');
+      const queuedText = storedCard(name);
       if (queuedText !== queuedCardText({ workflow: WORKFLOWS.good.name, body: FILED }, at, undefined, FACTORY)) {
         throw new Refused(
           `the card is written as wf inbox queue writes it, queued: beside its factory — ${written} holds ${JSON.stringify(queuedText)}`,
@@ -263,8 +277,8 @@ async function visit(page: Page) {
         );
       await expectCount(fresh.locator('[data-queued]'), 0, 'Unqueue takes the card off the queue');
       await expectVisible(fresh.getByRole('button', { name: 'Queue', exact: true }), 'and it offers Queue again');
-      if (fs.readFileSync(written, 'utf8') !== card)
-        throw new Refused(`and the card is written as it was filed — ${written} holds ${JSON.stringify(fs.readFileSync(written, 'utf8'))}`);
+      if (storedCard(name) !== card)
+        throw new Refused(`and the card is written as it was filed — ${written} holds ${JSON.stringify(storedCard(name))}`);
       const [dropped] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'DELETE' && cardsPath(name).test(new URL(r.url()).pathname), {
           timeout: WAIT_MS,
@@ -274,16 +288,17 @@ async function visit(page: Page) {
       if (dropped.status() !== 200)
         throw new Refused(`the api drops the card, through the board's proxy — it answered ${dropped.status()}: ${await dropped.text()}`);
       await expectCount(cardIn(page, name), 0, 'Remove takes the card off the list');
-      if (fs.existsSync(written)) throw new Refused(`and out of the inbox — ${written} is still there`);
+      if (storedCard(name) !== null) throw new Refused(`and out of the inbox — ${written} still shows it`);
     } finally {
-      fs.rmSync(written, { force: true });
+      dropStoredCard(name);
     }
 
     {
-      const file = path.join(inbox, `${planned.name}.md`);
-      const [text, mtime] = [fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs];
-      fs.writeFileSync(file, inFactory(text));
-      fs.utimesSync(file, new Date(mtime), new Date(mtime));
+      const file = `nemia get card ${planned.name}`;
+      const kept = storedCardFiled(planned.name);
+      if (kept === null) throw new Refused(`the seed files ${planned.name} — ${file} shows no card`);
+      const { text, filedAt } = kept;
+      storeCard(planned.name, inFactory(text), filedAt);
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       const item = cardIn(page, planned.name);
@@ -306,9 +321,10 @@ async function visit(page: Page) {
             `${when}, ${planned.name} keeps its place and its filing time — it was ${JSON.stringify(before)}, and is ${JSON.stringify(now)}`,
           );
         }
-        if (fs.statSync(file).mtimeMs !== mtime)
+        const filedNow = storedCardFiled(planned.name)?.filedAt;
+        if (filedNow !== filedAt)
           throw new Refused(
-            `${when}, ${file} keeps its mtime, a queue being no edit of the idea — it was ${new Date(mtime).toISOString()}, and is ${fs.statSync(file).mtime.toISOString()}`,
+            `${when}, ${file} keeps when it was filed, a queue being no edit of the idea — it was ${filedAt}, and is ${filedNow}`,
           );
       };
       try {
@@ -330,9 +346,9 @@ async function visit(page: Page) {
         const {
           spec: { queued: at },
         } = (await queued.json()) as { spec: { queued: string } };
-        if (fs.readFileSync(file, 'utf8') !== queuedCardText(planned, at, checkout, FACTORY))
+        if (storedCard(planned.name) !== queuedCardText(planned, at, checkout, FACTORY))
           throw new Refused(
-            `${planned.name} is queued in its factory, ${FACTORY}, which the tick starts it in — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`,
+            `${planned.name} is queued in its factory, ${FACTORY}, which the tick starts it in — ${file} holds ${JSON.stringify(storedCard(planned.name))}`,
           );
         await settled(page);
         await photograph(page, path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), { fullPage: true });
@@ -348,11 +364,10 @@ async function visit(page: Page) {
         await expectCount(item.locator('[data-queued]'), 0, `Unqueue takes ${planned.name} off the queue`);
         await idle(page);
         await unmoved('taken off the queue');
-        if (fs.readFileSync(file, 'utf8') !== inFactory(text))
-          throw new Refused(`${planned.name} is written back as it was — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`);
+        if (storedCard(planned.name) !== inFactory(text))
+          throw new Refused(`${planned.name} is written back as it was — ${file} holds ${JSON.stringify(storedCard(planned.name))}`);
       } finally {
-        fs.writeFileSync(file, text);
-        fs.utimesSync(file, new Date(mtime), new Date(mtime));
+        storeCard(planned.name, text, filedAt);
       }
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -380,9 +395,10 @@ async function visit(page: Page) {
     await plannedItem.getByRole('button', { name: 'Close' }).click();
     await expectCount(startForm, 0, 'Close folds the start form away');
 
-    const cardFile = path.join(inbox, `${planned.name}.md`);
-    const cardText = fs.readFileSync(cardFile, 'utf8');
-    const cardTime = fs.statSync(cardFile).mtime;
+    const cardFile = `nemia get card ${planned.name}`;
+    const plannedKept = storedCardFiled(planned.name);
+    if (plannedKept === null) throw new Refused(`the seed files ${planned.name} — ${cardFile} shows no card`);
+    const { text: cardText, filedAt: cardTime } = plannedKept;
     const runsBefore = storedRuns();
     const starting = await page.context().newPage();
     try {
@@ -437,8 +453,8 @@ async function visit(page: Page) {
       };
       if (JSON.stringify(got) !== JSON.stringify(expected))
         throw new Refused(`the record is the card's start — it holds ${JSON.stringify(got)}, and should hold ${JSON.stringify(expected)}`);
-      if (!fs.existsSync(cardFile) || fs.readFileSync(cardFile, 'utf8') !== cardText)
-        throw new Refused(`the card stays in the inbox as it was once its run is written — ${cardFile} is gone or changed`);
+      if (storedCard(planned.name) !== cardText)
+        throw new Refused(`the card stays in the inbox as it was once its run is written — ${cardFile} shows it gone or changed`);
       await idle(starting);
       await starting.goto(page.url(), { waitUntil: 'load' });
       await idle(starting);
@@ -459,10 +475,7 @@ async function visit(page: Page) {
     } finally {
       await starting.close();
       takeBackRuns(runsBefore);
-      if (!fs.existsSync(cardFile)) {
-        fs.writeFileSync(cardFile, cardText);
-        fs.utimesSync(cardFile, cardTime, cardTime);
-      }
+      if (storedCard(planned.name) === null) storeCard(planned.name, cardText, cardTime);
     }
 
     const already = await page.context().newPage();
@@ -513,10 +526,9 @@ async function visit(page: Page) {
 
     const elsewhere = path.join(store!, 'hkb-v2');
     const elsewhereName = 'a-card-about-another-repo-e2e0';
-    const elsewhereFile = path.join(inbox, `${elsewhereName}.md`);
     const other = await page.context().newPage();
     try {
-      fs.writeFileSync(elsewhereFile, `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${elsewhere}\n---\nA card about another repository\n`);
+      storeCard(elsewhereName, `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${elsewhere}\n---\nA card about another repository\n`);
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       await idle(other);
@@ -543,56 +555,57 @@ async function visit(page: Page) {
         );
     } finally {
       await other.close();
-      fs.rmSync(elsewhereFile, { force: true });
+      dropStoredCard(elsewhereName);
     }
 
     const strayFile = path.join(inbox, 'notes.txt');
     const strayText = 'Not a card: notes kept beside the cards.\n';
     const folder = path.join(inbox, 'sub');
     const namedFile = path.join(inbox, 'notes');
+    const namedText = 'Not a card: notes beside the card of that name.\n';
     const namedCard = path.join(inbox, 'notes.md');
+    const taken = path.join(store!, 'imported', 'inbox');
+    const takenNow = () => (fs.existsSync(taken) ? fs.readdirSync(taken) : []);
+    const takenBefore = takenNow();
     const strays = await page.context().newPage();
     try {
       fs.writeFileSync(strayFile, strayText);
       fs.mkdirSync(folder);
-      fs.writeFileSync(namedFile, 'Not a card: notes beside the card of that name.\n');
+      fs.writeFileSync(namedFile, namedText);
       fs.writeFileSync(namedCard, 'Notes, as a card\n');
       const { problems } = watch(strays);
       await strays.goto(page.url(), { waitUntil: 'load' });
       await idle(strays);
-      const sub = cardIn(strays, 'sub/');
-      await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
-      await expectCount(
-        sub.getByRole('link'),
-        0,
-        'and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed',
-      );
       const named = cardIn(strays, 'notes');
-      await expectCount(named, 2, 'a card and a stray file of one name are both listed, under that name');
-      const namedStray = named.filter({ hasText: 'notes: not a card' });
-      await expectVisible(namedStray, 'the stray is listed with why it is not a card');
-      await expectCount(
-        namedStray.getByRole('link'),
-        0,
-        "and has no page: /inbox/notes is notes.md, so a link would open the card's page under the stray's name",
-      );
+      await expectCount(named, 1, 'the card dropped into the inbox as notes.md is listed once, under its name, and the stray notes is not');
       await expectVisible(
-        named.filter({ has: strays.locator('[data-title]') }).locator('a[href="/inbox/notes"]', { hasText: 'Notes, as a card' }),
-        'and the card of that name keeps the page, which is the one the api reads',
+        named.locator('a[href="/inbox/notes"]', { hasText: 'Notes, as a card' }),
+        'and the card keeps its page, which is the one the api reads',
       );
-
-      await photograph(strays, path.join(OUT, `inbox-strays-list-${await themeOf(strays)}.png`), { fullPage: true });
-      const notes = cardIn(strays, 'notes.txt');
-      await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
-      await notes.getByRole('link', { name: 'notes.txt' }).click();
-      await strays.waitForURL('**/inbox/notes.txt', { timeout: WAIT_MS });
-      await expectVisible(strays.getByText(/^notes\.txt: not a card/), "the stray file's page says why it is not a card");
-      await expectCount(strays.locator('section[aria-label="Keys"]'), 0, 'and lays out no keys');
-      await strays.getByRole('button', { name: 'Source' }).click();
-      const shown = await strays.locator('pre[data-source]').textContent();
-      if (shown !== strayText) throw new Refused(`the stray file's Source is the file as written — it shows ${JSON.stringify(shown)}`);
+      await expectCount(listed(strays), 4 + QUEUED.length, 'the inbox lists the seeded cards and notes, and no stray beside them');
+      for (const stray of ['notes.txt', 'sub/', 'sub'])
+        await expectCount(cardIn(strays, stray), 0, `${stray}, which names no card, is not listed`);
+      await expectCount(
+        strays.locator('section[aria-label="Cards"]').getByText(/not a card/),
+        0,
+        'and no entry of the inbox is listed with why it is not a card',
+      );
+      if (storedCard('notes') !== 'Notes, as a card\n')
+        throw new Refused(
+          `notes.md, dropped into the inbox, is taken up as the card notes — nemia get card notes shows ${JSON.stringify(storedCard('notes'))}`,
+        );
+      if (fs.existsSync(namedCard)) throw new Refused(`and the file taken up is moved out of the inbox — ${namedCard} is still there`);
+      if (!takenNow().some((file) => /^notes\.md(\.\d+)?$/.test(file) && !takenBefore.includes(file)))
+        throw new Refused(`and kept, moved aside under ${taken}, never deleted — it holds ${takenNow().join(', ')}`);
+      const left = {
+        'notes.txt': fs.existsSync(strayFile) ? fs.readFileSync(strayFile, 'utf8') : null,
+        notes: fs.existsSync(namedFile) ? fs.readFileSync(namedFile, 'utf8') : null,
+        'sub/': fs.existsSync(folder) && fs.statSync(folder).isDirectory(),
+      };
+      if (JSON.stringify(left) !== JSON.stringify({ 'notes.txt': strayText, notes: namedText, 'sub/': true }))
+        throw new Refused(`the strays stay in the inbox as they were, neither taken up nor moved — ${inbox} holds ${JSON.stringify(left)}`);
       await settled(strays);
-      await photograph(strays, path.join(OUT, `inbox-strays-${await themeOf(strays)}.png`), { fullPage: true });
+      await photograph(strays, path.join(OUT, `inbox-strays-list-${await themeOf(strays)}.png`), { fullPage: true });
       await idle(strays);
       const seen = problems();
       if (seen.length)
@@ -605,12 +618,14 @@ async function visit(page: Page) {
       fs.rmSync(folder, { recursive: true, force: true });
       fs.rmSync(namedFile, { force: true });
       fs.rmSync(namedCard, { force: true });
+      for (const file of takenNow()) if (!takenBefore.includes(file)) fs.rmSync(path.join(taken, file), { force: true });
+      dropStoredCard('notes');
     }
 
-    const aside = path.join(store!, 'inbox-aside');
+    const held = storedCardNames().map((name) => ({ name, kept: storedCardFiled(name) }));
     const empty = await page.context().newPage();
     try {
-      fs.renameSync(inbox, aside);
+      for (const { name } of held) dropStoredCard(name);
       const { problems } = watch(empty);
       await empty.goto(page.url(), { waitUntil: 'load' });
       await idle(empty);
@@ -629,10 +644,7 @@ async function visit(page: Page) {
         throw new Refused(`no console error and no failed request on an empty inbox — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
       await empty.close();
-      if (fs.existsSync(aside)) {
-        fs.rmSync(inbox, { recursive: true, force: true });
-        fs.renameSync(aside, inbox);
-      }
+      for (const { name, kept } of held) if (kept !== null) storeCard(name, kept.text, kept.filedAt);
     }
 
     const rereadOf = (p: Page) =>
@@ -647,8 +659,8 @@ async function visit(page: Page) {
         );
     };
 
-    const bareFile = path.join(inbox, `${bare.name}.md`);
-    const bareAside = path.join(store!, `${bare.name}.md.aside`);
+    const bareKept = storedCardFiled(bare.name);
+    if (bareKept === null) throw new Refused(`the seed files ${bare.name} — nemia get card ${bare.name} shows no card`);
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
@@ -667,7 +679,7 @@ async function visit(page: Page) {
       if ((await bareBrief.inputValue()) !== bare.body)
         throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await bareBrief.inputValue())}`);
       const before = runsHeld();
-      fs.renameSync(bareFile, bareAside);
+      dropStoredCard(bare.name);
       const reread = rereadOf(refused);
       const [answered] = await Promise.all([
         refused.waitForResponse((r) => r.request().method() === 'POST' && cardsPath(bare.name, 'start').test(new URL(r.url()).pathname), {
@@ -711,10 +723,9 @@ async function visit(page: Page) {
       onlyRefusal(refused, problems(), answered);
     } finally {
       await refused.close();
-      if (fs.existsSync(bareAside)) fs.renameSync(bareAside, bareFile);
+      if (storedCard(bare.name) === null) storeCard(bare.name, bareKept.text, bareKept.filedAt);
     }
 
-    const plannedAside = path.join(store!, `${planned.name}.md.aside`);
     const unremoved = await page.context().newPage();
     try {
       const { problems } = watch(unremoved);
@@ -722,7 +733,7 @@ async function visit(page: Page) {
       await idle(unremoved);
       const item = cardIn(unremoved, planned.name);
       await expectVisible(item.getByRole('button', { name: 'Remove' }), `${planned.name} offers Remove`);
-      fs.renameSync(cardFile, plannedAside);
+      dropStoredCard(planned.name);
       const reread = rereadOf(unremoved);
       const [answered] = await Promise.all([
         unremoved.waitForResponse((r) => r.request().method() === 'DELETE' && cardsPath(planned.name).test(new URL(r.url()).pathname), {
@@ -758,7 +769,7 @@ async function visit(page: Page) {
       onlyRefusal(unremoved, problems(), answered);
     } finally {
       await unremoved.close();
-      if (fs.existsSync(plannedAside)) fs.renameSync(plannedAside, cardFile);
+      if (storedCard(planned.name) === null) storeCard(planned.name, cardText, cardTime);
     }
 
     const conflicted = await page.context().newPage();
@@ -836,12 +847,12 @@ async function visit(page: Page) {
       dropStoredRecord(STARTED_AS);
     }
 
-    const plannedText = fs.readFileSync(cardFile, 'utf8');
-    const plannedTime = fs.statSync(cardFile).mtime;
+    const plannedNow = storedCardFiled(planned.name);
+    if (plannedNow === null) throw new Refused(`${planned.name} is put back after each page — ${cardFile} shows no card`);
+    const { text: plannedText, filedAt: plannedTime } = plannedNow;
     const requeued = await page.context().newPage();
     try {
-      fs.writeFileSync(cardFile, inFactory(plannedText));
-      fs.utimesSync(cardFile, plannedTime, plannedTime);
+      storeCard(planned.name, inFactory(plannedText), plannedTime);
       const { problems } = watch(requeued);
       await requeued.goto(page.url(), { waitUntil: 'load' });
       await idle(requeued);
@@ -856,10 +867,8 @@ async function visit(page: Page) {
       const behind = ((await elsewhere.json()) as { spec?: { queued?: string } }).spec?.queued;
       if (elsewhere.status !== 200 || !behind)
         throw new Refused(`another tab queues ${planned.name} through the api — it answered ${elsewhere.status}`);
-      if (fs.readFileSync(cardFile, 'utf8') !== queuedCardText(planned, behind, checkout, FACTORY))
-        throw new Refused(
-          `the card is queued behind the page's back — ${cardFile} holds ${JSON.stringify(fs.readFileSync(cardFile, 'utf8'))}`,
-        );
+      if (storedCard(planned.name) !== queuedCardText(planned, behind, checkout, FACTORY))
+        throw new Refused(`the card is queued behind the page's back — ${cardFile} holds ${JSON.stringify(storedCard(planned.name))}`);
       const reread = rereadOf(requeued);
       const [answered] = await Promise.all([
         requeued.waitForResponse(
@@ -904,8 +913,7 @@ async function visit(page: Page) {
       onlyRefusal(requeued, problems(), answered);
     } finally {
       await requeued.close();
-      fs.writeFileSync(cardFile, plannedText);
-      fs.utimesSync(cardFile, plannedTime, plannedTime);
+      storeCard(planned.name, plannedText, plannedTime);
     }
     await settled(page);
   }

@@ -5,7 +5,7 @@ import { cardsPath, photograph, heldIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
+import { dropStoredCard, OUT, store, storeCard, storedCard, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /** The card this page files for the factory, and starts there. */
 const CARD = 'hire-the-reviewer-in-the-factory-e2e0';
@@ -81,19 +81,17 @@ export default {
   name: 'inbox-factory',
   route: '/inbox',
   expect: async (page) => {
-    const inbox = path.join(store!, 'inbox');
     const checkout = path.join(store!, 'checkout');
     const factory = FACTORIES.hiring.name;
     const factoryFile = path.join(store!, 'factories', `${factory}.json`);
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
-    const cardFile = path.join(inbox, `${CARD}.md`);
     const runsBefore = storedRuns();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     let unhire = () => {};
     try {
       fs.writeFileSync(factoryFile, withHires(factoryText, {}));
-      fs.writeFileSync(cardFile, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${BODY}\n`);
+      storeCard(CARD, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${BODY}\n`);
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       let item = await openStart(other);
@@ -149,7 +147,8 @@ export default {
         throw new Refused(
           `the record is the card's start in ${factory} — it holds ${JSON.stringify(got)}, not ${JSON.stringify(expected)}`,
         );
-      if (!fs.existsSync(cardFile)) throw new Refused(`the card stays in the inbox once its run is written — ${cardFile} is gone`);
+      if (storedCard(CARD) === null)
+        throw new Refused(`the card stays in the inbox once its run is written — nemia get card ${CARD} shows none`);
       await idle(other);
       const seen = problems();
       if (seen.length)
@@ -159,7 +158,7 @@ export default {
     } finally {
       await other.close();
       takeBackRuns(runsBefore);
-      fs.rmSync(cardFile, { force: true });
+      dropStoredCard(CARD);
       unhire();
       fs.writeFileSync(factoryFile, factoryText);
     }

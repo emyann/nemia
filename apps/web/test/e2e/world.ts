@@ -200,12 +200,27 @@ export function storedCardNames() {
 }
 
 /**
+ * The card `name` in the seeded store as its record holds it, its text and when it was filed (an ISO time), or null where it holds none:
+ * what a page keeps to put a card back as it was, its filing time with it, and reads to see a write kept that time.
+ * @param name The card's name.
+ */
+export function storedCardFiled(name: string) {
+  return JSON.parse(
+    inApi(
+      "return JSON.stringify(t.cardText(root, input) === null ? null : JSON.parse(t.recordText(root, t.cardKey(input)) ?? 'null'));",
+      name,
+    ),
+  ) as { text: string; filedAt: string } | null;
+}
+
+/**
  * The card `name` in the seeded store written as `text`, over the one there or none: what a page plants or changes by hand.
  * @param name The card's name.
  * @param text The card's text.
+ * @param filedAt When it was filed, an ISO time: now where none is given.
  */
-export function storeCard(name: string, text: string) {
-  inApi('t.plantCard(root, input.name, input.text);', { name, text });
+export function storeCard(name: string, text: string, filedAt?: string) {
+  inApi('t.plantCard(root, input.name, input.text, input.filedAt);', { name, text, filedAt });
 }
 
 /**

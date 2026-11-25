@@ -114,7 +114,7 @@ const isoOf = (ms: number) => new Date(ms).toISOString();
 
 /**
  * A task's answer to a `tools/call`, in place of its result: the task, flat, its `resultType` `task`, and the empty `content` the SDK
- * adds to a tool's result that has none (`normalizeContentlessToolResult`), which the extension's open `Result` admits.
+ * adds to a tool's result that has none, which the extension's open `Result` admits.
  * @param task The task created.
  */
 export const createdOf = (task: PortTask) => {
@@ -182,8 +182,8 @@ export async function followedTask(taskId: string, task: Followed, id: string, f
   if (!res.ok || !Predicate.isObject(json))
     return { kind: 'failed', message: `GET ${url.pathname} answered ${res.status}: ${text}` } satisfies FollowedRead as FollowedRead;
   const now = isoOf(Date.now());
-  const since = json[task.since];
-  const phase = json[task.phase];
+  const since = json[task.sinceKey];
+  const phase = json[task.phaseKey];
   const base = {
     taskId,
     createdAt: typeof since === 'string' ? since : now,
@@ -280,7 +280,8 @@ export type HeldBounds = { readonly most: number; readonly boundMs: number; read
  * A task past `boundMs` and `keepMs` from its start is dropped as the table is next read, its legs interrupted.
  * @param bounds The most at work at once, how long one asks again, and how long it is kept past that, in milliseconds.
  */
-export function heldTasks({ most, boundMs, keepMs }: HeldBounds) {
+export function heldTasks(bounds: HeldBounds) {
+  const { most, boundMs, keepMs } = bounds;
   const table = new Map<string, Held>();
   const stop = (held: Held) => {
     const fiber = held.fiber;
@@ -382,8 +383,8 @@ async function taskOf(taskId: string, from: Request, tools: readonly PortTool[],
  * The extension's methods on `server` (each a custom method the SDK admits on the modern era): `tasks/get` answers the task (`taskOf`);
  * `tasks/cancel` interrupts a held task and acknowledges a followed one, which goes on; `tasks/update` is acknowledged for a task of the
  * caller's, since none of the port's asks for input. Each is refused -32602 for an id no task of the caller's has. `tasks/update`'s
- * params are the extension's narrowed to their `taskId`: the SDK lifts `inputResponses` off every request before its handler validates
- * them (`ctx.mcpReq.inputResponses`), so the extension's whole schema would refuse every update.
+ * params are the extension's narrowed to their `taskId`: the SDK lifts the input responses off every request before its handler
+ * validates them, so the extension's whole schema would refuse every update.
  * @param server The server of one request.
  * @param tools The port's tools, whose links say which follow what they started.
  * @param appOf What gives the app a followed task is read through.

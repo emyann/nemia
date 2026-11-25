@@ -11,7 +11,7 @@
  * the upgrades; the app's own module for the waits, its feed written by the package's own writer on the app's runtime, as
  * `server.test.ts` writes it; a second token minted through the package's `TokenDoor` under the harness's store.
  */
-import { root } from '../../test/harness.ts';
+import { PERSON_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer, Logger } from 'effect';
@@ -117,6 +117,10 @@ const taskIdOf = (answer: Rpc) => {
   return String(id);
 };
 
+/** A result's own fields: all but what the SDK stamps on every result of the era, its `resultType` and the server named in `_meta`. */
+const ownOf = (result: Record<string, unknown> | undefined) =>
+  Object.fromEntries(Object.entries(result ?? {}).filter(([key]) => key !== 'resultType' && key !== '_meta'));
+
 /** The `structuredContent` of a completed task's result. */
 const structuredOf = (task: Record<string, unknown>) =>
   (task.result as { structuredContent?: Record<string, unknown> } | undefined)?.structuredContent;
@@ -151,7 +155,7 @@ test('a declared upgrade is a task followed through its read: working, then comp
   assert.ok(engine().tasks.get(id), 'the upgrade is filed on the engine before the task is answered');
   assert.equal((await got(app(), taskId)).status, 'working');
 
-  assert.deepEqual((await rpc(app(), 'tasks/cancel', { taskId })).result ?? {}, {}, 'a cancel is acknowledged, empty');
+  assert.deepEqual(ownOf((await rpc(app(), 'tasks/cancel', { taskId })).result), {}, 'a cancel is acknowledged, empty');
   assert.equal((await got(app(), taskId)).status, 'working', 'the upgrade goes on');
 
   engine().settle(id, 'succeeded', { exitCode: 0 });
@@ -182,6 +186,7 @@ test('an upgrade that declares nothing, and one of the legacy era, are answered 
   await client.connect(
     new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8787/mcp'), {
       fetch: async (url: string | URL, init?: RequestInit) => app().request(String(url), init),
+      requestInit: { headers: { authorization: `Bearer ${PERSON_TOKEN}` } },
     }),
   );
   assert.equal(client.getProtocolEra(), 'legacy');
@@ -253,7 +258,7 @@ test('tasks/cancel of a held wait is acknowledged and cancels it; another token 
   const taskId = taskIdOf(await call(on, 'wait', { labelSelector: 'run=tasks-wait-cancel', for: '60s' }));
   assert.equal((await rpc(on, 'tasks/get', { taskId }, { token: agentToken })).error?.code, -32602, "another token's read");
   assert.equal((await rpc(on, 'tasks/cancel', { taskId }, { token: agentToken })).error?.code, -32602, "another token's cancel");
-  assert.deepEqual((await rpc(on, 'tasks/cancel', { taskId })).result ?? {}, {});
+  assert.deepEqual(ownOf((await rpc(on, 'tasks/cancel', { taskId })).result), {});
   assert.equal((await got(on, taskId)).status, 'cancelled');
   await until(t, () => port.liveTasks() === 0, 'the held wait is let go');
 });

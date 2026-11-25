@@ -298,7 +298,7 @@ test('upgrade follows the upgrade it starts through GET /api/upgrades/:id, and w
 
 test("REFUSED: a link's task the port could not answer: a follow of a POST, a stream or a read of no id; an again with no from", () => {
   const entry = { name: 'probe', usage: '', help: ['a probe'], class: 'read' as const };
-  const follow = { kind: 'follow', id: 'id', phase: 'phase', since: 'startedAt', succeeded: ['succeeded'], failed: [] } as const;
+  const follow = { kind: 'follow', idKey: 'id', phaseKey: 'phase', sinceKey: 'startedAt', succeeded: ['succeeded'], failed: [] } as const;
   for (const read of ['upgrades.start', 'upgrades.output', 'upgrades.read'] as const)
     assert.throws(
       () => portTools([], [{ ...entry, served: [{ endpoint: 'upgrades.start', task: { ...follow, read } }] }], Api),

@@ -129,17 +129,17 @@ export type CommandLink = {
 };
 
 /**
- * A tool that follows what its call started: the call answers a thing with an id (`id`, the key of the answer that holds it), and
- * `read`, a GET of the `Api` whose one path key takes that id, says how it stands: `phase`, the key of its answer whose value is where it
- * stands, ended well on one of `succeeded` and badly on one of `failed`, at work on any other; `since`, the key that holds when it began,
- * an ISO 8601 time. The port keeps nothing: each read of the task reads `read` again, with the reader's own token.
+ * A tool that follows what its call started: the call answers a thing with an id (`idKey`, the key of the answer that holds it), and
+ * `read`, a GET of the `Api` whose one path key takes that id, says how it stands: `phaseKey`, the key of its answer whose value is where
+ * it stands, ended well on one of `succeeded` and badly on one of `failed`, at work on any other; `sinceKey`, the key that holds when it
+ * began, an ISO 8601 time. The port keeps nothing: each read of the task reads `read` again, with the reader's own token.
  */
 export type FollowedTask = {
   readonly kind: 'follow';
   readonly read: ApiEndpointName;
-  readonly id: string;
-  readonly phase: string;
-  readonly since: string;
+  readonly idKey: string;
+  readonly phaseKey: string;
+  readonly sinceKey: string;
   readonly succeeded: readonly [string, ...string[]];
   readonly failed: readonly string[];
 };

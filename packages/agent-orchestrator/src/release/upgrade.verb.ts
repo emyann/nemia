@@ -474,9 +474,9 @@ const UPGRADE: Command<Upgraded> = {
       task: {
         kind: 'follow',
         read: 'upgrades.upgradeOf',
-        id: 'id',
-        phase: 'phase',
-        since: 'startedAt',
+        idKey: 'id',
+        phaseKey: 'phase',
+        sinceKey: 'startedAt',
         succeeded: ['succeeded'],
         failed: ['failed'],
       },

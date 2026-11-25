@@ -281,7 +281,7 @@ export async function taskCalled(
   if (task.kind === 'again')
     return createdOf(held.start(task, args, from, (sent, sender, legSignal) => called(tool, sent, sender, app, legSignal)));
   const result = await called(tool, args, from, app, signal);
-  const id = Predicate.isObject(result.structuredContent) ? result.structuredContent[task.id] : undefined;
+  const id = Predicate.isObject(result.structuredContent) ? result.structuredContent[task.idKey] : undefined;
   if (result.isError === true || typeof id !== 'string') return result;
   const read = await followedTask(`${tool.name}:${id}`, task, id, from, app);
   return read.kind === 'task' ? createdOf(read.task) : result;

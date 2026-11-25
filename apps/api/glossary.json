@@ -148,7 +148,7 @@
     },
     {
       "term": "Port task",
-      "meaning": "an MCP task of the port (the tasks extension, `io.modelcontextprotocol/tasks`), never the runtime's task: the answer to a modern call that declares the extension, of a port tool whose link says one (`LinkTask`), which the caller reads with `tasks/get` and may cancel with `tasks/cancel` (`apps/api/src/mcp/tasks.ts`). A followed one (`upgrade`) is named `<tool>:<id>` and keeps nothing, each read reading the thing again with the reader's token; a held one (`wait`) is asked again in the api's memory under a random id, bound to its creator's token and lost at a restart. Whether a call is answered as one is `taskAnswerOf` (`apps/api/contracts/task-answer.contract.ts`), and where a followed one stands `followedStateOf` (`apps/api/contracts/followed-state.contract.ts`).",
+      "meaning": "an MCP task of the port (MCP's tasks extension), never the runtime's task: the answer to a modern call that declares the extension, of a port tool whose link says one (`LinkTask`), which the caller reads with the extension's get and may cancel with its cancel (`apps/api/src/mcp/tasks.ts`). A followed one (`upgrade`) is named `<tool>:<id>` and keeps nothing, each read reading the thing again with the reader's token; a held one (`wait`) is asked again in the api's memory under a random id, bound to its creator's token and lost at a restart. Whether a call is answered as one is `taskAnswerOf` (`apps/api/contracts/task-answer.contract.ts`), and where a followed one stands `followedStateOf` (`apps/api/contracts/followed-state.contract.ts`).",
       "type": "PortTask"
     },
     {

@@ -134,8 +134,31 @@ version, tokens and the Claude token, and the verbs that read and write files an
 run it on the server. `nemia upgrade` upgrades your laptop's install under a remote context too; the server is upgraded from your laptop
 by another verb (see [From another machine](#from-another-machine)).
 
-Claude Code's nemia plugin asks the server through the current context's token (`nemia config headers`, its `headersHelper`), at the
-address `NEMIA_URL` names: `nemia pair` prints the line to put in your shell profile.
+## Connect a coding agent
+
+A coding agent on your laptop operates the store through its MCP port, `/mcp`: each verb a tool, the port's instructions, and
+Nemia's skills, which say how to operate it. `nemia pair` prints the line that connects Claude Code to it, once for every project:
+
+```bash
+claude mcp add-json --scope user nemia '{"type":"http","url":"http://<address>:8787/mcp","headersHelper":"nemia config headers"}'
+```
+
+Claude Code runs `nemia config headers` at each connection for the token of the context in use, so no token is written in its
+settings and a token paired again is taken at the next connection.
+
+The skills are listed as the server's own, `nemia:operate` first, the role of the store's operator as you take it, then
+`nemia:write-a-card` and the others, and Claude Code loads one when it needs it. A host loads the skills of an MCP server only where it
+takes the Skills extension: Claude Code from 2.1.331, in an interactive session (none in `claude -p`, the Agent SDK, cloud sessions or
+GitHub Actions), on by default when you sign in on a Pro, Max or Ultra plan, off on a Team or Enterprise plan until the organisation
+turns it on, and off for now under an API key. Where they are off, the tools and the instructions are there all the same.
+
+Codex reads the same port as a server of its config, with the port's url and your bearer token, and is given its tools and its
+instructions:
+
+```toml
+[mcp_servers.nemia]
+url = "http://<address>:8787/mcp"
+```
 
 ## What is in place
 

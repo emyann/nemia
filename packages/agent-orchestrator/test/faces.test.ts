@@ -14,6 +14,7 @@
  * answers from its memo, and no cap is set on runs or sessions.
  */
 import { askKeyOf, asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
+import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -330,7 +331,7 @@ describe("each verb's program, given its services, answers what its plain face a
       () => over(b.e, roundRun(run.id)),
       () => runWith(b.e, roundRun(run.id)),
     );
-    dropRecord(ROOT, askKeyOf(run.id, 'round-review-4'));
+    await runWith(b.e, takeBackAsk(run.id, 'round', undefined));
     await same(
       'nemia approve of a loop',
       () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),

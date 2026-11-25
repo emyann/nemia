@@ -9,7 +9,8 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { askKeyOf, askText, dropAsk, listRuns, plantAsk, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { askKeyOf, askText, listRuns, plantAsk, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -616,9 +617,9 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
       assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'landed');
       const asked = await runWith(b.e, prune(landed.run.id, { yes: true }));
       assert.equal(asked.kind, 'refused', 'a retry asked of a step that landed, which no pass files: the ask alone holds it');
-      names(asked.refusal, 'try 2 of implement', `nemia prune ${landed.run.id}`, `rm ${askKeyOf(landed.run.id, 'retry-implement-2')}`);
+      names(asked.refusal, 'try 2 of implement', `nemia prune ${landed.run.id}`, `nemia retry ${landed.run.id} implement --off`);
       assert.ok(fs.existsSync(landed.wt) && !under('runs', `${landed.run.id}.pruned`));
-      dropAsk(ROOT, landed.run.id, 'retry-implement-2');
+      await runWith(b.e, takeBackAsk(landed.run.id, 'try', 'implement'));
       assert.equal((await runWith(b.e, prune(landed.run.id, { yes: true }))).kind, 'pruned', 'until the ask is taken back');
 
       assert.equal((await typed(b.e, 'cancel', run.id)).error, undefined);

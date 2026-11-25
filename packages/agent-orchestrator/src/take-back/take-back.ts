@@ -162,8 +162,18 @@ export function askTakeBackJudged(
       `${step.name}'s loop was accepted as it stands, and that acceptance has handed on: what waits on it has been filed, so taking it back would undo nothing. See where the run stands: nemia ls ${run.id}.`,
     );
   const n = at?.key.n ?? tryOf(run, step.name);
-  const what = of === 'round' ? `round ${n} of ${step.name}'s loop` : `try ${n} of ${at?.key.step ?? step.name}`;
+  const target = at?.key.step ?? step.name;
+  const what =
+    of === 'round'
+      ? `round ${n} of ${step.name}'s loop is not asked for`
+      : of === 'base'
+        ? `no merge of the base into ${target}'s work is asked`
+        : of === 'loop'
+          ? `try ${n} of ${step.name} is not accepted as it stands`
+          : of === 'gate'
+            ? `nothing waits at the approval of try ${n} of ${step.name}`
+            : `try ${n} of ${step.name} is not asked for`;
   return no(
-    `${ASK_WORDS[of]} of ${what} is not asked, so there is nothing to take back. To ask it: ${askAgain(of, run.id, step.name)}. See where it stands: nemia ls ${run.id}.`,
+    `${what}, so there is nothing to take back. To ask it: ${askAgain(of, run.id, step.name)}. See where it stands: nemia ls ${run.id}.`,
   );
 }

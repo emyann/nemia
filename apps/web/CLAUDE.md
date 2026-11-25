@@ -313,7 +313,7 @@ here.
 - A colour says one thing, one of four meanings: `yours` (waits on a person), `alive`, `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` writes each beside the theme, light at its root and dark under the media query (`--meaning-*`, `bg-yours`), at the
   values of `DESIGN.md`'s table, which `test/meanings.test.ts` holds, with contrast; `failure` is Material's error. A cost is no meaning:
-  it is drawn in ink, `failure` past its budget, and its sticker takes the look's `ink` tone (`Sticker`'s `Tone`), the Control rung
+  it is drawn in ink, `failure` past its budget, and its sticker takes the look's `ink` tone (`Sticker`'s `hue: 'ink'`), the Control rung
   under plain ink. `lib/meaning.ts` holds the drawn forms, each class a whole literal, and a tag in one is the look's `MeaningTag`.
 - A view, the page and each thing that opens over it, holds at most one filled action, the look's `CutPress` or `CutButton`; every
   other action is the kit's outlined button, and a text action is the look's `TextLink` (`DESIGN.md`, *Ink and the one action*). A

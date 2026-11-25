@@ -33,6 +33,7 @@ import {
   withClient,
   withProposal,
   kitBoxes,
+  cutPresses,
   kitButtons,
   kitChoices,
   kitRadios,
@@ -606,7 +607,11 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
   const buttons = (form: string) => kitButtons(forms.get(form)!);
-  assert.deepEqual(buttons('Approve plan'), [['submit', false, 'Approve']], 'Approve is enabled with no words: an approval needs none');
+  assert.deepEqual(
+    cutPresses(forms.get('Approve plan')!),
+    [['submit', false, 'Approve']],
+    'Approve is enabled with no words: an approval needs none',
+  );
   assert.deepEqual(
     buttons('Send plan back'),
     [['submit', true, 'Send back']],
@@ -1049,7 +1054,7 @@ test('a gate whose step asks questions draws them before its answer, with the re
   );
   assert.match(
     html,
-    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-cut-button="press"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   assert.match(
     html,
@@ -1062,7 +1067,7 @@ test('a gate whose step asks questions draws them before its answer, with the re
   const plain = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
   assert.ok(
-    kitButtons(plain).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    cutPresses(plain).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
     'Approve, enabled',
   );
 });
@@ -1081,14 +1086,14 @@ test("the inspector's gate of a step that asks questions draws them too, its App
   );
   assert.match(
     asked,
-    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-cut-button="press"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   const plain = atGate({ closeout: planCloseout });
   const none = await routedWith(createElement(Asked, { run: plain, step: plain.steps[0] }));
   assert.match(none, /aria-label="What review asks of you"/);
   assert.doesNotMatch(none, /data-question=|Not answered|data-recommend-all/);
   assert.ok(
-    kitButtons(none).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    cutPresses(none).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
     'Approve, enabled',
   );
 });

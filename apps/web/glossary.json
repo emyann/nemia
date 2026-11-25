@@ -279,7 +279,7 @@
     },
     {
       "term": "View",
-      "meaning": "the page, and each thing that opens over it: a dialog, a popover's form, a side sheet. It holds at most one filled action, the look's cut button (`DESIGN.md`, *Ink and the one action*), counted in each drawn story by `filledViews` and judged by `overFilled` (`apps/web/.storybook/filled.ts`, proved by `apps/web/contracts/one-filled.contract.ts`); a button of the kit's or shadcn's drawn filled or as words alone is refused where it is written (`buttonForms`, `apps/web/test/stories.ts`).",
+      "meaning": "the page, and each thing that opens over it: a dialog, a popover's form, a side sheet. It holds at most one filled action, the look's cut button (`apps/web/DESIGN.md`, *Ink and the one action*), counted in each drawn story by `filledViews` and judged by `overFilled` (`apps/web/.storybook/filled.ts`, proved by `apps/web/contracts/one-filled.contract.ts`); a button of the kit's or shadcn's drawn filled or as words alone is refused where it is written (`buttonForms`, `apps/web/test/stories.ts`).",
       "type": "ViewFilled"
     }
   ]

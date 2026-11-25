@@ -73,8 +73,7 @@ import {
   type Factory,
   DEFAULT_NAMESPACE,
 } from '../factory/factory.ts';
-import { factoryOrNone, filedAtOnce } from '../factory/door/factories.store.ts';
-import { labelValuesJudged } from '../factory/door/label-values.store.ts';
+import { factoryOrNone, filedAtOnce, labelValuesJudged } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';

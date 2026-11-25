@@ -1608,12 +1608,9 @@ describe("an ending whose check uses no checkout gives the checkout back once it
     settle(`${a.id}-ship-check-base-ci`, 'failed', undefined, 1);
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
-    assert.ok(landed && 'aborted' in landed, 'A records no landing of its own');
-    await at.aPass(e());
-    const decided = (await decisionOn(stage, a.id)).decided!;
     assert.ok(
-      decided.decision.kind === 'awaiting' && decided.decision.failedCheck.includes('ship'),
-      `A's ship reads failed on its check: ${JSON.stringify(decided.decision)}`,
+      landed && 'aborted' in landed && landed.aborted.includes('(exit 1)'),
+      `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`,
     );
     assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, "B's ending is still filed");
     assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined);

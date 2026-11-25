@@ -922,7 +922,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       fs.writeFileSync(path.join(elsewhere, 'shadowed'), 'From the file.\n');
       const file = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'shadowed', ...flags])));
       assert.equal(file.brief, 'From the file.', 'a file of that name where it is typed is the brief');
-      assert.ok(fs.existsSync(shadowed), 'the card of that name stays in the inbox');
+      assert.ok(cardText(ROOT, path.basename(shadowed, '.md')) !== null, 'the card of that name stays in the inbox');
     },
   );
   s.test(
@@ -963,7 +963,10 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       'dev',
       'nemia factory attach devs build',
     );
-    assert.ok(fs.existsSync(nosuch) && fs.existsSync(unattached), 'both cards are left in the inbox');
+    assert.ok(
+      [nosuch, unattached].every((card) => cardText(ROOT, path.basename(card, '.md')) !== null),
+      'both cards are left in the inbox',
+    );
   });
   s.test('with WF_DEFAULT_FACTORY_STARTS=1, a card naming no factory records none, on the repository it is started in', async () => {
     const other = teamIn(aRepo());

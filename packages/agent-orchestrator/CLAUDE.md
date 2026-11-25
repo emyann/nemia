@@ -194,8 +194,13 @@ of its kind, never from an older file that looks alike:
   and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
   one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
   `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
-  reads the files at the root it hands them whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
+  reads the keyspace or the feed at the root it hands them whatever door was given, the feed's counted in `test/feed-door.baseline.ts`;
   none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
+- **Delegations, subscriptions and deliveries, the ledger, tokens, and cards and their tries are records of the keyspace**, each kind's
+  door one engine over it (`<kind>Records`) and its stand-in the same code over a keyspace in memory. A kind's files of before are
+  imported by its `ImportKind` (`src/keyspace/import.store.ts`) the first time a process opens the keyspace, and moved under
+  `<root>/imported/`: a test that plants a file of before reads it back only after the import (`kindsTakenUp`, the testing entry), and
+  one that plants a record writes it (`plantRecord`, `plantCard`). A run's markers and the factory's record are still files.
 - **A proposal is read and written through the Proposal door (`ProposalDoor`, `src/proposal/proposal.store.ts`), over the keyspace**
   (`src/keyspace/keyspace.store.ts`, `<root>/db/state.db`, one SQLite file laid out as Kine's), rooted as the Factory door is. Its
   methods answer Effects that may suspend, with no synchronous layer: a test runs a program that reaches it with `runPromise`

@@ -144,7 +144,7 @@
     },
     {
       "term": "Checks",
-      "meaning": "a step's `checks:`, a list of named checks, each `{ name, run, after?, enabled? }` and each a task of its own on the `check` harness: one with no `after:` waits on the one above it, `after: []` on none, and `enabled: false` takes one out and hands its waits on. `check: <line>` is read as one check named `check`. Which are filed is decided on every pass by `checksDue` (`packages/agent-orchestrator/src/check/checks-due.ts`).",
+      "meaning": "a step's `checks:`, a list of named checks, each `{ name, run, after?, enabled?, usesCheckout? }` and each a task of its own on the `check` harness: one with no `after:` waits on the one above it, `after: []` on none, and `enabled: false` takes one out and hands its waits on. On an ending, `usesCheckout: false` says a check reads nothing of the repository's own checkout: the checkout is given back to the next ending once every other check passed, while it still runs and still judges the step (`checksHoldCheckout`, `packages/agent-orchestrator/src/ending/ending.ts`). `check: <line>` is read as one check named `check`. Which are filed is decided on every pass by `checksDue` (`packages/agent-orchestrator/src/check/checks-due.ts`).",
       "type": "CheckSpec"
     },
     {

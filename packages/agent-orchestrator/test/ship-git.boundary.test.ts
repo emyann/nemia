@@ -53,6 +53,7 @@ import { stagedHere, landingDenies, landingWords } from '../src/place/landing.st
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { filedDenies } from '../src/ending/ending.ts';
 import { landingContract } from '../src/check/check.ts';
+import { stepChecks } from '../src/step/step.ts';
 import { passStanding, standingLive } from '../src/standing/standing.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -882,7 +883,7 @@ test('REFUSED: a landing session is denied and told what its place says — a pl
   );
   const words = landingWords(run, stepsOf(run, ROOT), ship, place)!;
   assert.deepEqual(words, { stage: `hg -R ${repo} merge ${branch}`, denied: ['Bash(hg commit:*)'] });
-  const told = landingContract(ship.check!, words);
+  const told = landingContract(stepChecks(ship), words);
   assert.ok(told.includes(`\`hg -R ${repo} merge ${branch}\``), told);
   assert.ok(told.includes('Your fence denies `Bash(hg commit:*)`'), told);
   assert.doesNotMatch(told, /git (commit|merge)/);

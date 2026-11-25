@@ -224,6 +224,7 @@ erDiagram
     object costLines "optional"
     object workflowRepos "optional"
     object triggers "optional"
+    object labelValues "optional"
     number generation "optional"
   }
   AppliedTemplate {

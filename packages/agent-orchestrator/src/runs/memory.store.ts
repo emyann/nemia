@@ -43,7 +43,7 @@ const recordOf = (run: Run) => {
   return structuredClone(kept) as Run;
 };
 
-/** One ask held, by its key's name (`<of>-<step>-<n>`), whether it was set aside, and, of an approval, that a person took it back. */
+/** One ask held, by its key's name (`<of>-<step>-<n>`), whether it was set aside, and that a person took it back. */
 type Held = { person: PersonRequest; done: boolean; takenBack?: TakenBack };
 
 /** What a stand-in holds: each run's record, and a person's files beside it, by run id; and each run's stamp, a count of its changes. */
@@ -274,7 +274,7 @@ function asksGroup(st: State) {
     }),
     answers: (id) =>
       [...asksOf(st, id).values()]
-        .filter((h) => h.person.of === 'try' && h.person.ask.message !== undefined)
+        .filter((h) => h.person.of === 'try' && h.person.ask.message !== undefined && h.takenBack === undefined)
         .map((h) => structuredClone(h.person.ask as RetryAsk)),
     write: (id, person) => {
       const name = nameOf(keyOf(person));
@@ -289,14 +289,18 @@ function asksGroup(st: State) {
       return { written: true, where } satisfies AskWritten;
     },
     where: (id, key) => askKeyOf(id, nameOf(key)),
-    takeBack: (id, step, n, takenBack) => {
-      const name = nameOf({ of: 'gate', step, n });
+    held: (id, key) => {
+      const there = asksOf(st, id).get(nameOf(key));
+      return there && !there.done ? 'ask' : 'none';
+    },
+    takeBack: (id, key, takenBack) => {
+      const name = nameOf(key);
       const before = asksOf(st, id).get(name);
       if (!before || before.done) return null;
       before.done = true;
       before.takenBack = structuredClone(takenBack);
       touch(st, id);
-      return askDoneKey(id, name);
+      return { where: askDoneKey(id, name), stray: false };
     },
     route: (id, step, n, { route, at }) => {
       const name = routeAsk(step, n);

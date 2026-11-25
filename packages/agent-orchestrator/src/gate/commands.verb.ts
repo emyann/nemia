@@ -16,6 +16,10 @@ import { givenAnswers, typedAnswers } from '../question/asked.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { approveRun, takeBackRun } from './gate.verb.ts';
+import { takeBackAsk } from '../take-back/take-back.verb.ts';
+import { askTakenAt } from '../take-back/take-back.ts';
+import { acceptanceOf, approvalOf } from '../status/status.ts';
+import type { Run } from '../record/record.ts';
 import { dollarsOf } from '../keys/index.ts';
 import { budgetArgs, type StepBudget } from '../budget/budget.ts';
 
@@ -98,7 +102,8 @@ const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput) {
 
 /**
  * `nemia approve --off`: the approval of a step that stands approved while nothing it approved has been filed, taken back (`takeBackRun`),
- * with who took it back (`actor`) where the caller was handed. It takes the step, and no words, answers or caps (`approveRefusal` refuses
+ * with who took it back (`actor`) where the caller was handed; where none stands, the acceptance of the loop the step closes, or a record
+ * at the gate's key that reads as no approval (`takeBackAsk`, `otherAsk`), answered with `loop` or `stray`. It takes the step, and no words, answers or caps (`approveRefusal` refuses
  * them as typed; sent to the api, they are refused here). It answers no `next`: the step waits at its gate again.
  */
 const takenBack = Effect.fnUntraced(function* (input: ApproveInput) {
@@ -115,18 +120,52 @@ const takenBack = Effect.fnUntraced(function* (input: ApproveInput) {
         message: `--off takes back the approval of a step, named: nemia approve ${runId} <step> --off, the step as nemia ls ${runId} lists it.`,
       }),
     );
-  const { approval, file, takenBack: back } = yield* takeBackRun(runId, step, actor);
+  const door = yield* RunDoor;
+  const run = (yield* door.runs.exists(RunId.read(runId))) ? yield* door.runs.read(RunId.read(runId)) : undefined;
+  const of = run === undefined || approvalOf(run, step) ? undefined : yield* otherAsk(run, step);
+  if (run === undefined || of === undefined) {
+    const { approval, file, takenBack: back } = yield* takeBackRun(runId, step, actor);
+    return {
+      step,
+      try: approval.try,
+      at: approval.at,
+      message: approval.message ?? null,
+      file,
+      ...(approval.actor ? { actor: approval.actor } : {}),
+      loop: false,
+      caps: [],
+      takenBack: back,
+    };
+  }
+  const accepted = of === 'loop' ? acceptanceOf(run, step) : undefined;
+  const taken = yield* takeBackAsk(runId, of, step, actor);
   return {
-    step,
-    try: approval.try,
-    at: approval.at,
-    message: approval.message ?? null,
-    file,
-    ...(approval.actor ? { actor: approval.actor } : {}),
-    loop: false,
+    step: taken.step,
+    try: taken.key.n,
+    at: accepted?.at ?? taken.takenBack.at,
+    message: accepted?.message ?? null,
+    file: taken.file,
+    ...(accepted?.actor ? { actor: accepted.actor } : {}),
+    loop: of === 'loop',
     caps: [],
-    takenBack: back,
+    takenBack: taken.takenBack,
+    ...(taken.stray ? { stray: true as const } : {}),
   };
+});
+
+/**
+ * What `nemia approve <run> <step> --off` takes back where no approval of the step stands: the loop's acceptance where the step closes a
+ * loop and something waits at its key, else a stray at the gate's key; else, of a looping step, its acceptance — which is then refused as
+ * not asked — and of any other, undefined: the approval's take-back, which refuses it.
+ */
+const otherAsk = Effect.fnUntraced(function* (run: Run, step: string) {
+  const door = yield* RunDoor;
+  const steps = yield* stepsOf(run);
+  const accept = askTakenAt('loop', steps, run, step);
+  if (accept && (yield* door.asks.held(RunId.read(run.id), accept.key)) !== 'none') return 'loop' as const;
+  const gate = askTakenAt('gate', steps, run, step);
+  if (gate && (yield* door.asks.held(RunId.read(run.id), gate.key)) === 'stray') return 'gate' as const;
+  return accept ? ('loop' as const) : undefined;
 });
 
 /**
@@ -147,6 +186,7 @@ export const APPROVE: Served<
     loop: boolean;
     caps: Array<{ step: string; usd: number; above: boolean; workflow: number | null }>;
     takenBack?: { at: string; actor?: Actor };
+    stray?: true;
   },
   ApproveInput
 > = {

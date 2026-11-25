@@ -152,8 +152,8 @@ export const takeBackRun = Effect.fn('approve-off')(function* (id: string, stepN
   if ('refused' in judged) return yield* Effect.fail(new Conflict({ message: judged.refused }));
   const { approval } = judged;
   const takenBack: TakenBack = { at: new Date().toISOString(), ...(actor ? { actor } : {}) };
-  const file = yield* door.asks.takeBack(RunId.read(id), stepName, approval.try, takenBack);
-  if (file === null) {
+  const moved = yield* door.asks.takeBack(RunId.read(id), { of: 'gate', step: stepName, n: approval.try }, takenBack);
+  if (moved === null) {
     const now = takeBackJudged(steps, yield* door.runs.read(RunId.read(id)), stepName);
     return yield* Effect.fail(
       new Conflict({
@@ -164,5 +164,5 @@ export const takeBackRun = Effect.fn('approve-off')(function* (id: string, stepN
       }),
     );
   }
-  return { run, approval, file, takenBack } satisfies TakenBackApproval;
+  return { run, approval, file: moved.where, takenBack } satisfies TakenBackApproval;
 });

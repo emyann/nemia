@@ -5,7 +5,7 @@
  */
 import { askKey } from '../runs/run-keys.ts';
 import type { StepSpec } from '../step/step.ts';
-import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
+import { andList, checkTasksOf, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/index.ts';
 import { modeWord, spentAsks, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
@@ -248,14 +248,15 @@ function factsOf(f: Forgetting, others: readonly Run[]) {
   };
 }
 
-/** Each of the run's tasks — a step's, or its check's — that is pending or running, as `<label> is <phase>`. */
+/** Each of the run's tasks — a step's, or each of its checks' — that is pending or running, as `<label> is <phase>`. */
 function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   const live: string[] = [];
   for (const [name, record] of Object.entries(run.steps)) {
+    const checks = record.check ? checkTasksOf(record.check) : [];
     for (const [label, taskId] of [
-      [name, record.taskId],
-      [`${name}'s check`, record.check?.taskId],
-    ] as const) {
+      [name, record.taskId] as const,
+      ...checks.map(([check, id]) => [record.check?.tasks ? `${name}'s check ${check}` : `${name}'s check`, id] as const),
+    ]) {
       const phase = taskId ? phaseOf(taskId) : undefined;
       if (phase === 'pending' || phase === 'running') live.push(`${label} is ${phase}`);
     }
@@ -263,15 +264,16 @@ function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   return live;
 }
 
-/** The ending that lands on its check whose merge is not landed (`landingOpen`), with nothing of the run in flight — or undefined. */
+/**
+ * The ending that lands on its check whose merge is not landed, with nothing of the run in flight — or undefined: one that holds the
+ * checkout (`landingOpen`), or one that signed off done whose landing the run has not yet recorded (`checking`), whose checks may have
+ * given the checkout back.
+ */
 function unlandedEnding(f: Forgetting, live: readonly string[]) {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
   const ending = steps?.find((s) => landsOnCheck(s, run));
-  const unlanded =
-    ending &&
-    !live.length &&
-    steps &&
-    landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, () => merging);
+  const own = ending && steps ? ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) : undefined;
+  const unlanded = ending && own && !live.length && (own === 'checking' || landingOpen(ending, run, own, phaseOf, () => merging));
   return unlanded ? ending : undefined;
 }
 

@@ -525,6 +525,11 @@ jobs:
       - name: Sum the shards' page time against the whole run's bound
         # No npm ci: the command imports node and the e2e's own files, nothing installed.
         if: steps.due.outputs.due == 'true'
+        # Reported, not required, since 2026-11-25: over the bound it prints the sum and the slowest pages and fails the step alone.
+        # Main sits about 3% under the bound and one commit read 9% apart on two attempts, so it failed green work seven times that
+        # day. What replaces it, or which pages go, is the card "ci: the browser tests' time bound stops failing green work on a
+        # runner's noise"; take this line out with that change.
+        continue-on-error: true
         run: node apps/web/test/e2e/pages-bound.ts .e2e
 
   build:

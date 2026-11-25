@@ -37,7 +37,7 @@ import {
   runListPath,
   tipsOf,
 } from '../board.ts';
-import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
+import { expectBeneath, expectCount, expectNone, expectTexts, expectTwoDeep, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
@@ -1181,6 +1181,7 @@ export default {
     const drawn = answersDrawn(page);
     try {
       await withRegated(page, drawn.last);
+      await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
     } finally {
       drawn.stop();
       regatedBack();

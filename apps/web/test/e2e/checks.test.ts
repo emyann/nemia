@@ -662,14 +662,22 @@ test('text in a frame, an inset and an inset again is refused, naming it — a f
       <div data-cut-frame="none"><div style="${inset}"><div style="${deeper}"><p>Third box text</p></div></div></div>
       <div style="${frame}"><div style="${inset}"><p>Second box text</p><button style="background:rgb(54,54,56)">Press</button></div></div>
       <div style="${frame}"><div style="${inset}"><div data-slot="text-field-container" style="border:1px solid gray"><label>Its notch</label><input></div></div></div>
+      <div style="${frame}"><div role="row"><div style="${inset}"><div style="${deeper}"><p>Row box text</p></div></div></div></div>
       <div style="${frame}"><div style="${inset}"><div role="dialog" style="${inset}"><p>Over the page</p></div></div></div>
       <div style="${frame}"><div style="${inset};border-bottom:1px solid gray"><span style="background:gray">inline mark</span></div></div>
     </main>`);
   await assert.rejects(
     expectTwoDeep(page, 'two boxes deep', 'main[data-frame-page]', 300),
-    (err: Error) => err instanceof Refused && err.message.includes('Third box text') && !err.message.includes('Second box text'),
+    (err: Error) =>
+      err instanceof Refused &&
+      err.message.includes('Third box text') &&
+      err.message.includes('Row box text') &&
+      !err.message.includes('Second box text'),
   );
-  await page.evaluate(() => document.querySelector('[data-cut-frame] > div > div')?.removeAttribute('style'));
+  await page.evaluate(() => {
+    document.querySelector('[data-cut-frame] > div > div')?.removeAttribute('style');
+    document.querySelector('[role=row] > div')?.removeAttribute('style');
+  });
   await expectTwoDeep(page, 'two boxes deep', 'main[data-frame-page]', 300);
   await assert.rejects(expectTwoDeep(page, 'two boxes deep', 'main#gone', 300), (err: Error) => err instanceof Refused);
 });

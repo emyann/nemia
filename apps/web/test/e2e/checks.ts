@@ -337,9 +337,10 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
  * what would be a third box is a rule or a gap), within `timeout`. Counted up from each text the view shows, to `root` (the page's own
  * view, `main[data-frame-page]`, by default): a box is an element laid out as a block that paints a ground other than the one it stands
  * on, draws a hairline on all four sides, or is a cut frame (`data-cut-frame`, whose ground is a layer beside what it holds). A
- * control's own fill is its rung, no box: a button, a field (a kit field's container, its label in its notch included), a link, a tag,
- * a chip, a row, a sticker; and a dialog, a menu, a listbox or a popover over the page starts a count of its own. The refusal names each
- * text and the boxes it sits in. Nothing to look at is refused too.
+ * control's own fill is its rung, no box: a button, a field (a kit field's container, its label in its notch included), a tag, a chip,
+ * a sticker, and all they hold; a link and a row are no box themselves, but a box they hold is counted; and a dialog, a menu, a
+ * listbox or a popover over the page starts a count of its own. The refusal names each text and the boxes it sits in. Nothing to look
+ * at is refused too.
  */
 export async function expectTwoDeep(page: Page, assertion: string, root = 'main[data-frame-page]', timeout = WAIT_MS) {
   await expectNone(
@@ -348,7 +349,8 @@ export async function expectTwoDeep(page: Page, assertion: string, root = 'main[
         const view = document.querySelector(under);
         if (!view) return `nothing to look at: no ${under}`;
         const control =
-          'button,a,input,select,textarea,[role=button],[role=link],[role=tab],[role=option],[role=checkbox],[role=radio],[role=switch],[role=menuitem],[role=row],[role=slider],[data-slot=tag],[data-slot=chip],[data-cut-tag],[data-cut-field],[data-sticker],[data-slot=text-field-container],[data-slot=number-field-container],[data-slot=combo-box-container],[data-slot=phone-field-container]';
+          'button,input,select,textarea,[role=button],[role=tab],[role=option],[role=checkbox],[role=radio],[role=switch],[role=menuitem],[role=slider],[data-slot=tag],[data-slot=chip],[data-cut-tag],[data-cut-field],[data-sticker],[data-slot=text-field-container],[data-slot=number-field-container],[data-slot=combo-box-container],[data-slot=phone-field-container]';
+        const whole = 'a,[role=link],[role=row]';
         const own = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[role=tooltip],[popover]';
         const clear = (colour: string) => colour === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(colour);
         const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;
@@ -390,7 +392,8 @@ export async function expectTwoDeep(page: Page, assertion: string, root = 'main[
           if (!words || !holder || !holder.checkVisibility() || holder.closest('[aria-hidden=true]')) continue;
           const boxes: string[] = [];
           for (let at: Element | null = holder; at && at !== view && !at.matches(own); at = at.parentElement)
-            if (!at.closest(control) && isBox(at)) boxes.push(at.hasAttribute('data-cut-frame') ? 'a cut frame' : named(at));
+            if (!at.closest(control) && !at.matches(whole) && isBox(at))
+              boxes.push(at.hasAttribute('data-cut-frame') ? 'a cut frame' : named(at));
           if (boxes.length > 2) deep.add(`"${words.slice(0, 40)}" in ${boxes.join(' in ')}`);
         }
         return deep.size ? `${[...deep].join(', ')} ${deep.size > 1 ? 'sit' : 'sits'} three boxes deep or more` : null;

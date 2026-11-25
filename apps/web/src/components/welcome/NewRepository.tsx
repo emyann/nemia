@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Pending } from '@/components/look';
-import { Button, TextField } from '@/components/ui/ds';
+import { CutPress } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 
 /**
  * The new way's panel: a name, and an empty repository made for it in Nemia's store, `onMake` handed the name. `pending` while it is
@@ -39,9 +39,9 @@ export function NewRepository({
         </p>
       )}
       <div>
-        <Button type="submit" variant="filled" data-new-make isDisabled={!ready || pending} icon={pending ? Pending : undefined}>
+        <CutPress type="submit" data-new-make isDisabled={!ready || pending} pending={pending}>
           Make it
-        </Button>
+        </CutPress>
       </div>
     </form>
   );

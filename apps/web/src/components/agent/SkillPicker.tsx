@@ -46,7 +46,12 @@ export function SkillPicker({
         rows={rows}
         none="It gives no skills: its sessions are told its instructions alone."
         action={(row) => (
-          <Button variant="text" size="xsmall" aria-label={`Remove ${row.name}`} onPress={() => onSkills(withoutSkill(skills, row.name))}>
+          <Button
+            variant="outlined"
+            size="xsmall"
+            aria-label={`Remove ${row.name}`}
+            onPress={() => onSkills(withoutSkill(skills, row.name))}
+          >
             Remove
           </Button>
         )}
@@ -191,7 +196,7 @@ function Offered({
       </div>
       <div className="shrink-0">
         {offer.kind === 'add' && (
-          <Button size="xsmall" aria-label={`Add ${row.name}`} onPress={onAdd}>
+          <Button variant="outlined" size="xsmall" aria-label={`Add ${row.name}`} onPress={onAdd}>
             Add
           </Button>
         )}
@@ -199,6 +204,7 @@ function Offered({
         {offer.kind === 'copy' && (
           <Button
             icon={copying ? Pending : undefined}
+            variant="outlined"
             size="xsmall"
             aria-label={`Copy ${row.name} to my library and add`}
             onPress={onCopy}

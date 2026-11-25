@@ -4,7 +4,7 @@ import { liftHold } from '../../lib/api/runs.ts';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
-import { Pending } from '@/components/look';
+import { Pending, CutPress } from '@/components/look';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -37,7 +37,13 @@ export function LiftHold({ id, onClose }: { id: string; onClose: () => void }) {
   return (
     <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-body-small">
       {`Lift the hold on ${id}? ${LIFTS}`}
-      <Button icon={lift.isPending ? Pending : undefined} size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
+      <Button
+        icon={lift.isPending ? Pending : undefined}
+        variant="outlined"
+        size="xsmall"
+        onPress={() => lift.mutate()}
+        isDisabled={lift.isPending}
+      >
         {lift.isPending ? 'Lifting…' : 'Lift'}
       </Button>
       <Button
@@ -94,9 +100,9 @@ function LiftForm({ id, namespace, onClose }: { id: string; namespace: string; o
         {LIFTS}
       </Body>
       <div className="flex items-center gap-2">
-        <Button icon={lift.isPending ? Pending : undefined} size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
+        <CutPress pending={lift.isPending} onPress={() => lift.mutate()} isDisabled={lift.isPending}>
           {lift.isPending ? 'Lifting…' : 'Lift'}
-        </Button>
+        </CutPress>
         <Button variant="tonal" size="xsmall" onPress={onClose} isDisabled={lift.isPending}>
           Keep it
         </Button>

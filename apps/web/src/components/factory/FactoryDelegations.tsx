@@ -185,7 +185,7 @@ function DelegationForm({
         ))}
         <FieldDescription>Each grant needs a resource and a verb.</FieldDescription>
         <Field orientation="horizontal" className="flex-wrap">
-          <Button type="submit" data-delegation-save isDisabled={write.isPending || !agent.trim() || !whole}>
+          <Button type="submit" variant="outline" data-delegation-save isDisabled={write.isPending || !agent.trim() || !whole}>
             {write.isPending && <Pending size={16} />}
             {write.isPending ? 'Writing…' : 'Save'}
           </Button>

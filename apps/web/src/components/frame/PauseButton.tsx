@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
 import { Actor } from '../actor/Actor';
-import { Pending, Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines, CutPress } from '@/components/look';
 import { troubleOf } from '@/lib/api/read';
 
 /** The popover's heading: the pause's state. */
@@ -49,9 +49,9 @@ function FormActions({
       <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending || held}>
         Cancel
       </Button>
-      <Button type="submit" size="xsmall" icon={isPending ? Pending : undefined} isDisabled={isPending || held}>
+      <CutPress type="submit" pending={isPending} isDisabled={isPending || held}>
         {label}
-      </Button>
+      </CutPress>
     </div>
   );
 }
@@ -217,15 +217,15 @@ function PauseFacts({
 }
 
 /**
- * What opens the pause's popover: the kit's text button, a play icon once all factories are paused and a pause icon else, and the
- * pause's word beside it where it has one, its whole sentence on hover.
+ * What opens the pause's popover: the kit's outlined button, since the machine bar holds no filled one, a play icon once all
+ * factories are paused and a pause icon else, and the pause's word beside it where it has one, its whole sentence on hover.
  * @param words The pause in words (`pauseWords`).
  * @param finishing How many tasks still finish under the pause, which the button carries for the e2e.
  */
 function PauseTrigger({ words, finishing }: { words: PauseWords; finishing: number }) {
   return (
     <Button
-      variant="text"
+      variant="outlined"
       size="xsmall"
       icon={words.state === 'paused' ? Play : Pause}
       aria-label={words.label}

@@ -55,7 +55,7 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
           <li key={key} className="inline-flex items-center gap-1">
             <LabelTag name={key} value={value} />
             {CLOSED_LABEL_KEYS.includes(key) ? null : (
-              <Button size="xsmall" variant="text" aria-label={`Remove ${key}`} onPress={() => void send([`${key}-`])}>
+              <Button size="xsmall" variant="outlined" aria-label={`Remove ${key}`} onPress={() => void send([`${key}-`])}>
                 Remove
               </Button>
             )}

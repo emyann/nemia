@@ -32,7 +32,7 @@ export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () =
         <div role="alert" data-prune-unread>
           <Refusal error={error} not="Whether it was merged could not be read" />
         </div>
-        <Button variant="text" size="xsmall" onPress={onClose}>
+        <Button variant="outlined" size="xsmall" onPress={onClose}>
           Close
         </Button>
       </div>
@@ -115,7 +115,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           <div className="flex items-center gap-2">
             <PrunePress pending={prune.isPending} onPress={() => prune.mutate()} />
             <Button
-              variant="text"
+              variant="outlined"
               size="xsmall"
               onPress={() => {
                 prune.reset();
@@ -132,7 +132,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)} isDisabled={prune.isSuccess}>
             Prune…
           </Button>
-          <Button variant="text" size="xsmall" onPress={onClose}>
+          <Button variant="outlined" size="xsmall" onPress={onClose}>
             Close
           </Button>
         </div>

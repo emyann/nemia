@@ -96,6 +96,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
             <Button
               icon={ask.isPending ? Pending : undefined}
+              variant="outlined"
               type="submit"
               isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}
             >

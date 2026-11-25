@@ -315,6 +315,12 @@ here.
   values of `DESIGN.md`'s table, which `test/meanings.test.ts` holds, with contrast; `failure` is Material's error. A cost is no meaning:
   it is drawn in ink, `failure` past its budget, and its sticker takes the look's `ink` tone (`Sticker`'s `Tone`), the Control rung
   under plain ink. `lib/meaning.ts` holds the drawn forms, each class a whole literal, and a tag in one is the look's `MeaningTag`.
+- A view, the page and each thing that opens over it, holds at most one filled action, the look's `CutPress` or `CutButton`; every
+  other action is the kit's outlined button, and a text action is the look's `TextLink` (`DESIGN.md`, *Ink and the one action*). A
+  button of the kit's or shadcn's drawn filled, as words alone or in a variant it cannot read is refused where it is written, with no
+  baseline (`buttonForms`, `test/stories.ts`, held by `test/one-action.test.ts`), and a story whose view holds two filled actions
+  fails after it is drawn, its play's dialogs open (`overFilled` and `filledViews`, `.storybook/filled.ts`, proved by
+  `contracts/one-filled.contract.ts`).
 - A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`. Its
   geometry (`cutShape`, `cutRing`, `cutPoints`, `cutEdge` and `cutHold`) is taken from `./cut` by a part of the look alone, and no
   file outside the look writes a cut, a clip path or a polygon (`test/look.test.ts`): it takes the part that draws one. A part that

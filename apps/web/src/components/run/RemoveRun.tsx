@@ -42,7 +42,7 @@ export function RemoveRun({ id, onClose, leave = false }: { id: string; onClose:
         {remove.isPending ? 'Removing…' : 'Remove'}
       </Button>
       <Button
-        variant="text"
+        variant="outlined"
         size="xsmall"
         onPress={() => {
           remove.reset();

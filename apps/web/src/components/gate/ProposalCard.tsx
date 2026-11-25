@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Instant } from '@/components/time/Instant';
-import { Pending } from '@/components/look';
+import { Pending, CutPress } from '@/components/look';
 import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey } from '@/lib/api/proposals';
 import { readGone } from '@/lib/api/gone';
 import { ink } from '@/lib/meaning';
@@ -206,10 +206,9 @@ function Judge({
       {(offers.approve || offers.decline) && (
         <div className="flex flex-wrap gap-2">
           {offers.approve && (
-            <Button data-proposal-approve isDisabled={pending} onPress={() => onJudge('approve')}>
-              {judging === 'approve' && <Pending size={16} />}
+            <CutPress data-proposal-approve isDisabled={pending} pending={judging === 'approve'} onPress={() => onJudge('approve')}>
               Approve
-            </Button>
+            </CutPress>
           )}
           {offers.decline && (
             <Button data-proposal-decline variant="outline" isDisabled={pending} onPress={() => onJudge('decline')}>

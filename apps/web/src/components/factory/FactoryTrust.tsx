@@ -5,7 +5,7 @@
  * draw its two presses under the caution, Trust and Not now, `trusting` while the trust is being given.
  */
 import { ShieldAlert } from 'lucide-react';
-import { Pending } from '@/components/look';
+import { CutPress } from '@/components/look';
 import { Button } from '@/components/ui/ds';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { Factory } from '@/lib/api/factories';
@@ -55,12 +55,12 @@ export function FactoryTrust({
         {(onTrust !== undefined || onLater !== undefined) && (
           <div data-trust-presses className="flex flex-wrap items-center gap-2 pt-1">
             {onTrust !== undefined && (
-              <Button variant="filled" data-trust-give onPress={onTrust} isDisabled={trusting} icon={trusting ? Pending : undefined}>
+              <CutPress data-trust-give onPress={onTrust} isDisabled={trusting} pending={trusting}>
                 Trust
-              </Button>
+              </CutPress>
             )}
             {onLater !== undefined && (
-              <Button variant="text" data-trust-later onPress={onLater} isDisabled={trusting}>
+              <Button variant="outlined" data-trust-later onPress={onLater} isDisabled={trusting}>
                 Not now
               </Button>
             )}

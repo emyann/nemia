@@ -1,7 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
-import { CutButton, PageName } from '@/components/look';
-import { Button } from '@/components/ui/ds';
+import { CutButton, PageName, TextLink } from '@/components/look';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { milestonesQuery } from '@/lib/api/readiness';
 import { nextStepsOf } from '@/lib/firstCard';
@@ -21,7 +19,6 @@ const setFactoryOf = (factories: readonly Factory[]) => {
 export function YouAreSet() {
   const { data: milestones } = useSuspenseQuery(milestonesQuery);
   const { data: factories } = useSuspenseQuery(factoriesQuery);
-  const navigate = useNavigate();
   const landed = milestones.milestones.some((m) => m.name === 'landed' && m.state === 'done');
   const factory = setFactoryOf(factories);
   const first = factory?.volumes.find((v) => !v.readOnly);
@@ -47,7 +44,9 @@ export function YouAreSet() {
                   <p className="m-0 text-body-medium text-on-surface-variant">
                     Raise her level, and she reads what your runs need and answers what she may, saying what she did.
                   </p>
-                  <CutButton to="/settings">Her level, in Settings</CutButton>
+                  <CutButton to="/settings" quiet>
+                    Her level, in Settings
+                  </CutButton>
                 </>
               )}
               {step === 'github' && follow !== undefined && (
@@ -69,7 +68,9 @@ export function YouAreSet() {
                     Everything here has its command in a terminal on this machine, and a coding agent reaches Nemia through her MCP port:
                     Setup says how to pair one.
                   </p>
-                  <CutButton to="/setup">Setup</CutButton>
+                  <CutButton to="/setup" quiet>
+                    Setup
+                  </CutButton>
                 </>
               )}
             </li>
@@ -81,9 +82,9 @@ export function YouAreSet() {
         </CutButton>
       )}
       <footer className="flex flex-wrap items-center gap-3">
-        <Button variant="text" size="small" data-welcome-skip onPress={() => void navigate({ to: '/' })}>
+        <TextLink to="/" data-welcome-skip>
           On to the board
-        </Button>
+        </TextLink>
       </footer>
     </article>
   );

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Fix, FixStart, ReadinessPiece } from 'objects';
-import { Pending } from '@/components/look';
-import { Button, TextField } from '@/components/ui/ds';
+import { CutPress } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
 import { FollowedFix } from '../setup/FollowedFix';
 import { PieceFixes, type Starts } from '../setup/ReadinessList';
@@ -82,9 +82,9 @@ export function AddressPick({
           </p>
         )}
         <div>
-          <Button type="submit" variant="filled" data-address-clone isDisabled={!ready || pending} icon={pending ? Pending : undefined}>
+          <CutPress type="submit" data-address-clone isDisabled={!ready || pending} pending={pending}>
             Clone it
-          </Button>
+          </CutPress>
         </div>
       </form>
     </div>

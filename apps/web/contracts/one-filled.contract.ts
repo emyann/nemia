@@ -1,6 +1,6 @@
 /**
  * Which views of a story hold more than their one filled action (apps/web, `.storybook/filled.ts`, `overFilled`, read by the
- * preview's `afterEach`): `DESIGN.md`, *Ink and the one action*, gives a view exactly one filled button, the look's cut one, and a
+ * preview's `afterEach`): `DESIGN.md`, *Ink and the one action*, gives a view at most one filled button, the look's cut one, and a
  * view is the page and each thing that opens over it, a dialog, a popover's form, a side sheet. The caller counts each view's filled
  * actions in the drawn story (the look's `CutPress` and `CutButton` not quiet, and any filled button of the kit or of shadcn left), the
  * page counted without what opens over it; the story fails, naming each view this answers.

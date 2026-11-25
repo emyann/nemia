@@ -143,7 +143,7 @@ function CostLineForm({
         className="w-36"
         inputClassName="font-mono"
       />
-      <Button type="submit" isDisabled={pending || !savable}>
+      <Button type="submit" variant="outline" isDisabled={pending || !savable}>
         {pending && <Pending size={16} />}
         {pending ? 'Writing…' : 'Save'}
       </Button>

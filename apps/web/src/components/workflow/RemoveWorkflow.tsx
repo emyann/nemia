@@ -47,7 +47,7 @@ export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowRow;
         {remove.isPending ? 'Removing…' : 'Remove'}
       </Button>
       <Button
-        variant="text"
+        variant="outlined"
         size="xsmall"
         onPress={() => {
           remove.reset();

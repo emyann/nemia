@@ -114,7 +114,7 @@ function Recap({ ask, picks, onBack, onSubmit }: { ask: Ask; picks: Picks; onBac
         })}
       </dl>
       <div className="flex flex-wrap items-center gap-2">
-        <Button data-chat-submit size="xsmall" isDisabled={open > 0} onPress={onSubmit}>
+        <Button data-chat-submit variant="outlined" size="xsmall" isDisabled={open > 0} onPress={onSubmit}>
           Submit answers
         </Button>
         <Button size="xsmall" variant="outlined" onPress={onBack}>

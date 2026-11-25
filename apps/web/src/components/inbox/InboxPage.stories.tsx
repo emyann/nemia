@@ -37,13 +37,17 @@ export default meta;
 
 type Story = StoryObj<typeof InboxPage>;
 
-/** Two cards in play: the filed one's kit Start, Queue and Remove, the queued one's Unqueue; the box above with the kit's fields. */
+/**
+ * Two cards in play: the filed one's kit Start, outlined since it repeats down the list, Queue and Remove, the queued one's Unqueue;
+ * the box above with the kit's fields.
+ */
 export const TwoInPlay: Story = {
   render: () => drawn([unstartedCard('decode-the-reads', FACTORY), queuedCard('measure-the-list', FACTORY, 1)]),
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
     await expect(page.getByRole('textbox', { name: 'An idea' })).toBeVisible();
     await expect(page.getAllByRole('button', { name: 'Start' })[0]).toHaveAttribute('data-slot', 'button');
+    await expect(page.getAllByRole('button', { name: 'Start' })[0]).toHaveClass(/\bborder-outline-variant\b/);
     await expect(page.getByRole('button', { name: 'Unqueue' })).toBeVisible();
   },
 };

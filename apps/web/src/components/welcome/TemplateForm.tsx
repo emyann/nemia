@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Template } from 'objects';
-import { Pending, RadioTile, RadioTileGroup } from '@/components/look';
-import { Button, TextField } from '@/components/ui/ds';
+import { RadioTile, RadioTileGroup, CutPress } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 import { applyTemplate } from '@/lib/api/factories';
 import { parameterReadsOf, setsOf, startWordOf } from '@/lib/templateParameters';
 import { useFactoryWrite } from '@/lib/useFactoryWrite';
@@ -81,15 +81,9 @@ export function TemplateForm({ templates, onMade }: { templates: readonly Templa
         </p>
       )}
       <div>
-        <Button
-          type="submit"
-          variant="filled"
-          data-factory-make
-          isDisabled={!form.ready || chosen === undefined}
-          icon={form.pending ? Pending : undefined}
-        >
+        <CutPress type="submit" data-factory-make isDisabled={!form.ready || chosen === undefined} pending={form.pending}>
           Make the factory
-        </Button>
+        </CutPress>
       </div>
     </form>
   );

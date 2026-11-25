@@ -8,6 +8,7 @@ import { ConversationBand } from '@/components/conversation/ConversationBand';
 import { Button } from '@/components/ui/ds';
 import { clockWord } from '@/lib/quota';
 import { routeLink } from '../../nav/routeLink';
+import { TextLink } from '@/components/look';
 
 const RouterLinkButton = routeLink(Button);
 
@@ -25,9 +26,9 @@ export function ChatStoppedBand({ words }: { words: string }) {
         <RouterLinkButton to="/settings" variant="tonal" size="xsmall">
           Start her session
         </RouterLinkButton>
-        <RouterLinkButton to="/settings" variant="text" size="xsmall">
+        <TextLink to="/settings" className="self-center">
           Why it stopped
-        </RouterLinkButton>
+        </TextLink>
       </div>
     </>
   );

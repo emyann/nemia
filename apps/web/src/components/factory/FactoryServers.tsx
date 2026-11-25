@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { CutFrame, CutPress, CutTag, FRAMED_BOX, Plate, Reading, ReadingLines } from '@/components/look';
+import { CutFrame, CutPress, CutTag, FRAMED_BOX, Pending, Plate, Reading, ReadingLines } from '@/components/look';
 import { container } from '@/lib/meaning';
 import { CHIP } from '../step/Reach';
 import { ServerSignIn } from './ServerSignIn';
@@ -34,7 +34,7 @@ import {
   type FactoryServer,
   type McpServerWrite,
 } from '../../lib/api/factories.ts';
-import { Skeleton } from '@/components/ui/ds';
+import { Button as Kit, Skeleton } from '@/components/ui/ds';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
@@ -87,9 +87,9 @@ export function ServerRow({
           <span className="text-body-small text-on-surface-variant">{server.tools === 1 ? '1 tool' : `${server.tools} tools`}</span>
         )}
         <span className="ml-auto">
-          <CutPress pending={removing} isDisabled={pending} onPress={() => onRemove(server.name)}>
+          <Kit variant="outlined" size="xsmall" icon={removing ? Pending : undefined} isDisabled={pending} onPress={() => onRemove(server.name)}>
             Remove
-          </CutPress>
+          </Kit>
         </span>
       </div>
       <p className="font-mono text-body-small break-all text-on-surface">{server.url}</p>
@@ -360,9 +360,9 @@ export function FactoryServers({ name }: { name: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <Plate count={servers.length} title="MCP servers" hue="alive" quiet={servers.length === 0} />
         <span className="ml-auto">
-          <CutPress isDisabled={isFetching} onPress={() => void refetch()}>
+          <Kit variant="outlined" size="xsmall" isDisabled={isFetching} onPress={() => void refetch()}>
             Check again
-          </CutPress>
+          </Kit>
         </span>
       </div>
       <p data-servers-told className="text-body-medium text-on-surface-variant">

@@ -31,7 +31,7 @@ import { SpecNode, type SpecFlowNode } from '../step/StepNode';
 import { ringed } from '../../lib/meaning';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
-import { Pending, Reading } from '@/components/look';
+import { Pending, Reading, CutPress } from '@/components/look';
 import { Button, Skeleton, TextField } from '@/components/ui/ds';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 import { troubleLine } from '@/lib/api/read';
@@ -308,9 +308,9 @@ function BuilderToolbar(props: {
       <Button variant="outlined" size="xsmall" onPress={props.onClose}>
         {dirty ? 'Discard and close' : 'Close'}
       </Button>
-      <Button icon={saving ? Pending : undefined} size="xsmall" isDisabled={!dirty || saving || props.empty} onPress={props.onSave}>
+      <CutPress pending={saving} isDisabled={!dirty || saving || props.empty} onPress={props.onSave}>
         {saving ? 'Saving…' : 'Save'}
-      </Button>
+      </CutPress>
     </div>
   );
 }
@@ -455,7 +455,7 @@ function AddStep({
         <TextField label="What it is told" multiline value={body} onChange={setBody} />
       </div>
       <div className="flex gap-2">
-        <Button type="submit" size="xsmall" isDisabled={Boolean(nameRefusal(steps, name)) || !body.trim()}>
+        <Button type="submit" variant="outlined" size="xsmall" isDisabled={Boolean(nameRefusal(steps, name)) || !body.trim()}>
           Add
         </Button>
         <Button variant="outlined" size="xsmall" onPress={onCancel}>

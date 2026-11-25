@@ -12,7 +12,8 @@
  * held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a story that fails it today has its a11y
  * test set to warn only, in its own file, a count `test/stories.test.ts` holds to its baseline. A story the holder caught throwing, or
  * one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a broken story is a failing test and not a quiet
- * `data-broken`. Once Storybook has finished a story, its play function and `afterEach`
+ * `data-broken`. A view of a story, the page or what opens over it, that holds more than one filled action fails after it is drawn,
+ * its play function's dialogs open (`overFilled`, `filled.ts`). Once Storybook has finished a story, its play function and `afterEach`
  * run, the document's body says which (`data-story-finished`), so a browser test that opens it alone (`test/e2e/stories/built.ts`)
  * presses nothing while the play still moves the focus. The stage a story is drawn on is `stage.tsx`, which the design system's
  * producer (`tools/design-system`) bundles too, so its cards draw under the same one.
@@ -25,6 +26,7 @@ import { addons } from 'storybook/preview-api';
 import '../src/styles.css';
 import { setupWorker } from 'msw/browser';
 import { undrawn } from './drawn';
+import { filledViews, overFilled } from './filled';
 import { strayHandler, straysSaid } from './network';
 import { SCHEME_CLASSES } from './scheme';
 import { Routed } from './stage';
@@ -70,6 +72,8 @@ const preview: Preview = {
     if (faults.length) throw new Error(`the story did not draw as it should: ${faults.join('; ')}`);
     const stray = straysSaid(strays);
     if (stray) throw new Error(stray);
+    const over = overFilled(filledViews(document));
+    if (over.length) throw new Error(`a view holds more than one filled action: ${over.join('; ')}`);
   },
   decorators: [
     withThemeByClassName<ReactRenderer>({ themes: { ...SCHEME_CLASSES }, defaultTheme: 'dark', parentSelector: 'html' }),

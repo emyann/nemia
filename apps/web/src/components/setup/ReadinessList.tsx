@@ -74,7 +74,7 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
             <CutPress pending={pending} type="submit" isDisabled={pending || !answered(asks, answers)}>
               {pending ? 'Starting…' : 'Start the fix'}
             </CutPress>
-            <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
+            <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
               Cancel
             </Button>
           </div>

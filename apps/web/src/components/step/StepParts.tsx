@@ -225,14 +225,14 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
 export function StepPageLink({ page, step }: { page: WorkflowPageAddress | null; step: string }) {
   if (!page) return null;
   return (
-    <RouteLink
-      {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
-      data-step-page-link={step}
-      className="text-on-surface-variant hover:text-on-surface"
-    >
-      <Body size="small" component="span">
+    <Body size="small" component="span">
+      <RouteLink
+        {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
+        data-step-page-link={step}
+        className="text-on-surface-variant hover:text-on-surface"
+      >
         What it will be told now →
-      </Body>
-    </RouteLink>
+      </RouteLink>
+    </Body>
   );
 }

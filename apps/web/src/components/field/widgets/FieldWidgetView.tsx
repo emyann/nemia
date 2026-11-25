@@ -4,7 +4,7 @@
  * JSON of what no one widget draws; questions and budgets by the gate's own parts. A field not given yet is a dash.
  */
 import type { ReactNode } from 'react';
-import { Tag } from '@/components/ui/ds';
+import { Body, Label, Tag } from '@/components/ui/ds';
 import { CopyId } from '@/components/look';
 import type { FieldWidget } from '@/lib/fieldWidget';
 import type { Question } from '@/lib/api/tries';
@@ -21,9 +21,9 @@ const textOf = (value: unknown) => (typeof value === 'string' ? value : JSON.str
 
 /** What says nothing was given: a dash, muted. */
 const Dash = () => (
-  <span data-dash className="font-mono text-body-medium text-on-surface-variant">
+  <Body size="medium" component="span" colorRole="on-surface-variant" data-dash className="font-mono">
     —
-  </span>
+  </Body>
 );
 
 /** A cell's value: a string as the markdown it may be, anything else as its JSON. */
@@ -105,7 +105,7 @@ function Link({ value }: { value: string }) {
       {value}
     </a>
   ) : (
-    <span className="font-mono text-body-small break-all">{value}</span>
+    <Body size="small" component="span" className="font-mono break-all">{value}</Body>
   );
 }
 
@@ -123,10 +123,10 @@ function YesNo({ value, schema }: { value: unknown; schema: unknown }) {
   const description = descriptionOf(schema);
   return (
     <p>
-      <span data-yesno={value ? 'yes' : 'no'} className="text-label-large uppercase">
+      <Label size="large" component="span" data-yesno={value ? 'yes' : 'no'} className="uppercase">
         {value ? 'yes' : 'no'}
-      </span>
-      {description && <span className="text-body-small text-on-surface-variant"> — {description}</span>}
+      </Label>
+      {description && <Body size="small" component="span" colorRole="on-surface-variant"> — {description}</Body>}
     </p>
   );
 }
@@ -143,7 +143,7 @@ const DRAWS: Record<FieldWidget, (given: Given) => ReactNode | null> = {
   table: ({ value }) => (Array.isArray(value) ? <Table rows={value} /> : null),
   record: ({ value }) => (isObject(value) ? <Rows value={value} /> : null),
   yesNo: ({ value, schema }) => <YesNo value={value} schema={schema} />,
-  number: ({ value }) => <span className="font-mono text-body-large">{textOf(value)}</span>,
+  number: ({ value }) => <Body size="large" component="span" className="font-mono">{textOf(value)}</Body>,
   link: ({ value }) => (typeof value === 'string' ? <Link value={value} /> : null),
   commit: ({ value }) => (typeof value === 'string' ? <CopyId id={value} /> : null),
   questions: ({ name, questions }) => (questions && questions.length > 0 ? <Questions field={name} questions={questions} /> : null),
@@ -180,7 +180,7 @@ export function FieldWidgetView({
 }) {
   return (
     <section data-field={name} data-widget={widget} data-given={given || undefined} aria-label={name} className="min-w-0 space-y-1">
-      <h4 className="font-mono text-body-small text-on-surface-variant">{name}</h4>
+      <Body size="small" component="h4" colorRole="on-surface-variant" className="font-mono">{name}</Body>
       {given ? <Drawn name={name} widget={widget} value={value} schema={schema} questions={questions} budgets={budgets} /> : <Dash />}
     </section>
   );

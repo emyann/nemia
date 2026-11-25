@@ -24,7 +24,7 @@ import { EnoughRow } from '../step/Enough';
 import { RaiseRow } from './Raise';
 import { container, dashed, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
-import { Button, Radio, RadioGroup, Tag, TextField } from '@/components/ui/ds';
+import { Body, Button, Radio, RadioGroup, Tag, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
@@ -48,7 +48,7 @@ export function Decide({ run }: { run: RunDetail }) {
         }
       />
     );
-  if (!decidable || !isDecidable(data)) return <p className="text-body-medium text-on-surface-variant">Nothing to decide on it now.</p>;
+  if (!decidable || !isDecidable(data)) return <Body size="medium" colorRole="on-surface-variant">Nothing to decide on it now.</Body>;
   return (
     <DecideFrame>
       <DecisionParts runId={run.id} decision={data} run={run} />
@@ -62,10 +62,10 @@ function DecideFrame({ children }: { children: ReactNode }) {
     <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-outline-variant p-4">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
-        <p className="text-body-small text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant">
           What there is to decide on this run. Copy a command to run it yourself; each step's own answer is in its part, where the board
           runs its command as the command line would.
-        </p>
+        </Body>
       </div>
       {children}
     </section>
@@ -105,15 +105,15 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-body-medium text-on-surface-variant">
+            <Body size="medium" colorRole="on-surface-variant">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
-            </p>
+            </Body>
             <Facts rows={[['work', pathRow(run.work)]]} />
           </div>
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <p className="text-body-medium text-on-surface-variant">No branch to read: no step worked on one.</p>
+          <Body size="medium" colorRole="on-surface-variant">No branch to read: no step worked on one.</Body>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -221,11 +221,11 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
         ? ['fresh', 'continue']
         : ['continue', 'fresh'];
   return (
-    <li
+    <Body size="medium" component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
     >
       {offer.case === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
@@ -253,9 +253,9 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           supportingText={rechecking ? recheck.placeholder : words.placeholder}
         />
         {rechecking && message.trim() && (
-          <p data-recheck-note className="text-body-small text-on-surface-variant">
+          <Body size="small" colorRole="on-surface-variant" data-recheck-note>
             {recheck.note}
-          </p>
+          </Body>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <AskPress pending={ask.isPending} held={offer.case === 'answer' && !message.trim()}>
@@ -278,7 +278,7 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
-    </li>
+    </Body>
   );
 }
 
@@ -294,9 +294,9 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
   const ask = useAsk(runId, step, () => setMessage(''));
   if (ask.isSuccess) {
     return (
-      <p data-asked className="font-mono text-body-small">
+      <Body size="small" data-asked className="font-mono">
         {askedSaid(ask.data)}
-      </p>
+      </Body>
     );
   }
   return (
@@ -321,9 +321,9 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
           <AskPress pending={ask.isPending} held={false}>
             {OFFERS.continue.button}
           </AskPress>
-          <p className="text-body-small">
+          <Body size="small">
             as <code>{line}</code> {OFFERS.continue.said}
-          </p>
+          </Body>
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
@@ -338,19 +338,19 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
 export function TouchedBranch({ touched: { branch, radius } }: { touched: Touched }) {
   return (
     <div data-touched={branch} className="space-y-2">
-      <p className="text-body-medium">
+      <Body size="medium">
         <span className="text-on-surface-variant">touched </span>
-        <span className="break-all font-mono text-body-small">{branch}</span>
-      </p>
+        <Body size="small" component="span" className="break-all font-mono">{branch}</Body>
+      </Body>
       {'error' in radius ? (
-        <p className="text-body-medium text-failure">{radius.error}</p>
+        <Body size="medium" className="text-failure">{radius.error}</Body>
       ) : radius.changes.length ? (
         <>
           <GroupRows groups={radius.groups} />
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <p className="text-body-medium text-on-surface-variant">nothing — the branch changed no file against the base</p>
+        <Body size="medium" colorRole="on-surface-variant">nothing — the branch changed no file against the base</Body>
       )}
     </div>
   );
@@ -434,10 +434,10 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
       </p>
     );
   return (
-    <div className="space-y-1.5 text-body-small">
+    <Body size="small" component="div" className="space-y-1.5">
       {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, '')}
       {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, 'border-yours text-yours')}
-    </div>
+    </Body>
   );
 }
 
@@ -448,9 +448,9 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
       <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
-          {sensitive.length > 1 && <p className="break-all font-mono text-body-small text-on-surface-variant">{branch}</p>}
+          {sensitive.length > 1 && <Body size="small" colorRole="on-surface-variant" className="break-all font-mono">{branch}</Body>}
           {error ? (
-            <p className="text-body-medium text-failure">{error}</p>
+            <Body size="medium" className="text-failure">{error}</Body>
           ) : files.length ? (
             files.map((file) => (
               <DiffFileView
@@ -463,7 +463,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
               />
             ))
           ) : (
-            <p className="text-body-medium text-on-surface-variant">none</p>
+            <Body size="medium" colorRole="on-surface-variant">none</Body>
           )}
         </div>
       ))}
@@ -486,7 +486,7 @@ const LINE_CLASS: Record<DiffLine, string> = {
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
     <details data-diff={file.path} className="group rounded border border-outline-variant">
-      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-body-small hover:bg-surface-container-high">
+      <Body size="small" component="summary" className="flex cursor-pointer items-center gap-2 px-2 py-1 hover:bg-surface-container-high">
         <ChevronRight aria-hidden className="size-3.5 shrink-0 text-on-surface-variant transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
@@ -502,7 +502,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
             )}
           </span>
         )}
-      </summary>
+      </Body>
       <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono text-body-small leading-snug">
         {file.lines.map((line, i) => {
           const kind = diffLine(line);
@@ -514,9 +514,9 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
         })}
       </pre>
       {file.cut > 0 && (
-        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-body-small text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" data-cut={file.cut} className="border-t border-outline-variant px-2 py-1">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
-        </p>
+        </Body>
       )}
     </details>
   );
@@ -532,13 +532,13 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
         : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', dashed.grey];
   return (
     <p>
-      <span
+      <Body size="small" component="span"
         data-lesson={lesson.state}
         title={title}
-        className={cn('inline-block rounded px-2 py-0.5 font-mono text-body-small', className)}
+        className={cn('inline-block rounded px-2 py-0.5 font-mono', className)}
       >
         {text}
-      </span>
+      </Body>
     </p>
   );
 }
@@ -560,7 +560,7 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
           ))}
         </ul>
       ) : (
-        <p className="text-body-medium text-on-surface-variant">None yet: the run is still moving.</p>
+        <Body size="medium" colorRole="on-surface-variant">None yet: the run is still moving.</Body>
       )}
     </section>
   );

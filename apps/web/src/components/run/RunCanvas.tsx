@@ -26,7 +26,7 @@ import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { StateEdge } from '../step/StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from '../step/stepGraph';
@@ -88,7 +88,7 @@ export function RunCanvas(props: Props) {
   }, [names, edges]);
 
   if (computed instanceof Error) {
-    return <p className="rounded border border-failure px-3 py-2 text-body-medium text-failure">{computed.message}</p>;
+    return <Body size="medium" className="rounded border border-failure px-3 py-2 text-failure">{computed.message}</Body>;
   }
   return (
     <ReactFlowProvider>

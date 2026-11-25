@@ -4,7 +4,7 @@
  * its check and its gate besides. While the run's own answer is read, it says so in place of what it has not read.
  */
 import { ChevronRight, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
-import { Avatar, Body, Label, Meter, Tag } from '@/components/ui/ds';
+import { Avatar, Body, Label, Meter, Tag, Title } from '@/components/ui/ds';
 import { ink } from '@/lib/meaning';
 import type { CardNote, CardSpend, CardTime, PartHead as Head, PartSize } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
@@ -56,9 +56,9 @@ function Who({ head }: { head: Head }) {
         <Avatar size={40} alt={who.name} fallback={who.initial} className="shrink-0 bg-secondary-container text-on-secondary-container" />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span data-step-agent className="truncate text-title-small">
+        <Title size="small" component="span" data-step-agent className="truncate">
           {who?.name ?? 'no agent'}
-        </span>
+        </Title>
         {who?.role && (
           <Body component="span" size="small" colorRole="on-surface-variant">
             {who.role}
@@ -77,7 +77,7 @@ function Name({ head }: { head: Head }) {
       <Label component="span" size="large" className="truncate uppercase" title={head.step}>
         {head.step}
       </Label>
-      {head.round !== 'none' && <span className="font-mono text-body-small text-on-surface-variant">{head.round}</span>}
+      {head.round !== 'none' && <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{head.round}</Body>}
     </div>
   );
 }
@@ -87,8 +87,8 @@ function Time({ time }: { time: CardTime }) {
   return (
     <div data-step-time className="flex flex-wrap items-baseline gap-x-2.5 bg-surface-container-highest px-3 py-2.5">
       <Key className="w-[84px]">{time.label}</Key>
-      <span className={cn('font-mono text-body-large', TIME_INK[time.ink])}>{time.value}</span>
-      <span className="font-mono text-body-small text-on-surface-variant">{time.note}</span>
+      <Body size="large" component="span" className={cn('font-mono', TIME_INK[time.ink])}>{time.value}</Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{time.note}</Body>
     </div>
   );
 }
@@ -102,9 +102,9 @@ function Facts({ facts }: { facts: ReadonlyArray<{ key: string; value: string }>
           <dt>
             <Key>{fact.key}</Key>
           </dt>
-          <dd data-fact={fact.key} className="m-0 font-mono text-body-medium break-words">
+          <Body size="medium" component="dd" data-fact={fact.key} className="m-0 font-mono break-words">
             {fact.value}
-          </dd>
+          </Body>
         </div>
       ))}
     </dl>
@@ -131,8 +131,8 @@ function Spend({ spend }: { spend: CardSpend }) {
   return (
     <div data-step-spend="words" className="flex flex-wrap items-baseline gap-x-2.5 border-t border-outline-variant pt-3">
       <Key className="w-24">{spend.label}</Key>
-      <span className={'font-mono text-body-medium text-on-surface'}>{spend.said}</span>
-      <span className="font-mono text-body-small text-on-surface-variant">{spend.note}</span>
+      <Body size="medium" component="span" colorRole="on-surface" className={'font-mono'}>{spend.said}</Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{spend.note}</Body>
     </div>
   );
 }
@@ -147,7 +147,7 @@ function Note({ note, line = false }: { note: CardNote; line?: boolean }) {
       className={cn('flex min-w-0 items-start gap-2', note.icon === 'fail' ? ink.failure : 'text-on-surface-variant')}
     >
       <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span className={cn('text-body-small', line ? 'truncate' : 'break-words')}>{note.text}</span>
+      <Body size="small" component="span" className={cn('', line ? 'truncate' : 'break-words')}>{note.text}</Body>
     </div>
   );
 }

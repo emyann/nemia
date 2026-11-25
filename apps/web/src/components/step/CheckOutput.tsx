@@ -9,7 +9,7 @@ import type { CheckOutput as Printed, OutputStream } from 'objects';
 import { steps } from '@/lib/api/objects';
 import { PATH_POLL_MS } from '@/lib/lifecyclePath';
 import { Reading, ReadingLines } from '@/components/look';
-import { Button, SearchBar, Segment, SegmentedButton } from '@/components/ui/ds';
+import { Body, Button, SearchBar, Segment, SegmentedButton } from '@/components/ui/ds';
 import { focusRing } from '@/components/ui/ds/utils';
 import { cn } from '@/lib/utils';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
@@ -156,9 +156,9 @@ export function CheckOutput({ read }: { read: CheckRead }) {
         </Reading>
       ) : (
         <>
-          <p data-check-output-said className="text-body-small text-on-surface-variant">
+          <Body size="small" colorRole="on-surface-variant" data-check-output-said>
             {said(data, match)}
-          </p>
+          </Body>
           <Lines lines={data.lines} atEnd={!('from' in at)} />
           <Pages data={data} at={at} onAt={setAt} />
         </>

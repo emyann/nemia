@@ -11,6 +11,7 @@ import { Markdown } from '../../markdown/Markdown';
 import { AsItCame, ClosedNeeds, YourAnswer } from '../Closeout';
 import { OutcomeHead } from '../Outcome';
 import { Fold } from './Fold';
+import { Body, Label } from '@/components/ui/ds';
 
 /** What the step said, as its part's model has it. */
 type Said = Exclude<StepPartModel['said'], 'none'>;
@@ -21,21 +22,21 @@ export function PartSaid({ step, said }: { step: StepView; said: Said }) {
   const outcome = shown ? outcomeOf(shown, 'No closeout on the record of this try.') : null;
   return (
     <section data-part-said={step.name} aria-label="What it said" className="min-w-0 scroll-mt-4 space-y-2 text-body-medium">
-      <h3 className="text-label-medium text-on-surface-variant uppercase">Said</h3>
+      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">Said</Label>
       {outcome && <OutcomeHead outcome={outcome} />}
       {shown?.answer && <YourAnswer answer={shown.answer} by={shown.answeredBy} />}
       {said.kind === 'unreadable' ? (
         <AsItCame raw={step.unreadable?.raw ?? said.error} />
       ) : (
         <>
-          <p data-summary className="text-body-medium text-on-surface">
+          <Body size="medium" colorRole="on-surface" data-summary>
             {summaryShown(said.summary)}
-          </p>
+          </Body>
           {said.needs && <ClosedNeeds needs={said.needs} />}
           {step.closeout?.refused.map((why) => (
-            <p key={why} data-refused className="text-body-small text-failure">
+            <Body size="small" key={why} data-refused className="text-failure">
               not accepted: {why}
-            </p>
+            </Body>
           ))}
           {said.account && (
             <Fold name="account" title="Its account">

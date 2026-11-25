@@ -17,6 +17,7 @@ import { ChevronRightIcon } from 'lucide-react';
 
 import { focusRing } from '@/components/ui/ds/utils';
 import { cn } from '@/lib/utils';
+import { Body } from '@/components/ui/ds';
 
 /**
  * A line's state: at work (`running`), failed (`error`), not started (`pending`), or waiting on the person (`yours`, the look's
@@ -41,11 +42,11 @@ function Trace({ className, ...props }: React.ComponentProps<'div'>) {
 /** One step: its icon, its sentence and its fact, in the state `status` says, done when it says none. */
 function TraceLine({ className, status, ...props }: React.ComponentProps<'span'> & { status?: TraceStatus }) {
   return (
-    <span
+    <Body size="medium" component="span" colorRole="on-surface"
       data-slot="trace-line"
       data-status={status}
       className={cn(
-        'flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1 text-body-medium text-on-surface',
+        'flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1',
         status && STATUS[status],
         className,
       )}
@@ -83,9 +84,9 @@ function TraceTitle({ className, ...props }: React.ComponentProps<'span'>) {
 /** A line's quiet fact on its right, in mono: a duration, a count, a diff stat. */
 function TraceDescription({ className, ...props }: React.ComponentProps<'span'>) {
   return (
-    <span
+    <Body size="small" component="span" colorRole="on-surface-variant"
       data-slot="trace-description"
-      className={cn('shrink-0 font-mono text-body-small text-on-surface-variant tabular-nums', className)}
+      className={cn('shrink-0 font-mono tabular-nums', className)}
       {...props}
     />
   );

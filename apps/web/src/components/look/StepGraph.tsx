@@ -9,7 +9,7 @@ import { railSaid, railStates } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { stepMark, waitsNow, type StepMark } from '@/lib/stepMark';
 import { stateWordsOf } from '@/lib/words';
-import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Label, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 
 /** What the graph says under a step's node, with `named`: its agent, and a line of its own, its time and cost. */
@@ -41,11 +41,11 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
       className="absolute flex w-22 flex-col items-center text-center leading-tight"
       style={{ left: x - 44, top: y + 2 }}
     >
-      <span title={name} className={cn('truncate text-label-small uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
+      <Label size="small" component="span" title={name} className={cn('truncate uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
         {name}
-      </span>
-      <span className="truncate text-body-small text-on-surface">{named?.agent ?? '—'}</span>
-      <span className="truncate font-mono text-body-small text-on-surface-variant">{named?.said || '–'}</span>
+      </Label>
+      <Body size="small" component="span" colorRole="on-surface" className="truncate">{named?.agent ?? '—'}</Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="truncate font-mono">{named?.said || '–'}</Body>
     </span>
   );
 }
@@ -230,9 +230,9 @@ export function StepGraph({
           )}
       </div>
       {layout.error && (
-        <p data-graph-error title={layout.error} className="m-0 line-clamp-2 text-body-small text-failure">
+        <Body size="small" data-graph-error title={layout.error} className="m-0 line-clamp-2 text-failure">
           {layout.error}
-        </p>
+        </Body>
       )}
     </div>
   );
@@ -291,7 +291,7 @@ function Node({
     return (
       <div data-fold={point.names.join(' ')} className="absolute" style={box}>
         <Told said={said}>
-          <span className="font-mono text-body-small leading-none text-on-surface-variant">+{point.names.length}</span>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono leading-none">+{point.names.length}</Body>
         </Told>
       </div>
     );

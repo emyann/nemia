@@ -24,7 +24,7 @@ import {
   unassigned,
   type CardRefusal,
 } from '@/lib/inbox';
-import { Button } from '@/components/ui/ds';
+import { Body, Button, Title } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 
 /** What the Inbox reads of its address: the factory its path names (none for every factory's), its label selector and its cards' kind. */
@@ -66,28 +66,28 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
 
   return (
     <article className="space-y-6">
-      <p className="text-body-medium text-on-surface-variant">
+      <Body size="medium" colorRole="on-surface-variant">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
         command line parks one. Starting a card writes its run&apos;s record as any start does, and keeps the card, which reads its
         run&apos;s phase from then on: in play while the run waits its turn, works or waits on you, ended once it is over. A card queued
         starts on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the
         oldest queued first.
-      </p>
+      </Body>
       <FileCard shown={factory} />
       <SelectorField key={l ?? ''} selector={l} onSelect={(next) => onSearch({ l: next })} />
       <section aria-label="Cards" className="space-y-3">
         {all.length > 0 && <CardsSwitch ended={ended} inPlay={playing.length} over={over.length} onShow={show} />}
-        <h2 className="flex items-baseline gap-2 text-title-small">
+        <Title size="small" component="h2" className="flex items-baseline gap-2">
           Cards{' '}
-          <span data-count className="text-body-small font-normal text-on-surface-variant">
+          <Body size="small" component="span" colorRole="on-surface-variant" data-count className="font-normal">
             {cards.length}
-          </span>
+          </Body>
           {queue > 0 && (
-            <span data-queue-count className="text-body-small font-normal text-on-surface-variant">
+            <Body size="small" component="span" colorRole="on-surface-variant" data-queue-count className="font-normal">
               · {queue} queued
-            </span>
+            </Body>
           )}
-        </h2>
+        </Title>
         {lines.length > 0 && (
           <ul className="space-y-3">
             {lines.map(({ entry, refusal, gone }) =>
@@ -101,18 +101,18 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
         )}
         {cards.length === 0 && all.length > 0 && <NoneShown ended={ended} over={over.length} />}
         {all.length === 0 && factory !== undefined && (
-          <p data-filtered-out className="text-body-medium text-on-surface-variant">
+          <Body size="medium" colorRole="on-surface-variant" data-filtered-out>
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
               Show every factory&apos;s
             </Link>
             .
-          </p>
+          </Body>
         )}
         {all.length === 0 && factory === undefined && (
-          <p data-empty className="text-body-medium text-on-surface-variant">
+          <Body size="medium" colorRole="on-surface-variant" data-empty>
             The inbox is empty. File an idea in the box above, or from the command line.
-          </p>
+          </Body>
         )}
       </section>
     </article>
@@ -161,21 +161,21 @@ function CardsSwitch({
 /** What the page says where the segment picked lists none of the cards the filters keep, and a link to the other segment. */
 function NoneShown({ ended, over }: { ended: boolean; over: number }) {
   return ended ? (
-    <p data-none-ended className="text-body-medium text-on-surface-variant">
+    <Body size="medium" colorRole="on-surface-variant" data-none-ended>
       No card&apos;s run has ended: every card here is still in play.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: undefined })} className="underline underline-offset-2">
         Show the cards in play
       </Link>
       .
-    </p>
+    </Body>
   ) : (
-    <p data-none-in-play className="text-body-medium text-on-surface-variant">
+    <Body size="medium" colorRole="on-surface-variant" data-none-in-play>
       No card is in play: every card here was started, and its run has ended.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: 'ended' as const })} className="underline underline-offset-2">
         Show the {over} ended
       </Link>
       .
-    </p>
+    </Body>
   );
 }
 
@@ -264,11 +264,11 @@ function CardItem({
               </PageLink>
             </p>
           ) : (
-            <p className="font-mono text-body-medium break-all">
+            <Body size="medium" className="font-mono break-all">
               <PageLink entry={entry} entries={entries}>
                 {entry.file}
               </PageLink>
-            </p>
+            </Body>
           )}
           <CardMeta entry={entry} />
           <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
@@ -332,8 +332,8 @@ function StartCard({
 function NotACard({ error }: { error: string }) {
   return (
     <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
-      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
+      <Body size="medium" className="font-medium text-on-failure-container">Does not read as a card, so it cannot start:</Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{error}</Body>
     </div>
   );
 }

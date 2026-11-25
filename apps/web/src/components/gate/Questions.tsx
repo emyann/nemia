@@ -30,7 +30,7 @@ import {
 import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
-import { Body, Button, Radio, RadioGroup, Tag, TextField, Title } from '@/components/ui/ds';
+import { Body, Button, Label, Radio, RadioGroup, Tag, TextField, Title } from '@/components/ui/ds';
 import { CheckTile, CheckTileGroup, CutTag, Pending, RadioTile, RadioTileGroup } from '@/components/look';
 
 /** The value a way out's tile holds in its question's group; an option's is `option:<its place>`, so no label an agent wrote meets it. */
@@ -69,7 +69,7 @@ function OptionTitle({ label, recommended }: { label: string; recommended: boole
 function QuestionHead({ q, n }: { q: Frozen<Question>; n: number }) {
   return (
     <>
-      <span className="block text-label-small text-on-surface-variant uppercase">{SERIES.eyebrow(n)}</span>
+      <Label size="small" component="span" colorRole="on-surface-variant" className="block uppercase">{SERIES.eyebrow(n)}</Label>
       <Title size="medium" component="span" className="block text-on-surface">
         {q.title}
       </Title>
@@ -222,7 +222,7 @@ export function QuestionSeries({
   if (!onDraft) {
     return (
       <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-        {field && <h4 className="font-mono text-body-small text-on-surface-variant">{field}</h4>}
+        {field && <Body size="small" component="h4" colorRole="on-surface-variant" className="font-mono">{field}</Body>}
         <ol className="space-y-4 text-body-medium">
           {questions.map((q, i) => (
             <QuestionRead key={q.title} q={q} n={i + 1} />
@@ -279,12 +279,12 @@ export function RecommendButton({
 /** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
 export function AskedRow({ step, said }: { step: string; said: string }) {
   return (
-    <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
+    <Body size="medium" component="li" data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-on-surface-variant">
+      <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
         {said}
-      </span>
-    </li>
+      </Body>
+    </Body>
   );
 }
 
@@ -323,12 +323,12 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
   if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;
   const left = unanswered(offer.questions, draft);
   return (
-    <li
+    <Body size="medium" component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-questions
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
     >
       <p data-said>
         <strong>{offer.step}</strong> asks {offer.questions.length === 1 ? 'a question' : `${offer.questions.length} questions`}
@@ -368,6 +368,6 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
-    </li>
+    </Body>
   );
 }

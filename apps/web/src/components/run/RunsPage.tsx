@@ -10,7 +10,7 @@ import { ReadRefusal, troubleOf } from '@/lib/api/read';
 import { trailOf } from '@/lib/finished';
 import { ink } from '@/lib/meaning';
 import { CutTag, MeaningTag, Reading, ScanLines } from '../look';
-import { Button, Skeleton, Tag } from '../ui/ds';
+import { Body, Button, Label, Skeleton, Tag } from '../ui/ds';
 import { judged } from '@/lib/api/judged';
 import { useBar } from '@/lib/useBar';
 
@@ -102,9 +102,9 @@ export function RunsFailed({ error }: { error: unknown }) {
     <Frame state="error">
       <div role="alert" className="flex flex-col gap-1">
         <p className={`m-0 text-body-medium ${ink.failure}`}>The runs could not be loaded.</p>
-        <p data-error-reason className="m-0 text-body-small break-words text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" data-error-reason className="m-0 break-words">
           {troubleOf(error).words}
-        </p>
+        </Body>
       </div>
     </Frame>
   );
@@ -161,8 +161,8 @@ function CountChip({ count, word, tone }: { count: number; word: string; tone: '
       <CutTag edge={drawn === 'quiet'}>
         <CountTag count={count} drawn={drawn} tag={tag}>
           <span className="inline-flex items-baseline gap-2.5">
-            <span className="font-mono text-body-large">{count}</span>
-            <span className="text-label-large uppercase">{word}</span>
+            <Body size="large" component="span" className="font-mono">{count}</Body>
+            <Label size="large" component="span" className="uppercase">{word}</Label>
           </span>
         </CountTag>
       </CutTag>
@@ -190,9 +190,9 @@ function AcrossFactories() {
 /** What a section says when it holds nothing. */
 function Nothing({ children }: { children: string }) {
   return (
-    <p data-nothing className="m-0 text-body-medium text-on-surface-variant">
+    <Body size="medium" colorRole="on-surface-variant" data-nothing className="m-0">
       {children}
-    </p>
+    </Body>
   );
 }
 

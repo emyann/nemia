@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 import { CutField } from '@/components/look';
 import { checkSelector } from '@/lib/api/inbox';
 
@@ -57,9 +57,9 @@ export function SelectorField({
         />
       </CutField>
       {refused === null ? null : (
-        <p role="alert" data-selector-refused className="m-0 text-body-small text-failure">
+        <Body size="small" role="alert" data-selector-refused className="m-0 text-failure">
           {refused}
-        </p>
+        </Body>
       )}
     </form>
   );

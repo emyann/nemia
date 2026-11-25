@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { TextLink } from '../look';
 import { Markdown } from '../markdown/Markdown';
 import { PartGave } from '../step/part/PartGave';
+import { Body, Label } from '@/components/ui/ds';
 
 /** Where the run stands, until its final steps have given. */
 type Why = Extract<ReturnType<typeof resultOf>, { kind: 'stands' }>['why'];
@@ -42,19 +43,19 @@ function Routed({ message }: { message: string }) {
   const routed = routedOf(message);
   if (routed?.kind === 'sent')
     return (
-      <p data-result-sent={routed.card} className="text-body-medium">
+      <Body size="medium" data-result-sent={routed.card}>
         <span className="text-on-surface-variant">sent </span>
         <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
           {routed.card}
         </TextLink>
-      </p>
+      </Body>
     );
   if (routed?.kind === 'routed')
     return (
-      <p data-result-route={routed.route} className="text-body-medium">
+      <Body size="medium" data-result-route={routed.route}>
         <span className="text-on-surface-variant">took the route </span>
         <span className="font-mono">{routed.route}</span>
-      </p>
+      </Body>
     );
   return null;
 }
@@ -71,7 +72,7 @@ function Gave({ run, step, now }: { run: RunDetail; step: string; now: Date }) {
     <div data-result-gave={step} className="space-y-2">
       <ToPart run={run.id} step={step} />
       <Routed message={own.message} />
-      {own.closeout?.summary && <p className="text-body-medium break-words">{own.closeout.summary}</p>}
+      {own.closeout?.summary && <Body size="medium" className="break-words">{own.closeout.summary}</Body>}
       {gave !== 'none' && <PartGave step={own} gave={gave} size="L" />}
     </div>
   );
@@ -99,7 +100,7 @@ function Result({ run }: { run: RunDetail }) {
   const end = runEndOf(run);
   if (end !== null && result.why !== 'failed')
     return (
-      <p data-result-ended={end} className="text-body-medium">
+      <Body size="medium" data-result-ended={end}>
         Nothing given.{' '}
         {end === 'calledOff' ? (
           <>
@@ -111,11 +112,11 @@ function Result({ run }: { run: RunDetail }) {
         ) : (
           'The run ended before its last steps gave.'
         )}
-      </p>
+      </Body>
     );
   const { words, hue } = STANDS[result.why];
   return (
-    <p data-result-stands={result.why} className="text-body-medium">
+    <Body size="medium" data-result-stands={result.why}>
       Nothing given yet. Where it stands: <span className={cn('font-medium', ink[hue])}>{words}</span>
       {result.step === null ? (
         ', nothing left to run.'
@@ -125,7 +126,7 @@ function Result({ run }: { run: RunDetail }) {
           <ToPart run={run.id} step={result.step} />.
         </>
       )}
-    </p>
+    </Body>
   );
 }
 
@@ -134,16 +135,16 @@ export function RunResult({ run }: { run: RunDetail }) {
   return (
     <div className="grid items-start gap-6 @3xl/page:grid-cols-2">
       <section aria-label="The ask" data-run-ask className="min-w-0 space-y-3">
-        <h2 className="text-label-large text-on-surface-variant">The ask</h2>
+        <Label size="large" component="h2" colorRole="on-surface-variant">The ask</Label>
         <Markdown>{run.brief}</Markdown>
         {run.fromNote && (
-          <p data-from={run.from?.inbox} className="text-body-medium text-on-surface-variant">
+          <Body size="medium" colorRole="on-surface-variant" data-from={run.from?.inbox}>
             {run.fromNote}
-          </p>
+          </Body>
         )}
       </section>
       <section aria-label="The result" data-run-result={resultOf(resultStepsOf(run)).kind} className="min-w-0 space-y-3">
-        <h2 className="text-label-large text-on-surface-variant">The result</h2>
+        <Label size="large" component="h2" colorRole="on-surface-variant">The result</Label>
         <Result run={run} />
       </section>
     </div>

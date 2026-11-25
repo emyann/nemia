@@ -8,7 +8,7 @@ import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
 import { Reading, ReadingLines } from '@/components/look';
-import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, SideSheet, Skeleton, Slider, Title } from '@/components/ui/ds';
+import { Body, Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, SideSheet, Skeleton, Slider, Title } from '@/components/ui/ds';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 type Step = StepView;
@@ -39,7 +39,7 @@ export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; s
     <section aria-label="Debug" className="shrink-0">
       <Disclosure isExpanded={isExpanded} onExpandedChange={setExpanded}>
         <DisclosureTrigger className="min-h-0 py-1.5">
-          <span className="text-body-small font-body-small text-on-surface-variant">Debug</span>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="font-body-small">Debug</Body>
         </DisclosureTrigger>
         <DisclosurePanel isUnstyled className={UNCLIPPED}>
           {isExpanded && <PathOf run={run} step={step} shown={shown} />}
@@ -75,7 +75,7 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
 
   return (
     <div className="max-h-[60svh] space-y-2 overflow-y-auto px-4 pb-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
+      <Body size="small" component="div" colorRole="on-surface-variant" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span>
           {PATH_TITLE}
           {read.data?.taskId ? (
@@ -89,7 +89,7 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
           <WideGraph machine={machine} taskId={read.data.taskId} path={path} at={at} lit={lit} taken={taken} onScrub={onScrub} />
         ) : null}
         {step.tries.length > 1 && <span data-path-try={shown}>try {shown}</span>}
-      </div>
+      </Body>
       {read.error ? (
         <ReadTrouble what="the path" error={read.error} />
       ) : !read.data ? (
@@ -123,7 +123,7 @@ function PathDrawn({
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
-  if (read.taskId === null) return <p className="text-body-medium text-on-surface-variant">Not filed yet, so there is no path to show.</p>;
+  if (read.taskId === null) return <Body size="medium" colorRole="on-surface-variant">Not filed yet, so there is no path to show.</Body>;
   return (
     <div
       data-path={read.taskId}
@@ -232,10 +232,10 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[];
         showOutput={false}
         className="px-2"
       />
-      <p data-shown className="text-body-small text-on-surface-variant">
+      <Body size="small" colorRole="on-surface-variant" data-shown>
         Entry {at + 1} of {path.length}
         {at === path.length - 1 ? ', the newest' : ''}
-      </p>
+      </Body>
     </div>
   );
 }
@@ -258,7 +258,7 @@ function Timeline({
 }) {
   const now = new Date(useNow(60_000));
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
-  if (path.length === 0) return <p className="text-body-medium text-on-surface-variant">Its journal has nothing on it yet.</p>;
+  if (path.length === 0) return <Body size="medium" colorRole="on-surface-variant">Its journal has nothing on it yet.</Body>;
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />

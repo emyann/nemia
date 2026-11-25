@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Tag } from '@/components/ui/ds';
+import { Body, Tag } from '@/components/ui/ds';
 import { type Outcome, outcomeWord } from '../../lib/outcome';
 import { Markdown } from '../markdown/Markdown';
 import { container } from '../../lib/meaning';
@@ -30,11 +30,11 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Tag className={BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by]}>{word}</Tag>{' '}
-          <span className="text-body-small text-on-surface-variant">{BY[outcome.by]}</span>
+          <Body size="small" component="span" colorRole="on-surface-variant">{BY[outcome.by]}</Body>
         </p>
         {aside}
       </div>
-      {outcome.by === 'agent' && outcome.cut && <p className="text-body-small text-failure">… {outcome.cut}.</p>}
+      {outcome.by === 'agent' && outcome.cut && <Body size="small" className="text-failure">… {outcome.cut}.</Body>}
       {outcome.by !== 'agent' && (
         <p data-reason className="text-on-surface-variant">
           {outcome.words}

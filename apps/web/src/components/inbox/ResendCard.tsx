@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Radio, RadioGroup } from '@/components/ui/ds';
+import { Body, Button, Radio, RadioGroup } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 import { resendCard, type InboxEntry } from '@/lib/api/inbox';
 import type { CardResent } from 'objects';
@@ -37,9 +37,9 @@ export function ResendCard({
   });
   return (
     <div data-resend={entry.name} className="space-y-2 rounded border border-outline-variant px-3 py-2">
-      <p className="text-body-medium">
+      <Body size="medium">
         Send this card on as a card of its own, handed the run it was started as. Where that run waits on you, it is called off.
-      </p>
+      </Body>
       <RadioGroup
         aria-label={`Where ${entry.name} is sent on to`}
         name={`resend-${entry.name}`}
@@ -71,7 +71,7 @@ function Resent({ answer }: { answer: CardResent }) {
   const { card, from } = answer;
   const goes = card.spec.workflow === undefined ? "naming no workflow, for its factory's card triggers" : `queued on ${card.spec.workflow}`;
   return (
-    <div data-resent={card.metadata.name} className="space-y-1 text-body-small">
+    <Body size="small" component="div" data-resent={card.metadata.name} className="space-y-1">
       <p>
         Filed as <code className="font-mono">{card.metadata.name}</code>, {goes}.
       </p>
@@ -81,6 +81,6 @@ function Resent({ answer }: { answer: CardResent }) {
           Run {from.run} not called off: {answer.cancelLeft}
         </p>
       )}
-    </div>
+    </Body>
   );
 }

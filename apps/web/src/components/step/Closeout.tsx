@@ -8,6 +8,7 @@ import { Markdown } from '../markdown/Markdown';
 import { Json } from './Outcome';
 import { Actor } from '../actor/Actor';
 import type { Frozen } from '../../lib/frozen';
+import { Body } from '@/components/ui/ds';
 
 export { Artifacts } from '../run/Artifacts';
 
@@ -68,7 +69,7 @@ export function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null })
 export function AsItCame({ raw }: { raw: unknown }) {
   return (
     <section aria-label="As it came" className="space-y-1">
-      <h4 className="text-body-small text-on-surface-variant">the statement as it came</h4>
+      <Body size="small" component="h4" colorRole="on-surface-variant">the statement as it came</Body>
       <Json data-raw value={raw} />
     </section>
   );
@@ -97,15 +98,15 @@ export function Statement({ closeout }: { closeout: Frozen<Pick<StepCloseout, 's
   return (
     <>
       {!bodyLeadsWith(closeout.summary, closeout.body) && (
-        <p data-summary className="text-body-medium text-on-surface">
+        <Body size="medium" colorRole="on-surface" data-summary>
           {summaryShown(closeout.summary)}
-        </p>
+        </Body>
       )}
       {closeout.body && <Markdown data-body>{closeout.body}</Markdown>}
       {closeout.refused.map((why) => (
-        <p key={why} data-refused className="text-body-small text-failure">
+        <Body size="small" key={why} data-refused className="text-failure">
           not accepted: {why}
-        </p>
+        </Body>
       ))}
     </>
   );

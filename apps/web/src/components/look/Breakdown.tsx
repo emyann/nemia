@@ -1,4 +1,4 @@
-import { Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { Breakdown } from '@/lib/breakdown';
 import type { ReactNode } from 'react';
 import { cn } from '@/components/ui/ds/utils';
@@ -19,9 +19,9 @@ export function BreakdownRows({ breakdown }: { breakdown: Breakdown }) {
         ))}
       </dl>
       {breakdown.foot && (
-        <p data-breakdown-foot className="m-0 mt-2 border-t border-outline-variant pt-2 text-body-small">
+        <Body size="small" data-breakdown-foot className="m-0 mt-2 border-t border-outline-variant pt-2">
           {breakdown.foot}
-        </p>
+        </Body>
       )}
     </>
   );

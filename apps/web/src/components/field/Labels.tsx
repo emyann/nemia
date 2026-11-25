@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Tag } from '@/components/ui/ds';
+import { Body, Button, Tag } from '@/components/ui/ds';
 import { CutField, CutTag, TextLink } from '@/components/look';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 
@@ -87,9 +87,9 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
           />
         </CutField>
         {refused === null ? null : (
-          <p role="alert" data-labels-refused className="m-0 text-body-small text-failure">
+          <Body size="small" role="alert" data-labels-refused className="m-0 text-failure">
             {refused}
-          </p>
+          </Body>
         )}
       </form>
     </section>

@@ -5,7 +5,7 @@ import type { StepArtifact, StepValue } from '../../lib/api/tries.ts';
 import { fileKey } from '../../lib/stepPart';
 import { viewOpened } from '../../lib/viewAddress';
 import { cn, focusRing } from '../ui/ds/utils';
-import { Chip as KitChip } from '../ui/ds';
+import { Body, Chip as KitChip, Label } from '../ui/ds';
 import { when } from '../step/Facts';
 
 /**
@@ -72,11 +72,11 @@ export function Artifacts({
   size?: boolean;
   none?: string;
 }) {
-  if (!artifacts.length) return <p className="text-body-small text-on-surface-variant">{none}</p>;
+  if (!artifacts.length) return <Body size="small" colorRole="on-surface-variant">{none}</Body>;
   const pictures = artifacts.filter((a): a is Served => served(a) && a.kind === 'image');
   const rest = artifacts.filter((a) => !(served(a) && a.kind === 'image'));
   return (
-    <div data-artifacts className="mt-1 space-y-2 text-body-small">
+    <Body size="small" component="div" data-artifacts className="mt-1 space-y-2">
       {pictures.length > 0 && (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
           {pictures.map((picture) => (
@@ -102,7 +102,7 @@ export function Artifacts({
           ))}
         </ul>
       )}
-    </div>
+    </Body>
   );
 }
 
@@ -191,7 +191,7 @@ export function Values({ values }: { values: readonly StepValue[] }) {
     <ul data-values className="mt-1 flex flex-col gap-1 text-body-small">
       {values.map((v, i) => (
         <li key={`${i}:${v.name}`} data-value={v.name} className="break-all">
-          <span className="text-label-small uppercase text-on-surface-variant">{v.name}</span>{' '}
+          <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">{v.name}</Label>{' '}
           {v.link ? (
             <a href={v.link} target="_blank" rel="noreferrer" className={linkClass}>
               {v.value}

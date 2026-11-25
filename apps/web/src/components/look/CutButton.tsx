@@ -4,6 +4,7 @@ import { cn } from '@/components/ui/ds/utils';
 import { cutEdge, cutRing, cutShape } from './cut';
 import { Pending } from './Pending';
 import { routeLink } from '../nav/routeLink';
+import { Label } from '@/components/ui/ds';
 
 /** How long the button's cut is along each side, in pixels. */
 const CUT = 12;
@@ -61,10 +62,10 @@ function Body({
           style={{ clipPath: cutRing(CUT, GAP, RING) }}
         />
       )}
-      <span
+      <Label size="large" component="span"
         data-cut-shape
         className={cn(
-          'relative inline-flex items-center gap-2 text-label-large whitespace-nowrap uppercase',
+          'relative inline-flex items-center gap-2 whitespace-nowrap uppercase',
           quiet ? 'h-8 px-4' : 'h-10 px-6',
           disabled ? DISABLED : quiet ? QUIET : filled.yours,
         )}
@@ -86,7 +87,7 @@ function Body({
         )}
         {pending && <Pending size={18} className="relative" />}
         <span className="relative">{children}</span>
-      </span>
+      </Label>
     </>
   );
 }

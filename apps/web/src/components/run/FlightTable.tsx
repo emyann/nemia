@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
@@ -38,10 +38,10 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
             </TextLink>
             <Tooltip>{run.id}</Tooltip>
           </TooltipTrigger>
-          <span className="flex items-center gap-3.5 text-body-small font-medium text-on-surface-variant">
+          <Body size="small" component="span" colorRole="on-surface-variant" className="flex items-center gap-3.5 font-medium">
             <CopyId id={run.id} short />
             <span data-factory={namespaceOf(run.factory)}>{namespaceOf(run.factory)}</span>
-          </span>
+          </Body>
         </span>
       </Cell>
       <Cell>

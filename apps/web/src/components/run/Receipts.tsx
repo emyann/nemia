@@ -14,20 +14,21 @@ import { Fold } from '../step/part/Fold';
 import { Timeline } from './Timeline';
 import { StartedFrom } from './TryTag';
 import { Actor } from '../actor/Actor';
+import { Body, Label } from '@/components/ui/ds';
 
 /** The folds of the receipts, in the page's order. */
 export const RECEIPTS = ['timeline', 'checks', 'specs', 'tokens', 'where'] as const;
 
 /** What a receipt says where the run has nothing of it. */
 function Nothing({ children }: { children: ReactNode }) {
-  return <p className="text-body-small text-on-surface-variant">{children}</p>;
+  return <Body size="small" colorRole="on-surface-variant">{children}</Body>;
 }
 
 /** A step's name over what a receipt says of it. */
 function OfStep({ name, mark, children }: { name: string; mark: string; children: ReactNode }) {
   return (
     <div data-receipt={mark} data-step={name} className="space-y-1">
-      <h3 className="font-mono text-body-small text-on-surface-variant">{name}</h3>
+      <Body size="small" component="h3" colorRole="on-surface-variant" className="font-mono">{name}</Body>
       {children}
     </div>
   );
@@ -69,7 +70,7 @@ function Tokens({ run }: { run: RunDetail }) {
   const steps = run.steps.filter((s) => s.used || s.spent);
   return (
     <>
-      <div className="space-y-1 text-body-medium">
+      <Body size="medium" component="div" className="space-y-1">
         {run.cost && (
           <p data-run-spent title={spentTitle(run.cost, "the run's tries")}>
             <span className="text-on-surface-variant">cost </span>
@@ -90,7 +91,7 @@ function Tokens({ run }: { run: RunDetail }) {
           </p>
         )}
         {!run.cost && !run.read && !run.tokens && <Nothing>Nothing of it was measured yet.</Nothing>}
-      </div>
+      </Body>
       {steps.map((s) => (
         <OfStep key={s.name} name={s.name} mark="tokens">
           <Facts rows={[['used', s.used?.used], ['cost', s.used?.cost], ...readRows(s.used), ...spentRows(s)]} />
@@ -198,7 +199,7 @@ function Where({ run }: { run: RunDetail }) {
 export function Receipts({ run, open = false }: { run: RunDetail; open?: boolean }) {
   return (
     <section aria-label="Receipts" data-receipts className="space-y-1 border-t border-outline-variant pt-4">
-      <h2 className="text-label-large text-on-surface-variant">Receipts</h2>
+      <Label size="large" component="h2" colorRole="on-surface-variant">Receipts</Label>
       <Fold name="timeline" title="Timeline" open={open}>
         {run.steps.some((s) => s.timeline.length > 0) ? <Timeline run={run} /> : <Nothing>Nothing of it is on the clock yet.</Nothing>}
       </Fold>

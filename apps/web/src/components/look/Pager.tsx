@@ -2,6 +2,7 @@ import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderTrailOf, pageSaid, rowsSaid, trailSearch, type PageAt } from '@/lib/finished';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from '../nav/routeLink';
+import { Body } from '@/components/ui/ds';
 
 const PageLink = routeLink(AriaLink);
 
@@ -45,9 +46,9 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
 export function Pager({ trail, next, count, total, size }: PageAt) {
   const at = { trail, next, count, total, size };
   return (
-    <div
+    <Body size="small" component="div" colorRole="on-surface-variant"
       data-pager
-      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono text-body-small text-on-surface-variant"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono"
     >
       <span data-pager-rows>{rowsSaid(at)}</span>
       <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
@@ -61,6 +62,6 @@ export function Pager({ trail, next, count, total, size }: PageAt) {
           Older
         </PageButton>
       </div>
-    </div>
+    </Body>
   );
 }

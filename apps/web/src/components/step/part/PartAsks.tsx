@@ -16,6 +16,7 @@ import { ActsOn, endsTheRun } from '../../gate/Gate';
 import { GateBrief } from '../../gate/GateBrief';
 import { AskedRow } from '../../gate/Questions';
 import { Markdown } from '../../markdown/Markdown';
+import { Body } from '@/components/ui/ds';
 
 /** What the step asks, as its part's model has it. */
 type Asks = Exclude<StepPartModel['asks'], 'none'>;
@@ -37,7 +38,7 @@ function Words({ asks }: { asks: Asks }) {
       {asks.waitingFor && (
         <p data-asks-waiting className="break-words">
           {asks.waitingFor.words}
-          <span className="block text-body-small text-on-surface-variant">{asks.waitingFor.advice}</span>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="block">{asks.waitingFor.advice}</Body>
         </p>
       )}
     </>
@@ -77,9 +78,9 @@ export function PartAsks({ run, step, asks, size }: { run: RunDetail; step: Step
   if (size === 'S') {
     const { line } = askOf(run, step, asks);
     return (
-      <p data-part-asks="S" title={line} className={cn('truncate text-body-small', ink.yours)}>
+      <Body size="small" data-part-asks="S" title={line} className={cn('truncate', ink.yours)}>
         {line}
-      </p>
+      </Body>
     );
   }
   return (

@@ -18,7 +18,7 @@ import { useApprove } from '../../lib/useApprove';
 import { backName, endingWarning } from '../../lib/gate';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
-import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Body, Button, Label, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
 import { Pending, Reading, ReadingLines, CutPress } from '@/components/look';
 import { troubleOf } from '@/lib/api/read';
@@ -242,9 +242,9 @@ function ApproveForm({
             Not yet
           </Button>
         )}
-        <p className="text-body-small">
+        <Body size="small">
           as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
-        </p>
+        </Body>
       </div>
       {confirming && <EndingConfirm step={step} onto={onto} />}
       {approval.isError && <Refusal error={approval.error} not="Not approved" />}
@@ -258,9 +258,9 @@ function ApproveForm({
  */
 export function EndingConfirm({ step, onto }: { step: string; onto: string | null }) {
   return (
-    <p data-confirm className="text-body-small font-medium text-yours">
+    <Body size="small" data-confirm className="font-medium text-yours">
       {`${endingWarning(step, onto)} Press Run ${step} now to approve it.`}
-    </p>
+    </Body>
   );
 }
 
@@ -466,9 +466,9 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
       className="rounded border border-outline-variant px-3 py-2 text-body-medium"
     >
       <strong>{taken.named}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-on-surface-variant">
+      <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
         {taken.said}
-      </span>
+      </Body>
     </section>
   );
 }
@@ -532,24 +532,24 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
       className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-body-medium"
     >
       <div className="space-y-1">
-        <h3 className="text-label-medium text-on-surface-variant">The result it would act on</h3>
+        <Label size="medium" component="h3" colorRole="on-surface-variant">The result it would act on</Label>
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
-            <span className="font-mono text-body-small">{s.said}</span>
+            <Body size="small" component="span" className="font-mono">{s.said}</Body>
             {s.stat && (
-              <span data-stat className="block font-mono text-body-small text-on-surface-variant">
+              <Body size="small" component="span" colorRole="on-surface-variant" data-stat className="block font-mono">
                 {s.stat}
-              </span>
+              </Body>
             )}
           </p>
         ))}
         {!standings.length &&
           (error || isDecidable(data) ? (
-            <p className="text-body-small text-on-surface-variant">
+            <Body size="small" colorRole="on-surface-variant">
               {error
                 ? `The branch could not be read: ${troubleOf(error).words}`
                 : 'No result branch of its own: the work is on the base branch.'}
-            </p>
+            </Body>
           ) : (
             <Reading label="Reading the branch…">
               <ReadingLines widths={['w-2/3', 'w-1/3']} className="font-mono text-body-small" />
@@ -564,7 +564,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
               <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
                 What {one.name} gave
               </RouteLink>
-              {one.closeout && <span className="text-body-small text-on-surface-variant"> — {one.closeout.summary}</span>}
+              {one.closeout && <Body size="small" component="span" colorRole="on-surface-variant"> — {one.closeout.summary}</Body>}
             </li>
           ))}
         </ul>

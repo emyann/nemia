@@ -11,7 +11,7 @@ import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { Pending, Reading } from '@/components/look';
-import { Button, Checkbox, Skeleton, TextField } from '@/components/ui/ds';
+import { Body, Button, Checkbox, Skeleton, TextField } from '@/components/ui/ds';
 import { pastLimit, StartInputs } from './StartInputs';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
@@ -138,8 +138,8 @@ function StartPress({ pending, held, children }: { pending: boolean; held: boole
 function StartRefused({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-body-medium font-medium text-on-failure-container">Not started. The api refused it:</p>
-      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <Body size="medium" className="font-medium text-on-failure-container">Not started. The api refused it:</Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{message}</Body>
     </div>
   );
 }
@@ -186,7 +186,7 @@ const startWords = (pending: boolean, files: number, sent: number) =>
  */
 function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
   return (
-    <p className="text-body-medium" data-started={id}>
+    <Body size="medium" data-started={id}>
       Started{' '}
       <Link to="/runs/$runId" params={{ runId: id }} className="font-mono text-body-medium underline underline-offset-2">
         {id}
@@ -198,7 +198,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
         </>
       )}
       .
-    </p>
+    </Body>
   );
 }
 
@@ -209,7 +209,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowRow; repo?: string; factory?: string; card: boolean }) {
   return (
-    <span className="min-w-0 text-body-small text-on-surface-variant">
+    <Body size="small" component="span" colorRole="on-surface-variant" className="min-w-0">
       {workflow.folderTeam ? (
         'Works in folders it makes for each step'
       ) : (
@@ -223,7 +223,7 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowRow; repo?
       )}
       , from <code className="font-mono break-all">{workflow.dir}</code>
       {card && ', and the card stays in the inbox, listed as started'}.
-    </span>
+    </Body>
   );
 }
 
@@ -243,29 +243,29 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
-      <legend id={legend} className="text-body-medium font-medium">
+      <Body size="medium" component="legend" id={legend} className="font-medium">
         After
-      </legend>
-      <p className="text-body-small text-on-surface-variant">
+      </Body>
+      <Body size="small" colorRole="on-surface-variant">
         Waits until it lands: nothing of it is filed until each has landed, and it is handed what each concluded.
-      </p>
+      </Body>
       {!repo ? (
-        <p data-no-repo className="text-body-small text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" data-no-repo>
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
-        </p>
+        </Body>
       ) : runs.error ? (
         <ReadTrouble what="the runs to wait on" error={runs.error} className="text-body-small" />
       ) : !onRepo ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (
-            <div key={at} className="flex items-center gap-2 px-2 py-1 text-body-medium">
+            <Body size="medium" component="div" key={at} className="flex items-center gap-2 px-2 py-1">
               <Skeleton shape="rectangle" className="size-4 rounded-none" />
               <Skeleton className="flex-1" />
-            </div>
+            </Body>
           ))}
         </Reading>
       ) : !onRepo.length ? (
-        <p className="text-body-small text-on-surface-variant">No run on this repository to wait on.</p>
+        <Body size="small" colorRole="on-surface-variant">No run on this repository to wait on.</Body>
       ) : (
         <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {onRepo.map((run) => (
@@ -276,15 +276,15 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
                 onChange={(checked) => onChange(checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
                 className="flex w-full cursor-pointer px-2 hover:bg-surface-container-high"
               >
-                <span className="flex min-w-0 flex-1 items-baseline gap-2 text-body-medium">
+                <Body size="medium" component="span" className="flex min-w-0 flex-1 items-baseline gap-2">
                   <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                     {titleOf(run)}
                   </span>
-                  <span className="hidden shrink-0 font-mono text-body-small text-on-surface-variant @md/page:inline">{run.id}</span>
-                  <span data-standing className="shrink-0 text-body-small text-on-surface-variant" title={run.waiting?.advice}>
+                  <Body size="small" component="span" colorRole="on-surface-variant" className="hidden shrink-0 font-mono @md/page:inline">{run.id}</Body>
+                  <Body size="small" component="span" colorRole="on-surface-variant" data-standing className="shrink-0" title={run.waiting?.advice}>
                     {standingOf(run)}
-                  </span>
-                </span>
+                  </Body>
+                </Body>
               </Checkbox>
             </li>
           ))}

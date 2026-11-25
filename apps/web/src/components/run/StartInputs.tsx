@@ -1,7 +1,7 @@
 import { ByteSize } from 'effect';
 import { UploadIcon, XIcon } from 'lucide-react';
 import { FILE_KEPT_FOR, FILE_LIMIT } from 'objects';
-import { Button, DropZone, FileTrigger, IconButton } from '@/components/ui/ds';
+import { Body, Button, DropZone, FileTrigger, IconButton } from '@/components/ui/ds';
 import { inputsAdded } from '@/lib/startInputs';
 
 /** How long a file uploaded for a start is kept, in words: a day, or its hours. */
@@ -65,10 +65,10 @@ export function StartInputs({
       >
         <UploadIcon aria-hidden size={20} className="shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block text-body-medium">{label}: drop them here, or</span>
-          <span className="block text-body-small text-on-surface-variant" data-file-limit>
+          <Body size="medium" component="span" className="block">{label}: drop them here, or</Body>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="block" data-file-limit>
             {note}
-          </span>
+          </Body>
         </span>
         <FileTrigger allowsMultiple onSelect={(list) => add([...(list ?? [])])}>
           <Button variant="tonal" size="small" isDisabled={isDisabled}>
@@ -89,13 +89,13 @@ export function StartInputs({
                 data-upload={mark ?? undefined}
                 className="flex min-w-0 items-center gap-2 py-1 ps-3 pe-1"
               >
-                <span className="min-w-0 flex-1 truncate font-mono text-body-medium" title={file.name}>
+                <Body size="medium" component="span" className="min-w-0 flex-1 truncate font-mono" title={file.name}>
                   {file.name}
-                </span>
+                </Body>
                 <span className={past ? 'shrink-0 text-body-small text-failure' : 'shrink-0 text-body-small text-on-surface-variant'}>
                   {past ? `${sizeWords(file.size)}, past the ${MOST_WORDS} a file may be` : sizeWords(file.size)}
                 </span>
-                {mark && <span className="shrink-0 text-body-small text-on-surface-variant">{MARK_WORDS[mark]}</span>}
+                {mark && <Body size="small" component="span" colorRole="on-surface-variant" className="shrink-0">{MARK_WORDS[mark]}</Body>}
                 <IconButton
                   size="xsmall"
                   variant="standard"

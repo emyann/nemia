@@ -1,6 +1,6 @@
 import type { Node, NodeProps } from '@xyflow/react';
 import { Factory as FactoryIcon, TriangleAlert } from 'lucide-react';
-import { Tag } from '@/components/ui/ds';
+import { Body, Tag } from '@/components/ui/ds';
 import { offerOf, runsOf, type FactoryBlock } from '@/lib/factories';
 
 /** A block on the Factories canvas: one factory, as `openBlocks` counts it, and whether the frame's bar shows it (`inspected`). */
@@ -27,9 +27,9 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
     >
       <span className="flex items-center gap-2">
         <FactoryIcon className="size-4 shrink-0 text-on-surface-variant" />
-        <span className="truncate text-body-large font-semibold" title={block.name}>
+        <Body size="large" component="span" className="truncate font-semibold" title={block.name}>
           {block.name}
-        </span>
+        </Body>
         {block.default && <Tag>default</Tag>}
       </span>
       {block.error ? (

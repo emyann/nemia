@@ -2,6 +2,7 @@ import type { RunDetail, StepView } from '../../lib/runView';
 import { spentTitle } from '../../lib/cost';
 import { instantWhole } from '../../lib/instant';
 import { timeToTheSecond } from '../../lib/timeOfDay';
+import { Body, Title } from '@/components/ui/ds';
 
 /** One try of a step on the clock, as its object's status holds it. */
 type StepTimelineTry = StepView['timeline'][number];
@@ -26,12 +27,12 @@ export function Timeline({ run }: { run: RunDetail }) {
 
   return (
     <section aria-label="Timeline" className="space-y-2">
-      <h2 className="text-title-small">Timeline</h2>
-      <p className="text-body-small text-on-surface-variant">
+      <Title size="small" component="h2">Timeline</Title>
+      <Body size="small" colorRole="on-surface-variant">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
-      </p>
+      </Body>
       <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full text-left text-body-small tabular-nums">
           <thead className="bg-surface-container text-on-surface-variant">

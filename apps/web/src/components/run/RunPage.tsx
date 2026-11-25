@@ -13,6 +13,7 @@ import { titleOf } from '@/lib/factory';
 import { factoryLevel, runLevel, runsLevel, Trail } from '../nav/Trail';
 import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
+import { Body } from '@/components/ui/ds';
 
 /**
  * The page of a run, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by its id: the
@@ -70,9 +71,9 @@ function Run({ run }: { run: RunDetail }) {
       <FirstHint run={run} beat="card" />
 
       {run.warning && (
-        <p data-run-warning className="rounded border border-outline px-3 py-2 text-body-medium text-on-surface-variant">
+        <Body size="medium" colorRole="on-surface-variant" data-run-warning className="rounded border border-outline px-3 py-2">
           {run.warning}
-        </p>
+        </Body>
       )}
 
       <KindsBehind run={run} />

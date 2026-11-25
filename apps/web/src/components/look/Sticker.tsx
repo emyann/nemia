@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { filled, type Hue } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
+import { Label } from '@/components/ui/ds';
 
 /** The label face drawn wide, as the look's values are. */
 const WIDE: CSSProperties = { fontStretch: '125%' };
@@ -20,7 +21,7 @@ export function Sticker({ hue, label, children }: { hue: Hue | 'ink'; label: str
       data-grain="label"
       className={cn('inline-flex flex-col gap-0.5 rounded-[14px] px-3.5 pt-2.5 pb-[9px]', TONE[hue])}
     >
-      <span className="text-label-small uppercase">{label}</span>
+      <Label size="small" component="span" className="uppercase">{label}</Label>
       <span className="font-label text-[22px] leading-[26px] font-extrabold" style={WIDE}>
         {children}
       </span>

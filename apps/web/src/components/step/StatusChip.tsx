@@ -2,6 +2,7 @@ import { CircleDashed } from 'lucide-react';
 
 import { stateClass, stepState, type StepCodes } from '../../lib/status';
 import { chipTitle, stateWordsOf } from '../../lib/words';
+import { Body } from '@/components/ui/ds';
 
 /**
  * A step's state, from its codes (`phase`, `reason`, `on`, `via`), in a person's word (`PERSON`'s rail word, never the CLI's sentence),
@@ -51,8 +52,8 @@ export function StatusChip({
 export function StepNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (
-    <p data-note className="font-mono text-body-small leading-snug text-on-surface-variant">
+    <Body size="small" colorRole="on-surface-variant" data-note className="font-mono leading-snug">
       {note}
-    </p>
+    </Body>
   );
 }

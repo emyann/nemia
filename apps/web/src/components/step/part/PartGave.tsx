@@ -10,6 +10,7 @@ import { Artifacts, Values } from '../../run/Artifacts';
 import { FieldWidgetView } from '../../field/widgets/FieldWidgetView';
 import { Replies } from '../Outcome';
 import { Fold } from './Fold';
+import { Body, Label } from '@/components/ui/ds';
 
 /** What the step gave, as its part's model has it. */
 type Gave = Exclude<StepPartModel['gave'], 'none'>;
@@ -33,9 +34,9 @@ function First({ gave }: { gave: Gave }) {
           : null;
   if (said === null) return null;
   return (
-    <p data-part-gave="S" title={said} className="truncate font-mono text-body-small text-on-surface-variant">
+    <Body size="small" colorRole="on-surface-variant" data-part-gave="S" title={said} className="truncate font-mono">
       {said}
-    </p>
+    </Body>
   );
 }
 
@@ -46,9 +47,9 @@ export function PartGave({ step, gave, size }: { step: StepView; gave: Gave; siz
   const unnamed = stepFilesOf(step).unnamed;
   return (
     <section data-part-gave={size} aria-label="What it gave" className="min-w-0 space-y-3 text-body-medium">
-      <h3 className="text-label-medium text-on-surface-variant uppercase">
+      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">
         Gave{gave.packet && <span className="normal-case"> — handed on as {gave.packet}</span>}
-      </h3>
+      </Label>
       {gave.fields.map((field) => (
         <FieldWidgetView
           key={field.name}
@@ -62,9 +63,9 @@ export function PartGave({ step, gave, size }: { step: StepView; gave: Gave; siz
         />
       ))}
       {closeout && closeout.missing.length > 0 && (
-        <p data-missing className="text-body-small text-yours">
+        <Body size="small" data-missing className="text-yours">
           declared and not given: {closeout.missing.join(', ')}
-        </p>
+        </Body>
       )}
       {closeout?.replies && <Replies replies={closeout.replies} />}
       {gave.files.length > 0 && <Artifacts artifacts={gave.files} step={step.name} />}

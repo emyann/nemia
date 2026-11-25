@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Cell, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Cell, Label, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import type { RunClock as Clock } from '@/lib/api/runs';
@@ -359,9 +359,9 @@ function RunCard({
               <Fan count={waiters} />
             </span>
           )}
-          <span {...saying('id')} className={cn(s.id(), 'text-label-small')}>
+          <Label size="small" component="span" {...saying('id')} className={cn(s.id(), '')}>
             {run.id.slice(-4)}
-          </span>
+          </Label>
         </span>
       </span>
       <Title run={run} look={look} still={still} end={titleEnd} heading />

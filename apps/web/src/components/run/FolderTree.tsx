@@ -4,7 +4,7 @@ import { FileText, Folder, FolderOpen } from 'lucide-react';
 import type { StepArtifact } from '../../lib/api/tries.ts';
 import { folderTreeOf, type FolderTreeNode } from '../../lib/folderTree.ts';
 import { viewOpened } from '../../lib/viewAddress';
-import { Tree, TreeItem, type TreeProps } from '../ui/ds';
+import { Body, Tree, TreeItem, type TreeProps } from '../ui/ds';
 import { when } from '../step/Facts';
 import { bytesWord } from './Artifacts';
 
@@ -14,9 +14,9 @@ type Key = Parameters<NonNullable<TreeProps<object>['onAction']>>[0];
 /** What a file row says after its name: its size where the api serves it, when it went where a prune removed it, nothing else. */
 function After({ file }: { file: StepArtifact }) {
   if ('pruned' in file)
-    return <span className="text-body-small text-on-surface-variant">removed at {when(file.prunedAt)}, by a prune of its files</span>;
+    return <Body size="small" component="span" colorRole="on-surface-variant">removed at {when(file.prunedAt)}, by a prune of its files</Body>;
   if (!('url' in file)) return null;
-  return <span className="font-mono text-body-small text-on-surface-variant">· {bytesWord(file.size)}</span>;
+  return <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">· {bytesWord(file.size)}</Body>;
 }
 
 /** A file row's lead: the picture itself, small, where it is one the api serves; else a file's glyph. */
@@ -54,9 +54,9 @@ function rows(nodes: readonly FolderTreeNode[], step: string | null, open: Reado
           }
           title={<span className="font-mono">{node.name}/</span>}
           trailingElement={
-            <span className="text-body-small text-on-surface-variant">
+            <Body size="small" component="span" colorRole="on-surface-variant">
               {node.files} {node.files === 1 ? 'file' : 'files'}
-            </span>
+            </Body>
           }
         >
           {rows(node.children, step, open)}
@@ -103,7 +103,7 @@ export function FolderTree({
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState<ReadonlySet<Key>>(new Set());
-  if (!files.length) return <p className="text-body-small text-on-surface-variant">{none}</p>;
+  if (!files.length) return <Body size="small" colorRole="on-surface-variant">{none}</Body>;
   const tree = folderTreeOf(files);
   const opened = (key: Key) => {
     if (typeof key === 'string' && key.endsWith('/')) {

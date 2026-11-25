@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Select, SelectItem, Skeleton } from '@/components/ui/ds';
+import { Body, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started, type WorkflowRow } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
@@ -69,9 +69,9 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
           <Skeleton shape="rectangle" className="h-9 max-w-xs rounded-none" />
         </Reading>
       ) : offered.length === 0 ? (
-        <p data-no-factory className="text-body-small text-yours">
+        <Body size="small" data-no-factory className="text-yours">
           A card starts in a factory, and the store has none yet: file one with {code(store.fileFactory)}.
-        </p>
+        </Body>
       ) : (
         <Select
           label="Factory"
@@ -101,9 +101,9 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
   const [picked, setPicked] = useState<string | null>(null);
   if ('why' in place) {
     return (
-      <p data-unplaced className="text-body-small text-yours">
+      <Body size="small" data-unplaced className="text-yours">
         {place.why}
-      </p>
+      </Body>
     );
   }
   const { factory } = place;
@@ -114,11 +114,11 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
     <>
       {offered.length === 0 ? (
         <div className="space-y-1.5">
-          <p className="text-body-medium font-medium">Workflow</p>
-          <p data-no-workflow className="text-body-small text-yours">
+          <Body size="medium" className="font-medium">Workflow</Body>
+          <Body size="small" data-no-workflow className="text-yours">
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
-          </p>
-          <p className="text-body-small text-on-surface-variant">The workflows the factory {code(factory.name)} offers.</p>
+          </Body>
+          <Body size="small" colorRole="on-surface-variant">The workflows the factory {code(factory.name)} offers.</Body>
         </div>
       ) : (
         <Select
@@ -157,20 +157,20 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
 function Wired({ factory, workflow, on }: { factory: Pick<Factory, 'name'>; workflow: string; on: ReturnType<typeof startRepo> }) {
   if ('why' in on) {
     return (
-      <p data-unwired={on.refused} className="text-body-small break-words text-yours">
+      <Body size="small" data-unwired={on.refused} className="break-words text-yours">
         {on.why}
-      </p>
+      </Body>
     );
   }
   return (
     <div className="space-y-1">
-      <p className="text-body-medium font-medium">Repository</p>
-      <p data-factory-repo className="font-mono text-body-small break-all text-on-surface-variant">
+      <Body size="medium" className="font-medium">Repository</Body>
+      <Body size="small" colorRole="on-surface-variant" data-factory-repo className="font-mono break-all">
         {on.repo}
-      </p>
-      <p className="text-body-small text-on-surface-variant">
+      </Body>
+      <Body size="small" colorRole="on-surface-variant">
         Where the factory {code(factory.name)} runs {code(workflow)}: its wiring decides, never the card.
-      </p>
+      </Body>
     </div>
   );
 }
@@ -199,13 +199,13 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
     );
   if (unread) return <WorkflowsUnread workflows={listed} />;
   return read?.unfilled ? (
-    <p data-unfilled className="text-body-small whitespace-pre-wrap break-words text-yours">
+    <Body size="small" data-unfilled className="whitespace-pre-wrap break-words text-yours">
       {read.unfilled}
-    </p>
+    </Body>
   ) : read === null ? (
-    <p data-not-offered className="text-body-small text-yours">
+    <Body size="small" data-not-offered className="text-yours">
       The factory {code(place.factory)} lists no workflow {code(workflow)} on {code(place.repo)}.
-    </p>
+    </Body>
   ) : (
     <StartCard entry={entry} workflow={read} place={place} onStarted={onStarted} onRefused={onRefused} />
   );

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { KeyRow } from '../../lib/api/library.ts';
 import { cn } from '../../lib/utils';
 import { Markdown } from '../markdown/Markdown';
-import { Button } from '@/components/ui/ds';
+import { Body, Button, Title } from '@/components/ui/ds';
 
 /**
  * A file's keys as a table: a row per key the package has — set or not, so a person reads what the file could say beside what it does —
@@ -12,8 +12,8 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
   return (
     <section aria-label="Keys" className="space-y-2">
       <div className="space-y-0.5">
-        <h2 className="text-title-small">Keys</h2>
-        {note && <p className="text-body-small text-on-surface-variant">{note}</p>}
+        <Title size="small" component="h2">Keys</Title>
+        {note && <Body size="small" colorRole="on-surface-variant">{note}</Body>}
       </div>
       <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full min-w-[36rem] border-collapse text-left text-body-medium">
@@ -66,7 +66,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
   return (
     <section aria-label="The file" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-variant pb-2">
-        <p className="min-w-0 font-mono text-body-small break-all text-on-surface-variant">{file}</p>
+        <Body size="small" colorRole="on-surface-variant" className="min-w-0 font-mono break-all">{file}</Body>
         <span
           title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'}
           className="inline-flex shrink-0"

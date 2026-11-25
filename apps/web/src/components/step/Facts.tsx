@@ -19,6 +19,7 @@ import type { Frozen } from '../../lib/frozen';
 import { focusRing } from '../ui/ds/utils';
 import { CheckOutput, type CheckRead } from './CheckOutput';
 import { Fold } from './part/Fold';
+import { Body, Label } from '@/components/ui/ds';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
 export const HEADING = 'text-body-small font-medium text-on-surface-variant';
@@ -75,9 +76,9 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (
     <section aria-label="Trial merges" className="space-y-1">
-      <h3 className="text-label-medium text-on-surface-variant">
+      <Label size="medium" component="h3" colorRole="on-surface-variant">
         Trial merges, as git says them now: onto {collisions.onto}, and onto each run in flight on it
-      </h3>
+      </Label>
       <FactList runId={runId} facts={collisionFacts(collisions)} label="What the trial merges say" />
     </section>
   );
@@ -313,7 +314,7 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
  *
  * @param value the text to draw, null for none
  */
-export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-body-small">{value}</span>);
+export const code = (value: string | null) => (value === null ? null : <Body size="small" component="span" className="font-mono">{value}</Body>);
 
 /**
  * A path on the machine, as a `Facts` value: the path, and a button that copies it. A folder run's work is somewhere under the store
@@ -325,7 +326,7 @@ export const code = (value: string | null) => (value === null ? null : <span cla
 export const pathRow = (at: string | null) =>
   at === null ? null : (
     <span data-path className="flex items-start gap-1">
-      <span className="min-w-0 break-all font-mono text-body-small">{at}</span>
+      <Body size="small" component="span" className="min-w-0 break-all font-mono">{at}</Body>
       <CopyButton text={at} what="the path" />
     </span>
   );
@@ -381,9 +382,9 @@ export const unreadRows = (words: string | null) =>
     ? [
         [
           'unread',
-          <span key="unread" data-unread className={cn('text-body-small', WARN)}>
+          <Body size="small" component="span" key="unread" data-unread className={cn('', WARN)}>
             {words}
-          </span>,
+          </Body>,
         ],
       ]
     : []) satisfies Array<[string, ReactNode]>;
@@ -403,7 +404,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
   return (
     <span data-read className="block">
       {counts.length > 0 && (
-        <span className="font-mono text-body-small">
+        <Body size="small" component="span" className="font-mono">
           {counts.map((part, i) => (
             <span key={part}>
               {i > 0 && ' · '}
@@ -416,7 +417,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
               )}
             </span>
           ))}
-        </span>
+        </Body>
       )}
       {rebuilt > 0 &&
         rest.map((part) => (
@@ -453,7 +454,7 @@ export function Check({
   const title = named ? `Check ${name}` : 'Check';
   return (
     <section aria-label={title} className="space-y-2">
-      <h3 className="text-label-medium text-on-surface-variant">{title}</h3>
+      <Label size="medium" component="h3" colorRole="on-surface-variant">{title}</Label>
       <Facts
         rows={[
           ...(named ? namedRows(verdict, started, ended) : []),
@@ -462,15 +463,15 @@ export function Check({
             ? [
                 [
                   'refused',
-                  <span key="refused" className="font-mono text-body-small font-semibold text-failure">
+                  <Body size="small" component="span" key="refused" className="font-mono font-semibold text-failure">
                     {refused.exit}
-                  </span>,
+                  </Body>,
                 ] as [string, ReactNode],
               ]
             : []),
         ]}
       />
-      {refused?.unreadable && <p className="text-body-small text-failure">{refused.unreadable}</p>}
+      {refused?.unreadable && <Body size="small" className="text-failure">{refused.unreadable}</Body>}
       {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
       {read && taskId !== null && (
@@ -515,12 +516,12 @@ export function Checks({
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
-  if (!log.lines.length) return <p className="text-body-small text-on-surface-variant">No {name}.</p>;
+  if (!log.lines.length) return <Body size="small" colorRole="on-surface-variant">No {name}.</Body>;
   return (
     <div className="space-y-1">
-      <p className="text-body-small text-on-surface-variant">
+      <Body size="small" colorRole="on-surface-variant">
         {log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}
-      </p>
+      </Body>
       <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug">
         {log.lines.join('\n')}
       </pre>

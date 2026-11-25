@@ -1,4 +1,4 @@
-import { Cell, Column, Focusable, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
@@ -83,16 +83,16 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell>
         <TooltipTrigger delay={300}>
           <Focusable>
-            <span
+            <Label size="small" component="span"
               data-ended
               role="img"
               aria-label={ended.word}
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the outcome's tooltip by focusing it
               tabIndex={0}
-              className={cn('text-label-small uppercase', run.outcome === 'failed' ? ink.failure : 'text-on-surface-variant', focusRing())}
+              className={cn('uppercase', run.outcome === 'failed' ? ink.failure : 'text-on-surface-variant', focusRing())}
             >
               {ended.word}
-            </span>
+            </Label>
           </Focusable>
           <Tooltip>{ended.title}</Tooltip>
         </TooltipTrigger>

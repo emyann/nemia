@@ -73,7 +73,8 @@ const atWork = (e: Engine, record: UpgradeRecord) =>
  * `nemia upgrade` typed on the machine, building under `releases/` (`buildUnderWay`) — and for a tag older than the oldest release that
  * reads the store (`upgradeStartRefusal`), naming it; nothing is filed for any. Then filed on the runtime as a command task
  * (`upgradeCommand`) in the store's folder, `WF_ROOT` naming the store, under `UPGRADE_DEADLINE_SECONDS`, its record kept under
- * `<home>/upgrades/<id>.json`. The runtime runs it on the daemon's next pass, once a slot is free.
+ * `<home>/upgrades/<id>.json`. The runtime runs it on the daemon's next pass, once a slot is free. Its id ends in 128 random bits: the
+ * MCP port hands it out as the handle of a task (`LinkTask`'s `follow`), which no third party may guess.
  */
 export const startUpgrade = Effect.fn('startUpgrade')(function* (start: UpgradeStart) {
   const home = yield* StoreRoot;
@@ -97,7 +98,7 @@ export const startUpgrade = Effect.fn('startUpgrade')(function* (start: UpgradeS
       }),
     );
   if (refusal === 'below-floor' && floor !== null) return yield* Effect.fail(new Conflict({ message: floorWords(tag, floor) }));
-  const id = `upgrade-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
+  const id = `upgrade-${Date.now().toString(36)}-${randomBytes(16).toString('hex')}`;
   yield* asked(
     'file',
     e.file({

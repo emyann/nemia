@@ -283,3 +283,33 @@ test("the port says nothing of a tool, nor of itself, beyond the words objects w
   );
   assert.equal(PORT_INSTRUCTIONS, portInstructions());
 });
+
+test('upgrade follows the upgrade it starts through GET /api/upgrades/:id, and wait is asked again from its cursor', () => {
+  const upgrade = tool('upgrade').task;
+  assert.equal(upgrade?.kind, 'follow');
+  assert.deepEqual(upgrade.kind === 'follow' ? [upgrade.read, upgrade.path, upgrade.pathKey] : [], [
+    'upgrades.upgradeOf',
+    '/api/upgrades/:id',
+    'id',
+  ]);
+  assert.deepEqual(tool('wait').task, { kind: 'again', cursor: 'cursor', from: 'from', until: { key: 'ended', value: 'matched' } });
+  assert.equal(tool('ls').task, null, 'a link that says no task has none');
+});
+
+test("REFUSED: a link's task the port could not answer: a follow of a POST, a stream or a read of no id; an again with no from", () => {
+  const entry = { name: 'probe', usage: '', help: ['a probe'], class: 'read' as const };
+  const follow = { kind: 'follow', idKey: 'id', phaseKey: 'phase', sinceKey: 'startedAt', succeeded: ['succeeded'], failed: [] } as const;
+  for (const read of ['upgrades.start', 'upgrades.output', 'upgrades.read'] as const)
+    assert.throws(
+      () => portTools([], [{ ...entry, served: [{ endpoint: 'upgrades.start', task: { ...follow, read } }] }], Api),
+      Error,
+      read,
+    );
+  const again = { kind: 'again', cursor: 'cursor', until: { key: 'ended', value: 'matched' } } as const;
+  assert.throws(() => portTools([], [{ ...entry, served: [{ endpoint: 'server.wait', task: { ...again, from: 'since' } }] }], Api), Error);
+  assert.throws(
+    () => portTools([], [{ ...entry, served: [{ endpoint: 'upgrades.start', task: { ...again, from: 'from' } }] }], Api),
+    Error,
+  );
+  assert.doesNotThrow(() => portTools([], [{ ...entry, served: [{ endpoint: 'server.wait', task: { ...again, from: 'from' } }] }], Api));
+});

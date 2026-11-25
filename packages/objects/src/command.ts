@@ -118,13 +118,46 @@ export type Spec = {
  * An endpoint of the `Api` that serves a command (`<group>.<endpoint>`, typed so a name no endpoint has does not compile) — its handler,
  * or the read the client's verb prints — and the tool it is on the MCP port: the command's name, its spaces as `_`, for the first link of
  * an entry; `as` for every other. `query`, the values of the endpoint's query keys its tool sends where a call gives none (a call that
- * gives one, an empty one included, sends its own).
+ * gives one, an empty one included, sends its own). `task`, how its tool answers as an MCP task where a caller declares the tasks
+ * extension (`LinkTask`); a link with none always answers its result.
  */
 export type CommandLink = {
   readonly endpoint: ApiEndpointName;
   readonly as?: string;
   readonly query?: Readonly<Record<string, string>>;
+  readonly task?: LinkTask;
 };
+
+/**
+ * A tool that follows what its call started: the call answers a thing with an id (`idKey`, the key of the answer that holds it), and
+ * `read`, a GET of the `Api` whose one path key takes that id, says how it stands: `phaseKey`, the key of its answer whose value is where
+ * it stands, ended well on one of `succeeded` and badly on one of `failed`, at work on any other; `sinceKey`, the key that holds when it
+ * began, an ISO 8601 time. The port keeps nothing: each read of the task reads `read` again, with the reader's own token.
+ */
+export type FollowedTask = {
+  readonly kind: 'follow';
+  readonly read: ApiEndpointName;
+  readonly idKey: string;
+  readonly phaseKey: string;
+  readonly sinceKey: string;
+  readonly succeeded: readonly [string, ...string[]];
+  readonly failed: readonly string[];
+};
+
+/**
+ * A tool the port asks again from where its answer left off: `cursor`, the key of the answer that holds where to read on from; `from`,
+ * the query key of the endpoint that takes it; `until`, the key of the answer and its value that end the task (any other asks again).
+ * The port holds the task in its memory while it asks, and loses it at a restart.
+ */
+export type AskedAgainTask = {
+  readonly kind: 'again';
+  readonly cursor: string;
+  readonly from: string;
+  readonly until: { readonly key: string; readonly value: string };
+};
+
+/** How a tool answers as an MCP task: it follows what its call started (`follow`), or the port asks it again (`again`). */
+export type LinkTask = FollowedTask | AskedAgainTask;
 
 /**
  * A command's words: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `writes`, a

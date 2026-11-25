@@ -4,7 +4,7 @@ import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, NEIGHBOUR } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedRecord, storeRecord } from '../world.ts';
 
 /** The run the page writes: one step, `implement`, at work in a `claude -p` job whose words come in pieces. */
 const STREAMING = {
@@ -35,11 +35,10 @@ const said = (type: 'user' | 'assistant', uuid: string, content: unknown) => ({
   message: { id: type === 'assistant' ? 'msg_e2e_1' : undefined, role: type, content },
 });
 
-/** Where the page writes, each taken back: the run's record, its task's journal, the job's files and its transcript. */
+/** Where the page writes, each taken back: the task's journal, the job's files and its transcript (its record is the keyspace's). */
 const files = () => {
   const job = path.join(store!, 'engine', 'runs', 'claude', `ae_${TASK.replace(/[^a-zA-Z0-9]+/g, '_')}_1`);
   return {
-    record: path.join(store!, 'runs', `${STREAMING.id}.json`),
     journal: path.join(store!, 'engine', 'tasks', `${TASK}.jsonl`),
     feed: path.join(store!, 'engine', 'feed.jsonl'),
     run: `${job}.json`,
@@ -69,7 +68,7 @@ const beat = (f: ReturnType<typeof files>) =>
  * the prompt.
  */
 function written(f: ReturnType<typeof files>) {
-  const neighbour = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${NEIGHBOUR.id}.json`), 'utf8')) as Record<string, unknown>;
+  const neighbour = storedRecord(NEIGHBOUR.id);
   const at = new Date().toISOString();
   const run = {
     ...neighbour,
@@ -79,7 +78,7 @@ function written(f: ReturnType<typeof files>) {
     createdAt: at,
     steps: { [STREAMING.step]: { taskId: TASK } },
   };
-  fs.writeFileSync(f.record, JSON.stringify(run, null, 2));
+  storeRecord(STREAMING.id, JSON.stringify(run, null, 2));
   const events = [
     { kind: 'filed', at, brief: STREAMING.prompt, cwd: '/code/hkb-v2', maxAttempts: 1 },
     { kind: 'starting', at, attempt: 1 },
@@ -170,7 +169,8 @@ export default {
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      for (const file of [f.record, f.journal, f.run, f.stdout, f.log, f.transcript]) fs.rmSync(file, { force: true });
+      dropStoredRun(STREAMING.id);
+      for (const file of [f.journal, f.run, f.stdout, f.log, f.transcript]) fs.rmSync(file, { force: true });
       fs.writeFileSync(f.feed, feed);
     }
     await page.reload({ waitUntil: 'load' });

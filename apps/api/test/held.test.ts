@@ -15,12 +15,11 @@ import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import fs from 'node:fs';
 import path from 'node:path';
 import { listedOf, objectOf, triesOf } from './run-reads.ts';
-import { list, runsAtOnce } from 'agent-orchestrator';
+import { list } from 'agent-orchestrator';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 
 const stand = eachTest(testPlace);
@@ -31,10 +30,6 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
 /** A step's task filed held open that signed off with `closeout` and was neither answered nor closed: its attempt ended, unsettled. */
 const waiting = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex', holdOpen: true }));
@@ -46,8 +41,9 @@ const BLOCKED = { outcome: 'blocked', summary: 'Two ways to go.', needs: 'Warm c
 
 /** `plan → implement`, plan's task waiting; gated at plan when `gates` says so. */
 function writeRun(id: string, gates?: string[]) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -82,8 +78,8 @@ beforeEachTest(() => {
   Effect.runSync(engine().file({ id: 'h-rechecked-plan-try3', brief: 'Do it again.', cwd: '/code/app', harness: 'codex' }));
 });
 {
-  const file = path.join(root, 'runs', 'h-rechecked.json');
-  const run = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const file = runKey('h-rechecked');
+  const run = JSON.parse(recordText(root, file) ?? '');
   run.steps.plan = {
     ...run.steps.plan,
     taskId: 'h-rechecked-plan-try3',
@@ -92,7 +88,7 @@ beforeEachTest(() => {
       { taskId: 'h-rechecked-plan', cause: 'continue' },
     ],
   };
-  fs.writeFileSync(file, JSON.stringify(run));
+  plantRecord(root, file, JSON.stringify(run));
 }
 
 /** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
@@ -110,7 +106,7 @@ describe('a step whose task is held open reads as waiting on a person, never as 
         'input-required',
         "the seed is the engine's held task, waiting",
       );
-      const listed = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read('h-blocked')));
+      const listed = await runWith(engine(), list(engine(), runsNow(root).runs.read('h-blocked')));
       for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
         assert.deepEqual(
           run.steps.map(({ name, message, needs }) => ({ name, message, needs })),

@@ -6,6 +6,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import { root } from '../../test/harness.ts';
+import { plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -83,8 +84,9 @@ const signedOff = (taskId: string, costUsd: number, skills?: string[]) =>
 /** A finished run of one step on `repo`, in `factory` when one is named, its session's end saying the skills it loaded where given. */
 function finished(id: string, repo: string, costUsd: number, factory?: string, skills?: string[]) {
   signedOff(`${id}-implement`, costUsd, skills);
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,
@@ -108,8 +110,9 @@ write(path.join(root, 'runs', 'r-home.labels'), JSON.stringify({ team: 'core' })
 
 /** A run of the review workflow on `/repos/home`, created at `createdAt`, its skill rendered as `text`: nothing of it ran. */
 function reviewed(id: string, createdAt: string, text: string) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/repos/home',
@@ -163,8 +166,9 @@ function tallied(id: string, issues?: object[]) {
       { kind: 'settled', at: day(11), outcome: 'succeeded' },
     ]),
   );
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/repos/triage',
@@ -332,8 +336,8 @@ test("GET /api/stats reads no run's journal again while the store is as it was, 
   const again = await journalsAsked(() => unverified(() => asked('')));
   assert.equal(again.asked, 0, "the app's memo answered every run");
   assert.deepEqual(again.value, first);
-  const record = path.join(root, 'runs', 'r-home.json');
-  write(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, 'utf8')), brief: 'The brief of r-home, said again' }));
+  const record = runKey('r-home');
+  plantRecord(root, record, JSON.stringify({ ...JSON.parse(recordText(root, record) ?? ''), brief: 'The brief of r-home, said again' }));
   const after = await journalsAsked(() => unverified(() => asked('')));
   assert.equal(after.asked, 1, "r-home's one journal, and no other run's");
   assert.deepEqual(after.value.body, await runWith(e, flowNumbers({})));

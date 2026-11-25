@@ -5,6 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { recordText, runKey, runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,7 +27,7 @@ const refusedWith = (f: Forgot) => {
   const refusal = forgetRefusal(f);
   return [refusal?._tag, refusal?.message] satisfies [string | undefined, string | undefined];
 };
-import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -268,7 +269,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
     `${stray.run.id}  not forgotten: ${odd} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: nemia rm ${stray.run.id} again then.`,
   ]);
   assert.ok(
-    fs.existsSync(path.join(odd, 'mine.txt')) && under('runs', `${stray.run.id}.json`),
+    fs.existsSync(path.join(odd, 'mine.txt')) && recordText(ROOT, runKey(stray.run.id)) !== undefined,
     "something in the run's directory that git does not list is never deleted behind git's back",
   );
   fs.rmSync(odd, { recursive: true });
@@ -298,7 +299,7 @@ test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-comm
     `${p.run.id}  not forgotten: ${p.wt} holds what implement left uncommitted, and the hand-off could not commit it — lint: flag.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${p.wt} commit), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
   ]);
   assert.equal(gitIn(p.wt, 'status', '--porcelain'), 'A  flag.ts', 'the work is where it was, staged');
-  assert.ok(worktreesOf(repo).includes(p.wt) && under('runs', `${p.run.id}.json`));
+  assert.ok(worktreesOf(repo).includes(p.wt) && recordText(ROOT, runKey(p.run.id)) !== undefined);
 
   fs.writeFileSync(hook, '#!/bin/sh\necho "secret scan: a token in flag.ts"\nexit 1\n', { mode: 0o755 });
   assert.equal(

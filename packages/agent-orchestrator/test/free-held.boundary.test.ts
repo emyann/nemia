@@ -5,6 +5,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`, where `WF_KEEP_WORKTREES` is unset, so the rule is read at its shipped default.
  */
+import { runRecord } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -19,7 +20,6 @@ import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
 import { startRun, runWith as runEngine, gitPlaceLayer, withProposalsPass } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { tickRun, freshRestMemo } from '../src/tick/tick.verb.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';

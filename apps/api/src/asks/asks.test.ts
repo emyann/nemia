@@ -16,13 +16,22 @@
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
-import { askFile, list, runsAtOnce } from 'agent-orchestrator';
+import { list } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import {
+  askDoneKey,
+  asksPrefix,
+  keysUnder,
+  plantRecord,
+  recordText,
+  retryAskKey,
+  runKey,
+  runsNow,
+  testPlace,
+} from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
@@ -40,11 +49,6 @@ type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /** A task filed on `harness` and left in `phase`, with `end` laid over its attempt. */
 const task = (
   taskId: string,
@@ -66,9 +70,9 @@ const blocked = {
   artifacts: [],
 };
 
-fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-const recordFile = path.join(root, 'runs', `${R}.json`);
-fs.writeFileSync(
+const recordFile = runKey(R);
+plantRecord(
+  root,
   recordFile,
   JSON.stringify({
     id: R,
@@ -122,7 +126,7 @@ beforeEachTest(() => {
   task('t-working', 'claude', 'working');
 });
 
-const record = fs.readFileSync(recordFile, 'utf8');
+const record = recordText(root, recordFile) ?? '';
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -139,16 +143,17 @@ const ask = (step: string, body: unknown, headers: Record<string, string> = BOAR
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-/** Every file under the run's asks directory, waiting or consumed. */
+/** Every ask of the run by its name under the run's prefix, waiting or spent (`done/<name>`). */
 const asked = (run = R) => {
-  const dir = path.join(root, 'runs', `${run}.asks`);
-  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+  return keysUnder(root, asksPrefix(run))
+    .map((key) => key.slice(asksPrefix(run).length))
+    .sort();
 };
 
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
   assert.deepEqual(asked(), [], `no ask file: ${why}`);
-  assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
+  assert.equal(recordText(root, recordFile) ?? '', record, `the run's record untouched: ${why}`);
 };
 
 /** The run object of `id` (`GET /api/runs/:id`). */
@@ -287,8 +292,8 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       tasks = tasksOf();
       const res = await ask('implement', { mode: 'continue', message: 'Postgres, the one in docker-compose.yml.' });
       assert.equal(res.status, 202, await res.clone().text());
-      assert.deepEqual(await res.json(), { try: 2, file: askFile(root, R, 'implement', 2), stopFirst: false });
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'implement', 2), 'utf8'));
+      assert.deepEqual(await res.json(), { try: 2, file: retryAskKey(R, 'implement', 2), stopFirst: false });
+      const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R, 'implement', 2)) ?? '');
       assert.deepEqual(written, {
         step: 'implement',
         try: 2,
@@ -298,9 +303,9 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       assert.deepEqual(asked(), ['retry-implement-2']);
-      assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, recordFile) ?? '', record, "the api wrote nothing of the run's record");
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const run = await object();
       const implement = stepOf(run, 'implement');
       assert.equal(implement.note, 'try 2 asked (--continue, with your answer) — the next tick files it');
@@ -326,7 +331,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.equal(recheck.status, 202, await recheck.clone().text());
       assert.deepEqual(
         await recheck.json(),
-        { try: 2, file: askFile(root, R, 'theme', 2), stopFirst: false },
+        { try: 2, file: retryAskKey(R, 'theme', 2), stopFirst: false },
         'a refused check, run again: no message, and no session',
       );
       assert.deepEqual(stepOf(await object(), 'theme').asked, {
@@ -346,11 +351,11 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       const { hint, ...answered } = (await res.json()) as { hint?: string };
       assert.deepEqual(
         answered,
-        { try: 2, file: askFile(root, R, 'held', 2), stopFirst: true },
+        { try: 2, file: retryAskKey(R, 'held', 2), stopFirst: true },
         'the former `nudge` is answered as `continue`',
       );
       assert.ok(hint?.includes('"mode": "continue"'), `the answer's hint names the value to send now: ${hint}`);
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'held', 2), 'utf8'));
+      const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R, 'held', 2)) ?? '');
       assert.deepEqual(
         written,
         { step: 'held', try: 2, mode: 'continue', actor: SEATED },
@@ -359,8 +364,8 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       const fresh = await ask('idle', { mode: 'fresh', message: 'Sign in again first.' });
       assert.equal(fresh.status, 202, await fresh.clone().text());
-      assert.deepEqual(await fresh.json(), { try: 2, file: askFile(root, R, 'idle', 2), stopFirst: true });
-      const { at: freshWhen, ...freshly } = JSON.parse(fs.readFileSync(askFile(root, R, 'idle', 2), 'utf8'));
+      assert.deepEqual(await fresh.json(), { try: 2, file: retryAskKey(R, 'idle', 2), stopFirst: true });
+      const { at: freshWhen, ...freshly } = JSON.parse(recordText(root, retryAskKey(R, 'idle', 2)) ?? '');
       assert.deepEqual(
         freshly,
         { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.', actor: SEATED },
@@ -368,7 +373,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       );
       assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
 
-      assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, recordFile) ?? '', record, "the api wrote nothing of the run's record");
       assert.deepEqual(tasksOf(), tasks, "nor of the engine's tasks");
       assert.deepEqual([standIn().said, standIn().interrupts], [[], []], 'and said nothing to a session');
       assert.equal(
@@ -377,7 +382,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
         "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's",
       );
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
       const run = await object();
       const held = stepOf(run, 'held');
@@ -416,8 +421,9 @@ describe('a person answers a blocked step, rechecks a refused check and continue
     "a try a person answered carries the answer and who gave it, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none",
     async () => {
       const A = 'r-answered';
-      write(
-        path.join(root, 'runs', `${A}.json`),
+      plantRecord(
+        root,
+        runKey(A),
         JSON.stringify({
           id: A,
           repo: '/code/app',
@@ -444,11 +450,12 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       signedOff('t-a-implement-try2', { outcome: 'done', summary: 'Used Postgres.', artifacts: [] });
       signedOff('t-a-plan', blocked);
       signedOff('t-a-plan-try2', { outcome: 'done', summary: 'Planned it.', artifacts: [] });
-      write(
-        path.join(root, 'runs', `${A}.asks`, 'done', 'retry-implement-2'),
+      plantRecord(
+        root,
+        askDoneKey(A, 'retry-implement-2'),
         JSON.stringify({ mode: 'continue', message: 'Postgres.', at: at(30), actor: SEATED }),
       );
-      write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30), actor: SEATED }));
+      plantRecord(root, askDoneKey(A, 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30), actor: SEATED }));
 
       const run = await object(A);
       const implement = stepOf(run, 'implement');
@@ -476,7 +483,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.equal(implementTries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
       assert.equal(implement.needs, null, 'the current try signed off done');
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(A)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(A)));
       for (const [where, said] of [
         ['object', run.status],
         ['list', await summary(A)],

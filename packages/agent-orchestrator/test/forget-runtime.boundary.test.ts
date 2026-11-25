@@ -11,6 +11,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest, and throws on a difference; `WF_MAX_CONCURRENT` admits sessions enough, and no cap is set on runs.
  */
+import { runRecord, runsNow } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,11 +24,9 @@ import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, forgetRun, retryRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { runTasks } from '../src/record/record.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
 import { forgetTyped } from './forgetting.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-forget-runtime-');
@@ -36,7 +35,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: '10', WF_MAX_RUNS: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {

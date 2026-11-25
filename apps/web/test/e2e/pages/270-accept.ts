@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks, storedRecordText } from '../world.ts';
 import { SEAT_TOKEN } from '../served.ts';
 
 /** Who the board's write is, as the approval records it: the person, under the seat's token, which the browser presents as its cookie. */
@@ -22,11 +21,11 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const { id, exhausted: step } = LOOPING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
-    const recordFile = path.join(store!, 'runs', `${id}.json`);
-    if (fs.existsSync(asks))
-      throw new Refused(`the store is as seeded before the page presses anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
-    const seededRecord = fs.readFileSync(recordFile, 'utf8');
+    if (Object.keys(storedAsks(id)).length > 0)
+      throw new Refused(
+        `the store is as seeded before the page presses anything — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}`,
+      );
+    const seededRecord = storedRecordText(id);
     const decide = (await openFold(page.locator('[data-asks]'), 'decide')).locator('section[aria-label="Decide"]');
     const row = partOf(page, step).locator(`[data-part-asks] [data-offer="enough"][data-kind="approve"][data-step="${step}"]`);
     const form = row.locator(`form[aria-label="Approve ${step} as it stands"]`);
@@ -67,23 +66,29 @@ export default {
           `the api takes the acceptance, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
         );
       const took = (await response.json()) as { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown };
-      const file = path.join(asks, `accept-${step}-3`);
-      if (took.step !== step || took.try !== 3 || typeof took.at !== 'string' || took.message !== message || took.file !== file) {
+      const file = `accept-${step}-3`;
+      if (
+        took.step !== step ||
+        took.try !== 3 ||
+        typeof took.at !== 'string' ||
+        took.message !== message ||
+        took.file !== `/registry/asks/${id}/${file}`
+      ) {
         throw new Refused(
           `the api answers with the step, the try accepted, when, the words and the acceptance's file — it answered ${JSON.stringify(took)}`,
         );
       }
-      const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+      const written = JSON.parse(storedAsks(id)[file] ?? 'null');
       if (
         JSON.stringify(written) !== JSON.stringify({ step, try: 3, at: took.at, message, actor: SEATED }) ||
-        fs.readdirSync(asks).length !== 1
+        Object.keys(storedAsks(id)).length !== 1
       ) {
         throw new Refused(
-          `the acceptance is written as nemia approve writes it beside who sent it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
+          `the acceptance is written as nemia approve writes it beside who sent it, and nothing else — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}, and ${file} holds ${JSON.stringify(written)}`,
         );
       }
-      if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)
-        throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
+      if (storedRecordText(id) !== seededRecord)
+        throw new Refused(`the api writes nothing of the run's record — the store's record of ${id} changed`);
 
       await expectVisible(
         (await openFold(section, 'detail')).locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }),
@@ -95,7 +100,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `accept-accepted-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, step, 'rounds exhausted');
     }
 

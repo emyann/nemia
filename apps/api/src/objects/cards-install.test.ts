@@ -16,7 +16,7 @@ import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import type { Running } from 'agent-orchestrator';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, keysUnder } from 'agent-orchestrator/testing';
 import type { Card, CardList, Factory } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
@@ -89,7 +89,10 @@ describe('on an install, a card is placed by its factory, or filed with no repos
       const listed = (await (await app.request('/api/namespaces/default/cards')).json()) as CardList;
       const loose = listed.items.find((c) => c.spec.workflow === 'dev');
       assert.ok(loose, 'the card in no factory naming dev');
-      const runs = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []);
+      const runs = () => [
+        ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
+        ...keysUnder(root, '/registry/runs/'),
+      ];
       const before = runs();
       const res = await send(`/api/namespaces/default/cards/${loose.metadata.name}/start`, 'POST', {});
       const answer = (await res.json()) as { error: string };

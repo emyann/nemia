@@ -17,7 +17,7 @@ import {
 } from '../seed.ts';
 import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, takeBackRuns } from '../world.ts';
+import { dropStoredRecord, OUT, runsHeld, store, storedRecord, storedRuns, storeRecord, takeBackRuns } from '../world.ts';
 
 /** A card on the Inbox page, by its name. */
 const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
@@ -92,7 +92,6 @@ async function visit(page: Page) {
     const { planned, bare, rich } = CARDS;
     const inbox = path.join(store!, 'inbox');
     const checkout = path.join(store!, 'checkout');
-    const runsDir = path.join(store!, 'runs');
     const listed = (p: Page) => p.locator('section[aria-label="Cards"] li[data-card]');
     const order = (p: Page) => listed(p).evaluateAll((items) => items.map((item) => item.getAttribute('data-card')));
 
@@ -384,7 +383,7 @@ async function visit(page: Page) {
     const cardFile = path.join(inbox, `${planned.name}.md`);
     const cardText = fs.readFileSync(cardFile, 'utf8');
     const cardTime = fs.statSync(cardFile).mtime;
-    const runsBefore = fs.readdirSync(runsDir).sort();
+    const runsBefore = storedRuns();
     const starting = await page.context().newPage();
     try {
       const { problems } = watch(starting);
@@ -415,7 +414,7 @@ async function visit(page: Page) {
         starting.locator(`[data-from="${planned.name}"]`, { hasText: new RegExp(`^from inbox card ${planned.name}$`) }),
         `and the run's page says, under the brief, the card it came from, as wf decide does (from inbox card ${planned.name})`,
       );
-      const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as {
+      const record = storedRecord(id) as {
         from?: { inbox?: string };
         brief?: string;
         workflowDir?: string;
@@ -459,18 +458,17 @@ async function visit(page: Page) {
         );
     } finally {
       await starting.close();
-      takeBackRuns(runsDir, runsBefore);
+      takeBackRuns(runsBefore);
       if (!fs.existsSync(cardFile)) {
         fs.writeFileSync(cardFile, cardText);
         fs.utimesSync(cardFile, cardTime, cardTime);
       }
     }
 
-    const startedRecord = path.join(runsDir, `${STARTED_AS}.json`);
     const already = await page.context().newPage();
     try {
-      fs.writeFileSync(
-        startedRecord,
+      storeRecord(
+        STARTED_AS,
         JSON.stringify(
           {
             id: STARTED_AS,
@@ -510,7 +508,7 @@ async function visit(page: Page) {
         );
     } finally {
       await already.close();
-      fs.rmSync(startedRecord, { force: true });
+      dropStoredRecord(STARTED_AS);
     }
 
     const elsewhere = path.join(store!, 'hkb-v2');
@@ -668,7 +666,7 @@ async function visit(page: Page) {
       await expectVisible(bareBrief, 'a workflow picked, the brief and Start');
       if ((await bareBrief.inputValue()) !== bare.body)
         throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await bareBrief.inputValue())}`);
-      const before = fs.readdirSync(runsDir).sort();
+      const before = runsHeld();
       fs.renameSync(bareFile, bareAside);
       const reread = rereadOf(refused);
       const [answered] = await Promise.all([
@@ -704,9 +702,9 @@ async function visit(page: Page) {
         );
       if (JSON.stringify(await order(refused)) !== JSON.stringify([rich.name, planned.name, ...queuedByFiling]))
         throw new Refused(`the cards listed are the inbox's — ${(await order(refused)).join(', ')}`);
-      const after = fs.readdirSync(runsDir).sort();
+      const after = runsHeld();
       if (JSON.stringify(after) !== JSON.stringify(before))
-        throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+        throw new Refused(`nothing is written on a refusal — the store's runs went from ${before.length} held to ${after.length}`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
@@ -771,8 +769,8 @@ async function visit(page: Page) {
       const item = await startIn(conflicted, planned.name);
       const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
       await expectVisible(form.getByRole('button', { name: 'Start' }), `Start opens ${planned.name}'s start form`);
-      fs.writeFileSync(
-        startedRecord,
+      storeRecord(
+        STARTED_AS,
         JSON.stringify(
           {
             id: STARTED_AS,
@@ -792,7 +790,7 @@ async function visit(page: Page) {
           2,
         ),
       );
-      const before = fs.readdirSync(runsDir).sort();
+      const before = runsHeld();
       const reread = rereadOf(conflicted);
       const [answered] = await Promise.all([
         conflicted.waitForResponse(
@@ -826,16 +824,16 @@ async function visit(page: Page) {
         throw new Refused(
           `the refusal on the card is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
         );
-      const after = fs.readdirSync(runsDir).sort();
+      const after = runsHeld();
       if (JSON.stringify(after) !== JSON.stringify(before))
-        throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+        throw new Refused(`nothing is written on a refusal — the store's runs went from ${before.length} held to ${after.length}`);
       await settled(conflicted);
       await photograph(conflicted, path.join(OUT, `inbox-conflict-${await themeOf(conflicted)}.png`), { fullPage: true });
       await idle(conflicted);
       onlyRefusal(conflicted, problems(), answered);
     } finally {
       await conflicted.close();
-      fs.rmSync(startedRecord, { force: true });
+      dropStoredRecord(STARTED_AS);
     }
 
     const plannedText = fs.readFileSync(cardFile, 'utf8');

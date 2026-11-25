@@ -14,7 +14,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
-import { addFactory, attachWorkflow, setSchedule } from '../../../testing.ts';
+import { addFactory, attachWorkflow, plantRecord, runKey, setSchedule } from '../../../testing.ts';
 import { addFactoryAt } from '../factory.store.ts';
 import { treeDir } from '../applied/applied.store.ts';
 import { metered } from '../../meter/tally.store.ts';
@@ -38,8 +38,9 @@ const e = () => engineOf(engine().layer);
 /** A record of a run, as a start writes one, `scheduled` where a schedule's fire started it. */
 const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; workflow: string; due: string }) => {
   fs.mkdirSync(RUNS, { recursive: true });
-  fs.writeFileSync(
-    path.join(RUNS, `${id}.json`),
+  plantRecord(
+    ROOT,
+    runKey(id),
     JSON.stringify({
       id,
       workspace: ROOT,

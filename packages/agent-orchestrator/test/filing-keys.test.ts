@@ -8,6 +8,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
+import { keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,7 +18,6 @@ import type { RepositoryRun, Run } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { advanceRun, retryRun, startRun, runWith } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { isRepositoryRun } from '../src/run.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -127,9 +127,9 @@ const repositoryRunOf = (run: Run) => {
 const started = async (dir: string, repo = aRepo()) =>
   repositoryRunOf(await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: dir, isolate: false })));
 /** A run's record as it is on disk, its frozen steps as plain objects. */
-const recordAt = (id: string) => path.join(ROOT, 'runs', `${id}.json`);
+const recordAt = (id: string) => runKey(id);
 const frozenStep = (id: string, step = 'implement') =>
-  (JSON.parse(fs.readFileSync(recordAt(id), 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === step);
+  (JSON.parse(recordText(ROOT, recordAt(id)) ?? '') as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === step);
 
 const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
 const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
@@ -182,7 +182,7 @@ describe('every key a step sets reaches the runtime, on every filing — and a c
     assert.equal(runRecord(ROOT, id).workflowDir, dir);
   });
   s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
-    const before = fs.readdirSync(path.join(ROOT, 'runs')).length;
+    const before = keysUnder(ROOT, '/registry/runs/').length;
     await assert.rejects(
       Promise.resolve().then(() => workflowFolder('kyes', process.cwd(), repo)),
       (e: Error & { exitCode?: number }) => {
@@ -196,7 +196,7 @@ describe('every key a step sets reaches the runtime, on every filing — and a c
         return true;
       },
     );
-    assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, before, 'no run is written');
+    assert.equal(keysUnder(ROOT, '/registry/runs/').length, before, 'no run is written');
   });
   s.test('the first filing carries every key implement sets, and a job files no background session', async () => {
     assert.deepEqual((await tick(id)).filed, ['implement']);
@@ -312,14 +312,14 @@ describe('every key a step sets reaches the runtime, on every filing — and a c
     'a run frozen under `disallow` and `allow` loads, files its rules under the names they have now, and is written back so',
     async () => {
       const run = await started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
-      const record = JSON.parse(fs.readFileSync(recordAt(run.id), 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+      const record = JSON.parse(recordText(ROOT, recordAt(run.id)) ?? '') as Run & { workflow: Array<Record<string, unknown>> };
       record.workflow = record.workflow.map(({ disallowedTools, allowedTools, ...step }) => ({
         ...step,
         ...(disallowedTools ? { disallow: disallowedTools } : {}),
         ...(allowedTools ? { allow: allowedTools } : {}),
       }));
-      fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
-      assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"(disallowed|allowed)Tools":/, 'the fixture holds no new name');
+      plantRecord(ROOT, recordAt(run.id), JSON.stringify(record, null, 2));
+      assert.doesNotMatch(recordText(ROOT, recordAt(run.id)) ?? '', /"(disallowed|allowed)Tools":/, 'the fixture holds no new name');
       const read = runRecord(ROOT, run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.disallowedTools, read?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
       assert.equal(Object.hasOwn(read ?? {}, 'allow') || Object.hasOwn(read ?? {}, 'disallow'), false);
@@ -342,13 +342,13 @@ describe('every key a step sets reaches the runtime, on every filing — and a c
       ['danger-full-access', 'bypassPermissions'],
     ]) {
       const run = await started(folder(`harness: codex\nsandbox: ${sandbox}`));
-      const record = JSON.parse(fs.readFileSync(recordAt(run.id), 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+      const record = JSON.parse(recordText(ROOT, recordAt(run.id)) ?? '') as Run & { workflow: Array<Record<string, unknown>> };
       record.workflow = record.workflow.map(({ sandbox: given, permissionMode: _, ...step }) => ({
         ...step,
         ...(given ? { permissionMode: word } : {}),
       }));
-      fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
-      assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"sandbox":/, 'the fixture holds no `sandbox`');
+      plantRecord(ROOT, recordAt(run.id), JSON.stringify(record, null, 2));
+      assert.doesNotMatch(recordText(ROOT, recordAt(run.id)) ?? '', /"sandbox":/, 'the fixture holds no `sandbox`');
       const read = runRecord(ROOT, run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.permissionMode, read?.sandbox], [word, undefined], 'read as it was frozen');
       await tick(run.id);

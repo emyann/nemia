@@ -25,13 +25,12 @@ import { isDeepStrictEqual } from 'node:util';
 import { Context, Effect, Layer } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { type Judgements, type Judgement, type JudgedOrWhy, judgementsOf, restingOf } from '../summary/judgement.verb.ts';
 import { followedFeed } from './rest.verb.ts';
 import { evictedBy, informedOf, type Watch } from './rest.ts';
 import type { Run as RunObject } from '../object/run.model.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import { NeedsMemory, needsVersionOf } from '../needs/needs.verb.ts';
 
 /**
@@ -239,11 +238,10 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
   git: BranchReader,
   same: (kept: T, fresh: T) => boolean = isDeepStrictEqual,
 ) {
-  const home = yield* StoreRoot;
   const needsMemo = yield* NeedsMemory;
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
-  const stamps = runsAtOnce(home).runs.stamps();
+  const stamps = yield* (yield* RunDoor).runs.stamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
     const at = path.resolve(repo);

@@ -5,7 +5,7 @@ import { fed, LEDGER, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { SHAPED, writeShaped } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** The sheet, open on `step`'s file `file`. */
 const sheetOn = (page: Page, step: string, file: string) => page.locator(`[data-viewer-sheet="${step}/${file}"]`) satisfies Locator;
@@ -69,6 +69,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(SHAPED.id);
       fed(id, 'removed');
     }
   },

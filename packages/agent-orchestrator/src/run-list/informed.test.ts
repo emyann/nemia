@@ -8,6 +8,7 @@
  * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
  * what it served turns it off for itself (`unverified`).
  */
+import { emptyRuns, listRuns, runRecord } from '../../testing.ts';
 import { beforeEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine } fro
 import { runList } from './run-list.verb.ts';
 import { informerMemo, keepObject, keptObject, passStarted, type InformerMemo } from '../rest/informer.verb.ts';
 import type { RunList } from 'objects';
-import { listRuns, runRecord, pruneFile, artifactsDir } from '../record/record.store.ts';
+import { pruneFile, artifactsDir } from '../record/record.store.ts';
 import { passStanding } from '../standing/standing.verb.ts';
 import { writeLabels } from '../record/files.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
@@ -64,6 +65,7 @@ beforeEach(() => {
   lines.length = 0;
   outputRefused = false;
   fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 });
 
@@ -232,6 +234,7 @@ describe('each input that changes a run object, planted, is served fresh', () =>
   for (const { name, make, plant, pass } of ROWS)
     test(name, async () => {
       fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+      emptyRuns(ROOT);
       fs.mkdirSync(RUNS_DIR, { recursive: true });
       const run = await make();
       const memo = informerMemo();

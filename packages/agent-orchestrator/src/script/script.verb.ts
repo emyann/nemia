@@ -5,6 +5,7 @@
  * answered is read off that attempt on every pass (`scriptCloseouts`), and its route copied onto its record once per try (`fileScripts`).
  * A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import type { Refusal } from '../refusal/refusal.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -37,13 +38,13 @@ export type ScriptFiling = {
     verdictOf: (step: string) => Verdict | undefined;
     spendOf: SpendOf;
   };
-  mayFile: () => boolean;
+  mayFile: Effect.Effect<boolean, Refusal>;
   notes: string[];
 };
 
 /**
  * Copy each table condition's route onto its record, once for the try it is on (`StepRecord.route`, `by: 'table'`), where its table
- * answers one and nothing is there for the try: a person's (`routeFile`) or one copied before. Answers with the conditions written. The
+ * answers one and nothing is there for the try: a person's (`routeAsk`) or one copied before. Answers with the conditions written. The
  * pass reads the route afresh either way (`answeredRoute`); the copy, written with the record when the pass writes it — as it does on the
  * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
  * @param f The pass's filing: the run, whose records are written, and its reads of each step's word and closeout.
@@ -87,7 +88,7 @@ export const fileScripts = Effect.fn('fileScripts')(function* (f: ScriptFiling, 
   for (const name of ready) {
     const step = reads.steps.find((s) => s.name === name);
     if (!isScript(step)) continue;
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     if (yield* fileScript(f, step)) filed.push(name);
   }
   return filed;

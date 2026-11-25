@@ -24,7 +24,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
+import { BuiltinTemplates, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
@@ -176,10 +176,14 @@ const fileOf = (s: Store, name: string) => {
   return made;
 };
 
-/** The run `id` on `s`'s record, started from the inbox's card `card`. */
+/**
+ * The run `id` a record of `s`'s keyspace, started from the inbox's card `card`, and read back once: a read after it, with no write
+ * between, leaves the store's files as they are, SQLite's own index (`db/state.db-shm`) among them.
+ */
 function runFrom(s: Store, id: string, card: string, repo: string) {
-  write(
-    path.join(s.home, 'runs', `${id}.json`),
+  plantRecord(
+    s.home,
+    runKey(id),
     JSON.stringify({
       id,
       repo,
@@ -196,6 +200,7 @@ function runFrom(s: Store, id: string, card: string, repo: string) {
       from: { inbox: card },
     }),
   );
+  assert.ok(recordText(s.home, runKey(id)) !== undefined, `${id} is a record of the store`);
 }
 
 /** A session's token minted on `s`'s store for a task no engine runs: a token whose session has ended. */

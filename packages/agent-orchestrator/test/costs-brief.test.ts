@@ -12,6 +12,7 @@
  * is read through `tapped`, which notes each task viewed and fails the view of a spoiled task as a journal that does not read fails it.
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
+import { plantRecord, runKey, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,6 @@ import { JournalError } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { RECENT_RUNS } from '../src/costs/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { typed } from './typed.ts';
@@ -112,8 +112,9 @@ async function aRun(id: string, i: number, costUsd: number, more: { settled?: bo
       closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
       usage: { costUsd },
     });
-  fs.writeFileSync(
-    path.join(ROOT, 'runs', `${id}.json`),
+  plantRecord(
+    ROOT,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/repos/home',

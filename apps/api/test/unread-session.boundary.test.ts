@@ -5,6 +5,7 @@
  * afresh on every request. A boundary test: the run file and the capture are the job's own files, which the test engine has no model of.
  */
 import { root } from './harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -48,8 +49,9 @@ const atWork = (taskId: string, said: object[]) => {
 const result = (cost: unknown) => ({ type: 'result', subtype: 'success', total_cost_usd: cost });
 
 const RUN = 'r-unread';
-write(
-  path.join(root, 'runs', `${RUN}.json`),
+plantRecord(
+  root,
+  runKey(RUN),
   JSON.stringify({
     id: RUN,
     place: { kind: 'folder' },

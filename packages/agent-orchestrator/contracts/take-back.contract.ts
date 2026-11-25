@@ -2,7 +2,7 @@
  * An approval taken back (agent-orchestrator, src/gate/gate.ts): `takeBackStop`, what of a step refuses `nemia approve <run> <step>
  * --off`. A person who approved a gate may take the approval back while nothing it approved has been filed — an ending waiting on the
  * checkout, held, or not yet ticked — and the step then waits at its gate again. `takeBackJudged` words the stop it decides; the verb
- * (`takeBackRun`, gate.verb.ts) moves the approval's file into the run's `.asks/done/`, as the pass moves a spent one.
+ * (`takeBackRun`, gate.verb.ts) sets the approval's record aside under the run's asks' `done/`, as the pass sets a spent one aside.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

@@ -5,7 +5,7 @@ import { cardsPath, photograph, heldIn, optionsIn, pickIn, snackbarSaying, theme
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, takeBackRuns } from '../world.ts';
+import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /** The idea filed with no factory, then started through the Factory list of its Start. */
 const UNASSIGNED = 'File an idea with no factory\n\nIt gets its factory when it is started.';
@@ -70,8 +70,7 @@ function expectFile(file: string, text: string, assertion: string) {
 async function startUnassigned(page: Page, name: string, theme: string) {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
-  const runsDir = path.join(store!, 'runs');
-  const runsBefore = fs.readdirSync(runsDir).sort();
+  const runsBefore = storedRuns();
   const other = await page.context().newPage();
   try {
     const { problems } = watch(other);
@@ -105,7 +104,7 @@ async function startUnassigned(page: Page, name: string, theme: string) {
       throw new Refused(`no console error and no failed request while starting a card of no factory:\n    ${seen.join('\n    ')}`);
   } finally {
     await other.close();
-    takeBackRuns(runsDir, runsBefore);
+    takeBackRuns(runsBefore);
   }
 }
 
@@ -120,7 +119,7 @@ async function expectStartedIn(started: Response, { factory, repo, card }: { fac
   if (started.status() !== 201)
     throw new Refused(`the api starts the card in ${factory} — it answered ${started.status()}: ${await started.text()}`);
   const { id } = (await started.json()) as { id: string };
-  const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+  const record = storedRecord(id) as {
     factory?: string;
     repo?: string;
     from?: { inbox?: string };

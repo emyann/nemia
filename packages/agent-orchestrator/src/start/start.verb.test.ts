@@ -3,6 +3,7 @@
  * over them, the typed `--label` edits over those; a key two runs disagree on left out and said by `nemia start`; a malformed or reserved
  * edit refused before any file is written; and no `.labels` file for a run started with none. On the files, with the test place.
  */
+import { recordText, runKey, runsNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,13 +14,12 @@ import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
 import { startedFacts } from './commands.verb.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const RUNS_DIR = path.join(ROOT, 'runs');
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);
@@ -65,7 +65,7 @@ test("a start copies the labels its --after and --from runs agree on, the card's
   assert.deepEqual(run.labels, want, "the card's tier beats the runs', and area- drops an inherited one");
   assert.equal(run.labelsLeftOut, undefined, 'nothing left out');
   assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile(run.id), 'utf8')), want, 'written beside the record');
-  assert.equal('labels' in JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${run.id}.json`), 'utf8')), false, 'never in it');
+  assert.equal('labels' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? ''), false, 'never in it');
 });
 
 test('a key two named runs disagree on is left out, and `nemia start` answers it, with the runs and their values', async () => {

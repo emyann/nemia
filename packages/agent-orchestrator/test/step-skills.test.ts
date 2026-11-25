@@ -12,6 +12,7 @@
  * by name, with no run left. The link rule itself is held beside its code (`src/skills/read.store.test.ts`), the shipped build
  * folder's kit skills in `skill-folders.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -37,7 +38,6 @@ import { workflowVersion } from '../src/folder/version.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { skillsFor, skillVersion } from '../src/skills/read.store.ts';
 import { agentFilesDir, renderedSkillVersions, writeAgentFiles } from '../src/agents/agents.store.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { toldOf } from '../src/tick/told.verb.ts';
 import { SkillDoor } from '../src/skills/skill-door.store.ts';
 import { MEMORY_ROOT, skillDoorMemory } from '../src/skills/skill-memory.store.ts';
@@ -64,7 +64,11 @@ function written(dir: string, files: Record<string, string>) {
 }
 
 /** The runs the store holds, by what their folder lists. */
-const runsNow = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+const runsNow = () =>
+  [
+    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+    ...keysUnder(ROOT, '/registry/runs/'),
+  ].sort();
 
 /** The skill `name` of the folder `folder` of `repo`, where a session there finds it; the repository's own for `.`. */
 const nested = (repo: string, folder: string, name: string) => path.join(repo, folder, '.claude', 'skills', name);

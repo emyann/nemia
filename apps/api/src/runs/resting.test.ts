@@ -28,7 +28,6 @@ import {
   passStanding,
   Informer,
   informerRead,
-  runsAtOnce,
   standingReader,
   standingSnapshot,
   verifiesRest,
@@ -37,6 +36,7 @@ import type { RunList } from 'objects';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
+import { dropRecord, plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
@@ -46,7 +46,7 @@ const snapshotGit = async () => standingReader(await runWith(e, standingSnapshot
  * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list reads, and a tip it
  * read is one the memo watches.
  */
-const aPass = () => runWith(e, passStanding(runsAtOnce(root).runs.list()));
+const aPass = () => runWith(e, passStanding(runsNow(root).runs.list()));
 /** The app's informer of each run's judgement (`Informer`, given by `liveOf`), which the list reads and keeps runs in. */
 const resting = await runtime.runPromise(
   Effect.gen(function* () {
@@ -153,8 +153,9 @@ function aFinishedRun(id: string, brief = 'Decide it') {
   writeRun(id, brief);
 }
 function writeRun(id: string, brief: string, check?: string) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify(
       {
         id,
@@ -300,7 +301,7 @@ describe('a polled list keeps a run at rest and judges it afresh the moment anyt
     assert.ok(resting.runs.has('r-ask'));
     const before = await listed('r-ask');
     assert.equal(before?.status, 'waiting');
-    write(path.join(root, 'runs', 'r-ask.asks', 'retry-implement-2'), JSON.stringify({ mode: 'fresh', at }));
+    plantAsk(root, 'r-ask', 'retry-implement-2', JSON.stringify({ mode: 'fresh', at }));
     const after = await unverified(() => listed('r-ask'));
     assert.notDeepEqual(after, before, 'the ask moved the answer');
     assert.deepEqual(after, await listed('r-ask'), 'and the answer is the fresh one');
@@ -348,7 +349,7 @@ describe('a polled list keeps a run at rest and judges it afresh the moment anyt
     await aPass();
     await list();
     assert.ok(resting.runs.has('r-gone'));
-    fs.rmSync(path.join(root, 'runs', 'r-gone.json'));
+    dropRecord(root, runKey('r-gone'));
     assert.equal(await unverified(() => listed('r-gone')), undefined);
     assert.ok(!resting.runs.has('r-gone'));
   });
@@ -407,7 +408,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   blocked('r-raced-implement');
   fed('r-raced-implement');
   await runWith(e, informerRead(e, resting, false, await snapshotGit()));
-  first.keep(findRun(root, 'r-raced')!, judged, [], () => new Map(), true);
+  first.keep((await findRun(root, 'r-raced'))!, judged, [], () => new Map(), true);
   await runWith(e, first.commit());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -416,7 +417,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'waiting');
 
   const alone = await runWith(e, informerRead(e, resting, false, await snapshotGit()));
-  alone.keep(findRun(root, 'r-raced')!, judged, [], () => new Map(), true);
+  alone.keep((await findRun(root, 'r-raced'))!, judged, [], () => new Map(), true);
   await runWith(e, alone.commit());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
@@ -424,8 +425,9 @@ test('two requests at once: the first reads the feed and judges the run succeede
 
 /** A run of `design → implement` whose design is gated, its record as the tick writes it: design's task given once filed. */
 function writeGated(id: string, filed: boolean) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify(
       {
         id,
@@ -578,8 +580,9 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-parent/implement');
     await aPass();
     const child = (id: string) =>
-      write(
-        path.join(root, 'runs', `${id}.json`),
+      plantRecord(
+        root,
+        runKey(id),
         JSON.stringify(
           {
             id,
@@ -663,7 +666,8 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
           "the route's check that the run's journal reads (`viewsFor`), and no view more: the hold is answered off the runs it is held until",
         );
       } finally {
-        for (const file of ['r-held.json', 'r-held.hold']) fs.rmSync(path.join(root, 'runs', file));
+        dropRecord(root, runKey('r-held'));
+        fs.rmSync(path.join(root, 'runs', 'r-held.hold'));
       }
     },
   );
@@ -675,8 +679,8 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
       branchOff('wf/r-asks/implement');
       blocked('r-asks-implement');
       writeRun('r-asks', 'Answer it');
-      const asks = path.join(root, 'runs', 'r-asks.json');
-      write(asks, JSON.stringify({ ...(JSON.parse(fs.readFileSync(asks, 'utf8')) as object), after: ['r-paged'] }));
+      const asks = runKey('r-asks');
+      plantRecord(root, asks, JSON.stringify({ ...(JSON.parse(recordText(root, asks) ?? '') as object), after: ['r-paged'] }));
       await aPass();
       try {
         await list();
@@ -713,13 +717,13 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
           'each row with its clock read, in flight as much as waiting',
         );
         assert.deepEqual(
-          runsAtOnce(root).runs.read('r-asks').after,
+          runsNow(root).runs.read('r-asks').after,
           ['r-paged'],
           'it was started after the finished run, whose journal is not read',
         );
         assert.equal(open.asked, plain.asked, "the open runs by state: what the plain poll costs, no finished run's journal");
       } finally {
-        for (const file of ['r-paged.json', 'r-paged-too.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
+        for (const id of ['r-paged', 'r-paged-too', 'r-asks']) dropRecord(root, runKey(id));
       }
     },
   );

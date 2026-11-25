@@ -5,7 +5,7 @@ import { fed, partOf, photograph, sidebar, themeOf, isRunAction } from '../board
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedAsks } from '../world.ts';
 
 export default {
   /**
@@ -46,8 +46,8 @@ export default {
       ]);
       if (sent.status() !== 202)
         throw new Refused(`the api takes the raise with its answer — it answered ${sent.status()}: ${await sent.text()}`);
-      const file = path.join(store!, 'runs', `${id}.asks`, `retry-${raised}-2`);
-      const ask = (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as {
+      const file = `retry-${raised}-2`;
+      const ask = JSON.parse(storedAsks(id)[file] ?? '{}') as {
         mode?: string;
         budget?: number;
         message?: string;
@@ -59,11 +59,12 @@ export default {
         `Answered by: ${ask.actor ? actorWords(ask.actor) : 'nobody'}`,
       ].join('\n\n');
       if (ask.mode !== 'continue' || ask.budget !== 2 || !ask.actor || ask.message !== told)
-        throw new Refused(`the try is asked with the budget, the answer its words — ${file} holds ${JSON.stringify(ask)}`);
+        throw new Refused(`the try is asked with the budget, the answer its words — the run's ask ${file} holds ${JSON.stringify(ask)}`);
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(ASKING.id);
       fed(id, 'removed');
     }
     await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'taken back and said on the feed: the run is gone from the list');

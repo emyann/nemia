@@ -5,6 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { dropRecord, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,6 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -49,7 +49,7 @@ const aRun = (id: string, steps: Run['steps']) =>
   }) satisfies Run;
 
 /** What the daemon does to the run's json, and the only thing it does to it. */
-const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
+const writeRun = (run: Run) => plantRecord(ROOT, runKey(run.id), JSON.stringify(run, null, 2));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {
@@ -242,7 +242,6 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-implement-check.stderr`), 'boom\n');
   fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-x2-implement-check.stderr`), 'not mine\n');
   writeRun(aRun(`${run.id}-x2`, { implement: { taskId: `${run.id}-x2-implement` } }));
-  fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
   const filings = [...b.filings];
 
   const { printed, forgot, error } = await rmTyped(t, b.e, run.id);
@@ -259,13 +258,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
         [wt],
         [{ step: 'implement', branch, commit }],
         [],
-        [
-          `runs/${run.id}.json`,
-          `runs/${run.id}.asks/`,
-          `runs/${run.id}/`,
-          `checks/${run.id}-implement-check.stderr`,
-          `worktrees/${run.id}/`,
-        ],
+        [runKey(run.id), `runs/${run.id}/`, `checks/${run.id}-implement-check.stderr`, `worktrees/${run.id}/`],
         [{ branch, deleted: false, why: 'default' }],
         run.branch,
       ],
@@ -289,8 +282,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     'the work written after the pass that handed the failed step off, and nothing git ignores',
   );
   assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me\n', 'a link in node_modules is not followed');
-  for (const gone of [[`${run.id}.json`], [run.id], [`${run.id}.asks`]])
-    assert.ok(!under('runs', ...gone), `runs/${gone.join('/')} removed`);
+  assert.ok(recordText(ROOT, runKey(run.id)) === undefined && !under('runs', run.id), 'its record and its directory removed');
   assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
   assert.deepEqual(
@@ -306,5 +298,5 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const again = await rmTyped(t, b.e, run.id);
   assert.deepEqual([again.printed, again.error?.exitCode], [[`${run.id}  no such run — nothing to forget`], 2]);
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
-  fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
+  dropRecord(ROOT, runKey(`${run.id}-x2`));
 });

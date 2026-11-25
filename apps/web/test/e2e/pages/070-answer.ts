@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storeAsk, storedAsks } from '../world.ts';
 
 /** What the `answer` page answers FAKE's blocked step with. */
 const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
@@ -25,11 +24,9 @@ export default {
     await sidebar(page);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, FAKE.id, `/steps/${FAKE.blocked}/retry`);
-    const asks = path.join(store!, 'runs', `${FAKE.id}.asks`);
-    const file = path.join(asks, `retry-${FAKE.blocked}-2`);
+    const file = `retry-${FAKE.blocked}-2`;
 
-    fs.mkdirSync(asks, { recursive: true });
-    fs.writeFileSync(file, '{}\n');
+    storeAsk(FAKE.id, file, '{}\n');
     const refused = await page.context().newPage();
     const decisionRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}/decision`;
     let release: () => void = () => undefined;
@@ -76,9 +73,9 @@ export default {
           `the refusal beside the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
         );
       if ((await refusedBox.inputValue()) !== ANSWER) throw new Refused('the answer stays in the box after a refusal, to send again');
-      const there = fs.readdirSync(asks);
-      if (there.length !== 1 || fs.readFileSync(file, 'utf8') !== '{}\n')
-        throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
+      const there = storedAsks(FAKE.id);
+      if (Object.keys(there).length !== 1 || there[file] !== '{}\n')
+        throw new Refused(`nothing is written on a refusal — the run's asks hold ${Object.keys(there).join(', ')}`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
@@ -95,7 +92,7 @@ export default {
       release();
       await refused.unrouteAll({ behavior: 'ignoreErrors' });
       await refused.close();
-      fs.rmSync(file, { force: true });
+      dropStoredAsks(FAKE.id);
     }
 
     const part = partOf(page, FAKE.blocked);
@@ -123,14 +120,16 @@ export default {
       0,
       'and they no longer say it asks: nobody waits on you for it',
     );
-    const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+    const written = JSON.parse(storedAsks(FAKE.id)[file] ?? 'null');
     if (written?.mode !== 'continue' || written?.message !== ANSWER) {
-      throw new Refused(`the ask is written as wf retry writes it, with the answer — ${file} holds ${JSON.stringify(written)}`);
+      throw new Refused(
+        `the ask is written as wf retry writes it, with the answer — the run's ask ${file} holds ${JSON.stringify(written)}`,
+      );
     }
     await settled(page);
     await photograph(page, path.join(OUT, `answer-asked-${await themeOf(page)}.png`), { fullPage: true });
 
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(FAKE.id);
     fed(FAKE.id, FAKE.blocked, 'blocked');
     await expectVisible(box, `with the ask taken back, ${FAKE.blocked} waits on you again, and its box is back once the run is read again`);
   },

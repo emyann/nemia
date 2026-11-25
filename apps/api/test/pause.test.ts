@@ -17,10 +17,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { engine, runsAtOnce } from 'agent-orchestrator';
+import { engine } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import type { PauseNowRead } from 'objects';
+import { askNames, dropAsk, dropRecord, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -157,8 +158,9 @@ describe('the board pauses the store and lifts it, refused a second of each; the
     async () => {
       const id = 'r-pause-now';
       fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-      fs.writeFileSync(
-        path.join(root, 'runs', `${id}.json`),
+      plantRecord(
+        root,
+        runKey(id),
         JSON.stringify({
           id,
           workspace: root,
@@ -189,15 +191,15 @@ describe('the board pauses the store and lifts it, refused a second of each; the
       });
       assert.deepEqual({ by: pause.by, why: pause.why, timeoutMs: pause.timeoutMs }, { by: 'ann', why: 'the bill', timeoutMs: 0 });
       assert.deepEqual(stops, [], "a session is not stopped: the sessions' drain cuts its call, and it goes on as the same try");
-      assert.deepEqual(runsAtOnce(root).asks.read(id).asks, [], 'and it is asked no try');
+      assert.deepEqual(runsNow(root).asks.read(id).asks, [], 'and it is asked no try');
       assert.equal((await asked('POST', { why: 'again' }, BOARD, on)).status, 409, 'a plain pause on one that stands');
       const again = await asked('POST', { now: true, why: 'again' }, BOARD, on);
       assert.equal(again.status, 200);
       assert.deepEqual({ pause: again.body.pause, kept: again.body.kept }, { pause, kept: true }, 'the pause kept as it was put');
       assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause);
       assert.deepEqual(await asked('DELETE', undefined, BOARD, on), { status: 200, body: { pause } });
-      fs.rmSync(path.join(root, 'runs', `${id}.asks`), { recursive: true, force: true });
-      fs.rmSync(path.join(root, 'runs', `${id}.json`));
+      askNames(root, id).forEach((name) => dropAsk(root, id, name));
+      dropRecord(root, runKey(id));
     },
   );
 });

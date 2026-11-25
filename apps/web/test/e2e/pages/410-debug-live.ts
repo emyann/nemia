@@ -5,7 +5,7 @@ import { fed, LEDGER, openDebug, partOf, photograph, sidebar, themeOf, isRunActi
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storedRecordText, storeRecord } from '../world.ts';
 
 /** How long a change on the feed may take to show, as the `live` page holds the board to. */
 const LIVE_MS = 3_000;
@@ -30,9 +30,8 @@ export default {
     const step = SESSION.step;
     const first = `${id}-${step}`;
     const second = `${first}-2`;
-    const record = path.join(store!, 'runs', `${id}.json`);
     const journal = path.join(store!, 'engine', 'tasks', `${second}.jsonl`);
-    const seeded = fs.readFileSync(record, 'utf8');
+    const seeded = storedRecordText(id);
     const part = partOf(page.locator(LEDGER), SESSION.step);
     const { panel, lifecycle } = await openDebug(part, first);
     const completed = lifecycle.locator('[data-state="completed"][data-lit]');
@@ -54,7 +53,7 @@ export default {
         { kind: 'settled', at, outcome: 'stopped' },
       ];
       fs.writeFileSync(journal, stopped.map((entry) => `${JSON.stringify(entry)}\n`).join(''));
-      fs.writeFileSync(record, JSON.stringify(run, null, 2));
+      storeRecord(id, JSON.stringify(run, null, 2));
       await page.waitForTimeout(QUIET_MS);
       if (reads !== 0)
         throw new Refused(
@@ -87,7 +86,7 @@ export default {
       await expectVisible(panel.locator(`[data-path="${first}"]`), 'try 1 picked, the address keeping it: its own task');
       await expectVisible(completed, 'where it ended: completed lit');
     } finally {
-      fs.writeFileSync(record, seeded);
+      storeRecord(id, seeded);
       fs.rmSync(journal, { force: true });
       fed(id, step, 'succeeded');
     }

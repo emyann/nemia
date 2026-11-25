@@ -15,6 +15,7 @@
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
  * its end, or for the line it says, never for a length of time.
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -74,8 +75,9 @@ const settled = (taskId: string, closeout: object, s: number) =>
   ]);
 
 const RUN = 'r-parity';
-write(
-  path.join(root, 'runs', `${RUN}.json`),
+plantRecord(
+  root,
+  runKey(RUN),
   JSON.stringify({
     id: RUN,
     place: { kind: 'folder' },
@@ -96,8 +98,9 @@ write(
 );
 /** A run of one step not filed yet, beside `RUN`, with `more` on its record: a wait, a hold or a cancellation for `nemia ls` to word. */
 const waitingRun = (id: string, more: object) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       place: { kind: 'folder' },
@@ -142,8 +145,9 @@ journal('t-working', [
  * step blocked asking two questions its folder's `output:` declares a field of.
  */
 const oneStepRun = (id: string, taskId: string, more: object = {}, step: object = {}) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       place: { kind: 'folder' },
@@ -172,8 +176,9 @@ write(
     additionalProperties: false,
   }),
 );
-write(
-  path.join(root, 'runs', 'r-asking.json'),
+plantRecord(
+  root,
+  runKey('r-asking'),
   JSON.stringify({
     id: 'r-asking',
     place: { kind: 'folder' },

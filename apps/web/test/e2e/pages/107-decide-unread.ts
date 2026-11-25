@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, storedRecordText, storeRecord } from '../world.ts';
 
 /** A repository no place can read: where a branch of it stands is asked and not answered. */
 const NOWHERE = '/code/no-such-repository';
@@ -20,10 +19,9 @@ export default {
   route: `/runs/${ENDING.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const record = path.join(store!, 'runs', `${ENDING.id}.json`);
-    const was = fs.readFileSync(record, 'utf8');
+    const was = storedRecordText(ENDING.id);
     try {
-      fs.writeFileSync(record, JSON.stringify({ ...JSON.parse(was), repo: NOWHERE }, null, 2));
+      storeRecord(ENDING.id, JSON.stringify({ ...JSON.parse(was), repo: NOWHERE }, null, 2));
       fed(ENDING.id, ENDING.ending, 'awaiting approval');
       await page.reload();
       const acts = partOf(page, ENDING.ending).locator(`section[aria-label="What ${ENDING.ending} would act on"]`);
@@ -41,7 +39,7 @@ export default {
       await idle(page);
       await photograph(acts, path.join(OUT, `decide-unread-panel-${await themeOf(page)}.png`));
     } finally {
-      fs.writeFileSync(record, was);
+      storeRecord(ENDING.id, was);
       fed(ENDING.id, ENDING.ending, 'awaiting approval');
     }
   },

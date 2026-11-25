@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { captured } from '../src/local.ts';
 import { servedStore } from './served.ts';
+import { askNames, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-local-');
@@ -81,7 +82,7 @@ function seedGated(root: string) {
     steps: { plan: { taskId: task, workspace: lane, branch: `wf/${GATED.id}/plan` }, implement: { taskId: null } },
   };
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', `${GATED.id}.json`), JSON.stringify(run, null, 2));
+  plantRecord(root, runKey(GATED.id), JSON.stringify(run, null, 2));
   const journal = [
     { kind: 'filed', at, brief: 'Plan it.', cwd: lane, maxAttempts: 1, harness: 'claude' },
     { kind: 'starting', at, attempt: 1 },
@@ -139,16 +140,12 @@ test('version, service status and template lint run with no daemon and no flag',
 test('nemia approve <run> <step> reaches the store through the api with its words intact: the approval is written into the store', async () => {
   const store = await servedStore('nemia-local-approve-', seedGated);
   try {
-    const before = fs.readdirSync(path.join(store.root, 'runs'));
+    const before = askNames(store.root, GATED.id);
     const { code, err } = await store.nemia(['approve', GATED.id, GATED.step]);
     assert.equal(code, 0, err);
-    const written = fs.readdirSync(path.join(store.root, 'runs')).filter((name) => !before.includes(name));
-    assert.deepEqual(written, [`${GATED.id}.asks`]);
-    const asks = path.join(store.root, 'runs', `${GATED.id}.asks`);
-    const said = fs.statSync(asks).isDirectory()
-      ? fs.readdirSync(asks, { recursive: true, encoding: 'utf8' }).join('\n')
-      : fs.readFileSync(asks, 'utf8');
-    assert.ok(said.includes(GATED.step), said);
+    const written = askNames(store.root, GATED.id).filter((name) => !before.includes(name));
+    assert.equal(written.length, 1, written.join(', '));
+    assert.ok(written[0]?.includes(GATED.step), written.join(', '));
   } finally {
     await store.stop();
   }

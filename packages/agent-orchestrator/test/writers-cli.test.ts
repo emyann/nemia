@@ -37,6 +37,7 @@ import {
 import { agentDraftOf, skillDraftOf } from '../src/workflow.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { keysUnder, recordText, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-writers-cli-');
 process.env.NEMIA_DAEMON_START = 'off';
@@ -312,12 +313,12 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       const taster = agentDraft('taster', '---\ndescription: Use this to taste it.\nmodel: sonnet\n---\nTaste it.\n');
       await handled(AGENTS_WRITE.handler({ from: 'user', draft: taster, schema: null }));
       const { id } = await answered<{ id: string }>('agents', 'try', 'user', 'taster', '--brief', '  Taste the soup.  ');
-      const run = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'));
+      const run = JSON.parse(recordText(ROOT, runKey(id)) ?? '');
       assert.equal(run.repo, undefined, 'with no repository');
       assert.equal(run.brief, 'Taste the soup.');
       assert.equal(run.workflowDir, path.join(ROOT, 'tries', 'taster'));
       assert.equal(run.workflow[0].agent.name, 'taster');
-      const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
+      const runs = () => [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
       const before = runs();
       await refusedAs(sub, 'Conflict', ['agents', 'try', 'user', 'taster', '--brief', 'Once more.'], `still running (${id})`);
       await refusedAs(

@@ -14,6 +14,7 @@
  * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. Its store is its own at
  * `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { proposalHeld, proposalsHeld } from './proposal-walks.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -38,7 +39,6 @@ import {
   swapTree,
   treeDir,
 } from '../src/factory/applied/applied.store.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { approveProgram, declineProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { mintToken } from '../src/token/token.store.ts';

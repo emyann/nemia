@@ -3,16 +3,17 @@
  * tries, one try, its closeout, what its check printed (`nemia check-output`) and what it was told, and `nemia logs` (a step's session
  * output).
  */
+import { RunId } from '../record/record.model.ts';
 import { Effect, Schema } from 'effect';
 import { CHECK_OUTPUT_WORDS, type CheckOutput, CLOSEOUT_WORDS, LOGS_WORDS, OUTPUT_STREAMS, Run as RunObject, SHOW_WORDS } from 'objects';
-import { EngineService, asked, tried } from '../runtime-client.ts';
+import { EngineService, asked } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import type { StepTry } from '../resource/tries.verb.ts';
 import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from './run.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { stepCheckOutput } from '../check-output/check-output.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
@@ -40,7 +41,7 @@ export const SHOW: Served<Readonly<Record<string, unknown>>, typeof ShowInput.Ty
   input: ShowInput,
   handler: (args) =>
     Effect.flatMap(
-      Effect.flatMap(StoreRoot, (home) => tried(() => runsAtOnce(home).runs.read(args.runId))),
+      Effect.flatMap(RunDoor, (door) => door.runs.read(RunId.read(args.runId))),
       (run) =>
         (args.raw === true
           ? Effect.succeed(rawOf(run))
@@ -171,8 +172,7 @@ export const LOGS: Served<{ taskId?: string; output?: string }, StepInput> = {
   input: StepInput,
   handler: Effect.fnUntraced(function* ({ runId, step }: StepInput) {
     const e = yield* EngineService;
-    const home = yield* StoreRoot;
-    const taskId = runsAtOnce(home).runs.read(runId).steps[step]?.taskId;
+    const taskId = (yield* (yield* RunDoor).runs.read(RunId.read(runId))).steps[step]?.taskId;
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
 };

@@ -12,6 +12,7 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
+import { keysUnder, recordText, runKey, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -33,13 +34,12 @@ import { anAgent } from './agent-walks.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { configRefusal, engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = path.join(scratch('wf-start-judged-'), 'First (Last)');
 fs.mkdirSync(ROOT);
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 const stage = staged({ runWith, main, engineOf, env: ENV });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 type Workflow = import('../src/step/step.ts').StepSpec;
@@ -73,15 +73,11 @@ function aRepo(allow?: readonly string[]) {
   return repo;
 }
 
-/** The runs on disk, by id. */
+/** The runs the store holds, by id. */
 const runsWritten = () =>
-  fs.existsSync(path.join(ROOT, 'runs'))
-    ? fs
-        .readdirSync(path.join(ROOT, 'runs'))
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => f.slice(0, -5))
-        .sort()
-    : [];
+  keysUnder(ROOT, '/registry/runs/')
+    .map((key) => key.slice('/registry/runs/'.length))
+    .sort();
 
 /** Whether the run `id` is written to disk. */
 const written = (id: string) => runsWritten().includes(id);
@@ -394,7 +390,7 @@ describe("nemia start copies the workflow folder whole into the run's own, read-
     fs.mkdirSync(path.join(dir, 'sub'));
     fs.writeFileSync(path.join(dir, 'sub', 'x.json'), '{"x":1}\n');
     const id = started(dir);
-    const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')) as { workflowFiles?: string };
+    const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as { workflowFiles?: string };
     assert.equal(typeof record.workflowFiles, 'string', 'the record names the copy');
     const copy = path.join(ROOT, 'runs', id, 'workflow', String(record.workflowFiles));
     for (const file of ['implement.md', 'helper.ts', path.join('sub', 'x.json')]) {
@@ -408,7 +404,11 @@ describe("nemia start copies the workflow folder whole into the run's own, read-
   test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
     const dir = folder('linked', lines({ implement: '' }));
     fs.symlinkSync(path.join(ROOT, 'notes.md'), path.join(dir, 'helper.ts'));
-    const dirs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+    const dirs = () =>
+      [
+        ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+        ...keysUnder(ROOT, '/registry/runs/'),
+      ].sort();
     const before = dirs();
     await refused(() => started(dir), path.join(dir, 'helper.ts'));
     assert.deepEqual(dirs(), before, 'no run directory either');

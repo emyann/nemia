@@ -5,7 +5,7 @@ import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled } from '../checks.ts';
 import { SHAPED, writeShaped } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** The sources Got draws a line for, in the one order it draws them, of those SHAPED's `build` was told by. */
 const SOURCES = ['you', 'step', 'check', 'other-run'];
@@ -69,6 +69,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(SHAPED.id);
       fed(id, 'removed');
     }
   },

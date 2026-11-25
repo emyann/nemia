@@ -4,6 +4,7 @@
  * end — the fix's output read back as it succeeded, the condition's answer taken as its route. An engine whose harnesses had no
  * `command` refused both at their filing, and every fix on a daemon with it.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,6 @@ import { declared } from '../place/memory/place.ts';
 import { eachTest, runOver } from './placed.ts';
 import { engine, runWith, type Engine } from '../src/runtime-client.ts';
 import { advanceRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { PlaceService } from '../src/place/place.store.ts';

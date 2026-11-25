@@ -115,14 +115,23 @@ export class KeyRefused extends Data.TaggedError('KeyRefused')<{
 /** A watch's answer: the changes after the revision it asked from, or why it cannot start there. */
 export type Since = { readonly changes: readonly KeyChange[]; readonly head: number } | { readonly refused: 'gone' | 'ahead' };
 
+/** The reads and writes of one transaction (`Keyspace.within`): the store's own, opening no transaction of their own. */
+export type KeyTxn = {
+  readonly get: (key: string) => Effect.Effect<KeyRecord | undefined>;
+  readonly list: (prefix: string) => Effect.Effect<readonly KeyRecord[]>;
+  readonly write: (key: string, write: KeyWriteOf) => Effect.Effect<KeyRecord, KeyRefused>;
+};
+
 /** The keyspace of one file, each method an Effect; `settings` its connection's journal mode and synchronous level, as SQLite says. */
 export type Keyspace = {
   readonly head: Effect.Effect<number>;
   readonly get: (key: string) => Effect.Effect<KeyRecord | undefined>;
   readonly list: (prefix: string) => Effect.Effect<{ readonly records: readonly KeyRecord[]; readonly revision: number }>;
   readonly keys: (prefix: string) => Effect.Effect<readonly string[]>;
+  readonly revisions: (prefix: string) => Effect.Effect<ReadonlyMap<string, number>>;
   readonly write: (key: string, write: KeyWriteOf) => Effect.Effect<KeyRecord, KeyRefused>;
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
+  readonly within: <A, E>(body: (tx: KeyTxn) => Effect.Effect<A, E>) => Effect.Effect<A, E | KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
   readonly compact: (retain: number) => Effect.Effect<number>;
   readonly settings: Effect.Effect<{ readonly journal: string; readonly synchronous: number }>;
@@ -244,6 +253,17 @@ const keysUnder = (prefix: string) =>
     return rows.map((row) => row.name);
   });
 
+/** The live keys that begin with `prefix`, each with its latest revision, no value read. */
+const revisionsUnder = (prefix: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ readonly name: string; readonly id: number }>`SELECT kv.name, kv.id FROM kine AS kv
+      JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
+      ON maxkv.id = kv.id
+      WHERE kv.deleted = 0`;
+    return new Map(rows.map((row) => [row.name, row.id]));
+  });
+
 /** The live records whose key begins with `prefix`, by key, each its latest row that deletes nothing. */
 const liveUnder = (prefix: string) =>
   Effect.gen(function* () {
@@ -299,23 +319,47 @@ const loader = Effect.gen(function* () {
   return yield* SqliteMigrator.fromRecord(KEYSPACE_MIGRATIONS);
 });
 
-/** The keyspace over a client already opened and migrated. */
+/**
+ * The keyspace over a client already opened and migrated. A read makes no span, as a file read made none: a list that reads a record per
+ * run keeps its trace bounded whatever the number of runs; a write is traced. A write reads the head once it has committed, so the WAL's
+ * read mark stands at its commit and a read after it, in any process, leaves the store's files as they were: a preview writes nothing.
+ */
 function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
   const inTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
     Effect.provide(
       Effect.flatMap(SqlClient.SqlClient, (sql) => sql.withTransaction(effect)),
       client,
     );
-  const read = <A>(effect: Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>) => Effect.orDie(Effect.provide(effect, client));
+  const read = <A>(effect: Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>) =>
+    Effect.withTracerEnabled(Effect.orDie(Effect.provide(effect, client)), false);
   const refusing = <A>(effect: Effect.Effect<A, KeyRefused | SqlError.SqlError>) =>
     Effect.catchTag(effect, 'SqlError', (err) => Effect.die(err));
+  const committed = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.tap(effect, () => read(headNow));
   return {
     head: read(headNow),
     get: (key) => read(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))),
-    list: (prefix) => Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))),
+    list: (prefix) => Effect.withTracerEnabled(Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))), false),
     keys: (prefix) => read(keysUnder(prefix)),
-    write: (key, write) => refusing(inTxn(writeOne(key, write))),
-    txn: (writes) => refusing(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write)))),
+    revisions: (prefix) => read(revisionsUnder(prefix)),
+    write: (key, write) => refusing(committed(inTxn(writeOne(key, write)))),
+    txn: (writes) => refusing(committed(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write))))),
+    within: (body) =>
+      Effect.flatMap(SqlClient.SqlClient, (sql) =>
+        sql.withTransaction(
+          body({
+            get: (key) =>
+              Effect.orDie(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))).pipe(
+                Effect.provide(client),
+              ),
+            list: (prefix) => Effect.orDie(Effect.provide(liveUnder(prefix), client)),
+            write: (key, write) => refusing(Effect.provide(writeOne(key, write), client)),
+          }),
+        ),
+      ).pipe(
+        Effect.provide(client),
+        committed,
+        Effect.catchTag('SqlError', (err) => Effect.die(err)),
+      ),
     since: (revision, prefix) =>
       Effect.orDie(
         inTxn(

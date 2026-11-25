@@ -18,6 +18,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { TOKEN_COOKIE } from 'objects';
 import { appOf, liveOf } from '../src/app.ts';
 import { withHer } from './her.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** The app of the upgraded release over the harness's store, marked exposed as a server bound to a shared address is. */
 const { app: exposed } = appOf(liveOf({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' }));
@@ -36,9 +37,9 @@ function keptByTheOldRelease(name: string) {
 
 /** A run planted as its record alone, one step and nothing of it filed: something a person holds. */
 function planted(id: string) {
-  const file = path.join(root, 'runs', `${id}.json`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(
+  const file = runKey(id);
+  plantRecord(
+    root,
     file,
     JSON.stringify({
       id,

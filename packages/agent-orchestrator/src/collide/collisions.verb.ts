@@ -9,7 +9,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import type { StepSpec } from '../workflow.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { trialMerges, type Place } from '../place/place.store.ts';
 import { collisionsOf, othersInFlight, trialsOf, type Collisions, type Theirs } from './collide.ts';
@@ -21,25 +21,17 @@ const ahead = (standings: readonly BranchStanding[]) => standings.filter((s) => 
  * them) tried onto the base and onto each branch ahead of it of every other run in flight (`othersInFlight`), whose standings `git` reads.
  * Undefined, asking nothing, for a folder run, a run without worktrees, or one with no branch ahead of its base. Fails with a refusal a
  * read threw; dies of anything else (`tried`).
- * @param home The store's root folder, whose runs are read.
  * @param run The run whose ending lands.
  * @param ending The ending's name.
  * @param standings Where the run's branches stand against its base, as the decision read them.
  * @param git What reads where the other runs' branches stand.
  * @param place The place whose trial verb merges.
  */
-export const collisionsAt = (
-  home: string,
-  run: Run,
-  ending: string,
-  standings: readonly BranchStanding[],
-  git: BranchReader,
-  place: Place,
-) =>
+export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
   Effect.gen(function* () {
     const ours = ahead(standings);
     if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
-    const others = othersInFlight(run, runsAtOnce(home).runs.list());
+    const others = othersInFlight(run, yield* (yield* RunDoor).runs.list());
     const steps = new Map(yield* Effect.forEach(others, (other) => Effect.map(stepsOf(other), (s) => [other.id, s] as const)));
     return yield* tried(() => collisionsRead(run, ending, ours, git, place, others, steps));
   });

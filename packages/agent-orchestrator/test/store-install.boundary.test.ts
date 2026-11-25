@@ -7,6 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
+import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, cancelRun, forgetRun, retryRun, startRun, startPlan, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { UNPROVISIONED } from '../src/check/index.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -297,7 +297,7 @@ test("a worktree whose main packages could only be linked — its store on anoth
 
 test('nemia start refuses a .worktreeinclude line outside the repository, by name, before a run is written', async () => {
   const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n.git/hooks\n');
-  const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+  const runs = keysUnder(ROOT, '/registry/runs/').length;
   await assert.rejects(
     () => isolated(repo),
     (err: Error & { exitCode?: number }) => {
@@ -310,7 +310,7 @@ test('nemia start refuses a .worktreeinclude line outside the repository, by nam
       return true;
     },
   );
-  assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
+  assert.equal(keysUnder(ROOT, '/registry/runs/').length, runs);
   assert.ok(
     await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false })),
     '--no-worktree cuts nothing and copies nothing, so it has nothing to refuse',
@@ -403,7 +403,7 @@ const oneStep = () => {
   return dir;
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** A card's text: its frontmatter keys, and its body. */
 const cardText = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
@@ -481,7 +481,10 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia cancel` 
   await release();
 
   assert.deepEqual(b.filings, [], 'the step is not filed into a worktree that is gone');
-  assert.ok(!under('runs', `${run.id}.json`) && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
+  assert.ok(
+    recordText(ROOT, runKey(run.id)) === undefined && !under('runs', run.id) && !under('worktrees', run.id),
+    'nothing of the run made again',
+  );
 });
 
 test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `nemia cancel` lands files no session for it — the worktree it cut stays, and `nemia rm` then forgets the run, with nothing in flight", async (t) => {

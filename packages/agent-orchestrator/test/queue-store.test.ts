@@ -12,6 +12,7 @@
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
+import { dropRecord, emptyRuns, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -49,7 +50,6 @@ import {
   readInbox as readInboxVerb,
 } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { listedRow, stepRow, told } from './typed.ts';
 import { shownStatus, type RunsListed } from '../src/list/list.ts';
 import { cardFiles } from '../src/cards/cards.store.ts';
@@ -136,6 +136,7 @@ const refusedAs =
  */
 const emptyStore = (cap: string | undefined) => {
   for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
   ENV.WF_MAX_RUNS = cap;
 };
@@ -176,12 +177,12 @@ const started = async (brief: string, createdAt: string, opts: { isolate?: boole
       ...(opts.after ? { after: opts.after } : {}),
     }),
   );
-  const file = path.join(RUNS, `${run.id}.json`);
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
+  const file = runKey(run.id);
+  plantRecord(ROOT, file, JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), createdAt }, null, 2));
   return runRecord(ROOT, run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
-const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** What `nemia argv` printed, line by line, over `e` (the stage's engine when none is named). */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
@@ -1103,8 +1104,9 @@ describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name wit
     aCard('loose', { workflow: 'dev' }, 'Build it, somewhere.');
     aCard('history', { workflow: 'dev', factory: 'default' }, 'Build it in the history.');
     x = await started('x', at(1));
-    fs.writeFileSync(
-      path.join(RUNS, 'started-already-zz99.json'),
+    plantRecord(
+      ROOT,
+      runKey('started-already-zz99'),
       JSON.stringify({ ...runRecord(ROOT, x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
     );
     before = cards();
@@ -1240,7 +1242,7 @@ test.skipIf(process.getuid?.() === 0 && 'root removes a file from a folder it ma
       [undefined, undefined, 1],
     );
     const [byHand] = fromCard(removed.card.name);
-    fs.rmSync(path.join(ROOT, 'runs', `${byHand.id}.json`));
+    dropRecord(ROOT, runKey(byHand.id));
     assert.deepEqual(
       [
         readInbox().find((l) => l.name === removed.card.name)?.startedAs,
@@ -1278,8 +1280,8 @@ test('a record that does not read as a run stops no other run: the pass files th
   t.onTestFinished(() => emptyStore(undefined));
   const b = ticking();
   const run = await started('a run beside a broken one', at(1));
-  const broken = path.join(RUNS, 'r-broken.json');
-  fs.writeFileSync(broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
+  const broken = runKey('r-broken');
+  plantRecord(ROOT, broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
   const err = vi.spyOn(process.stderr, 'write');
   let written: string[] = [];
   const errs = () => written;
@@ -1296,7 +1298,7 @@ test('a record that does not read as a run stops no other run: the pass files th
   } finally {
     written = err.mock.calls.flatMap(([chunk]) => [String(chunk)]);
     err.mockRestore();
-    fs.rmSync(broken);
+    dropRecord(ROOT, broken);
   }
   const leftOut = errs().filter((l) => l.startsWith('left out: run r-broken: its record, '));
   assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs().join('')}`);

@@ -21,7 +21,7 @@ import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir } from '../record/files.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
@@ -212,8 +212,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
 const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const home = yield* StoreRoot;
   const name = path.basename(dir);
-  const runs = runsAtOnce(home)
-    .runs.list(() => {})
+  const runs = (yield* (yield* RunDoor).runs.list(() => {}))
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
   const cards = (yield* readInbox())

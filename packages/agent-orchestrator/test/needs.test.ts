@@ -12,6 +12,7 @@
  * as the daemon's sweep does. The test's store is its own, at `ROOT`, given as `ENV`; the PATH its checks inherit holds no harness's
  * program of the machine's, so only what a checkpoint plants is found.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -24,7 +25,6 @@ import { staged, story } from './story.ts';
 import { advanceRun, list, runWith, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { typed as onHandler } from './typed.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { readRun } from '../src/tick/told.verb.ts';
 import { assess } from '../src/tick/assess.ts';
 import { slotNeed } from '../src/cap/cap.ts';

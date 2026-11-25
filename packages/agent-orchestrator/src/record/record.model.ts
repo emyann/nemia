@@ -143,7 +143,7 @@ export const Step = Schema.Struct({
 export type Step = typeof Step.Type;
 
 /**
- * A loop asked round again by a person (`RoundAsk`, read off `runs/<id>.asks/round-<step>-<n>` by `roundAskIn` in record.store.ts):
+ * A loop asked round again by a person (`RoundAsk`, read off the run's ask record `round-<step>-<n>` by `roundAskIn` in record.store.ts):
  * the looping step, the round, the cap `--budget` raised, when, and the merge `nemia refresh --base` asks with it. Beside the record, not
  * in it; a loop's own round is a try moved behind with `cause: 'round'`.
  */
@@ -458,15 +458,15 @@ const runFields = {
    */
   runTimed: Schema.optional(Schema.Boolean),
   /**
-   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
-   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into
+   * What people approved at a gate (`nemia approve`), each a record of its own beside the retry asks —
+   * `approve-<step>-<try>` — composed on read, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into
    * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one
    * for an earlier try is spent. Absent when there are none.
    */
   approvals: Schema.optional(Schema.Array(Approval)),
   /**
-   * What people accepted at a loop out of rounds (`nemia approve`), each in a file of its own beside the approvals —
-   * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
+   * What people accepted at a loop out of rounds (`nemia approve`), each a record of its own beside the approvals —
+   * `accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
    * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
    * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
    */

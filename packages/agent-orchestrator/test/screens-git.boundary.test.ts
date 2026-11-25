@@ -9,6 +9,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,7 +37,6 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import type { RunsListed } from '../src/list/list.ts';
@@ -668,7 +668,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
         isolate: true,
         steps: Object.fromEntries(Object.entries(read.steps).map(([name, step]) => [name, { ...step, branch }])),
       };
-      fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+      plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
       a = { run, repo, branch, b };
       await runWith(b.e, passStanding(listRuns(ROOT)));
 
@@ -766,7 +766,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
       branchOff(a.repo, `wf/${more.id}`, () => write(a.repo, `more-${k}.txt`, 'x\n'));
       const record = runRecord(ROOT, more.id);
       record.steps.implement = { ...record.steps.implement, branch: `wf/${more.id}` };
-      fs.writeFileSync(path.join(ROOT, 'runs', `${more.id}.json`), JSON.stringify(record, null, 2));
+      plantRecord(ROOT, runKey(more.id), JSON.stringify(record, null, 2));
     }
     const after = await ls();
     assert.ok(viewed.has(`${first}-work`), 'the run of one step, finished in a worktree and waited on by the next, was read');

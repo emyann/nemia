@@ -6,7 +6,7 @@ import { cardOf, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { CARDS, DIAMOND, FACTORIES, FAKE, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedRecord, storeRecord } from '../world.ts';
 
 /** The runner's viewport, put back before the page ends. */
 const WIDE = { width: 1280, height: 800 };
@@ -83,11 +83,10 @@ const TASK = [
 /**
  * READER's record, as `wf start --after --from` freezes it, from DIAMOND's `bottom`'s: waiting on `running` with nothing filed; or,
  * `filed`, after the diamond's top, which landed, its step filed with TASK, its journal and its line on the engine's feed written as the
- * runtime writes them. Each file it writes is returned, to be taken back.
+ * runtime writes them. Each file it writes is returned, to be taken back; its record, the keyspace's, by `dropStoredRun`.
  */
 function written(filed: boolean) {
-  const runs = path.join(store!, 'runs');
-  const bottom = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.bottom.id}.json`), 'utf8')) as {
+  const bottom = storedRecord(DIAMOND.bottom.id) as {
     repo: string;
     workflow: Array<Record<string, unknown>>;
   };
@@ -96,7 +95,6 @@ function written(filed: boolean) {
     ...bottom.workflow[0],
     agent: { name: 'implementer', keys: [], body: 'Implement it.', given: {}, instructions: READER.instructions },
   };
-  const record = path.join(runs, `${READER.id}.json`);
   const run = {
     ...bottom,
     id: READER.id,
@@ -107,13 +105,13 @@ function written(filed: boolean) {
     createdAt: new Date().toISOString(),
     steps: { implement: filed ? { taskId: task, workspace: bottom.repo } : { taskId: null } },
   };
-  fs.writeFileSync(record, JSON.stringify(run, null, 2));
-  if (!filed) return [record] satisfies string[];
+  storeRecord(READER.id, JSON.stringify(run, null, 2));
+  if (!filed) return [] satisfies string[];
   const event = { kind: 'filed', at: new Date().toISOString(), brief: TASK, cwd: bottom.repo, maxAttempts: 1 };
   const journal = path.join(store!, 'engine', 'tasks', `${task}.jsonl`);
   fs.writeFileSync(journal, `${JSON.stringify(event)}\n`);
   fs.appendFileSync(path.join(store!, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId: task, event })}\n`);
-  return [record, journal] satisfies string[];
+  return [journal] satisfies string[];
 }
 
 /**
@@ -275,6 +273,7 @@ export default {
       await goto(page, `/runs/${READER.id}`);
       await wideThenPhone(page, (what) => onTheRunPage(page, what));
     } finally {
+      dropStoredRun(READER.id);
       for (const file of files) fs.rmSync(file, { force: true });
       fs.writeFileSync(feed, fed);
       await page.setViewportSize(WIDE);

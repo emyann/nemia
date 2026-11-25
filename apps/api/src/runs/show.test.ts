@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { COMMANDS, RunObject } from 'agent-orchestrator';
 import type { Run as RunAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -39,7 +39,7 @@ const record = (id: string) => ({
   steps: { implement: { taskId: `t-${id}` } },
 });
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(path.join(root, 'runs', `${R}.json`), JSON.stringify(record(R)));
+plantRecord(root, runKey(R), JSON.stringify(record(R)));
 beforeEachTest(() => {
   Effect.runSync(engine().file({ id: `t-${R}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${R}`, 'succeeded', {

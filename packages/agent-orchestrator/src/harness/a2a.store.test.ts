@@ -10,6 +10,7 @@
  * file a holder's engine mints it in. That path is the runtime's own, and that the two processes agree on
  * it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder; this file proves the branch that reads it.
  */
+import { keysUnder, runRecord } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,7 +29,6 @@ import type { EnginePhase } from '../views/views-words.ts';
 import { advanceRun, procStartOf, remoteAgents, startRun, runWith as runEngine } from '../runner.ts';
 import { BEARER } from 'agent-runtime';
 import { engineOf } from '../runtime-client.ts';
-import { runRecord } from '../record/record.store.ts';
 import { credentialsAt, missingCredential, readRemote } from '../runtime-client.ts';
 import { remoteBrief } from '../run.ts';
 import type { Env } from '../config/config.store.ts';
@@ -407,7 +407,7 @@ describe('a2a-agents.json, the secrets a remote step is given and the keys it ma
   });
   test('nemia start refuses a step whose remote agent a2a-agents.json does not declare, before a run is written, with the entry to add', async () => {
     const dir = team('undeclared', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
-    const before = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
+    const before = keysUnder(ROOT, '/registry/runs/').length;
     const none = await rejection(() => runPlaced(startRun({ brief: 'a review', repo: HERE, workflowDir: dir })));
     assert.equal(
       none,
@@ -431,7 +431,7 @@ describe('a2a-agents.json, the secrets a remote step is given and the keys it ma
         /^ask: `harness: a2a:reviewer` names a remote A2A agent, and the file that declares them is refused\. .*a2a-agents\.json: is a list/,
         'a file refused as it stands is refused for any step',
       );
-      const after = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
+      const after = keysUnder(ROOT, '/registry/runs/').length;
       assert.equal(after, before, 'no run was written');
     } finally {
       fs.rmSync(FILE, { force: true });

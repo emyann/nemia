@@ -2,13 +2,13 @@
  * The collisions an ending's decision reads live (`collisionsAt`): no other run's steps are read unless ours has a branch ahead of its
  * base, so a run beside ours whose folder no longer loads does not fail a decision that asks nothing.
  */
+import { writeRun } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { collisionsAt } from './collisions.verb.ts';
-import { writeRun } from '../record/record.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
 import type { RepositoryRun } from '../record/record.ts';
@@ -48,7 +48,7 @@ const git = new Proxy({}, { get: () => assert.fail('git was read') }) as BranchR
 const place = new Proxy({}, { get: () => assert.fail('the place was asked') }) as Place;
 
 const at = (standings: readonly BranchStanding[]) =>
-  Effect.runSyncExit(Effect.provideService(collisionsAt(STORE, ours, 'implement', standings, git, place), StoreRoot, STORE));
+  Effect.runSyncExit(Effect.provideService(collisionsAt(ours, 'implement', standings, git, place), StoreRoot, STORE));
 
 test("a run with no branch ahead reads no other run's steps, and asks nothing", () => {
   const exit = at([{ branch: 'wf/ours/implement', where: 'on' }]);
@@ -57,7 +57,7 @@ test("a run with no branch ahead reads no other run's steps, and asks nothing", 
 });
 
 test("a run with a branch ahead reads the others' steps: one whose folder does not load still fails", () => {
-  const ahead = collisionsAt(STORE, ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
+  const ahead = collisionsAt(ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
   const refused = Effect.runSync(Effect.flip(Effect.provideService(ahead, StoreRoot, STORE)));
   assert.ok(refused instanceof UnloadedFolder, 'the read is moved, not dropped');
 });

@@ -5,7 +5,7 @@ import { fed, openFold, partOf, photograph, sidebar, themeOf, stepBar } from '..
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storeRecord } from '../world.ts';
 
 /**
  * A run of seven steps, each ending another way, written for this page's visit and taken back before it ends: every page shares the
@@ -205,9 +205,8 @@ function writeRun(root: string) {
     write(path.join(dir, `${step.name}.md`), `---\nplace: git\nharness: claude\n${output}${loop}---\nDo ${step.name}.\n`);
     if ('output' in step && step.output) write(path.join(dir, step.output.file), `${JSON.stringify(step.output.schema, null, 2)}\n`);
   }
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -229,7 +228,7 @@ function writeRun(root: string) {
       2,
     ),
   );
-  return [record, dir, files, ...tasks] satisfies string[];
+  return [dir, files, ...tasks] satisfies string[];
 }
 
 /**
@@ -388,6 +387,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(OUTCOME.id);
       fed(OUTCOME.id, 'removed');
     }
     await expectCount(

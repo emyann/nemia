@@ -6,7 +6,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { serveSeat } from '../served.ts';
-import { apiEnv, OUT, store } from '../world.ts';
+import { apiEnv, dropStoredRun, OUT, store, storedRecord, storedRuns, storeRecord } from '../world.ts';
 
 /** A path as a regular expression matches it, character for character. */
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -56,8 +56,7 @@ const goto = async (page: Page, to: string) => {
  * schema asks for, without which it reads unsigned — and a file written there.
  */
 function ranTo(id: string) {
-  const record = path.join(store!, 'runs', `${id}.json`);
-  const run = JSON.parse(fs.readFileSync(record, 'utf8')) as { workspace: string; steps: Record<string, unknown> };
+  const run = storedRecord(id) as { workspace: string; steps: Record<string, unknown> };
   const cwd = path.join(run.workspace, 'try');
   fs.mkdirSync(cwd, { recursive: true });
   fs.writeFileSync(path.join(cwd, TRY.file), TRY.text);
@@ -103,7 +102,7 @@ function ranTo(id: string) {
       .join(''),
   );
   run.steps = { try: { taskId: task, workspace: cwd } };
-  fs.writeFileSync(record, JSON.stringify(run, null, 2));
+  storeRecord(id, JSON.stringify(run, null, 2));
 }
 
 export default {
@@ -187,7 +186,7 @@ export default {
         if (!stepFile.includes(line))
           throw new Refused(`tries/${seeded.name}/try.md says ${line} — it holds ${JSON.stringify(stepFile.join('\n'))}`);
       }
-      const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+      const record = storedRecord(id) as {
         workflowDir: string;
         repo?: string;
         place?: { kind: string };
@@ -247,17 +246,14 @@ export default {
       if (removed.status() !== 200) throw new Refused(`the api removes the try — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/runs', { timeout: WAIT_MS });
       await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'removed, the try is off Runs');
-      for (const gone of [path.join(store!, 'runs', `${id}.json`), path.join(store!, 'runs', id)]) {
-        if (fs.existsSync(gone)) throw new Refused(`removed, the try leaves nothing under its id — ${gone} is there`);
-      }
+      if (storedRuns().includes(id)) throw new Refused(`removed, the try leaves nothing under its id — the store still holds its record`);
+      const folder = path.join(store!, 'runs', id);
+      if (fs.existsSync(folder)) throw new Refused(`removed, the try leaves nothing under its id — ${folder} is there`);
       await idle(page);
     } finally {
       if (id) {
-        for (const at of [
-          path.join(store!, 'runs', `${id}.json`),
-          path.join(store!, 'runs', id),
-          path.join(store!, 'engine', 'tasks', `${id}-try.jsonl`),
-        ])
+        dropStoredRun(id);
+        for (const at of [path.join(store!, 'runs', id), path.join(store!, 'engine', 'tasks', `${id}-try.jsonl`)])
           fs.rmSync(at, { recursive: true, force: true });
       }
       fs.rmSync(tries, { recursive: true, force: true });

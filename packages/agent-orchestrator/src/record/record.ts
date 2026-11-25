@@ -607,12 +607,26 @@ export type MergeAskHeld = {
 export type AskWritten = { written: true; where: string } | { written: false; where: string; stray: string | null };
 
 /**
- * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
- * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
- * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), read by the Run door alone (`RunDoor`,
- * `src/runs/runs.store.ts`). What the tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`,
- * `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a
- * person's cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * What a pass's settle writes (`runs.settle`): whether the record is written back (`write`), and the asks it read — the tries and rounds
+ * asked for, and those it found void (`voided`, an ask `nemia pause --now` wrote) — each it answers set aside with the record, in one
+ * transaction.
+ */
+export type Spent = {
+  readonly write: boolean;
+  readonly asks: readonly RetryAsk[];
+  readonly rounds: readonly RoundAsk[];
+  readonly voided?: readonly RetryAsk[];
+};
+
+/**
+ * The run store's shape, as a plain value of synchronous methods: a run's record, its claim on the card it was started from, a person's
+ * asks and the files a person keeps beside it, by run id and never by path. The tick writes the record; a person's verbs write their own
+ * asks and files; no method lets one writer write the other's, but the tick's settle of the asks its record answers and a hold lifted. The
+ * Run door (`RunDoor`, `src/runs/runs.store.ts`) answers each method as an Effect: over the keyspace (`src/runs/records.store.ts`), and
+ * over the memory stand-in (`memory.store.ts`), which keeps this plain shape. What the tick's pass and a person's verbs read and write of
+ * the store, grouped as `runs`, `asks`, `holds`, `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the
+ * engine forget; and the inbox, `inbox`: a person's cards, which their verbs write, and the tick's tries of a queued card's start, which
+ * the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
@@ -645,6 +659,12 @@ export type RunStore = {
      */
     readonly rewrite: (run: Run) => boolean;
     /**
+     * The pass's writes, in one transaction: the record written back where `spent.write` says so, as `rewrite` writes it, and each ask,
+     * approval and acceptance the record answers, and each ask of `spent.voided`, set aside under `done/` — consumed, never edited. False,
+     * with nothing written, where the record is gone.
+     */
+    readonly settle: (run: Run, spent: Spent) => boolean;
+    /**
      * Each run's stamp: a text that changes whenever anything a pass reads of the run changes — its record, a person's file, an ask — and
      * that the memo of runs at rest compares. Taken before the pass reads the records, so a change between the two is never missed; a pass
      * reads no record whose stamp holds.
@@ -662,9 +682,10 @@ export type RunStore = {
      */
     readonly cancel: (id: string, actor?: Actor) => string;
     /**
-     * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
-     * the hold, the refresh ask, the labels, the asks, what was said before a step was filed and the run's own directory, in that
-     * order — and answer with each path removed, from `WF_ROOT`, a directory's with a trailing `/`. Writes nothing.
+     * Remove what the store keeps under the run's id, whether or not its record is there — the record, its claim while it names the run
+     * and its asks, in one transaction; then the cancellation, the prune marker, the hold, the refresh ask, the labels, what was said
+     * before a step was filed and the run's own directory, in that order — and answer with each key removed and each path, from `WF_ROOT`,
+     * a directory's with a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
     /**
@@ -687,16 +708,11 @@ export type RunStore = {
     /** Every ask that carried a message, waiting or consumed. */
     readonly answers: (id: string) => RetryAsk[];
     /**
-     * Set aside each ask, approval and acceptance the run's record already answers, and each ask of `voided` (an ask `nemia pause --now`
-     * wrote, found void): consumed, never edited.
-     */
-    readonly consume: (run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided?: readonly RetryAsk[]) => void;
-    /**
      * Write a person's ask, whole and exclusively, keyed by its kind, its step and its number: never over a file at its name, which is
      * answered as `written: false`, with why that file is no ask of its kind (`AskWritten`).
      */
     readonly write: (id: string, ask: PersonRequest) => AskWritten;
-    /** Where a person finds the ask `key` of the run: the path a message names for them to read or remove. */
+    /** Where a person finds the ask `key` of the run: the key a message names for them to read. */
     readonly where: (id: string, key: AskKey) => string;
     /**
      * Set aside the approval of try `n` of `step`, taken back by a person: its file moved into the run's `done/` as a spent one is, at the
@@ -704,6 +720,11 @@ export type RunStore = {
      * where it was set aside, or null where no approval was at its name, taken back or spent since it was read.
      */
     readonly takeBack: (id: string, step: string, n: number, takenBack: TakenBack) => string | null;
+    /**
+     * Write a person's route for try `n` of the condition `step` (`nemia route`), whole over the one there: never spent, read on every
+     * pass. Answers where a person finds it.
+     */
+    readonly route: (id: string, step: string, n: number, route: { route: string; at: string }) => string;
   };
   readonly holds: {
     /**

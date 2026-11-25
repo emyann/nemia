@@ -5,6 +5,7 @@
  * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
  * given as `ENV`.
  */
+import { runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import { runWith as runEngine } from '../runner.ts';
 import { engineOf } from '../runtime-client.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { removeWorkflowAt } from '../folder/write.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 import * as verbs from '../inbox/inbox.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -37,7 +37,7 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
-const runFiles = filesStoreAt(ROOT);
+const runFiles = runsNow(ROOT);
 /** `nemia inbox queue`'s verb run at this test's store root and settings, as `nemia` gives them: its answer, or its refusal thrown. */
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => Effect.runSync(storeGiven(ROOT, ENV)(verbs.queueInInbox(...args)));
 

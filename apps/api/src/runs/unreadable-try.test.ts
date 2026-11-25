@@ -15,9 +15,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
+import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { runListOf } from '../../test/run-reads.ts';
+import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -77,8 +78,9 @@ const spoil = (taskId: string) => fs.appendFileSync(journal(taskId), jsonl([MISW
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
 function writeRun(id: string, steps: Record<string, object>, more: object = {}) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,
@@ -117,7 +119,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-child', {}, { after: ['r-check'] });
-await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
+await runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
 
 /** Why the RunList leaves each run unjudged (its `unjudged` entry's `error`), by name, and the names of the runs it judges. */
 const listed = async () => {

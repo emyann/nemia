@@ -1,14 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, watch } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
-
-/** Where the run's record waits while it is gone: beside it, under a name that is no run's, so the api lists no run for it. */
-const AWAY = '.away';
+import { dropStoredRecord, OUT, storedRecordText, storeRecord } from '../world.ts';
 
 /** A second page, open on `route` and watched: the one refusal it may see is the read of the run that finds none. */
 async function openOn(page: Page, route: string, opened: Page[]) {
@@ -31,7 +27,7 @@ export default {
   route: '/runs',
   expect: async (page) => {
     const { id, ending } = LANDED;
-    const record = path.join(store!, 'runs', `${id}.json`);
+    let away: string | undefined;
     const opened: Page[] = [];
     try {
       const run = await openOn(page, `/runs/${id}`, opened);
@@ -43,7 +39,8 @@ export default {
           throw new Refused(`the pages saw nothing wrong while the run was there — they saw:\n    ${problems().join('\n    ')}`);
       }
 
-      fs.renameSync(record, record + AWAY);
+      away = storedRecordText(id);
+      dropStoredRecord(id);
       fed(id, 'removed');
       const said = new RegExp(
         `^${LANDED.title} is no longer in this store: it was removed while this page was open\\. Runs lists the runs the store has\\.$`,
@@ -86,8 +83,8 @@ export default {
           );
       }
     } finally {
-      if (fs.existsSync(record + AWAY)) {
-        fs.renameSync(record + AWAY, record);
+      if (away !== undefined) {
+        storeRecord(id, away);
         fed(id, 'finished');
       }
       for (const other of opened) await other.close();

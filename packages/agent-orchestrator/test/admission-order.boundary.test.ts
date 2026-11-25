@@ -6,6 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +23,6 @@ import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-admission-order-');

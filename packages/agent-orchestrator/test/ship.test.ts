@@ -17,6 +17,19 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
+import {
+  askDoneKey,
+  askKeyOf,
+  askNames,
+  askText,
+  dropAsk,
+  plantAsk,
+  plantRecord,
+  recordText,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -54,7 +67,7 @@ import {
 import { told, type StartedAnswer } from './typed.ts';
 import { staged, story } from './story.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runFile, runRecord } from '../src/record/record.store.ts';
+
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { resumePause, putPause } from '../src/pause/pause.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
@@ -65,7 +78,6 @@ import { merging } from '../src/forget/prune/prune.verb.ts';
 import { taskPhasesRead, closeoutReader, closeoutAsked, spendReader, exitVerdicts } from '../src/views/views.verb.ts';
 import { headsNow, NOTHING_READ, passStanding, standingLive, standingNow, standingReader } from '../src/standing/standing.verb.ts';
 import { roundOf } from '../src/run.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 
 /** The tests' team (`team.ts`, which this file may not import: it loads the package before the file sets its environment). */
@@ -142,7 +154,7 @@ const filedAs = (record: StepRecord | undefined) => {
  *   check settled `failed` with exit 1, or with none where it did not finish; the pass after aborts the merge.
  */
 async function endings(stage: Stage, root: string) {
-  const rooted = filesStoreAt(ROOT);
+  const rooted = runsNow(ROOT);
   fs.cpSync(path.join(TEAM, 'agents'), path.join(root, 'agents'), { recursive: true });
   fs.cpSync(path.join(TEAM, 'skills'), path.join(root, 'skills'), { recursive: true });
   const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
@@ -255,15 +267,12 @@ async function endings(stage: Stage, root: string) {
         : []) satisfies string[],
     /** Rewrite the record of run `id` through `edit`, as a record a nemia before this one wrote, or an odd one, reads. */
     rewritten: async (id: string, edit: (record: Record<string, unknown>) => void) => {
-      const record = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
+      const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as Record<string, unknown>;
       edit(record);
-      fs.writeFileSync(runFile(ROOT, id), JSON.stringify(record, null, 2));
+      plantRecord(ROOT, runKey(id), JSON.stringify(record, null, 2));
     },
-    /** The asks written for run `id`, in its `.asks` directory. */
-    asksOf: (id: string) => {
-      const dir = path.join(root, 'runs', `${id}.asks`);
-      return (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) satisfies string[];
-    },
+    /** The asks waiting for run `id`, by name. */
+    asksOf: (id: string) => askNames(root, id).filter((n) => !n.startsWith('done/')),
     /** A pass of the run `id` over the board's engine, read from disk now. */
     pass: (id: string, e: Engine = stage.board().e) => run(e, runRecord(ROOT, id)),
   };
@@ -299,7 +308,7 @@ async function endings(stage: Stage, root: string) {
     const second = await atTheGate({ repo });
     await stage.runWith(b.e, approveRun(first.id, 'ship'));
     const { file } = await stage.runWith(b.e, approveRun(second.id, 'ship'));
-    fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
+    plantRecord(ROOT, file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
     return { repo, first, second };
   }
 
@@ -373,7 +382,7 @@ const ENV: Record<string, string | undefined> = {
 };
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const at = await endings(stage, ROOT);
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 type Place = import('../src/place/place.store.ts').Place;
 type PlaceAnswers = import('../src/place/place.ts').PlaceAnswers;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
@@ -749,16 +758,19 @@ async function landedThrough(e: Engine, id: string, place: Place) {
   const r = runRecord(ROOT, id);
   const { views, phaseOf } = await stage.runWith(e, taskPhasesRead(r));
   const memo = statusMemo(at.liveHeads, place);
-  return landEnding(
-    ROOT,
-    r,
-    stepsOf(r, ROOT),
-    phaseOf,
-    closeoutReader(views, r),
-    closeoutAsked(views),
-    spendReader(views),
-    exitVerdicts(views, r, stepsOf(r, ROOT)),
-    memo,
+  return stage.runWith(
+    e,
+    landEnding(
+      ROOT,
+      r,
+      stepsOf(r, ROOT),
+      phaseOf,
+      closeoutReader(views, r),
+      closeoutAsked(views),
+      spendReader(views),
+      exitVerdicts(views, r, stepsOf(r, ROOT)),
+      memo,
+    ),
   );
 }
 
@@ -766,7 +778,7 @@ async function landedThrough(e: Engine, id: string, place: Place) {
 const holdOf = (e: Engine, id: string, memo: ReturnType<typeof statusMemo>) => {
   const r = runRecord(ROOT, id);
   const standing = standingNow(rooted.runs.list()).pipe(Effect.provide(stage.place().layer));
-  return stage.runWith(e, checkoutHold(ROOT, e, r, stepsOf(r, ROOT), { standing }, settingsOf(ENV), memo));
+  return stage.runWith(e, checkoutHold(e, r, stepsOf(r, ROOT), { standing }, settingsOf(ENV), memo));
 };
 
 /** Two runs of one repository, one whose ending is filed and has staged its merge, the other approved behind it. */
@@ -912,8 +924,12 @@ const blockedClean = async () => {
  */
 const checkedDecision = async (exitCode: number | undefined) => {
   const { repo, id, checkId } = await at.stagedAndSigned();
-  const approval = path.join(ROOT, 'runs', `${id}.asks`, 'approve-ship-1');
-  fs.writeFileSync(approval, JSON.stringify({ ...JSON.parse(fs.readFileSync(approval, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
+  plantAsk(
+    ROOT,
+    id,
+    'approve-ship-1',
+    JSON.stringify({ ...JSON.parse(askText(ROOT, id, 'approve-ship-1') ?? ''), at: '2026-09-17T08:00:00.000Z' }),
+  );
   at.photographed(id, { count: 2, bytes: 10 });
   stage.board().settle(checkId, 'failed', undefined, exitCode);
   if (exitCode !== undefined) stage.board().tasks.get(checkId)!.printed = { stdout: '' };
@@ -1197,7 +1213,7 @@ describe('a result a person merged by hand before its ending ran: the run has la
       at.mergedByHand(repo, branch);
       const forgot = await stage.runWith(e(), forgetRun(id));
       assert.equal(forgot.kind, 'forgotten', forgot.kind === 'refused' ? forgot.refusal : '');
-      assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false);
+      assert.equal(recordText(ROOT, runKey(id)) !== undefined, false);
     },
   );
   s.test(
@@ -1681,7 +1697,7 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
       const repo = at.aRepo();
       const waiting = await at.atTheGate({ repo });
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [waiting.id] }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
       assert.deepEqual((await at.pass(child.id)).filed, [], 'a merge-only run approved oldest waits on a run at its own gate');
       await stage.runWith(e(), approveRun(waiting.id, 'ship'));
       assert.deepEqual((await at.pass(waiting.id)).filed, ['ship'], 'so the checkout goes to the run that would use it');
@@ -1691,7 +1707,7 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
       const inFlight = await at.atTheGate({ repo: other });
       await stage.runWith(e(), approveRun(inFlight.id, 'ship'));
       const queued = await stage.runPlaced(startRun({ brief: 'ship the flag', repo: other, workflowDir: at.mergeOnly() }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(queued.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(queued.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
       ENV.WF_MAX_RUNS = '1';
       try {
         const capped = await stage.runWith(e(), advanceRun(runRecord(ROOT, queued.id), { inFlight: 1, cap: 1 }));
@@ -1718,9 +1734,9 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
         "the merge-only run's parent has landed",
       );
       const other = await at.atTheGate({ repo });
-      fs.writeFileSync((await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [parent.id] }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
       assert.deepEqual((await at.pass(other.id)).filed, ['ship'], 'the older word takes the checkout');
       assert.deepEqual((await at.pass(child.id)).filed, [], 'and the run with nothing filed waits for it');
       await at.aPass(e());
@@ -1873,13 +1889,12 @@ describe('an ending approved and waiting on the checkout, in a round after the f
     assert.deepEqual([sent.tried, sent.filed], [['review'], []]);
     assert.equal(runRecord(ROOT, id).steps.ship.taskId, null);
     assert.ok(!at.asksOf(id).includes('approve-ship-1'), 'no longer in force');
-    assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'approve-ship-1')), 'kept as given, spent');
+    assert.ok(askText(ROOT, id, 'done/approve-ship-1') !== undefined, 'kept as given, spent');
   });
   s.test(
     'a restart that finds the spent approval where it was given still reads it spent: the work it approved is not the work that stands',
     async () => {
-      const asksDir = path.join(ROOT, 'runs', `${id}.asks`);
-      fs.copyFileSync(path.join(asksDir, 'done', 'approve-ship-1'), path.join(asksDir, 'approve-ship-1'));
+      plantAsk(ROOT, id, 'approve-ship-1', askText(ROOT, id, 'done/approve-ship-1') ?? '');
       settle(`${holder.id}-ship`, 'succeeded', BLOCKED);
       assert.deepEqual((await at.pass(holder.id)).filed, [], 'the checkout is free');
       assert.deepEqual((await at.pass(id)).filed, [], 'and the ending is not filed on the old approval');
@@ -1888,8 +1903,8 @@ describe('an ending approved and waiting on the checkout, in a round after the f
       assert.equal(await statusOf(id, 'ship'), 'awaiting approval');
       assert.ok(!at.asksOf(id).includes('approve-ship-1'), 'the pass spent it again');
       assert.deepEqual(
-        fs.readdirSync(path.join(asksDir, 'done')).filter((f) => f.startsWith('approve-')),
-        ['approve-ship-1', 'approve-ship-1.2'],
+        askNames(ROOT, id).filter((f) => f.startsWith('done/approve-')),
+        ['done/approve-ship-1', 'done/approve-ship-1.2'],
         'beside the one spent before, never over it',
       );
       await stage.runWith(e(), approveRun(id, 'ship'));
@@ -1901,13 +1916,11 @@ describe('an ending approved and waiting on the checkout, in a round after the f
 describe('an ending approved by an older nemia and waiting on the checkout: its approval names no work, so a send-back is offered nowhere, is refused naming how to take it back, and is taken once it is', () => {
   const s = story(test);
   let first = '';
-  let asksDir = '';
-  s.test('REFUSED: no try of the work would spend the approval, so the send-back names the file to take back', async () => {
+  s.test('REFUSED: no try of the work would spend the approval, so the send-back names how to take it back', async () => {
     const two = await at.twoApproved();
     first = two.first.id;
-    asksDir = path.join(ROOT, 'runs', `${first}.asks`);
     assert.deepEqual([(await at.pass(first)).filed, (await at.pass(two.second.id)).filed], [[], ['ship']]);
-    fs.writeFileSync(path.join(asksDir, 'approve-ship-1'), JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+    plantAsk(ROOT, first, 'approve-ship-1', JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
     assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${two.second.id}'s ship has it)`);
     assert.ok(!(await shipOf(first)).note?.includes('nemia retry'), 'nemia ls offers no send-back');
     await assert.rejects(
@@ -1918,7 +1931,7 @@ describe('an ending approved by an older nemia and waiting on the checkout: its 
   });
   s.test('taken back as the refusal says, the gate holds again and the send-back is taken', async () => {
     await stage.main(['approve', first, 'ship', '--off'], e());
-    assert.ok(fs.existsSync(path.join(asksDir, 'done', 'approve-ship-1')), 'the approval is set aside, not deleted');
+    assert.ok(askText(ROOT, first, 'done/approve-ship-1') !== undefined, 'the approval is set aside, not deleted');
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
     const { ask } = await stage.runWith(
       e(),
@@ -1933,9 +1946,8 @@ describe('an ending approved and waiting on the checkout: a person takes the app
   const PERSON = { kind: 'person' } as const;
   let first = '';
   let second = '';
-  const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
   const doneOf = (id: string, name: string) =>
-    JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', name), 'utf8')) as {
+    JSON.parse(askText(ROOT, id, `done/${name}`) ?? '') as {
       step?: string;
       at: string;
       work?: Record<string, number>;
@@ -1946,16 +1958,16 @@ describe('an ending approved and waiting on the checkout: a person takes the app
     [first, second] = [two.first.id, two.second.id];
     assert.deepEqual([(await at.pass(first)).filed, (await at.pass(second)).filed], [[], ['ship']]);
     assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${second}'s ship has it)`);
-    const given = JSON.parse(fs.readFileSync(path.join(asksDir(first), 'approve-ship-1'), 'utf8')) as { at: string };
+    const given = JSON.parse(askText(ROOT, first, 'approve-ship-1') ?? '') as { at: string };
     const off = await stage.runWith(e(), APPROVE.handler({ runId: first, step: 'ship', off: true, actor: PERSON }));
     assert.deepEqual([off.step, off.try, off.at, off.takenBack?.actor], ['ship', 1, given.at, PERSON]);
-    assert.ok(!fs.existsSync(path.join(asksDir(first), 'approve-ship-1')), 'the approval is no longer in force');
+    assert.equal(askText(ROOT, first, 'approve-ship-1'), undefined, 'the approval is no longer in force');
     const kept = doneOf(first, 'approve-ship-1');
     assert.deepEqual(
       [kept.at, kept.work, kept.takenBack?.at, kept.takenBack?.actor],
       [given.at, { implement: 1 }, off.takenBack?.at, PERSON],
     );
-    assert.equal(off.file, path.join(asksDir(first), 'done', 'approve-ship-1'));
+    assert.equal(off.file, askKeyOf(first, 'done/approve-ship-1'));
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
     assert.deepEqual((await at.pass(first)).filed, [], 'nothing of ship is filed on the approval taken back');
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
@@ -1968,7 +1980,7 @@ describe('an ending approved and waiting on the checkout: a person takes the app
     'an approval an older nemia wrote, naming no work, is taken back the same on a held run, kept beside the first in done/',
     async () => {
       const { file } = await stage.runWith(e(), approveRun(first, 'ship'));
-      fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      plantRecord(ROOT, file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
       assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${second}'s ship has it)`);
       const hold = rooted.holds.put(first, [], { why: 'send it back' })!;
       await stage.main(['approve', first, 'ship', '--off'], e());
@@ -1981,7 +1993,7 @@ describe('an ending approved and waiting on the checkout: a person takes the app
   s.test('REFUSED once its land is filed: what it approved has run, and the approval stays', async () => {
     assert.equal(runRecord(ROOT, second).steps.ship.taskId, `${second}-ship`);
     await assert.rejects(stage.main(['approve', second, 'ship', '--off'], e()), refusedAs('Conflict', `nemia ls ${second}`));
-    assert.ok(fs.existsSync(path.join(asksDir(second), 'approve-ship-1')), 'the approval is not moved');
+    assert.ok(askText(ROOT, second, 'approve-ship-1') !== undefined, 'the approval is not moved');
   });
 });
 
@@ -2116,7 +2128,7 @@ describe('an ending that stopped on the base branch sends the work back through 
         refusedNaming(`try 2 of ship is asked for (--continue, at ${ask.at})`, 'a send-back would take that try back'),
         'the two ways on take the same try of the ending: one asked refuses the other, each way round',
       );
-      fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
+      dropAsk(ROOT, id, 'retry-ship-2');
       const sending = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' }));
       const sentBack = `the work is being sent back from ship (nemia retry ${id} review, at ${sending.ask.at})`;
       const wait = `Wait for it: nemia ls ${id}.`;
@@ -2309,7 +2321,7 @@ describe('a loop out of rounds before its ending: accepted as it stands, sent ba
       const sent = await at.pass(id);
       assert.deepEqual([sent.tried, sent.filed], [['review'], []]);
       assert.equal(runRecord(ROOT, id).acceptances, undefined, 'spent by the try after it, as an approval is');
-      assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'accept-review-1')), 'and moved whole');
+      assert.ok(recordText(ROOT, askDoneKey(id, 'accept-review-1')) !== undefined, 'and moved whole');
       assert.doesNotMatch(tasks.get(`${id}-review-try2`)!.spec.brief, /## Accepted/, 'the reviewer is not told its own loop was ended');
       await assert.rejects(
         stage.runWith(e(), acceptRun(id, 'review', ENOUGH)),

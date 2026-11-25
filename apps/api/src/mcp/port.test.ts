@@ -21,8 +21,8 @@ import { Effect, Layer, Schema } from 'effect';
 import { Hono } from 'hono';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
-import { approvalFile, CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { approvalKey, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { until } from '../../test/waits.ts';
@@ -57,9 +57,9 @@ const agentToken = door((d) => d.persons.mint('port-ops', { kind: 'agent', agent
 
 /** A run planted as its record alone: one step, nothing of it filed yet. */
 const planted = (id: string) => {
-  const file = path.join(root, 'runs', `${id}.json`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(
+  const file = runKey(id);
+  plantRecord(
+    root,
     file,
     JSON.stringify({
       id,
@@ -82,8 +82,7 @@ const planted = (id: string) => {
  * takes several: it waits at its gate.
  */
 const askingAtGate = (id: string) => {
-  const file = path.join(root, 'runs', `${id}.json`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const file = runKey(id);
   const design = parseWorkflow('design', '---\nplace: git\noutput: spec.schema.json\n---\nDesign it.\n', () =>
     JSON.stringify({
       type: 'object',
@@ -92,7 +91,8 @@ const askingAtGate = (id: string) => {
       additionalProperties: false,
     }),
   );
-  fs.writeFileSync(
+  plantRecord(
+    root,
     file,
     JSON.stringify({
       id,
@@ -353,7 +353,7 @@ test("an agent answers a gate's questions over the port as the tools say: decide
     arguments: { namespace: 'default', name: id, step: 'design', answers },
   });
   assert.notEqual(approved.isError, true, textOf(approved));
-  const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'design', 1), 'utf8')) as { message: string };
+  const written = JSON.parse(recordText(root, approvalKey(id, 'design', 1)) ?? '') as { message: string };
   for (const q of answers) assert.ok(written.message.includes(q.question), `the approval carries the answer to ${q.question}`);
   await client.close();
 });

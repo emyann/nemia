@@ -13,6 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
+import { askKeyOf, asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -49,14 +50,13 @@ import {
 } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
 import { isRepositoryRun } from '../src/run.ts';
-import { cancelFile, runRecord } from '../src/record/record.store.ts';
+import { cancelFile } from '../src/record/record.store.ts';
 import { EngineService as Service, engineOf } from '../src/runtime-client.ts';
 import { Invalid, isRefusal } from '../src/refusal/refusal.ts';
 import { inputsDir, runsDir } from '../src/record/record.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { PHASES } from '../src/meter/meter.ts';
 import { main } from '../src/cli/main.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import * as views from '../src/views/views.verb.ts';
 import { standingLiveOf } from '../src/standing/standing.verb.ts';
 import { SAY } from '../src/say/commands.verb.ts';
@@ -74,7 +74,7 @@ const ENV: Record<string, string | undefined> = {
 };
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 /** `program` given the place of the test running now, and still to be run. */
@@ -111,7 +111,6 @@ const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | P
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** Why a person judged the loop's findings later work rather than this run's. */
 const ENOUGH = 'the finding is a case no shipped team has: follow-up work, not this run.';
-const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view — every task is read off the stand-in. */
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
@@ -310,7 +309,7 @@ describe("each verb's program, given its services, answers what its plain face a
       vi.useFakeTimers({ toFake: ['Date'], now: at });
       try {
         const ran = await program();
-        if ('file' in ran) fs.rmSync(String(ran.file));
+        if ('file' in ran) dropRecord(ROOT, String(ran.file));
         assert.deepStrictEqual(ran, await face(), what);
       } finally {
         vi.useRealTimers();
@@ -331,7 +330,7 @@ describe("each verb's program, given its services, answers what its plain face a
       () => over(b.e, roundRun(run.id)),
       () => runWith(b.e, roundRun(run.id)),
     );
-    fs.rmSync(path.join(asksDir(run.id), 'round-review-4'));
+    dropRecord(ROOT, askKeyOf(run.id, 'round-review-4'));
     await same(
       'nemia approve of a loop',
       () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),
@@ -400,11 +399,11 @@ describe("each verb's program, given its services, answers what its plain face a
       assert.equal(err.exitCode, 2, what);
       assert.equal(await recovered(b.e, program, 'Conflict'), err.message, what);
     }
-    assert.ok(!fs.existsSync(asksDir(run.id)), 'nothing written');
+    assert.ok(!(keysUnder(ROOT, asksPrefix(run.id)).length > 0), 'nothing written');
   });
   test("REFUSED as a typed failure: a record the store refuses to read is each program's `Invalid`, not a defect", async () => {
     const e = stage.board().e;
-    fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+    plantRecord(ROOT, runKey('garbled'), '{ not json');
     try {
       const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>]> = [
         ['nemia retry --round', roundRun('garbled')],
@@ -415,9 +414,12 @@ describe("each verb's program, given its services, answers what its plain face a
         ['nemia cancel', cancelRun('garbled')],
       ];
       for (const [what, program] of programs) assert.match(await recovered(e, program, 'Invalid'), /is not JSON/, what);
-      assert.ok(!fs.existsSync(asksDir('garbled')) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')), 'nothing written');
+      assert.ok(
+        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')),
+        'nothing written',
+      );
     } finally {
-      fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
+      dropRecord(ROOT, runKey('garbled'));
     }
   });
   test('a journal that does not read is a defect of each program, which no `Effect.catch` recovers, and its plain face rejects with it; nothing written', async () => {
@@ -447,7 +449,7 @@ describe("each verb's program, given its services, answers what its plain face a
       assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
       assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
     }
-    assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(ROOT, run.id).cancelledAt, 'nothing written');
+    assert.ok(!(keysUnder(ROOT, asksPrefix(run.id)).length > 0) && !runRecord(ROOT, run.id).cancelledAt, 'nothing written');
   });
   test("REFUSED as a typed failure: `nemia say`'s engine refusing is its program's `Conflict`; words not delivered are a defect its face rejects with", async () => {
     const b = stage.board();

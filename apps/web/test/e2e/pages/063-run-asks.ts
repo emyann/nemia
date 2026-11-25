@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, isRunAction, LEDGER, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectOnScreen, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks } from '../world.ts';
 
 export default {
   /**
@@ -39,7 +38,6 @@ export default {
     await settled(page);
     await photograph(part, path.join(OUT, `run-asks-part-${await themeOf(page)}.png`));
 
-    const dir = path.join(store!, 'runs', `${id}.asks`);
     try {
       const [answered] = await Promise.all([
         page.waitForResponse(
@@ -49,12 +47,12 @@ export default {
         approve.click(),
       ]);
       if (answered.status() !== 202) throw new Refused(`the api takes the approval made in the part — it answered ${answered.status()}`);
-      if (!fs.existsSync(path.join(dir, `approve-${gated}-1`)))
-        throw new Refused(`the approval is written in ${dir}, as nemia approve does`);
+      if (storedAsks(id)[`approve-${gated}-1`] === undefined)
+        throw new Refused(`the approval is written in the run's asks, as nemia approve does, as approve-${gated}-1`);
       await expectCount(asks, 0, 'approved, the top asks nothing more');
       await expectCount(gate, 0, 'and the part offers the gate no more');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, gated, 'awaiting approval');
     }
     await expectVisible(approve, `taken back, ${gated} waits at its gate again`);

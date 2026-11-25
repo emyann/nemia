@@ -28,6 +28,10 @@
               "why": "the record's names for what a loop's end writes, as the files on disk are named"
             },
             {
+              "path": "packages/agent-orchestrator/src/runs/run-keys.ts",
+              "why": "an ask's key keeps the name its file had, `accept-<step>-<n>`, so a store's ask files import at their own names"
+            },
+            {
               "path": "packages/agent-orchestrator/src/record/record.model.ts",
               "why": "the doc of the run's `acceptances` names the file a loop's end writes, `accept-<step>-<try>`, as it is named on disk"
             },
@@ -613,7 +617,7 @@
     },
     {
       "term": "Run door",
-      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. A run from a card is created once: its create claims the card exclusively, in the store's started folder, and refuses a second run from it as `Conflict`. A synchronous caller reads it at once (`runsAtOnce`), and no file of `src` but the door's reads the files store.",
+      "meaning": "the run's door: its record, its card's claim and its asks, records of the store's keyspace, and the holds, refresh asks and forgetting markers a person keeps beside it as files, by `RunId`; the keyspace by default, the memory stand-in where a test gives it. A run from a card is created once: its record and its card's claim are written in one transaction, and a second run from the card is refused as `Conflict`. Every caller of `src` yields it: none reads a run at once.",
       "type": "RunDoor"
     },
     {
@@ -948,14 +952,24 @@
     },
     {
       "term": "Run record",
-      "meaning": "a run's record read off the store, with what people own beside it composed onto it (`runRecord`, `packages/agent-orchestrator/src/record/record.store.ts`).",
+      "meaning": "a run's record read off the store's keyspace, with its asks and what people own beside it composed onto it (`composedRun`, `packages/agent-orchestrator/src/record/record.store.ts`).",
       "type": "Run"
     },
     {
-      "term": "Runs at once",
-      "meaning": "the Run door's synchronous face (`runsAtOnce`, `packages/agent-orchestrator/src/runs/runs.store.ts`): the door over the files run at once, so a plain synchronous caller — a page, a refusal's words, the command line — writes checked as the door checks.",
+      "term": "Run records",
+      "meaning": "a run's record, its card's claim and its asks as records of the store's keyspace (`runRecords`, `packages/agent-orchestrator/src/runs/records.store.ts`): the layer under the Run door, which writes what belongs together in one transaction, and imports a store's run files once each, moving them aside under the store's `imported` folder.",
       "type": "RunsLayer",
       "retired": [
+        {
+          "spelling": "runsAtOnce",
+          "card": "store: runs and their claims are records of the store",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/test/run-store.test.ts",
+              "why": "the guard that refuses a call of it in src, planting one to prove the refusal"
+            }
+          ]
+        },
         {
           "spelling": "runStore",
           "card": "run-core, one read of a run (A2): no file of src reads the run store but the Run door, and the engine's verbs are one table",
@@ -975,6 +989,10 @@
             {
               "path": "packages/agent-orchestrator/src/runs/runs.store.ts",
               "why": "`RunsLayer = RunStore`, the store's interface"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/runs/records.store.ts",
+              "why": "`DoorOf<RunStore, RunId>`, the keyspace layer typed by the store's interface"
             },
             {
               "path": "packages/agent-orchestrator/src/rest/kept.ts",

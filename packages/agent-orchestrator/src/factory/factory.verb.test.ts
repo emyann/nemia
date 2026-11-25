@@ -3,6 +3,7 @@
  * store has, so the listing reads every record — through the memo a serving caller hands it, each run whose files have not moved is
  * answered from memory, and a warm read reads no finished run's record.
  */
+import { emptyRuns, plantRecord, runKey } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -33,8 +34,9 @@ const RUNS = path.join(ROOT, 'runs');
 
 /** A record of a run a schedule started, as the tick writes one. */
 const writeRun = (id: string, scheduled?: { factory: string; workflow: string; due: string }) =>
-  fs.writeFileSync(
-    path.join(RUNS, `${id}.json`),
+  plantRecord(
+    ROOT,
+    runKey(id),
     JSON.stringify({
       id,
       workspace: ROOT,
@@ -51,6 +53,7 @@ const listed = (kept?: Parameters<typeof FACTORY.handler>[1]) => runWith(e(), FA
 
 test("a warm read of the factories reads no finished run's record, however many there are, and answers a cold read's own", async () => {
   fs.rmSync(RUNS, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});

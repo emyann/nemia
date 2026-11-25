@@ -5,6 +5,7 @@
  * sets up together. Over a store and repositories of its own, with git for real. The rest of `nemia hold` is told on the stage, in
  * `hold.test.ts`, and its pure refusals in `src/wait/wait.test.ts`.
  */
+import { runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { runGiven, runOver } from './placed.ts';
 import { names } from './assessed.ts';
 import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { typed as onHandler } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';

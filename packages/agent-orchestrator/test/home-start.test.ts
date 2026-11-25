@@ -10,6 +10,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -22,7 +23,6 @@ import { advanceRun, forgetRun, retryRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { treeDir, writeTreeWiring } from '../src/factory/applied/applied.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -203,7 +203,11 @@ describe("a start whose run's home cannot be trusted is refused, and leaves no r
   });
   test("REFUSED: a harness's file that does not read refuses the start Invalid, naming the file, and nothing is started", async () => {
     const kept = fs.existsSync(CONFIG_FILE) ? fs.readFileSync(CONFIG_FILE, 'utf8') : undefined;
-    const runs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+    const runs = () =>
+      [
+        ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+        ...keysUnder(ROOT, '/registry/runs/'),
+      ].sort();
     const before = runs();
     fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
     fs.writeFileSync(CONFIG_FILE, '[]');

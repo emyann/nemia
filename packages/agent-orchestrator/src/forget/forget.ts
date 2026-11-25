@@ -3,6 +3,7 @@
  * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line a refusal says (`notForgottenLine`). Pure:
  * what the run's place reads of its repository is handed in.
  */
+import { askKey } from '../runs/run-keys.ts';
 import type { StepSpec } from '../step/step.ts';
 import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -130,8 +131,7 @@ export function forgetRefusal(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  askAt: (ask: AskName) => string = (a) =>
-    `${run.id}.asks/${a.of === 'try' ? 'retry' : a.of === 'base' ? 'merge' : 'round'}-${a.step}-${a.n}`,
+  askAt: (ask: AskName) => string = (a) => askKey(run.id, a),
   standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',

@@ -19,7 +19,7 @@ import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { RunDoor, runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
@@ -50,7 +50,6 @@ const inFlightPhase = (phase: TaskPhase) => phase === 'pending' || phase === 'ru
  * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`). Its plain
  * guards are asked first, untraced: a listing asks this of every run, and most claim no checkout.
  *
- * @param home The store's directory (`WF_ROOT`).
  * @param e The engine whose tasks in flight are read.
  * @param run The run's record.
  * @param steps The run's workflow's steps.
@@ -66,8 +65,7 @@ const inFlightPhase = (phase: TaskPhase) => phase === 'pending' || phase === 'ru
  *   checkout already, so nothing holds it and no task is viewed again — a long-lived `workspace: base` step, filed and never landed, claims
  *   as of the run's creation, and is read on each pass. Left out, the ending's task is viewed (`mainClaim`).
  */
-export const checkoutHold = (
-  home: string,
+export const checkoutHold = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
   steps: readonly StepSpec[],
@@ -77,14 +75,14 @@ export const checkoutHold = (
   config: Settings,
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
-) => {
+) {
   const ending = steps.find((s) => endsOnBase(s));
-  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runsAtOnce(home).asks.read(run.id).asks) === undefined)
-    return Effect.succeed(undefined);
+  if (!ending || run.cancelledAt) return undefined;
+  if (endingClaimedAt(run, ending, (yield* (yield* RunDoor).asks.read(RunId.read(run.id))).asks) === undefined) return undefined;
   const taskId = run.steps[ending.name]?.taskId;
-  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return Effect.succeed(undefined);
-  return claimsRead(e, run, from, config, memo);
-};
+  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return undefined;
+  return yield* claimsRead(e, run, from, config, memo);
+});
 
 /** The claims on the run's repository's checkout, read once the run's ending claims it (`checkoutHold`). */
 const claimsRead = Effect.fn('checkoutHold')(function* (
@@ -209,7 +207,7 @@ const mainClaim = Effect.fnUntraced(function* (
  * @param memo The pass's reading of its places (`StatusMemo`), shared with its `checkoutHold`: the place to read and land through, in
  *   place of the run's own, where it names one.
  */
-export function landEnding(
+export const landEnding = Effect.fnUntraced(function* (
   home: string,
   run: Run,
   steps: readonly StepSpec[],
@@ -222,8 +220,8 @@ export function landEnding(
 ) {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
-  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runsAtOnce(home).runs.exists(run.id))
-    return { notes: [], landed: false };
+  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run)) return { notes: [] as string[], landed: false };
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(run.id)))) return { notes: [] as string[], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
   const due = landingDue(
@@ -236,7 +234,7 @@ export function landEnding(
     stagedHere(run) ?? true,
     () => checkoutStatus(run, steps, memo),
   );
-  if (!due) return { notes: [], landed: false };
+  if (!due) return { notes: [] as string[], landed: false };
   const name = ending.name;
   const write = (landed: LandingRecord, note: string) => {
     const dropped =
@@ -262,7 +260,7 @@ export function landEnding(
   if (refused) return again(`${due.why}, and the run could not abort its merge (${refused})`);
   const aborted = { aborted: due.why, ...(due.refusedOn ? { refusedOn: due.refusedOn } : {}) };
   return write(aborted, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
-}
+});
 
 /**
  * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the

@@ -13,6 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_MAX_CONCURRENT` admits sessions enough for every run, and no cap is set on
  * runs but in the checkpoint that counts the slots, which sets it on `ENV` for its own scope.
  */
+import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -24,7 +25,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { retryRun, runWith, startRun, tickRun } from '../src/runner.ts';
 import { decisionRead } from '../src/decide/decision.verb.ts';
-import { runRecord, runFile } from '../src/record/record.store.ts';
+
 import { slotsRead } from '../src/cap/slots-read.verb.ts';
 import { readFeed } from '../src/feed/feed.store.ts';
 import { REMOVED } from '../src/feed/feed.ts';
@@ -99,8 +100,8 @@ const started = (brief: string, dir = FOLDER, more: { after?: string[]; isolate?
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
 const unfrozen = (id: string, dir: string) => {
-  const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
-  fs.writeFileSync(runFile(ROOT, id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
+  const { workflow: _, ...record } = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as Record<string, unknown>;
+  plantRecord(ROOT, runKey(id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
 };
 
 const LEFT_OUT = (id: string) => `${id} is not advanced while its workflow folder does not load: run ${id}: it froze no workflow`;
@@ -199,7 +200,7 @@ describe('one broken run does not stop the others: each left out and said once, 
       spoil(runRecord(ROOT, runs.checked).steps.work.check!.taskId);
       spoil(runRecord(ROOT, runs.tried).steps.work.tries![0].taskId);
       unfrozen(runs.gone, path.join(ROOT, 'no-such-folder'));
-      fs.writeFileSync(runFile(ROOT, 'torn'), '{ "id": "torn", "repo"');
+      plantRecord(ROOT, runKey('torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
 
       const stderr = vi.spyOn(process.stderr, 'write');

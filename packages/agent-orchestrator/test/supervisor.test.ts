@@ -5,6 +5,7 @@
  * is here; and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts, which is the cap's story in
  * `queue-store.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,6 @@ import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { advanceRun, list, retryRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-supervisor-');

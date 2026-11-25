@@ -6,6 +6,7 @@
  * The path is read off the journal alone, so no harness is asked.
  */
 import { root } from '../../test/harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -43,8 +44,9 @@ const turn = (n: number, s: number) => [
 
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 const writeRun = (id: string, steps: Record<string, object>) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: root,

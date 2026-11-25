@@ -5,6 +5,7 @@
  * `nemia` it calls acts as that agent while it runs. What it said is read off its attempt on every pass (`commandCloseout`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import type { Refusal } from '../refusal/refusal.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -27,7 +28,7 @@ export type CommandFiling = {
   e: Engine;
   run: Run;
   reads: { steps: StepSpec[]; signedOff: (step: string) => Closeout | undefined };
-  mayFile: () => boolean;
+  mayFile: Effect.Effect<boolean, Refusal>;
 };
 
 /**
@@ -41,7 +42,7 @@ export const fileCommands = Effect.fn('fileCommands')(function* (f: CommandFilin
   for (const name of ready) {
     const step = f.reads.steps.find((s) => s.name === name);
     if (!isCommandNode(step)) continue;
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     yield* fileCommand(f, step, stepTaskId(f.run, step.name, tryOf(f.run, step.name)));
     filed.push(name);
   }

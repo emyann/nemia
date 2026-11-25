@@ -5,7 +5,7 @@ import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storeRecord } from '../world.ts';
 
 /** The run the page writes, its steps not filed, and the words each layer of `write` was frozen with. */
 const LAYERED = {
@@ -54,7 +54,6 @@ const goto = async (page: Page, to: string) => {
  * them, after the custom instructions, and `review`, with no agent, was told none.
  */
 function written(id: string = LAYERED.id, rules: string | null = null) {
-  const record = path.join(store!, 'runs', `${id}.json`);
   const work = path.join(store!, 'runs', id, 'work');
   fs.mkdirSync(work, { recursive: true });
   const write = {
@@ -97,13 +96,12 @@ function written(id: string = LAYERED.id, rules: string | null = null) {
     createdAt: new Date().toISOString(),
     steps: { write: { taskId: null }, review: { taskId: null } },
   };
-  fs.writeFileSync(record, JSON.stringify(run, null, 2));
-  return record;
+  storeRecord(id, JSON.stringify(run, null, 2));
+  return id;
 }
 
 /** Writes a record that froze no workflow, as one written before runs froze theirs: its key absent, so the api reads the folder's steps. */
 function unfrozen() {
-  const record = path.join(store!, 'runs', `${LAYERED.unfrozen}.json`);
   const work = path.join(store!, 'runs', LAYERED.unfrozen, 'work');
   fs.mkdirSync(work, { recursive: true });
   const run = {
@@ -115,8 +113,8 @@ function unfrozen() {
     createdAt: new Date().toISOString(),
     steps: { write: { taskId: null }, review: { taskId: null } },
   };
-  fs.writeFileSync(record, JSON.stringify(run, null, 2));
-  return record;
+  storeRecord(LAYERED.unfrozen, JSON.stringify(run, null, 2));
+  return LAYERED.unfrozen;
 }
 
 /** Refuses unless the step section `write` says each of `words` once, fold and all. */
@@ -311,7 +309,7 @@ export default {
       await photograph(whole, path.join(OUT, `told-layers-unfrozen-${await themeOf(page)}.png`));
       await goto(page, `/runs/${FOLDER.id}`);
     } finally {
-      for (const record of records) fs.rmSync(record, { force: true });
+      for (const id of records) dropStoredRun(id);
       for (const id of [LAYERED.id, LAYERED.unfrozen, LAYERED.ruled])
         fs.rmSync(path.join(store!, 'runs', id), { recursive: true, force: true });
     }

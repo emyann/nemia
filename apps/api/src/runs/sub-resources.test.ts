@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -21,8 +21,9 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const R = 'r-sub';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${R}.json`),
+plantRecord(
+  root,
+  runKey(R),
   JSON.stringify({
     id: R,
     repo: '/code/app',

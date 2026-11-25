@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { openFold, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
@@ -6,7 +5,7 @@ import { expectCount, expectInside, expectUncut, expectVisible, idle, Refused, s
 import { COSTLY } from '../seed.ts';
 import { dollars } from '../../../src/lib/money.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks } from '../world.ts';
 
 /**
  * The run's header says what the run took beside what it cost, each a tile: its clock — at work, since it waits on you — with its start
@@ -226,7 +225,6 @@ export default {
       'once more: the round with its cap raised, as a line',
     );
 
-    const asks = path.join(store!, 'runs', `${COSTLY.id}.asks`);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, COSTLY.id, `/steps/${over.step}/retry`);
     const refused = await page.context().newPage();
@@ -263,8 +261,8 @@ export default {
         );
       if ((await box.inputValue()) !== dollars(COSTLY.refused))
         throw new Refused('the amount stays in the box after a refusal, to raise again');
-      if (fs.existsSync(asks))
-        throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
+      if (Object.keys(storedAsks(COSTLY.id)).length > 0)
+        throw new Refused(`nothing is written on a refusal — the run's asks hold ${Object.keys(storedAsks(COSTLY.id)).join(', ')}`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
@@ -279,7 +277,7 @@ export default {
         );
     } finally {
       await refused.close();
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(COSTLY.id);
     }
 
     await node(over.step).click();

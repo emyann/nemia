@@ -14,12 +14,14 @@ import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { ApiConfig } from '../src/layer.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const RUNS = Array.from({ length: 5 }, (_, i) => `r-gz-${i}`);
 for (const id of RUNS) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

@@ -20,8 +20,9 @@ import { scratch } from 'test-kit/scratch';
 import type { RunDecision } from 'objects';
 import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
+import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
+import { plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -66,7 +67,7 @@ function branchOff(repo: string, branch: string, file: string, text: string) {
  * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list and a run's page read,
  * with no `git` of their own.
  */
-const aPass = () => runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
+const aPass = () => runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
 
 /** The tick's last reading, gone: no pass has read where anything stands. */
 const noPass = () => fs.rmSync(path.join(root, 'standing.json'), { force: true });
@@ -119,8 +120,9 @@ const ENDING = [
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
-  write(
-    path.join(root, 'runs', `${run.id}.json`),
+  plantRecord(
+    root,
+    runKey(run.id),
     JSON.stringify(
       {
         workspace: run.repo,
@@ -488,13 +490,13 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
   );
   s.test('level-triggered: a branch merged by hand stops being one to decide on the next pass, with nobody telling the run', async () => {
     const id = 'r-plain';
-    const record = fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8');
+    const record = recordText(root, runKey(id)) ?? '';
     git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, `wf/${id}/implement`);
     try {
       await aPass();
       assert.equal((await detailOf(id)).status.toDecide, null, 'the branch is on the base: nothing left to decide');
       assert.equal((await listedOf(id)).toDecide, null);
-      assert.equal(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8'), record, "and nothing is written on the run's record");
+      assert.equal(recordText(root, runKey(id)) ?? '', record, "and nothing is written on the run's record");
       assert.deepEqual(
         await decisionOf(id),
         { nothing: `landed — wf/${id}/implement is already on main` },
@@ -519,7 +521,7 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
         workflow: ENDING,
         steps: { implement: { taskId: `${id}-implement`, branch }, ship: { taskId: `${id}-ship`, workspace: repo } },
       });
-      write(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at }));
+      plantAsk(root, id, 'approve-ship-1', JSON.stringify({ step: 'ship', try: 1, at }));
       git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
 
       const detail = await detailOf(id);
@@ -552,12 +554,12 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   assert.equal((await listedOf(id)).toDecide, null, 'and it still says nothing to decide');
   assert.equal(gitCount(), first, 'with no git call at all: the list reads what the pass read');
 
-  const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
+  const tried = JSON.parse(recordText(root, runKey(id)) ?? '') as {
     steps: Record<string, { taskId: string; tries?: unknown[] }>;
   };
   tried.steps.implement = { taskId: `${id}-implement-2`, branch, tries: [{ taskId: `${id}-implement`, cause: 'continue' }] } as never;
   signedOff(`${id}-implement-2`, repo);
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify(tried, null, 2));
+  plantRecord(root, runKey(id), JSON.stringify(tried, null, 2));
   git(repo, 'checkout', '-q', branch);
   write(path.join(repo, 'src/memo.ts'), 'export const memo = 2;\n');
   git(repo, 'commit', '-q', '-am', 'the second try');
@@ -601,6 +603,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
     workflow: PLAIN,
     steps: { implement: { taskId: 'r-plain-implement', branch: 'wf/r-plain/implement' } },
   });
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runs', 'r-off.cancelled'), at);
 
   const before = gitCount();

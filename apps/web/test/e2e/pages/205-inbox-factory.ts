@@ -5,7 +5,7 @@ import { cardsPath, photograph, heldIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, takeBackRuns } from '../world.ts';
+import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /** The card this page files for the factory, and starts there. */
 const CARD = 'hire-the-reviewer-in-the-factory-e2e0';
@@ -82,13 +82,12 @@ export default {
   route: '/inbox',
   expect: async (page) => {
     const inbox = path.join(store!, 'inbox');
-    const runsDir = path.join(store!, 'runs');
     const checkout = path.join(store!, 'checkout');
     const factory = FACTORIES.hiring.name;
     const factoryFile = path.join(store!, 'factories', `${factory}.json`);
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
     const cardFile = path.join(inbox, `${CARD}.md`);
-    const runsBefore = fs.readdirSync(runsDir).sort();
+    const runsBefore = storedRuns();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     let unhire = () => {};
@@ -139,7 +138,7 @@ export default {
         throw new Refused(`the api starts the card in ${factory} — it answered ${started.status()}: ${await started.text()}`);
       const { id } = (await started.json()) as { id: string };
       await other.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
-      const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as {
+      const record = storedRecord(id) as {
         factory?: string;
         repo?: string;
         from?: { inbox?: string };
@@ -159,7 +158,7 @@ export default {
         );
     } finally {
       await other.close();
-      takeBackRuns(runsDir, runsBefore);
+      takeBackRuns(runsBefore);
       fs.rmSync(cardFile, { force: true });
       unhire();
       fs.writeFileSync(factoryFile, factoryText);

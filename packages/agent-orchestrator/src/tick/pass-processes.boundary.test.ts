@@ -7,6 +7,7 @@
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand. On a store of its
  * own at `ROOT`, given as `ENV`.
  */
+import { listRuns } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,6 @@ import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
 import { startRun } from '../runner.ts';
-import { listRuns } from '../record/record.store.ts';
 import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { gitPlaceLayer, builtinGitPlace } from '../place/builtin.store.ts';

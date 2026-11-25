@@ -11,6 +11,7 @@
  * `src/factory/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. Its store is its own at `ROOT`, given as
  * `ENV`, and `CLAUDE_CONFIG_DIR` is set before any test runs.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -26,7 +27,6 @@ import { checkedTree, packageSkillNames } from '../src/template/template.store.t
 import { readFactoriesAt, readFactoryAt } from '../src/factory/factory.store.ts';
 import { appliedDir, readStatus, statusFile, treeDir } from '../src/factory/applied/applied.store.ts';
 import { reconcileOnce } from '../src/factory/applied/applied.verb.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { startDue } from '../src/factory/schedule/schedule.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { TemplateDoor } from '../src/template/door/templates.store.ts';

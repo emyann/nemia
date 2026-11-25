@@ -6,6 +6,7 @@
  * and its skills whole in its brief. And a table: a start that cannot tell a step its agent stops, and writes no run. The pure renderers
  * are tables in `rendering.test.ts`; an agent file's rules, in `src/agents/agents.test.ts`.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -18,7 +19,6 @@ import { staged, story } from './story.ts';
 import { advanceRun, runWith as runEngine, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { noCodingStyle, pluginOf } from '../src/agents/agents.ts';

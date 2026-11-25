@@ -6,6 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
+import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,7 @@ import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { factsOf, typed as onHandler } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
@@ -234,7 +235,7 @@ const aParent = async (
   return { run, wt, branch: `wf/${run.id}/implement` };
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async () => {
@@ -317,7 +318,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   const bare = await typed();
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${bare.id}.json`), 'utf8')), 'after'),
+    Object.hasOwn(JSON.parse(recordText(ROOT, runKey(bare.id)) ?? ''), 'after'),
     false,
     'without --after the record is what it was',
   );

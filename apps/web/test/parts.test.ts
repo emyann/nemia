@@ -197,12 +197,15 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     const html = await drawn(createElement(CutBubble, { 'data-chat-bubble': 'agent', children: 'Hello' }));
     assert.equal(
       html,
-      '<div data-chat-bubble="agent" class="bg-surface-container-highest px-3.5 py-2.5 text-body-medium text-on-surface" style="clip-path:polygon(0px 0px, calc(100% - 10px) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc(100% - 10px))">Hello</div>',
-      "the conversation's bubble as it was drawn by hand: one element, its ground, its padding and its cut",
+      '<div data-slot="typography" class="text-body-medium font-body-medium bg-surface-container-highest px-3.5 py-2.5 text-on-surface" data-chat-bubble="agent" style="clip-path:polygon(0px 0px, calc(100% - 10px) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc(100% - 10px))">Hello</div>',
+      "the conversation's bubble: one element in the kit's body role, its ground, its padding and its cut",
     );
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const pre = await drawn(createElement(CutBubble, { pre: true, children: 'a\nb' }));
-    assert.match(pre, /class="bg-surface-container-highest px-3\.5 py-2\.5 whitespace-pre-wrap text-body-medium text-on-surface"/);
+    assert.match(
+      pre,
+      /class="text-body-medium font-body-medium bg-surface-container-highest px-3\.5 py-2\.5 whitespace-pre-wrap text-on-surface"/,
+    );
   });
   test("the cut icon press: the kit's tonal icon button in the cut, its ring a band in the cut shape around it", async () => {
     const { CutIconPress } = await import('../src/components/look/CutIconPress.tsx');
@@ -382,10 +385,12 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
     const html = await drawn(createElement(Pager, { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 }));
     for (const mark of ['data-pager-newer', 'data-pager-older']) {
       const button = tagWith(html, mark);
-      assert.match(button, /\bfont-label-large\b/, `${mark} is in the label face`);
-      assert.match(button, /text-label-large uppercase/);
+      const words = html.match(new RegExp(`<[a-z]+\\b[^>]*\\b${mark}[^>]*><span data-slot="typography" class="([^"]*)"`))?.[1] ?? '';
+      assert.match(words, /\bfont-label-large\b/, `${mark} is in the label face`);
+      assert.match(words, /\btext-label-large\b/);
+      assert.match(button, /\buppercase\b/);
       assert.match(button, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/);
-      assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);
+      assert.doesNotMatch(button + words, /font-mono|ring-2\b|ring-offset/);
     }
   });
   test('the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard', async () => {

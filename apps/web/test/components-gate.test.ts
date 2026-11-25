@@ -197,7 +197,7 @@ test('a diff is folded under its file, coloured by line, and a capped one says h
     [...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]),
     ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context'],
   );
-  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — the command line&#x27;s decide prints them all<\/p>/);
+  assert.match(capped, /<p [^>]*data-cut="26"[^>]*>26 more lines — the command line&#x27;s decide prints them all<\/p>/);
 
   const whole = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 0 } }));
   assert.doesNotMatch(whole, /data-cut|more line/);
@@ -368,7 +368,7 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
   const rows = new Map(
     [...html.matchAll(/<li data-offer="denied" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
   );
-  const said = (name: string) => unescaped(textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' '));
+  const said = (name: string) => unescaped(textsOf(/<p [^>]*data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' '));
   assert.equal(said('notes'), `notes ${OFFERS.denied.said('denied: Write(/tmp/w/notes.md)')}`, 'the calls the api named');
   assert.equal(said('bare'), `bare ${OFFERS.denied.said(null)}`, 'and none where it named none');
   assert.notEqual(OFFERS.denied.said('x'), OFFERS.denied.said(null), 'the calls are in the sentence');
@@ -598,7 +598,10 @@ test("a result nobody decided is asked in the inspector, with the way to the run
 
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
-  assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
+  assert.match(
+    html,
+    /^<div data-slot="typography" class="text-body-medium font-body-medium contents"><section aria-label="The gate of plan" data-gate="awaiting"/,
+  );
   assert.match(
     html,
     /as <code>nemia approve r-1 plan<\/code> approves it: the next tick files what waits on it/,
@@ -638,7 +641,10 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
 test('the approval under a step: the try, when, and the words as they were written — or that there were none', () => {
   const words = 'Ship the second reading.\nKeep the flag <b>off</b> by default.';
   const html = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 2, at, message: words } }));
-  assert.match(html, /^<section aria-label="The approval of plan" data-approval="2"/);
+  assert.match(
+    html,
+    /^<div data-slot="typography" class="text-body-medium font-body-medium contents"><section aria-label="The approval of plan" data-approval="2"/,
+  );
   assert.ok(textsOf(html).includes('Approved'), html);
   assert.ok(html.includes(`try 2, <time dateTime="${at}" title="${instantWhole(new Date(at))}">`), html);
   assert.match(
@@ -727,7 +733,10 @@ test("what an ending step would act on, beside its gate: the branch's standing a
     stat: '4 files: +456 −2',
   };
   const html = await actsOn(run, decidedAs([standing]));
-  assert.match(html, /^<section aria-label="What ship would act on"/);
+  assert.match(
+    html,
+    /^<div data-slot="typography" class="text-body-medium font-body-medium contents"><section aria-label="What ship would act on"/,
+  );
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
   assert.ok(texts.includes(standing.said), html);
@@ -893,9 +902,12 @@ test("the Decide section says why a step past its budget is held — `wf decide`
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
     html,
-    /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/,
+    /<p data-slot="typography" class="[^"]*" data-over-budget="true">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/,
   );
-  assert.ok(drawnYours(/<p data-over-budget="true" class="([^"]*)"/.exec(html)![1]), 'a step held on its budget waits on a person: yours');
+  assert.ok(
+    drawnYours(/<p data-slot="typography" class="([^"]*)" data-over-budget="true"/.exec(html)![1]),
+    'a step held on its budget waits on a person: yours',
+  );
   assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 sessions not measured<\/dd>/);
   const none = renderToStaticMarkup(
     createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }),
@@ -990,7 +1002,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
   assert.match(
     capped,
-    /<span data-rebuilt="1" class="block text-body-small [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/,
+    /<span data-slot="typography" class="(?=[^"]*\bblock\b)(?=[^"]*\btext-body-small\b)[^"]*" data-rebuilt="1" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/,
   );
 
   const large = markup(

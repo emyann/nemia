@@ -204,13 +204,13 @@ test("a step the store's pause parked reads paused, and its hover names the call
 
 test('a note under a chip is the note as `wf ls` prints it, and nothing at all for a step without one', () => {
   const html = renderToStaticMarkup(createElement(StepNote, { note: 'try 2, by retries: 1' }));
-  assert.match(html, /^<p data-note="true"[^>]*>try 2, by retries: 1<\/p>$/);
+  assert.match(html, /^<p [^>]*data-note="true"[^>]*>try 2, by retries: 1<\/p>$/);
   assert.equal(renderToStaticMarkup(createElement(StepNote, { note: null })), '');
 });
 
 test("a step's detail shows its note as `wf ls` prints it, and none for a step without one", async () => {
   const html = await detailOf(runWith(exhaustedNote));
-  assert.match(html, /<p data-note="true"/);
+  assert.match(html, /<p [^>]*data-note="true"/);
   assert.ok(html.includes(`>${exhaustedNote}</p>`), html);
   assert.doesNotMatch(await detailOf(runWith(null)), /data-note/);
 });
@@ -1177,10 +1177,10 @@ test("a step's detail says what a step used and what it cost beside its sessions
     'a step not filed has run nothing: never a table of dashes',
   );
   const html = await detailOf(run, unfiledStep);
-  assert.match(html, /<p data-unfiled="true"[^>]*>not filed yet<\/p>/, 'said once');
+  assert.match(html, /<p [^>]*data-unfiled="true"[^>]*>not filed yet<\/p>/, 'said once');
   assert.match(html, /<p[^>]*>No spec:/, 'and what its spec says still below: none, on this fixture');
   const gated = await detailOf({ ...run, waitingOnYou: [] }, { ...unfiledStep, approve: 'approve implement' });
-  assert.match(gated, /<p data-unfiled="true"[^>]*>not filed yet: it waits at its gate<\/p>/, 'at its gate, it says so');
+  assert.match(gated, /<p [^>]*data-unfiled="true"[^>]*>not filed yet: it waits at its gate<\/p>/, 'at its gate, it says so');
 });
 
 const { Facts, specRows, unreadRows, when } = facts;
@@ -1188,7 +1188,7 @@ const { Facts, specRows, unreadRows, when } = facts;
 test("REFUSED: a step's session alone unread draws an `unread` fact, the runtime's words whole, and a step read draws none", () => {
   const words = '`ae/t-1/1`\'s transcript cannot be read: line 2 does not decode: Expected string, got "yesterday" at ["timestamp"]';
   const html = renderToStaticMarkup(createElement(Facts, { rows: [['task', 't-1'], ...unreadRows(words)] }));
-  const row = /<div data-fact="unread"[^>]*>.*?<dd[^>]*><span data-unread="true"[^>]*>([^<]*)<\/span><\/dd><\/div>/.exec(html);
+  const row = /<div data-fact="unread"[^>]*>.*?<dd[^>]*><span [^>]*data-unread="true"[^>]*>([^<]*)<\/span><\/dd><\/div>/.exec(html);
   assert.ok(row, `an unread fact holds the words: ${html}`);
   assert.equal(unescaped(row[1]), words, "the runtime's words, whole");
   assert.deepEqual(unreadRows(null), [], 'a step whose session was read: no row');
@@ -1287,7 +1287,7 @@ test("the part says how its try ended and who said it, then gives each declared 
   ]);
   assert.match(/<section data-field="matrix"[\s\S]*?<\/section>/.exec(html)![0], /<pre[^>]*>\[\n {2}\[\n {4}1,/);
   assert.match(/<section data-field="notes"[\s\S]*?<\/section>/.exec(html)![0], /data-dash="true"/, 'a field not given is a dash');
-  assert.match(html, /<p data-missing="true"[^>]*>declared and not given: notes<\/p>/);
+  assert.match(html, /<p [^>]*data-missing="true"[^>]*>declared and not given: notes<\/p>/);
   assert.deepEqual(
     [...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]).join(' ')),
     [
@@ -1888,7 +1888,10 @@ test('a prose field is drawn as markdown; a number as it is', () => {
     field('prose', 'Run `npm test`.'),
     /data-widget="prose"[^]*<div data-markdown="true"[^>]*><p[^>]*>Run <code[^>]*>npm test<\/code>\.<\/p>/,
   );
-  assert.match(field('number', 3), /data-widget="number"[^]*<span class="font-mono text-body-large">3<\/span>/);
+  assert.match(
+    field('number', 3),
+    /data-widget="number"[^]*<span data-slot="typography" class="(?=[^"]*\bfont-mono\b)(?=[^"]*\btext-body-large\b)[^"]*">3<\/span>/,
+  );
 });
 
 test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waits on you` — and on a run called off, not', () => {
@@ -2048,7 +2051,7 @@ const pricedRun = (status: Word, cost: ReturnType<typeof priced>, waitingOnYou: 
 
 test("a step's node says what its tries cost, of its cap where it has one — in failure's red once they cost it or more — and a step past its budget is a human gate", () => {
   const over = nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review']));
-  const costOf = (html: string) => /<p data-cost="(\w+)"[^>]*class="([^"]*)"><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
+  const costOf = (html: string) => /<p (?=[^>]*data-cost="(\w+)")[^>]*class="([^"]*)"[^>]*><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
   const [, state, className, said] = costOf(over) ?? [];
   assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
   assert.match(className, /\btext-failure\b/);
@@ -2073,7 +2076,7 @@ test("a step's node says what its tries cost, of its cap where it has one — in
   assert.equal(costOf(past)?.[1], 'over', 'a job its harness ended a little past its cap, which finished: red');
   assert.match(
     past,
-    /<p data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/,
+    /<p [^>]*data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/,
     'and nothing waits on a raise',
   );
   assert.equal(gateDrawn(past), false, 'a finished step past its cap holds nothing');
@@ -2094,10 +2097,13 @@ test("a step's detail says what every try cost of its cap — `spent`, red once 
   const step = run.steps[0];
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal((await rows(over)).spent, '$4.25 of $3');
-  assert.match(await markup(over), /<span data-spent="over" class="[^"]*\btext-failure\b[^"]*">\$4\.25 of \$3<\/span>/);
+  assert.match(
+    await markup(over),
+    /<span data-slot="typography" class="[^"]*\btext-failure\b[^"]*" data-spent="over">\$4\.25 of \$3<\/span>/,
+  );
   assert.match(
     await markup({ ...step, ...priced(1.2, 3) }),
-    /<span data-spent="within" class="font-mono text-body-small ">\$1\.20 of \$3<\/span>/,
+    /<span data-slot="typography" class="(?=[^"]*\bfont-mono\b)(?=[^"]*\btext-body-small\b)(?![^"]*\btext-failure\b)[^"]*" data-spent="within">\$1\.20 of \$3<\/span>/,
   );
   assert.equal((await rows({ ...step, ...priced(null, 3) })).spent, 'budget $3');
   assert.equal(
@@ -2566,16 +2572,16 @@ test('a closeout whose body does not open with its summary draws both, and one w
   const handed = (summary: string, body: string | null) =>
     renderToStaticMarkup(createElement(Closeouts.Statement, { closeout: { ...planCloseout, summary, body } }));
   const both = handed('Capped the runs in flight.', 'The cap is read on every pass, and stored nowhere.');
-  assert.match(both, /<p data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
+  assert.match(both, /<p [^>]*data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
   assert.match(both, /data-body="true"[^>]*>.*The cap is read on every pass/s);
-  assert.match(handed('Capped the runs in flight.', null), /<p data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
+  assert.match(handed('Capped the runs in flight.', null), /<p [^>]*data-summary="true"[^>]*>Capped the runs in flight\.<\/p>/);
 });
 
 test('what the run did not accept of a closeout is drawn under its words, each under `not accepted`', () => {
   const why = '`needs` is said on a done closeout: needs is for a blocked one alone.';
   const html = renderToStaticMarkup(createElement(Closeouts.Statement, { closeout: { ...planCloseout, refused: [why] } }));
   assert.ok(textsOf(html).includes(`not accepted: ${why}`), html);
-  assert.match(html, /<p data-refused="true"/);
+  assert.match(html, /<p [^>]*data-refused="true"/);
 });
 
 test('the step bar is one scroll and no tabs: the part whole, then its conversation under it', async () => {
@@ -2690,7 +2696,7 @@ test('a lifecycle state lit is marked data-lit and filled as alive; a route take
       createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...drawing.states[0], lit } } as never)),
     );
   assert.match(node(true), /data-state="a"[^>]*data-lit="true"[^>]*class="[^"]*ring-alive/);
-  assert.match(node(false), /<p data-state-name="true"[^>]*>a<\/p>/, 'the name marked for the e2e to measure its size');
+  assert.match(node(false), /<p [^>]*data-state-name="true"[^>]*>a<\/p>/, 'the name marked for the e2e to measure its size');
   assert.doesNotMatch(node(false), /data-lit|ring-alive/);
   const edge = (taken: boolean) =>
     renderToStaticMarkup(
@@ -3039,13 +3045,13 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   assert.match(html, /<details open=""[^>]*data-will-be-told[^>]*><summary[^>]*>What it will be told<\/summary>/);
   assert.match(html, /data-read-now[^>]*>Read now from the files, and frozen when a run starts/);
   assert.match(html, /<details data-instructions-fold="true">[^]*You are the writer\./, "the agent's words folded, closed");
-  const home = (name: string) => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
+  const home = (name: string) => new RegExp(`<span [^>]*data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
   assert.match(home('instructions'), /href="\/agents\/user\/writer"/);
   assert.match(home('custom'), /href="\/agents\/user\/writer#custom-instructions"/);
   const theirs = await routedWith(
     createElement(StepTold, { page: { ...(await hiredPage()), from: 'repo' }, place: { factory: 'hiring' } }),
   );
-  const theirHome = (name: string) => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
+  const theirHome = (name: string) => new RegExp(`<span [^>]*data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
   assert.match(
     theirHome('custom'),
     /href="\/factories\/hiring\/agents\/writer\?from=repo#custom-instructions"/,
@@ -3576,7 +3582,7 @@ test("a trace's line says its state in the board's meanings: running alive and s
   const yours = traceLine('yours');
   assert.match(yours, /border-l-2 border-yours/);
   assert.match(yours, /\*:data-\[slot=trace-icon\]:text-yours/);
-  assert.match(traceLine(), /data-slot="trace-description" class="[^"]*font-mono text-body-small/, 'the fact in mono');
+  assert.match(traceLine(), /data-slot="trace-description" class="(?=[^"]*\bfont-mono\b)(?=[^"]*\btext-body-small\b)/, 'the fact in mono');
 });
 
 /** A step of a trace, open or not, holding `held` under its `kind`. */
@@ -3598,8 +3604,8 @@ test('a step of a trace draws what it holds only while open, nested on a rule or
   assert.doesNotMatch(traceStep(false, 'body'), /data-held/, 'a closed step lays out nothing it holds');
   const body = traceStep(true, 'body');
   assert.match(body, /data-held/);
-  assert.match(body, /data-kind="body"[^>]*font-mono text-body-small/);
-  assert.match(traceStep(true, 'nest'), /data-kind="nest"[^>]*border-l border-outline-variant/);
+  assert.match(body, /class="(?=[^"]*\bfont-mono\b)(?=[^"]*\btext-body-small\b)[^"]*" data-kind="body"/);
+  assert.match(traceStep(true, 'nest'), /class="[^"]*border-l border-outline-variant[^"]*" data-kind="nest"/);
   assert.match(body, /lucide-chevron-right/, 'the chevron that opens it');
 });
 
@@ -3612,8 +3618,8 @@ test("a step's part draws its slots by its size: on the node its head, what it a
   const small = await sized('S');
   assert.match(small, /<article id="step-S" data-step-part="S" data-step-name="review"/);
   assert.deepEqual(slots(small), ['step-head', 'part-asks', 'part-gave']);
-  assert.match(small, /<p data-part-asks="S"/, 'one line, not the gate');
-  assert.match(small, /<p data-part-gave="S"/);
+  assert.match(small, /<p [^>]*data-part-asks="S"/, 'one line, not the gate');
+  assert.match(small, /<p [^>]*data-part-gave="S"/);
   const card = await sized('M');
   assert.deepEqual(slots(card), ['step-head', 'part-asks', 'part-said', 'part-gave']);
   assert.match(card, /data-step-card="true"/, 'the preview card keeps its mark');

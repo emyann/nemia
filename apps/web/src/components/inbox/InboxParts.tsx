@@ -67,7 +67,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
 export function NoQueue({ entry }: { entry: InboxEntry }) {
   if (!queueNeedsFactory(entry)) return null;
   return (
-    <Body size="small" data-no-queue>
+    <Body size="small" colorRole="on-surface-variant" data-no-queue>
       No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
     </Body>
   );

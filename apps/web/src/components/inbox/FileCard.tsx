@@ -175,13 +175,11 @@ function FactoryField({
         </Body>
       )}
       {!error && !read && (
-        <div data-reading-factories>
+        <Body size="small" component="div" data-reading-factories>
           <Reading label="Reading the factories…">
-            <Body size="small" component="div" className="contents">
-              <ReadingLines widths={['w-64']} />
-            </Body>
+            <ReadingLines widths={['w-64']} />
           </Reading>
-        </div>
+        </Body>
       )}
       {!error && read && offered.length === 0 && store && (
         <Body size="small" data-no-factory>

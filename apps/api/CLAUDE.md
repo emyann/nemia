@@ -66,7 +66,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   each request of a namespaced kind placed in its namespace's factory (`placeFor`, `answeredIn`), a write of yours taken in `default`
   alone. A refusal's status is its class's, said once (`refusedAs`, `statusOf`, `src/objects/refused.ts`).
 - **The MCP port (`/mcp`, `src/mcp/`) is a protocol host, not a resource**, served by the SDK's `createMcpHandler` in both eras (2026-07-28
-  and 2025-11-25), a fresh `portServer` per request: a call reads the caller's Request off `ctx.http.req`, and its tool list carries
+  and 2025-11-25), a fresh `portServer` per request, an `McpServer`: it serves Nemia's skills by the SDK's own catalog of the Skills
+  extension (`skill://<name>/SKILL.md`, attached first; `loadSkills` in `app.ts` over the orchestrator's `NEMIA_SKILLS`, read once), the
+  feed's templates and the files a tool hands over by `registerResource` (`nemia://{+path}` catching each URI of the scheme no feed
+  template matches), and its tools by hand on its `server`: a call reads the caller's Request off `ctx.http.req`, and its tool list carries
   `PORT_LIST_TTL_MS` on 2026-07-28. It calls the `Api`'s own endpoints through the app's `fetch`
   with the caller's `Authorization`, so every middleware, refusal and memo applies as to any client (a call logs two request lines). A
   tool is a link of the command table (`served` on the entry, `toolsOf`), never added here, its words and input read once in `objects`

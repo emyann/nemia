@@ -29,6 +29,9 @@ export const filledViews = (root: Document) => {
   const heldBy = (view: Element | null) => shown.filter((one) => one.closest(VIEW) === view).length;
   return [
     { view: 'the page', filled: heldBy(null) },
-    ...views.map((view, at) => ({ view: `${view.getAttribute('aria-label') ?? 'a view'} (${at + 1} over the page)`, filled: heldBy(view) })),
+    ...views.map((view, at) => ({
+      view: `${view.getAttribute('aria-label') ?? 'a view'} (${at + 1} over the page)`,
+      filled: heldBy(view),
+    })),
   ] satisfies ViewFilled[];
 };

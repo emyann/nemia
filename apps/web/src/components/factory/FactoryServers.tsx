@@ -87,7 +87,13 @@ export function ServerRow({
           <span className="text-body-small text-on-surface-variant">{server.tools === 1 ? '1 tool' : `${server.tools} tools`}</span>
         )}
         <span className="ml-auto">
-          <Kit variant="outlined" size="xsmall" icon={removing ? Pending : undefined} isDisabled={pending} onPress={() => onRemove(server.name)}>
+          <Kit
+            variant="outlined"
+            size="xsmall"
+            icon={removing ? Pending : undefined}
+            isDisabled={pending}
+            onPress={() => onRemove(server.name)}
+          >
             Remove
           </Kit>
         </span>

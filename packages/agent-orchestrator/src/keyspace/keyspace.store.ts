@@ -397,10 +397,18 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
   } satisfies Keyspace;
 }
 
-/** Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. */
+/**
+ * Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. A folder and a file it
+ * makes are its owner's alone (`db/` 0700, `state.db` 0600), as a token's record was.
+ */
 const opened = (file: string, scope: Scope.Scope) =>
   Effect.gen(function* () {
-    if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
+    const made = file !== ':memory:' && !fs.existsSync(file);
+    if (file !== ':memory:' && !fs.existsSync(path.dirname(file))) {
+      fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+      fs.chmodSync(path.dirname(file), 0o700);
+    }
+    if (made) fs.closeSync(fs.openSync(file, 'a', 0o600));
     const client = yield* Layer.buildWithScope(SqliteClient.layer({ filename: file, busyTimeout: Duration.seconds(30) }), scope);
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

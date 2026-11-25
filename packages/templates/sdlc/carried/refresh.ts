@@ -13,11 +13,12 @@
  * The bound is mechanical, since the review read a head that no longer lands as is: the head pushed is git's plain merge of the reviewed
  * head and the base (`git merge-tree --write-tree`), differing from it only in the paths `--derives` names. An install or a command that
  * exits non-zero (its stderr quoted), a path left unmerged, a change it left out of the index, and a difference from the plain merge
- * outside those paths each take the merge back (`git merge --abort`) and refuse, nothing pushed. A merge that went clean and that the
- * command changed nothing of is taken back too and the landing merges as it did before the refresh. Otherwise the merge is committed,
- * pushed to the branch with no force (`git push origin <sha>:refs/heads/<branch>`), and recorded for the check in `refreshed.json` in the
- * step's files folder (`$WF_STEP_FILES`, which the check is given as `WF_ARTIFACTS`), the merge commit's body copied in whole so the
- * check's merge reads what the session wrote even where its file has since changed.
+ * outside those paths each take the merge back (`git merge --abort`, then `git reset --hard` of what an install or a command wrote out of
+ * the index, the worktree having been clean before the merge) and refuse, nothing pushed. A merge that went clean and that the command
+ * changed nothing of is taken back too and the landing merges as it did before the refresh. Otherwise the merge is committed, pushed to the
+ * branch with no force (`git push origin <sha>:refs/heads/<branch>`), and recorded for the check in `refreshed.json` in the step's files
+ * folder (`$WF_STEP_FILES`, which the check is given as `WF_ARTIFACTS`), the merge commit's body copied in whole so the check's merge reads
+ * what the session wrote even where its file has since changed.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -217,6 +218,7 @@ export function refresh(a: Asked) {
       same = tried(at, a, install(at, a));
     } catch (err) {
       run('git', ['-C', at, 'merge', '--abort']);
+      run('git', ['-C', at, 'reset', '-q', '--hard']);
       throw err;
     }
     if (same) {

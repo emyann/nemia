@@ -17,6 +17,11 @@
       "type": "ToolWords"
     },
     {
+      "term": "Link task",
+      "meaning": "how a tool of the MCP port answers as an MCP task where its caller declares the extension, said on its command table link (`task` of a `CommandLink`): `follow`, the call started a thing another GET reads by its id, ended by the phases it names; or `again`, the port asks the endpoint again from the cursor its answer gave until the answer says it is done (`packages/objects/src/command.ts`); read and refused where the port could not answer it as the tool words are read (`packages/objects/src/tool-words.ts`).",
+      "type": "LinkTask"
+    },
+    {
       "term": "Unlinked read",
       "meaning": "a GET endpoint of the `Api` that no verb of the command table links (`served`), so neither Nemia's shell fence nor the MCP port reaches it: refused unless it is a stream, which no tool can serve, or `UNLINKED_READS` says in words why it has no verb; a reason for a read a verb links, a stream or no read is refused too (`readsUnlinked`, `unlinkedReadsOf`, `packages/objects/src/read-verbs.ts`).",
       "type": "UnlinkedBreak"

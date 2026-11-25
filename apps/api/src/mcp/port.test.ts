@@ -32,6 +32,7 @@ import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
 import { FILES_EXTENSION } from './files.ts';
+import { TASKS_EXTENSION } from './tasks.ts';
 import { fileRead, fileUriOf } from './links.ts';
 
 const stand = eachTest(testPlace);
@@ -469,8 +470,8 @@ test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_
   assert.equal(discovered?.resultType, 'complete');
   assert.deepEqual(
     (discovered?.capabilities as { extensions?: unknown } | undefined)?.extensions,
-    FILES_EXTENSION,
-    'server/discover advertises the files extension, inline alone',
+    { ...FILES_EXTENSION, ...TASKS_EXTENSION },
+    'server/discover advertises the files extension, inline, and the tasks extension',
   );
   await client.close();
 });

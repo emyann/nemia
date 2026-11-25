@@ -15,6 +15,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/ext-tasks": "0.2.3",
     "@modelcontextprotocol/server": "^2.4.0",
     "@scalar/api-reference": "^1.76.4",
     "@scalar/hono-api-reference": "^0.12.17",

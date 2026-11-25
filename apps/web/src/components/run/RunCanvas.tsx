@@ -24,7 +24,7 @@ import { useContent } from '../../lib/useContent';
 import { stepState } from '../../lib/status';
 import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
-import { FLOOR_BOX } from '../../lib/classes';
+import { FLOOR_RULED } from '../../lib/classes';
 import { cn } from '../../lib/utils';
 import { Body, Button } from '@/components/ui/ds';
 import { CanvasLegend } from '../step/CanvasLegend';
@@ -235,7 +235,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   useRefit(frame, resets, flow);
 
   return (
-    <div ref={frame} className={cn(FLOOR_BOX, 'h-[30rem]')}>
+    <div ref={frame} className={cn(FLOOR_RULED, 'h-[30rem]')}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

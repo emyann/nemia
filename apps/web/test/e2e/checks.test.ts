@@ -657,9 +657,11 @@ test('idle lets go of the requests a page left behind when it reloaded or naviga
 test('text in a frame, an inset and an inset again is refused, naming it — a frame and an inset, a control in an inset and a popover pass', async () => {
   const frame = 'background:rgb(28,28,30)';
   const inset = 'background:rgb(33,33,35);padding:8px';
+  const deeper = 'background:rgb(40,40,42);padding:8px';
   const { page } = await pageWith(`<main data-frame-page>
-      <div data-cut-frame="none"><div style="${inset}"><div style="${inset}"><p>Third box text</p></div></div></div>
+      <div data-cut-frame="none"><div style="${inset}"><div style="${deeper}"><p>Third box text</p></div></div></div>
       <div style="${frame}"><div style="${inset}"><p>Second box text</p><button style="background:rgb(54,54,56)">Press</button></div></div>
+      <div style="${frame}"><div style="${inset}"><div data-slot="text-field-container" style="border:1px solid gray"><label>Its notch</label><input></div></div></div>
       <div style="${frame}"><div style="${inset}"><div role="dialog" style="${inset}"><p>Over the page</p></div></div></div>
       <div style="${frame}"><div style="${inset};border-bottom:1px solid gray"><span style="background:gray">inline mark</span></div></div>
     </main>`);

@@ -337,9 +337,9 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
  * what would be a third box is a rule or a gap), within `timeout`. Counted up from each text the view shows, to `root` (the page's own
  * view, `main[data-frame-page]`, by default): a box is an element laid out as a block that paints a ground other than the one it stands
  * on, draws a hairline on all four sides, or is a cut frame (`data-cut-frame`, whose ground is a layer beside what it holds). A
- * control's own fill is its rung, no box: a button, a field, a link, a tag, a chip, a row, a sticker; and a dialog, a menu, a listbox or
- * a popover over the page starts a count of its own. The refusal names each text and the boxes it sits in. Nothing to look at is
- * refused too.
+ * control's own fill is its rung, no box: a button, a field (a kit field's container, its label in its notch included), a link, a tag,
+ * a chip, a row, a sticker; and a dialog, a menu, a listbox or a popover over the page starts a count of its own. The refusal names each
+ * text and the boxes it sits in. Nothing to look at is refused too.
  */
 export async function expectTwoDeep(page: Page, assertion: string, root = 'main[data-frame-page]', timeout = WAIT_MS) {
   await expectNone(
@@ -348,7 +348,7 @@ export async function expectTwoDeep(page: Page, assertion: string, root = 'main[
         const view = document.querySelector(under);
         if (!view) return `nothing to look at: no ${under}`;
         const control =
-          'button,a,input,select,textarea,[role=button],[role=link],[role=tab],[role=option],[role=checkbox],[role=radio],[role=switch],[role=menuitem],[role=row],[role=slider],[data-slot=tag],[data-slot=chip],[data-cut-tag],[data-cut-field],[data-sticker]';
+          'button,a,input,select,textarea,[role=button],[role=link],[role=tab],[role=option],[role=checkbox],[role=radio],[role=switch],[role=menuitem],[role=row],[role=slider],[data-slot=tag],[data-slot=chip],[data-cut-tag],[data-cut-field],[data-sticker],[data-slot=text-field-container],[data-slot=number-field-container],[data-slot=combo-box-container],[data-slot=phone-field-container]';
         const own = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[role=tooltip],[popover]';
         const clear = (colour: string) => colour === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(colour);
         const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;

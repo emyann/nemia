@@ -79,7 +79,8 @@ import {
   writeHold,
   type AskEntry,
 } from '../record/record.store.ts';
-import type { AskWritten, PersonRequest, Run, RunStore } from '../record/record.ts';
+import type { AskKey, AskWritten, PersonRequest, Run, RunStore } from '../record/record.ts';
+import type { AskHeld } from '../../contracts/ask-take-back.contract.ts';
 import type { RunId } from '../record/record.model.ts';
 import { ASK_WORDS, askDoneKey, askKey, askKeyOf, askName, asksPrefix, ASKS_PREFIX, claimKey, runKey, RUNS_PREFIX } from './run-keys.ts';
 
@@ -177,7 +178,10 @@ function allAsksIn(asks: readonly AskEntry[]) {
     const [, target, n] = /^merge-(.+)-(\d+)$/.exec(name) ?? [];
     if (target === undefined || n === undefined) continue;
     const ask = mergeAskIn(text, target, Number(n));
-    if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia refresh --base`);
+    if (typeof ask === 'string')
+      read.notes.push(
+        `${where}: ${ask}, so it is not honoured — at the target's next try, take it back (nemia refresh <runId> [<step>] --base --off) and ask again with nemia refresh --base; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+      );
     else read.rounds.push(ask);
   }
   return read;
@@ -204,6 +208,12 @@ function strayOf(person: PersonRequest, text: string, step: string, n: number) {
   const read = ASK_READERS[person.of](text, step, n);
   return typeof read === 'string' ? read : null;
 }
+
+/** What the text at an ask's key holds, read by its kind's reader: an ask, a stray that reads as none, or nothing. */
+const heldAs = (key: AskKey, text: string | undefined) => {
+  const held: AskHeld = text === undefined ? 'none' : typeof ASK_READERS[key.of](text, key.step, key.n) === 'string' ? 'stray' : 'ask';
+  return held;
+};
 
 /** The first key under `done/` for `name` no record holds: the plain name, else `.2`, `.3`, …. */
 const doneKeyFree = (id: string, name: string, held: ReadonlySet<string>) => {
@@ -526,18 +536,27 @@ function askMethods(open: Opened, held: Held) {
     answers: (id) => asksCounted(Effect.map(asksOf(id), (records) => answersIn(allOf(id, records)))),
     write: askWritten(open),
     where: (id, key) => Effect.succeed(askKey(id, key)),
-    takeBack: (id, step, n, takenBack) =>
+    held: (id, key) =>
+      Effect.flatMap(held, (ks) =>
+        ks === undefined || !ownKey(id)
+          ? Effect.succeed<AskHeld>('none')
+          : Effect.map(ks.get(askKeyOf(id, askName(key))), (at) => heldAs(key, at?.value)),
+      ),
+    takeBack: (id, key, takenBack) =>
       Effect.flatMap(open, (ks) =>
         racedOn(
           ks.within((tx) =>
             Effect.gen(function* () {
-              const name = askName({ of: 'gate', step, n });
+              const name = askName(key);
               const at = yield* tx.get(askKeyOf(id, name));
-              if (at === undefined || typeof approvalIn(at.value, step, n) === 'string') return null;
-              const held = heldText(at.value);
-              const said = 'read' in held && held.read !== null && typeof held.read === 'object' ? held.read : {};
-              const [done] = yield* setAside(tx, id, [name], () => JSON.stringify({ ...said, takenBack }));
-              return done ?? null;
+              if (at === undefined) return null;
+              const stray = heldAs(key, at.value) === 'stray';
+              const read = heldText(at.value);
+              const said = 'read' in read && read.read !== null && typeof read.read === 'object' ? read.read : undefined;
+              const [done] = yield* setAside(tx, id, [name], () =>
+                JSON.stringify(stray || said === undefined ? { stray: at.value, takenBack } : { ...said, takenBack }),
+              );
+              return done === undefined ? null : { where: done, stray };
             }),
           ),
         ),

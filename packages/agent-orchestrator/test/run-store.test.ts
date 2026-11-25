@@ -250,6 +250,22 @@ test("an ask written where a record that is not one stands is refused with the t
   }
 });
 
+test('a record at an ask key that reads as no ask is held as a stray, and a take-back sets it aside with its text kept whole', () => {
+  const run = made('r-back-stray');
+  for (const { asked, key } of asksOfEachKind(run.id)) {
+    const n = asked.of === 'round' ? asked.ask.round : asked.of === 'base' ? asked.ask.merge.try : asked.ask.try;
+    const askKeyed = { of: asked.of, step: asked.of === 'base' ? asked.ask.merge.target : asked.ask.step, n };
+    plantRecord(ROOT, key, 'not json');
+    assert.equal(store.asks.held(run.id, askKeyed), 'stray');
+    const taken = store.asks.takeBack(run.id, askKeyed, { at });
+    assert.equal(taken?.stray, true);
+    assert.equal(recordText(ROOT, key), undefined, 'nothing is left at the key');
+    assert.deepEqual(JSON.parse(recordText(ROOT, taken?.where ?? '') ?? ''), { stray: 'not json', takenBack: { at } });
+    assert.equal(store.asks.held(run.id, askKeyed), 'none');
+    assert.equal(store.asks.write(run.id, asked).written, true, 'the ask is written once the stray is set aside');
+  }
+});
+
 test('a hold file stands while it is there, read as a hold or not, and not once it is gone', () => {
   const run = made('r-stands');
   assert.equal(store.holds.stands(run.id), false);

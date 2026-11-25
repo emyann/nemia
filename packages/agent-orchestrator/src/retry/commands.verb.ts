@@ -14,6 +14,8 @@ import { roundBudgetRefusal } from '../round/round.ts';
 import { amountIn, commandLine, renamedValues, type Args } from '../command/command.ts';
 import { checked, type Served } from '../command/entry.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
+import { takeBackAsk } from '../take-back/take-back.verb.ts';
+import { retryRefusal as wordsRefusal } from 'objects';
 
 /** What `nemia retry`'s how is read off: its parsed flags, or its typed input. */
 type HowGiven = {
@@ -93,6 +95,47 @@ function askRefusal({ mode, model, answers, check }: RetryInput) {
 }
 
 /**
+ * `nemia retry --off`, and with `--round`: the try asked of the step, or the round asked of its loop, and not yet filed, taken back
+ * (`takeBackAsk`), with who took it back (`actor`) where the caller was handed. What a take-back does not take is refused by objects'
+ * words as typed (`retryRefusal`), and sent to the api the answers and a way that is not continue's are refused here.
+ */
+const takenBackOf = Effect.fnUntraced(function* (input: RetryInput) {
+  const { runId, step, actor } = input;
+  yield* checked(
+    wordsRefusal({
+      runId,
+      ...(step === undefined ? {} : { step }),
+      off: true,
+      ...(input.round === true ? { round: true } : {}),
+      ...(input.mode === undefined ? {} : { mode: input.mode }),
+      ...(input.model === undefined ? {} : { model: input.model }),
+      ...(input.check === undefined ? {} : { check: input.check }),
+      ...(input.message === undefined ? {} : { message: input.message }),
+      ...(input.budget === undefined ? {} : { budget: input.budget }),
+      ...(input.answers?.length || input.answer?.length ? { answer: 'given' } : {}),
+    }),
+  );
+  if (input.round === true) {
+    const taken = yield* takeBackAsk(runId, 'round', step, actor);
+    return {
+      step: taken.step,
+      round: taken.key.n,
+      file: taken.file,
+      takenBack: taken.takenBack,
+      ...(taken.stray ? { stray: true as const } : {}),
+    };
+  }
+  const taken = yield* takeBackAsk(runId, 'try', step, actor);
+  return {
+    step: taken.step,
+    try: taken.key.n,
+    file: taken.file,
+    takenBack: taken.takenBack,
+    ...(taken.stray ? { stray: true as const } : {}),
+  };
+});
+
+/**
  * `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to; or, with `--round`,
  * another round of a loop out of rounds (what `nemia round` was, decision 7), its cap raised with `--budget`. A person's `answers` are
  * checked against the questions the step's current closeout asks and written as the try's message (`givenAnswers`), as `--answer`s are
@@ -107,6 +150,8 @@ export const RETRY: Served<
     round?: number;
     budget?: number;
     hint?: string;
+    takenBack?: { at: string; actor?: Actor };
+    stray?: true;
   },
   RetryInput
 > = {
@@ -117,6 +162,7 @@ export const RETRY: Served<
     const { answers, actor, ...flags } = input;
     yield* checked(retryRefusal(flags) ?? askRefusal(input));
     const { runId, step } = input;
+    if (input.off === true) return yield* takenBackOf(input);
     const { hint } = renamedValues('retry', input);
     const hinted = hint === undefined ? {} : { hint };
     if (input.round === true) {

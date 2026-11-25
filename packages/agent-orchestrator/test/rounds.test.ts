@@ -11,6 +11,7 @@
  * in repositories no factory holds.
  */
 import { askKeyOf, askNames, dropRecord, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -304,7 +305,8 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     namesFor('not an ask', noteOf('round-review-5'), 'not an ask nemia retry --round wrote', 'not honoured');
     assert.deepEqual(asksOf(id, 'round'), ['round-review-4', 'round-review-5']);
     assert.equal(stage.board().filings.length, filed);
-    for (const f of asksOf(id, 'round')) dropRecord(ROOT, askKeyOf(id, f));
+    assert.equal((await over(takeBackAsk(id, 'round', 'review'))).stray, true, 'the stray at the next round is taken back, kept as it was');
+    dropRecord(ROOT, askKeyOf(id, 'round-review-5'));
   });
   let file = '';
   s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async () => {
@@ -357,7 +359,8 @@ describe('three rounds, then a person accepts the work as it stands', () => {
       assert.equal(recordText(ROOT, accept) ?? '', written, 'not touched');
       assert.equal((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[1].message, 'rounds exhausted');
     }
-    dropRecord(ROOT, accept);
+    await typedOn(['approve', id, 'review', '--off']);
+    assert.equal(recordText(ROOT, accept), undefined, 'the stray is taken back by `nemia approve --off`, set aside as it was');
   });
   let at = '';
   s.test(
@@ -381,8 +384,13 @@ describe('three rounds, then a person accepts the work as it stands', () => {
       await assert.rejects(over(acceptRun(id, undefined, ENOUGH)), refusedAs('Conflict', 'try 4 of review is already accepted'));
       await assert.rejects(
         over(roundRun(id)),
-        refusedAs('Conflict', 'review asked for round 5', 'accept-review-4', `nemia retry ${id} review --round`),
+        refusedAs('Conflict', 'review asked for round 5', `nemia approve ${id} review --off`, `nemia retry ${id} review --round`),
       );
+      await typedOn(['approve', id, 'review', '--off']);
+      assert.deepEqual(asksOf(id, 'accept'), [], 'nothing waiting on it filed, the acceptance is taken back: set aside, never deleted');
+      assert.ok(recordText(ROOT, askKeyOf(id, 'done/accept-review-4'))?.includes('takenBack'), 'kept under done/ with when');
+      await over(acceptRun(id, undefined, ENOUGH));
+      at = JSON.parse(recordText(ROOT, accepted) ?? '').at;
       const l = await over(list(stage.board().e, runRecord(ROOT, id)));
       assert.equal(l.steps[1].message, 'unverified · done');
       namesFor('the note', l.steps[1].note, `accepted as it stands at ${at}`, 'its findings open');
@@ -392,6 +400,11 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     const pass = await tick(id);
     assert.deepEqual([pass.filed, pass.looped, pass.tried, pass.status], [['ship'], [], [], 'running']);
     assert.deepEqual(asksOf(id, 'accept'), ['accept-review-4'], 'the acceptance stays where it was written, as an approval does');
+    await assert.rejects(
+      typedOn(['approve', id, 'review', '--off']),
+      refusedAs('Conflict', 'has handed on', `nemia ls ${id}`),
+      'once what waits on the loop is filed, its acceptance is not taken back',
+    );
     const brief = specOf(`${id}-ship`).brief;
     assert.match(brief, /\n## Accepted\n/);
     assert.match(brief, /\(`nemia approve`, try 4, at /);

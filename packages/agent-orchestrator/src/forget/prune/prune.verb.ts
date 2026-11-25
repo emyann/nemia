@@ -16,10 +16,9 @@ import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../../status/status.ts';
 import { decision } from '../../decide/decide.ts';
-import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, leftWhy, runWorktrees, type AskName } from '../forget.ts';
+import { askOffLine, forgetRefusal, heldWorktree, idRefusal, inventoryUnread, leftWhy, runWorktrees, type AskName } from '../forget.ts';
 import { stepsOrWhy } from '../../steps/steps.verb.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
-import { askKey } from '../../runs/run-keys.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../place/place.ts';
@@ -274,7 +273,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const placed = yield* PlaceService;
   const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
   const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, spendOf } = read;
-  const askAt = (a: AskName) => askKey(run.id, a);
+  const offOf = (a: AskName) => askOffLine(run.id, a);
   const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const checkout = statusMemo(headsOver(git), placed);
   if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
@@ -291,7 +290,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       asks,
       rounds,
       spendOf,
-      askAt,
+      offOf,
       standings,
       'prune',
       merging(run, steps, checkout),

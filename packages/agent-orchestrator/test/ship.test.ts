@@ -17,19 +17,9 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
-import {
-  askDoneKey,
-  askKeyOf,
-  askNames,
-  askText,
-  dropAsk,
-  plantAsk,
-  plantRecord,
-  recordText,
-  runKey,
-  runRecord,
-  runsNow,
-} from '../testing.ts';
+import { askDoneKey, askKeyOf, askNames, askText, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
+import { REFRESH } from '../src/revisions/commands.verb.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -2206,7 +2196,7 @@ describe('an ending that stopped on the base branch sends the work back through 
         refusedNaming(`try 2 of ship is asked for (--continue, at ${ask.at})`, 'a send-back would take that try back'),
         'the two ways on take the same try of the ending: one asked refuses the other, each way round',
       );
-      dropAsk(ROOT, id, 'retry-ship-2');
+      await stage.runWith(e(), takeBackAsk(id, 'try', 'ship'));
       const sending = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' }));
       const sentBack = `the work is being sent back from ship (nemia retry ${id} review, at ${sending.ask.at})`;
       const wait = `Wait for it: nemia ls ${id}.`;
@@ -2419,17 +2409,18 @@ describe('a loop out of rounds before its ending: accepted as it stands, sent ba
       const waits = (verb: string) => (err: Error & { exitCode?: number }) => {
         assert.equal(err.exitCode, 2);
         assert.match(err.message, /^a merge of main into implement's work is asked \(at \S+\)/);
-        for (const fact of [
-          'the next tick files it once, on round 1: ',
-          " merge-implement-2, in the run's .asks directory",
-          ` — then: ${verb}.`,
-        ])
+        for (const fact of ['the next tick files it once, on round 1: ', ' --base --off — then', ` — then: ${verb}.`])
           assert.ok(err.message.includes(fact), `${err.message} names ${fact}`);
         assert.deepEqual(at.asksOf(id), written, 'nothing written');
         return true;
       };
       await assert.rejects(stage.runWith(e(), roundRun(id, 'review')), waits(`nemia retry ${id} review --round`));
       await assert.rejects(stage.runWith(e(), acceptRun(id, 'review', ENOUGH)), waits(`nemia approve ${id} review --message "<why>"`));
+      const back = await stage.runWith(e(), REFRESH.handler({ runId: id, step: 'review', base: true, off: true }));
+      assert.deepEqual([back.target, back.round, back.sha, typeof back.takenBack?.at], ['implement', 1, sha, 'string']);
+      assert.ok(!at.asksOf(id).includes('merge-implement-2'), '`nemia refresh --base --off` sets the merge aside');
+      assert.deepEqual((await at.pass(id)).looped, [], 'and no pass files it');
+      await stage.runWith(e(), mergeRun(id, 'review'));
       assert.deepEqual((await at.pass(id)).looped, ['review']);
       assert.deepEqual(
         runRecord(ROOT, id).steps.implement.tries?.map((x) => x.cause),

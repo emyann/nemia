@@ -1117,7 +1117,7 @@ Its arguments:
 ## retry
 
 ```text
-  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>] | <runId> <step> --off | <runId> [<step>] --round --off
     try a step waiting on you again, once, on the next tick:
     --continue (default) continues its session, told what happened;
     --fresh a new session on its branch; --model <m> the same, on m;
@@ -1140,6 +1140,9 @@ Its arguments:
     "<n>=a: <words>" adds your own words, "<n>: <words>" says words
     alone, "<n>=none" says none of its options fits; --message is
     then the note under your answers
+    --off: take back the try asked of the step and not yet filed, or with
+    --round the round asked of its loop: the ask is set aside, never
+    deleted, and the step waits on you again
 ```
 
 Asks for another try or round of the step, written as a file the next pass acts on. Answers RunAsked with a 202: the ask's file and what it asked for.
@@ -1151,7 +1154,8 @@ Its arguments:
 - namespace: The namespace, a run's factory (default for one that names none).
 - name: The run's name.
 - step (<step> at a shell): The step's name.
-- mode (--continue, --fresh, --recheck, --model at a shell): How the step is tried again: continue its session, start it fresh, or recheck its work; nudge is continue's former spelling.
+- mode (--continue, --fresh, --recheck, --model at a shell): How the step is tried again: continue its session, start it fresh, or recheck its work; nudge is continue's former spelling. Left out, continue.
+- off (--off at a shell): Takes back the try asked of the step and not yet filed (--off), or with round the round asked of its loop, setting the ask aside: no model, words, budget, answers or check beside it.
 - model (--model at a shell): The model a fresh try runs on; left out, the step's own.
 - round (--round at a shell): Whether this asks another round of the loop the step closes (--round), not another try.
 - message (--message at a shell): The words the try is told: an answer to its needs, or what to do differently.
@@ -1187,7 +1191,9 @@ Its arguments:
     a step's own budget
     --off: take back the approval of a step that stands approved while
     nothing it approved has been filed — an ending waiting on the base
-    branch, held, or not yet ticked. The step waits at its gate again
+    branch, held, or not yet ticked. The step waits at its gate again.
+    Of a loop ended as it stands, while nothing waiting on its step is
+    filed: that acceptance taken back, and the loop waits on you again
 ```
 
 Approves the step at its gate, recording who gave the approval; with off, takes the approval back. Answers RunApproved with a 202: the approval written, its file and what follows it.
@@ -1228,7 +1234,7 @@ Its arguments:
 ## refresh
 
 ```text
-  nemia refresh <runId> [<step>] [--base]
+  nemia refresh <runId> [<step>] [--base [--off]]
     take the new revisions: a run keeps the workflow, agents, skills and
     factory rules it resolved when it started, and this pins it to the
     ones they hold now, so every filing after it — a new step, a retry,
@@ -1241,7 +1247,9 @@ Its arguments:
     --base: take the base instead — a loop's work that no longer merges
     cleanly goes back to merge it, once, on the next tick, on the round it
     is on, which the merge does not spend; the step is the one that closes
-    the loop, left out where the run has one loop
+    the loop, left out where the run has one loop;
+    --base --off: take back that merge, asked and not yet filed: the ask
+    is set aside, never deleted, and the loop waits on you again
 ```
 
 Brings the run onto its workflow's newest revision, or merges its base into its branch, as the RunRefresh body asks. Answers RunRefreshed with a 202: the drift it found, or the merge it asked of the looping step.
@@ -1254,6 +1262,7 @@ Its arguments:
 - name: The run's name.
 - step (<step> at a shell): With base, the looping step whose loop's work merges its base.
 - base (--base at a shell): Whether the loop's work is sent to merge its base (--base), rather than the run pinned to the new revisions.
+- off (--off at a shell): With base, takes back the merge of the base asked of the loop and not yet filed (--off), setting the ask aside.
 
 ## say
 

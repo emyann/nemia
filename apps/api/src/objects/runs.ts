@@ -198,10 +198,14 @@ const removed = (at: At, query: RemoveQuery) =>
     query.whole === 'true',
   );
 
-/** The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given. */
+/**
+ * The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given; or, with
+ * `base` and `off`, the merge taken back, with who took it back (the caller's actor).
+ */
 const refreshed = (at: At, payload: RunRefresh) =>
   acted(at, async (s) => {
-    const { drift, step, target, onto, sha, round, file, said } = await s.inRequest(REFRESH.handler({ runId: at.name, ...payload }));
+    const done = await s.inRequest(REFRESH.handler({ runId: at.name, ...payload, actor: actorOf(s.caller) }));
+    const { drift, step, target, onto, sha, round, file, said, takenBack, stray } = done;
     return {
       ...given('drift', drift),
       ...given('step', step),
@@ -211,6 +215,8 @@ const refreshed = (at: At, payload: RunRefresh) =>
       ...given('round', round),
       ...given('file', file),
       ...given('said', said),
+      ...given('takenBack', takenBack),
+      ...given('stray', stray),
     };
   });
 
@@ -225,7 +231,10 @@ const pruned = (at: At, { preview, ...payload }: RunPrune) =>
     return { id, pruned: done.pruned, lines, worktrees, artifacts, left, bytes: pruningBytes(done.pruning) };
   });
 
-/** Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked. */
+/**
+ * Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked; or, with `off`,
+ * the ask taken back, with who took it back (the caller's actor).
+ */
 const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
   acted(at, async (s) => {
     const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload, actor: actorOf(s.caller) }));
@@ -237,17 +246,19 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
       ...given('round', asked.round),
       ...given('budget', asked.budget),
       ...given('hint', asked.hint),
+      ...given('takenBack', asked.takenBack),
+      ...given('stray', asked.stray),
     };
   });
 
 /**
  * The step `at.step` approved at its gate (`nemia approve`): the approval written, with who gave it (the caller's actor); or, with `off`,
- * its approval taken back, with who took it back.
+ * its approval, or its loop's acceptance, taken back, with who took it back.
  */
 const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
   acted(at, async (s) => {
     const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload, actor: actorOf(s.caller) }));
-    const { step, try: tried, at: when, message, file, actor, loop, next, caps, takenBack } = done;
+    const { step, try: tried, at: when, message, file, actor, loop, next, caps, takenBack, stray } = done;
     return {
       step,
       try: tried,
@@ -259,6 +270,7 @@ const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
       ...given('next', next),
       caps,
       ...given('takenBack', takenBack),
+      ...given('stray', stray),
     };
   });
 

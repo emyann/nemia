@@ -501,6 +501,21 @@ const ASK_WALKS: Record<string, Walk[]> = {
       says: [true, true],
     },
   ],
+  'asks.held': [
+    {
+      name: 'what waits at an ask key is held as an ask once written, as none before, and none at the key of another kind',
+      walk: ({ door }) => {
+        made(door, 'w-held');
+        const key = { of: 'try', step: 'implement', n: 2 } as const;
+        const before = done(door.asks.held(idOf('w-held'), key));
+        act(door.asks.write(idOf('w-held'), ASKS[0].asked));
+        const after = done(door.asks.held(idOf('w-held'), key));
+        const other = done(door.asks.held(idOf('w-held'), { of: 'round', step: 'implement', n: 2 }));
+        return [before, after, other];
+      },
+      says: ['none', 'ask', 'none'],
+    },
+  ],
   'asks.takeBack': [
     {
       name: "an approval taken back is set aside in its run's done/, no longer composed onto the run, and a second take-back finds none",
@@ -508,22 +523,53 @@ const ASK_WALKS: Record<string, Walk[]> = {
         made(door, 'w-take');
         const ask = { step: 'implement', try: 1, at, work: { implement: 1 } };
         act(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
-        const where = done(door.asks.takeBack(idOf('w-take'), 'implement', 1, { at, actor: ON_LAPTOP }));
-        const again = done(door.asks.takeBack(idOf('w-take'), 'implement', 1, { at }));
+        const key = { of: 'gate', step: 'implement', n: 1 } as const;
+        const taken = done(door.asks.takeBack(idOf('w-take'), key, { at, actor: ON_LAPTOP }));
+        const again = done(door.asks.takeBack(idOf('w-take'), key, { at }));
         const run = act(door.runs.read(idOf('w-take'))) as Run;
         const given = done(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
-        return [where?.startsWith('/registry/asks/w-take/done/'), again, run.approvals, given.written];
+        return [taken?.where.startsWith('/registry/asks/w-take/done/'), taken?.stray, again, run.approvals, given.written];
       },
-      says: [true, null, undefined, true],
+      says: [true, false, null, undefined, true],
     },
     {
       name: 'a take-back of an approval never written finds none',
       walk: ({ door }) => {
         made(door, 'w-take-none');
-        return done(door.asks.takeBack(idOf('w-take-none'), 'implement', 1, { at }));
+        return done(door.asks.takeBack(idOf('w-take-none'), { of: 'gate', step: 'implement', n: 1 }, { at }));
       },
       says: null,
     },
+    ...ASKS.map(
+      ({ asked, n }) =>
+        ({
+          name: `an ask of ${asked.of} is held, then taken back by its key: set aside in done/, held no more, a second take-back finds none, and it is asked again`,
+          walk: ({ door }) => {
+            const id = `w-back-${asked.of}`;
+            made(door, id);
+            const key = { of: asked.of, step: stepOf(asked), n };
+            const before = done(door.asks.held(idOf(id), key));
+            act(door.asks.write(idOf(id), asked));
+            const held = done(door.asks.held(idOf(id), key));
+            const taken = done(door.asks.takeBack(idOf(id), key, { at, actor: ON_LAPTOP }));
+            const after = done(door.asks.held(idOf(id), key));
+            const read = act(door.asks.read(idOf(id))) as { asks: unknown[]; rounds: unknown[] };
+            const again = done(door.asks.takeBack(idOf(id), key, { at }));
+            const given = done(door.asks.write(idOf(id), asked));
+            return [
+              before,
+              held,
+              taken?.where.startsWith(`/registry/asks/${id}/done/`),
+              taken?.stray,
+              after,
+              asked.of === 'try' ? read.asks.length : asked.of === 'round' || asked.of === 'base' ? read.rounds.length : 0,
+              again,
+              given.written,
+            ];
+          },
+          says: ['none', 'ask', true, false, 'none', 0, null, true],
+        }) satisfies Walk,
+    ),
   ],
   'asks.read': [
     {
@@ -647,6 +693,16 @@ const ASK_WALKS: Record<string, Walk[]> = {
         return (act(door.asks.answers(idOf('w-answers'))) as Array<{ message?: string }>).map((a) => a.message);
       },
       says: ['again'],
+    },
+    {
+      name: 'a retry a person took back is no answer: its words were never told',
+      walk: ({ door }) => {
+        made(door, 'w-answers-back');
+        act(door.asks.write(idOf('w-answers-back'), ASKS[0].asked));
+        done(door.asks.takeBack(idOf('w-answers-back'), { of: 'try', step: 'implement', n: 2 }, { at }));
+        return act(door.asks.answers(idOf('w-answers-back')));
+      },
+      says: [],
     },
   ],
 };

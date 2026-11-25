@@ -65,7 +65,13 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     const why =
       'refusal' in now
         ? now.refusal
-        : strayAsk(file, written.stray, `round ${ask.round} of ${ask.step}'s loop`, `nemia retry ${id} ${ask.step} --round`);
+        : strayAsk(
+            file,
+            written.stray,
+            `round ${ask.round} of ${ask.step}'s loop`,
+            `nemia retry ${id} ${ask.step} --round`,
+            `nemia retry ${id} ${ask.step} --round --off`,
+          );
     return yield* Effect.fail(
       new Conflict({ message: why ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: nemia ls ${id}.` }),
     );
@@ -145,6 +151,6 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
 function acceptedAlready(file: string, stray: string | null, acceptance: Acceptance, now: ReturnType<typeof acceptAsk>, id: string) {
   if ('refusal' in now) return now.refusal;
   return stray !== null
-    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: nemia approve ${id} ${acceptance.step} --message "<why>".`
+    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Take it back — nemia approve ${id} ${acceptance.step} --off, which sets it aside as it is — then accept again: nemia approve ${id} ${acceptance.step} --message "<why>".`
     : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: nemia ls ${id}.`;
 }

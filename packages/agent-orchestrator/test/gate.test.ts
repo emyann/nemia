@@ -42,7 +42,9 @@ import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import { decidedOn } from './screens.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { listedRow, told, type StartedAnswer } from './typed.ts';
+import { handled, listedRow, told, type StartedAnswer } from './typed.ts';
+import { RETRY } from '../src/retry/commands.verb.ts';
+import { APPROVE } from '../src/gate/commands.verb.ts';
 import { onYouWords, type RunsListed } from '../src/list/list.ts';
 import { RM } from '../src/runner.ts';
 
@@ -643,7 +645,7 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('approve it: '), l.steps[0].note);
   });
-  s.test('REFUSED: `nemia approve` and `nemia retry --message` name the ask to delete, and leave it where it is', async () => {
+  s.test('REFUSED: `nemia approve` and `nemia retry --message` name the take-back of the ask, and leave it where it is', async () => {
     const naming =
       (...facts: string[]) =>
       (err: Error & { exitCode?: number; _tag?: string }) => {
@@ -652,12 +654,29 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
           assert.ok(err.message.includes(fact), err.message);
         return true;
       };
-    await assert.rejects(runWith(b.e, approveRun(id, 'plan')), naming('at its gate', 'retry-plan-2', 'then approve it'));
+    await assert.rejects(runWith(b.e, approveRun(id, 'plan')), naming('at its gate', `nemia retry ${id} plan --off`, 'then approve it'));
     await assert.rejects(runWith(b.e, retryRun(id, 'plan', { mode: 'continue', message: 'store it first' })), naming('awaiting approval'));
     assert.ok(recordText(ROOT, file) !== undefined, 'left where it is, for a person to take back');
   });
-  s.test('with the ask deleted, the approval files what follows', async () => {
-    dropRecord(ROOT, file);
+  s.test('`nemia retry --off` takes the ask back, set aside with who and when, and the approval files what follows', async () => {
+    const back = await handled(
+      RETRY,
+      { runId: id, step: 'plan', off: true, actor: { kind: 'person', token: 'laptop' } },
+      { e: b.e, env: ENV },
+    );
+    assert.deepEqual([back.try, back.takenBack?.actor?.token, back.stray], [2, 'laptop', undefined]);
+    assert.equal(recordText(ROOT, file), undefined, 'nothing waits at its key');
+    const kept = JSON.parse(recordText(ROOT, back.file) ?? '{}') as { mode?: string; takenBack?: { at?: string } };
+    assert.deepEqual([kept.mode, typeof kept.takenBack?.at], ['continue', 'string'], 'never deleted: what it said is kept beside when');
+    await assert.rejects(
+      handled(RETRY, { runId: id, step: 'plan', off: true }, { e: b.e, env: ENV }),
+      (err: Error & { exitCode?: number; _tag?: string }) => {
+        assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2]);
+        assert.ok(err.message.includes(`nemia retry ${id} plan`), err.message);
+        return true;
+      },
+      'a second take-back finds nothing asked',
+    );
     await runWith(b.e, approveRun(id, 'plan'));
     assert.deepEqual((await tick(b.e, id)).filed, ['implement']);
   });
@@ -848,8 +867,23 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
     plantRecord(ROOT, askKeyOf(stray.id, 'approve-plan-1'), 'yes please');
     await assert.rejects(
       runWith(stray.e, approveRun(stray.id, 'plan')),
-      refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', '(rm ', 'then approve again'),
+      refusedAs(
+        'Conflict',
+        'try 1 of plan cannot be approved',
+        'approve-plan-1 is already there',
+        `nemia approve ${stray.id} plan --off`,
+        'then approve again',
+      ),
     );
+    const back = await handled(APPROVE, { runId: stray.id, step: 'plan', off: true }, { e: stray.e, env: ENV });
+    assert.deepEqual(
+      [back.stray, back.loop, typeof back.takenBack?.at],
+      [true, false, 'string'],
+      '`nemia approve --off` sets the stray aside',
+    );
+    assert.deepEqual(JSON.parse(recordText(ROOT, back.file) ?? '{}').stray, 'yes please', 'kept as it was, never deleted');
+    await runWith(stray.e, approveRun(stray.id, 'plan'));
+    assert.deepEqual(asksOf(stray.id), ['approve-plan-1'], 'and the approval is written where the stray stood');
   });
 });
 

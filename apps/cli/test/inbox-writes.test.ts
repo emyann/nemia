@@ -2,9 +2,10 @@
  * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox resend`, `inbox from`, `inbox edit`, `inbox
  * rm`, `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
  * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it
- * prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given
- * as a path are refused, exit 2, before anything is asked. A card's files: an idea file's picture beside it and a `--file` uploaded and
- * carried and said, a link quoted in code not carried, another attached, listed, one written out byte for byte, and one taken off.
+ * prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder, one word that reads
+ * as a path to no file, and a workflow given as a path are refused, exit 2, before anything is asked. A card's files: an idea file's
+ * picture beside it and a `--file` uploaded and carried and said, a link quoted in code not carried, another attached, listed, one
+ * written out byte for byte, and one taken off.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -269,10 +270,13 @@ test('`nemia inbox resend` files a started card again as <run>-resent, queued on
   assert.ok(again.err.includes('r-sent-resent'), again.err);
 });
 
-test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
+test("REFUSED, exit 2, before anything is asked: a folder or a path to no file as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
   const before = fs.existsSync(path.join(store.root, 'inbox')) ? fs.readdirSync(path.join(store.root, 'inbox')) : [];
   for (const [argv, named] of [
     [['inbox', 'add', IDEAS], /nemia inbox add/],
+    [['inbox', 'add', path.join(IDEAS, 'no-such.md')], /no-such\.md/],
+    [['inbox', 'add', 'no-such.md'], /no-such\.md/],
+    [['inbox', 'edit', 'some-card', path.join(IDEAS, 'gone', 'card')], /nemia inbox edit/],
     [['inbox', 'add', 'An idea', '--workflow', './workflows/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', 'dev', '--off'], /--off/],

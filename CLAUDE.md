@@ -125,7 +125,11 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
   reviewed head and the base only in the paths `landingDerives` names. This repository's command is `node packages/templates/released.ts
   cut`, which cuts each template's version and record again from the base: the nemia factory takes them at its upgrade onto sdlc
   3.11.0, `nemia factory upgrade <factory> --to 3.11.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
-  "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`.
+  "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`. Before the refresh the merge runs the
+  factory's `landingInstall` in the same worktree, with the base's merge in progress, so the refresh reads the dependencies the merged
+  tree names (a base that added a package would otherwise fail `released.ts cut` on the branch's install, or on none in a scratch
+  worktree): the nemia factory's is `npm ci`, set at its upgrade onto the sdlc version this lands at, `nemia factory upgrade nemia
+  --to <that version> --set "landingInstall=npm ci"`.
 
 ## Agents in this repository
 

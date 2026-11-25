@@ -7,7 +7,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Logger } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aCard, CARD_WALKS } from '../../test/card-walks.ts';
@@ -42,6 +42,32 @@ test("a card file dropped into the inbox is filed at its file's time and moved a
   fs.writeFileSync(path.join(inbox, 'an-idea.md'), 'again\n');
   assert.equal(done(door.cards.read(nameOf('an-idea'))), 'an idea\n', 'a file at a card filed already does not write over it');
   assert.ok(fs.existsSync(path.join(root, 'imported', 'inbox', 'an-idea.md.2')), 'and is moved aside beside the first');
+});
+
+test('an entry of the inbox that is no card is said in the log as the import passes over it; a hidden file and a README are not', () => {
+  const { root, door, inbox } = store();
+  fs.mkdirSync(path.join(inbox, 'a-folder'), { recursive: true });
+  fs.writeFileSync(path.join(inbox, 'notes.txt'), 'not a card');
+  fs.writeFileSync(path.join(inbox, 'Not A Card.md'), 'not a name');
+  fs.writeFileSync(path.join(inbox, '.idea.md.swp'), 'x');
+  fs.writeFileSync(path.join(inbox, 'README.md'), '# ideas\n');
+  fs.writeFileSync(path.join(inbox, 'an-idea.md'), 'an idea\n');
+  const warned: string[] = [];
+  const keeper = Logger.make(({ message }) => void warned.push((Array.isArray(message) ? message : [message]).join(' ')));
+  const entries = Effect.runSync(door.cards.entries().pipe(Effect.provide(Logger.layer([keeper]))));
+  assert.deepEqual(
+    entries.map((e) => e.file),
+    ['an-idea.md'],
+  );
+  const named = ['a-folder', 'notes.txt', 'Not A Card.md'].map((entry) => path.join(inbox, entry));
+  assert.deepEqual(
+    named.map((entry) => warned.some((line) => line.startsWith(`${entry} was not imported`))),
+    [true, true, true],
+    warned.join('\n'),
+  );
+  assert.equal(warned.length, 3, warned.join('\n'));
+  assert.deepEqual(fs.readdirSync(inbox).sort(), ['.idea.md.swp', 'Not A Card.md', 'README.md', 'a-folder', 'notes.txt']);
+  assert.ok(fs.existsSync(path.join(root, 'imported', 'inbox', 'an-idea.md')));
 });
 
 test('a card written back keeps its filing time, and no card file is made', () => {

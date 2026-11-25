@@ -32,12 +32,14 @@ export type KindFile = {
 
 /**
  * A kind of record whose files a store kept before the keyspace: its name (one import per kind and store), the folders its files are in
- * (whose change times are the import's mark), and its files as they are now.
+ * (whose change times are the import's mark), its files as they are now, and the entries of its folders it never takes up, each with
+ * why, which an import says in the log and leaves where they are.
  */
 export type ImportKind = {
   readonly name: string;
   readonly folders: (home: string) => readonly string[];
   readonly files: (home: string) => readonly KindFile[];
+  readonly strays?: (home: string) => readonly { readonly entry: string; readonly why: string }[];
 };
 
 /**
@@ -112,12 +114,14 @@ const looked = (one: KindFile) => {
 /**
  * Import the store `home`'s files of `kind` into `keyspace`, once: every file asked first, the import stopped `Invalid` naming one over
  * the ceiling, then each record whose key is not held made in one transaction (its pointers kept where they name a live key), then each
- * file read moved aside; one that does not read stays, said in the log. Answers how many records it made.
+ * file read moved aside; one that does not read stays, said in the log, as each of the kind's strays is. Answers how many records it made.
  * @param home The store's root folder.
  * @param kind The kind imported.
  * @param keyspace The store's keyspace.
  */
 export const kindImported = Effect.fnUntraced(function* (home: string, kind: ImportKind, keyspace: Keyspace) {
+  for (const stray of yield* fromThrow(() => kind.strays?.(home) ?? []))
+    yield* Effect.logWarning(`${stray.entry} was not imported: ${stray.why}; move it aside, or remove it`);
   const files = yield* fromThrow(() => kind.files(home).map(looked));
   if (files.length === 0) return 0;
   const over = files.find((f) => importAct({ read: f.read, size: f.size, held: false }, RECORD_CEILING) === 'stop');

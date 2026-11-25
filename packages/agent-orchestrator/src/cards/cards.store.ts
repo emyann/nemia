@@ -27,7 +27,7 @@ import { checked, fromThrow, rootedDoor } from '../door/door.store.ts';
 import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
 import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
 import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.ts';
-import { asideOf, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
+import { asideOf, entriesIn, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
 import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts';
 import { FILE_ID_PREFIX } from 'objects';
 
@@ -357,7 +357,9 @@ const filesOf = (home: string, text: string) => {
 /**
  * The card files of a store from before the keyspace — and a card a person drops into the inbox by hand — `inbox/<name>.md`, filed at
  * the file's change time, and the tick's tries, `queue/<name>.json`: what the kind's import takes up. A card's text is taken as it is,
- * and checked as a card when it is read; a try that is not JSON stays where it is.
+ * and checked as a card when it is read; a try that is not JSON stays where it is. An entry of the inbox that is no card — a folder, a
+ * file of another kind, an `.md` whose name is no card's — stays where it is, said in the log (`strays`); a hidden file and a README are
+ * not.
  */
 export const CARD_FILES: ImportKind = {
   name: 'cards',
@@ -389,6 +391,14 @@ export const CARD_FILES: ImportKind = {
         };
       }),
   ],
+  strays: (home) =>
+    entriesIn(inboxAt(home))
+      .filter((entry) => !entry.startsWith('.') && entry !== 'README.md')
+      .filter((entry) => !(entry.endsWith('.md') && Option.isSome(Schema.decodeUnknownOption(CardName.OnCreate)(entry.slice(0, -3)))))
+      .map((entry) => ({
+        entry: path.join(inboxAt(home), entry),
+        why: 'a card is a file <name>.md whose name a card may take, and this is none: file the idea with nemia inbox add',
+      })),
 };
 
 /** The Card door over the keyspace at the store `root`. */

@@ -185,6 +185,27 @@ export function dropStoredRecord(id: string) {
   inApi('t.dropRecord(root, t.runKey(input));', id);
 }
 
+/** Every kind's files the seed wrote as a store before the keyspace taken up into its records, as each door's first read would. */
+export function storeTakenUp() {
+  inApi('t.kindsTakenUp(root);');
+}
+
+/**
+ * The keys under `prefix` in the seeded store: what a page reads the records it added by, to take them back.
+ * @param prefix The keys' prefix, `/registry/persontokens/` say.
+ */
+export function storedKeys(prefix: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.keysUnder(root, input));', prefix)) as string[];
+}
+
+/**
+ * The record at `key` taken out of the seeded store, there or not.
+ * @param key The record's key.
+ */
+export function dropStoredKey(key: string) {
+  inApi('t.dropRecord(root, input);', key);
+}
+
 /**
  * The text of the card `name` in the seeded store, as the Card door reads it (a card file dropped into its inbox taken up first), or null
  * where it holds none: what a page reads a card filed or written back by, now that a card is a record and no file.

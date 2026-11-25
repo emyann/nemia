@@ -91,11 +91,20 @@ const PREFIX = '/registry/revisions/';
 /** The key a kind and name's entries are kept at, its name escaped (`encodeURIComponent`). */
 const keyOf = ({ kind, name }: RevisionOf) => `${PREFIX}${kind}/${encodeURIComponent(name)}`;
 
-/** The entries `text` holds, as `entries.of` reads them. */
-function entriesIn(text: string) {
+/**
+ * The entries the ledger at `key` holds, as `entries.of` reads them: refused `Invalid` where its record holds no list, so a ledger that
+ * does not read is never numbered again from 1.
+ */
+const entriesIn = (key: string, text: string) => {
   const read = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text);
-  return Option.isSome(read) ? read.value.filter(isRevision) : [];
-}
+  return Option.isSome(read)
+    ? Effect.succeed(read.value.filter(isRevision))
+    : Effect.fail(
+        new Invalid({
+          message: `the ledger at ${key} does not read as a list of revisions: nothing was numbered. Say so to whoever keeps this nemia.`,
+        }),
+      );
+};
 
 /**
  * The ledger of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it answers
@@ -110,7 +119,7 @@ export function ledgerRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effe
         Effect.gen(function* () {
           const keyspace = yield* held;
           const record = keyspace === undefined ? undefined : yield* keyspace.get(keyOf(of));
-          return record === undefined ? [] : entriesIn(record.value);
+          return record === undefined ? [] : yield* entriesIn(record.key, record.value);
         }),
       append: (of, hash, at) =>
         Effect.gen(function* () {
@@ -120,7 +129,7 @@ export function ledgerRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effe
             .within((tx) =>
               Effect.gen(function* () {
                 const there = yield* tx.get(key);
-                const stored = there === undefined ? [] : entriesIn(there.value);
+                const stored = there === undefined ? [] : yield* entriesIn(key, there.value);
                 const now = revisionNow(stored, hash, at);
                 if (stored.includes(now)) return now;
                 yield* tx.write(key, {
@@ -133,11 +142,13 @@ export function ledgerRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effe
             )
             .pipe(
               Effect.mapError((err) =>
-                err.refusal === 'too-large'
-                  ? new Invalid({
-                      message: `the ledger of the ${of.kind} ${of.name} is larger than a record holds: say so to whoever keeps this nemia.`,
-                    })
-                  : new Conflict({ message: `${err.key} was written by another while it was appended to: run again.` }),
+                err._tag === 'Invalid'
+                  ? err
+                  : err.refusal === 'too-large'
+                    ? new Invalid({
+                        message: `the ledger of the ${of.kind} ${of.name} is larger than a record holds: say so to whoever keeps this nemia.`,
+                      })
+                    : new Conflict({ message: `${err.key} was written by another while it was appended to: run again.` }),
               ),
             );
         }),

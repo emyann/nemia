@@ -118,6 +118,7 @@ process.env.HOME = away;
  * every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
  */
 const { SERVING_VARIABLES, SESSION_VARIABLES, tokenDigest } = await import('agent-orchestrator');
+const { plantRecord, recordText } = await import('agent-orchestrator/testing');
 for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.env[name];
 
 /**
@@ -135,15 +136,14 @@ export const SEATED = { kind: 'person', token: 'harness' } as const;
 export const NO_TOKEN = { 'x-harness-token': 'none' } as const;
 
 /**
- * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by (`person-tokens/<digest>.json`),
- * so an app over a store of a test's own takes it too. Idempotent.
+ * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by
+ * (`/registry/persontokens/<digest>`), so an app over a store of a test's own takes it too. Idempotent.
+ * @param home The store's root folder.
  */
 export function seatPerson(home: string) {
-  const dir = path.join(home, 'person-tokens');
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${tokenDigest(PERSON_TOKEN)}.json`);
-  if (!fs.existsSync(file))
-    fs.writeFileSync(file, `${JSON.stringify({ name: 'harness', createdAt: '2026-01-01T00:00:00.000Z' })}\n`, { mode: 0o600 });
+  const key = `/registry/persontokens/${tokenDigest(PERSON_TOKEN)}`;
+  if (recordText(home, key) === undefined)
+    plantRecord(home, key, JSON.stringify({ name: 'harness', createdAt: '2026-01-01T00:00:00.000Z' }));
 }
 seatPerson(root);
 

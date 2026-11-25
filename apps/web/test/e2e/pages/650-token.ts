@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
 import { photograph, themeOf, topBarOf } from '../board.ts';
@@ -6,7 +5,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } fr
 import { mintPersonToken, serveExposed } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
 import { TOKEN_COOKIE as COOKIE } from 'objects';
-import { OUT, store } from '../world.ts';
+import { dropStoredKey, OUT, store, storedKeys } from '../world.ts';
 
 /** The name the page mints its token under, taken back at its end. */
 const NAME = 'board-e2e';
@@ -77,8 +76,7 @@ export default {
       await here.close();
     }
 
-    const dir = path.join(store!, 'person-tokens');
-    const before = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
+    const before = new Set(storedKeys('/registry/persontokens/'));
     const seat = await serveExposed();
     const context = await page
       .context()
@@ -147,9 +145,8 @@ export default {
     } finally {
       await context.close();
       await seat.stop();
-      if (fs.existsSync(dir)) {
-        for (const file of fs.readdirSync(dir)) if (!before.has(file)) fs.rmSync(path.join(dir, file), { force: true });
-        if (before.size === 0) fs.rmSync(dir, { recursive: true, force: true });
+      {
+        for (const key of storedKeys('/registry/persontokens/')) if (!before.has(key)) dropStoredKey(key);
       }
     }
   },

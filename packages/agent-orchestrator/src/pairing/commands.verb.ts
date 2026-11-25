@@ -38,8 +38,8 @@ const mintedFor = (marked: Marked, nowMs: number) =>
  */
 export const pairingClaimed = Effect.fnUntraced(function* (home: string, id: string, secret: string, nowMs: number) {
   const marked = yield* fromThrow(() => pairingMarked(home, id, secret, nowMs));
-  if ('phase' in marked) return marked satisfies PairingClaimed as PairingClaimed;
-  return { phase: 'claimed', ...(yield* mintedFor(marked, nowMs)) } satisfies PairingClaimed as PairingClaimed;
+  if ('phase' in marked) return marked satisfies PairingClaimed;
+  return { phase: 'claimed', ...(yield* mintedFor(marked, nowMs)) } satisfies PairingClaimed;
 });
 
 /**

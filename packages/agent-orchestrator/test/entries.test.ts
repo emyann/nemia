@@ -991,6 +991,7 @@ const PINNED: Record<string, string[]> = {
     'cardNames',
     'plantCard',
     'emptyCards',
+    'kindsTakenUp',
   ],
   'agent-orchestrator/workflow': [
     'checkFailurePolicyLine',

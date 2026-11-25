@@ -43,7 +43,7 @@ import {
   setStore,
   standingPass,
   store,
-  storedCardNames,
+  storeTakenUp,
   WEB,
 } from './world.ts';
 
@@ -413,8 +413,9 @@ export const serveExposed = () => serveSeat('exposed', { WF_EXPOSED: '1' }) sati
  * Seeds `root`, an empty directory, and serves it (`startServers`). draft's say file (SAYING) is read, standing in for its holder,
  * before the api can be asked to say anything into it, and each arrival is written into draft's transcript, as a working session does
  * when it reads the words between calls. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the
- * tick would, and the cards and tries the seed dropped into `inbox/` and `queue/` are taken up into the keyspace (`storedCardNames`), so
- * the store a worker prints before its first page (`fingerprint`) is the one its pages read and put back, not files the first read moves.
+ * tick would, and every kind's files the seed wrote as a store before the keyspace — cards, tries, tokens, the ledger — are taken up
+ * into it (`storeTakenUp`), so the store a worker prints before its first page (`fingerprint`) is the one its pages read and put back,
+ * not files the first read moves.
  */
 export async function serveStore(root: string, seat: Served, dist?: string) {
   seedStore(root);
@@ -427,6 +428,6 @@ export async function serveStore(root: string, seat: Served, dist?: string) {
   });
   setApiEnv(apiEnvOf(root, bin));
   standingPass();
-  storedCardNames();
+  storeTakenUp();
   return startServers(seat, dist);
 }

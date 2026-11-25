@@ -78,7 +78,8 @@ test("a client's name already a token's is made unique with -2, -3", () => {
   const names = [1, 2].map((i) => {
     const asked = pairingAsked(home, 'laptop', T0 + i);
     pairingApproved(home, asked.code, T0 + i);
-    return claimedNow(home, asked.id, asked.secret, T0 + i).name;
+    const claimed = claimedNow(home, asked.id, asked.secret, T0 + i);
+    return 'name' in claimed ? claimed.name : claimed.phase;
   });
   assert.deepEqual(names, ['laptop-2', 'laptop-3']);
 });

@@ -35,7 +35,12 @@ import { askKey, askKeyOf, asksPrefix, runKey } from './src/runs/run-keys.ts';
 import { recordValue } from './src/record/record.store.ts';
 import type { Run } from './src/record/record.ts';
 import { RunDoor, type RunDoorShape, type RunsLayer } from './src/runs/runs.store.ts';
-import { CardDoor, cardDoorAt, cardKey, cardTryKey } from './src/cards/cards.store.ts';
+import { CARD_FILES, CardDoor, cardDoorAt, cardKey, cardTryKey } from './src/cards/cards.store.ts';
+import { DELEGATION_FILES } from './src/delegation/delegation.store.ts';
+import { kindKeyspaceHeld } from './src/keyspace/import.store.ts';
+import { LEDGER_FILES } from './src/revisions/revisions.store.ts';
+import { SUBSCRIPTION_FILES } from './src/subscription/subscription.store.ts';
+import { TOKEN_FILES } from './src/token/token.store.ts';
 import { CardName } from './src/inbox/inbox.model.ts';
 
 /**
@@ -361,4 +366,15 @@ export const plantCard = (root: string, name: string, text: string, filedAt = ne
  */
 export const emptyCards = (root: string) => {
   for (const key of [...keysUnder(root, '/registry/cards/'), ...keysUnder(root, '/registry/cardtries/')]) dropRecord(root, key);
+};
+
+/**
+ * Every kind's files of before the keyspace the store `root` holds taken up into its records and moved aside — delegations,
+ * subscriptions, the revision ledger, tokens, cards and tries — as each door's first read takes them up: what a test that prints a store
+ * before its first read runs first, so the store it prints is the one its reads leave.
+ * @param root The store's root folder.
+ */
+export const kindsTakenUp = (root: string) => {
+  for (const kind of [DELEGATION_FILES, SUBSCRIPTION_FILES, LEDGER_FILES, TOKEN_FILES, CARD_FILES])
+    void Effect.runSync(kindKeyspaceHeld(root, kind));
 };

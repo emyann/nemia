@@ -54,6 +54,7 @@ const agentToken = minted('caller-ops', { kind: 'agent', agent: 'operator', fact
  * kept every standing token then.
  */
 const formerToken = 'caller-former-0123456789abcdefghijklmnopqrstuvw';
+fs.mkdirSync(path.join(root, 'person-tokens'), { recursive: true, mode: 0o700 });
 fs.writeFileSync(
   path.join(root, 'person-tokens', `${tokenDigest(formerToken)}.json`),
   `${JSON.stringify({ name: 'caller-former', createdAt: '2026-01-01T00:00:00.000Z' })}\n`,

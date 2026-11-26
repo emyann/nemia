@@ -12,6 +12,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { REPO } from 'test-kit/repo';
 import { storeEnv } from './template.ts';
+import { cardNames, cardText } from 'agent-orchestrator/testing';
 
 /** The client's bin (`apps/cli`), the `nemia` a factory's steps type, and the api it asks (`apps/api`), from the repository's root. */
 export const CLIENT = path.join(REPO, 'apps', 'cli', 'bin', 'nemia.ts');
@@ -95,17 +96,8 @@ export function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]) {
 }
 
 /** The inbox's cards in `root`, by file name, with their text. */
-export const inbox = (root: string) => {
-  const dir = path.join(root, 'inbox');
-  if (!fs.existsSync(dir)) return {} satisfies Record<string, string>;
-  return Object.fromEntries(
-    fs
-      .readdirSync(dir)
-      .filter((f) => f.endsWith('.md'))
-      .sort()
-      .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
-  ) satisfies Record<string, string>;
-};
+export const inbox = (root: string) =>
+  Object.fromEntries(cardNames(root).map((name) => [`${name}.md`, cardText(root, name) ?? ''])) satisfies Record<string, string>;
 
 /** `nemia <argv>` typed by a person in the world `env`: its exit and streams. */
 export const typed = (env: NodeJS.ProcessEnv, argv: string[]) => {

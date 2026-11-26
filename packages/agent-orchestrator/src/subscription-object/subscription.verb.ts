@@ -1,18 +1,16 @@
 /**
  * The subscriptions as objects (`Subscription`, `SubscriptionList`, from `objects`), read through the Subscription door: each listed
  * subscription with where the deliverer is with it, its own file read (`subscriptionObjectOf`). A deliverer's file that does not read
- * says why in `status.error`, the subscription read at its start. A subscription's `creationTimestamp` is its file's birth where the
- * program is given the store's root, and the epoch where it is not (the memory door names no file). A subscription file left out of
+ * says why in `status.error`, the subscription read at its start. A subscription's `creationTimestamp` is when its record says it was
+ * made (`createdAt`, its file's birth for one imported), and the epoch where it says none. A subscription file left out of
  * the door's listing is no object: the deliverer says its words, and `nemia subscriptions` lists them.
  */
-import path from 'node:path';
-import { Effect, Option } from 'effect';
+import { Effect } from 'effect';
 import { API_VERSION, type Subscription, type SubscriptionList } from 'objects';
 import type { DeliveryKept } from '../../contracts/subscription-status.contract.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
-import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
-import { noSubscription, subscriptionFileAt, SubscriptionDoor, type Listed } from '../subscription/subscription.store.ts';
+import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
+import { noSubscription, SubscriptionDoor, type Listed } from '../subscription/subscription.store.ts';
 import { deliveryKept, subscriptionDelivered } from './subscription.ts';
 
 /**
@@ -43,15 +41,12 @@ export const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | u
   } satisfies Subscription;
 };
 
-/** The object of `listed`, its delivery read through the door, born at its file under `root` where one is given. */
-const objectOf = (listed: Listed, root: Option.Option<string>) =>
+/** The object of `listed`, its delivery read through the door, born when its record says it was made, or at the epoch. */
+const objectOf = (listed: Listed) =>
   Effect.gen(function* () {
     const door = yield* SubscriptionDoor;
     const read = yield* door.deliveries.read(SubscriptionName.read(listed.name));
-    const born = Option.match(root, {
-      onNone: () => new Date(0).toISOString(),
-      onSome: (home) => bornAt(path.resolve(subscriptionFileAt(home, listed.name))),
-    });
+    const born = listed.born ?? new Date(0).toISOString();
     if (read === null) return subscriptionObjectOf(listed, undefined, born);
     if ('unread' in read) return subscriptionObjectOf(listed, undefined, born, read.unread);
     return subscriptionObjectOf(listed, deliveryKept(read.kept), born);
@@ -60,9 +55,8 @@ const objectOf = (listed: Listed, root: Option.Option<string>) =>
 /** Every subscription's object, sorted by name. */
 const subscriptionObjects = Effect.gen(function* () {
   const door = yield* SubscriptionDoor;
-  const root = yield* Effect.serviceOption(StoreRoot);
   const { listed } = yield* door.subscriptions.list();
-  return yield* Effect.forEach(listed, (one) => objectOf(one, root));
+  return yield* Effect.forEach(listed, objectOf);
 });
 
 /** A page of the subscriptions, as `SubscriptionList`: those its selectors keep, sorted by name, cut by its limit after its continue. */
@@ -78,6 +72,6 @@ export const subscriptionObject = Effect.fn('subscriptionObject')(function* (nam
   const { listed } = yield* door.subscriptions.list();
   const one = listed.find((l) => l.name === name);
   if (one === undefined) return yield* noSubscription(name);
-  const object: Subscription = yield* objectOf(one, yield* Effect.serviceOption(StoreRoot));
+  const object: Subscription = yield* objectOf(one);
   return object;
 });

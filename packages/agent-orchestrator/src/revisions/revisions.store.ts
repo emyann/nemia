@@ -1,36 +1,32 @@
 /**
  * The Ledger door: the one way a program reads and appends to the revisions ledger — an Effect service, `LedgerDoor`, whose methods take
- * what a ledger is kept for as a `RevisionOf` (a kind and a name) and answer an Effect failing with a refusal. Its pattern is the Card
- * door's (`src/door/door.store.ts`).
+ * what a ledger is kept for as a `RevisionOf` (a kind and a name) and answer an Effect failing with a refusal.
  *
- * The ledger is one file per kind and name, `<root>/revisions/<kind>/<name>.json`, holding that content's entries in order. One file per
- * kind and name on purpose: a hand edit of one agent touches one file, and two passes resolving different kinds never contend. An append
- * is keyed by the digest — a content already in the ledger keeps the number it was given (`revisionNow`) — so two passes resolving the
- * same edit at once give it one number, not two.
+ * The ledger is one record of the keyspace per kind and name, `/registry/revisions/<kind>/<name>` (the name escaped by
+ * `encodeURIComponent`, since a skill's holds a folder and a colon), holding that content's entries in order. An append reads the record
+ * and writes it in one transaction, keyed by the digest — a content already in the ledger keeps the number it was given (`revisionNow`)
+ * — so two passes resolving the same edit at once give it one number, and two resolving different edits give them two numbers in turn.
  *
- * Two layers: the files (`ledgerFiles`) and the memory stand-in (`ledgerDoorMemory`, `memory.store.ts`), both built by `ledgerDoorOver`,
- * so an append is checked the one way on both: its kind and name, its digest and its time, as the model's `Revision` holds them
- * (`RevisionAppended`), or `Invalid` and nothing is written. A stored entry is read nominally (`RevisionOnRead`), so a ledger written
- * before the check still reads. The walks of `test/ledger-walks.ts` hold both layers to one table.
+ * The rooted door and the memory stand-in (`ledgerDoorMemory`, `memory.store.ts`, over a keyspace in memory) are both `ledgerRecords`
+ * under `ledgerDoorOver`, so an append is checked the one way on both: its kind and name, its digest and its time, as the model's
+ * `Revision` holds them (`RevisionAppended`), or `Invalid` and nothing is written. A stored entry is read nominally (`RevisionOnRead`),
+ * so a ledger written before the check still reads. The walks of `test/ledger-walks.ts` hold both to one table. A store's ledger files of
+ * before the keyspace (`<root>/revisions/<kind>/<name>.json`) are imported once by the kind's import (`LEDGER_FILES`,
+ * `src/keyspace/import.store.ts`) and moved aside under `<root>/imported/`.
  *
- * The door's default is rooted (`rootedDoor`). `ledgerOf` and `appendRevision` are its synchronous spellings for the callers that are
- * not programs yet, over the files at the root `home` they are handed (`test/ledger-door.baseline.ts` counts them, and only shrinks).
+ * The door's default is rooted (`rootedDoor`). `ledgerOf` is its synchronous read at the root `home` it is handed, a test's; no file of
+ * `src` calls it (`src/revisions/revisions.store.test.ts`).
  */
-import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Option, Schema } from 'effect';
+import { Context, Effect, Option, Schema } from 'effect';
 import { revisionNow, REVISION_KINDS, type Revision, type RevisionKind } from './revisions.ts';
 import { RevisionAppended, RevisionOnRead, type RevisionOf } from './revisions.model.ts';
-import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { checked, rootedDoor } from '../door/door.store.ts';
+import { asideOf, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
+import type { Keyspace } from '../keyspace/keyspace.store.ts';
+import { Conflict, Invalid, type Refusal } from '../refusal/refusal.ts';
 
 export type { RevisionOf } from './revisions.model.ts';
-
-/**
- * Where the ledger lives: `$WF_ROOT/revisions`, beside `runs/`.
- * @param home The store's folder.
- */
-export const revisionsDir = (home: string) => path.join(home, 'revisions');
 
 /**
  * What a run or one of its steps resolved of one kind and name (`Pin`), as a record keeps it: absent where nothing was resolved, and each
@@ -47,26 +43,23 @@ export const Pins = Schema.optional(
   ),
 );
 
-/** A layer of the Ledger door, as plain synchronous methods: a ledger's entries, read and appended to. */
-export type LedgerLayer = {
+/** The Ledger door's shape: a ledger's entries, read and appended to. */
+export type LedgerDoorShape = {
   readonly entries: {
     /**
      * The entries kept for `of`, in the order they were given: `[]` for a ledger that is not there, does not read as JSON, or holds no
-     * list — a hand edit of one kind leaves every other readable, and a file nobody can read gives the next resolve revision 1 again
-     * rather than stopping the pass. An entry that does not read as one is left out; one that does is kept whole.
+     * list, so a record nobody can read gives the next resolve revision 1 again rather than stopping the pass. An entry that does not
+     * read as one is left out; one that does is kept whole.
      */
-    readonly of: (of: RevisionOf) => Revision[];
+    readonly of: (of: RevisionOf) => Effect.Effect<Revision[], Refusal>;
     /**
      * The revision `hash` stands at for `of`, appended when the content is new, and answered either way (`revisionNow`). Appends nothing
      * for a content the ledger already holds: an edit gets its number the first time anyone resolves it, and resolving again writes
      * nothing.
      */
-    readonly append: (of: RevisionOf, hash: string, at: string) => Revision;
+    readonly append: (of: RevisionOf, hash: string, at: string) => Effect.Effect<Revision, Refusal>;
   };
 };
-
-/** The Ledger door's shape: each method of `LedgerLayer` answering an Effect. Its key is a struct, which `doorOf` leaves as it is. */
-export type LedgerDoorShape = DoorOf<LedgerLayer, string>;
 
 /** An append's kind, name, digest and time, as the model's `Revision` holds them. */
 const appendChecked = checked(
@@ -75,11 +68,10 @@ const appendChecked = checked(
 );
 
 /**
- * The door over `layer`: each method as `doorOf` makes it, an append checked before the layer writes.
- * @param layer The ledger's layer the door is over.
+ * The door over `door`: an append checked before it is written.
+ * @param door The ledger as the door's shape, read and appended to through.
  */
-export function ledgerDoorOver(layer: LedgerLayer) {
-  const door = doorOf<LedgerLayer, string>(layer);
+export function ledgerDoorOver(door: LedgerDoorShape) {
   return {
     ...door,
     entries: {
@@ -93,100 +85,123 @@ export function ledgerDoorOver(layer: LedgerLayer) {
 /** Whether `value` reads as one entry of a ledger, nominally. */
 const isRevision = Schema.is(RevisionOnRead);
 
-/** How many times an append reads the ledger again to find its own entry, before it answers with the entry it computed. */
-const APPEND_TRIES = 5;
+/** The keyspace's prefix of every ledger. */
+const PREFIX = '/registry/revisions/';
+
+/** The key a kind and name's entries are kept at, its name escaped (`encodeURIComponent`). */
+const keyOf = ({ kind, name }: RevisionOf) => `${PREFIX}${kind}/${encodeURIComponent(name)}`;
+
+/** The entries the text of a ledger's record holds, or none where it does not read as a list. */
+const listIn = (text: string) =>
+  Option.map(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text), (list) => list.filter(isRevision));
 
 /**
- * The file in `dir` a kind and name's entries are kept in. The name is escaped (`encodeURIComponent`), since a skill's name holds a
- * folder and a colon (`apps/web:ds-build`) and would otherwise name a path of its own.
+ * The entries the ledger at `key` holds, as an append reads them: refused `Invalid` where its record holds no list, which `entries.of`
+ * reads as an empty ledger, so a ledger that does not read is never numbered again from 1.
  */
-const ledgerFile = (dir: string, { kind, name }: RevisionOf) => path.join(dir, kind, `${encodeURIComponent(name)}.json`);
+const entriesIn = (key: string, text: string) => {
+  const read = listIn(text);
+  return Option.isSome(read)
+    ? Effect.succeed(read.value)
+    : Effect.fail(
+        new Invalid({
+          message: `the ledger at ${key} does not read as a list of revisions: nothing was numbered. Say so to whoever keeps this nemia.`,
+        }),
+      );
+};
 
-/** The entries written to `file`, whole, through a temporary file beside it so a reader never sees half of one. */
-function writeLedger(file: string, entries: readonly Revision[]) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeWhole(file, `${JSON.stringify(entries, null, 2)}\n`);
-}
-
-/** The entries `file` holds, as `LedgerLayer['entries']['of']` reads them. */
-function entriesIn(file: string) {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return [];
-  }
-  const read = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text);
-  return Option.isSome(read) ? read.value.filter(isRevision) : [];
-}
-
-/** The ledger's files in the folder `dir` (`<root>/revisions`), as a layer of the door. */
-function ledgerIn(dir: string) {
-  const of = (at: RevisionOf) => entriesIn(ledgerFile(dir, at));
+/**
+ * The ledger of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it answers
+ * no keyspace, so a store read is not a store made.
+ * @param open Opens the keyspace the ledger is held in, refused as opening it is.
+ * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
+ */
+export function ledgerRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal> = open) {
   return {
     entries: {
-      of,
-      /**
-       * A pass that loses a race with another appending to the same file reads it again and keeps the entry that landed, so one content
-       * is one number. After `APPEND_TRIES` reads that still do not hold it, the entry it computed is answered without being written: a
-       * number said once is better than a pass that spins.
-       */
-      append: (at, hash, when) => {
-        for (let tried = 0; tried < APPEND_TRIES; tried += 1) {
-          const entries = of(at);
-          const now = revisionNow(entries, hash, when);
-          if (entries.includes(now)) return now;
-          writeLedger(ledgerFile(dir, at), [...entries, now]);
-        }
-        return revisionNow(of(at), hash, when);
-      },
+      of: (of) =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          const record = keyspace === undefined ? undefined : yield* keyspace.get(keyOf(of));
+          return record === undefined ? [] : Option.getOrElse(listIn(record.value), () => []);
+        }),
+      append: (of, hash, at) =>
+        Effect.gen(function* () {
+          const keyspace = yield* open;
+          const key = keyOf(of);
+          return yield* keyspace
+            .within((tx) =>
+              Effect.gen(function* () {
+                const there = yield* tx.get(key);
+                const stored = there === undefined ? [] : yield* entriesIn(key, there.value);
+                const now = revisionNow(stored, hash, at);
+                if (stored.includes(now)) return now;
+                yield* tx.write(key, {
+                  verb: there === undefined ? 'create' : 'update',
+                  expected: null,
+                  value: JSON.stringify([...stored, now]),
+                });
+                return now;
+              }),
+            )
+            .pipe(
+              Effect.mapError((err) =>
+                err._tag === 'Invalid'
+                  ? err
+                  : err.refusal === 'too-large'
+                    ? new Invalid({
+                        message: `the ledger of the ${of.kind} ${of.name} is larger than a record holds: say so to whoever keeps this nemia.`,
+                      })
+                    : new Conflict({ message: `${err.key} was written by another while it was appended to: run again.` }),
+              ),
+            );
+        }),
     },
-  } satisfies LedgerLayer;
+  } satisfies LedgerDoorShape;
 }
 
 /**
- * The ledger's files of the store `root`, as a layer of the door.
- * @param root The store's folder.
+ * The ledger files of a store from before the keyspace, `revisions/<kind>/<name>.json` (the name escaped as the key's is): what the kind's
+ * import takes up, as they were, at `/registry/revisions/<kind>/<name>`. A file that holds no list stays where it is.
  */
-export const ledgerFiles = (root: string) => ledgerIn(path.join(root, 'revisions'));
+export const LEDGER_FILES: ImportKind = {
+  name: 'revisions',
+  folders: (home) => [path.join(home, 'revisions'), ...REVISION_KINDS.map((kind) => path.join(home, 'revisions', kind))],
+  files: (home) =>
+    REVISION_KINDS.flatMap((kind) =>
+      namesIn(path.join(home, 'revisions', kind), '.json').map((escaped) => {
+        const file = path.join(home, 'revisions', kind, `${escaped}.json`);
+        return {
+          file,
+          key: `${PREFIX}${kind}/${escaped}`,
+          aside: asideOf(home, file),
+          read: (text: string) => {
+            const read = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text);
+            return Option.isSome(read) ? { value: JSON.stringify(read.value) } : { unreadable: 'it holds no list of entries' };
+          },
+        };
+      }),
+    ),
+};
+
+/** The Ledger door over the keyspace at the store `root`. */
+const ledgerAt = (root: string) => ledgerDoorOver(ledgerRecords(kindKeyspace(root, LEDGER_FILES), kindKeyspaceHeld(root, LEDGER_FILES)));
 
 /**
- * The Ledger door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
- * store's root the program is given, refused `Invalid` where it was given none — and a test gives `ledgerDoorMemory()` with no root.
+ * The Ledger door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the keyspace at
+ * the store's root the program is given, refused `Invalid` where it was given none — and a test gives `ledgerDoorMemory()` with no root.
  */
 export const LedgerDoor = Context.Reference<LedgerDoorShape>('agent-orchestrator/LedgerDoor', {
-  defaultValue: () => rootedDoor((root) => ledgerDoorOver(ledgerFiles(root)), 'Ledger door'),
+  defaultValue: () => rootedDoor(ledgerAt, 'Ledger door'),
 });
 
 /**
- * The Ledger door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
- * @param root The store's folder.
- */
-export const ledgerDoorFiles = (root: string) => Layer.succeed(LedgerDoor)(ledgerDoorOver(ledgerFiles(root)));
-
-/** An act of the door over the ledger at the root `home`, run now: what it answers, or the refusal thrown. */
-const atRoot = <A>(home: string, act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>) =>
-  Effect.runSync(act(ledgerDoorOver(ledgerIn(revisionsDir(home)))));
-
-/**
- * The entries kept for `kind` and `name` at the root `home` (`LedgerLayer['entries']['of']`): the door's synchronous spelling.
+ * The entries kept for `kind` and `name` at the root `home` (`entries.of`), read at once: a test's synchronous read.
  * @param home The store's folder.
  * @param kind The kind of definition.
  * @param name The definition's name.
  */
-export const ledgerOf = (home: string, kind: RevisionKind, name: string) => atRoot(home, (door) => door.entries.of({ kind, name }));
-
-/**
- * The revision `hash` stands at for `kind` and `name` at the root `home`, appended when new (`LedgerLayer['entries']['append']`): the
- * door's synchronous spelling, refused as the door refuses.
- * @param home The store's folder.
- * @param kind The kind of definition.
- * @param name The definition's name.
- * @param hash The digest of what the definition holds now.
- * @param at When the revision is appended, written on a new entry.
- */
-export const appendRevision = (home: string, kind: RevisionKind, name: string, hash: string, at: string) =>
-  atRoot(home, (door) => door.entries.append({ kind, name }, hash, at));
+export const ledgerOf = (home: string, kind: RevisionKind, name: string) => Effect.runSync(ledgerAt(home).entries.of({ kind, name }));
 
 /**
  * The ledger's number for what a definition holds now, by its digest (`version`), read through the Ledger door and never appended: the

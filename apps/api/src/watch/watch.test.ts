@@ -20,7 +20,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
-import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -29,14 +29,11 @@ const { app } = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defa
 const WatchEvent = watchEventOf(WatchedObject);
 type WatchEvent = typeof WatchEvent.Type;
 
-const inbox = path.join(root, 'inbox');
-
-/** A card filed by hand in `default`, with the labels given in its front matter. */
+/** A card filed by hand in `default`, with the labels given in its front matter, its record planted over what is there. */
 const card = (name: string, labels: Record<string, string> = {}) => {
-  fs.mkdirSync(inbox, { recursive: true });
   const keys = Object.entries(labels);
   const front = keys.length ? `---\nlabels: { ${keys.map(([k, v]) => `${k}: ${v}`).join(', ')} }\n---\n` : '';
-  fs.writeFileSync(path.join(inbox, `${name}.md`), `${front}Do ${name}.\n`);
+  plantCard(root, name, `${front}Do ${name}.\n`);
 };
 
 card('w-1', { team: 'core' });
@@ -99,7 +96,7 @@ test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed A
     await waitFor(t, () => changes(w.events, 'w-3').includes('ADDED'), "changes(w.events, 'w-3').includes('ADDED')");
     card('w-3', { team: 'docs' });
     await waitFor(t, () => changes(w.events, 'w-3').includes('MODIFIED'), "changes(w.events, 'w-3').includes('MODIFIED')");
-    fs.rmSync(path.join(inbox, 'w-3.md'));
+    dropRecord(root, cardKey('w-3'));
     await waitFor(t, () => changes(w.events, 'w-3').includes('DELETED'), "changes(w.events, 'w-3').includes('DELETED')");
     const deleted = w.events.find((e) => e.type === 'DELETED' && named(e) === 'w-3');
     assert.equal(deleted?.type !== 'BOOKMARK' && deleted?.object.metadata.labels?.team, 'docs', 'DELETED carries the last object sent');
@@ -117,7 +114,7 @@ test('a watch reads its list through every page: over more cards than a page hol
   const names = ['wp-1', 'wp-2', 'wp-3', 'wp-4', 'wp-5'];
   for (const name of names) card(name, { pages: 'yes' });
   t.onTestFinished(() => {
-    for (const name of names) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const name of names) dropRecord(root, cardKey(name));
   });
   const w = await watch(t, '/api/namespaces/default/cards?watch=true&labelSelector=pages%3Dyes', paged.app);
   try {

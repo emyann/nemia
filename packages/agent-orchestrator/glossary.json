@@ -332,7 +332,7 @@
     },
     {
       "term": "Ledger door",
-      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its files layer at the store's root a program is given and a memory one, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
+      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its keyspace layer at the store's root a program is given and a memory one over a keyspace in memory, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
       "type": "LedgerDoorShape"
     },
     {
@@ -531,12 +531,12 @@
     },
     {
       "term": "Revision ledger",
-      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one file per kind and name under `<WF_ROOT>/revisions/`: a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
-      "type": "LedgerLayer"
+      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one record per kind and name in the store's keyspace, `/registry/revisions/<kind>/<name>`, appended to in one transaction (a ledger file of before the keyspace imported and moved aside): a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
+      "type": "LedgerDoorShape"
     },
     {
       "term": "Keyspace",
-      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`.",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, and the inbox's cards and the tick's tries of them follow, each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
       "type": "Keyspace"
     },
     {
@@ -664,7 +664,7 @@
     },
     {
       "term": "Standing token",
-      "meaning": "a token the person mints with `nemia token add <name>` (`POST /api/tokens`), printed once and kept only as the record its sha-256 digest names under the store's `person-tokens` folder, its name kept so no record minted before is orphaned: `{ name, createdAt, holder? }` (`packages/agent-orchestrator/src/token/token.store.ts`); listed by name with `nemia token ls` and retired with `nemia token rm <name>`. Its holder (`TokenHolder`, `packages/agent-orchestrator/src/token/token.ts`) is the person, under the name of the device it is for, or with `--agent` an agent under its own name, bound to one factory (`--factory`) or store-wide, and maybe narrowed (`--narrow read|act`); a record that names none, minted before holders were said, is the person's (`holderOf`). A person's token is the person (`callerOf`); an agent's reaches no further than its floor (`Token floor`). The MCP port takes either. The store's own, named `local`, is kept in `<WF_ROOT>/credential` at mode 0600 by the daemon at its start (`credentialKept`), and the person's `nemia` on the store's machine presents it.",
+      "meaning": "a token the person mints with `nemia token add <name>` (`POST /api/tokens`), printed once and kept only as the record its sha-256 digest names in the store's keyspace, `/registry/persontokens/<digest>`, a name checked and taken in one transaction, its name kept so no record minted before is orphaned: `{ name, createdAt, holder? }` (`packages/agent-orchestrator/src/token/token.store.ts`); listed by name with `nemia token ls` and retired with `nemia token rm <name>`. Its holder (`TokenHolder`, `packages/agent-orchestrator/src/token/token.ts`) is the person, under the name of the device it is for, or with `--agent` an agent under its own name, bound to one factory (`--factory`) or store-wide, and maybe narrowed (`--narrow read|act`); a record that names none, minted before holders were said, is the person's (`holderOf`). A person's token is the person (`callerOf`); an agent's reaches no further than its floor (`Token floor`). The MCP port takes either. The store's own, named `local`, is kept in `<WF_ROOT>/credential` at mode 0600 by the daemon at its start (`credentialKept`), and the person's `nemia` on the store's machine presents it.",
       "type": "PersonTokenFiled"
     },
     {

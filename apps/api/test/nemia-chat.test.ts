@@ -23,7 +23,7 @@ import { Effect, Layer } from 'effect';
 import { TOKEN_COOKIE } from 'objects';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Beats } from '../src/layer.ts';
-import { FILES_CHECK_MS, RECORD_BEAT_MS, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { FILES_CHECK_MS, RECORD_BEAT_MS, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -44,7 +44,7 @@ const minted = (name: string, agent?: string) =>
       return yield* agent === undefined
         ? door.persons.mint(name)
         : door.persons.mint(name, { kind: 'agent', agent, factory: null, narrowed: null });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 /** The api's answer to a send presenting `presented` (the board's cookie, or a bearer token), with no Sec-Fetch-Site: plain http. */

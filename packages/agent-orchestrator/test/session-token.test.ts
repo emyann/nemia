@@ -9,7 +9,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { dropRecord, keysUnder, plantRecord, recordText, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,7 +23,7 @@ import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { sessionCaller } from '../src/token/caller.verb.ts';
 import type { TokenNeed } from '../src/token/token.ts';
-import { tokenDigest, tokensDir, mintToken, mintPersonToken, personTokensDir, revokePersonToken } from '../src/token/token.store.ts';
+import { tokenDigest, mintToken, mintPersonToken, revokePersonToken } from '../src/token/token.store.ts';
 import { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from '../src/token/commands.verb.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -70,11 +70,12 @@ const tokenOf = (id: string) => stage.board().tasks.get(id)?.spec.config?.env?.[
 /** Who a request presenting `token` is from, to a route that needs `need` of it, over the stage's engine and the store's root. */
 const callerBy = (token: string | undefined, need?: TokenNeed) => stage.runWith(stage.board().e, sessionCaller(token, need));
 
-/** Every file under the store's tokens folder, with its text. */
-const tokenFiles = () => {
-  const dir = tokensDir(ROOT);
-  return fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => ({ name, text: fs.readFileSync(path.join(dir, name), 'utf8') })) : [];
-};
+/** Every session token's record the store keeps, by its digest, with its text. */
+const tokenFiles = () =>
+  keysUnder(ROOT, '/registry/tokens/').map((key) => ({
+    name: key.slice('/registry/tokens/'.length),
+    text: recordText(ROOT, key) ?? '',
+  }));
 
 describe('a step is filed a session token, which names its agent while its try is live and is refused once it ends', () => {
   const s = story(test);
@@ -89,7 +90,7 @@ describe('a step is filed a session token, which names its agent while its try i
   });
   s.test('the store keeps only the record its digest names, never the token in the clear', () => {
     const files = tokenFiles();
-    const mine = files.filter((f) => f.name === `${tokenDigest(token)}.json`);
+    const mine = files.filter((f) => f.name === tokenDigest(token));
     assert.equal(mine.length, 1);
     assert.deepEqual(JSON.parse(mine[0].text), {
       agent: 'implement',
@@ -132,7 +133,7 @@ describe('a step is filed a session token, which names its agent while its try i
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
   s.test('a token whose record the store does not hold is refused unknown-token', async () => {
-    fs.rmSync(path.join(tokensDir(ROOT), `${tokenDigest(token)}.json`));
+    dropRecord(ROOT, `/registry/tokens/${tokenDigest(token)}`);
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'unknown-token' });
   });
 });
@@ -230,9 +231,9 @@ describe('a standing token is its holder whatever the route needs, until retired
   });
   test('a token minted before holders were said, a record with no holder, is the person under its name', async () => {
     const token = mintPersonToken(ROOT, 'old-laptop');
-    const file = path.join(personTokensDir(ROOT), `${tokenDigest(token)}.json`);
-    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')) as object).sort(), ['createdAt', 'name']);
-    fs.writeFileSync(file, `${JSON.stringify({ name: 'old-laptop', createdAt: '2026-01-01T00:00:00.000Z' })}\n`);
+    const key = `/registry/persontokens/${tokenDigest(token)}`;
+    assert.deepEqual(Object.keys(JSON.parse(recordText(ROOT, key) ?? '{}') as object).sort(), ['createdAt', 'name']);
+    plantRecord(ROOT, key, JSON.stringify({ name: 'old-laptop', createdAt: '2026-01-01T00:00:00.000Z' }));
     assert.deepEqual(await callerBy(token, 'standing'), { kind: 'person', token: 'old-laptop' });
   });
   test("an agent's token is its agent under the token's name, in the factory it is bound to, with its narrowing, in no run", async () => {

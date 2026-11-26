@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { keysUnder, runRecord } from '../testing.ts';
+import { cardNames, cardText, keysUnder, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -119,7 +119,7 @@ describe("a card's files reach the run started from it", () => {
     const bytes = Buffer.from('again');
     const again = await kept(bytes);
     await served(INBOX_ATTACH.handler({ name, namespace: 'default', files: [{ file: again.id, name: 'shot.png' }] }));
-    const text = fs.readFileSync(path.join(inboxDir(ROOT), `${name}.md`), 'utf8');
+    const text = cardText(ROOT, name) ?? '';
     assert.ok(text.includes(again.id) && !text.includes(`file_${'0'.repeat(32)}`), text);
     const twice = await kept(Buffer.from('twice'));
     await assert.rejects(
@@ -131,8 +131,7 @@ describe("a card's files reach the run started from it", () => {
   });
   test('REFUSED: an idea whose factory: is not the namespace it is filed in, nothing filed, naming where to file it; one naming default by name is filed there', async () => {
     const file = await kept(Buffer.from('pic'));
-    fs.mkdirSync(inboxDir(ROOT), { recursive: true });
-    const before = fs.readdirSync(inboxDir(ROOT)).sort();
+    const before = cardNames(ROOT);
     await assert.rejects(
       served(
         INBOX_ADD.handler({
@@ -142,7 +141,7 @@ describe("a card's files reach the run started from it", () => {
       ),
       (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.includes('/api/namespaces/elsewhere/cards'),
     );
-    assert.deepEqual(fs.readdirSync(inboxDir(ROOT)).sort(), before, 'no card is filed');
+    assert.deepEqual(cardNames(ROOT), before, 'no card is filed');
     const named = await served(INBOX_ADD.handler({ idea: '---\nfactory: default\n---\nFiled where it says\n' }));
     assert.equal(named.card.factory ?? 'default', 'default', 'an idea naming the default factory by name is filed in default');
   });

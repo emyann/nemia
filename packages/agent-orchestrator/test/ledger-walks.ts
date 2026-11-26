@@ -1,6 +1,6 @@
 /**
  * The Ledger door's contract (`LedgerDoor`, `src/revisions/revisions.store.ts`), as walks (`door-walks.ts`): every method's rows, run on
- * the files by `src/revisions/revisions.store.test.ts` and on the memory stand-in by `src/revisions/memory.store.test.ts`. A kind and
+ * the keyspace by `src/revisions/revisions.store.test.ts` and on the memory stand-in by `src/revisions/memory.store.test.ts`. A kind and
  * name never resolved holds no entry; a content appended is numbered 1, the next 2, the same content again keeps its number and writes
  * nothing; a workflow and an agent of one name are two ledgers. And the write check: an unknown kind, an empty name or an empty hash are
  * refused and nothing is written.

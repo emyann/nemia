@@ -597,7 +597,7 @@ import * as RunObject from './object/run.model.ts';
  */
 export { RunModel, RunObject };
 
-export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
+export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorAt } from './token/caller.verb.ts';
 export type { CallerOf, PersonTokenFiled, StandingRecord, TokenHolder, TokenNeed } from './token/caller.verb.ts';
 export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
 export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
@@ -622,7 +622,7 @@ export { workflowSpecOf, type WorkflowSpecRead } from './propose/index.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList, proposalsListed } from './approval/approve.verb.ts';
 export { ProposalDoor, type ProposalDoorShape } from './proposal/proposal.store.ts';
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
-export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
+export { DelegationDoor, type DelegationDoorShape } from './delegation/delegation.store.ts';
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
 export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './pause/commands.verb.ts';

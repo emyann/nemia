@@ -4,7 +4,7 @@
  * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
-import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, cardText, dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -106,7 +106,7 @@ test('a stray file of the same name as a card is passed over: the card is read a
   fs.writeFileSync(path.join(inbox, 'z-notes'), 'a stray file, no card\n');
   t.onTestFinished(() => {
     fs.rmSync(path.join(inbox, 'z-notes'), { force: true });
-    fs.rmSync(path.join(inbox, 'z-notes.md'), { force: true });
+    dropRecord(root, cardKey('z-notes'));
   });
   const at = '/api/namespaces/default/cards/z-notes';
   const read = await app.request(at);
@@ -122,7 +122,7 @@ test('GET /api/cards/:name finds a card in its factory, its file as written in s
   assert.equal(got.status, 200);
   const object = (await got.json()) as typeof Card.Type;
   assert.equal(object.metadata.namespace, 'a');
-  assert.equal(object.status.source, fs.readFileSync(path.join(inbox, 'f-a.md'), 'utf8'));
+  assert.equal(object.status.source, cardText(root, 'f-a') ?? '');
   const inNamespace = (await (await app.request('/api/namespaces/a/cards/f-a')).json()) as typeof Card.Type;
   assert.equal(inNamespace.status.source, object.status.source, 'a read in its namespace carries it too');
   assert.equal((await app.request('/api/cards/no-such-card')).status, 404);
@@ -161,7 +161,7 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   run('ctx-a1');
   run('started-b2', 'w-started');
   t.onTestFinished(() => {
-    for (const name of ['w-1', 'w-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const name of ['w-1', 'w-started']) dropRecord(root, cardKey(name));
     for (const id of ['ctx-a1', 'started-b2']) dropRecord(root, runKey(id));
   });
   const at = '/api/namespaces/default/cards/w-1';
@@ -173,19 +173,19 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   const after = (await written.json()) as typeof Card.Type;
   assert.deepEqual(after.spec.from, ['ctx-a1']);
   assert.notEqual(after.metadata.resourceVersion, read.metadata.resourceVersion);
-  assert.equal(after.status.source, fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8'));
+  assert.equal(after.status.source, cardText(root, 'w-1') ?? '');
   assert.match(after.status.source ?? '', /^from: ctx-a1$/m);
 
-  const now = fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8');
+  const now = cardText(root, 'w-1') ?? '';
   const stale = await put(at, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { ...read.spec } });
   assert.equal(stale.status, 409);
-  assert.equal(fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8'), now, 'a stale write writes nothing');
+  assert.equal(cardText(root, 'w-1') ?? '', now, 'a stale write writes nothing');
 
   const startedAt = '/api/namespaces/default/cards/w-started';
-  const before = fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8');
+  const before = cardText(root, 'w-started') ?? '';
   const started = await put(startedAt, { metadata: {}, spec: { body: 'Do it otherwise.' } });
   assert.equal(started.status, 409);
-  assert.equal(fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8'), before, 'a started card keeps its file');
+  assert.equal(cardText(root, 'w-started') ?? '', before, 'a started card keeps its file');
 });
 
 test("PUT a card's text to its source: the name kept, the text's body and keys; REFUSED: started 409, a bad key 422, another namespace 404, no source 400", async (t) => {
@@ -213,7 +213,7 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
     }),
   );
   t.onTestFinished(() => {
-    for (const name of ['e-1', 'e-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const name of ['e-1', 'e-started']) dropRecord(root, cardKey(name));
     dropRecord(root, runKey('started-e3'));
   });
   const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers, body: JSON.stringify(body) });
@@ -229,7 +229,7 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
   assert.deepEqual(after.metadata.labels?.['team'], 'core', 'its labels kept');
   assert.notEqual(after.metadata.resourceVersion, read.metadata.resourceVersion);
 
-  const now = fs.readFileSync(path.join(inbox, 'e-1.md'), 'utf8');
+  const now = cardText(root, 'e-1') ?? '';
   for (const [url, body, status] of [
     ['/api/namespaces/default/cards/e-started/source', { source: 'Do it otherwise.\n' }, 409],
     [at, { source: '---\nworkflow: quick\ngate: a,b\n---\nDo it.\n' }, 422],
@@ -239,7 +239,7 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
     const res = await put(url, body);
     assert.equal(res.status, status, `${url} ${JSON.stringify(body)}`);
   }
-  assert.equal(fs.readFileSync(path.join(inbox, 'e-1.md'), 'utf8'), now, 'nothing written by a refusal');
+  assert.equal(cardText(root, 'e-1') ?? '', now, 'nothing written by a refusal');
 });
 
 test("a card filed from runs that disagree on a label says the key it left out, each run with its value, on the filing's answer alone", async (t) => {
@@ -270,7 +270,7 @@ test("a card filed from runs that disagree on a label says the key it left out, 
   run('left-b2', 'infra');
   const filedAs: string[] = [];
   t.onTestFinished(() => {
-    for (const name of filedAs) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const name of filedAs) dropRecord(root, cardKey(name));
     for (const id of ['left-a1', 'left-b2'])
       for (const end of ['json', 'labels']) fs.rmSync(path.join(runs, `${id}.${end}`), { force: true });
   });
@@ -301,7 +301,7 @@ test("a card filed from runs that disagree on a label says the key it left out, 
 test('a card file that does not parse is listed all the same, its status saying why, and read alone with that why', async (t) => {
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'y-broken.md'), '---\nnot-a-key: 1\n---\nDo it.\n');
-  t.onTestFinished(() => fs.rmSync(path.join(inbox, 'y-broken.md'), { force: true }));
+  t.onTestFinished(() => dropRecord(root, cardKey('y-broken')));
   const listed = (await list('/api/cards')).body.items.find((c) => c.metadata.name === 'y-broken');
   assert.ok(listed, 'listed, never hidden');
   assert.equal('body' in listed.spec, false, 'a list carries no body');
@@ -360,7 +360,7 @@ test('POST a started card to resend: filed as <run>-resent in its namespace, han
   fs.writeFileSync(path.join(runs, 'ended-c3.cancelled'), '2026-11-05T01:00:00.000Z');
   run('working-d4', 'r-working');
   t.onTestFinished(() => {
-    for (const name of ['r-ended', 'r-working', 'ended-c3-resent']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const name of ['r-ended', 'r-working', 'ended-c3-resent']) dropRecord(root, cardKey(name));
     for (const file of ['ended-c3.json', 'ended-c3.cancelled', 'working-d4.json']) fs.rmSync(path.join(runs, file), { force: true });
   });
   const post = (url: string, body: unknown) => app.request(url, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -374,11 +374,11 @@ test('POST a started card to resend: filed as <run>-resent in its namespace, han
   assert.deepEqual(answer.card.spec.from, ['ended-c3']);
   assert.deepEqual(answer.from, { card: 'r-ended', run: 'ended-c3' });
   assert.equal(answer.cancelled, undefined, 'a run that has ended is not cancelled again');
-  assert.ok(fs.existsSync(path.join(inbox, 'ended-c3-resent.md')));
+  assert.ok(cardText(root, 'ended-c3-resent') !== null);
 
   assert.equal((await post('/api/namespaces/default/cards/r-ended/resend', {})).status, 409, 'sent on once');
   assert.equal((await post('/api/namespaces/default/cards/r-working/resend', {})).status, 409, 'its run is still at work');
   assert.equal((await post('/api/namespaces/a/cards/r-working/resend', {})).status, 404);
   assert.equal((await post('/api/namespaces/default/cards/r-working/resend', { workflow: 'a/b' })).status, 422);
-  assert.ok(!fs.existsSync(path.join(inbox, 'working-d4-resent.md')), 'nothing filed for a refused card');
+  assert.ok(cardText(root, 'working-d4-resent') === null, 'nothing filed for a refused card');
 });

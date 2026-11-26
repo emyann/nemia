@@ -16,7 +16,7 @@ import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import type { Running } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, keysUnder } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, cardNames, keysUnder } from 'agent-orchestrator/testing';
 import type { Card, CardList, Factory } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
@@ -60,7 +60,7 @@ describe('on an install, a card is placed by its factory, or filed with no repos
     );
   });
   s.test('the card in mill is labelled and queued on the install', async () => {
-    [filed] = fs.readdirSync(path.join(root, 'inbox'));
+    [filed] = cardNames(root).map((n) => `${n}.md`);
     assert.ok(filed);
     name = filed.replace(/\.md$/, '');
     const labelled = await send(`/api/namespaces/mill/cards/${name}/labels`, 'POST', { labels: ['team=core'] });
@@ -102,10 +102,10 @@ describe('on an install, a card is placed by its factory, or filed with no repos
     },
   );
   s.test('REFUSED: a card sent with a repo is 422, the repo being retired, nothing filed', async () => {
-    const before = fs.readdirSync(path.join(root, 'inbox')).length;
+    const before = cardNames(root).length;
     const res = await send('/api/namespaces/default/cards', 'POST', { body: 'On the mill.', repo: millRepo, workflow: 'dev' });
     assert.equal(res.status, 422, await res.clone().text());
-    assert.equal(fs.readdirSync(path.join(root, 'inbox')).length, before);
+    assert.equal(cardNames(root).length, before);
   });
   s.test("REFUSED: a card's start that names ?repo= is 422, naming the attach, no run started", async () => {
     const res = await send(`/api/namespaces/mill/cards/${name}/start?repo=${encodeURIComponent(millRepo)}`, 'POST', {});

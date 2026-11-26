@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { cardText as heldText, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo } from 'agent-orchestrator';
 import type { CardList } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -57,7 +57,7 @@ const listed = async () => {
   return ((await res.json()) as CardList).items.map((c) => [c.metadata.name, c.status.state]).sort(([a], [b]) => a.localeCompare(b));
 };
 
-const cardText = () => fs.readFileSync(path.join(root, 'inbox', `${CARD}.md`), 'utf8');
+const cardText = () => heldText(root, CARD) ?? '';
 
 test("a started card reads its run's phase, read now: running while its run works, and its run's end once it ended, with nothing written on the card", async () => {
   Effect.runSync(engine().file({ id: `t-${RUN}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));

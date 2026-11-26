@@ -6,10 +6,10 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { Effect, Exit, Schema } from 'effect';
 import { Subscription, SubscriptionList } from 'objects';
-import { SubscriptionDoor, deliveryFileAt, subscriptionDoorFiles } from '../subscription/subscription.store.ts';
+import { SubscriptionDoor, deliveryKey, subscriptionDoorAt } from '../subscription/subscription.store.ts';
+import { plantRecord } from '../../testing.ts';
 import { subscriptionDoorMemory } from '../subscription/memory.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -102,14 +102,14 @@ test('a bad labelSelector or limit is Invalid', () => {
   assert.ok(failed(over(planted, subscriptionList({ limit: -1 }))) instanceof Invalid);
 });
 
-test('on the files, a delivery that does not read says why in status.error, and the file is born when it was put', () => {
+test('at a store, a delivery that does not read says why in status.error, and the subscription is born when it was put', () => {
   const root = scratch('subscription-object-');
   const program = Effect.gen(function* () {
     yield* planting({ subscriptions: { mill: aSubscription('nemia-1') } }, Effect.void);
-    fs.writeFileSync(deliveryFileAt(root, 'mill'), 'not json\n');
+    plantRecord(root, deliveryKey('mill'), 'not json\n');
     return yield* subscriptionObject('mill');
   });
-  const one = ok(Effect.runSyncExit(program.pipe(Effect.provide(subscriptionDoorFiles(root)), Effect.provideService(StoreRoot, root))));
+  const one = ok(Effect.runSyncExit(program.pipe(Effect.provide(subscriptionDoorAt(root)), Effect.provideService(StoreRoot, root))));
   Schema.decodeUnknownSync(Subscription)(one);
   assert.equal(one.status.cursor, 120);
   assert.equal(one.status.pending, 0);

@@ -78,7 +78,7 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
-import { stepToken } from '../token/token.store.ts';
+import { sessionTokenFor, stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
@@ -94,7 +94,7 @@ import {
   type StepTold,
   type Told,
 } from './told.verb.ts';
-import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
+import { found, inboxViewed, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
@@ -379,7 +379,9 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const brief = composed + heldSaid(pictured);
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd, askedOrMomentum(r));
-  yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told, pictured })));
+  yield* inboxViewed(f.home, f.run, step);
+  const token = yield* stepToken(f.run, step, taskId, r.try);
+  yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told, pictured, token })));
   return undefined;
 });
 
@@ -452,6 +454,7 @@ const trySpec = (
     budgetUsd: number | undefined;
     told: Told;
     pictured: PicturesFiled | undefined;
+    token: { readonly sessionToken?: string };
   },
 ) => ({
   id: t.taskId,
@@ -465,7 +468,7 @@ const trySpec = (
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
       ...filedAt(f.run, f.home, record.workspace ?? f.run.workspace),
-      ...stepToken(f.home, f.run, step, t.taskId, r.try),
+      ...t.token,
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
       ...picturesConfig(t.pictured),
@@ -519,7 +522,9 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
       deps: isRemoteHarness(target.harness) ? undefined : (yield* depsBefore(f, r.target, record.workspace ?? run.workspace))?.deps,
     };
-    yield* asked('file', e.file(roundSpec(home, f, r, looping, target, taskId, yield* toldOf(run, target), said)));
+    yield* inboxViewed(home, run, target);
+    const token = yield* stepToken(run, target, taskId, tryOf(run, r.target) + 1);
+    yield* asked('file', e.file(roundSpec(home, f, r, looping, target, taskId, yield* toldOf(run, target), said, token)));
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
   if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
@@ -554,6 +559,7 @@ function roundSpec(
   taskId: string,
   told: StepTold,
   said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts; deps?: Provisioned },
+  token: { readonly sessionToken?: string },
 ) {
   const { run, reads } = f;
   const record = recordNamed(run, r.target);
@@ -595,7 +601,7 @@ function roundSpec(
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
         ...filedAt(run, f.home, record.workspace ?? run.workspace),
-        ...stepToken(f.home, run, target, taskId, tryOf(run, r.target) + 1),
+        ...token,
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
           stepSpend(run, r.target, reads.spendOf),
@@ -706,7 +712,7 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
       ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
     }),
     WF_CHECK: check.name,
-    [SESSION_TOKEN]: stepToken(home, run, step, taskId, tryOf(run, name)).sessionToken,
+    [SESSION_TOKEN]: yield* sessionTokenFor(run, step, taskId, tryOf(run, name)),
   };
   yield* asked(
     'file',
@@ -786,9 +792,12 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       targets: landing.targets,
     };
     const pictured = picturesFor(home, f, step);
-    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said, pictured))).pipe(
-      forStep(run, step),
-    );
+    yield* inboxViewed(home, run, step);
+    const token = yield* stepToken(run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name));
+    const taskId = yield* asked(
+      'file',
+      e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said, token, pictured)),
+    ).pipe(forStep(run, step));
     run.steps[name] = {
       ...run.steps[name],
       taskId,
@@ -852,6 +861,7 @@ function readySpec(
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
   },
+  token: { readonly sessionToken?: string },
   pictured?: PicturesFiled,
 ) {
   const { parents, closeoutOf } = said;
@@ -895,7 +905,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         ...filedAt(run, f.home, place.workspace),
-        ...stepToken(f.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
+        ...token,
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],

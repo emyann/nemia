@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { expectKeys, expectRendered, expectSource, filesIn, placeLitOf, placeOf, sidebar } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
@@ -38,7 +39,7 @@ export default {
         `/api/namespaces/${FACTORIES.hiring.name}/workflows/${good.name}/steps/review?origin=repo`,
         good.review.keys,
       );
-      await expectSource(file, body, path.join(folder, 'review.md'));
+      await expectSource(file, body, path.join(folder, 'review.md'), fs.readFileSync(path.join(folder, 'review.md'), 'utf8'));
       if (JSON.stringify(filesIn(folder)) !== JSON.stringify(before))
         throw new Refused(`a step's page writes nothing — ${folder} changed while it was open`);
     } finally {

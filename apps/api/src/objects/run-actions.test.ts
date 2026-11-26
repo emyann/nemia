@@ -21,9 +21,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { askKeyOf, plantAsk, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { askKeyOf, cardText, plantAsk, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
-import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { OBJECT_BODY_LIMIT } from './serve.ts';
 import { objectOf } from '../../test/run-reads.ts';
@@ -277,7 +277,7 @@ const operatorToken = () =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint('ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 /** The token of the session of `step` of run `id`, its task `task`, as the store mints it when it files the try. */
@@ -285,7 +285,7 @@ const sessionToken = (id: string, step: string, task: string) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({ agent: 'reviewer', factory: null, run: id, step, attempt: 1, task });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 describe('each write keeps who acted, by the token its request presented, and the run serves it where the write is read', () => {
@@ -343,7 +343,7 @@ describe('each write keeps who acted, by the token its request presented, and th
     const sent = await answered(await send('POST', '/api/namespaces/default/cards/resend-me/resend', { workflow: 'deliver' }));
     assert.equal(sent.status, 201, JSON.stringify(sent.body));
     assert.equal(sent.body.cancelled, 'ra-by-resent', 'the run that waited is called off');
-    assert.ok(fs.existsSync(path.join(root, 'inbox', 'ra-by-resent-resent.md')), 'the card is filed');
+    assert.ok(cardText(root, 'ra-by-resent-resent') !== null, 'the card is filed');
     const called = await status('ra-by-resent');
     assert.equal(typeof called.cancelledAt, 'string', 'the next read judges it called off');
     assert.deepEqual(called.cancelledBy, person, 'kept as who sent the card on');

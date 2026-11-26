@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { Cause, Effect, Layer, Logger } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest } from '../../test/placed.ts';
-import { CardDoor, cardDoorOver, type CardLayer } from '../cards/cards.store.ts';
+import { CardDoor, cardDoorOver, type CardDoorShape } from '../cards/cards.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
 import { landedThrough, startQueued, waitingOf } from './inbox.verb.ts';
 import { engineOf } from '../runtime-client.ts';
@@ -31,24 +31,22 @@ const tried: MissedStart = { at: '2026-11-05T10:00:00.000Z', text: '# Gone\n', r
 
 /** A Card door with no card, one try of a card no longer queued, and a disk that refuses to remove it. */
 const stuckTries = () => {
-  const layer: CardLayer = {
+  const layer: CardDoorShape = {
     cards: {
-      entries: () => [],
-      read: () => null,
-      filedAt: () => null,
-      entryAt: () => null,
-      entryText: () => null,
-      add: () => '/memory/inbox/never.md',
-      rewrite: () => undefined,
-      drop: () => false,
-      where: (name) => `/memory/inbox/${name}.md`,
+      entries: () => Effect.succeed([]),
+      read: () => Effect.succeed(null),
+      filedAt: () => Effect.succeed(null),
+      entryAt: () => Effect.succeed(null),
+      entryText: () => Effect.succeed(null),
+      add: () => Effect.succeed('/registry/cards/never'),
+      rewrite: () => Effect.void,
+      drop: () => Effect.succeed(false),
+      where: (name) => Effect.succeed(`/registry/cards/${name}`),
     },
     tries: {
-      list: () => new Map([['gone', tried]]),
-      put: () => undefined,
-      drop: () => {
-        throw new Error('EACCES: permission denied, unlink queue/gone.json');
-      },
+      list: () => Effect.succeed(new Map([['gone', tried]])),
+      put: () => Effect.void,
+      drop: () => Effect.die(new Error('EACCES: permission denied, unlink queue/gone.json')),
     },
   };
   return Layer.succeed(CardDoor)(cardDoorOver(layer));

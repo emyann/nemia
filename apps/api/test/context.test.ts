@@ -14,7 +14,7 @@ import type { Card } from 'objects';
 import { addToInbox, StoreRoot } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { cardText, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor } from './placed.ts';
 import { objectOf, toldOf } from './run-reads.ts';
 
@@ -90,7 +90,6 @@ describe("context without a wait: a run's concluded section read, a card's from:
     async () => {
       writeRun({ id: 'source-f1' });
       const { card } = onStore(addToInbox({ text: 'Read what source-f1 concluded' }));
-      const file = path.join(root, 'inbox', `${card.name}.md`);
       const at = `/api/namespaces/default/cards/${card.name}`;
       const read = (await (await app().request(at)).json()) as Card;
       const put = (from: string[]) =>
@@ -103,18 +102,18 @@ describe("context without a wait: a run's concluded section read, a card's from:
       const set = await put(['source-f1']);
       assert.equal(set.status, 200);
       assert.deepEqual(((await set.json()) as Card).spec.from, ['source-f1']);
-      assert.match(fs.readFileSync(file, 'utf8'), /^from: source-f1$/m);
+      assert.match(cardText(root, card.name) ?? '', /^from: source-f1$/m);
 
-      const before = fs.readFileSync(file, 'utf8');
+      const before = cardText(root, card.name) ?? '';
       const unknown = await put(['nobody-z9']);
       assert.equal(unknown.status, 404);
       assert.match(((await unknown.json()) as { error: string }).error, /nobody-z9/);
-      assert.equal(fs.readFileSync(file, 'utf8'), before, 'a refused from: writes nothing');
+      assert.equal(cardText(root, card.name) ?? '', before, 'a refused from: writes nothing');
 
       const off = await put([]);
       assert.equal(off.status, 200);
       assert.equal(((await off.json()) as Card).spec.from, undefined);
-      assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^from:/m);
+      assert.doesNotMatch(cardText(root, card.name) ?? '', /^from:/m);
     },
   );
   s.test(

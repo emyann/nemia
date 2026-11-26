@@ -35,6 +35,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { Effect } from 'effect';
 
 /** Where the fake `claude` is, first on PATH. */
 export const bin = scratch('nemia-api-harness-');
@@ -117,7 +118,7 @@ process.env.HOME = away;
  * address its api listens on, the store marked exposed): a test that means one sets it itself. The package is imported here, after
  * every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
  */
-const { SERVING_VARIABLES, SESSION_VARIABLES, tokenDigest } = await import('agent-orchestrator');
+const { SERVING_VARIABLES, SESSION_VARIABLES, TokenDoor, tokenDigest, tokenDoorAt } = await import('agent-orchestrator');
 for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.env[name];
 
 /**
@@ -135,15 +136,27 @@ export const SEATED = { kind: 'person', token: 'harness' } as const;
 export const NO_TOKEN = { 'x-harness-token': 'none' } as const;
 
 /**
- * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by (`person-tokens/<digest>.json`),
- * so an app over a store of a test's own takes it too. Idempotent.
+ * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by
+ * (`/registry/persontokens/<digest>`), so an app over a store of a test's own takes it too: dropped as the file of before
+ * (`person-tokens/<digest>.json`) and read once through the Token door, whose import takes it up now rather than in a test. Idempotent.
+ * @param home The store's root folder.
  */
 export function seatPerson(home: string) {
+  const digest = tokenDigest(PERSON_TOKEN);
+  const read = () =>
+    Effect.runSync(
+      Effect.gen(function* () {
+        const door = yield* TokenDoor;
+        return yield* door.persons.read(digest);
+      }).pipe(Effect.provide(tokenDoorAt(home))),
+    );
+  if (read() !== null) return;
   const dir = path.join(home, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${tokenDigest(PERSON_TOKEN)}.json`);
-  if (!fs.existsSync(file))
-    fs.writeFileSync(file, `${JSON.stringify({ name: 'harness', createdAt: '2026-01-01T00:00:00.000Z' })}\n`, { mode: 0o600 });
+  fs.writeFileSync(path.join(dir, `${digest}.json`), `${JSON.stringify({ name: 'harness', createdAt: '2026-01-01T00:00:00.000Z' })}\n`, {
+    mode: 0o600,
+  });
+  read();
 }
 seatPerson(root);
 

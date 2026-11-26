@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
+import { cardNames } from 'agent-orchestrator/testing';
 import { configWritten } from '../src/context.ts';
 import { type Said, servedStore, write } from './served.ts';
 
@@ -126,10 +127,9 @@ test("REFUSED: a card of the daemon's inbox that names no workflow, started with
   execFileSync('git', ['init', '-q'], { cwd: press });
   await typed(env, ['factory', 'add', 'press', '--volume', `${press}:rw`]);
   write(path.join(HERE, 'bare.md'), 'Show the flag\n\nNo workflow named.\n');
-  const before = Object.keys(filesOf(path.join(exposed.root, 'inbox')));
+  const before = cardNames(exposed.root);
   await typed(env, ['inbox', 'add', 'bare.md', '--factory', 'press']);
-  const [made = ''] = Object.keys(filesOf(path.join(exposed.root, 'inbox'))).filter((f) => f.endsWith('.md') && !before.includes(f));
-  const name = path.basename(made, '.md');
+  const [name = ''] = cardNames(exposed.root).filter((n) => !before.includes(n));
   assert.ok(name, 'the card is filed there');
   const started = await typed(env, ['start', name], 2);
   assert.ok(started.err.includes(`nemia start ${name} --workflows`), started.err);

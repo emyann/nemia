@@ -11,12 +11,18 @@ import { test } from 'vitest';
 import { drift, fingerprint, leftOver } from './e2e/print.ts';
 import { scratch } from 'test-kit/scratch';
 
-/** A store with a run, a card and a repository, as the seed writes them. */
+/** The record of a card in the keyspace, `text` filed at a fixed time. */
+const cardRecord = (text: string) => JSON.stringify({ text, filedAt: '2026-10-01T00:00:00.000Z' });
+
+/**
+ * A store with a run, a card and a repository, as a worker prints it: the card the seed dropped into its inbox taken up, a record of the
+ * keyspace, its file moved aside under `imported/`.
+ */
 function store() {
   const root = scratch('nemia-e2e-print-');
   for (const [rel, text] of Object.entries({
     'runs/r1.json': '{"id":"r1"}\n',
-    'inbox/c1.md': 'a card\n',
+    'imported/inbox/c1.md': 'a card\n',
     'checkout/README.md': 'hello\n',
     'checkout/.git/HEAD': 'ref: refs/heads/main\n',
     'bin/claude': '#!/bin/sh\n',
@@ -24,6 +30,7 @@ function store() {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), text);
   }
+  keyspaceWith(root, [['/registry/cards/c1', cardRecord('a card\n'), false]]);
   return root;
 }
 
@@ -33,9 +40,15 @@ test('a store whose pages took back what they wrote passes, the same bytes writt
   const root = store();
   const before = fingerprint(root);
   fs.writeFileSync(path.join(root, 'runs', 'r1.json'), '{"id":"r1","held":true}\n');
-  fs.writeFileSync(path.join(root, 'inbox', 'c2.md'), 'another\n');
+  keyspaceWith(root, [
+    ['/registry/cards/c2', cardRecord('another\n'), false],
+    ['/registry/cards/c1', '', true],
+  ]);
   fs.writeFileSync(path.join(root, 'runs', 'r1.json'), '{"id":"r1"}\n');
-  fs.rmSync(path.join(root, 'inbox', 'c2.md'));
+  keyspaceWith(root, [
+    ['/registry/cards/c2', '', true],
+    ['/registry/cards/c1', cardRecord('a card\n'), false],
+  ]);
   assert.equal(leftOver(before, fingerprint(root), PAGES), null);
 });
 
@@ -43,10 +56,10 @@ test('REFUSED: a file a page changed, added or removed and left so, each named, 
   const root = store();
   const before = fingerprint(root);
   fs.writeFileSync(path.join(root, 'runs', 'r1.json'), '{"id":"r1","held":true}\n');
-  fs.writeFileSync(path.join(root, 'inbox', 'c2.md'), 'another\n');
+  keyspaceWith(root, [['/registry/cards/c2', cardRecord('another\n'), false]]);
   fs.rmSync(path.join(root, 'checkout', 'README.md'));
   const after = fingerprint(root);
-  assert.deepEqual(drift(before, after), ['removed checkout/README.md', 'added inbox/c2.md', 'changed runs/r1.json']);
+  assert.deepEqual(drift(before, after), ['removed checkout/README.md', 'changed db/state.db', 'changed runs/r1.json']);
   const why = leftOver(before, after, PAGES);
   assert.ok(why !== null, 'a write left in the store is refused');
   assert.match(why, /^a page left a write in the store it did not take back, removed checkout\/README\.md and 2 more, /);

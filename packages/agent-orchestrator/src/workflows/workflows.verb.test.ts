@@ -5,7 +5,7 @@
  * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
  * given as `ENV`.
  */
-import { runsNow } from '../../testing.ts';
+import { cardKey, dropRecord, runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -326,8 +326,7 @@ test('REFUSED: a card queued on the folder, freed by the commands its refusal na
   cardOn('idle-idea', idle, false);
   await remove(idle);
   assert.equal(fs.existsSync(idle), false);
-  fs.rmSync(path.join(ROOT, 'inbox', 'queued-idea.md'));
-  fs.rmSync(path.join(ROOT, 'inbox', 'idle-idea.md'));
+  for (const name of ['queued-idea', 'idle-idea']) dropRecord(ROOT, cardKey(name));
 });
 
 test('REFUSED: a factory offering the name with nothing else to give under it, and neither one whose repository has the workflow nor one offering another name does', async () => {

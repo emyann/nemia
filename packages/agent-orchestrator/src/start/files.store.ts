@@ -8,12 +8,12 @@
  * (`read`), and a record that carries one names it by its pointer (`pointer`, objects' `FilePointer`), which the keyspace holds to a live
  * File.
  *
- * Every File no inbox card names is let go of `FILE_KEPT_FOR` after it was uploaded (`pruned`, which each upload and each card's removal
- * asks first, as `fileLetGo` decides): its record deleted through the keyspace, which refuses while a live record points to it
- * (`referenced`, the File kept), then its bytes. The same pass removes bytes and parts no live record names that are older than a day,
- * what a write cut off between its bytes and its record left: read afresh on each pass, nothing carried between them. A run copies what it
- * is handed into its own `inputs/`, so a File let go of takes nothing from a run, and a card keeps its Files while its text names their
- * ids.
+ * Every File no inbox card names — a card's record, or a card file not yet taken up — is let go of `FILE_KEPT_FOR` after it was
+ * uploaded (`pruned`, which each upload and each card's removal asks first, as `fileLetGo` decides): its record deleted through the
+ * keyspace, which refuses while a live record points to it (`referenced`, the File kept), then its bytes. The same pass removes bytes and
+ * parts no live record names that are older than a day, what a write cut off between its bytes and its record left: read afresh on each
+ * pass, nothing carried between them. A run copies what it is handed into its own `inputs/`, so a File let go of takes nothing from a run,
+ * and a card keeps its Files while its text names their ids.
  *
  * An Effect service, `FileDoor`, its default rooted (`rootedDoor`) as the Proposal door's is; a test gives it `fileDoorMemory(root)`
  * (`memory.store.ts`), the same code over an in-memory keyspace, its bytes under the root it is given. Both are built by `fileRecords`,
@@ -81,9 +81,13 @@ const entriesOf = (dir: string) => {
   }
 };
 
+/** The keyspace's prefix of every card of the inbox (`src/cards/cards.store.ts`), whose text a prune reads for the Files it names. */
+const CARDS = '/registry/cards/';
+
 /**
- * Every File id written in any entry of the store's inbox, a card that does not read included, so a card nobody can parse loses none of
- * its Files; read afresh on each prune, nothing carried between them.
+ * Every File id written in any entry of the store's inbox not yet taken up as a card's record, a card that does not read included, so a
+ * card nobody can parse loses none of its Files; read afresh on each prune, nothing carried between them. The cards' records are read
+ * beside it, and each points to the Files its text names, which the keyspace keeps while it stands.
  * @param home The store's root.
  */
 function namedByCards(home: string) {
@@ -207,6 +211,8 @@ const prunedIn = (held: Held, home: string, now: number) =>
   Effect.gen(function* () {
     const named = namedByCards(home);
     const keyspace = yield* held;
+    for (const card of keyspace === undefined ? [] : (yield* keyspace.list(CARDS)).records)
+      for (const id of card.value.match(FILE_IDS) ?? []) named.add(id);
     const records = keyspace === undefined ? [] : (yield* keyspace.list(PREFIX)).records;
     const gone: string[] = [];
     const live = new Set<string>();

@@ -130,6 +130,10 @@ export const programsOnce = Effect.fn('programsOnce')(function* () {
     const d = declared.find((one) => one.id === id);
     if (d !== undefined) yield* asked('file', e.file(programSpec(d, yield* programToken(d), home)));
   }
+  for (const h of held.filter((one) => one.settled && declared.some((d) => d.id === one.id)))
+    yield* Effect.logWarning(
+      `The program task ${h.id} is down and the runtime will not restart it: change its \`run:\` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon after \`nemia rm\` of the task.`,
+    );
   for (const id of due.stop) yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
   return due;
 });

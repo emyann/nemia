@@ -127,3 +127,22 @@ export const writtenFor = (run: Pick<Run, 'steps'>, step: string, name: string) 
  */
 export const standingOfCondition = (run: Pick<Run, 'steps'>, step: string, name: string) =>
   conditionStanding(writtenFor(run, step, name), (run.steps[step]?.tries?.length ?? 0) + 1);
+
+/**
+ * What a step says while its checks wait on conditions that are not decided: for each, that it is not written for this try, or written
+ * Unknown with its message, and what to do next, that the program of its factory that writes it runs (its task's id begins `program-`,
+ * `nemia ls`) or a person writes it (`nemia condition`). Empty where every condition is decided.
+ * @param run The run, whose step record holds what was written for the try the step is on.
+ * @param runId The run's id, which the command to type names.
+ * @param step The step's name.
+ * @param names The conditions the step's checks wait on.
+ */
+export const conditionWaitWords = (run: Pick<Run, 'steps'>, runId: string, step: string, names: readonly string[]) =>
+  names
+    .filter((name) => standingOfCondition(run, step, name) === 'running')
+    .map((name) => {
+      const written = writtenFor(run, step, name);
+      const said = written === null ? 'not written for this try' : `written Unknown${written.message === '' ? '' : `: ${written.message}`}`;
+      return `waits on condition ${name}, ${said}: its writer runs in the factory (a task \`program-…\` in \`nemia ls\`), or write it: nemia condition ${runId} ${step} ${name} --status True`;
+    })
+    .join(' · ');

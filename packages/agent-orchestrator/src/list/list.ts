@@ -6,7 +6,8 @@ import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
-import type { StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
+import { conditionWaitWords } from '../condition/condition.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/index.ts';
 import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
@@ -487,7 +488,18 @@ function listedSteps(
       return { name, message: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
-    if (judged) return { name, ...judged, branch };
+    if (judged) {
+      const waits =
+        status === 'checking'
+          ? conditionWaitWords(
+              run,
+              run.id,
+              name,
+              stepChecks(step).flatMap((c) => (c.condition === undefined ? [] : [c.condition])),
+            )
+          : '';
+      return { name, ...judged, ...(waits ? { note: [('note' in judged ? judged.note : ''), waits].filter(Boolean).join(' · ') } : {}), branch };
+    }
 
     return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }

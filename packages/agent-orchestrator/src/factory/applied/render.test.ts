@@ -234,6 +234,30 @@ describe("what a render writes into a factory's tree, read back as today's folde
       "a name the template writes that is no server's is refused as the step file is read, as its own line would be",
     );
   });
+  test("a step's mcp: rendered from a parameter names the server it is given, and a parameter left empty writes no line", () => {
+    const { dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { server: { type: 'string', description: 'the server the review reads', default: '' } };
+    });
+    edit(dir, 'agents/reviewer/agent.yaml', (spec) => {
+      spec.overridable = ['output', 'skills', 'mcp'];
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      const step = spec.steps.find((one: { name: string }) => one.name === 'review');
+      step.overrides = { ...step.overrides, mcp: ['${{ parameters.server }}'] };
+    });
+    const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+    const blank = rendered(dir);
+    assert.deepEqual(blank.out.refusals, []);
+    assert.doesNotMatch(fs.readFileSync(path.join(blank.tree, 'workflows/dev/review.md'), 'utf8'), /^mcp:/m);
+    const unset = loadWorkflows(path.join(blank.tree, 'workflows', 'dev'), {}, fills).find((s) => s.name === 'review');
+    assert.equal(unset?.mcp, undefined);
+    const set = rendered(dir, ['server=docs']);
+    assert.deepEqual(set.out.refusals, []);
+    assert.match(fs.readFileSync(path.join(set.tree, 'workflows/dev/review.md'), 'utf8'), /^mcp: docs$/m);
+    const named = loadWorkflows(path.join(set.tree, 'workflows', 'dev'), {}, fills).find((s) => s.name === 'review');
+    assert.deepEqual(named?.mcp, ['docs']);
+  });
   test("an agent's overridable: line has its place in a template: exported in the agent's spec, rendered back as the line it was, and none stays none", () => {
     const repo = scratch('wf-render-repo-');
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));

@@ -218,12 +218,16 @@ release for the machine into Nemia's tools folder, its sum checked, no sudo); an
 https://github.com/login/device, then `gh auth setup-git`. The third, `git-identity`, fills the git place's need of the same name: its
 first fix sets git's name and email from the account gh is signed in to, the email its noreply address
 `<id>+<login>@users.noreply.github.com` (`needs.ts identity`); the place's own fix, which asks for a name and an email, comes after it.
-The fourth, `browser`, holds either way and says `scope: repository`, so it is checked and fixed in the factory's repository: `needs.ts
+The fourth, `ci-server`, holds only where the `ciServer` parameter names an MCP server, the one implement loads (its `mcp:` line, which a blank
+parameter leaves out) to read a red CI's runs and job logs: its check asks the api whether the factory has added it (`nemia get
+mcpservers/<name> -n "$WF_FACTORY"`, the factory a workflow's check is told), and it has no fix to start, since a server is added and
+signed in by a person, on the factory's settings page; a workflow with it unmet still loads, its runs held as by any need.
+The fifth, `browser`, holds either way and says `scope: repository`, so it is checked and fixed in the factory's repository: `needs.ts
 browser` resolves there the `playwright-core` the steps' browser tools run (the one `@playwright/mcp` resolves, else the repository's
 own) and is met where its `chromium.executablePath()` is on disk, the build named where it is not; where the repository holds neither,
 any Chromium where Playwright looks meets it. Its fix, `needs.ts browser --install`, runs that `playwright-core`'s own installer
 (`cli.js install chromium`), so the build installed is the one the tools launch, not the one another Playwright of the repository
-wants. `quick` declares the same four.
+wants. `quick` declares the same five.
 
 **Measured: the sign-in with no terminal.** A fix runs with no terminal, so the sign-in gives gh `</dev/null`. On 2026-11-12, `gh auth
 login --hostname github.com --git-protocol https --web --scopes workflow </dev/null` was run with no TTY, in a throwaway

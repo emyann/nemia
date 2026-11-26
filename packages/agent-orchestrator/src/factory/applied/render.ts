@@ -239,12 +239,16 @@ function routeEvalOf(route: unknown) {
 }
 
 /**
- * Whether `key` is a step's `checkMemory:`, `memoryRequest:` or `relabel:` that renders blank, as an empty parameter writes it: no line,
- * so the check or the sessions ask the daemon's default request and the node edits no label. A blank `checkMemory:` or `memoryRequest:`
- * in a person's step file is still refused by the parser.
+ * Whether `key` is a step's `checkMemory:`, `memoryRequest:`, `relabel:` or `mcp:` that renders blank, as an empty parameter writes it:
+ * no line, so the check or the sessions ask the daemon's default request, the node edits no label and the step adds no server to its
+ * agent's. A blank `checkMemory:`, `memoryRequest:` or `mcp:` in a person's step file is still refused by the parser.
  */
 const blankAsked = (key: string, value: unknown) =>
-  (key === 'checkMemory' || key === 'memoryRequest' || key === 'relabel') && lineOf(value).replaceAll(',', '').trim() === '';
+  (key === 'checkMemory' || key === 'memoryRequest' || key === 'relabel' || key === 'mcp') &&
+  lineOf(value).replaceAll(',', '').trim() === '';
+
+/** A step's `mcp:` override as its line, none where it says none or renders blank (`blankAsked`). */
+const mcpLineOf = (mcp: unknown) => (mcp === undefined || blankAsked('mcp', mcp) ? {} : { mcp: lineOf(mcp) });
 
 /** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
 const policyOf = (step: string, policy: unknown) =>
@@ -275,7 +279,7 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);
-  if (overrides.mcp !== undefined) keys.mcp = lineOf(overrides.mcp);
+  Object.assign(keys, mcpLineOf(overrides.mcp));
   Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, read, refusals));
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   const route = routeEvalOf(step.route);

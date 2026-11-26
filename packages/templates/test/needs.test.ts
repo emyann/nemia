@@ -4,6 +4,8 @@
  * the PATH, signed in with the `workflow` scope, and a git identity, which the account fills; where it is false nothing of GitHub holds
  * a run: the two gh checks are met, whatever the machine has. Either way a run needs the Chromium the steps' browser tools open
  * (`browser`), checked and fixed in the factory's repository (`scope: repository`) by the carried `needs.ts`, whose fix the server runs.
+ * Where `ciServer` names an MCP server, a run needs its factory to have added it (`ci-server`), asked of the api by `nemia get`; where it
+ * is empty, nothing.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -54,7 +56,7 @@ for (const github of [true, false]) {
       const needs = needsOf(tree, workflow);
       assert.deepEqual(
         needs.map((need) => need.name),
-        ['gh', 'gh-sign-in', 'git-identity', 'browser'],
+        ['gh', 'gh-sign-in', 'git-identity', 'ci-server', 'browser'],
         workflow,
       );
       const of = (name: string) => needs.find((need) => need.name === name);
@@ -95,4 +97,44 @@ test("build and quick declare a browser checked in the repository by the browser
     ...(LANDING.map((workflow) => needsOf(tree, workflow).find((need) => need.name === 'browser')) as [unknown, unknown]),
     'build and quick say the one need',
   );
+});
+
+/**
+ * The exit of `check` run as the sweep runs a workflow's, told its factory (`WF_FACTORY`), on a PATH whose `nemia` answers a get of the
+ * servers `added` and refuses any other, writing each call's words to `calls`.
+ */
+function checkedWith(check: string, added: readonly string[], calls: string) {
+  const bin = scratch('nemia-needs-bin-');
+  fs.writeFileSync(
+    path.join(bin, 'nemia'),
+    [
+      '#!/bin/sh',
+      `echo "$*" >> '${calls}'`,
+      ...added.map((name) => `[ "$1 $2 $3 $4" = "get mcpservers/${name} -n acme" ] && exit 0`),
+      'exit 1',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  return spawnSync('/bin/sh', ['-c', check], {
+    cwd: scratch('nemia-needs-cwd-'),
+    env: { PATH: `${bin}:/usr/bin:/bin`, HOME: scratch('nemia-needs-home-'), WF_FACTORY: 'acme' },
+    timeout: 30_000,
+  }).status;
+}
+
+test('ci-server is missing where the factory has not added the server ciServer names, met once it has, and met with no ask where ciServer is empty', async () => {
+  const named = await renderedSdlc(['github=true', 'ciServer=github']);
+  const empty = await renderedSdlc(['github=true']);
+  for (const workflow of LANDING) {
+    const check = needsOf(named.tree, workflow).find((need) => need.name === 'ci-server')?.check ?? 'exit 9';
+    const calls = path.join(scratch('nemia-needs-calls-'), 'calls');
+    assert.notEqual(checkedWith(check, [], calls), 0, `${workflow}: a factory that has not added github is told the need`);
+    assert.equal(checkedWith(check, ['github'], calls), 0, `${workflow}: met once the factory has added it`);
+    assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n'), Array(2).fill('get mcpservers/github -n acme -o name'));
+    const none = path.join(scratch('nemia-needs-calls-'), 'calls');
+    const unnamed = needsOf(empty.tree, workflow).find((need) => need.name === 'ci-server')?.check ?? 'exit 9';
+    assert.equal(checkedWith(unnamed, [], none), 0, `${workflow}: no server named, nothing needed`);
+    assert.equal(fs.existsSync(none), false, `${workflow}: and the api is not asked`);
+  }
 });

@@ -58,8 +58,8 @@ const FRAME_GROUND = 'surface-container-low';
 
 /**
  * The noise a tile's turbulence draws at the measure's `GRAIN_TAIL`, by its `baseFrequency`: what the red channel of `feTurbulence`
- * reaches on all but that share of the tile's pixels. Back-solved once from the measure of 2026-11-22, the outline grey `#8e8f95` read
- * as `#707175` under the label tile (0.9) and `#f3f1f3` as `#d4d3d4` under the frame's tile of then (0.8, `0.3 … -0.12`), so a
+ * reaches on all but that share of the tile's pixels. Back-solved from the board's measure, which read the outline grey `#8e8f95`
+ * as `#707175` under the label tile (0.9) and `#f3f1f3` as `#d4d3d4` under a frame's former tile (0.8, `0.3 … -0.12`), so a
  * change of a tile's weight moves the far end with it, and a frequency not measured is refused.
  */
 const NOISE_AT_TAIL = new Map([
@@ -188,7 +188,9 @@ export function farOf(css: string, tile: string, scheme: Scheme) {
   const frequency = Number(/baseFrequency="([\d.]+)"/.exec(svg)?.[1]);
   const noise = NOISE_AT_TAIL.get(frequency);
   if (noise === undefined)
-    throw new Error(`--grain-${tile} draws at baseFrequency ${frequency}, unmeasured: run the contrast measure and add it to NOISE_AT_TAIL`);
+    throw new Error(
+      `--grain-${tile} draws at baseFrequency ${frequency}, unmeasured: run the contrast measure and add it to NOISE_AT_TAIL`,
+    );
   const values = (/values="([^"]+)"/.exec(svg)?.[1] ?? '').trim().split(/\s+/).map(Number);
   if (values.length !== 20) throw new Error(`--grain-${tile}'s feColorMatrix writes ${values.length} values, not 20`);
   const speck = [255 * values[4], 255 * values[9], 255 * values[14]] satisfies Rgb;
@@ -311,15 +313,22 @@ for (const scheme of ['light', 'dark'] as const)
 test("REFUSED: rest's tint written in the stylesheet as the theme's outline, apart from the rulebook's bullet, is named", () => {
   const sage = sageOf(
     [
-      '- **Rest** is the label\'s grey. A step that is done is filled in sage: `#9aa3ad`, ink `#0c0d0e` dark;',
+      "- **Rest** is the label's grey. A step that is done is filled in sage: `#9aa3ad`, ink `#0c0d0e` dark;",
       '  `#6b6e72`, ink `#ffffff` light.',
       '',
     ].join('\n'),
   );
   assert.equal(sage.dark.get('sage'), '#9aa3ad');
   assert.equal(sage.light.get('on-sage'), '#ffffff');
-  const roles = { light: new Map<string, Rgb>([['outline', [0x74, 0x77, 0x7b]]]), dark: new Map<string, Rgb>([['outline', [0x8e, 0x8f, 0x95]]]) };
-  const css = [':root { --meaning-sage: var(--md-sys-color-outline); --meaning-on-sage: #ffffff; }', DARK, '{ :root { --meaning-on-sage: #0c0d0e; } }'].join('\n');
+  const roles = {
+    light: new Map<string, Rgb>([['outline', [0x74, 0x77, 0x7b]]]),
+    dark: new Map<string, Rgb>([['outline', [0x8e, 0x8f, 0x95]]]),
+  };
+  const css = [
+    ':root { --meaning-sage: var(--md-sys-color-outline); --meaning-on-sage: #ffffff; }',
+    DARK,
+    '{ :root { --meaning-on-sage: #0c0d0e; } }',
+  ].join('\n');
   assert.deepEqual(apartFrom(sage, writtenOf(css), roles), [
     'light sage: var(--md-sys-color-outline), #6b6e72',
     'dark sage: var(--md-sys-color-outline), #9aa3ad',
@@ -353,7 +362,9 @@ test("REFUSED: a grain's far end is read from its tile, and a tile unwritten or 
     [0xd4, 0xd2, 0xd4],
   );
   assert.throws(() => farOf(css, 'quiet', 'light'));
-  assert.throws(() => farOf(`:root { --grain-label: ${tile('0.7', '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.62 0 0 0 -0.24')}; }`, 'label', 'light'));
+  assert.throws(() =>
+    farOf(`:root { --grain-label: ${tile('0.7', '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.62 0 0 0 -0.24')}; }`, 'label', 'light'),
+  );
 });
 
 for (const scheme of ['light', 'dark'] as const)
@@ -375,5 +386,9 @@ for (const scheme of ['light', 'dark'] as const)
     const under = [...onLabels, ...onFrames]
       .filter(([, , read]) => read < THRESHOLD)
       .map(([ink, fill, read]) => `${ink} on ${fill}: ${read.toFixed(2)}:1`);
-    assert.deepEqual(under, [], `under ${THRESHOLD}:1 at the grain's far end (GRAIN_TAIL ${GRAIN_TAIL}), ${scheme}: say it to the person who owns DESIGN.md's values`);
+    assert.deepEqual(
+      under,
+      [],
+      `under ${THRESHOLD}:1 at the grain's far end (GRAIN_TAIL ${GRAIN_TAIL}), ${scheme}: say it to the person who owns DESIGN.md's values`,
+    );
   });

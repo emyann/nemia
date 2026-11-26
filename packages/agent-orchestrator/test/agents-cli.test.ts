@@ -23,7 +23,6 @@ import { anAgent as aDraft } from './agent-walks.ts';
 import { clearCustomInstructions, writeCustomInstructions } from '../src/custom/custom.store.ts';
 import { AGENTS_CUSTOM } from '../src/custom/custom.verb.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
-import { StoreRoot } from '../src/config/root.store.ts';
 import { agentsRead } from '../src/roster/roster.store.ts';
 import type { AgentsRead, CardRead } from '../src/roster/roster.ts';
 import { AgentDoor } from '../src/agents/agent-door.store.ts';
@@ -121,8 +120,8 @@ describe("nemia agents' handlers: both places read with what each agent can do, 
       Effect.gen(function* () {
         const door = yield* AgentDoor;
         yield* door.agents.write(AgentName.read('courier'), aDraft('courier'), undefined, { dir: MEMORY_AGENTS });
-        return yield* agentsRead({ repo, home: MEMORY_ROOT, revisions: { head: 1, of: () => 1, words: () => 1 } });
-      }).pipe(Effect.provide(Layer.merge(agentDoorMemory(), skillDoorMemory())), Effect.provideService(StoreRoot, MEMORY_ROOT)),
+        return yield* agentsRead({ repo, home: MEMORY_ROOT, revisions: { of: () => 1 } });
+      }).pipe(Effect.provide(Layer.merge(agentDoorMemory(), skillDoorMemory()))),
     );
     assert.deepEqual(
       read.agents.map(({ from, name, error, description }) => ({ from, name, error, description })),

@@ -300,13 +300,13 @@ test("each served resourceVersion is the number a run's start pins: past the fir
   );
   const second = kinds(await pinnedAtStart());
   assert.deepEqual(await served(), second, 'a start after the edit pins each at its new served revision');
-  assert.ok(second['workflow/mine']! > first['workflow/mine']!, 'the workflow moved past its first revision');
-  assert.ok(second['agent/implementer']! > first['agent/implementer']!, 'and so did the agent');
+  assert.ok(second['workflow/mine'] > first['workflow/mine'], 'the workflow moved past its first revision');
+  assert.ok(second['agent/implementer'] > first['agent/implementer'], 'and so did the agent');
   assert.equal(second['skill/notes'], first['skill/notes'], 'the skill nobody edited kept its revision');
   write(path.join(STORE, 'skills', 'notes', 'SKILL.md'), '---\nname: notes\ndescription: Keeps notes.\n---\nKeep notes, dated.\n');
   const third = kinds(await pinnedAtStart());
   assert.deepEqual(await served(), third, 'each served revision is the pin');
-  assert.ok(third['skill/notes']! > second['skill/notes']!, "a skill's edit moves its own revision");
-  assert.ok(third['agent/implementer']! > second['agent/implementer']!, "and the agent's, which gives it");
-  assert.ok(third['workflow/mine']! > second['workflow/mine']!, "and the workflow's, which names the agent");
+  assert.ok(third['skill/notes'] > second['skill/notes'], "a skill's edit moves its own revision");
+  assert.ok(third['agent/implementer'] > second['agent/implementer'], "and the agent's, which gives it");
+  assert.ok(third['workflow/mine'] > second['workflow/mine'], "and the workflow's, which names the agent");
 });

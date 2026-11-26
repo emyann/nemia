@@ -176,11 +176,17 @@ export const readsOf = (s: Served, dirs: readonly string[]) => s.inRequest(SKILL
  * reads them through its Skill door (`SKILLS_READ`).
  * @param s The request's services, its caller and the place it is answered in.
  * @param dir The skill's folder.
- * @param namespace The namespace the version, the skill's revision, is read in; none for the library's.
+ * @param revision The skill's revision, which a listing numbers once for all its skills; read for this skill alone where none is given.
+ * @param namespace The namespace the revision is read in; none for the library's.
  */
-export const skillShownAt = async (s: Served, dir: string, namespace?: string) => {
+export const skillShownAt = async (s: Served, dir: string, revision?: number, namespace?: string) => {
   const { version, files } = await s.inRequest(
-    SKILLS_READ.handler({ name: path.basename(dir), dir, ...(namespace !== undefined && { namespace }) }),
+    SKILLS_READ.handler({
+      name: path.basename(dir),
+      dir,
+      ...(namespace !== undefined && { namespace }),
+      ...(revision !== undefined && { version: String(revision) }),
+    }),
   );
   return { version, files };
 };

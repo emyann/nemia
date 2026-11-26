@@ -13,6 +13,7 @@ import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedOf } from '../factory/door/factories.store.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
+import { definitionRevisionsNow } from '../definition-index/definition-index.store.ts';
 import { agentRead } from '../roster/roster.store.ts';
 import { tryAgent } from '../try/try.verb.ts';
 import type { AgentDraft } from './agents.ts';
@@ -197,6 +198,7 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
         repo: textOf(args, 'repo') ?? '',
         home: root,
         namespace: textOf(args, 'namespace'),
+        revisions: yield* definitionRevisionsNow(),
       });
       return { agent };
     }),

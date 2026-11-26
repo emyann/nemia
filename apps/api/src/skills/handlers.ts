@@ -20,6 +20,7 @@ import {
   builtinCopies,
   definitionJudged,
   definitionRevisionNow,
+  definitionRevisionsNow,
   skillVersion,
   skillRemoved,
   libraryUsers,
@@ -131,7 +132,12 @@ function specOf({ dir, error }: Row, name: string) {
  */
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string) {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
-  const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir, namespace)] as const)));
+  const revisions = await s.inRequest(definitionRevisionsNow());
+  const shown = new Map(
+    await Promise.all(
+      read.map(async (dir) => [dir, await skillShownAt(s, dir, revisions.of('Skill', namespace, path.basename(dir)), namespace)] as const),
+    ),
+  );
   const repo = repoLayer(s);
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>

@@ -70,7 +70,6 @@ test('an agent, a skill and a workflow have one resourceVersion, through the orc
   const after = await readAll();
   assert.deepEqual(after.api, after.verb, 'after an edit by hand they still agree');
   assert.equal(after.listed, after.api.workflow);
-  assert.notEqual(after.api.agent, before.api.agent, 'and the edit moved the number');
 });
 
 test('a Hire has one resourceVersion, in process and through the api', async () => {

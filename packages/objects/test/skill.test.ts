@@ -16,7 +16,6 @@ const skill = {
   spec: { title: 'Git', description: 'Keep your work.', tags: ['git'], examples: null, preload: false, body: 'Commit.' },
   status: {
     origin: 'builtin',
-    revision: 2,
     dir: '/pkg/skills/git',
     entry: { id: 'git', name: 'Git', description: 'Keep your work.', tags: ['git'] },
     error: null,

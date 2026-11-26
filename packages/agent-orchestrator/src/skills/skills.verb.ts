@@ -70,9 +70,15 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>, SkillsInput> = {
 
 /**
  * What `skills show`'s handler takes: the skill's name, its folder as the api resolved it, and the namespace its revision is read in, the
- * library's where none is given.
+ * library's where none is given. A caller that already holds the revision (a listing numbers every skill from one read) hands it as
+ * `version`, which is answered as it is.
  */
-export const SkillShowInput = Schema.Struct({ name: Schema.String, dir: Schema.String, namespace: Schema.optionalKey(Schema.String) });
+export const SkillShowInput = Schema.Struct({
+  name: Schema.String,
+  dir: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
+  version: Schema.optionalKey(Schema.String),
+});
 export type SkillShowInput = typeof SkillShowInput.Type;
 
 /** One skill read for its page (`SkillPage`), and the other text files of its folder (`files`, by path, sorted; none where it has none). */
@@ -93,7 +99,7 @@ export const SKILLS_READ: Command<SkillShown, SkillShowInput> = {
       { key: 'from', takes: 'required', kind: 'name' },
       { key: 'name', takes: 'required', kind: 'name' },
     ],
-    ['dir', 'namespace'],
+    ['dir', 'namespace', 'version'],
   ),
   writes: false,
   class: 'read',
@@ -102,11 +108,11 @@ export const SKILLS_READ: Command<SkillShown, SkillShowInput> = {
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
   },
   input: SkillShowInput,
-  handler: ({ name, dir, namespace }) =>
+  handler: ({ name, dir, namespace, version: held }) =>
     Effect.gen(function* () {
       const door = yield* SkillDoor;
       const page = yield* door.skills.read(SkillName.read(name), path.dirname(dir));
-      const version = String(yield* definitionRevisionNow('Skill', namespace, name));
+      const version = held ?? String(yield* definitionRevisionNow('Skill', namespace, name));
       return { ...page, version, files: yield* door.skills.others(SkillName.read(name), path.dirname(dir)) };
     }),
   print: () => [],

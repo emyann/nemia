@@ -103,6 +103,9 @@ export type AgentReading = {
   copied: AgentCopiedFrom | null;
 };
 
+/** The revision each agent stands at, as the definition index numbers it: `of` an agent in a namespace, none for the library's. */
+export type AgentRevisions = { of: (kind: 'Agent', namespace: string | undefined, name: string) => number };
+
 /** Where an agent of yours was copied from, the version it was at then, and how that file stands now. */
 export type AgentCopiedFrom = { source: string; version: string; now: 'same' | 'changed' | 'gone' };
 

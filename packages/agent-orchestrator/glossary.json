@@ -540,7 +540,7 @@
     },
     {
       "term": "Keyspace revision",
-      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, an object's `resourceVersion` (the highest revision among the records it is made of, `WATCHED_KINDS`) and the revision a list was read at (the keyspace head). A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`). Not a ledger's `Revision`.",
+      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, an object's `resourceVersion` (the highest revision among the records it is made of, `WATCHED_KINDS`) and the revision a list was read at (the keyspace head). A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`).",
       "type": "WriteRefusal"
     },
     {

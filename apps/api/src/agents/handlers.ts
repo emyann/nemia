@@ -30,6 +30,7 @@ import {
   agentRead,
   customInstructionsFile,
   customOf,
+  definitionRevisionsNow,
   factoriesFilling,
   inFactory,
   listedAt,
@@ -79,8 +80,9 @@ const treeAgents = (s: Served) =>
     if (tree === undefined) return [];
     const dir = path.join(tree, 'workflows', AGENTS_FOLDER);
     const read: AgentReading[] = [];
+    const revisions = yield* definitionRevisionsNow();
     for (const name of markdownNamesIn(dir)) {
-      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home, namespace: s.factory?.name });
+      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home, namespace: s.factory?.name, revisions });
       if (one) read.push(one);
     }
     return read;

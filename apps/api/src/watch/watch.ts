@@ -268,10 +268,22 @@ const framesOfChanges = (
 ) => {
   const sent = new Set<string>();
   const gone = (change: KindChange) => {
-    const key = `${change.namespace ?? ''}/${change.name ?? ''}`;
-    if (!whole && !known.has(key)) return [];
-    known.delete(key);
-    return [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+    const held = [...known].filter((key) => {
+      const at = key.indexOf('/');
+      return (
+        (change.namespace === null || key.slice(0, at) === change.namespace) && (change.name === null || key.slice(at + 1) === change.name)
+      );
+    });
+    const keys = whole && held.length === 0 ? [`${change.namespace ?? ''}/${change.name ?? ''}`] : held;
+    return keys.map((key) => {
+      known.delete(key);
+      const at = key.indexOf('/');
+      const space = key.slice(0, at);
+      return frameOf({
+        type: 'DELETED',
+        object: goneObject(kind, { ...change, namespace: space === '' ? null : space, name: key.slice(at + 1) }),
+      });
+    });
   };
   return changes.flatMap((change) => {
     if (change.change === 'DELETED') return change.name === null ? [] : gone(change);

@@ -2,9 +2,9 @@ apiVersion: nemia.dev/v1alpha1
 kind: FactoryTemplate
 metadata:
   name: sdlc
-  description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing, and the front door asks only where it cannot tell; quick lands once its review passes."
+  description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, with no gate unless the run is started with one at land."
 spec:
-  version: 5.6.1
+  version: 5.7.0
   rules:
     path: RULES.md
   parameters:

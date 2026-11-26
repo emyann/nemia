@@ -11,7 +11,7 @@ quick run with `--gate land` at its start, or `gate: land` on its card; this not
 - **With no `## Gates after you`, your pass lands the change.** There is no gate after you: once you sign off without asking again,
   the run files `land`, which merges the change into the base branch — on GitHub, this run's pull request; in this checkout, its
   branch — and nobody reads the change between your word and the merge.
-- **With `land` named there, a person approves the land after your pass**, as on a build: your pass files `land`, and it waits for
+- **With `land` named there, a person approves the land after your pass**: your pass files `land`, and it waits for
   their `nemia approve` before it merges anything. A card that says it waits on the person at its land is met by that gate: it is no
   finding and no reason to sign off `blocked`. Judge and word your sign-off for the person who reads it there.
 

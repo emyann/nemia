@@ -8,6 +8,7 @@ import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
 import { conditionWaitWords } from '../condition/condition.ts';
+import type { ConditionWriter } from '../program/program.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/index.ts';
 import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
@@ -202,6 +203,11 @@ export interface ListingInput {
    */
   readonly ranOnOf?: (taskId: string) => string | undefined;
   /**
+   * Who writes each condition in the run's factory (`writerOfIn`, off `programsStanding`): a step that waits on a condition says whether
+   * its writer runs, is not started or is down, with what to type. Left out, it says no more than that its writer runs in the factory.
+   */
+  readonly writerOf?: ((condition: string) => ConditionWriter) | undefined;
+  /**
    * Whether each task's session is parked (`parkedOf` in views-words.ts): held at its hook with the call it stopped `after`, or ended
    * with the call it `cut`. A parked step at work says `paused` (`pausedWord`), reason `Paused`, in place of the engine's word. Left out,
    * none is.
@@ -244,7 +250,7 @@ export function listing(input: ListingInput) {
     standing(step, run, read.phaseOf, read.signedOff, read.asked, read.steps, read.spendOf, read.verdictOf);
   const statuses = new Map(steps.map((s) => [s.name, stoodOf(s).status]));
   const words = steps.some(routes) ? routedWords(steps, run, statuses, read.signedOff) : statuses;
-  const listed = memoryNoted(input, admissionNoted(input, listedSteps(input, assessed, stoodOf, words)));
+  const listed = conditionNoted(input, memoryNoted(input, admissionNoted(input, listedSteps(input, assessed, stoodOf, words))));
   const routed = routedRows({ steps, run, closeoutOf: input.closeoutOf }, words);
   if (!routed.size) return listed;
   const rows = listed.steps.map((s) => {
@@ -312,6 +318,21 @@ const admissionNoted = ({ read, admissionWaitOf }: ListingInput, listed: Listing
     }),
   };
 };
+
+/**
+ * Each step's note with what a `checking` row waits on (`conditionWaitWords`), after the note's own words: for a step whose check waits
+ * on a condition that is not decided, which of its factory's programs writes it and whether that task runs (`writerOf`), and what to type.
+ */
+const conditionNoted = ({ steps, read, writerOf }: ListingInput, listed: Listing) => ({
+  ...listed,
+  steps: listed.steps.map((s) => {
+    const spec = steps.find((one) => one.name === s.name);
+    if (spec === undefined || s.message !== 'checking') return s;
+    const names = stepChecks(spec).flatMap((c) => (c.condition === undefined ? [] : [c.condition]));
+    const words = conditionWaitWords(read.run, read.run.id, s.name, names, writerOf);
+    return words ? { ...s, note: [s.note, words].filter(Boolean).join(' · ') } : s;
+  }),
+});
 
 /**
  * Each step's note with what its current try's session and check say of a kill at the memory limit (`outOfMemoryWords`), after the note's
@@ -417,7 +438,6 @@ function listedSteps(
   const refiled = roundSpans(steps, rounds);
   const waitingAgain = new Set(assessed.unheld);
   const takenByHand = (name: string) => resultOnBase(standings) && unrunEnding(steps, run, name);
-
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
   const heldLoops = new Set<string>();
@@ -488,7 +508,7 @@ function listedSteps(
       return { name, message: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
-    if (judged) return { name, ...judged, ...conditionNote(run, step, judged.message), branch };
+    if (judged) return { name, ...judged, branch };
 
     return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }
@@ -576,20 +596,6 @@ function saidReason(word: StepStatus | ListedPhase, c: Closeout | { error: strin
 
 /** What a check's verdict is as codes while it runs, and while the pause keeps it from being filed: running, with no exit yet. */
 const CHECK_RUNNING: CheckVerdict = { result: 'running', exit: null };
-
-/** The note of a row that says `checking` while its checks wait on conditions (`conditionWaitWords`), and none for any other row. */
-const conditionNote = (run: Run, step: StepSpec, word: string) => {
-  const note =
-    word === 'checking'
-      ? conditionWaitWords(
-          run,
-          run.id,
-          step.name,
-          stepChecks(step).flatMap((c) => (c.condition === undefined ? [] : [c.condition])),
-        )
-      : '';
-  return note ? { note } : {};
-};
 
 /**
  * The row of a step its run judged by its check or a person refused: `verified ✓`; `checking` while its check is filed, else `waiting on

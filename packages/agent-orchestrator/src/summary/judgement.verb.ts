@@ -11,7 +11,9 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { runTasks, type Run } from '../record/record.ts';
-import type { StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
+import { programsStanding } from '../program/program.verb.ts';
+import { writerOfIn, type ProgramStanding } from '../program/program.ts';
 import {
   judgedSteps,
   judgedUnlessUnreadable,
@@ -77,15 +79,20 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
 ) {
   const { views, reader, unreadable } = yield* viewsFor(e, runs, store);
   const out = new Map<string, JudgedOrWhy>();
+  let programs: ReadonlyMap<string, readonly ProgramStanding[]> | undefined;
   for (const run of runs) {
     const folder = run.workflow === undefined ? (yield* workflowsOf(run, home)).steps : null;
     const names = stepNames(run, folder);
+    const waits = judgedSteps(run, folder).some((s) => stepChecks(s).some((c) => c.condition !== undefined));
+    if (waits && programs === undefined) programs = yield* programsStanding(e, home);
+    const writerOf = waits ? writerOfIn(programs?.get(run.factory ?? 'default') ?? []) : undefined;
     const asked: GitAsked = { branches: [], failed: false };
     const one = yield* judgedUnlessUnreadable(run, unreadable, () =>
       judge(run, names, folder, views, {
         reader,
         git,
         standings: (status, steps) => standingsOf(run, steps, status, git, asked),
+        writerOf,
         ...(store ? { store } : {}),
       }),
     );

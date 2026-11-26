@@ -6,6 +6,7 @@
  * the pass reads, and nothing is carried between them.
  */
 import type { ConditionStanding } from '../../contracts/condition-standing.contract.ts';
+import type { ConditionWriter } from '../program/program.ts';
 import type { ConditionWriteRefusalOf } from '../../contracts/condition-write.contract.ts';
 import type { ConditionWritten, Run, StepRecord } from '../record/record.ts';
 
@@ -134,19 +135,39 @@ export const standingOfCondition = (run: Pick<Run, 'steps'>, step: string, name:
 
 /**
  * What a step says while its checks wait on conditions that are not decided: for each, that it is not written for this try, or written
- * Unknown with its message, and what to do next, that the program of its factory that writes it runs (its task's id begins `program-`,
- * `nemia ls`) or a person writes it (`nemia condition`). Empty where every condition is decided.
+ * Unknown with its message, and what to do next. With `writerOf`, who writes it: the program of its factory that does, running, not yet
+ * filed or down with what to type, or that none does; without, that its program runs in the factory (`nemia ls`). A person may always
+ * write it (`nemia condition`). Empty where every condition is decided.
  * @param run The run, whose step record holds what was written for the try the step is on.
  * @param runId The run's id, which the command to type names.
  * @param step The step's name.
  * @param names The conditions the step's checks wait on.
+ * @param writerOf Who writes a condition in the run's factory, as `programsStanding` read it; left out, not said.
  */
-export const conditionWaitWords = (run: Pick<Run, 'steps'>, runId: string, step: string, names: readonly string[]) =>
+export const conditionWaitWords = (
+  run: Pick<Run, 'steps'>,
+  runId: string,
+  step: string,
+  names: readonly string[],
+  writerOf?: (condition: string) => ConditionWriter,
+) =>
   names
     .filter((name) => standingOfCondition(run, step, name) === 'running')
     .map((name) => {
       const written = writtenFor(run, step, name);
       const said = written === null ? 'not written for this try' : `written Unknown${written.message === '' ? '' : `: ${written.message}`}`;
-      return `waits on condition ${name}, ${said}: its writer runs in the factory (a task \`program-…\` in \`nemia ls\`), or write it: nemia condition ${runId} ${step} ${name} --status True`;
+      const byHand = `nemia condition ${runId} ${step} ${name} --status True`;
+      const writer = writerOf?.(name);
+      if (writerOf === undefined)
+        return `waits on condition ${name}, ${said}: its writer runs in the factory (a program task in \`nemia ls\`), or write it: ${byHand}`;
+      if (writer === null || writer === undefined)
+        return `waits on condition ${name}, ${said}: no program of its factory writes it, so write it: ${byHand}`;
+      if (writer.phase === 'Running')
+        return `waits on condition ${name}, ${said}: its writer, the program ${writer.program}, is running; or write it: ${byHand}`;
+      const fix =
+        writer.phase === 'Pending'
+          ? 'is not started yet: the daemon starts it within seconds (nemia up keeps it)'
+          : 'is down and the runtime will not restart it: change its `run:` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon';
+      return `waits on condition ${name}, ${said}: its writer, the program ${writer.program}, ${fix}; or write it: ${byHand}`;
     })
     .join(' · ');

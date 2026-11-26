@@ -463,6 +463,7 @@ export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts'
 export { triggerList, triggerObject } from './factory/object/trigger.verb.ts';
 export { hireList, hireObject } from './factory/object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
+export { programList, programObject } from './factory/object/program.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export {

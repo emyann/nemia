@@ -166,6 +166,7 @@ const PAGES: Readonly<
   'schedules.list': { url: `/api/namespaces/${WORKFLOW_FACTORY}/schedules`, planted: SCHEDULES },
   'hires.list': { url: `/api/namespaces/${WORKFLOW_FACTORY}/hires`, planted: HIRES },
   'volumes.list': { url: `/api/namespaces/${FACTORY}/volumes` },
+  'programs.list': { url: `/api/namespaces/${FACTORY}/programs` },
   'triggers.list': { url: `/api/namespaces/${FACTORY}/triggers` },
   'workflows.list': { url: `/api/namespaces/${WORKFLOW_FACTORY}/workflows`, planted: WORKFLOWS },
   'templates.listAll': { url: '/api/templates' },

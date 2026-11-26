@@ -6,6 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { ProgramsDueOf } from '../../contracts/programs-due.contract.ts';
+import type { Program as ProgramObject } from 'objects';
 import type { Program } from '../factory/factory.ts';
 
 /** The id every program's task begins with, which the record of the controller and a person's `nemia ls` tell it by. */
@@ -39,3 +40,58 @@ export const programsDue: ProgramsDueOf = (declared, filed) => ({
   file: declared.filter((id) => !filed.some((f) => f.id === id)),
   stop: filed.filter((f) => !f.settled && !f.stopRequested && !declared.some((id) => id === f.id)).map((f) => f.id),
 });
+
+/** What a program's task is, as far as its status reads it: when it was filed, whether the runtime settled it, and its attempts. */
+export type ProgramHeld = {
+  readonly filedAt?: string | undefined;
+  readonly settled: string | null;
+  readonly attempts: readonly { readonly startedAt: string; readonly endedAt: string | null }[];
+};
+
+/** The status of a factory's program, as its object carries it. */
+type ProgramStatus = NonNullable<ProgramObject['status']>;
+
+/**
+ * What a person reads of a program whose task the runtime settled: that it will not be started again, and what to type so it runs.
+ * @param id The program's task id.
+ */
+export const programDownMessage = (id: string) =>
+  `The program task ${id} is down and the runtime will not restart it: change its \`run:\` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon.`;
+
+/**
+ * Where a factory's program runs, read off its task: Pending where the engine holds none filed, Down where the runtime settled it (its
+ * `message` says what to type), and Running otherwise, its restarts the attempts after the first and `since` the start of the latest.
+ * @param held The program's task as the engine holds it, or undefined where it holds none.
+ * @param id The task's id, which the message of a Down program names.
+ */
+export const programStatus = (held: ProgramHeld | undefined, id: string) => {
+  if (held?.filedAt === undefined) return { phase: 'Pending', restarts: 0 } satisfies ProgramStatus;
+  const last = held.attempts.at(-1);
+  const restarts = Math.max(0, held.attempts.length - 1);
+  if (held.settled === null) return { phase: 'Running', restarts, since: last?.startedAt ?? held.filedAt } satisfies ProgramStatus;
+  return {
+    phase: 'Down',
+    restarts,
+    since: last?.endedAt ?? last?.startedAt ?? held.filedAt,
+    message: programDownMessage(id),
+  } satisfies ProgramStatus;
+};
+
+/** A factory's program as a waiting step reads it: its name, the conditions it writes and the phase of its task. */
+export type ProgramStanding = {
+  readonly name: string;
+  readonly writes: readonly string[];
+  readonly phase: NonNullable<ProgramObject['status']>['phase'];
+};
+
+/** The program that writes a condition and where its task stands, or null where no program of the run's factory writes it. */
+export type ConditionWriter = { readonly program: string; readonly phase: ProgramStanding['phase'] } | null;
+
+/**
+ * Who writes each condition of a factory, off its programs' standing: the first program that names it.
+ * @param programs The factory's programs and where their tasks stand.
+ */
+export const writerOfIn = (programs: readonly ProgramStanding[]) => (condition: string) => {
+  const found = programs.find((p) => p.writes.includes(condition));
+  return (found === undefined ? null : { program: found.name, phase: found.phase }) satisfies ConditionWriter;
+};

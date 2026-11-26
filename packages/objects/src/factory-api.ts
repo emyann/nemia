@@ -43,6 +43,7 @@ import { LibraryAdd, LibraryAddList } from './library.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Trigger, TriggerList, TriggerWrite } from './trigger.ts';
+import { Program, ProgramList } from './program.ts';
 import { Volume, VolumeList, VolumeSwitchesWrite } from './volume.ts';
 import {
   cardParams,
@@ -74,6 +75,8 @@ const LibraryAddObject = LibraryAdd.annotate({ identifier: 'LibraryAdd' });
 const LibraryAddListObject = LibraryAddList.annotate({ identifier: 'LibraryAddList' });
 const VolumeObject = Volume.annotate({ identifier: 'Volume' });
 const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
+const ProgramObject = Program.annotate({ identifier: 'Program' });
+const ProgramListObject = ProgramList.annotate({ identifier: 'ProgramList' });
 /** The factories and a factory's MCP servers, each a page or the same page as a `Table` where the request asks for one, as the cards. */
 const FactoryListOrTable = [FactoryListObject, Table] as const;
 const McpServerListOrTable = [McpServerListObject, Table] as const;
@@ -603,4 +606,22 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
     OpenApi.Description,
     "Sets the switches of one of a factory's volumes, by its stored name: those the body gives, the others kept, its folder and mark unmoved. Answers the Volume as it reads after, with the file written.",
   ),
+) {}
+
+/** A factory's programs, in its namespace: the long-lived commands its template declares, each with where its task runs now. */
+export class ProgramsGroup extends HttpApiGroup.make('programs').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/programs', {
+    params: namespaceParams,
+    query: listQuery,
+    success: [ProgramListObject, Table],
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's programs in its namespace, a page at a time, each with its phase, its restarts and since when. Answers a ProgramList, or the same page as a Table where the request asks for one.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/programs/:name', {
+    params: cardParams,
+    success: ProgramObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Reads one of a factory's programs by its name, with where its task runs now. Answers the Program."),
 ) {}

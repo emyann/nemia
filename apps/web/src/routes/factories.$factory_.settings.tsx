@@ -9,6 +9,7 @@ import { TemplateCard } from '@/components/factory/TemplateCard';
 import { FactoryTrust } from '@/components/factory/FactoryTrust';
 import { FactoryTriggers } from '@/components/factory/FactoryTriggers';
 import { FactoryServers } from '@/components/factory/FactoryServers';
+import { FactoryPrograms } from '@/components/factory/FactoryPrograms';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { LibraryAdds } from '@/components/library/LibraryAdds';
 import { TextLink } from '@/components/look';
@@ -60,7 +61,8 @@ const OPENED = { enter: 0, stay: Infinity } as const;
  * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); the line that opens
  * their own session in its home, where it has one (`FactoryHome`); then a place of it that is not trusted, with the line that trusts it
  * (`FactoryTrust`); the folders its runs reach beside its repositories, each with its two switches and the line that takes it back
- * (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules,
+ * (`FactoryVolumes`); the programs its template keeps running, a row each with its phase (`FactoryPrograms`, none drawn where it has
+ * none); the cost line it sets per workflow it offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules,
  * what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its
  * instruction, what Nemia is to know about it (`FactoryInstruction`); then its triggers, its schedules among them, read for this factory
  * alone (`FactoryTriggers`). The default factory, and a name no factory has, have no settings to keep, and say so: neither the rules
@@ -98,6 +100,7 @@ function SettingsPage() {
               Add the work: a folder, a repository, a new one
             </TextLink>
           </p>
+          <FactoryPrograms name={name} />
           <FactoryCostLines factory={factory} />
           <FactoryRules name={name} />
           <FactoryDelegations name={name} />

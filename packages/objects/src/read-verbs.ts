@@ -102,6 +102,8 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'libraryadds.get': BY_GET,
   'volumes.list': BY_GET,
   'volumes.get': BY_GET,
+  'programs.list': BY_GET,
+  'programs.get': BY_GET,
   'workflows.list': BY_GET,
   'workflows.get': BY_GET,
   'templates.listAll': BY_GET,

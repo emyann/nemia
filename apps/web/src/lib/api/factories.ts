@@ -18,7 +18,7 @@ import {
   type McpTransport,
   type Schedule,
 } from 'objects';
-import { factories, library, hireName, hires, mcpServers, schedules, triggers } from './objects.ts';
+import { factories, library, hireName, hires, mcpServers, programs, schedules, triggers } from './objects.ts';
 
 export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInState } from 'objects';
 
@@ -484,6 +484,13 @@ export const signOutServer = (name: string, server: string) => mcpServers.signOu
  */
 export const factoryTriggersQuery = (name: string) =>
   queryOptions({ queryKey: ['factory-triggers', name], queryFn: () => triggers.list(name) });
+
+/**
+ * The programs of the factory `name`, each with its phase, its restarts and since when.
+ * @param name The factory's name.
+ */
+export const factoryProgramsQuery = (name: string) =>
+  queryOptions({ queryKey: ['factory-programs', name], queryFn: () => programs.list(name) });
 
 /**
  * Take back the factory `name`'s own card trigger `trigger`.

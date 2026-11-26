@@ -730,6 +730,7 @@ export const KINDS = [
   'Agent',
   'Skill',
   'Template',
+  'Program',
   'Subscription',
   'Event',
   'Proposal',
@@ -1040,3 +1041,12 @@ export type TicketState = (typeof TICKET_STATES)[number];
  * stream, a file's bytes.
  */
 export const READ_SHAPES = ['page', 'cursor', 'part', 'one', 'stream', 'bytes'] as const;
+
+/**
+ * Where a program's task stands: not filed yet, running (its process is up or waiting out its back-off), or down (the runtime settled
+ * it).
+ */
+export const PROGRAM_PHASES = ['Pending', 'Running', 'Down'] as const;
+
+/** One of `PROGRAM_PHASES`. */
+export type ProgramPhase = (typeof PROGRAM_PHASES)[number];

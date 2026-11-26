@@ -224,6 +224,10 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     list: { in: (namespace, s) => (c) => everyPage((page) => c.volumes.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.volumes.get({ params: { namespace, name } }) },
   },
+  Program: {
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.programs.list({ params: { namespace }, query: query(s, page) })) },
+    get: { in: (namespace, name) => (c) => c.programs.get({ params: { namespace, name } }) },
+  },
   Workflow: {
     list: { in: (namespace, s) => (c) => everyPage((page) => c.workflows.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.workflows.get({ params: { namespace, name }, query: {} }) },

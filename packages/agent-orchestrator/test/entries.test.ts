@@ -711,6 +711,8 @@ const PINNED: Record<string, string[]> = {
     'hireObject',
     'volumeList',
     'volumeObject',
+    'programList',
+    'programObject',
     'eventKept',
     'eventList',
     'eventObject',

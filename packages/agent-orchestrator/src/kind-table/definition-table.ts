@@ -86,6 +86,8 @@ const PROGRAM_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The program's name.", 0),
   column('Writes', 'The conditions it writes.', 0),
   column('Run', 'The command line it runs.', 1),
+  column('Phase', 'Where its task runs now: Pending, Running or Down; none for a template’s declaration.', 0),
+  column('Restarts', 'How many times the runtime started it again.', 1, 'integer'),
 ];
 
 /** The cells of a program's row, in `PROGRAM_COLUMNS`' order. */
@@ -93,6 +95,8 @@ const programCells = (program: ProgramList['items'][number]) => [
   program.metadata.name,
   program.spec.writes.join(', '),
   firstLine(program.spec.run),
+  program.status?.phase ?? '',
+  program.status?.restarts ?? 0,
 ];
 
 /**

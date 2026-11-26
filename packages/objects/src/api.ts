@@ -58,6 +58,7 @@ import {
   HiresGroup,
   LibraryAddsGroup,
   McpServersGroup,
+  ProgramsGroup,
   SchedulesGroup,
   TriggersGroup,
   VolumesGroup,
@@ -259,6 +260,7 @@ export const RESOURCE_PLURALS = {
   Agent: AgentsGroup.identifier,
   Skill: SkillsGroup.identifier,
   Template: TemplatesGroup.identifier,
+  Program: ProgramsGroup.identifier,
   Subscription: SubscriptionsGroup.identifier,
   Event: EventsGroup.identifier,
   Proposal: ProposalsGroup.identifier,
@@ -282,6 +284,7 @@ export const Api = HttpApi.make('nemia')
   .add(AgentsGroup)
   .add(SkillsGroup)
   .add(TemplatesGroup)
+  .add(ProgramsGroup)
   .add(SubscriptionsGroup)
   .add(EventsGroup)
   .add(ProposalsGroup)

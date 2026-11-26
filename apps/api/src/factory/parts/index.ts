@@ -10,3 +10,4 @@ export { factoryNamed, queryOf } from './parts.ts';
 export { schedulesHandlers } from './schedules.ts';
 export { triggersHandlers } from './triggers.ts';
 export { volumesHandlers } from './volumes.ts';
+export { programsHandlers } from './programs.ts';

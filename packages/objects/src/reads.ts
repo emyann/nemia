@@ -112,6 +112,8 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'libraryadds.get': ONE,
   'volumes.list': LIST,
   'volumes.get': ONE,
+  'programs.list': LIST,
+  'programs.get': ONE,
   'workflows.list': LIST,
   'workflows.get': ONE,
   'workflows.step': ONE,

@@ -22,7 +22,17 @@ import { SESSION_TOKEN } from '../filed/filed.ts';
 import { needsEnv } from '../needs/needs.verb.ts';
 import { ownBin } from '../nemia/level.store.ts';
 import { CARRIED_FOLDER } from '../step/step.ts';
-import { programTaskId, programsDue } from './program.ts';
+import {
+  programDownMessage,
+  programStatus,
+  programTaskId,
+  programsDue,
+  writerOfIn,
+  type ConditionWriter,
+  type ProgramStanding,
+} from './program.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
+import type { Run } from '../record/record.ts';
 import type { FactoryListing, Program } from '../factory/factory.ts';
 
 /** How often the controller reads the factories' programs and the engine again. */
@@ -129,9 +139,7 @@ const programsOnce = Effect.fn('programsOnce')(function* () {
     if (d !== undefined) yield* asked('file', e.file(programSpec(d, yield* programToken(d), home)));
   }
   for (const h of held.filter((one) => one.settled && declared.some((d) => d.id === one.id)))
-    yield* Effect.logWarning(
-      `The program task ${h.id} is down and the runtime will not restart it: change its \`run:\` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon.`,
-    );
+    yield* Effect.logWarning(programDownMessage(h.id));
   for (const id of due.stop) yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
   return due;
 });
@@ -147,3 +155,39 @@ export const programs = (every: Duration.Input = PROGRAMS_EVERY) =>
       Effect.andThen(Effect.sleep(every)),
     ),
   );
+
+/**
+ * Where every factory's programs stand, by the factory's name: each declared program with the phase of its task, read off the engine as the
+ * controller reads it (`programStatus`). Read once for a listing of runs, only by a caller whose runs wait on a condition.
+ * @param e The engine the programs' tasks are read from.
+ * @param home The store's root folder.
+ */
+export const programsStanding = Effect.fn('programsStanding')(function* (e: Engine, home: string) {
+  const standing = new Map<string, ProgramStanding[]>();
+  for (const d of declaredPrograms(yield* listedAt(home))) {
+    const { state } = yield* asked('view', e.view(d.id));
+    const one = { name: d.name, writes: d.program.writes, phase: programStatus(state, d.id).phase } satisfies ProgramStanding;
+    standing.set(d.factory, [...(standing.get(d.factory) ?? []), one]);
+  }
+  return standing;
+});
+
+/**
+ * Who writes each condition for each of `runs`, by the run's id: read off the programs' standing (`programsStanding`), and only where one
+ * of the runs' steps waits on a condition, so a listing of runs that wait on none reads no program.
+ * @param e The engine the programs' tasks are read from.
+ * @param home The store's root folder.
+ * @param runs The runs, each with the steps it is judged by.
+ */
+export const writersOfRuns = Effect.fn('writersOfRuns')(function* (
+  e: Engine,
+  home: string,
+  runs: readonly { readonly run: Run; readonly steps: readonly StepSpec[] }[],
+) {
+  const writers = new Map<string, (condition: string) => ConditionWriter>();
+  const waiting = runs.filter(({ steps }) => steps.some((s) => stepChecks(s).some((c) => c.condition !== undefined)));
+  if (waiting.length === 0) return writers;
+  const standing = yield* programsStanding(e, home);
+  for (const { run } of waiting) writers.set(run.id, writerOfIn(standing.get(run.factory ?? 'default') ?? []));
+  return writers;
+});

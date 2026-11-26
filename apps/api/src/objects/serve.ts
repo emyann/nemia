@@ -36,6 +36,7 @@ import {
   schedulesHandlers,
   triggersHandlers,
   volumesHandlers,
+  programsHandlers,
 } from '../factory/index.ts';
 import { agentsHandlers } from '../agents/index.ts';
 import { skillsHandlers } from '../skills/index.ts';
@@ -195,6 +196,7 @@ const objectsHandler = (runtime: ApiRuntime) =>
         triggersHandlers,
         hiresHandlers,
         volumesHandlers,
+        programsHandlers,
         workflowsHandlers,
         agentsHandlers,
         skillsHandlers,

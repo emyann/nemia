@@ -1,7 +1,7 @@
 /**
  * What the api stamps with a revision of the keyspace: the objects it serves that no verb of the orchestrator stamps (`atRevisions`) — a
- * Card, a Proposal and a Delegation's list, which the api pages itself, and an Agent, a Skill and a Workflow, which the api builds from
- * the doors' listings. Each leaves with `metadata.resourceVersion` the keyspace revision of its last change, the highest among the records
+ * Card, a Proposal, a Delegation and a Run's list, which the api pages itself, and an Agent, a Skill and a Workflow, which the api
+ * builds from the doors' listings. Each leaves with `metadata.resourceVersion` the keyspace revision of its last change, the highest among the records
  * it is made of, and every list of one with the keyspace head read before its items were, so a watch from it loses no change between
  * the two. A GET writes nothing here, in any process, and nothing is kept between two requests: the definition index is numbered with no
  * write (`kindRevisions`).
@@ -18,7 +18,13 @@ const watchedListOf = (kind: string | undefined) => {
 };
 
 /** The kinds the api stamps itself: those no verb of the orchestrator stamps. */
-const API_STAMPED = new Set<string>(['Card', 'Proposal', 'Delegation', 'Agent', 'Skill', 'Workflow']);
+const API_STAMPED = new Set<string>(['Card', 'Proposal', 'Delegation', 'Run', 'Agent', 'Skill', 'Workflow']);
+
+/**
+ * The kinds stamped in a list only: a Delegation read alone the orchestrator stamps, and a Run read alone is built per request from parts
+ * no revision covers.
+ */
+const LISTED_ONLY = new Set<string>(['Run', 'Delegation']);
 
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
@@ -31,7 +37,7 @@ const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   }
   const list = watchedListOf(body.kind);
   if (list !== undefined) return API_STAMPED.has(list) ? { kind: list, list: true, table: false } : undefined;
-  return isWatchedKind(body.kind) && API_STAMPED.has(body.kind) && body.kind !== 'Delegation'
+  return isWatchedKind(body.kind) && API_STAMPED.has(body.kind) && !LISTED_ONLY.has(body.kind)
     ? { kind: body.kind, list: false, table: false }
     : undefined;
 };

@@ -11,8 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
-import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
-import { asNamed, autoDropped, modeOf, parseAgent, parseWorkflow, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
+import { asNamed, modeOf, parseAgent, parseWorkflow, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
 import { FrozenStepSchema } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
@@ -780,15 +779,6 @@ describe("where a skill or an agent is found: the workflow's own root, the repos
         assert.notEqual(edited, was, 'its SKILL.md');
         fs.writeFileSync(path.join(skills, 'write-a-note', 'template.md'), '# A template\n');
         assert.notEqual(agentVersion(agents, 'builder'), edited, 'a file beside it, which the plugin copies too');
-      },
-    ],
-    [
-      "F21's models: the two measured, and a name that only begins like one is not it",
-      () => {
-        assert.deepEqual([...CLAUDE_AUTO_DROPPED], ['claude-haiku-4-5', 'claude-sonnet-4-5'], 'a new one is measured first');
-        assert.equal(autoDropped('claude', 'haiku', undefined), undefined, 'the alias resolves to a model that keeps `auto`');
-        assert.ok(autoDropped('claude', 'claude-sonnet-4-5-20250929', undefined));
-        assert.equal(autoDropped('claude', 'claude-sonnet-5', undefined), undefined);
       },
     ],
   ]);

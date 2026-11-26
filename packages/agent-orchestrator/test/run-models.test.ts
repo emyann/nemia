@@ -199,21 +199,8 @@ describe('a step’s model at start, REFUSED before a run is written', () => {
       ['--model desing=fable', 'plan, implement, review'],
     ],
     ["`inherit`, a subagent's word", () => starting({ plan: 'inherit' }), ['--model plan=inherit']],
-    [
-      'a model that drops the step’s `auto`, naming the models that keep it',
-      () => starting({ implement: 'claude-haiku-4-5' }),
-      ['--model implement=claude-haiku-4-5', 'sonnet, or opus, or fable'],
-    ],
     ['the CLI: a pair with no model', () => typed('--model', 'implement='), ['implement=']],
     ['the CLI: a step named twice', () => typed('--model', 'implement=fable', '--model', 'implement=opus'), ['implement twice']],
-    [
-      "a card's `model:` the step cannot run on, in the card's words",
-      () =>
-        runPlaced(
-          startFromInbox({ name: card('plan-the-flag-m3c3', dir, 'review=claude-sonnet-4-5', repo), callerRepo: repo, isolate: false }),
-        ),
-      ['plan-the-flag-m3c3.md: `model: review=claude-sonnet-4-5`'],
-    ],
   ] as Array<[string, () => Promise<unknown>, string[]]>) {
     test(`REFUSED ${row}, no run written`, async () => {
       const before = runsWritten();
@@ -221,8 +208,4 @@ describe('a step’s model at start, REFUSED before a run is written', () => {
       assert.equal(runsWritten(), before);
     });
   }
-  test('taken: a model that drops `auto`, on a step that names a mode the model keeps', async () => {
-    const run = await starting({ implement: 'claude-haiku-4-5' }, planned({ implement: 'model: opus\npermissionMode: acceptEdits' }));
-    assert.deepEqual(frozenModels(run.id).implement, 'claude-haiku-4-5');
-  });
 });

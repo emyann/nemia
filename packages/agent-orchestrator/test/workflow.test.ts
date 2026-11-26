@@ -18,7 +18,6 @@ import { agentsDir, parseFolder, renderStep, type StepDraft } from '../src/workf
 import { skillsFor } from '../src/skills/read.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import {
-  autoDropped,
   cardRetired,
   codexModeLine,
   codexModeWritten,
@@ -885,7 +884,6 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     codexModeLine('w/review.md', 'read-only'),
     codexModeWritten('w/review.md', 'read-only'),
     cardRetired('agents/builder.md', 'card'),
-    autoDropped('claude', 'claude-haiku-4-5', undefined)!,
     said(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft)),
     said(() => fm('review', 'harness: codex\npermissionMode: read-only\nsandbox: read-only')),
     said(() => fm('write', 'background: true')),

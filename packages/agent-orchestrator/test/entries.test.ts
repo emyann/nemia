@@ -1030,7 +1030,6 @@ const PINNED: Record<string, string[]> = {
     'agentsFolderRefusal',
     'allowRuleOf',
     'asNamed',
-    'autoDropped',
     'cardRetired',
     'codexModeLine',
     'codexModeWritten',

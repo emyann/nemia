@@ -413,7 +413,11 @@ function againSection(
   retry?: RetryBriefing,
   round?: RoundBriefing,
 ) {
-  if (retry) return retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf);
+  if (retry)
+    return (
+      retrySection(step, retry, inFolder, retry.resumed && owesReplies(steps, run, step.name)) +
+      retriedInRound(step, run, steps, retry, closeoutOf)
+    );
   if (round?.merge) return mergeSection(step, round.merge, round.loop, steps, say);
   return round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
 }

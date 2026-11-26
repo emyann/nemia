@@ -780,14 +780,12 @@ describe("composeBrief of a new session of a loop's target within a round: hande
       mode: 'continue',
       resumed: true,
       status: 'failed (check)',
+      refusal: { command: 'npm test', verdict: 1 as Verdict, stdout: 'not ok 3', stderr: '' },
     });
     assert.doesNotMatch(nudged, /## Round 2 of 3|## From review/);
     assert.match(nudged, /- `replies`: your answer/);
-    const at = nudged.indexOf('## Try 3\n');
-    assert.ok(
-      at >= 0 && nudged.indexOf(REPLIES_OWED) > at && nudged.indexOf(REPLIES_OWED) < nudged.indexOf('## When you are finished'),
-      nudged,
-    );
+    const at = (h: string) => nudged.indexOf(h);
+    assert.ok(at('## Try 3\n') >= 0 && at(REPLIES_OWED) > at('## Try 3\n') && at(REPLIES_OWED) < at('## What the check said\n'), nudged);
   });
   test('round 1 has no findings to hand', () => {
     assert.doesNotMatch(composeBrief(IMPLEMENT, inRound(1), LOOP, fromAsking, FILES, undefined, newSessions[0]), /## Round|## From review/);

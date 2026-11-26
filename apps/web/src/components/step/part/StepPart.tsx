@@ -6,7 +6,7 @@
  */
 import type { AgentListing } from '@/lib/api/agents';
 import type { RunDetail, StepView } from '@/lib/runView';
-import { useUnchecked } from '@/lib/api/models';
+import { useUnchecked } from '@/lib/useUnchecked';
 import { slotsOf, stepPartOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';

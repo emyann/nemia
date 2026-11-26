@@ -105,7 +105,7 @@ export type HeadInput = {
 };
 
 /** Whether the models of the harness a step names (undefined for the default one) are not checked, no list of them being recorded. */
-export type Unchecked = (harness: string | null | undefined) => boolean;
+type Unchecked = (harness: string | null | undefined) => boolean;
 
 const TAGS: Record<StepKind, Omit<HeadTag, 'word'>> = {
   work: { color: 'alive', variant: 'tonal' },

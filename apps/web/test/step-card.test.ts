@@ -232,7 +232,7 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
             },
           }),
         ],
-        'Ada',
+        undefined,
         unchecked,
       ).facts?.find((fact) => fact.key === 'Model')?.value;
     assert.equal(modelOf('claude-opus-5-5'), 'claude-opus-5-5 · asked opus');

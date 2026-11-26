@@ -11,7 +11,10 @@ import { changesOf, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKi
 /** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
 type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
 
-/** The prefixes of the keyspace a kind is made of, each once. */
+/**
+ * The prefixes of the keyspace a kind is made of, each once.
+ * @param kind The kind whose records are listed.
+ */
 export const prefixesOf = (kind: WatchedKind) => [...new Set(WATCHED_KINDS[kind].map((s) => s.prefix))];
 
 /**

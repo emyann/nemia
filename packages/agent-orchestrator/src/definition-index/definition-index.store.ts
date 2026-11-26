@@ -220,7 +220,6 @@ const definitionsFound = Effect.fn('definitionsFound')(function* (
       found.push(...(yield* skillsIn(scope, path.join(repo, REPOSITORY_HOLDER, 'skills'))));
     }
   }
-  for (const f of factories) found.push(...(yield* factoryWordsOf(f)));
   const everyRepo = [...new Set(factories.flatMap((f) => f.repos))];
   found.push(...(yield* definitionsIn(LIBRARY_SCOPE, path.join(path.resolve(home), 'workflows'), everyRepo)));
   found.push(...(yield* builtinFound(templates)));
@@ -279,7 +278,9 @@ const definitionsWanted = Effect.fn('definitionsWanted')(function* () {
       ? derived.wanted
       : new Map((yield* definitionsFound(home, factories, templates)).map((d) => [definitionKey(d.scope, d.kind, d.name), textOf(d)]));
   DERIVED.set(home, { print, wanted });
-  return wanted;
+  const words = new Map(wanted);
+  for (const f of factories) for (const d of yield* factoryWordsOf(f)) words.set(definitionKey(d.scope, d.kind, d.name), textOf(d));
+  return words;
 });
 
 /**

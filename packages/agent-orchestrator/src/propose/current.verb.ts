@@ -250,23 +250,18 @@ export const contentNow = (place: ProposalPlace, factory: string, kind: Proposab
 };
 
 /**
- * The definitions of the store numbered, so a proposal that is filed reads each at the revision it keeps until its files move: a
- * definition not yet numbered is served at one that moves with every write, and the apply would find it changed.
- * @param place Where the proposal is read: the store's root.
- */
-export const definitionsNumberedFor = (place: ProposalPlace) => definitionsSwept().pipe(Effect.provideService(StoreRoot, place.home));
-
-/**
- * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision it is served at (the keyspace's; a
- * definition's worked out with no write, so a hand edit since a read counts), and its spec: what a proposal's stale check and an apply
- * compare the version a proposal read to. Refused as `contentNow` refuses.
+ * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision it is served at (the keyspace's), the
+ * definitions numbered first (`definitionsSwept`) so what a proposal read stays the revision it holds until a file moves, and its spec:
+ * what a proposal's stale check and an apply compare the version a proposal read to. Refused as `contentNow` refuses.
  * @param place Where the proposal is read: the store's root.
  * @param factory The factory's name.
  * @param kind The kind of the object.
  * @param name The object's name; for a Factory, the factory's own.
  */
 export const currentOf = (place: ProposalPlace, factory: string, kind: ProposableKind, name: string) =>
-  contentNow(place, factory, kind, name).pipe(
+  definitionsSwept().pipe(
+    Effect.provideService(StoreRoot, place.home),
+    Effect.andThen(contentNow(place, factory, kind, name)),
     Effect.flatMap((now) =>
       now.version === null
         ? Effect.succeed(now)

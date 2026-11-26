@@ -15,7 +15,7 @@ import { TEAM } from '../../test/team.ts';
 import { story } from 'test-kit/checkpoints';
 import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
-import { addFactory, agentDoorMemory } from 'agent-orchestrator/testing';
+import { addFactory, agentDoorMemory, definitionsIndexed } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
 import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
@@ -1442,6 +1442,7 @@ describe('PUT /api/workflows/yours/:name: a save the package refuses, or of a fo
     const dir = planned('edited');
     write(path.join(dir, 'README.md'), '# edited\n');
     const [plan, build] = (await listedSteps('edited')) as [ListedStep, ListedStep];
+    await definitionsIndexed(root);
     const read = await revisionOf('edited');
     const draft = { version: read, steps: [plan, { ...build, spec: { ...build.spec, retries: 2 } }] };
     const handEdits: Array<[string, () => void, () => void]> = [

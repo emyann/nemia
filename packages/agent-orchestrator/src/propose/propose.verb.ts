@@ -31,7 +31,7 @@ import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { readmeComposed } from '../folder/folder.ts';
-import { currentOf, definitionsNumberedFor, readFresh, workflowStepsWritten, type ProposalPlace } from './current.verb.ts';
+import { currentOf, readFresh, workflowStepsWritten, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
 import { skillFilesRefusal } from '../skills/skills.ts';
@@ -191,7 +191,6 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
   Effect.gen(function* () {
     const verb = verbOf(object);
     const label = labelOf(object);
-    yield* definitionsNumberedFor(place);
     const now = yield* currentOf(place, factory, object.kind, object.metadata.name);
     if (verb === 'create' && now.version !== null)
       return yield* Effect.fail(

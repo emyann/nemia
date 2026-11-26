@@ -70,6 +70,7 @@ test("a sweep gives the definition its record's revision, which a hand edit sinc
 
 test('a writer that names the revision it read is refused Conflict where a hand edit moved it, with the index untouched', async () => {
   const s = stored();
+  await s.run(indexSweep());
   const read = String(await s.run(definitionRevisionNow('Agent', undefined, 'coder')));
   await s.run(definitionJudged('Agent', undefined, 'coder', read, 'write'));
   fs.appendFileSync(s.file, 'Edited by hand.\n');

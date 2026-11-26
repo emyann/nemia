@@ -19,7 +19,7 @@ import { storeGiven } from '../../test/config-given.ts';
 import { foldersLoaded, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows.verb.ts';
 import { runWith as runEngine } from '../runner.ts';
 import { engineOf } from '../runtime-client.ts';
-import { definitionRevisionNow } from '../definition-index/definition-index.store.ts';
+import { definitionRevisionNow, indexSweep } from '../definition-index/definition-index.store.ts';
 import { removeWorkflowAt } from '../folder/write.store.ts';
 import * as verbs from '../inbox/inbox.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -125,6 +125,7 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
 
 /** The version a remove of the folder `dir` is handed: the revision it is served at, where it is a folder; none where it is not. */
 async function versionAt(dir: string) {
+  await runWith(e(), indexSweep());
   return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()
     ? { version: String(await runWith(e(), definitionRevisionNow('Workflow', undefined, path.basename(dir)))) }
     : {};

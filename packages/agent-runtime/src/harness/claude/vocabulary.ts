@@ -131,19 +131,6 @@ const CLAUDE_HELD_MODE = 'dontAsk';
 const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
 
 /**
- * The models on which Claude Code drops `auto`: the session is filed in `auto` and runs in `default` from its first turn. Each matches
- * the name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.316, the Agent SDK's, by
- * the `permissionMode` of the session's `init` line, and again on 2.1.322, 2.1.323 and 2.1.325 by `test/live-sdk.boundary.test.ts`, which
- * measures each listed model and each alias at every bump: `haiku`, `sonnet`, `opus` and `fable` keep `auto` and are not listed. On
- * 2.1.322, ten runs a model: both listed ran in `default` all ten times, and `haiku` and `sonnet` in `auto` all ten, so no model's
- * answer varies — but in one run of ten each listed model's `init` line said `auto`, and a `status` line after it `default`: the mode
- * Claude Code settles after printing the `init` line, by a check of its own bundled code (`auto` is refused on a model before
- * `claude-opus-4-6` in its list of models, no flag fetched). So the mode is read off both (`claudeStreamOutput`). A model not listed is
- * let through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
- */
-export const CLAUDE_AUTO_DROPPED: readonly string[] = ['claude-haiku-4-5', 'claude-sonnet-4-5'];
-
-/**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
  * refuse one: it prints a warning for an unknown `--effort` and runs at its default effort — a knob
  * that silently does nothing.
@@ -371,12 +358,8 @@ export const CLAUDE_ADDED_FOLDER_READS = {
   memoryExcludes: 'claudeMdExcludes',
 } as const;
 
-/** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
-const dropsAuto = (model: string | undefined) =>
-  model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
-
-/** Claude Code's fence on `model`, run as a job or a background session alike. */
-const claudeReach = (model: string | undefined) =>
+/** Claude Code's fence, run as a job or a background session alike. */
+const claudeReach = () =>
   ({
     by: 'mode',
     rank: CLAUDE_MODE_RANK,
@@ -384,7 +367,7 @@ const claudeReach = (model: string | undefined) =>
     writes: CLAUDE_MODE_RANK.acceptEdits,
     held: CLAUDE_HELD_MODE,
     unasking: CLAUDE_UNASKING_MODES,
-    dropped: dropsAuto(model) ? ['auto'] : [],
+    autoMode: 'auto',
     refusing: CLAUDE_REFUSING_MODES,
     unfenced: CLAUDE_UNFENCED,
     granted: CLAUDE_GRANTED,
@@ -413,6 +396,7 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
     'interrupt',
     'answerAsk',
     'quota',
+    'models',
     'mcp',
     'hold',
     'drain',

@@ -5,6 +5,7 @@
  * use and hands on stdin (`--factory-parts -`), so no store is read here; `pack`, which writes a checked folder into one archive, and
  * `unpack`, which writes an archive's folder back. Their handlers answer data, and the CLI prints it.
  */
+import { listedModels } from '../harness/models.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Result, Schema } from 'effect';
@@ -88,7 +89,7 @@ const digestLine = (digest: string | undefined) => `digest of the content: ${dig
 /** The folder or archive `folder`, read through the Template door and checked: it passes with its digest, or every problem is refused. */
 const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {
   const read = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(folder)));
-  const { problems, digest } = checkedTree(read, packageSkillNames());
+  const { problems, digest } = checkedTree(read, packageSkillNames(), listedModels(yield* StoreRoot));
   if (problems.length)
     return yield* Effect.fail(
       new Invalid({

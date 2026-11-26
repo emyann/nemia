@@ -44,6 +44,7 @@ import {
   UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
+import type { ListedModel } from '../../contracts/listed-models.contract.ts';
 import { fold, waitsForInput, isLive, nameParts, type Event, type Sighting, type Usage } from '../core/index.ts';
 import {
   RunnerError,
@@ -128,6 +129,7 @@ export const cardOf = (harness: string, ops: RunnerOps) => ({
             ...(ops.transcript ? ['sessionTranscript' as const] : []),
             ...(ops.observeFor ? ['observeSessions' as const] : []),
             ...(ops.quota ? ['harnessQuota' as const] : []),
+            ...(ops.models ? ['harnessModels' as const] : []),
             ...(ops.forget ? ['forgetSession' as const] : []),
             ...(ops.kept ? ['sessionKept' as const] : []),
             ...(ops.compact ? ['compactSessions' as const] : []),
@@ -202,6 +204,8 @@ export interface SessionMethods {
   ): Promise<{ tasks: Task[]; unread: string[]; why: string[]; unreadWhy: Record<string, string> }>;
   /** What the harness's subscription has left, asked of the harness and of no session (`RunnerOps.quota`): one ask each call. */
   harnessQuota(params: Record<string, never>, context: ServerCallContext): Promise<HarnessQuota>;
+  /** The models the harness lists for a session, asked of the harness and of no session (`RunnerOps.models`): one ask each call. */
+  harnessModels(params: Record<string, never>, context: ServerCallContext): Promise<readonly ListedModel[]>;
   /**
    * What the harness keeps of a session, by its name and the id it ended with: removed, or with `dry` only listed, and what
    * it leaves that is not its own to remove (`RunnerOps.forget`). Asked only of a session the harness no longer lists.
@@ -544,6 +548,13 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness reports no quota: no subscription's use can be asked of it.`);
     }
     return this.run(this.ops.quota);
+  }
+
+  async harnessModels(_params: Record<string, never>, _context: ServerCallContext) {
+    if (!this.ops.models) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness lists no models: none can be asked of it.`);
+    }
+    return this.run(this.ops.models);
   }
 
   async forgetSession(params: ForgetRequest, _context: ServerCallContext) {

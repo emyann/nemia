@@ -5,4 +5,5 @@
 export { ceilingsOf, metricsOf } from './ceilings.ts';
 export { readDaemon } from './daemon.ts';
 export { feedOpened } from './feed.ts';
+export { modelsOf } from './models.ts';
 export { QuotaAsker } from './quota.ts';

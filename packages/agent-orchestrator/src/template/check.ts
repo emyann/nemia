@@ -6,10 +6,10 @@
  * that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
-import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
-import { HARNESS_PROPERTIES, OVERRIDABLE } from '../workflow/index.ts';
+import { harnessModelJudged, HARNESS_PROPERTIES, listedFor, modelWords, OVERRIDABLE, type ModelLists } from '../workflow/index.ts';
 import { selectorsRefusal } from '../watch/selector.ts';
 import { labelValuesOf } from '../label-spelling/label-spelling.ts';
 import {
@@ -330,6 +330,25 @@ const agentRefusals = (held: Held) =>
     ];
   }) satisfies Refusal[];
 
+/**
+ * The model each harness block of an agent names, judged against the list its harness recorded (`modelWords`): an alias, a word the
+ * harness does not list, or a model that drops the block's mode or effort, refused at the block's `model`. None where no list is recorded.
+ */
+const modelRefusals = (held: Held, lists: ModelLists | undefined) =>
+  [...held.agents].flatMap(([name, spec]) =>
+    Object.keys(HARNESS_KNOBS).flatMap((harness) => {
+      const block = spec[harness];
+      if (!isMap(block) || typeof block.model !== 'string') return [];
+      const fence = isMap(block.fence) ? block.fence : {};
+      const key = fenceKeyOf(harness);
+      const word = key === undefined ? undefined : fence[key];
+      const effort = typeof block.effort === 'string' ? block.effort : undefined;
+      const judged = harnessModelJudged(block.model, harness, typeof word === 'string' ? word : undefined, effort, lists);
+      const words = modelWords(block.model, judged, listedFor(harness, lists));
+      return words === undefined ? [] : [{ file: `agents/${name}/agent.yaml`, at: ['spec', harness, 'model'], message: words }];
+    }),
+  ) satisfies Refusal[];
+
 /** Each word of an agent's `overridable` that is none of `OVERRIDABLE`, refused at its place, as the agent's file refuses it. */
 const overridableRefusals = (file: string, offered: unknown) =>
   (Array.isArray(offered) ? offered : []).flatMap((word, i) => {
@@ -566,6 +585,7 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
  * @param text The words of one of the folder's files, by its path.
  * @param lines The lines of a file of shared lines, by its path, or undefined where it is no YAML list of strings.
  * @param placeNeeds The names of the needs the builtin places declare, which a workflow's need may fill.
+ * @param lists The models each harness lists, as the store recorded them, which each agent's model is judged against; undefined for none.
  */
 export function checkTemplate(
   folder: ReadFolder,
@@ -573,6 +593,7 @@ export function checkTemplate(
   text: (file: string) => string,
   lines: (file: string) => readonly string[] | undefined,
   placeNeeds: readonly string[] = [],
+  lists?: ModelLists,
 ) {
   const held = heldOf(folder, packageSkills);
   const documents = [...folder.documents].flatMap(([file, doc]) =>
@@ -586,6 +607,7 @@ export function checkTemplate(
     ...labelValuesRefusals(held),
     ...originRefusals(held),
     ...agentRefusals(held),
+    ...modelRefusals(held, lists),
     ...stepRefusals(held),
     ...needRefusals(held, placeNeeds),
     ...stepFileRefusals(folder, held),

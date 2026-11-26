@@ -3,8 +3,8 @@
  * step and the folders beside it may take, and `parseFolder`, which reads every step and checks them together.
  */
 import path from 'node:path';
-import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
-import { orderSteps, parseWorkflow, validate } from '../workflow/index.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, refuse, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
+import { orderSteps, parseWorkflow, stepModelRefusal, validate, type ModelLists } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
 import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';
@@ -200,6 +200,8 @@ export function hireOf(fills: Fills | undefined, step: string) {
  * @param agents The agents `agent:` may name; none where not given.
  * @param skills The skills those agents may be given; none where not given.
  * @param fills The agents a factory hires into the steps and its rules; none where not given.
+ * @param lists The models each harness lists, as the store recorded them: each step's model, its agent's where it names none, is judged
+ *   against its harness's (`stepModelRefusal`); none where not given, and then no model is judged.
  */
 export function parseFolder(
   files: ReadonlyArray<readonly [name: string, text: string]>,
@@ -207,9 +209,14 @@ export function parseFolder(
   agents?: Agents,
   skills?: SkillsFound,
   fills?: Fills,
+  lists?: ModelLists,
 ) {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
   const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name), fills?.rules));
+  for (const step of steps) {
+    const refused = stepModelRefusal(step, lists);
+    if (refused !== undefined) refuse(refused);
+  }
   validate(steps);
   return orderSteps(steps) satisfies StepSpec[];
 }

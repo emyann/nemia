@@ -541,6 +541,7 @@ const readStep = (name: string, from: number | null, to: number | null, usd: num
             reason: null,
             release: null,
             harness: null,
+            model: null,
           },
         },
   taskId: from === null ? null : `${name}-task`,

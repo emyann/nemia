@@ -11,7 +11,6 @@
  * alone (`test/vocabulary-door.test.ts`).
  */
 export {
-  CLAUDE_AUTO_DROPPED,
   CLAUDE_CONTEXT_TOKENS,
   CLAUDE_EFFORTS,
   CLAUDE_PERMISSION_MODES,
@@ -42,5 +41,6 @@ export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
 export { HARNESS_CHOICES, HARNESS_KNOBS, type HarnessKnobs } from './harness/choices.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { ADDED_FOLDER_READS, addedFolderReadsOf, CONFIG_FOLDERS, configFolderIn, type AddedFolderReads } from './harness/config-folders.ts';
+export type { ListedModel } from '../contracts/listed-models.contract.ts';
 export type { Admission, AdmissionAnswer, AdmissionCall } from './harness/admission.ts';
 export { memoryBytesOf, memoryQuantityRefusal } from './core/memory.ts';

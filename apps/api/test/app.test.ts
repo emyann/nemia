@@ -611,7 +611,10 @@ describe("a store's runs read on the list and on a run's page: each summarized w
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
+      attempts: {
+        count: 1,
+        latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null, model: null },
+      },
     };
     assert.deepEqual(specOf(run, 'implement'), {
       name: 'implement',
@@ -938,7 +941,10 @@ describe('a run whose workflow folder changes or vanishes after it starts is rea
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
+      attempts: {
+        count: 1,
+        latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null, model: null },
+      },
     };
     assert.equal(specOf(object, 'original'), undefined, 'the folder no longer has it: no spec of it');
     assert.deepEqual(await toldOf(app, 'r-6', 'original'), {
@@ -1201,7 +1207,7 @@ describe("a step's attempts and its log: how many, when the latest began and end
     assert.deepEqual(
       run.steps.map((s: { attempts: unknown }) => s.attempts),
       [
-        { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null, release: null, harness: null } },
+        { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null, release: null, harness: null, model: null } },
         { count: 0, latest: null },
       ],
       'the second attempt is still going, so it has not ended; the one the engine lost is counted',
@@ -1219,7 +1225,7 @@ describe("a step's attempts and its log: how many, when the latest began and end
       (await objectOf(app, 'r-8')).status.steps[0].attempts,
       {
         count: 1,
-        latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness', release: null, harness: null },
+        latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness', release: null, harness: null, model: null },
       },
       'an attempt that ran half an hour ends at its ended event, not at its start, so the board can say how long it took',
     );
@@ -1234,7 +1240,7 @@ describe("a step's attempts and its log: how many, when the latest began and end
       ]);
     const unsignedWords = {
       count: 1,
-      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned', release: null, harness: null },
+      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned', release: null, harness: null, model: null },
     };
     quiet('t-8u', { observed: 'done', reason: 'harness', closedOut: false }, 'succeeded');
     writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
@@ -1257,7 +1263,7 @@ describe("a step's attempts and its log: how many, when the latest began and end
 
     const cappedWords = {
       count: 1,
-      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget', release: null, harness: null },
+      latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget', release: null, harness: null, model: null },
     };
     quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
@@ -2215,7 +2221,7 @@ describe("a step's tries and its closeout: every try of a looped step off one ob
 
       const once = {
         count: 1,
-        latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null },
+        latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null, model: null },
       };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
         apiVersion: null,

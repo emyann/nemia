@@ -1120,35 +1120,6 @@ describe('a command node takes `retries:`, a failure policy by exit code and `ga
   });
 });
 
-describe('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', () => {
-  const refusedModel = async (lines: string[], model: string, ...facts: string[]) => {
-    const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });
-    await assert.rejects(
-      stage.runWith(stage.board().e, retryRun(run.id, 'implement', { mode: 'fresh', model })),
-      (err: Error & { exitCode?: number; _tag?: string }) => {
-        refusedAs('Conflict', `\`--model ${model}\``, `nemia retry ${run.id} implement --model sonnet`, ...facts)(err);
-        assert.doesNotMatch(err.message, /F21|measured/, 'no finding number, no version');
-        return true;
-      },
-    );
-    assert.deepEqual(retryAsks(run.id), [], 'nothing written');
-  };
-  const askedModel = async (lines: string[], model: string) => {
-    const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });
-    assert.equal((await stage.runWith(stage.board().e, retryRun(run.id, 'implement', { mode: 'fresh', model }))).ask.model, model);
-  };
-  for (const model of ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'])
-    test(`REFUSED ${model} on a step that names no mode, filed in \`auto\` by default`, () =>
-      refusedModel([], model, 'implement names no `permissionMode:`', '`auto`', 'a job denies every call `default` would ask about'));
-  test('REFUSED claude-haiku-4-5 on a step that says `permissionMode: auto`', () =>
-    refusedModel(['permissionMode: auto'], 'claude-haiku-4-5', 'implement says `permissionMode: auto`'));
-  test('sonnet, which keeps the mode, is asked', () => askedModel([], 'sonnet'));
-  test('haiku, whose alias keeps the mode, is asked on a step that says `permissionMode: auto`', () =>
-    askedModel(['permissionMode: auto'], 'haiku'));
-  test('claude-haiku-4-5 on a step in `dontAsk` is asked', () => askedModel(['permissionMode: dontAsk'], 'claude-haiku-4-5'));
-  test('claude-haiku-4-5 on a codex step is asked', () => askedModel(['harness: codex'], 'claude-haiku-4-5'));
-});
-
 describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', () => {
   let b!: import('./story.ts').Board;
   beforeAll(async () => {

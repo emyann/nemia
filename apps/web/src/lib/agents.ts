@@ -1,3 +1,4 @@
+import type { HarnessModels } from './api/models.ts';
 import type { AgentListing, AgentRoleKey } from './api/agents.ts';
 import type { KeyForm } from './api/builder.ts';
 import { remoteRefuses } from './builder.ts';
@@ -347,4 +348,16 @@ export function tryHeld(brief: string, latest: { moving: boolean; id: string } |
   if (latest?.moving) return `A try is still running (${latest.id}): one at a time.` satisfies string | null as string | null;
   if (!brief.trim()) return 'Write a brief to try it on.' satisfies string | null as string | null;
   return null satisfies string | null as string | null;
+}
+
+/**
+ * The ids of the models `models` records for the harness an agent names, the default harness where it names none: undefined where no
+ * list is recorded for it, and then its model is free text, not checked.
+ * @param models What the api serves of each harness's list; undefined while it is read or where it was not.
+ * @param harness The harness the agent names, as typed; empty for the default one.
+ * @param defaultHarness The harness an agent that names none runs on.
+ */
+export function modelIdsOf(models: HarnessModels | undefined, harness: string, defaultHarness: string | undefined) {
+  const on = harness.trim() || defaultHarness;
+  return models?.harnesses.find((h) => h.harness === on)?.models.map((m) => m.id);
 }

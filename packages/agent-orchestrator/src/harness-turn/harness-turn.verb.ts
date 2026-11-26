@@ -188,7 +188,7 @@ export const startTurn = Effect.fn('startTurn')(function* (start: TurnStart) {
     if (running.check.state === 'running') return running;
   }
   const id = `turn-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
-  const held = declaration.reach?.(model).held;
+  const held = declaration.reach?.().held;
   const fence = declaration.knobs?.fence.key;
   fs.mkdirSync(turnsDir(home), { recursive: true });
   yield* asked(

@@ -134,6 +134,7 @@ const VERBS = [
   'mcpSignInState',
   'mcpSignOut',
   'mcpState',
+  'models',
   'output',
   'path',
   'quota',

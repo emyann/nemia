@@ -628,7 +628,7 @@ An agent is written once, in `agents/` beside the workflow folders — `<repo>/w
 ---
 description: Reviews a change read-only, as a second engineer would
 harness: claude
-model: opus
+model: claude-opus-5-5
 output: review.schema.json   # beside the agent, in agents/
 overridable: output, fence    # what a step may override of it
 claude:
@@ -949,9 +949,7 @@ naming each place looked in; skills with no `Skill` in the step's `tools:` or wi
 session cannot load is a name in its prompt (F11); skills or a harness prompt on codex, which is handed the instructions in its brief
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
-on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`:
-`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316, 2.1.322, 2.1.323 and 2.1.325), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
-(`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
+on a model whose row in the harness's list says it does not keep `auto` (`supportsAutoMode`, recorded by the daemon: `models.json`), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way (`retryRefusal`, through `modelJudged`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
 agent's fence (`addedSkillsRefusal`); and one no place has, naming each place looked in.
@@ -4598,6 +4596,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `worktrees/<id>/run/` (`worktrees/<id>/<step>/` for a fork) | the run's line of work, or a fork's, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
 | `tick-recent.json` | the last 150 passes, oldest first, each its time, phases and what it saw (`RecentPass`): what `wf passes` and the api's `GET /api/passes` read | the tick (`recordRecentPass`), through a hidden file and a rename, the oldest dropped past 150 | not touched |
+| `models.json` | the models each harness lists, by canonical id, as the harness answered the daemon (`recordedModels`): what a load, a start, a retry and the template lint judge a model by, and what `GET /api/models` serves | the daemon, at its start and every hour (`askedModels`), a harness's answer replacing its own entry whole | not touched |
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed, and a line each time a daemon takes the store (`nemia watch`) | the daemon: its tick, and `up`'s start | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `forgetting/<id>.json` | the engine's tasks of a run `wf rm` removed, until the engine forgets them | `wf rm`; the tick lifts it | written, then lifted once each task is forgotten |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | each task of the run forgotten through the runtime's `forget`, once settled |
@@ -4745,8 +4744,8 @@ keeps them (`withModels`). Its other steps, and every other run of the workflow,
 Pod's container takes its image per Pod. `wf start` says them (`models: implement=fable`).
 
 Refused before a run is written, exit 2, naming where the model was said: a step the workflow does not have; `inherit`; a step on a
-remote agent, which runs as its operator configured it; and a Claude Code step in `auto` on a model that drops it
-(`CLAUDE_AUTO_DROPPED`), naming the models that keep it, as `wf retry --model` is refused. What the step's harness then refuses of the
+remote agent, which runs as its operator configured it; and, where the daemon has recorded the step's harness's list of models
+(`models.json`, `GET /api/models`), a model that is no id of the list (an alias such as `opus` is refused, naming the id it resolves to) or that drops the step's mode or effort, naming the ids, as `wf retry --model` is refused. What the step's harness then refuses of the
 config it would be filed with is refused as any start's (`configRefused`). `wf start <folder> --model` is refused by name, and so is a
 `--model` sent to another machine's api: say it on the card there.
 

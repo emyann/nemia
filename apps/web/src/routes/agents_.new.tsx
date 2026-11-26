@@ -6,6 +6,7 @@ import { AgentRefused, DefinitionTrail, RouteLink } from '../components/agent/Ag
 import { AgentRefusal, createAgent, type AgentDraft } from '../lib/api/agents.ts';
 import { hireAgent } from '../lib/api/factories.ts';
 import { keyFormQuery } from '../lib/api/builder.ts';
+import { modelsQuery } from '../lib/api/models.ts';
 import { storeQuery } from '../lib/api/store.ts';
 import { invalidateAgents, invalidateHires } from '../lib/agentWrites';
 import { hireOnCreate, hirePlaceOf, type HirePlace } from '../lib/factories';
@@ -32,6 +33,7 @@ export const Route = createFileRoute('/agents_/new')({
  */
 function NewAgentPage() {
   const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: models } = useQuery(modelsQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
   const { factory: hiring, workflow: into, step: intoStep } = hirePlaceOf(Route.useSearch());
   const hireInto = hiring && into && intoStep ? { factory: hiring, workflow: into, step: intoStep } : null;
@@ -67,6 +69,7 @@ function NewAgentPage() {
       <AgentForm
         listing={null}
         keyForm={keyForm}
+        models={models}
         saving={create.isPending}
         refusal={create.error && <AgentRefused message={create.error.message} users={refused?.users ?? []} from="user" />}
         onSave={(draft) => create.mutate(draft)}

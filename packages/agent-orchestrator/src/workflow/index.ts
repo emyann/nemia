@@ -2,7 +2,7 @@
  * The face of `workflow/`: one step file read and written, the steps of a folder checked together, and a step's tools judged against
  * what its session will be allowed, each re-exported by name.
  */
-export { autoDropped, parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
+export { parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
 export {
   agentDeniesOf,
   directoryFence,
@@ -19,6 +19,7 @@ export {
   type Fenced,
   type Overridable,
 } from './fence.ts';
+export { harnessModelJudged, listedFor, modelWords, stepModelJudged, stepModelRefusal, type ModelLists } from './model-words.ts';
 export { headedLayers } from './layers.ts';
 export type { ComposedLayer } from './layers.ts';
 export { unallowedRefusal } from './unallowed.ts';

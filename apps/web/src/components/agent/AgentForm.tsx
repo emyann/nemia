@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/ds';
 import type { AgentListing, AgentRoleKey } from '../../lib/api/agents.ts';
 import type { KeyForm } from '../../lib/api/builder.ts';
+import type { HarnessModels } from '../../lib/api/models.ts';
 import { GivenSkills, Skills } from './AgentParts';
 import { Markdown } from '../markdown/Markdown';
 import { cn } from '../../lib/utils';
@@ -25,6 +26,7 @@ import {
   edited,
   formOf,
   hasKey,
+  modelIdsOf,
   KEY_LABELS,
   meaningOf,
   pickHarnessPrompt,
@@ -48,7 +50,6 @@ const HINTS: Partial<Record<AgentRoleKey, string>> = {
   tools: 'The tools its sessions may use, comma-separated: Read, Grep, Bash(npm test). Unset, the harness decides.',
   disallowedTools: 'The tools its sessions may never use, comma-separated, whatever `tools` allows.',
   context: 'The context window its sessions are capped at, in tokens: 200k, say.',
-  model: 'A model its harness knows: opus, sonnet, gpt-5-codex.',
 };
 
 /**
@@ -61,6 +62,7 @@ const HINTS: Partial<Record<AgentRoleKey, string>> = {
 export function AgentForm({
   listing,
   keyForm,
+  models,
   readOnly = false,
   saving,
   refusal,
@@ -70,6 +72,8 @@ export function AgentForm({
 }: {
   listing: AgentListing | null;
   keyForm: KeyForm | undefined;
+  /** The models each harness lists, as the api serves them: the model is picked from its harness's, free text where none is recorded. */
+  models?: HarnessModels | undefined;
   readOnly?: boolean;
   saving: boolean;
   refusal: ReactNode;
@@ -82,6 +86,7 @@ export function AgentForm({
   const setKey = (key: AgentRoleKey, value: string) => setForm((f) => ({ ...f, keys: { ...f.keys, [key]: value } }));
   const changed = edited(form, listing);
   const harness = form.keys.harness;
+  const modelIds = modelIdsOf(models, harness, keyForm?.defaultHarness);
 
   const text = (key: AgentRoleKey) => (
     <Field
@@ -134,7 +139,7 @@ export function AgentForm({
         <legend className="mb-2 text-label-medium text-on-surface-variant uppercase">How its sessions run</legend>
         <div className="grid gap-4 @md/page:grid-cols-2 @3xl/page:grid-cols-3">
           {choice('harness')}
-          {text('model')}
+          <ModelField ids={modelIds} value={form.keys.model} onChange={(v) => setKey('model', v)} readOnly={readOnly} />
           {choice('effort')}
           {text('context')}
           {choice('permissionMode')}
@@ -191,22 +196,86 @@ export function AgentForm({
       />
 
       {!readOnly && (
-        <div className="flex flex-wrap items-center gap-3">
-          <CutPress pending={saving} type="submit" isDisabled={saving || !changed}>
-            {saving ? 'Saving…' : listing ? 'Save' : 'Create agent'}
-          </CutPress>
-          {listing && changed && (
-            <Button variant="outlined" onPress={() => setForm(formOf(listing))} isDisabled={saving}>
-              Discard changes
-            </Button>
-          )}
-          <p className="text-body-small text-on-surface-variant">
-            A save changes what a run started later freezes. A run already started keeps the agent it froze.
-          </p>
-          {footer}
-        </div>
+        <SaveRow
+          saving={saving}
+          isNew={!listing}
+          changed={changed}
+          onDiscard={listing ? () => setForm(formOf(listing)) : undefined}
+          footer={footer}
+        />
       )}
     </form>
+  );
+}
+
+/** The row under the form: Save (or Create agent), Discard where the agent is written and changed, and what a save does. */
+function SaveRow({
+  saving,
+  isNew,
+  changed,
+  onDiscard,
+  footer,
+}: {
+  saving: boolean;
+  isNew: boolean;
+  changed: boolean;
+  onDiscard: (() => void) | undefined;
+  footer: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <CutPress pending={saving} type="submit" isDisabled={saving || !changed}>
+        {saving ? 'Saving…' : isNew ? 'Create agent' : 'Save'}
+      </CutPress>
+      {onDiscard && changed && (
+        <Button variant="outlined" onPress={onDiscard} isDisabled={saving}>
+          Discard changes
+        </Button>
+      )}
+      <p className="text-body-small text-on-surface-variant">
+        A save changes what a run started later freezes. A run already started keeps the agent it froze.
+      </p>
+      {footer}
+    </div>
+  );
+}
+
+/**
+ * The agent's model: picked from the ids its harness lists (`ids`), an alias being refused where a step runs it (the load judges a step's
+ * model on the step's own harness, which may not be the agent's); free text, said not checked, where no list of its harness is recorded.
+ */
+function ModelField({
+  ids,
+  value,
+  onChange,
+  readOnly,
+}: {
+  ids: readonly string[] | undefined;
+  value: string;
+  onChange: (value: string) => void;
+  readOnly: boolean;
+}) {
+  if (ids) {
+    return (
+      <Choice
+        label={KEY_LABELS.model}
+        hint="The id its harness lists; a step that runs an alias such as opus is refused."
+        value={value}
+        choices={ids}
+        onChange={onChange}
+        readOnly={readOnly}
+      />
+    );
+  }
+  return (
+    <Field
+      label={KEY_LABELS.model}
+      hint="Not checked: no list of this harness's models is recorded yet."
+      value={value}
+      onChange={onChange}
+      readOnly={readOnly}
+      mono
+    />
   );
 }
 

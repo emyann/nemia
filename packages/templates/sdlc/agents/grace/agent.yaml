@@ -15,7 +15,7 @@ spec:
     - mcp
   harness: claude
   claude:
-    model: opus
+    model: claude-opus-5-5
     effort: medium
     context: 200k
     fence:

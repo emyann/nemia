@@ -44,7 +44,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   filed in `default` (`test/live.test.ts`, M1 and M7). Measured again on **SDK 0.3.322, Claude Code 2.1.322, 2026-11-11**, by
   `test/live-sdk.boundary.test.ts`'s third case, one job per model filed in `auto` and read off its `init` line: `haiku`
   (`claude-haiku-5-5`), `sonnet` (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) ran in `auto`, and
-  `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so `CLAUDE_AUTO_DROPPED` stands as it was. The case makes this measurement
+  `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so the list Nemia kept then (replaced since by the harness's own `supportsAutoMode`, read through `models`) stood as it was. The case makes this measurement
   again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`. Measured ten times a model the same day, after
   two runs' checks failed on the case and a third passed: `claude-haiku-4-5` and `claude-sonnet-4-5` ran in `default` in all ten, and
   `haiku` and `sonnet` in `auto` in all ten, so no model's answer varies. What varied is the `init` line: in one run of ten each listed
@@ -52,7 +52,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   session ran in, which Claude Code settles after printing `init` (its bundled code refuses `auto` on a model before
   `claude-opus-4-6` in its list, a local check, no flag fetched). So `ranIn` is the last mode an `init` or a `status` line names
   (`claudeStreamOutput`), and the case reads it so. A case that fails is a change of Claude Code's: measure the model ten times, as
-  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own. Read again on **SDK 0.3.323, Claude Code 2.1.323, 2026-11-13**,
+  here, before a list of the models that drop `auto` is kept again, on a card of its own. Read again on **SDK 0.3.323, Claude Code 2.1.323, 2026-11-13**,
   off the `init` line the bundled binary prints for each model asked with `--permission-mode auto`, before it refuses to run unsigned
   in the implement step's session: `claude-haiku-4-5` and `claude-sonnet-4-5` say `default`, `haiku` (`claude-haiku-5-5`), `sonnet`
   (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) say `auto`; the list stands. The live case

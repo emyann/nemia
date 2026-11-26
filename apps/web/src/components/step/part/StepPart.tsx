@@ -6,6 +6,7 @@
  */
 import type { AgentListing } from '@/lib/api/agents';
 import type { RunDetail, StepView } from '@/lib/runView';
+import { useUnchecked } from '@/lib/useUnchecked';
 import { slotsOf, stepPartOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
@@ -71,7 +72,8 @@ export function StepPart({
   id?: string;
 }) {
   const ticking = useNow(30_000);
-  const part = stepPartOf(view, step, now ?? new Date(ticking), agents);
+  const unchecked = useUnchecked();
+  const part = stepPartOf(view, step, now ?? new Date(ticking), agents, unchecked);
   const own = view.steps.find((s) => s.name === step);
   return (
     <CutFrame hue={part.head.hue} size={size === 'S' ? 12 : 24} className={cn(WIDTH[size], size === 'L' && 'scroll-mt-4')}>

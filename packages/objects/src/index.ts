@@ -470,6 +470,7 @@ export {
   LatestRelease,
   YourStore,
 } from './server-api.ts';
+export { HarnessModelList, HarnessModels, ListedModelRead } from './models.ts';
 export { SessionAnswer, SessionGroup } from './session.ts';
 export {
   FINISHING_KINDS,

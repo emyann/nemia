@@ -16,7 +16,7 @@ spec:
   output:
     path: agents/seldon/output.schema.json
   claude:
-    model: opus
+    model: claude-opus-5-5
     effort: high
     context: 400k
     fence:

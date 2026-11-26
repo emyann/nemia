@@ -351,7 +351,11 @@ export const definitionRevisionsNow = Effect.fn('definitionRevisionsNow')(functi
   return {
     head,
     of: (kind: 'Agent' | 'Skill' | 'Workflow', namespace: string | undefined, name: string) => kinds[kind](namespace, name),
-    words: (factory: string) => held.get(definitionKey(factory, 'factory', factory)) ?? head + 1,
+    words: (factory: string) => {
+      if (!withFactoryWords)
+        throw new Error('definitionRevisionsNow reads no factory words unless it is called with `true`: ask for them.');
+      return held.get(definitionKey(factory, 'factory', factory)) ?? head + 1;
+    },
   };
 });
 

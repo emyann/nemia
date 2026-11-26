@@ -122,7 +122,7 @@ const KINDS = { workflow: 'Workflow', agent: 'Agent', skill: 'Skill' } as const;
 /** The revision the definition index numbers a definition at now, as a run's pin is numbered: the factory's rules by the factory's name. */
 const revisionOf = (kind: Pin['kind'], name: string, namespace = 'default') =>
   rootedLater(
-    Effect.map(definitionRevisionsNow(), (table) => (kind === 'rules' ? table.words(name) : table.of(KINDS[kind], namespace, name))),
+    Effect.map(definitionRevisionsNow(true), (table) => (kind === 'rules' ? table.words(name) : table.of(KINDS[kind], namespace, name))),
   );
 
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>

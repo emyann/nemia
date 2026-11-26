@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Option, Schema } from 'effect';
+import { HARNESS_PROPERTIES } from '../workflow/index.ts';
 import { Agent, AgentName, agentsModel, Skill, SkillName, StepAgent } from './agents.model.ts';
 import { erDiagram } from '../model/er.model.ts';
 import { skillDraftOf } from '../skills/skills.ts';
@@ -73,7 +74,8 @@ describe("each step of the tests' team names its agent by id", () => {
       const overrides = overridesOf(readKeys(step, block, () => undefined).meta);
       const offered = agents.get(name)?.overridable;
       assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step, agent: name, overrides }), true, step);
-      for (const word of overrides) assert.ok(offered === undefined || offered.includes(word), `${step} overrides ${word} of ${name}`);
+      for (const word of overrides.filter((word) => !(HARNESS_PROPERTIES as readonly string[]).includes(word)))
+        assert.ok(offered === undefined || (offered as readonly string[]).includes(word), `${step} overrides ${word} of ${name}`);
     }
   });
   test('REFUSED: an override that is nothing a step may override', () =>

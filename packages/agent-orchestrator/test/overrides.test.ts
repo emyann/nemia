@@ -107,13 +107,11 @@ const offering = (offers?: string) =>
   });
 
 describe('what a step may override is what its agent offers: anything else is refused at load, naming the key and the agent', () => {
-  test('REFUSED: a model the agent does not offer', () => {
-    const said = refusal(() => step('---\nplace: git\nagent: reviewer\nmodel: sonnet\n---\n', offering('skills')));
-    assert.ok(said.includes('`model`') && said.includes('reviewer'), said);
+  test("a model is always the step's to override, whatever the agent offers", () => {
+    assert.equal(step('---\nplace: git\nagent: reviewer\nmodel: sonnet\n---\n', offering('skills')).model, 'sonnet');
   });
-  test('REFUSED: the same, on a step its factory hires the agent into', () => {
-    const said = refusal(() => step('---\nplace: git\nmodel: sonnet\n---\nReview.\n', offering('skills'), 'reviewer'));
-    assert.ok(said.includes('`model`') && said.includes('reviewer'), said);
+  test('the same, on a step its factory hires the agent into', () => {
+    assert.equal(step('---\nplace: git\nmodel: sonnet\n---\nReview.\n', offering('skills'), 'reviewer').model, 'sonnet');
   });
   test('REFUSED: a fence the agent does not offer, even one that only narrows', () => {
     const said = refusal(() =>
@@ -146,8 +144,12 @@ describe('what a step may override is what its agent offers: anything else is re
     assert.deepEqual(formerKeyLines(path.join(root, 'dev')), [overridableLine(path.join(root, 'agents', 'reviewer.md'))]);
   });
   test('REFUSED: a word on `overridable:` that is nothing a step may override', () => {
-    const said = refusal(() => parseAgent('reviewer', '---\noverridable: model, check\n---\nYou review.\n'));
+    const said = refusal(() => parseAgent('reviewer', '---\noverridable: fence, check\n---\nYou review.\n'));
     assert.ok(said.includes('`check`'), said);
+  });
+  test("REFUSED: a property of the harness on `overridable:`, which is always a step's to override", () => {
+    const said = refusal(() => parseAgent('reviewer', '---\noverridable: model, fence\n---\nYou review.\n'));
+    assert.ok(said.includes('`model`'), said);
   });
 });
 
@@ -155,10 +157,10 @@ test("a save of an agent that does not send its `overridable:` line keeps the fi
   const dir = path.join(ROOT, 'workflows', 'agents');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'reviewer.md');
-  fs.writeFileSync(file, '---\noverridable: model, fence\nmodel: opus\n---\nYou review.\n');
+  fs.writeFileSync(file, '---\noverridable: output, fence\nmodel: opus\n---\nYou review.\n');
   const draft = { name: 'reviewer', keys: { model: 'sonnet' }, body: 'You review.' };
   writeAgent(ROOT, dir, draft, { version: agentVersion(dir, 'reviewer') });
-  assert.deepEqual(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).overridable, ['model', 'fence'], 'the line kept');
+  assert.deepEqual(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).overridable, ['output', 'fence'], 'the line kept');
   assert.equal(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).keys.model, 'sonnet', 'and the change written');
   writeAgent(ROOT, dir, { ...draft, overridable: null }, { version: agentVersion(dir, 'reviewer') });
   assert.equal(parseAgent('reviewer', fs.readFileSync(file, 'utf8')).overridable, undefined, 'taken out');

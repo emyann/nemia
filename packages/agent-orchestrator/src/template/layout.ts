@@ -104,7 +104,7 @@ export type AgentSpec = {
   skills?: readonly string[];
   /** The MCP servers of the checkout its sessions load, by name. */
   mcp?: readonly string[];
-  /** What a step may override of it, each one of `OVERRIDABLE`; absent, everything, as the agent's `overridable:` line. */
+  /** What a step may override of it beyond the harness's properties, which it always may, each one of `OVERRIDABLE`; absent, everything. */
   overridable?: readonly string[];
   output?: { path: string };
   harness?: string;

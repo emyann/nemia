@@ -630,7 +630,7 @@ description: Reviews a change read-only, as a second engineer would
 harness: claude
 model: opus
 output: review.schema.json   # beside the agent, in agents/
-overridable: model, fence    # what a step may override of it
+overridable: output, fence    # what a step may override of it
 claude:
   fence:
     tools: Read, Grep, Glob, Bash
@@ -674,8 +674,9 @@ writes a resolved step back as its file was: `agent:`, the keys the step set its
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
 
-**What a step may override is the agent's to say: `overridable:`.** Its words are `OVERRIDABLE` (`src/workflow/fence.ts`): `model`,
-`effort`, `context`, `harness`, `remote`, `output`, `fence`, `skills` and `mcp`. `fence` stands for every fence key at once, and a
+**The harness's properties are always a step's to override** (`HARNESS_PROPERTIES`, `src/workflow/fence.ts`): `model`, `effort`,
+`context` and `harness`. **What shapes the agent's behaviour is the agent's to say: `overridable:`.** Its words are `OVERRIDABLE`:
+`remote`, `output`, `fence`, `skills` and `mcp`; a harness property written on the line is refused, saying to take it off. `fence` stands for every fence key at once, and a
 step's fence still only narrows its agent's; `skills` and `mcp` only add. A word not in the list is refused, naming it and the list. A
 step whose own frontmatter sets something the line leaves out is refused at load (`offerRefusal`), naming the step, the key and the
 agent: delete the step's line, or add the word to the agent's. This is judged on every load, from the files, the same for a step that

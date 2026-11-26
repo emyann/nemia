@@ -1,6 +1,7 @@
 /**
  * Every list the Api serves of a kind the keyspace watches (`isWatchedKind`) says its position as the keyspace head it was read at, and
- * each object of it the revision it stands at: a decimal, never past the list's. One table, every kind, so a kind added to the table of
+ * each object of it the revision it stands at: a decimal, never past the list's but for a definition no sweep has numbered, which stands
+ * one past it: the revision the sweep will write it at, sent to a watch from the list as an ordinary change. One table, every kind, so a kind added to the table of
  * `WATCHED_KINDS` and not served at a revision fails here; a kind the keyspace does not watch (the runs, the events) is left alone.
  */
 import { root } from '../../test/harness.ts';
@@ -37,8 +38,8 @@ test('every list of a watched kind is read at the keyspace head and each of its 
       assert.match(item.metadata.resourceVersion, /^(0|[1-9][0-9]*)$/, `${url}: an object's resourceVersion is a revision`);
     const head = Number(list.metadata.resourceVersion);
     assert.ok(
-      list.items.every((o) => Number(o.metadata.resourceVersion) <= head),
-      `${url}: no object is past the list`,
+      list.items.every((o) => Number(o.metadata.resourceVersion) <= head + 1),
+      `${url}: no object is more than one past the list, where only an unnumbered definition stands`,
     );
   }
   assert.ok(watched >= 10, `${watched} lists of a watched kind`);

@@ -22,7 +22,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
-import { cardKey, compactedAt, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, compactedAt, definitionsIndexed, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -188,6 +188,22 @@ test('a watch from the resourceVersion of a list sends the cards changed since a
     await w.stop();
     dropRecord(root, cardKey('rv-1'));
     dropRecord(root, cardKey('rv-2'));
+  }
+});
+
+test('a watch from the list of agents read while one has no sweep yet is not refused, and is sent that agent when the sweep writes it', async (t) => {
+  const file = path.join(root, 'workflows', 'agents', 'unswept.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '---\nrole: sweeper\ndescription: Waits for a sweep.\n---\nSweep it.\n');
+  const list = (await (await app.request('/api/namespaces/default/agents')).json()) as { metadata: { resourceVersion: string } };
+  const w = await watch(t, `/api/namespaces/default/agents?watch=true&resourceVersion=${list.metadata.resourceVersion}`);
+  try {
+    await w.initial();
+    await definitionsIndexed(root);
+    await waitFor(t, () => changes(w.events, 'unswept').length > 0, 'the agent the sweep wrote arrives as an ordinary change');
+  } finally {
+    await w.stop();
+    fs.rmSync(file, { force: true });
   }
 });
 

@@ -11,22 +11,21 @@ import { prefixesOf } from './kind-watch.store.ts';
 
 /**
  * The revision each object of `kind` stands at, as of one read of its records, the revision a write of its spec waits on (`specOf`,
- * which leaves out the records its status reads), and the keyspace head the read was made at, or the highest revision a definition not
- * yet numbered is served at where that is past it, so no object of a list is past its position. The definitions' revisions are worked
- * out with no write (`definitionsNumbered`).
+ * which leaves out the records its status reads), and the keyspace head the read was made at; a definition not yet numbered may stand
+ * one past it, the revision the sweep will write it at, which a watch from the head sends as an ordinary change. The definitions'
+ * revisions are worked out with no write (`definitionsNumbered`).
  * @param kind The kind served.
  */
 export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: WatchedKind) {
   const home = yield* StoreRoot;
   const keyspace = yield* keyspaceAt(keyspaceFile(home)).pipe(Effect.orDie);
   const held = new Map<string, ReadonlyMap<string, number>>();
-  let head = yield* keyspace.head;
+  const head = yield* keyspace.head;
   for (const prefix of prefixesOf(kind)) {
     if (prefix !== DEFINITIONS_PREFIX) held.set(prefix, yield* keyspace.touched(prefix));
     else {
       const numbered = yield* definitionsNumbered();
       held.set(prefix, numbered.held);
-      head = Math.max(head, numbered.head, ...numbered.held.values());
     }
   }
   return { of: revisionTable(kind, held), specOf: revisionTable(kind, held, true), head } as const;

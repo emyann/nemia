@@ -329,7 +329,7 @@ export const railStates = (
 ) => steps.map((step) => ({ name: step.name, state: stepState(step, cancelled, held), on: step.on }));
 
 /**
- * What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
+ * What the rail says aloud: each step and its word, in the run's order: `design verified, land waiting`, a step a
  * check verified told from one done on its own word.
  * @param steps The run's steps, each with its name and its codes.
  * @param cancelled Whether the run was called off.
@@ -345,7 +345,7 @@ export const railSaid = (
     .join(', ');
 
 /**
- * A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`.
+ * A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, working`.
  * @param name The step's name.
  * @param state The step's state.
  * @param on What thing the step waits on (`WaitOn`), or null where it waits on no thing.

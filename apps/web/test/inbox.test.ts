@@ -841,7 +841,7 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
       assert.ok(CARD_WORDS[state].word.trim() !== '', state);
       assert.ok(CARD_WORDS[state].title.trim() !== '', state);
     }
-    assert.equal(CARD_WORDS.cancelled.word, 'called off');
+    assert.equal(CARD_WORDS.cancelled.word, 'cancelled');
     assert.equal(CARD_WORDS.waiting.hue, 'yours', 'a run waiting on a person is yours');
     assert.equal(CARD_WORDS.running.hue, 'alive');
     assert.equal(CARD_WORDS.failed.hue, 'failure');

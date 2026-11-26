@@ -45,7 +45,7 @@ export default {
     for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
     await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
     await expectVisible(
-      graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-gate-band]`, { hasText: 'waits on you' }),
+      graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-gate-band]`, { hasText: 'waiting' }),
       `${FAKE.blocked} is drawn as a human gate`,
     );
     await expectVisible(

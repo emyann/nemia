@@ -305,7 +305,7 @@ when the cost becomes a state: over its budget it is `failure`, and a
 spend that needs a person's word is `yours`.
 
 - **Yours** is the acid yellow, the seed, and it says your move: what
-  waits on a person (the tag "waits on you", a count of what waits, a
+  waits on a person (the tag "waiting", a count of what waits, a
   gate, the edge of a card that waits) and the one filled action of a
   view. A waiting part is told from an action by its form: a tag, a count
   or an edge is never pressed, and a button always is.

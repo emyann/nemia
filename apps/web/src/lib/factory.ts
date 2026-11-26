@@ -116,7 +116,7 @@ export const onYouOf = (
 };
 
 /**
- * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
+ * Where a run stands, in a word, as the start form offers it to wait on: cancelled; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
  * @param run The run as the api lists it.
  */

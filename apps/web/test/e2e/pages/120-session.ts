@@ -20,7 +20,7 @@ export default {
     const top = page.locator('header[aria-label="The step"]');
     await expectVisible(top.getByRole('heading', { level: 1, name: SESSION.step, exact: true }), 'the page is headed by the step');
     const part = partOf(page, SESSION.step);
-    await expectVisible(part.locator('[data-step-tag]', { hasText: /^waits on you$/i }), "the step's chip, in its part under the top");
+    await expectVisible(part.locator('[data-step-tag]', { hasText: /^waiting$/i }), "the step's chip, in its part under the top");
     await expectVisible(top.locator(`a[href="/runs/${FAKE.id}"]`, { hasText: FAKE.title }), 'a link back to the run, by what it asked');
     await expectCount(top.locator('[data-following]'), 0, 'a settled task is read once, not followed');
 

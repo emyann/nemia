@@ -30,7 +30,7 @@ export default {
 
     const node = page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${ending}"]`);
     await expectVisible(
-      node.locator('[data-state="awaiting-approval"]', { hasText: 'waits on you' }),
+      node.locator('[data-state="awaiting-approval"]', { hasText: 'waiting' }),
       `${ending}'s chip, awaiting approval, reads waits on you`,
     );
     await expectVisible(

@@ -380,10 +380,14 @@ here.
   (`lib/proposals.ts`, proved by `contracts/proposal.contract.ts`). Her action ask, the chat event kind `proposal`, is `ChatActions`.
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
-  run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs
-  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepPart.ts` compose.
-  `test/structure.test.ts` refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`,
-  `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
+  run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`) sit beside it. Where the board's word differs from the code's, it is
+  translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepPart.ts` compose.
+  **A state the board names is one word** (`working`, `waiting`, `retry`, `pending`, `cancelled`), as a modern app names it, and the
+  sentence goes in its meaning, on hover: a step's rail, a run's end (`ENDED`), a card's state (`CARD_WORDS`) and a proposal's phase
+  (`PROPOSAL_WORDS`) alike. A yellow tag that says what to do (`approve <step>`, `past budget`, `try it again`) is an action, not a
+  state, and keeps its words. `test/structure.test.ts` refuses a state of more than one word, a state's phrase from before it was one
+  word (`waits on you`, `called off`) spelled as a word of its own, a retired phrasing (`waits for you`, `check refused`, `not signed`)
+  and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the word a route kept on Hono reads for a workflow's
   origin (`sourceOf`) and a card entry copied (`cardEntryOf`) sit in `library.ts`, which `workflows.ts`, `agents.ts`, `skills.ts` and
   `inbox.ts` all read.

@@ -1,6 +1,7 @@
 /**
  * Every word the board says to a person of a step's state, of a run's wait and of how a run ended, in one place: where the board's words
- * differ from the code's (`awaiting-approval` is `waits on you`, `cancelled` is `called off`), they are translated here and nowhere else.
+ * differ from the code's (`awaiting-approval` is `waiting`, `unsigned` is `retry`), they are translated here and nowhere else. A state
+ * the board names is one word, and its sentence is its meaning, on hover.
  * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepPart.ts` compose; each reads its words from here. No word here is
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
@@ -67,19 +68,19 @@ const BUDGET: WaitWords = {
   open: opens,
 };
 
-/** A state that waits on you: the rail says so of every gate alike, and its wait says what is asked. */
-const GATE = 'waits on you';
+/** A state that waits on you: the rail says `waiting` of every gate alike, in the hue that is yours, and its wait says what is asked. */
+const GATE = 'waiting';
 
 /** A person's words for each state of a step. */
 export const PERSON: Record<StepState, PersonWords> = {
-  working: { rail: 'at work', meaning: 'Its session is running.', ...NONE },
+  working: { rail: 'working', meaning: 'Its session is running.', ...NONE },
   paused: {
     rail: 'paused',
     meaning: "Parked between two tool calls by the store's pause; resumes as the same try.",
     ...NONE,
   },
-  'asks-in-session': { rail: 'asks you', meaning: 'Its session is asking a person a question.', ...NONE },
-  checking: { rail: 'being checked', meaning: 'It signed off, and the run is running its check.', ...NONE },
+  'asks-in-session': { rail: 'asking', meaning: 'Its session is asking a person a question.', ...NONE },
+  checking: { rail: 'checking', meaning: 'It signed off, and the run is running its check.', ...NONE },
   verified: { rail: 'verified', meaning: 'Its check passed: the command the run judges it by exited 0.', ...NONE },
   unverified: { rail: 'done', meaning: 'It signed off and has no check, so only its own word says it worked.', ...NONE },
   blocked: {
@@ -113,7 +114,7 @@ export const PERSON: Record<StepState, PersonWords> = {
     ...BUDGET,
   },
   unsigned: {
-    rail: 'to try again',
+    rail: 'retry',
     meaning:
       'The run did not take its closeout: it gave none, left out a field its output declares, or named a file the run does not have. Try it again.',
     tag: () => 'try it again',
@@ -121,7 +122,7 @@ export const PERSON: Record<StepState, PersonWords> = {
     open: opens,
   },
   denied: {
-    rail: 'to try again',
+    rail: 'retry',
     meaning:
       "Its harness refused its try a call, and the step says denials fail. Nothing after it starts until you try it again; a new run's allowedTools: is where the call is let through.",
     tag: () => 'tool refused',
@@ -130,15 +131,15 @@ export const PERSON: Record<StepState, PersonWords> = {
   },
   failed: { rail: 'failed', meaning: 'Its session failed.', ...NONE },
   'failed-check': {
-    rail: 'failed its check',
+    rail: 'failed',
     meaning: 'The command the run judges it by did not exit 0.',
-    tag: () => 'failed its check',
+    tag: () => 'failed',
     sentence: (wait) => `${named(wait.step)} failed its check. Try it again or call the run off.`,
     open: () => 'Read the check',
   },
-  waiting: { rail: 'to come', meaning: 'It has not started yet.', ...NONE },
+  waiting: { rail: 'pending', meaning: 'It has not started yet.', ...NONE },
   'waiting-for-slot': {
-    rail: 'to come',
+    rail: 'queued',
     meaning:
       'It has not started yet: the cap on runs in flight holds the run, and it starts once a run in flight settles, oldest held first.',
     ...NONE,
@@ -148,7 +149,7 @@ export const PERSON: Record<StepState, PersonWords> = {
     meaning: 'A person holds the run, so nothing of it starts and nothing is asked of you until the hold lifts.',
     ...NONE,
   },
-  cancelled: { rail: 'called off', meaning: 'The run was called off.', ...NONE },
+  cancelled: { rail: 'cancelled', meaning: 'The run was called off.', ...NONE },
   skipped: { rail: 'skipped', meaning: 'Its route was not taken, so it never runs: the run goes on without it.', ...NONE },
   sent: { rail: 'sent', meaning: 'It filed its card for another workflow, and that run carries the work on.', ...NONE },
   unreadable: {
@@ -162,7 +163,7 @@ export const PERSON: Record<StepState, PersonWords> = {
 
 /** A step `waiting` whose check the store's pause holds: not to come, since it signed off, but held until the factories resume. */
 export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
-  rail: 'waits on the pause',
+  rail: 'paused',
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
@@ -263,23 +264,23 @@ type Ended = { word: string; title: string; hue: Hue };
 /** How a finished run of each outcome ended (`Ended`): the one table of an outcome's word and hue. */
 export const ENDED: Record<RunOutcome, Ended> = {
   succeeded: { word: 'done', title: 'Every step of it is done.', hue: 'sage' },
-  cancelled: { word: 'called off', title: 'Somebody called it off.', hue: 'grey' },
+  cancelled: { word: 'cancelled', title: 'Somebody called it off.', hue: 'grey' },
   failed: { word: 'failed', title: 'It stopped on a step that failed.', hue: 'failure' },
   undecided: { word: 'undecided', title: 'Nobody has decided its result.', hue: 'yours' },
 };
 
 /**
  * A person's word for each state of an inbox card (`CardState`), its whole sentence on hover, and the hue its chip is drawn in: the card's
- * own three until it starts, and its run's phase from then on, said as the runs pages say it — `waits on you` for a run waiting on a
- * person, and `called off`, never `cancelled`, for one called off (`ENDED`).
+ * own three until it starts, and its run's phase from then on, said as the runs pages say it — `waiting` for a run waiting on a
+ * person, and `cancelled` for one called off (`ENDED`).
  */
 export const CARD_WORDS: Record<CardState, { word: string; title: string; hue: Hue }> = {
   filed: { word: 'filed', title: 'Filed, and not started: Start it, or queue it to start on its own.', hue: 'grey' },
   queued: { word: 'queued', title: 'Queued: it starts on its own when a run slot is free.', hue: 'grey' },
   refused: { word: 'refused', title: 'Queued, and its start was refused: edit the card, or take it off the queue.', hue: 'failure' },
-  pending: { word: 'waiting its turn', title: 'Its run is started and waits its turn: nothing of it is at work yet.', hue: 'grey' },
-  running: { word: 'at work', title: 'Its run is at work.', hue: 'alive' },
-  waiting: { word: 'waits on you', title: 'Its run waits on you: open it to see what it asks.', hue: 'yours' },
+  pending: { word: 'pending', title: 'Its run is started and waits its turn: nothing of it is at work yet.', hue: 'grey' },
+  running: { word: 'working', title: 'Its run is at work.', hue: 'alive' },
+  waiting: { word: 'waiting', title: 'Its run waits on you: open it to see what it asks.', hue: 'yours' },
   succeeded: { word: ENDED.succeeded.word, title: `Its run is done. ${ENDED.succeeded.title}`, hue: ENDED.succeeded.hue },
   failed: { word: ENDED.failed.word, title: `Its run failed. ${ENDED.failed.title}`, hue: ENDED.failed.hue },
   stopped: { word: 'stopped', title: 'Its run was stopped before it ended.', hue: 'grey' },
@@ -291,7 +292,7 @@ export const CARD_WORDS: Record<CardState, { word: string; title: string; hue: H
  * `yours` while it waits on them, `failure` where it failed to apply, sage once applied, grey for the rest.
  */
 export const PROPOSAL_WORDS: Record<ProposalPhase, { word: string; title: string; hue: Hue }> = {
-  waiting: { word: 'waits on you', title: 'It waits on your approval: Approve it, or Decline it.', hue: 'yours' },
+  waiting: { word: 'waiting', title: 'It waits on your approval: Approve it, or Decline it.', hue: 'yours' },
   approved: {
     word: 'approved',
     title: 'Approved, and applied when the run that proposed it ends well: Decline it before then to take it back.',

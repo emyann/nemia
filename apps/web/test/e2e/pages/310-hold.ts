@@ -201,7 +201,7 @@ async function heldNotStarted(page: Page) {
       .locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="implement"] [data-state="waiting"]`)
       .first();
     await expectVisible(chip, 'and its step not started has the chip of a step to come, on its graph');
-    await expectVisible(partOf(page, 'implement').locator('[data-step-tag]', { hasText: /^to come$/i }), 'and its part says to come');
+    await expectVisible(partOf(page, 'implement').locator('[data-step-tag]', { hasText: /^pending$/i }), 'and its part says pending');
     if (!(await chip.getAttribute('title'))?.includes('holds the run'))
       throw new Refused(`the chip says on hover that it waits on the hold — it says ${JSON.stringify(await chip.getAttribute('title'))}`);
     await settled(page);

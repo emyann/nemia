@@ -33,7 +33,7 @@ export default {
     await page.goto(new URL(`/runs/${DIAMOND.cancelled.id}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const off = page.locator('section[data-run-result] [data-result-ended="calledOff"]');
-    await expectVisible(off.getByText('called off'), 'a run called off before its final steps gave says it was called off');
+    await expectVisible(off.getByText('cancelled'), 'a run called off before its final steps gave says it was called off');
     await expectCount(page.locator('section[data-run-result] [data-result-stands]'), 0, 'and never that they are still to come');
     await settled(page);
     await photograph(

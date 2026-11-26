@@ -78,7 +78,7 @@ const treeDigest = (dir: string) => {
 };
 
 /** The digest of one definition read through a door, or of why it cannot be read: unreadable files are a digest of what they say. */
-const digestOf = (read: Effect.Effect<string | null, unknown, never>) =>
+const digestOf = (read: Effect.Effect<string | null, unknown>) =>
   read.pipe(Effect.catchCause((cause) => Effect.succeed(`unreadable:${Cause.pretty(cause)}`)));
 
 /**
@@ -107,7 +107,7 @@ const skillsIn = Effect.fn('skillsIn')(function* (scope: string, skills: string)
     const dir = path.join(skills, name);
     const digest = yield* digestOf(
       Effect.map(
-        Effect.suspend(() => skillsDoor.there(SkillName.read(name), dir)),
+        Effect.suspend(() => skillsDoor.there(SkillName.read(name), skills)),
         heldVersion,
       ),
     );
@@ -229,6 +229,30 @@ const definitionsFound = Effect.fn('definitionsFound')(function* (
 });
 
 /**
+ * What the files under `roots` look like from outside, by the path, the size and the time of each: the same print as the pass before it
+ * means the same digests, so a pass reads no file's bytes. Hidden `.git` and `node_modules` folders are left out.
+ * @param roots The folders the definitions are read from.
+ */
+const rootsPrint = (roots: readonly string[]) => {
+  const hash = createHash('sha1');
+  const seen = new Set<string>();
+  const walk = (at: string) => {
+    const link = fs.lstatSync(at, { throwIfNoEntry: false });
+    const stat = link?.isSymbolicLink() === true ? fs.statSync(at, { throwIfNoEntry: false }) : link;
+    if (link === undefined) return;
+    hash.update(`${at}\0${link.mtimeMs}\0${stat?.mtimeMs}\0${stat?.size}\0${stat?.isDirectory() === true ? 'd' : 'f'}\n`);
+    if (stat?.isDirectory() !== true || seen.has(fs.realpathSync(at))) return;
+    seen.add(fs.realpathSync(at));
+    for (const entry of entriesOf(at).sort()) if (entry !== '.git' && entry !== 'node_modules') walk(path.join(at, entry));
+  };
+  for (const root of roots) walk(root);
+  return hash.digest('hex');
+};
+
+/** What a pass derived of each store, with the print of the files it read: the next pass reads the files again only where it moved. */
+const DERIVED = new Map<string, { readonly print: string; readonly wanted: ReadonlyMap<string, string> }>();
+
+/**
  * One pass of the index of the store `StoreRoot` names: each definition found read, and its record written where it differs from the
  * record the index holds (`recordDue`), each record whose definition is gone deleted, all in one transaction of the keyspace. A pass
  * that finds nothing new writes nothing, so the head stands. A write another hand raced is left to the next pass.
@@ -238,9 +262,19 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
   const templates = yield* BuiltinTemplates;
   const listings = yield* listedAt(home);
   const factories = listings.flatMap((f) => ('error' in f ? [] : [{ name: f.name, tree: f.tree, repos: workedOn(f) }]));
-  const wanted = new Map(
-    (yield* definitionsFound(home, factories, templates)).map((d) => [definitionKey(d.scope, d.kind, d.name), textOf(d)]),
-  );
+  const print = rootsPrint([
+    path.join(path.resolve(home), 'workflows'),
+    ...factories.flatMap((f) => [
+      ...(f.tree === undefined ? [] : [f.tree]),
+      ...f.repos.flatMap((repo) => [path.join(repo, 'workflows'), path.join(repo, REPOSITORY_HOLDER, 'skills')]),
+    ]),
+  ]);
+  const derived = DERIVED.get(home);
+  const wanted =
+    derived?.print === print
+      ? derived.wanted
+      : new Map((yield* definitionsFound(home, factories, templates)).map((d) => [definitionKey(d.scope, d.kind, d.name), textOf(d)]));
+  DERIVED.set(home, { print, wanted });
   const keyspace = yield* keyspaceAt(keyspaceFile(home));
   return yield* keyspace
     .within((tx) =>

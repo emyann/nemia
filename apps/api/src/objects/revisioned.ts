@@ -15,8 +15,14 @@ const watchedListOf = (kind: string | undefined) => {
   return kind?.endsWith('List') === true && base !== undefined && isWatchedKind(base) ? base : undefined;
 };
 
-/** The kinds whose revisions are made of the definition index's records, which a read of one reads again where no daemon sweeps it. */
+/** The kinds whose revisions are made of the definition index's records, which a write of one reads again. */
 const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire', 'Factory']);
+
+/**
+ * Those a read of reads the index again too where no daemon sweeps it: not the Factory, whose read writes nothing — the index holds its
+ * rules and instruction as of the daemon's last sweep, or of the last write or proposal that read it.
+ */
+const INDEXED_ON_READ = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire']);
 
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
@@ -87,9 +93,10 @@ export const revisioned =
     const path = new URL(request.url).pathname;
     const kinds = kindsAt(request.method, path);
     if (!kinds.some((kind) => stampedOf({ kind }) !== undefined)) return list(c, request);
-    const indexed = kinds.some((kind) => INDEXED.has(kind.replace(/List$/, '')));
+    const base = kinds.map((kind) => kind.replace(/List$/, ''));
+    const indexed = base.some((kind) => INDEXED.has(kind));
     const reads = request.method === 'GET';
-    if (indexed && reads) await c.var.runtime.runPromise(definitionsRefreshed(false));
+    if (reads && base.some((kind) => INDEXED_ON_READ.has(kind))) await c.var.runtime.runPromise(definitionsRefreshed(false));
     const head =
       reads && kinds.some((kind) => watchedListOf(kind) !== undefined) ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
     const response = await list(c, request);

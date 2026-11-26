@@ -456,18 +456,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         'README.md': '# fresh\n\nA plan.\n',
         'plan.md': '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n',
       });
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'fresh'),
-      );
+      const read = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'fresh');
+      assert.deepEqual(saved.workflow, read && { ...read, version: saved.workflow.version });
+      assert.equal(saved.workflow.version, await revisionOf('fresh'), 'at the revision the api serves it at');
       assert.equal(saved.workflow.from, 'user');
       assert.deepEqual(
         loadWorkflows(dir).map((s) => renderStep(s)),

@@ -850,8 +850,8 @@ const addressParts = (href: string) => {
 
 /**
  * Each finished row names the workflow it ran, by its folder's name, the folder whole on hover, linked as `WorkflowLink` links a run's
- * workflow, and its title is whole on hover too; the first row's workflow link, pressed, leads to that workflow's page, and the page
- * comes back to Runs.
+ * workflow, and its title, where cut to its room, is whole on hover too; the first row's workflow link, pressed, leads to that
+ * workflow's page, and the page comes back to Runs.
  */
 async function workflowsSay(page: Page, finished: FinishedPage) {
   const links = section(page, 'finished').locator('tr[data-run] a[data-workflow]');
@@ -878,9 +878,13 @@ async function workflowsSay(page: Page, finished: FinishedPage) {
       : [`${run.id}: ${JSON.stringify(said[i])}, expected ${run.workflowDir} to ${JSON.stringify(want)}`];
   });
   if (wrong.length) throw new Refused(`each workflow is whole on hover and links to its page — ${wrong.join('; ')}`);
-  const titled = await tipsOf(section(page, 'finished').locator('tr[data-run] a[href^="/runs/"]'), "the finished rows' titles");
-  if (titled.join('|') !== finished.runs.map(titleOf).join('|'))
-    throw new Refused(`and each run's title, a link cut to its room, is whole on hover — ${titled.join(', ')}`);
+  const titles = section(page, 'finished').locator('tr[data-run] a[href^="/runs/"]');
+  const cut = await titles.evaluateAll((all) => all.map((title) => title.scrollWidth - title.clientWidth > 1));
+  const titled: string[] = [];
+  for (const [i, isCut] of cut.entries()) if (isCut) titled.push(...(await tipsOf(titles.nth(i), "the finished rows' cut titles")));
+  const whole = finished.runs.map(titleOf).filter((_, i) => cut[i]);
+  if (titled.join('|') !== whole.join('|'))
+    throw new Refused(`and each run's title cut to its room is whole on hover — ${titled.join(', ')}`);
   const [first] = finished.runs;
   if (!first) throw new Refused('the seed holds a finished run, to press its workflow');
   const want = workflowAddress(pages[0] ?? null);

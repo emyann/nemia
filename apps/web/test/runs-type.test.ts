@@ -40,6 +40,7 @@ const FILES = [
   'components/look/TextLink.tsx',
   'components/look/CutFrame.tsx',
   'components/look/CutTag.tsx',
+  'components/look/HeldTooltip.tsx',
   'components/look/CutBubble.tsx',
   'components/look/CutIconPress.tsx',
   'components/look/ScanLines.tsx',

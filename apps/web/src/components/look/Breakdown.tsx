@@ -1,4 +1,5 @@
-import { Body, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, TooltipTrigger } from '@/components/ui/ds';
+import { HeldTooltip } from './HeldTooltip';
 import type { Breakdown } from '@/lib/breakdown';
 import type { ReactNode } from 'react';
 import { cn } from '@/components/ui/ds/utils';
@@ -42,9 +43,9 @@ export function BreakdownPreview({ breakdown, children }: { breakdown: Breakdown
   return (
     <TooltipTrigger delay={200} closeDelay={150}>
       {children}
-      <Tooltip variant="rich" headline={breakdown.head}>
+      <HeldTooltip variant="rich" headline={breakdown.head}>
         <BreakdownRows breakdown={breakdown} />
-      </Tooltip>
+      </HeldTooltip>
     </TooltipTrigger>
   );
 }

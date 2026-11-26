@@ -9,7 +9,8 @@ import { railSaid, railStates } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { stepMark, waitsNow, type StepMark } from '@/lib/stepMark';
 import { stateWordsOf } from '@/lib/words';
-import { Body, Focusable, Label, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Label, TooltipTrigger } from '@/components/ui/ds';
+import { HeldTooltip } from './HeldTooltip';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 
 /** What the graph says under a step's node, with `named`: its agent, and a line of its own, its time and cost. */
@@ -161,7 +162,7 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
           {children}
         </span>
       </Focusable>
-      <Tooltip>{said}</Tooltip>
+      <HeldTooltip>{said}</HeldTooltip>
     </TooltipTrigger>
   );
 }

@@ -12,6 +12,7 @@ export { CutField } from './CutField';
 export { CutIconPress } from './CutIconPress';
 export { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, TableAtCut, type FrameHue } from './CutFrame';
 export { CutTag } from './CutTag';
+export { HeldTooltip } from './HeldTooltip';
 export { Marker } from './Marker';
 export { MeaningTag } from './MeaningTag';
 export { Pager } from './Pager';

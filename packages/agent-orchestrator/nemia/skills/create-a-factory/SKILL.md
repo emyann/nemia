@@ -94,6 +94,12 @@ tells nothing.
 **Its instruction** is yours: what you are to know about the factory, which wins over your habits there. No step is told it. Draft it
 in `drafts/<factory>/NEMIA.md` and show it. The person may keep it in the repository (`NEMIA.md` in its first folder, which they place); or, kept in the store,
 `nemia factory instruction <factory> --store`, then `nemia factory instruct <factory> --file drafts/<factory>/NEMIA.md`.
+Where the factory's workflows read a card's labels, the values each label key takes are the factory's own (`labelValues`), and
+filing, labelling and starting refuse any other value of such a key. A factory made from a template takes them from its parameter
+where it has one (its `parameters` say), given with `--set` at apply. One made by hand keeps them in its own file, the
+`labelValues` key of `factories/<factory>.json` in the store, a key to an array of its values, which no verb writes: draft it, show
+the person, and ask them to place it, as the two things no verb writes are. Its instruction says only what each key and value means,
+so a card written for it is labelled by them (the `write-a-card` skill, *Its labels*).
 
 Words a person adds to one agent without rewriting it are its custom instructions: `nemia agents custom <name> --file <path>`.
 

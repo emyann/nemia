@@ -432,7 +432,7 @@ rebuilt.
 - **A change to the product's model, or one spanning several cards, goes through an intake first** (Iris, the `intake` workflow): the
   intent is the system's durable record of the person's decisions, and her confirmation round catches misreadings. A contained change is
   a build card, or a quick card (`workflow: quick`) when its card settles it, whatever its size (`packages/templates/sdlc/workflows/quick/README.md`). In auto mode, Iris may interview the operator, who answers from the person's decisions and brings them the taste calls.
-- **Chain** with `--after <run>` when runs touch the same files, or when one's design depends on another's result. `--after` also hands
+- **Chain** with `--after <run>` when runs touch the same files, or when one's design depends on another's result: it waits for the run to succeed, merged or not, and a failed or called-off run's waiters go on once you run `nemia release <run>`. `--after` also hands
   the run that waited the other's conclusions (`## From run`); context without a wait is `--from` once it lands
   (`context-is-not-a-wait-a-run-zovw`).
 - **Pace by the harness quota.** Before running work side by side instead of waiting, read `nemia quota` (its tool on the port: `quota`): the week's use against the

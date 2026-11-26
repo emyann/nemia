@@ -84,18 +84,18 @@ prefix, as Kubernetes' does, as in sdlc/stage. sdlc's [front door](/sdlc/#its-wo
 ### A card that waits on others
 
 A card may name the cards it **waits on** in its `after:`, by name, comma-separated, or as it is filed, with one `--after <card>` per
-card. While one of them has not landed, no trigger queues the card and the tick starts none of it, even one queued by hand. A named card
-has landed when a run started from it has, as that run's own decision says, or when the card its run passed the work on to has: the
-card a routing workflow's card node filed for it, or the card it was sent on as. When the last lands, the next pass queues the card as
+card. While one of them has not succeeded, no trigger queues the card and the tick starts none of it, even one queued by hand. A named card
+has succeeded when a run started from it has, as `nemia ls` says its status, or a person ran `nemia release` on that run, or when the card its run passed the work on to has: the
+card a routing workflow's card node filed for it, or the card it was sent on as. When the last succeeds, the next pass queues the card as
 any other, and its run starts from the base as it is then. So a person can put a whole chain in the sprint at once, each card waiting
 on the one before, and the factory runs it in order.
 
 The inbox, the Card's `status.waitingOn` and the board list a waiting card with each card it waits on, the card that work stands at
 now and that card's state. Read on every pass, nothing is written on the card. A wait that only a person can release is **stalled**: a
-name the store does not know, a cycle of `after:` lines, or a card whose run ended without landing or whose start was refused. It is
+name the store does not know, a cycle of `after:` lines, or a card whose run failed or was cancelled and not released, or whose start was refused. It is
 said on the inbox's line with its fix, and once on the feed when it begins and once when it clears. The fixes are to send the card
-on, change this card's `after:`, or start this card by hand. A start by hand starts a waiting card all the same, and says which cards
-had not landed.
+on, change this card's `after:`, release the run with `nemia release`, or start this card by hand. A start by hand starts a waiting card all the same, and says which cards
+had not succeeded.
 
 ## Who writes what
 

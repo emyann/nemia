@@ -21,7 +21,8 @@ export type Releasing = { run: Run; released: Released };
 
 /**
  * Release the waiters of a run — `nemia release <run>`: every run that waits on it (`--after`, `hold --until`, a card's `after:`) goes
- * on at the next tick, as if it had succeeded, and keeps going: the release is written once and never taken back, since a waiter that started
+ * on at the next tick, as if it had succeeded, and keeps going: the release is written once and never taken back, since a waiter that
+ * started
  * cannot be un-started. A waiter starts from its base branch as it is then, whatever the run did.
  *
  * Fails before anything is written, with what to do instead: an id that is not a run's (`idRefusal`, `Invalid`); a run not there

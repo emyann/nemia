@@ -8,8 +8,8 @@
  * a person's words handed to a session while it runs, which the engine journals and never acts on. And an
  * eighth, `find`: one session by its name, without observing every other, for a read that needs only which
  * session it is. And a ninth, `quota`: what the harness's subscription has left, asked of the harness and of no session. And a
- * tenth, `models`: the models the harness lists for a session, asked the same way. Swap the layer and the same engine drives a different harness; `Runner.test()` drives
- * nothing at all, which is how the engine's tests cost zero dollars.
+ * tenth, `models`: the models the harness lists for a session, asked the same way. Swap the layer and the same engine drives a
+ * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero dollars.
  *
  * Several harnesses, one seam (`composite`). A task says which harness it wants; this dispatches `spawn` to that one and
  * MERGES what all of them observe. The merge is safe without any coordination because the key is `ae/<task>/<attempt>` —

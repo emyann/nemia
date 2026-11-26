@@ -54,7 +54,7 @@ export default {
       if ((await section.getAttribute('data-on-you')) !== 'false')
         throw new Refused('the Held section is not drawn as waiting on you: the hold is the person’s word already given');
       await expectCount(approve, 0, `and ${gated}'s section offers no Approve`);
-      await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
+      await expectCount(page.locator('[data-run-state="waiting"], [data-waits-on-you]'), 0, 'and nothing on it says it waits on you');
       const row = (await rowsAnswered(page)).find((r) => r.id === id);
       if (!row || waitsOnYou(row)) throw new Refused(`the api lists ${id} among the runs that wait on no one, which the bell reads`);
       await idle(page);

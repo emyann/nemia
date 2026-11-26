@@ -14,15 +14,15 @@ import type { RunDetail } from '@/lib/runView';
 import { whenWords } from '@/lib/runWords';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
-import { ENDED } from '@/lib/words';
+import { ENDED, STANDING } from '@/lib/words';
 import { CopyId, StatTile } from '../look';
 import { Labels } from '../field/Labels';
 import { RunMenu } from './RunMenu';
 import { Label, Title } from '@/components/ui/ds';
 
-/** The hue of where a run stands (`standingOf`): waiting on you, in flight, finished, or cancelled. */
+/** The hue of where a run stands (`standingOf`): waiting, running, finished, or cancelled. */
 const standingHue = (standing: string) =>
-  standing === 'waiting on you' ? 'yours' : standing === 'in flight' ? 'alive' : standing === ENDED.cancelled.word ? 'grey' : 'sage';
+  standing === STANDING.waiting ? 'yours' : standing === STANDING.running ? 'alive' : standing === ENDED.cancelled.word ? 'grey' : 'sage';
 
 /**
  * The run's labels, a person's edited in place: an edit reads the run's object again (`exact`, as a hold does) and every list it is on

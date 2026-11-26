@@ -159,10 +159,10 @@ export default {
         `${FAKE.id}, on another repository, is not offered`,
       );
       for (const [run, standing] of [
-        [DIAMOND.orphan, 'waiting on you'],
+        [DIAMOND.orphan, 'waiting'],
         [DIAMOND.cancelled, 'cancelled'],
-        [DIAMOND.bottom, 'in flight'],
-        [DIAMOND.running, 'in flight'],
+        [DIAMOND.bottom, 'running'],
+        [DIAMOND.running, 'running'],
         [DIAMOND.top, 'finished'],
       ] as const) {
         await expectVisible(

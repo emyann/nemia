@@ -56,7 +56,7 @@ import {
 import { tryOf } from '../src/record/record.ts';
 import type { OutputSchema, StepSpec } from '../src/workflow.ts';
 import { aRead, listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
-import { PRECEDENCE } from '../src/brief/index.ts';
+import { PRECEDENCE, REPLIES_OWED } from '../src/brief/index.ts';
 import type { Verdict } from '../src/check/check.ts';
 
 const asked = () => true;
@@ -783,9 +783,20 @@ describe("composeBrief of a new session of a loop's target within a round: hande
     });
     assert.doesNotMatch(nudged, /## Round 2 of 3|## From review/);
     assert.match(nudged, /- `replies`: your answer/);
+    const at = nudged.indexOf('## Try 3\n');
+    assert.ok(
+      at >= 0 && nudged.indexOf(REPLIES_OWED) > at && nudged.indexOf(REPLIES_OWED) < nudged.indexOf('## When you are finished'),
+      nudged,
+    );
   });
   test('round 1 has no findings to hand', () => {
     assert.doesNotMatch(composeBrief(IMPLEMENT, inRound(1), LOOP, fromAsking, FILES, undefined, newSessions[0]), /## Round|## From review/);
+  });
+  test('a continued try of round 1, and of a step no loop comes back to, is not told it owes replies again', () => {
+    const continued = { try: 2, by: 'retries' as const, mode: 'continue' as const, resumed: true, status: 'failed (check)' as const };
+    assert.ok(!composeBrief(IMPLEMENT, inRound(1), LOOP, fromAsking, FILES, undefined, continued).includes(REPLIES_OWED));
+    const other = step('other');
+    assert.ok(!composeBrief(other, run({ other: null }), [other], () => undefined, FILES, undefined, continued).includes(REPLIES_OWED));
   });
 });
 

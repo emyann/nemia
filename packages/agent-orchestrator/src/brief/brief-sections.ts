@@ -104,11 +104,23 @@ export function headingOf(heading: TaskHeading, ...fills: readonly (string | num
 }
 
 /**
+ * What a try that continues the session of a loop's target past round 1 is told, inside its `## Try <n>`: its sign-off owes `replies`
+ * again, in full. The session replied in an earlier try of the round, and, handed a check's refusal alone, reads the refusal as all that is
+ * asked of it and signs with an empty list, which reads as unsigned (`declaredOutput`). Nothing is carried forward from that earlier try.
+ */
+export const REPLIES_OWED = [
+  `Your sign-off owes \`${LOOP_REPLIES}\` again, in full: one for each finding of this round, as true now, those your earlier try in this`,
+  `round answered included. The run reads only this sign-off's \`${LOOP_REPLIES}\`, and an empty list reads as unsigned: nothing that`,
+  'waits on this step starts.',
+].join('\n');
+
+/**
  * For a new session of a loop's target within a round past the first — a fresh try, or a continue with no session left to continue — the
  * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
- * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`). The
- * section is given as continuing (`resumed: true`), since `retrySection` has said the session is new.
+ * already, and is told only that its sign-off owes them again (`REPLIES_OWED`). `closeoutOf` answers for the looping step with its try
+ * that asked (`askingTry`, in `advance`). The section is given as continuing (`resumed: true`), since `retrySection` has said the
+ * session is new.
  * @param step The loop's target.
  * @param run The run.
  * @param steps The run's steps.
@@ -123,7 +135,8 @@ export function retriedInRound(
   closeoutOf: (step: string) => Closeout | undefined,
 ) {
   const looping = steps.find((s) => s.loop === step.name);
-  if (retry.resumed || !looping || !owesReplies(steps, run, step.name)) return '';
+  if (!looping || !owesReplies(steps, run, step.name)) return '';
+  if (retry.resumed) return ['', REPLIES_OWED].join('\n');
   const round = roundOf(run, step.name);
   const rounds = capOf(looping);
   return roundSection(step, { loop: looping.name, round, rounds, by: round > rounds ? 'ask' : 'again', resumed: true }, steps, closeoutOf);

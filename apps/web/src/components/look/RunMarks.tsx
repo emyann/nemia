@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Body, Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Tag, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import { titleOf } from '@/lib/factory';
@@ -9,6 +9,7 @@ import { CHIP_TAG, type ChipTone } from '@/lib/nowChip';
 import { nowOf, type Now, type NowPart } from '@/lib/runWords';
 import { nowMark } from '@/lib/stepMark';
 import { NOW_WORDS } from '@/lib/words';
+import { HeldTooltip } from './HeldTooltip';
 import { CutTag } from './CutTag';
 import { MeaningTag } from './MeaningTag';
 import { MarkDiamond } from './StepGraph';
@@ -34,7 +35,7 @@ function Marked({ said, children }: { said: string; children: ComponentProps<typ
   return (
     <TooltipTrigger delay={300}>
       <Focusable>{children}</Focusable>
-      <Tooltip>{said}</Tooltip>
+      <HeldTooltip>{said}</HeldTooltip>
     </TooltipTrigger>
   );
 }
@@ -62,7 +63,7 @@ export function RunMark({ id, run }: { id: string; run?: NamedRun }) {
           <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
         </Body>
       </TextLink>
-      <Tooltip>{`${id}\n${said}`}</Tooltip>
+      <HeldTooltip>{`${id}\n${said}`}</HeldTooltip>
     </TooltipTrigger>
   );
 }

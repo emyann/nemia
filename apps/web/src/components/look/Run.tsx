@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Body, Cell, Label, Row, Title as TitleType, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Label, Row, Title as TitleType, TooltipTrigger } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import type { RunClock as Clock } from '@/lib/api/runs';
@@ -12,6 +12,7 @@ import { waitersOf } from '@/lib/nowChip';
 import { nowOf, presentWait, type Now } from '@/lib/runWords';
 import { says, type RunLayout, type RunSays, type RunSize } from '@/lib/runSays';
 import { ENDED, OPENS } from '@/lib/words';
+import { HeldTooltip } from './HeldTooltip';
 import { CutButton } from './CutButton';
 import { cutRing } from './cut';
 import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
@@ -135,8 +136,9 @@ export function Run(props: RunProps) {
 }
 
 /**
- * The run's title, a link to its page, on a card raised over the copy control's target (a row's leaves it the control's); whole in the
- * kit's tooltip where it is cut to a line; a card's heading where `heading`.
+ * The run's title, a link to its page as wide as its words up to its room, on a card raised over the copy control's target (a
+ * row's leaves it the control's); whole in the kit's tooltip only while it is cut, the tooltip beside its words; `end` at the row's
+ * end however short the title; a card's heading where `heading`.
  */
 function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; still?: string; end?: ReactNode; heading?: boolean }) {
   const Holder = heading ? 'h3' : 'span';
@@ -146,9 +148,9 @@ function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; s
         <TextLink to="/runs/$runId" params={{ runId: run.id }} className={cn(look.s.title(), still)}>
           <Typed type={look.type.title}>{look.title}</Typed>
         </TextLink>
-        <Tooltip>{look.title}</Tooltip>
+        <HeldTooltip repeats>{look.title}</HeldTooltip>
       </TooltipTrigger>
-      {end}
+      {end && <span className="ml-auto inline-flex shrink-0">{end}</span>}
     </Holder>
   );
 }

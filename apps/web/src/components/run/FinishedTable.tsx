@@ -1,4 +1,4 @@
-import { Body, Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, TooltipTrigger } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
@@ -9,7 +9,7 @@ import { agoWords } from '@/lib/runWords';
 import { ENDED } from '@/lib/words';
 import { instantWhole } from '@/lib/instant';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, RunClock, RunCost, RunMeta, TextLink } from '../look';
+import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, HeldTooltip, Pager, RunClock, RunCost, RunMeta, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'uppercase';
@@ -34,7 +34,7 @@ const Ago = ({ at, asOf }: { at: string; asOf: Date }) => {
           {ago}
         </time>
       </Focusable>
-      <Tooltip>{instantWhole(new Date(at))}</Tooltip>
+      <HeldTooltip>{instantWhole(new Date(at))}</HeldTooltip>
     </TooltipTrigger>
   );
 };
@@ -60,12 +60,12 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell className="py-2.5">
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>
-            <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block truncate font-medium">
+            <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block w-fit max-w-full truncate font-medium">
               <Body size="large" component="span">
                 {titleOf(run)}
               </Body>
             </TextLink>
-            <Tooltip>{titleOf(run)}</Tooltip>
+            <HeldTooltip repeats>{titleOf(run)}</HeldTooltip>
           </TooltipTrigger>
           <RunMeta run={run} workflowPage={workflowPage} />
         </span>
@@ -97,7 +97,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
               {ended.word}
             </Label>
           </Focusable>
-          <Tooltip>{ended.title}</Tooltip>
+          <HeldTooltip>{ended.title}</HeldTooltip>
         </TooltipTrigger>
       </Cell>
     </Row>

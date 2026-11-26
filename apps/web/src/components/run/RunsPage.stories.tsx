@@ -83,16 +83,16 @@ const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_
 };
 
 /**
- * That the rows' marks say their words in the kit's tooltip, each reached by the keyboard, the arrows walking its row: a finished
- * row's title whole, how long ago it finished as the whole instant, and how it ended in a sentence; a row in flight's id whole behind
- * its last four characters.
+ * That the rows' marks say their words in the kit's tooltip, each reached by the keyboard, the arrows walking its row: the last
+ * finished row's title, the longest, cut to its column, whole, how long ago it finished as the whole instant, and how it ended in a
+ * sentence; a row in flight's id whole behind its last four characters.
  * @param page The page.
  * @param user The user the play function is handed.
  */
 const tipsSay = async (page: HTMLElement, user: Parameters<typeof tipInRow>[0]) => {
-  const finished = page.querySelector<HTMLElement>('[data-section="finished"] tr[data-run]')!;
+  const finished = page.querySelector<HTMLElement>('[data-section="finished"] tr[data-run]:last-child')!;
   const title = finished.querySelector('a[href^="/runs/"]')!;
-  await expect(await tipInRow(user, finished, title), "a finished run's title whole").toHaveTextContent(title.textContent ?? '');
+  await expect(await tipInRow(user, finished, title), "a finished run's cut title whole").toHaveTextContent(title.textContent ?? '');
   await expect((await tipInRow(user, finished, finished.querySelector('time')!)).textContent, 'the whole instant').toMatch(
     /\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/,
   );
@@ -127,7 +127,7 @@ export const NothingWaits: Story = {
     const waiting = within(page.querySelector<HTMLElement>('[data-section="waiting"]')!);
     await expect(waiting.getByText('Nothing waits on you.')).toBeVisible();
     await expect(waiting.getByRole('button', { name: 'Waiting in every factory ›' })).toHaveAttribute('aria-expanded', 'false');
-    await expect(tonesOf(page, 'in-flight')).toEqual({ lgll: 'alive', '649a': 'waits', '5zt1': 'waits' });
+    await waitFor(() => expect(tonesOf(page, 'in-flight')).toEqual({ lgll: 'alive', '649a': 'waits', '5zt1': 'waits' }));
     await expect(headsOf(page, 'Runs in flight')).toEqual(['RUN', 'NOW', 'CLOCK', 'COST']);
     await expect(headsOf(page, 'Finished runs')).toEqual(['RUN', 'FINISHED', 'CLOCK', 'COST', 'OUTCOME']);
     const lgll = page.querySelector<HTMLElement>(`[data-run="${TARGET_RUNS.lgll.metadata.name}"]`)!;

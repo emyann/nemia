@@ -31,10 +31,15 @@ export default {
     const cards = await page.locator('section[data-section="waiting"] article[data-run]').all();
     let others = 0;
     for (const other of cards) {
+      const approves = await other.locator('[data-approve]').count();
+      if (approves > 1) throw new Refused(`a waiting card holds one Approve button at most — one holds ${approves}`);
+      if (approves === 1) {
+        await expectCount(other.locator('[data-now-words]'), 0, 'a card that holds Approve leaves the words of its wait to it');
+        continue;
+      }
+      others += 1;
       const said = ((await other.locator('[data-now-words]').first().textContent()) ?? '').trim().toLowerCase();
-      const wanted = said.startsWith('approve ') ? 1 : 0;
-      if (wanted === 0) others += 1;
-      await expectCount(other.locator('[data-approve]'), wanted, `the card that says "${said}" holds ${wanted} Approve button`);
+      if (said.startsWith('approve ')) throw new Refused(`the card that says "${said}" holds its Approve button`);
     }
     if (others === 0) throw new Refused('a waiting card of another kind of wait stands beside the gate, to hold no Approve');
 

@@ -1,26 +1,28 @@
 ---
 title: How a run lives
-description: From a card to a landing, the orchestrator's tick and the runtime's engine each reconciling what was asked for against what is, on every pass.
+description: From a card to a landing. On every pass, the orchestrator's tick and the runtime's engine each compare what was asked for with what is actually happening.
 ---
 
-A run is one go of a workflow on a card. This page follows one from the moment it is started to the moment its work is merged, and
-shows who moves it at each point. Two loops do the moving, one in each package, and both work the same way.
+A run is one execution of a workflow for a card. This page follows a run from the moment it starts to the moment its work is merged,
+and shows what moves it forward at each point. Two loops do this work, one in each package, and both work the same way.
 
 ## Two loops, both level-triggered
 
-- **The tick** is the orchestrator's loop. On each pass it reads every run's record and what the runtime says of each task, asks one
-  pure function what should happen to the run now (`assess`, in `packages/agent-orchestrator/src/tick/assess.ts`), and does it: files
-  a step, files a check, commits a landing. Its pass is `tickRun` (`packages/agent-orchestrator/src/tick/tick.verb.ts`).
-- **The engine** is the runtime's loop. On each pass it reads each task's journal and what the harness says of its session, asks
-  `decide` (`packages/agent-runtime/src/core/domain.ts`) for the one thing to do, and does it: admits, spawns, stops, records an end.
+- **The tick** is the orchestrator's loop. On each pass, it reads every run's record and what the runtime reports about each task.
+  It asks one pure function what should happen to the run now (`assess`, in `packages/agent-orchestrator/src/tick/assess.ts`), and
+  does it: start a step, start a check, or commit a landing. Its pass is `tickRun` (`packages/agent-orchestrator/src/tick/tick.verb.ts`).
+- **The engine** is the runtime's loop. On each pass, it reads each task's journal and what the harness reports about its session. It
+  asks `decide` (`packages/agent-runtime/src/core/domain.ts`) for the one thing to do, and does it: admit, spawn, stop, or record an
+  end.
 
-Both loops run in one process, the store's daemon, every few seconds: a pass of the daemon is the runtime's pass first, then the
-orchestrator's, judging every run on what the runtime just reported. There is one daemon per store
-(`~/.agent-workflows/daemon.json`, `WF_ROOT`): the api's process, or `nemia up` on a machine with no board.
+Both loops run every few seconds in one process: the store's daemon. Each daemon pass runs the runtime's pass first, then the
+orchestrator's, which judges every run on what the runtime just reported. There is one daemon per store
+(`~/.agent-workflows/daemon.json`, `WF_ROOT`): the API's process, or `nemia up` on a machine without the board.
 
-**Level-triggered** means each pass reads the whole world again and carries nothing to the next pass. Nothing is remembered as "I just
-did this": what was done is on disk, in a record or a journal, and is read again. So a daemon stopped mid-run and started again an
-hour later picks up exactly where things stand, and a session that ran on while no daemon ticked is found and judged.
+**Level-triggered** means each pass reads the whole world again and carries nothing over to the next pass. Nothing is remembered as
+"I just did this": everything that happened is on disk, in a record or a journal, and is read again. So if you stop the daemon
+mid-run and start it an hour later, it picks up exactly where things stand. A session that kept running while no daemon was ticking
+is found and judged.
 
 ## From a card to a landing
 
@@ -45,71 +47,74 @@ sequenceDiagram
   T-->>P: the merge committed on the base branch
 ```
 
-1. **A card.** A short markdown brief, which may wait in the inbox (`~/.agent-workflows/inbox/`) until someone starts it. Once
-   started, the card stays and shows its run's phase. The inbox lists the cards still in play, and those whose run ended are behind
-   a filter (`nemia inbox --all`, or Ended on the Inbox page).
-2. **The start.** `nemia start` in a [factory](/factories/) writes the run's record: the workflow folder as it is now, every step's
-   agent and hire, the check commands, all frozen on the record. Nothing the run does later reads the folder again.
-3. **The tick files a step.** On its next pass, the tick finds a step whose `after` is satisfied and files its task with the runtime,
-   queued, with the run's momentum as its priority. The tick writes the run's record; nothing else does.
-4. **The engine runs it.** On its own pass, the engine admits the queued task when its pool has room, spawns its session on the
-   harness, and from then on compares the journal with the harness on every pass, until the session ends.
-5. **The closeout and the check.** The session signs off with its [closeout](/workflows/#the-closeout). The tick sees the task settle,
-   commits what the step left, and files its check, which the engine runs like any other task. Its exit code is the verdict.
-6. **What comes next.** The tick asks `assess` again: the next step, a try again if the check refused, a round if a reviewer asked for
-   one, or nothing, while a [gate](/workflows/#a-gate) waits for a person.
-7. **The landing.** The last step stages the merge of the run's branch onto the base, and signs off. The tick files the check on the
-   merged tree, then commits the merge on exit 0, or aborts it on anything else (`landEnding`, in
+1. **A card.** A short Markdown brief. It can wait in the inbox (`~/.agent-workflows/inbox/`) until someone starts it. Once started,
+   the card stays and shows its run's phase. The inbox lists the cards still in progress. To see cards whose run has ended, use a
+   filter (`nemia inbox --all`, or Ended on the Inbox page).
+2. **The start.** `nemia start` in a [factory](/factories/) writes the run's record. The record freezes the workflow folder as it is
+   now, every step's agent and hire, and the check commands. Nothing the run does later reads the folder again.
+3. **The tick starts a step.** On its next pass, the tick finds a step whose `after` is satisfied. It submits that step's task to the
+   runtime, queued, with the run's momentum as its priority. Only the tick writes the run's record.
+4. **The engine runs it.** On its own pass, the engine admits the queued task when its pool has room and spawns its session on the
+   harness. From then on, it compares the journal with the harness on every pass, until the session ends.
+5. **The closeout and the check.** The session signs off with its [closeout](/workflows/#the-closeout). The tick sees the task
+   settle, commits what the step left, and starts its check. The engine runs the check like any other task, and its exit code is the
+   verdict.
+6. **What comes next.** The tick asks `assess` again. The answer is the next step, a retry if the check failed, a new round if a
+   reviewer asked for one, or nothing while a [gate](/workflows/#a-gate) waits for a person.
+7. **The landing.** The last step stages a merge of the run's branch into the base branch, and signs off. The tick runs the check on
+   the merged code. On exit 0 it commits the merge; on anything else it aborts it (`landEnding`, in
    `packages/agent-orchestrator/src/ending/ending.verb.ts`).
 
 ### A card a trigger starts
 
-A card need not be started by hand. A factory's **card trigger** selects its cards by their labels
-(`nemia factory trigger <factory> <name> --labels <key>=<value> --to <workflow>`, or its template's `triggers`), and each card of
-the factory it selects, not queued by hand and not started, is queued: on the workflow the card names,
-or on the trigger's target where it names none, ordered with the
-cards queued by hand by when it was filed. Nothing is written on the card: each pass reads it again, so taking its label off takes
-it out of the queue. Where two triggers would send a card that names no workflow to two workflows, it **clashes**: it waits, and the
-inbox and the factory's settings name the triggers, until a selector or its labels change.
+You don't have to start a card by hand. A factory's **card trigger** selects cards by their labels
+(`nemia factory trigger <factory> <name> --labels <key>=<value> --to <workflow>`, or its template's `triggers`). Each matching card in
+the factory that isn't already queued by hand or started gets queued. It goes to the workflow the card names, or to the trigger's
+target if the card names none. It is ordered with the hand-queued cards by when it was created. Nothing is written on the card: each
+pass reads it again, so removing its label takes it out of the queue.
 
-A trigger can spend quota only where something its target can reach runs an agent: a session or a judge, in the target or in a
-workflow one of its card nodes files a card for. A target that reaches only scripts, table or script conditions and card nodes costs
-nothing, however many cards the trigger queues. The factory's settings say which, apart from what the trigger queues now.
+If two triggers would send a card that names no workflow to two different workflows, the card **clashes**. It waits, and the inbox
+and the factory's settings name the triggers, until a selector or the card's labels change.
 
-A routing workflow sends a card on with a **card node** (`card: given`): the run's own card as it was given, its body and labels, on
-the workflow the node names, with the route taken and the reason its condition gave; or back to the inbox, unqueued, with the label
-edits its `relabel:` lists (`card: backlog`): kubectl's, `key=value` to set a key and `key-` to remove one. A label key may take a
-prefix, as Kubernetes' does, as in sdlc/stage. sdlc's [front door](/sdlc/#its-workflows) is one.
+A trigger spends quota only if its target can reach something that runs an agent: a session or a judge, in the target itself or in a
+workflow that one of its card nodes creates a card for. A target that reaches only scripts, table or script conditions, and card nodes
+costs nothing, however many cards the trigger queues. The factory's settings show which kind each trigger is, separately from what it
+is queueing right now.
+
+A routing workflow passes a card on with a **card node** (`card: given`). The node sends the run's own card, as it was given (its body
+and labels), to the workflow the node names, along with the route taken and the reason its condition gave. A card node can instead
+send the card back to the inbox, unqueued, with the label edits its `relabel:` lists (`card: backlog`). The edits use kubectl's syntax:
+`key=value` sets a key, and `key-` removes one. A label key can have a prefix, as in Kubernetes, such as sdlc/stage. sdlc's
+[front door](/sdlc/#its-workflows) is a routing workflow.
 
 ### A card that waits on others
 
-A card may name the cards it **waits on** in its `after:`, by name, comma-separated, or as it is filed, with one `--after <card>` per
-card. While one of them has not landed, no trigger queues the card and the tick starts none of it, even one queued by hand. A named card
-has landed when a run started from it has, as that run's own decision says, or when the card its run passed the work on to has: the
-card a routing workflow's card node filed for it, or the card it was sent on as. When the last lands, the next pass queues the card as
-any other, and its run starts from the base as it is then. So a person can put a whole chain in the sprint at once, each card waiting
-on the one before, and the factory runs it in order.
+A card can list the cards it **waits on** in its `after:`, by name and comma-separated, or when it is created, with one
+`--after <card>` per card. Until all of them have landed, no trigger queues the card and the tick doesn't start it, even if it was
+queued by hand. A listed card has landed when a run started from it has landed (by that run's own decision), or when the card its run
+passed the work on to has landed. That is the card a routing workflow's card node created for it, or the card it was sent on as. When
+the last one lands, the next pass queues the card like any other, and its run starts from the base branch as it is then. So you can
+put a whole chain in the sprint at once, each card waiting on the one before, and the factory runs them in order.
 
-The inbox, the Card's `status.waitingOn` and the board list a waiting card with each card it waits on, the card that work stands at
-now and that card's state. Read on every pass, nothing is written on the card. A wait that only a person can release is **stalled**: a
-name the store does not know, a cycle of `after:` lines, or a card whose run ended without landing or whose start was refused. It is
-said on the inbox's line with its fix, and once on the feed when it begins and once when it clears. The fixes are to send the card
-on, change this card's `after:`, or start this card by hand. A start by hand starts a waiting card all the same, and says which cards
-had not landed.
+The inbox, the Card's `status.waitingOn`, and the board list a waiting card with each card it waits on, where that work stands now,
+and that card's state. This is read on every pass, and nothing is written on the card. A wait that only a person can release is
+**stalled**. That happens when a name is unknown to the store, when `after:` lines form a cycle, or when a card's run ended without
+landing or its start was refused. The inbox line says so and gives the fix, and the feed says so once when the stall begins and once
+when it clears. To fix it, send the card on, change this card's `after:`, or start this card by hand. You can still start a waiting card
+by hand: the wait doesn't block it, and the start lists the cards that have not landed yet.
 
 ## Who writes what
 
-Each file has one writer, so two loops never fight over it:
+Each file has exactly one writer, so the two loops never conflict:
 
-- **The run's record** is written by the tick alone.
-- **A task's journal** is written by the runtime alone.
-- **A person's facts**, such as a cancel or an answer, go in files of their own, read beside the record.
-- **The feed**, the line of everything that happened, is written by the daemon and followed by the board and by
-  [Nemia](/nemia/).
+- **The run's record** is written only by the tick.
+- **A task's journal** is written only by the runtime.
+- **A person's actions**, such as a cancel or an answer, go in their own files, read alongside the record.
+- **The feed**, the log of everything that happened, is written by the daemon and followed by the board and by [Nemia](/nemia/).
 
 ## Sources
 
-This page is written from `packages/agent-orchestrator/README.md` (_Following it_, _One daemon per store_, _Deciding what lands_) and
-`packages/agent-runtime/README.md` (_The model_, _`tick` and `up`, and why both_), and from
-`packages/agent-orchestrator/src/tick/assess.ts`, `packages/agent-orchestrator/src/tick/tick.verb.ts` and
+This page is based on `packages/agent-orchestrator/README.md` (_Following it_, _One daemon per store_, _Deciding what lands_) and
+`packages/agent-runtime/README.md` (_The model_, _`tick` and `up`, and why both_), and on
+`packages/agent-orchestrator/src/tick/assess.ts`, `packages/agent-orchestrator/src/tick/tick.verb.ts`, and
 `packages/agent-runtime/src/core/domain.ts`.

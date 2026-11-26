@@ -83,6 +83,8 @@ import { sessionTokenFor, stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
+import { fileWaits } from '../wait-node/wait-node.verb.ts';
+import { isWaitNode, waitCheck, waitFiled } from '../wait-node/index.ts';
 import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
@@ -271,7 +273,8 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (r.mode === 'recheck') {
     out.tried.push(r.step);
     notes.push(said);
-    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check, r.check);
+    const next = keptChecks(f, step, nextTry(record, r), record.check, r.check);
+    run.steps[r.step] = isWaitNode(step) && !next.check ? { ...next, check: waitCheck(run, step, (next.tries?.length ?? 0) + 1) } : next;
     out.rechecked.push(r.step);
     const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
     if (only) yield* fileOneCheck(f, r.step, only);
@@ -799,7 +802,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready))];
+  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready)), ...(yield* fileWaits(f, ready))];
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);

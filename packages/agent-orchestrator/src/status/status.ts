@@ -814,7 +814,7 @@ export const addSpend = (spends: ReadonlyArray<Spend | undefined>) =>
  * @param record The step's record, or undefined where the run has none of it.
  */
 export const sessionTasks = (record: StepRecord | undefined) => [
-  ...new Set([...(record?.tries ?? []).map((t) => t.taskId), ...(record?.taskId ? [record.taskId] : [])]),
+  ...new Set([...(record?.tries ?? []).flatMap((t) => (t.taskId ? [t.taskId] : [])), ...(record?.taskId ? [record.taskId] : [])]),
 ];
 
 /**

@@ -467,7 +467,8 @@ export const RunHolding = Schema.Struct({
   }),
   why: Schema.optionalKey(
     Schema.String.annotate({
-      description: 'What the person who put the hold said of why (nemia hold --why), at most 200 characters; absent where they said nothing.',
+      description:
+        'What the person who put the hold said of why (nemia hold --why), at most 200 characters; absent where they said nothing.',
     }),
   ),
   by: Schema.optionalKey(

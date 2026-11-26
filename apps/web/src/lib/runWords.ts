@@ -227,10 +227,23 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
 }
 
 /**
+ * The words of a row that waits on a person: a hold's held words (`heldWords`), another wait's tag (`waitTag`), or the rail word of the
+ * step it draws where the row names no wait.
+ * @param row The run's row.
+ * @param wait What it waits on a person for (`waitOf`), null where its step alone waits on one.
+ * @param drawn The step drawn now: its state and what it waits on.
+ */
+function yoursWords(row: NowRow, wait: Wait | null, drawn: { state: StepState; on: WaitOn | null }) {
+  if (wait?.kind === 'hold') return heldWords(row.holding);
+  return [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, row.holding != null).rail];
+}
+
+/**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
  * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or
  * waits on a person, its round of its rounds, its budget and what it spent, and the few words of its wait: on a person, the wait's tag
- * (`waitTag`), a hold's being the held words every held row says (`heldWords`); on no person, `waitWords`. None for a run whose every step is done. It says no duration: the row's Clock column says
+ * (`yoursWords`), a hold's being the held words every held row says; on no person, `waitWords`. None for a run whose every step is
+ * done. It says no duration: the row's Clock column says
  * how long the run has been at work.
  * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
  */
@@ -253,11 +266,7 @@ export function nowOf(row: NowRow) {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words: yours
-      ? wait?.kind === 'hold'
-        ? heldWords(row.holding)
-        : [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail]
-      : waitWords(row, stands, drawn.state, drawn.on, step),
+    words: yours ? yoursWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
   };
 }
 

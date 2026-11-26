@@ -35,6 +35,21 @@ type Stands = (
  */
 const judgedByAnExit = (step: StepSpec) => !!step.check || (step.checks?.length ?? 0) > 0 || step.run !== undefined;
 
+/**
+ * Whether a step is a wait node (`waitsFor:`): it runs no session and no command, and stands on its condition checks alone, which the
+ * loader lays as its `checks:` (one per name, waiting on nothing), as Kubernetes' readinessGates name the conditions a Pod waits on.
+ */
+const waits = (step: StepSpec) => step.waitsFor !== undefined;
+
+/**
+ * Whether anything of a step is filed for the try it is on: its task, or, for a wait node, which files no task, its checks laid on its
+ * record.
+ */
+const filed = (step: StepSpec, run: Run) => !!run.steps[step.name]?.taskId || (waits(step) && !!run.steps[step.name]?.check);
+
+/** The words a wait node stands in on its own work: unfiled, then on its checks, and nothing a session or a command ends as. */
+const WAIT_WORDS: ReadonlySet<StepStatus> = new Set<StepStatus>(['pending', 'checking', 'verified', 'failed (check)']);
+
 export const overItsCap = assume(overBudget, { pure: true });
 export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
@@ -97,6 +112,10 @@ const standingSpec = spec<Stands>({
     overBudgetOnlyOnceFiled: {
       description: 'Over budget only where another session of it would be the way on: a step filed',
       condition: ({ input: [step, run], output }) => output.status !== 'over budget' || !!run.steps[step.name]?.taskId,
+    },
+    aWaitIsNeverOverBudget: {
+      description: 'A wait node spends nothing, since it runs no session: no budget holds it',
+      condition: ({ input: [step], output }) => !waits(step) || output.status !== 'over budget',
     },
     overBudgetOnlyOverACap: {
       description: 'Over budget only over its cap, or as a loop held by a step of it over its own',
@@ -213,8 +232,18 @@ const ownStatusSpec = spec<
       condition: ({ output }) => output !== 'sent' && output !== 'skipped',
     },
     pendingExactlyUnfiled: {
-      description: 'A step is pending exactly while it has no task filed',
-      condition: ({ input: [step, run], output }) => (output === 'pending') === !run.steps[step.name]?.taskId,
+      description:
+        'A step is pending exactly while nothing of it is filed: no task, and for a wait node, which files none, no checks laid on its record',
+      condition: ({ input: [step, run], output }) => (output === 'pending') === !filed(step, run),
+    },
+    aWaitStandsOnlyOnItsConditions: {
+      description:
+        'A wait node runs no session and no command, so it is never running, unsigned, blocked, failed, stopped, denied, cut off at a budget nor out of rounds: it is pending, checking, verified, or refused at its check',
+      condition: ({ input: [step], output }) => !waits(step) || WAIT_WORDS.has(output),
+    },
+    aWaitIsJudgedByItsChecks: {
+      description: 'A wait node is never unverified: its conditions are checks, and only their verdict passes it',
+      condition: ({ input: [step], output }) => !waits(step) || output !== 'unverified',
     },
     unverifiedOnlyWithNoCheck: {
       description: 'Unverified only of a step with no check nor command: a step with one is verified, checking, or its check failed',

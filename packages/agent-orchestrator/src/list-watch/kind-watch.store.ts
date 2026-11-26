@@ -7,7 +7,15 @@ import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { definitionsNumbered } from '../definition-index/definition-index.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { changesOf, DEFINITIONS_PREFIX, revisionTable, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
+import {
+  changesOf,
+  DEFINITIONS_PREFIX,
+  revisionTable,
+  WATCHED_KINDS,
+  type KindChange,
+  type RowSeen,
+  type WatchedKind,
+} from './kind-watch.ts';
 
 /** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
 type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
@@ -47,7 +55,8 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
 
 /**
  * The revision each object of `kind` stands at, as of one read of its records, the revision a write of its spec waits on (`specOf`,
- * which leaves out the records its status reads), and the keyspace head the read was made at. The definitions' revisions are worked out with no write (`definitionsNumbered`).
+ * which leaves out the records its status reads), and the keyspace head the read was made at. The definitions' revisions are worked
+ * out with no write (`definitionsNumbered`).
  * @param kind The kind served.
  */
 export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: WatchedKind) {

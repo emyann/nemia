@@ -118,7 +118,11 @@ const factoryObjectOf = Effect.fn('factoryObjectOf')(function* (
 ) {
   const { metadata, spec } = yield* filedOf(listing, home);
   if ('error' in listing)
-    return objectOf(at, metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` }) satisfies FactoryObject;
+    return objectOf(at, metadata, spec, {
+      conditions: [],
+      untrusted: [],
+      error: `${listing.file} ${listing.error}`,
+    }) satisfies FactoryObject;
   const written = yield* doorAt(home, (door) => door.status.read(FactoryName.read(listing.name)));
   const level = yield* ownLevel(home, listing.name);
   const status: FactoryStatus = {

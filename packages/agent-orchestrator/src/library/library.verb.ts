@@ -216,14 +216,7 @@ function addStateIn(listing: readonly FactoryListing[], home: string, name: stri
  * @param recorded Whether the factory's adds are its record's.
  * @param at The revisions of the LibraryAdd kind.
  */
-function addObjectIn(
-  listing: readonly FactoryListing[],
-  home: string,
-  name: string,
-  ref: LibraryRef,
-  recorded: boolean,
-  at: AtRevisions,
-) {
+function addObjectIn(listing: readonly FactoryListing[], home: string, name: string, ref: LibraryRef, recorded: boolean, at: AtRevisions) {
   return {
     apiVersion: API_VERSION,
     kind: 'LibraryAdd',

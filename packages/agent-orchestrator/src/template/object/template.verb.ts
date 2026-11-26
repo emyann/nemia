@@ -155,7 +155,10 @@ const templateAt = Effect.fn('templateAt')(function* (name: string, place: strin
   return object(at, meta, spec, status);
 });
 
-/** A Template of `meta`, `spec` and `status`, its `resourceVersion` the revision of its index record (`atRevisions`); its content's digest is `status.digest`. */
+/**
+ * A Template of `meta`, `spec` and `status`, its `resourceVersion` the revision of its index record (`atRevisions`); its content's
+ * digest is `status.digest`.
+ */
 const object = (at: AtRevisions, meta: { name: string; creationTimestamp: string }, spec: TemplateSpec, status: TemplateStatus) =>
   ({
     apiVersion: API_VERSION,

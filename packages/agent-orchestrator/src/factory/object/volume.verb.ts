@@ -30,7 +30,8 @@ export type VolumeWorld = {
  * The volumes of the factory `listing` as objects, filed at `filedAt`, read against `world`.
  * @param listing The factory's listing, read without error, whose volumes are named.
  * @param filedAt When the factory was filed, each volume's creation timestamp.
- * @param world What each volume's status is read against: the store's root, whether a path is a folder, and the runs that mount one, and the revisions its objects are stamped at.
+ * @param world What each volume's status is read against: the store's root, whether a path is a folder, the runs that mount one,
+ *   and the revisions its objects are stamped at.
  */
 export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld) =>
   factoryVolumesNamed(listing).map((v) => {
@@ -52,7 +53,12 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
     return {
       apiVersion: API_VERSION,
       kind: 'Volume',
-      metadata: { name: v.name, namespace: listing.name, creationTimestamp: filedAt, resourceVersion: world.at.stamp(listing.name, v.name) },
+      metadata: {
+        name: v.name,
+        namespace: listing.name,
+        creationTimestamp: filedAt,
+        resourceVersion: world.at.stamp(listing.name, v.name),
+      },
       spec,
       status,
     };
@@ -81,7 +87,13 @@ export const volumeList = Effect.fn('volumeList')(function* (
   isDirectory: (at: string) => boolean = onDisk,
 ) {
   const at = yield* atRevisions('Volume', how.home);
-  const listed: VolumeList = yield* objectsListed('Volume', yield* volumesNow(e, how, namespace, isDirectory, at), query, 'volume', at.head);
+  const listed: VolumeList = yield* objectsListed(
+    'Volume',
+    yield* volumesNow(e, how, namespace, isDirectory, at),
+    query,
+    'volume',
+    at.head,
+  );
   return listed;
 });
 
@@ -93,7 +105,9 @@ export const volumeObject = Effect.fn('volumeObject')(function* (
   name: string,
   isDirectory: (at: string) => boolean = onDisk,
 ) {
-  const found = (yield* volumesNow(e, how, namespace, isDirectory, yield* atRevisions('Volume', how.home))).find((v) => v.metadata.name === name);
+  const found = (yield* volumesNow(e, how, namespace, isDirectory, yield* atRevisions('Volume', how.home))).find(
+    (v) => v.metadata.name === name,
+  );
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

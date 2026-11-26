@@ -20,7 +20,12 @@ const delegationObject = (record: DelegationRecord, at: AtRevisions) =>
   ({
     apiVersion: API_VERSION,
     kind: 'Delegation',
-    metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: at.stamp(record.factory, record.agent) },
+    metadata: {
+      name: record.agent,
+      namespace: record.factory,
+      creationTimestamp: record.since,
+      resourceVersion: at.stamp(record.factory, record.agent),
+    },
     spec: record.spec,
   }) satisfies Delegation;
 

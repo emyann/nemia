@@ -383,7 +383,8 @@ function heldAt(at: string) {
 
 /**
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it (with none, as one in yours alone), through the
- * engine `e`: a change of the folder there, judged at the revision it was read at (`read`) before a byte is written and handed the revision it holds once its schemas are written, or a new one. The
+ * engine `e`: a change of the folder there, judged at the revision it was read at (`read`) before a byte is written and handed the
+ * revision it holds once its schemas are written, or a new one. The
  * agents and skills its schemas are judged with are read through the doors on the request's services (`inRequest`).
  */
 export type Writing = {

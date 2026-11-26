@@ -8,7 +8,6 @@ import { addedOf, objectsListed, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite, type WriteAt } from 'agent-orchestrator/workflow';
 import { Conflict, DEFAULT_NAMESPACE, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 import { repoNeeded, type Place } from '../factory/place.ts';
-import type { Served as ServedRequest } from '../layer.ts';
 export { writtenAt } from '../workflows/builder.ts';
 
 /** An origin a definition is read from: the factory's tree, the repository, the person's library, or Nemia's builtin. */

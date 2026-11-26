@@ -35,7 +35,9 @@ export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* 
   const stamps = at ?? (yield* atRevisions('McpServer', home));
   const mine = libraryServers(home);
   const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
-  const own = yield* Effect.all(Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt, stamps)));
+  const own = yield* Effect.all(
+    Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt, stamps)),
+  );
   const builtin = yield* Effect.all(
     builtinServers(BUILTIN_SERVERS)
       .filter((s) => mine[s.name] === undefined)

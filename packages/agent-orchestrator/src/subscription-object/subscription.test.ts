@@ -34,7 +34,10 @@ const planting = <A, E, R>(planted: Planted, program: Effect.Effect<A, E, R>) =>
 /** `program` run on a fresh memory door after `planted`. */
 const over = <A, E>(planted: Planted, program: Effect.Effect<A, E, StoreRoot>) =>
   Effect.runSyncExit(
-    planting(planted, program).pipe(Effect.provide(subscriptionDoorMemory()), Effect.provideService(StoreRoot, scratch('subscription-memory-'))),
+    planting(planted, program).pipe(
+      Effect.provide(subscriptionDoorMemory()),
+      Effect.provideService(StoreRoot, scratch('subscription-memory-')),
+    ),
   );
 
 /** The success of `exit`, or a failure of the test naming what it failed with. */

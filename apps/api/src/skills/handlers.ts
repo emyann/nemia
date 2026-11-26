@@ -24,7 +24,6 @@ import {
   skillRemoved,
   libraryUsers,
   recordBuiltinCopy,
-  SkillDoor,
   SKILLS_WRITE,
   skillCopyCommand,
   skillTable,

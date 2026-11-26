@@ -57,10 +57,10 @@ const objectOf = (listed: Listed, at: AtRevisions) =>
 /** Every subscription's object, sorted by name. */
 const subscriptionObjects = (at: AtRevisions) =>
   Effect.gen(function* () {
-  const door = yield* SubscriptionDoor;
-  const { listed } = yield* door.subscriptions.list();
-  return yield* Effect.forEach(listed, (l) => objectOf(l, at));
-});
+    const door = yield* SubscriptionDoor;
+    const { listed } = yield* door.subscriptions.list();
+    return yield* Effect.forEach(listed, (l) => objectOf(l, at));
+  });
 
 /** A page of the subscriptions, as `SubscriptionList`: those its selectors keep, sorted by name, cut by its limit after its continue. */
 export const subscriptionList = Effect.fn('subscriptionList')(function* (query: ObjectQuery) {

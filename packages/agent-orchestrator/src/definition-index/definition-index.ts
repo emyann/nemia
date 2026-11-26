@@ -5,8 +5,6 @@
  */
 import type { IndexedRevisionOf } from '../../contracts/indexed-revision.contract.ts';
 
-export type { IndexRecord } from '../../contracts/indexed-revision.contract.ts';
-
 /**
  * A definition's revision with no write.
  * @param held The index's live record of the definition, none where no sweep has numbered it.

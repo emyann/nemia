@@ -27,7 +27,13 @@ test("a server's headers are masked, its state carried, and why the states are u
   assert.deepEqual(s.status, { state: 'connected', tools: 3 });
   assert.equal(s.metadata.namespace, 'mill');
   assert.equal(s.metadata.resourceVersion, '6');
-  const unread = mcpServerOf({ name: 'docs', type: 'sse', url: 'https://d', state: null }, 'mill', '2026-11-01T00:00:00.000Z', 'no engine', at);
+  const unread = mcpServerOf(
+    { name: 'docs', type: 'sse', url: 'https://d', state: null },
+    'mill',
+    '2026-11-01T00:00:00.000Z',
+    'no engine',
+    at,
+  );
   assert.deepEqual(unread.status, { error: 'no engine' });
 });
 

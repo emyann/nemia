@@ -115,7 +115,8 @@ const SkillChangeValue = Schema.declare(
 
 /**
  * What `nemia skills write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the skill's
- * name on the path where it changes one (`name`), the `version` it was read at (the `resourceVersion` the skill was served at), and either its `change` or the builtin skill to `copy`
+ * name on the path where it changes one (`name`), the `version` it was read at (the `resourceVersion` the skill was served at), and
+ * either its `change` or the builtin skill to `copy`
  * from the folder of builtin skills (`builtin`).
  */
 export const SkillWriteInput = Schema.Struct({
@@ -153,7 +154,8 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
         );
       const judged = SkillName.read(name ?? change.name);
       yield* definitionJudged('Skill', from === 'factory' ? factory : undefined, judged, version, 'write');
-      const held = version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(change.name), library)) ?? version);
+      const held =
+        version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(change.name), library)) ?? version);
       const written = yield* door.skills.write(SkillName.read(change.name), change, held, library);
       yield* definitionsSwept();
       return written;

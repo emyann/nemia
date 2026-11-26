@@ -1,7 +1,7 @@
 /**
  * The definition index (`indexSweep`): a definition file written once is one record, a sweep that sees nothing new writes nothing, an
- * edit is one write, a removed file a tombstone; and a read or a write of a definition numbers it with no write (`definitionRevisionNow`): a
- * definition no sweep has numbered is the next revision.
+ * edit is one write, a removed file a tombstone; and a read or a write of a definition numbers it with no write
+ * (`definitionRevisionNow`): a definition no sweep has numbered is the next revision.
  */
 import { test } from 'vitest';
 import { scratch } from 'test-kit/scratch';

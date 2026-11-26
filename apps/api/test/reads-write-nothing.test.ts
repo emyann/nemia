@@ -42,7 +42,10 @@ test('GET of every list and item of the indexed kinds leaves the keyspace head w
   const put = await app.request('/api/agents/implementer', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ metadata: { resourceVersion: served.metadata.resourceVersion }, spec: { ...served.spec, instructions: 'Build it.' } }),
+    body: JSON.stringify({
+      metadata: { resourceVersion: served.metadata.resourceVersion },
+      spec: { ...served.spec, instructions: 'Build it.' },
+    }),
   });
   assert.equal(put.status, 200, await put.clone().text());
   assert.ok((await head()) > before, 'the writer swept the index once it had written');

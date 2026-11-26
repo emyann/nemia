@@ -37,7 +37,8 @@ export const firstLine = (text: string | null | undefined) => {
 const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
 
 /**
- * A page as a table: its place (`continue`, and the `resourceVersion` it was read at, where it has one), its columns, and a row per item, its cells by `cells`, its metadata beside them.
+ * A page as a table: its place (`continue`, and the `resourceVersion` it was read at, where it has one), its columns, and a row per
+ * item, its cells by `cells`, its metadata beside them.
  * @param page The page, its items and where it stands.
  * @param columns The table's columns, in the order the cells are.
  * @param cells An item's cells, in the columns' order.

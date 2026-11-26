@@ -8,7 +8,16 @@
  * already carries. A run of the page that could not be judged is a row too, its note saying why, as `nemia ls` says it unreadable. The
  * api answers it to a list asked for a `Table` (`TABLE_ACCEPT`), so no client keeps a printer of the runs. Pure.
  */
-import { headline, type Run, type RunList, type RunStepStatus, type RunUnjudged, type Table, type TableColumnDefinition } from 'objects';
+import {
+  actorWords,
+  headline,
+  type Run,
+  type RunList,
+  type RunStepStatus,
+  type RunUnjudged,
+  type Table,
+  type TableColumnDefinition,
+} from 'objects';
 import { ranOnWords } from '../release/index.ts';
 
 /** How much of a brief's first line a row shows, as `nemia ls` cuts it. */
@@ -71,9 +80,19 @@ const stepWordOf = (step: RunStepStatus) =>
     ? `${NEEDS_HUMAN}: ${step.waitingFor.words}${step.message.slice(NEEDS_HUMAN.length)}`
     : step.message;
 
-/** Where the run stands: its word, `held` under a person's hold, then each step waiting on you in its word. */
+/** Who has a run in hand, as `nemia ls` names them: the name given, else the caller who put it (`actorWords`), else someone. */
+const assigneeName = ({ name, actor }: NonNullable<Run['status']['assignee']>) => name ?? (actor ? actorWords(actor) : 'someone');
+
+/**
+ * Where the run stands: its word, `held` under a person's hold, `assigned to <name>` while someone has it in hand, then each step waiting
+ * on you in its word.
+ */
 const statusCell = ({ status }: Run) => {
-  const word = [status.status, ...(status.holding ? ['held'] : [])].join(', ');
+  const word = [
+    status.status,
+    ...(status.holding ? ['held'] : []),
+    ...(status.assignee ? [`assigned to ${assigneeName(status.assignee)}`] : []),
+  ].join(', ');
   const asking = status.waitingOnYou.map((name) => {
     const step = status.steps.find((s) => s.name === name);
     return step ? `${name} ${stepWordOf(step)}` : name;
@@ -97,17 +116,20 @@ const resultNamed = ({ result = [], toDecide }: Run['status']) =>
 
 /**
  * What waits on you, as `nemia ls` said it under a run (`asksLines`): what to decide with its command, the steps waiting on you (an
- * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it, and where its
+ * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it — each asked of
+ * its assignee instead while someone has the run in hand, with who, when it comes back and how to give it back — and where its
  * work ended up (`result`), landed or not, unless what to decide names those branches already.
  */
 const waitsCell = ({ metadata: { name }, status }: Run) => {
-  const { toDecide, waiting, holding } = status;
+  const { toDecide, waiting, holding, assignee } = status;
   const asked = status.waitingOnYouWords.filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
+  const of = assignee ? `asked of ${assigneeName(assignee)}` : 'waiting on you';
   return [
     ...(toDecide ? [`to decide: ${toDecide.said}`] : []),
-    ...(asked.length ? [`waiting on you: ${asked.join(', ')} — nemia decide ${name}`] : []),
-    ...(waiting?.waitingOnYou ? [`waiting on you: ${waiting.advice}`] : []),
+    ...(asked.length ? [`${of}: ${asked.join(', ')} — nemia decide ${name}`] : []),
+    ...(waiting?.waitingOnYou ? [`${of}: ${waiting.advice}`] : []),
     ...(holding ? [holdWords(name, holding)] : []),
+    ...(assignee ? [`${assignee.word} — nemia assign ${name} --off gives it back`] : []),
     ...(resultNamed(status) ? [] : [`result: ${(status.result ?? []).join(', ')} — nemia decide ${name}`]),
   ].join('; ');
 };

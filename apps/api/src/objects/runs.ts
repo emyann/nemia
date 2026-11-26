@@ -4,7 +4,7 @@
  * app's informer (`runObject`); what is read beside it — its lines (`runLines`), what it concludes (`CONCLUDED`), its record (`SHOW`,
  * raw); its four sub-resources, the entries `tries`, `try`, `closeout` and `told`; a run started (`create`,
  * `runStart`); and the run's named actions, each its body decoded by its endpoint (`objects`' `RunRetry`, `RunApprove`, …) and handed with
- * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `ROUTE`, `SAY`, `REFRESH`, `HOLD`, `CANCEL`,
+ * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `ROUTE`, `SAY`, `REFRESH`, `HOLD`, `ASSIGN`, `CANCEL`,
  * `RM`, `PRUNE`, `LABEL_RUN`).
  *
  * A run's namespace is its factory, `default` for one that names none (`runNamespace`): a run read or acted on under another is
@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import {
   actorOf,
   APPROVE,
+  ASSIGN,
   CANCEL,
   CONCLUDED,
   dropInformed,
@@ -307,6 +308,12 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true, actor: actorOf(s.caller) }))),
+    )
+    .handle('assign', ({ params: { namespace, name }, payload }) =>
+      acted({ namespace, name }, (s) => s.inRequest(ASSIGN.handler({ runId: name, ...payload, off: false, actor: actorOf(s.caller) }))),
+    )
+    .handle('unassign', ({ params: { namespace, name } }) =>
+      acted({ namespace, name }, (s) => s.inRequest(ASSIGN.handler({ runId: name, off: true, actor: actorOf(s.caller) }))),
     )
     .handle('cancel', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name, actor: actorOf(s.caller) }))),

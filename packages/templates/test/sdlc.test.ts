@@ -183,12 +183,14 @@ const checksIn = (tree: string, workflow: string, step: string) => {
   return all.filter((c) => c.enabled !== false && c.enabled !== 'false');
 };
 
-/** The `run:` of the factory program `name` of `tree`, as its `program.yaml` holds it, and what it writes. */
+/** The factory program `name` of `tree`, as the rendered wiring holds it: its `run:` line and the conditions it writes. */
 const programIn = (tree: string, name: string) => {
-  const { spec } = yaml.load(fs.readFileSync(path.join(tree, 'programs', name, 'program.yaml'), 'utf8')) as {
-    spec: { run: string; writes: string[] };
+  const wiring = JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')) as {
+    programs?: Record<string, { run: string; writes: string[] }>;
   };
-  return spec;
+  const program = wiring.programs?.[name];
+  assert.ok(program, `${name} is in the tree's wiring`);
+  return program;
 };
 
 test('on GitHub the round and the landing wait on the conditions the ci-watch program writes, with no check that waits on CI; in the checkout they wait on none', () => {

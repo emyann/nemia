@@ -140,6 +140,7 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^skills\/[\w-]+\/traps\.md$/, () => '# Traps of a test\n'],
   [/^workflows\/([\w-]+)\/README\.md$/, (file) => `# ${file.split('/')[1]}\n`],
   [/^workflows\/[\w-]+\/workflow\.yaml$/, () => 'kind: Workflow'],
+  [/^programs\/[\w-]+\/program\.yaml$/, () => 'kind: Program'],
   [/^carried\/ci-log\.ts$/, () => 'export function failures'],
   [/^carried\/ci-write\.ts$/, () => 'export const conditionDue'],
   [/^carried\/exec\.ts$/, () => 'export function run'],

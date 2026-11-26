@@ -1563,6 +1563,8 @@ describe("an ending whose last check is a condition gives the checkout back once
     await at.pass(a.id);
     assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
     await writeBaseCi(a.id, 'False');
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'the refusal files its check, which exits 1');
+    settle(`${a.id}-ship-check-base-ci`, 'failed', undefined, 1);
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
     assert.ok(landed && 'aborted' in landed, `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`);

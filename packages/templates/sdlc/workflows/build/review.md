@@ -78,9 +78,9 @@ are each page outside the repository the spec rests on, as design read it: its a
 claims the spec takes from it. Check each claim of the spec and of the change that rests on such a page against its passage. A claim
 with no passage there, on a page your fence refuses:
 
-- **With no `## Gates after you`, stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
+- **With no `## Gates after you`, it stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
   `needs` naming each claim and its page, and a person answers with `nemia retry <run> review --message "<what the page says>"`.
-- **With `land` named there, goes at the top of your sign-off**, each claim and its page, where the person who approves the land
+- **With `land` named there, it goes at the top of your sign-off**, each claim and its page, where the person who approves the land
   reads it before anything merges: it is no reason to sign off `blocked`.
 
 **A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you

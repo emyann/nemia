@@ -143,6 +143,9 @@ const ACT_WORDS: readonly Case[] = [
   { kind: 'Run', word: 'cancel asked', note: 'at 2026-10-16T04:00:00.000Z', reason: 'CancelAsked' },
   { kind: 'Run', word: 'hold put', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldPut' },
   { kind: 'Run', word: 'hold lifted', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldLifted' },
+  { kind: 'Run', word: 'assigned', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneePut' },
+  { kind: 'Run', word: 'given back', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeGivenBack' },
+  { kind: 'Run', word: 'assignee ran out', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeLapsed' },
   { kind: 'Step', word: 'nothing started', note: 'try 1', reason: 'SpawnFailed' },
   { kind: 'Step', word: 'session lost', note: 'try 3', reason: 'SessionLost' },
 ];

@@ -154,7 +154,7 @@ test("a sweep reads the places', the harnesses' and every trusted factory's work
   fs.writeFileSync(path.join(trusted.repo, 'here'), '');
   const read = await Effect.runPromise(needsOnce(memo).pipe(Effect.provide(placed)));
   assert.equal(read.get(checkKey({ check: 'exit 0' })), 'met');
-  const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir) };
+  const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir), factory: 'acme' };
   assert.equal(read.get(checkKey({ check: 'exit 1', ...own })), 'missing');
   assert.equal(
     read.get(checkKey(repositoryCheckOf(toolchain, trusted.repo))),
@@ -182,7 +182,7 @@ test("a workflow's need of scope repository is swept in its factory's repository
       'needs:',
       '  - name: inside',
       '    message: met inside the repository',
-      '    check: test -f only-here && test -n "$WF_CARRIED_FILES"',
+      '    check: test -f only-here && test -n "$WF_CARRIED_FILES" && test "$WF_FACTORY" = acme',
       '    scope: repository',
       '  - name: outside',
       '    message: the same check, unscoped',
@@ -204,7 +204,7 @@ test("a workflow's need of scope repository is swept in its factory's repository
   assert.ok(inside !== undefined && outside !== undefined);
   const scoped = workflowCheckOf(w, inside);
   assert.equal(scoped?.cwd, repo, "it runs in the factory's repository");
-  assert.equal(read.get(checkKey(scoped ?? { check: 'none' })), 'met', 'told the carried files, as an unscoped check is');
+  assert.equal(read.get(checkKey(scoped ?? { check: 'none' })), 'met', 'told the carried files and its factory, as an unscoped check is');
   const unscoped = workflowCheckOf(w, outside);
   assert.equal(unscoped?.cwd, undefined, 'a need that says no scope runs where it always has');
   assert.equal(read.get(checkKey(unscoped ?? { check: 'none' })), 'missing');

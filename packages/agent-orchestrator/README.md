@@ -4127,7 +4127,9 @@ rendered there), and a builtin place declares its own (`PlaceDeclared.needs`: th
 before. The daemon runs the declared checks on a sweep beside its passes (`src/needs/sweep.verb.ts`): the builtin places', and those
 of a factory's workflows only where its places are trusted (`trustedOf`), an untrusted factory's needs read unknown, naming `nemia
 factory trust <factory>`; each with the tools folder's
-`bin` first on PATH and `NEMIA_TOOLS` set, and every pass hands each run its reading: a run that has filed nothing waits while a need
+`bin` first on PATH and `NEMIA_TOOLS` set, a workflow's check told its folders (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`) and its
+factory (`WF_FACTORY`, as Kubernetes' Downward API tells a container its namespace), so a check can ask the api of its own factory's
+objects (`nemia get mcpservers/<name> -n "$WF_FACTORY"`), and every pass hands each run its reading: a run that has filed nothing waits while a need
 reads missing (`needsHolding`, `contracts/needs.contract.ts`), listed `waiting on <need>: <fix>`, takes no slot, and its first step is
 filed on the pass after the need reads met. A run that has filed a step is never held by a need.
 

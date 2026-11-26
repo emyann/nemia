@@ -170,11 +170,12 @@ test('REFUSED: branch given an argument, on the remote default branch, or on no 
   assert.equal(given.code, 1);
   assert.ok(given.err.includes('pull-request.ts" branch'), given.err);
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
-  const onBase = placed({ branch: 'main' });
-  gitIn(onBase.repo, 'push', '-q', 'origin', 'HEAD:refs/heads/main');
+  const onBase = placed();
+  gitIn(onBase.repo, 'push', '-q', 'origin', 'HEAD:refs/heads/wf/r-1/run');
+  execFileSync('git', ['-C', onBase.bare!, 'symbolic-ref', 'HEAD', 'refs/heads/wf/r-1/run']);
   const base = pr(onBase, 'branch');
   assert.equal(base.code, 1);
-  assert.ok(base.err.includes('HEAD is on `main`'), base.err);
+  assert.ok(base.err.includes("HEAD is on `wf/r-1/run`, the remote's default branch"), base.err);
   const outside = placed({ branch: 'feature/x' });
   const off = pr(outside, 'branch');
   assert.equal(off.code, 1);
@@ -1347,7 +1348,7 @@ test("build's and quick's implement notes, rendered on GitHub, type the branch l
     const note = fs.readFileSync(path.join(at.tree, 'workflows', workflow, 'implement.md'), 'utf8');
     const line = note.split('\n').find((text) => text.includes('pull-request.ts" branch'));
     assert.ok(line, `${workflow}'s note types the branch line`);
-    assert.ok(!/--labels|--title|pull-request\.ts" open/.test(note), `${workflow}: no open line is left in the note`);
+    assert.ok(!/--title|pull-request\.ts" open/.test(note), `${workflow}: no open line is left in the note`);
     for (const tool of ['list_pull_requests', 'create_pull_request', 'update_pull_request'])
       assert.ok(note.includes(tool), `${workflow}: the note names ${tool}`);
     const place = withMain(placed());

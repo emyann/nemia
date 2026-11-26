@@ -240,7 +240,9 @@ export const checksWritten = (checks: readonly CheckSpec[]) =>
 export function waitChecksOf(step: string, names: readonly string[] | undefined) {
   if (names === undefined) return undefined;
   if (names.length === 0)
-    return refuse(`${step}: \`waitsFor:\` names no condition, so the step would wait on nothing. Name one: \`waitsFor: [ready]\`, or delete the line.`);
+    return refuse(
+      `${step}: \`waitsFor:\` names no condition, so the step would wait on nothing. Name one: \`waitsFor: [ready]\`, or delete the line.`,
+    );
   const bad = names.find((n) => !CHECK_NAME.test(n));
   if (bad !== undefined)
     refuse(

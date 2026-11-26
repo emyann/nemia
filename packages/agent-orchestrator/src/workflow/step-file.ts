@@ -139,12 +139,11 @@ export function parseWorkflow(
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
     : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), MAP_KEYS);
   meta = baseSpelled(placeSpelled(name, meta));
-  if (meta.waitsFor === undefined) placeRequired(name, meta.place);
+  placedOrWaits(name, meta);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     refuseFenceBlock(name, fenced, meta.harness);
-    if (!own && meta.waitsFor === undefined)
-      throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
+    bodiedOrWaits(name, own, meta);
     const step = stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
     if (meta.skills !== undefined)
       refuse(
@@ -340,6 +339,16 @@ function notAnAgent(step: string, name: string, there: readonly string[], hired:
       ? `The agents are: ${there.join(', ')} — ${instead ?? 'name one'}, or write ${AGENTS_FOLDER}/${name}.md beside them.`
       : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or ${instead ?? 'delete the line'}.`)
   );
+}
+
+/** A step's `place:` as its file says it, which a wait node need not: it works in no place of its own (`placeRequired`). */
+function placedOrWaits(name: string, meta: Partial<Record<StepKey, string>>) {
+  if (meta.waitsFor === undefined) placeRequired(name, meta.place);
+}
+
+/** A step with no agent has something to say, which a wait node has not: it runs no session. */
+function bodiedOrWaits(name: string, own: string, meta: Partial<Record<StepKey, string>>) {
+  if (!own && meta.waitsFor === undefined) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
 }
 
 /**

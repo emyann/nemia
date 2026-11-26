@@ -135,6 +135,8 @@ describe('what a refused start names: the factory, the workflow, the steps, the 
       },
       { name: 'handoff', harness: undefined, agent: undefined, workflow: 'dev' },
     ];
+    const waiting = [{ name: 'ready', harness: undefined, agent: undefined, waitsFor: ['ready'] }];
+    assert.equal(unfilledRefusal(waiting, 'acme', 'land'), undefined, 'a wait node runs no agent, so no hire fills it');
     assert.equal(unfilledRefusal(routed, 'acme', 'triage'), undefined, 'a table condition and a workflow node run no agent');
     const judged = [{ name: 'triage', harness: undefined, agent: undefined, routes: ['web'], route: { kind: 'judge' as const } }];
     names(unfilledRefusal(judged, 'acme', 'triage'), 'acme', 'triage');

@@ -300,6 +300,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
       | 'workflow'
       | 'card'
       | 'relabel'
+      | 'waitsFor'
       | 'checks'
       | 'run'
     >,

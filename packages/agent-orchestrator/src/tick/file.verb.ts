@@ -84,7 +84,7 @@ import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
 import { fileWaits } from '../wait-node/wait-node.verb.ts';
-import { isWaitNode, waitCheck, waitFiled } from '../wait-node/index.ts';
+import { isWaitNode, waitCheck } from '../wait-node/index.ts';
 import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
@@ -258,6 +258,28 @@ export const tryFiled = (
 });
 
 /**
+ * File a recheck due: the step's check run again, as the same task's next try. A wait node's try has no task, so its checks are laid
+ * anew for the try it is now on, as the loader lays them (`waitCheck`). A person's recheck of one check (`--check`) files that check
+ * itself.
+ * @param f The pass's filing.
+ * @param r The try to file.
+ * @param out The steps tried and rechecked on this pass.
+ * @param said The note that says the try.
+ */
+const fileRecheck = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried, said: string) {
+  const { run } = f;
+  const step = stepNamed(f, r.step);
+  const record = recordNamed(run, r.step);
+  out.tried.push(r.step);
+  f.notes.push(said);
+  const next = keptChecks(f, step, nextTry(record, r), record.check, r.check);
+  run.steps[r.step] = isWaitNode(step) && !next.check ? { ...next, check: waitCheck(run, step, (next.tries?.length ?? 0) + 1) } : next;
+  out.rechecked.push(r.step);
+  const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
+  if (only) yield* fileOneCheck(f, r.step, only);
+});
+
+/**
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
  * nothing but the note where the engine refuses the close or the answer it needs. A person's recheck of one check (`--check`) files that
  * check itself: the others' tasks are kept, a refused one among them, and the pass files no check of a step one of whose checks stands
@@ -270,16 +292,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (!(yield* f.mayFile)) return;
   const record = recordNamed(run, r.step);
   const said = tryWord(r, step);
-  if (r.mode === 'recheck') {
-    out.tried.push(r.step);
-    notes.push(said);
-    const next = keptChecks(f, step, nextTry(record, r), record.check, r.check);
-    run.steps[r.step] = isWaitNode(step) && !next.check ? { ...next, check: waitCheck(run, step, (next.tries?.length ?? 0) + 1) } : next;
-    out.rechecked.push(r.step);
-    const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
-    if (only) yield* fileOneCheck(f, r.step, only);
-    return;
-  }
+  if (r.mode === 'recheck') return yield* fileRecheck(f, r, out, said);
   const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
   const held = heldAnswered(f, r, step, record);
   const answers = held !== undefined;

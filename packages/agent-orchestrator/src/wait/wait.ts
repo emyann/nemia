@@ -15,7 +15,8 @@ export type { Wait } from '../../contracts/hold.contract.ts';
  * started never waits on a run again.
  * @param run The run asked about.
  */
-export const hasStarted = (run: Run) => Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.tries?.length));
+export const hasStarted = (run: Run) =>
+  Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.check) || Boolean(s.tries?.length));
 
 /**
  * Whether the gate applies to this run, and a parent is read at all: it waits on runs, nobody has called it off, and nothing of it has

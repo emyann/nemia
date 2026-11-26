@@ -63,7 +63,8 @@ const TryCause = Schema.Literals(TRY_CAUSES).annotate({ identifier: 'TryCause' }
 
 /**
  * A try behind a step's current one (`EarlierTry`): the task it ran as, its check, how it ended, and what a person gave the try
- * after it, none for a wait node's, which files no task. Numbered by its place in the step's `tries`, from 1 (`tryOf`, record.ts:363): the record writes no number.
+ * after it, none for a wait node's, which files no task. Numbered by its place in the step's `tries`, from 1 (`tryOf`, record.ts:363): the
+ * record writes no number.
  */
 export const Try = Schema.Struct({
   taskId: Schema.NullOr(TaskId.OnRead),

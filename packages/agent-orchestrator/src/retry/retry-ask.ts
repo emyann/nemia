@@ -116,10 +116,11 @@ const upgradeTry = (t: unknown) => {
  * `cause` is what replaced it (`TryCause`; a record written before it said `then`, read as `cause`, `upgradeTries`): `retries`, the
  * run re-filing the step itself after its check refused — continued on the workflow's word — or `signoff`, the run continuing a session
  * that ended without its closeout, once a round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the
- * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`, none for a wait node's, which files no task. Or `round`: the step's loop
- * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
- * for its target to merge the base (`nemia refresh --base`), which no round counts (`roundIn`). Or `back`: an ending that stopped on the
- * base branch, sent back with its work (`sentBack`), whose next try is filed on a new approval.
+ * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`, none for a wait node's, which
+ * files no task. Or `round`: the step's loop went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the
+ * loop was filed again on the round it is on, for its target to merge the base (`nemia refresh --base`), which no round counts
+ * (`roundIn`). Or `back`: an ending that stopped on the base branch, sent back with its work (`sentBack`), whose next try is filed on a
+ * new approval.
  */
 export type EarlierTry = {
   taskId: string | null;

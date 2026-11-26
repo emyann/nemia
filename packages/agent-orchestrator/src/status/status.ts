@@ -650,8 +650,13 @@ const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: read
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
 export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
+  if (step.waitsFor !== undefined) return waitStanding(step, run.steps[step.name], phaseOf);
+  return sessionStanding(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+};
+
+/** Where a step that runs a session or a command stands on its own work (`ownStatus`). Pure. */
+const sessionStanding: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
-  if (step.waitsFor !== undefined) return waitFiled(step, st) ? checkedWord(st?.check, phaseOf) : 'pending';
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
   if (standsBlocked(step, st, said, steps)) return 'blocked';
@@ -668,6 +673,16 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   return judgedStatus(step, run, st, said, phaseOf, closeoutOf);
 };
+
+/**
+ * Where a wait node stands: `pending` while nothing of it is filed (`waitFiled`), then on its checks alone, which are its conditions: it
+ * runs no session and no command, so no other word is its. Pure.
+ * @param step The wait node.
+ * @param st The step's record, or undefined where the run has none of it.
+ * @param phaseOf The phase of a task, by its id.
+ */
+const waitStanding = (step: StepSpec, st: StepRecord | undefined, phaseOf: (taskId: string) => TaskPhase) =>
+  (waitFiled(step, st) ? checkedWord(st?.check, phaseOf) : 'pending') satisfies StepStatus;
 
 /**
  * Where a step stands on its checks (`onItsCheck`), `exhausted` where they passed but its loop asked another round past its cap.

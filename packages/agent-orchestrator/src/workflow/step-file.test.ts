@@ -931,6 +931,7 @@ const EVERY: Record<
     | 'workflow'
     | 'card'
     | 'relabel'
+    | 'waitsFor'
     | 'checkFailurePolicy'
     | 'checks'
     | 'run'

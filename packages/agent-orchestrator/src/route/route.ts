@@ -67,11 +67,15 @@ export type { NodeKind };
  */
 export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card' | 'run' | 'waitsFor'>) => {
   const kind: NodeKind =
-    step.routes !== undefined ? 'condition' : isCardNode(step) ? 'workflow' : step.run !== undefined
-        ? 'command'
-        : step.waitsFor !== undefined
-          ? 'wait'
-          : 'step';
+    step.routes !== undefined
+      ? 'condition'
+      : isCardNode(step)
+        ? 'workflow'
+        : step.run !== undefined
+          ? 'command'
+          : step.waitsFor !== undefined
+            ? 'wait'
+            : 'step';
   return kind;
 };
 

@@ -28,6 +28,7 @@ const RESTING: RestFacts = {
 
 const PRUNED = { at: '2026-09-25T10:00:00.000Z', worktrees: [] };
 const HOLD = { at: '2026-09-25T10:00:00.000Z', until: ['other'] };
+const ASSIGNEE = { at: '2026-09-25T10:00:00.000Z', forMs: 3_600_000 };
 
 /**
  * Each row a run's facts and the clauses that hold it out of the memo (`restBlockers`), none for a run at rest; `atRest` agrees with
@@ -50,6 +51,16 @@ const CLAUSES: Array<[string, Partial<RestFacts>, string[]]> = [
   [
     "a cancelled run's hold reads no run: it rests",
     { status: 'cancelled', run: { workflow: [], hold: HOLD, cancelledAt: '2026-09-25T11:00:00.000Z' } },
+    [],
+  ],
+  [
+    'REFUSED: assigned: its assignee lapses with time, which no file of the run says',
+    { run: { workflow: [], assignee: ASSIGNEE } },
+    ['assignee'],
+  ],
+  [
+    "a cancelled run's assignee ends with it: it rests",
+    { status: 'cancelled', run: { workflow: [], assignee: ASSIGNEE, cancelledAt: '2026-09-25T11:00:00.000Z' } },
     [],
   ],
   ['REFUSED: a task not settled — at work, waiting for a word, unknown to the engine — moves on its own', { settled: false }, ['settled']],

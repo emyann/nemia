@@ -117,6 +117,7 @@ test("a run's judged fields: the judgement's run-level words, its time at work a
     waiting: null,
     holding: null,
     toDecide: null,
+    assignee: null,
   } as const;
   const fields = judgedFields(run, judged, new Map());
   assert.deepEqual(fields, { ...judged, atWork: { ms: 0, since: null, endedAt: null }, tokens: null }, 'no view read: no time, no tokens');

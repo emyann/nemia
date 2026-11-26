@@ -20,7 +20,8 @@ import {
 } from '../runtime-client.ts';
 import type { QueueStarted } from '../inbox/index.ts';
 import type { RunStatusWord } from 'objects';
-import type { RunPhase } from '../phase/phase.ts';
+import { RUN_PHASE_IN_PLAY, type RunPhase } from '../phase/phase.ts';
+import { judgedNow } from '../summary/summary.verb.ts';
 import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
@@ -310,6 +311,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const landed = landedThrough(e, passParents(standingReader(standing)));
+  yield* withinEffect('act', assigneesEnded(e, home, judging));
   const inbox = yield* inboxOfPass(runs, landed, judging);
   if (informer) yield* informed(e, informer, runs, judging, verify);
   yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
@@ -449,6 +451,29 @@ const STATUS_PHASE: Readonly<Record<RunStatusWord, RunPhase>> = {
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with why (`Unjudged`). */
 type Judging = { done: Map<string, Advanced>; unjudged: Map<string, Pick<Unjudged, 'why' | 'by'>> };
+
+/**
+ * End each assignee that no longer stands, once its run is advanced: every run the pass judged that someone has in hand is judged as the
+ * list judges it (`judgedNow`), so the tick ends one exactly when a read stops serving it (`assigneeStandingOf`, judged.verb.ts) —
+ * `lapsed` while the run is in play, an ask having waited past its time, and `ended` once it is over. Only the assignee this pass read is
+ * ended (`assignees.end`), so one given back and put again since stays; and the pass's words for the feed say the end at once
+ * (`assigneeOnce`). Level-triggered: a run the pass did not end is read again on the next, a restart's first included. A run left unjudged
+ * (`unreadable`) is left as it is.
+ */
+const assigneesEnded = Effect.fnUntraced(function* (e: Engine, home: string, judging: Judging) {
+  const held = [...judging.done.values()].flatMap(({ run }) => (run.assignee ? [run] : []));
+  if (!held.length) return;
+  const door = yield* RunDoor;
+  for (const summary of yield* judgedNow(e, home, held)) {
+    const run = held.find((r) => r.id === summary.id);
+    const done = judging.done.get(summary.id);
+    if (!run?.assignee || !done || summary.unreadable !== null || summary.assignee !== null) continue;
+    const how = RUN_PHASE_IN_PLAY[summary.phase] ? 'lapsed' : 'ended';
+    if (!(yield* door.assignees.end(RunId.read(run.id), run.assignee.at, how))) continue;
+    const { assignee: _, ...words } = done.feed;
+    judging.done.set(run.id, { ...done, feed: { ...words, unassigned: { since: run.assignee.at, how } } });
+  }
+});
 
 /**
  * Why a run was left unjudged: a read of one of its tasks' journals was refused (`unreadableJournal`), in the runtime's words, `by` the

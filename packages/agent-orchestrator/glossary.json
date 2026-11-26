@@ -290,6 +290,11 @@
       ]
     },
     {
+      "term": "Assignee",
+      "meaning": "who has a run in hand (`nemia assign`, `--to` a name or the OS user, `--off` gives it back): what the run asks of a person is theirs to answer, and the run waits on nobody else (`waitsOnYou`), until they give it back, the run is over (`ended`), or an ask waits on them past their time, an hour unless `--for` gives another (`lapsed`, `assigneeStanding`); it refuses nothing, anyone may still answer. A file of its own beside the run (`runs/<id>.assignee`), its end a receipt (`runs/<id>.unassigned`), served as `RunAssignee` on the run's status. Never \"held\", which is the hold's alone.",
+      "type": "Assignee"
+    },
+    {
       "term": "Inherited",
       "meaning": "the labels a run or a card is created with, copied once from its card and every `--after` and `--from` run: what the runs agree on, the card's over them, the typed `--label` over those; a key two runs disagree on is left out and said.",
       "type": "Inherited",
@@ -847,7 +852,7 @@
     },
     {
       "term": "Waiting on you",
-      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it — on a hold, where a run it names never lands, and never for a hold that names none, the person's word already given; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it — on a hold, where a run it names never lands, and never for a hold that names none, the person's word already given; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name. Whether a run waits on you is `waitsOnYou` alone: something of it is asked of a person (`asksOfAPerson`) and nobody has it in hand (`Assignee`); a run someone has in hand is listed in flight, its asks still asked.",
       "type": "RunWaiting",
       "retired": [
         {

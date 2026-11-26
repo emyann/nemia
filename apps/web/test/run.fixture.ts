@@ -340,6 +340,7 @@ export const detail = (extra: Partial<RunDetail> = {}) =>
     },
     context: [],
     holdUntil: ['r-0'],
+    assignee: null,
     holding: {
       at: '2026-09-30T05:00:00.000Z',
       runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
@@ -596,6 +597,7 @@ export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Pa
     context: [],
     holdUntil: [],
     holding: null,
+    assignee: null,
     toDecide: null,
     timeline: {
       rounds: [],

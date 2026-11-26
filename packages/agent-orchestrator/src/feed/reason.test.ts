@@ -159,6 +159,13 @@ const ONE_SHOTS: readonly Case[] = [
   { kind: 'Daemon', word: 'daemon started', note: 'first daemon on this store', reason: 'DaemonStarted' },
 ];
 
+/** A run's assignee as the feed words it: put and given back by a person, and the lapse by the tick, which judges it. */
+const ASSIGNEE_LINES: readonly Case[] = [
+  { kind: 'Run', word: 'assigned', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneePut' },
+  { kind: 'Run', word: 'given back', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeGivenBack' },
+  { kind: 'Run', word: 'assignee ran out', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeLapsed' },
+];
+
 /**
  * The six words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
  * moment the pause was put as its note, `level changed`, a factory's level in force in words as its note, `not ready` and `ready`,
@@ -213,6 +220,7 @@ const CASES: readonly Case[] = [
   ...FORMER_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
+  ...ASSIGNEE_LINES,
   ...STORE_LINES,
   ...FACTORY_LINES,
 ];
@@ -276,10 +284,10 @@ describe('reasonOf names a reason for every word the package writes, only of a k
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
     assert.equal(
       entries.length,
-      58,
-      "the table the owner named has 58 entries: a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stalled wait two more (CardWaitStalled, CardWaitFreed)",
+      61,
+      "the table the owner named has 61 entries: a run's assignee adds three (AssigneePut, AssigneeGivenBack, AssigneeLapsed), a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stalled wait two more (CardWaitStalled, CardWaitFreed)",
     );
-    assert.equal(REASON_CODES.length, 47, 'of 47 distinct codes');
+    assert.equal(REASON_CODES.length, 50, 'of 50 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -395,6 +403,15 @@ describe('typeOf, messageOf and sourceOf: how serious a line is, what a person r
       ACT_WORDS.map((c) => sourceOf(c.reason)),
       ['person', 'person', 'person', 'person', 'runtime', 'runtime'],
       "the owner's four verbs are a person's deed and the two faults the runtime's",
+    );
+    assert.deepEqual(
+      ASSIGNEE_LINES.map((c) => [c.reason, sourceOf(c.reason), isOnce(c.reason), typeOf(c.reason), waitsOf(c.reason)]),
+      [
+        ['AssigneePut', 'person', true, 'Normal', false],
+        ['AssigneeGivenBack', 'person', true, 'Normal', false],
+        ['AssigneeLapsed', 'tick', true, 'Normal', false],
+      ],
+      "an assignee is put and given back by a person; its lapse is the tick's own deed, since the pass judges it",
     );
     assert.equal(sourceOf('ToolDenied'), 'runtime', 'a call the harness denied is the runtime telling us');
     assert.equal(sourceOf('DaemonStarted'), 'daemon');

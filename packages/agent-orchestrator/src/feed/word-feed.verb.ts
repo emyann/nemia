@@ -79,6 +79,8 @@ export function wordFeed(
       ...(run.hold?.actor ? { holder: run.hold.actor } : {}),
       ...(run.unheld ? { unheld: run.unheld } : {}),
       ...(lifted !== undefined ? { lifted } : {}),
+      ...(run.assignee ? { assignee: run.assignee } : {}),
+      ...(run.unassigned ? { unassigned: run.unassigned } : {}),
     },
   );
 }

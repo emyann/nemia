@@ -1,9 +1,9 @@
 /**
- * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
- * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `LandingRecord`), the
- * try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares
- * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
- * Pure: `record.store.ts` reads and writes the record.
+ * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Assignee`,
+ * `Approval`, `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`,
+ * `LandingRecord`), the try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's
+ * judgement shares (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through
+ * (`RunStore`). Pure: `record.store.ts` reads and writes the record.
  */
 import type { PictureHeld } from '../filed/pictures/pictures.ts';
 import type { Verdict } from '../check/index.ts';
@@ -96,6 +96,26 @@ export type Hold = { at: string; until: readonly string[]; why?: string; by?: st
  * lift's alone: a lift by a caller the api did not resolve leaves none.
  */
 export type Unheld = { since: string; actor: Actor };
+
+/**
+ * Who has a run in hand (`nemia assign`), as its file says it: when it was put (`at`), how long an ask may wait on them before the run is
+ * the person's move again (`forMs`), who they are (`name`: `--to`, else the OS user of the client, absent where none is known), the words
+ * for why (`why`), and the caller who put it (`actor`, objects' `Actor`), absent on one put in-process. Whether it still stands is
+ * `assigneeStanding`'s, judged on every read and pass.
+ */
+export type Assignee = { at: string; forMs: number; name?: string; why?: string; actor?: Actor };
+
+/**
+ * How an assignee ended, as its receipt says it: given back by hand (`nemia assign <run> --off`), lapsed (an ask waited on them past
+ * their time) or ended with its run.
+ */
+export type AssigneeEnd = 'given-back' | 'lapsed' | 'ended';
+
+/**
+ * The receipt of the run's last assignee that ended: the moment it was put (`since`, its `at`), which pairs it with that assignee's put on
+ * the feed, how it ended (`how`), and the caller who gave it back (`actor`), absent where the tick ended it or the caller is not known.
+ */
+export type Unassigned = { since: string; how: AssigneeEnd; actor?: Actor };
 
 /**
  * Words said to a step before it was filed (`nemia say` to a step with no task and no try behind it): when, and the words as said — an
@@ -731,6 +751,20 @@ export type RunStore = {
      */
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
+    readonly stands: (id: string) => boolean;
+  };
+  readonly assignees: {
+    /**
+     * Put the run in someone's hand, with how long an ask may wait on them, who and why: the assignee written, or null when one already
+     * stands, which is kept.
+     */
+    readonly put: (id: string, said: Omit<Assignee, 'at'>) => Assignee | null;
+    /**
+     * End the assignee put at `at`, and only while it still stands: false when it is gone or another was put since. Its receipt
+     * (`unassigned`: how it ended, and who gave it back where known) is written first, so the pass that reads it gone reads how.
+     */
+    readonly end: (id: string, at: string, how: AssigneeEnd, actor?: Actor) => boolean;
+    /** Whether an assignee's file is there, read as one or not. */
     readonly stands: (id: string) => boolean;
   };
   readonly said: {

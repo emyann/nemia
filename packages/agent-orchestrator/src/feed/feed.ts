@@ -28,7 +28,7 @@
  */
 import { onYouWords, shownStatus, type ListedPhase, type Listing } from '../list/list.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import { oneLine, type Run } from '../record/record.ts';
+import { type AssigneeEnd, oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { holdWord } from '../wait/wait.ts';
@@ -582,8 +582,63 @@ function holdOnce(
   return out;
 }
 
+/**
+ * The one-shots a run's assignee owes the feed: the put, while one stands on the record (`assignee`, its `at`, with the caller who put it),
+ * and an end for each put the feed holds that is no longer the one on the record and has no end written yet — `lapsed` or `ended` with
+ * the run, the tick's, where the receipt beside the run says so for that put (`unassigned`, paired by its `since`), and given back
+ * otherwise, carrying who gave it back where the receipt says. Read off an absence, as a hold's lift is (`holdOnce`), so a restarted
+ * daemon writes an end neither again nor never. Pure.
+ */
+function assigneeOnce(
+  fold: FeedFold,
+  run: string,
+  assignee: { at: string; actor?: Actor } | undefined,
+  unassigned: { since: string; how: AssigneeEnd; actor?: Actor } | undefined,
+) {
+  const involved = onceInvolved(run, undefined);
+  const standing = assignee === undefined ? undefined : holdSince(assignee.at);
+  const out: Once[] =
+    assignee && standing !== undefined
+      ? [{ word: LINE_WORDS.AssigneePut, note: standing, ...(assignee.actor ? { actor: assignee.actor } : {}) }]
+      : [];
+  const puts = onceKey(involved, 'AssigneePut', undefined, '');
+  const ended = (note: string) =>
+    (['AssigneeGivenBack', 'AssigneeLapsed'] as const).some((reason) => fold.shots.has(onceKey(involved, reason, undefined, note)));
+  for (const key of fold.shots.keys()) {
+    if (!key.startsWith(puts)) continue;
+    const note = key.slice(puts.length);
+    if (note === standing || ended(note)) continue;
+    out.push(assigneeEnd(note, unassigned && note === holdSince(unassigned.since) ? unassigned : undefined));
+  }
+  return out;
+}
+
+/**
+ * The end of the assignee put at `note`: ran out or ended with the run, the tick's, where its receipt says so; given back otherwise,
+ * carrying who gave it back where the receipt says. Pure.
+ * @param note The moment the assignee was put, as its put's line notes it (`holdSince`).
+ * @param receipt The receipt beside the run for that put, if it is that put's.
+ */
+function assigneeEnd(note: string, receipt: { how: AssigneeEnd; actor?: Actor } | undefined) {
+  if (receipt?.how === 'lapsed') return { word: LINE_WORDS.AssigneeLapsed, note, source: 'tick' } satisfies Once;
+  if (receipt?.how === 'ended') return { word: LINE_WORDS.AssigneeGivenBack, note, source: 'tick' } satisfies Once;
+  return { word: LINE_WORDS.AssigneeGivenBack, note, ...(receipt?.actor ? { actor: receipt.actor } : {}) } satisfies Once;
+}
+
 /** What the store's one-shots are about: the store, by its one name. */
 const STORE_INVOLVED: Involved = { kind: 'Store', name: STORE };
+
+/** The moments a hold and an assignee are paired by, as a pass read them of a run (`FeedWords`). */
+type Paired = Pick<FeedWords, 'held' | 'lifted' | 'holder' | 'unheld' | 'assignee' | 'unassigned'>;
+
+/**
+ * The paired moments `labelled` carries, each key that is said and none that is not. Pure.
+ * @param labelled What the pass read of the run: its paired moments among the rest.
+ */
+const pairedOf = ({ held, lifted, holder, unheld, assignee, unassigned }: Paired) =>
+  Object.fromEntries(
+    Object.entries({ held, lifted, holder, unheld, assignee, unassigned }).filter(([, value]) => value !== undefined),
+  ) as Paired;
 
 /**
  * The store's pause as a pass read it (`readPause`): the moment it was put while one stands, and who put it and why where its file says,
@@ -931,8 +986,9 @@ const closeoutOnce = (c: FeedCloseout) => ({
 
 /**
  * The lines a pass owes the feed for the one-shots `words` carries: each call its steps were denied, each act a person took on the run
- * (`acts`), its hold's put and lift (`holdOnce`), each fault the runtime journalled (`faults`) and each closeout its steps gave
- * (`closeouts`) — each written once per occurrence (`oncePast`), stamped through the one door (`upgraded`). Pure.
+ * (`acts`), its hold's put and lift (`holdOnce`), its assignee's put and end (`assigneeOnce`), each fault the runtime journalled (`faults`)
+ * and each closeout its steps gave (`closeouts`) — each written once per occurrence (`oncePast`), stamped through the one door
+ * (`upgraded`). Pure.
  */
 function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords) {
   const runLabels = words.labels ?? { run };
@@ -940,6 +996,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords) {
     ...(words.denials ?? []).map(denialOnce),
     ...(words.acts ?? []),
     ...holdOnce(fold, run, words.held, words.lifted, words.holder, words.unheld),
+    ...assigneeOnce(fold, run, words.assignee, words.unassigned),
     ...(words.faults ?? []),
     ...(words.closeouts ?? []).map(closeoutOnce),
   ];
@@ -1135,7 +1192,9 @@ export type FeedSaid = { word: string; note?: string; reason?: Reason; on?: Wait
  * steps were denied (`denials`), the acts a person took on it (`acts`, from `actsOf`), the faults the runtime journalled (`faults`, from
  * `faultsOf`), the closeouts its steps' current turns gave (`closeouts`, from `closeoutsOf`), the moment the hold on its record was put
  * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift, who put the
- * hold on the record (`holder`), which its put carries, and who last lifted a hold by hand (`unheld`), which that hold's lift carries.
+ * hold on the record (`holder`), which its put carries, and who last lifted a hold by hand (`unheld`), which that hold's lift carries;
+ * and the run's assignee on the record (`assignee`) and how its last one ended (`unassigned`), which `assigneeOnce` pairs into a put and
+ * an end.
  */
 export type FeedWords = {
   run: FeedSaid;
@@ -1150,6 +1209,8 @@ export type FeedWords = {
   lifted?: string;
   holder?: Actor;
   unheld?: { since: string; actor: Actor };
+  assignee?: { at: string; actor?: Actor };
+  unassigned?: { since: string; how: AssigneeEnd; actor?: Actor };
 };
 
 /**
@@ -1246,6 +1307,9 @@ export function feedWords(
     held?: string;
     lifted?: string;
     holder?: Actor;
+    unheld?: { since: string; actor: Actor };
+    assignee?: { at: string; actor?: Actor };
+    unassigned?: { since: string; how: AssigneeEnd; actor?: Actor };
   } = {},
 ) {
   const waitingWords = onYouWords(l);
@@ -1257,9 +1321,7 @@ export function feedWords(
     ...(labelled.acts?.length ? { acts: labelled.acts } : {}),
     ...(labelled.faults?.length ? { faults: labelled.faults } : {}),
     ...(labelled.closeouts?.length ? { closeouts: labelled.closeouts } : {}),
-    ...(labelled.held !== undefined ? { held: labelled.held } : {}),
-    ...(labelled.lifted !== undefined ? { lifted: labelled.lifted } : {}),
-    ...(labelled.holder !== undefined ? { holder: labelled.holder } : {}),
+    ...pairedOf(labelled),
     run: {
       word: `${status}${run.pruned ? ' (pruned)' : ''}`,
       ...(held && run.hold

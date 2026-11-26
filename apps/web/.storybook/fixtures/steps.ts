@@ -195,6 +195,7 @@ export const runOf = (step: StepView) => ({
   context: [],
   holdUntil: [],
   holding: null,
+  assignee: null,
   status: step.phase === 'succeeded' ? 'succeeded' : 'running',
   phase: step.phase === 'succeeded' ? 'succeeded' : 'running',
   reason: step.phase === 'succeeded' ? 'Succeeded' : 'Running',

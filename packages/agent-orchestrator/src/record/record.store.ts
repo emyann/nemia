@@ -20,6 +20,9 @@ import {
   type Hold,
   type Run,
   type Unheld,
+  type Assignee,
+  type AssigneeEnd,
+  type Unassigned,
   type Pruned,
 } from './record.ts';
 import { workStands, type RoundAsk } from '../status/status.ts';
@@ -414,6 +417,121 @@ const heldOf = (home: string, id: string) => {
   >;
 };
 
+/**
+ * Who has the run in hand (`nemia assign`): `{ at, forMs, name?, why?, actor? }`, a person's fact in a file of its own for the reason
+ * `cancelFile` is. Written by `assign` alone, exclusively; removed by `nemia assign --off`, by the tick once it reads it lapsed or ended
+ * (`removeAssignee`), and by `nemia rm` with the run. Composed onto the run on read as `assignee`.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const assigneeFile = (home: string, id: string) => path.join(runsDir(home), `${id}.assignee`);
+
+/**
+ * How the run's last assignee ended (`Unassigned`): a file of its own beside the assignee's, written whole before that file is taken away
+ * (`removeAssignee`), overwritten by the next end, and removed by `nemia rm` with the run. Composed onto the run on read as `unassigned`.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const unassignedFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unassigned`);
+
+/** The longest time an assignee's file is read with, in milliseconds: 23 hours, as `--for` takes. */
+const MOST_FOR_MS = 23 * 3_600_000;
+
+/**
+ * The assignee, read: undefined where no file is there. A file that does not read as one still has the run in someone's hand, put at no
+ * instant for an hour, so only `nemia assign --off` or the run's end takes it away.
+ */
+function readAssignee(home: string, id: string) {
+  const marker = markerOf(assigneeFile(home, id));
+  if (!marker) return undefined satisfies Assignee | undefined as Assignee | undefined;
+  const [at, forMs] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'forMs')];
+  const [name, why] = [wordsOf(fieldOf(marker.json, 'name'), BY_CAP), wordsOf(fieldOf(marker.json, 'why'), WHY_CAP)];
+  return {
+    at: isText(at) ? at : '',
+    forMs: isAmount(forMs) && Number.isSafeInteger(forMs) && forMs >= 1_000 && forMs <= MOST_FOR_MS ? forMs : 3_600_000,
+    ...(name ? { name } : {}),
+    ...(why ? { why } : {}),
+    ...actorIn(fieldOf(marker.json, 'actor')),
+  } satisfies Assignee | undefined as Assignee | undefined;
+}
+
+/** The ways an assignee ends, as a receipt says them. */
+const ENDS: readonly AssigneeEnd[] = ['given-back', 'lapsed', 'ended'];
+
+/** How the run's last assignee ended, read: undefined where no file is there, or it does not read as one. */
+function readUnassigned(home: string, id: string) {
+  const marker = markerOf(unassignedFile(home, id));
+  if (!marker) return undefined satisfies Unassigned | undefined as Unassigned | undefined;
+  const [since, how] = [fieldOf(marker.json, 'since'), fieldOf(marker.json, 'how')];
+  const end = ENDS.find((e) => e === how);
+  return (isText(since) && end ? { since, how: end, ...actorIn(fieldOf(marker.json, 'actor')) } : undefined) satisfies
+    | Unassigned
+    | undefined;
+}
+
+/**
+ * Put the run in someone's hand, and answer with the assignee written — or null, when one already stands. `wx`, so two put at once are
+ * the first one's, whole, and an assignee is never edited: another time or name is `--off` and a new one.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param said How long an ask may wait on them, who they are, why, and the caller who put it.
+ */
+export const writeAssignee = (home: string, id: string, said: Omit<Assignee, 'at'>) => {
+  const { forMs, name, why, actor } = said;
+  fs.mkdirSync(runsDir(home), { recursive: true });
+  const assignee: Assignee = {
+    at: new Date().toISOString(),
+    forMs,
+    ...(name ? { name } : {}),
+    ...(why ? { why } : {}),
+    ...(actor ? { actor } : {}),
+  };
+  try {
+    fs.writeFileSync(assigneeFile(home, id), JSON.stringify(assignee, null, 2), { flag: 'wx' });
+    return assignee satisfies Assignee | null as Assignee | null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null satisfies Assignee | null as Assignee | null;
+    throw err;
+  }
+};
+
+/**
+ * End an assignee — the one put at `at`, and only while it still stands: false when the file is gone or holds one put since. Its receipt
+ * is written first (`unassignedFile`), so a pass that reads it gone reads how it ended.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param at When the assignee to end was put, as its file says.
+ * @param how How it ends: given back, lapsed, or ended with its run.
+ * @param actor Who gave it back; absent where the tick ends it, or the caller is not known.
+ */
+export const removeAssignee = (home: string, id: string, at: string, how: AssigneeEnd, actor?: Actor) => {
+  if (readAssignee(home, id)?.at !== at) return false;
+  writeWhole(unassignedFile(home, id), JSON.stringify({ since: at, how, ...(actor ? { actor } : {}) } satisfies Unassigned, null, 2));
+  try {
+    fs.rmSync(assigneeFile(home, id));
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+};
+
+/**
+ * Whether someone has the run in hand: its assignee's file is there, whether or not it reads as one (`assigneeFile`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const assigneeStands = (home: string, id: string) => fs.existsSync(assigneeFile(home, id));
+
+/** The run's assignee (`assigneeFile`) and how its last one ended (`unassignedFile`), each where its file is there. */
+const assignedOf = (home: string, id: string) => {
+  const [assignee, unassigned] = [readAssignee(home, id), readUnassigned(home, id)];
+  return { ...(assignee ? { assignee } : {}), ...(unassigned ? { unassigned } : {}) } satisfies Pick<
+    Run,
+    'assignee' | 'unassigned'
+  > as Pick<Run, 'assignee' | 'unassigned'>;
+};
+
 /** An ask as the Run door hands it to a reader: its name (`retry-<step>-<n>`, …), what it holds, and where a person finds it, its key. */
 export type AskEntry = { readonly name: string; readonly text: string; readonly where: string };
 
@@ -441,7 +559,20 @@ export const recordIn = (id: string, text: string, where: string) =>
     }
     if (!isRunRecord(raw)) throw new UnreadableRecord(where, id, recordRefusal(raw));
     const read = { ...raw };
-    for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
+    for (const key of [
+      'approvals',
+      'acceptances',
+      'pruned',
+      'hold',
+      'unheld',
+      'assignee',
+      'unassigned',
+      'labels',
+      'saidBefore',
+      'pause',
+      'cordon',
+    ])
+      delete read[key];
     const { workflow, ...unfrozen } = read;
     return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;
   });
@@ -473,6 +604,7 @@ export const composedRun = (home: string, run: Run, asks: readonly AskEntry[]) =
     ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
     ...(pruned ? { pruned } : {}),
     ...heldOf(home, id),
+    ...assignedOf(home, id),
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),
     ...(acceptances.length ? { acceptances } : {}),

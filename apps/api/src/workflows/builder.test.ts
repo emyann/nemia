@@ -562,19 +562,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
       ]);
       assert.equal(saved.workflow.description, 'Plan, build, review.');
       assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'drawn'),
-        'answered as the listing reads it',
-      );
+      const listing = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'drawn');
+      assert.deepEqual(saved.workflow, listing && { ...listing, version: saved.workflow.version }, 'answered as the listing reads it');
+      assert.equal(saved.workflow.version, await revisionOf('drawn'), 'at the revision the api serves it at');
 
       const windowed = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, context: 150_000 } }, review] });
       assert.equal(windowed.status, 200, await windowed.clone().text());

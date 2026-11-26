@@ -742,8 +742,8 @@ test("the scan reads the code's metrics, and the traced pass the spans the dashb
     Object.values(MEMORY).map((m) => METRICS.get(m.id)),
     [
       ['v8js_memory_heap_used'],
-      ['v8js_memory_heap_committed'],
-      ['v8js_memory_heap_limit'],
+      ['v8js_memory_heap_space_size'],
+      ['v8js_memory_heap_size_limit'],
       ['v8js_memory_external'],
       ['v8js_memory_array_buffers'],
       ['process_memory_usage'],

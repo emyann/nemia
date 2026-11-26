@@ -420,7 +420,7 @@
       "id": 49,
       "type": "timeseries",
       "title": "Daemon memory",
-      "description": "process.memory.usage, v8js.memory.heap.committed and v8js.memory.heap.used: the daemon's resident size, what V8 has committed for its heap and what the heap holds live; a leak climbs and stays, a burst rises and falls.",
+      "description": "process.memory.usage, v8js.memory.heap.space.size and v8js.memory.heap.used: the daemon's resident size, what V8 has committed for its heap and what the heap holds live; a leak climbs and stays, a burst rises and falls.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -447,7 +447,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "v8js_memory_heap_committed{service_name=\"$service\"}",
+          "expr": "v8js_memory_heap_space_size{service_name=\"$service\"}",
           "legendFormat": "heap committed"
         },
         {
@@ -551,7 +551,7 @@
       "id": 51,
       "type": "timeseries",
       "title": "Heap limit",
-      "description": "v8js.memory.heap.limit: the size the daemon's V8 heap may grow to before the process fails, beside which the heap used is read.",
+      "description": "v8js.memory.heap.size_limit: the size the daemon's V8 heap may grow to before the process fails, beside which the heap used is read.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -569,7 +569,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "v8js_memory_heap_limit{service_name=\"$service\"}",
+          "expr": "v8js_memory_heap_size_limit{service_name=\"$service\"}",
           "legendFormat": "limit"
         }
       ],

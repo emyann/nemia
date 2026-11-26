@@ -1706,6 +1706,8 @@ A launch the OS could not make for a short-lived reason is no refusal: its attem
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends a session that runs) and `closeoutSchema` (a statement would end its
 attempt); and, at the engine's `file`, a harness that ends its session with its turn — Codex, a `HarnessSpec`, a remote agent.
+The command harness takes `'Always'` too (`keepsOpen`): a long-lived command task is a process, never idle, started again after each
+end no stop asked, under the same `RESTART_BACKOFF`, with no session to resume; `stop` settles it `stopped`.
 A consumer's own runner is asked only its own `refuses`. Until 2026-10-24 a long-lived Claude Code session ran as `claude --bg`,
 filed with `config.background: true`; that field is refused now (`TAKEN_ARGS`), and `upgrade` drops it from an old journal.
 

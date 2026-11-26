@@ -211,6 +211,38 @@ test('a run spawned again under its name starts with empty streams, and a cut in
   assert.equal(await Effect.runPromise(ops.output!('ae/never/1', 'stdout')), undefined, 'a run that never was has no stream');
 });
 
+test("a command filed `restartPolicy: 'Always'` is not settled by its process's end, and a stop settles it `stopped`", WAITED, async (t) => {
+  const root = scratch('ae-command-');
+  const cwd = scratch('ae-command-cwd-');
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
+  const id = await Effect.runPromise(
+    engine.file({ brief: 'keep it', cwd, harness: 'command', restartPolicy: 'Always', config: { command: ['sh', '-c', 'exit 3'] } }),
+  );
+  const state = async () => (await Effect.runPromise(engine.view(id))).state;
+  await until(
+    t,
+    async () => {
+      await Effect.runPromise(engine.tick());
+      return (await state()).attempts[0]?.exitCode === 3;
+    },
+    'the process ended',
+    { everyMs: 50 },
+  );
+  assert.equal((await state()).settled, null, 'its end is not the task’s: it waits to be started again');
+  await Effect.runPromise(engine.stop(id));
+  await until(
+    t,
+    async () => {
+      await Effect.runPromise(engine.tick());
+      return (await state()).settled !== null;
+    },
+    'the stop settled it',
+    { everyMs: 50 },
+  );
+  const stopped = await state();
+  assert.deepEqual([stopped.settled, stopped.attempts.length], ['stopped', 1], 'no second process was started after the stop');
+});
+
 /** Asserts `got` is a `FileRefused` whose message names each of `names`. */
 const refusedNaming = (got: { tag?: string; message: string }, ...names: string[]) => {
   assert.equal(got.tag, 'FileRefused', got.message);

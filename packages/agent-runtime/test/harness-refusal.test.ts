@@ -52,7 +52,7 @@ const TAKERS: Partial<Record<Check, string>> = {
   enabledSkills: '`claude`',
   pictures: '`claude`',
   memoryLimit: '`claude` or `codex` or `command`',
-  keepsOpen: '`claude`',
+  keepsOpen: '`claude` or `command`',
 };
 
 /** What a task asks beside its brief and folder, by a name for the row. */
@@ -116,9 +116,9 @@ const ON_ALL: Record<keyof typeof ASKS, readonly [Check | '', Check | '', Check 
   "enabledSkills: 'default'": ['', '', 'commandOwn', 'remoteOwn', ''],
   pictures: ['', 'pictures', 'pictures', 'remoteOwn', ''],
   'a memory limit': ['', '', 'commandOwn', 'memoryLimit', ''],
-  "restartPolicy: 'Always'": ['', 'keepsOpen', 'keepsOpen', 'keepsOpen', ''],
+  "restartPolicy: 'Always'": ['', 'keepsOpen', '', 'keepsOpen', ''],
   mayAsk: ['holdsCalls', 'holdsCalls', 'holdsCalls', 'holdsCalls', 'holdsCalls'],
-  "mayAsk, restartPolicy: 'Always'": ['', 'keepsOpen', 'keepsOpen', 'keepsOpen', 'holdsCalls'],
+  "mayAsk, restartPolicy: 'Always'": ['', 'keepsOpen', 'holdsCalls', 'keepsOpen', 'holdsCalls'],
   'codex and env on command': ['codexArgs', 'commandArgs', 'codexArgs', 'codexArgs', ''],
 };
 

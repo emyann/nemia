@@ -32,7 +32,7 @@ const askedNow = Effect.fn('askedNow')(function* (home: string, run: Run, step: 
   const taskId = run.steps[step]?.taskId;
   const views = new Map<string, TaskView>();
   if (taskId) views.set(taskId, yield* asked('view', e.view(taskId)));
-  const frozen = judgedSteps(run, workflowsOf(run, home).steps).find((s) => s.name === step);
+  const frozen = judgedSteps(run, (yield* workflowsOf(run, home)).steps).find((s) => s.name === step);
   return askedQuestions(frozen, closeoutOf(views, run, step));
 });
 

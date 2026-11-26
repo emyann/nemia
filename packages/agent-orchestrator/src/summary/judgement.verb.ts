@@ -78,7 +78,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
   const { views, reader, unreadable } = yield* viewsFor(e, runs, store);
   const out = new Map<string, JudgedOrWhy>();
   for (const run of runs) {
-    const folder = run.workflow === undefined ? workflowsOf(run, home).steps : null;
+    const folder = run.workflow === undefined ? (yield* workflowsOf(run, home)).steps : null;
     const names = stepNames(run, folder);
     const asked: GitAsked = { branches: [], failed: false };
     const one = yield* judgedUnlessUnreadable(run, unreadable, () =>

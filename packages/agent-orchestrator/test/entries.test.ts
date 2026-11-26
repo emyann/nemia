@@ -1001,6 +1001,7 @@ const PINNED: Record<string, string[]> = {
     'plantCard',
     'emptyCards',
     'kindsTakenUp',
+    'knownAt',
     'credentialKeptNow',
     'addFactoryAt',
     'attachWorkflowAt',

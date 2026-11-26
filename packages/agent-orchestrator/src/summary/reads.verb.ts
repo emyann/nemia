@@ -15,6 +15,8 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
+import { fromThrow } from '../door/door.store.ts';
+import type { Fills } from '../folder/folder.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
@@ -127,16 +129,16 @@ export const seenBy = (e: Engine, views: Views) =>
  * a run in no factory or the default one, as the Factory door answers it at the store `home`; or, for a factory that is not there (`gone`)
  * or whose file does not read, its name alone. Throws what is no refusal.
  */
-function factoryRead(run: Run, home: string) {
+const factoryRead = Effect.fnUntraced(function* (run: Run, home: string) {
   const name = runNamespace(run.factory);
-  try {
-    const record = Effect.runSync(doorAt(home, (door) => door.factories.read(FactoryName.read(name))));
-    return isDefaultFactory(record) ? {} : { fills: factoryFills(home, record, path.basename(path.resolve(run.workflowDir))).fills };
-  } catch (err) {
-    if (!isRefusal(err)) throw err;
-    return { unread: { name, gone: err instanceof Missing } };
-  }
-}
+  const read = doorAt(home, (door) => door.factories.read(FactoryName.read(name))).pipe(
+    Effect.flatMap((record) =>
+      fromThrow(() => (isDefaultFactory(record) ? {} : { fills: factoryFills(home, record, path.basename(path.resolve(run.workflowDir))).fills })),
+    ),
+  );
+  const fills = yield* read.pipe(Effect.catch((err) => Effect.succeed({ unread: { name, gone: err instanceof Missing } })));
+  return fills as { fills?: Fills; unread?: { name: string; gone: boolean } };
+});
 
 /** `why` ended with a full stop, where it ends with no stop of its own. */
 const stopped = (why: string) => (/[.!?]$/.test(why) ? why : `${why}.`);
@@ -159,8 +161,8 @@ const stopped = (why: string) => (/[.!?]$/.test(why) ? why : `${why}.`);
  * @param run The run whose workflow folder is read.
  * @param home The store's root folder.
  */
-export function workflowsOf(run: Run, home: string) {
-  const { fills, unread } = factoryRead(run, home);
+export const workflowsOf = Effect.fnUntraced(function* (run: Run, home: string) {
+  const { fills, unread } = yield* factoryRead(run, home);
   try {
     const read = Effect.gen(function* () {
       return yield* (yield* WorkflowDoor).workflows.read(WorkflowDir.read(run.workflowDir), { repo: run.repo, home }, fills);
@@ -180,7 +182,10 @@ export function workflowsOf(run: Run, home: string) {
         : why,
     };
   }
-}
+});
+
+/** A run's workflow folder as it reads now: its steps, or none and why. */
+export type FolderRead = { steps: StepSpec[]; warning: null } | { steps: null; warning: string };
 
 /**
  * `workflowsOf` for each run it is asked about, each folder loaded once for the life of the reader: one for a request, so a list of many
@@ -188,15 +193,15 @@ export function workflowsOf(run: Run, home: string) {
  * @param home The store's root folder.
  */
 export function folderReader(home: string) {
-  const loaded = new Map<string, ReturnType<typeof workflowsOf>>();
-  return ((run) => {
+  const loaded = new Map<string, FolderRead>();
+  return Effect.fnUntraced(function* (run: Run) {
     const key = JSON.stringify([run.workflowDir, run.repo ?? null, run.factory ?? null, run.workflow === undefined]);
     const known = loaded.get(key);
     if (known !== undefined) return known;
-    const read = workflowsOf(run, home);
+    const read = yield* workflowsOf(run, home);
     loaded.set(key, read);
     return read;
-  }) satisfies (run: Run) => ReturnType<typeof workflowsOf>;
+  });
 }
 
 /**

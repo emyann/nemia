@@ -336,8 +336,8 @@ function unjudgedCodes(word: UnjudgedWord) {
  * an earlier try's among them (`unjudgedWord`) — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and
  * counts it in flight, so it is `running` and moving until the journal reads, or the folder loads, again.
  */
-function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string) {
-  const folder = workflowsOf(run, home).steps;
+const unjudged = Effect.fnUntraced(function* (run: Run, views: Views, unreadable: Unreadable, said: string, home: string) {
+  const folder = (yield* workflowsOf(run, home)).steps;
   const names = stepNames(run, folder);
   const wordOf = unjudgedWord(views, unreadable);
   const agentOf = agentsOf(run, folder);
@@ -381,22 +381,21 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     waitingOnYouWords: [],
     unreadable: said,
   } satisfies Omit<RunSummary, 'startedAt'>;
-}
+});
 
 /** Each of `runs` summarized off what was judged of it, or off its record where it was not judged (`unjudged`). */
-const summariesOf = (runs: readonly Run[], judged: Judgements, home: string) =>
-  new Map(
-    runs.flatMap((run) => {
-      const one = judged.runs.get(run.id);
-      if (one === undefined) return [];
-      return [
-        [
-          run.id,
-          'judgement' in one ? summaryOf(one.judgement, home) : unjudged(run, judged.views, judged.unreadable, one.unjudged, home),
-        ] as const,
-      ];
-    }),
-  ) satisfies Map<string, Omit<RunSummary, 'startedAt'>>;
+const summariesOf = Effect.fnUntraced(function* (runs: readonly Run[], judged: Judgements, home: string) {
+  const out = new Map<string, Omit<RunSummary, 'startedAt'>>();
+  for (const run of runs) {
+    const one = judged.runs.get(run.id);
+    if (one === undefined) continue;
+    out.set(
+      run.id,
+      'judgement' in one ? summaryOf(one.judgement, home) : yield* unjudged(run, judged.views, judged.unreadable, one.unjudged, home),
+    );
+  }
+  return out;
+});
 
 /**
  * Runs judged now, as the list judges them and never from the informer: for a write that must know whether one still moves (a try
@@ -404,7 +403,7 @@ const summariesOf = (runs: readonly Run[], judged: Judgements, home: string) =>
  */
 export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: string, some: readonly Run[]) {
   const git = standingReader(yield* standingSnapshot());
-  const summaries = summariesOf(some, yield* judgementsOf(e, home, some, git), home);
+  const summaries = yield* summariesOf(some, yield* judgementsOf(e, home, some, git), home);
   return some.flatMap((run) => {
     const summary = summaries.get(run.id);
     return summary ? [summary] : [];
@@ -459,7 +458,7 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
   const { git, read, all } = yield* listedThrough(e, memo, verify);
   const runs = selectedRuns(all, selectors);
   const judged = yield* informedJudgements(e, home, runs, read, git, () => all);
-  const summaries = summariesOf(runs, judged, home);
+  const summaries = yield* summariesOf(runs, judged, home);
   return runs.flatMap((run) => {
     const summary = summaries.get(run.id);
     const one = judged.runs.get(run.id);

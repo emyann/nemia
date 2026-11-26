@@ -1,0 +1,13 @@
+{
+  "name": "film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stage": "mkdir -p assets/fonts && cp ../../apps/web/test/approved/pages-welcome--fresh.png ../../apps/web/test/approved/store-filecard--filed.png ../../apps/web/test/approved/look-run--ladder.png ../../apps/web/test/approved/run-steppart--waits-on-you.png ../../apps/web/test/approved/factory-factorycanvas--runs-on-the-floor.png ../../apps/web/test/approved/run-first-hint--landed.png assets/ && for f in michroma/files/michroma-latin-400-normal barlow/files/barlow-latin-400-normal barlow/files/barlow-latin-500-normal jetbrains-mono/files/jetbrains-mono-latin-400-normal; do cp ../../node_modules/@fontsource/$f.woff2 assets/fonts/; done",
+    "preview": "npm run stage && npx --yes hyperframes@0.9.99 preview",
+    "lint": "npm run stage && npx --yes hyperframes@0.9.99 lint",
+    "check": "npm run stage && npx --yes hyperframes@0.9.99 check",
+    "render": "npm run stage && npx --yes hyperframes@0.9.99 render --output nemia.mp4",
+    "poster": "ffmpeg -y -ss 2.5 -i nemia.mp4 -frames:v 1 -vf scale=1280:-1 poster.png"
+  }
+}

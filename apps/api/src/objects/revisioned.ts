@@ -5,7 +5,7 @@
  * A GET writes nothing here, and nothing is kept between two requests.
  */
 import type { Context as RequestContext } from 'hono';
-import { definitionsRefreshed, isWatchedKind, keyspaceHead, kindRevisions } from 'agent-orchestrator';
+import { definitionsRefreshed, isWatchedKind, keyspaceHead, kindRevisions, type WatchedKind } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 import type { Listed } from '../watch/watch.ts';
 
@@ -37,9 +37,36 @@ const withRevision = (object: unknown, revision: (namespace: string | undefined,
   return { ...object, metadata: { ...metadata, resourceVersion: String(revision(namespace, metadata.name)) } };
 };
 
+/** The revision of each object of a watched kind as the keyspace holds them now: a template's documents all at the template's own. */
+async function revisionsOf(c: RequestContext<ApiEnv>, path: string, kind: WatchedKind) {
+  const { of } = await c.var.runtime.runPromise(kindRevisions(kind));
+  const template = TEMPLATE_PATH.exec(path)?.[1];
+  if (template === undefined || kind === 'Template') return of;
+  const at = (await c.var.runtime.runPromise(kindRevisions('Template'))).of(undefined, template);
+  return () => at;
+}
+
+/** `body`, a list or an object of the watched kind, served at the revisions `revision` says, a list at the head it was read at. */
+const servedAt = (
+  body: unknown,
+  list: boolean,
+  revision: (namespace: string | undefined, name: string) => number,
+  head: number | undefined,
+) => {
+  if (!list || typeof body !== 'object' || body === null || !('items' in body) || !Array.isArray(body.items))
+    return withRevision(body, revision);
+  const metadata = 'metadata' in body && typeof body.metadata === 'object' ? body.metadata : {};
+  return {
+    ...body,
+    items: body.items.map((item: unknown) => withRevision(item, revision)),
+    metadata: { ...metadata, ...(head === undefined ? {} : { resourceVersion: String(head) }) },
+  };
+};
+
 /**
  * `list` answering objects of a watched kind at their revision: a list's items each, and its position the head read before it was read; a
- * single object read or written each. Any other answer as it is.
+ * single object read or written each. Any other answer as it is. The definition index is read again first where a read needs it exact,
+ * and after a write of a definition.
  * @param list The handler that answers a request.
  * @param kindsAt The kinds a request's endpoint answers, from its method and its path: none where it answers no object of the api's.
  */
@@ -52,30 +79,15 @@ export const revisioned =
     const indexed = kinds.some((kind) => INDEXED.has(kind.replace(/List$/, '')));
     const reads = request.method === 'GET';
     if (indexed && reads) await c.var.runtime.runPromise(definitionsRefreshed(false));
-    const before = reads && kinds.some((kind) => watchedListOf(kind) !== undefined);
-    const head = before ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
+    const head =
+      reads && kinds.some((kind) => watchedListOf(kind) !== undefined) ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
     const response = await list(c, request);
     if (indexed && !reads) await c.var.runtime.runPromise(definitionsRefreshed(true));
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
     const body: unknown = await response.clone().json();
     const stamped = stampedOf(body);
     if (stamped === undefined) return response;
-    const { of } = await c.var.runtime.runPromise(kindRevisions(stamped.kind));
-    const template = TEMPLATE_PATH.exec(path)?.[1];
-    const templates = template === undefined ? undefined : (await c.var.runtime.runPromise(kindRevisions('Template'))).of;
-    const revision = (namespace: string | undefined, name: string) =>
-      templates !== undefined && stamped.kind !== 'Template' ? templates(undefined, template ?? '') : of(namespace, name);
-    const served =
-      stamped.list && typeof body === 'object' && body !== null && 'items' in body && Array.isArray(body.items)
-        ? {
-            ...body,
-            items: body.items.map((item: unknown) => withRevision(item, revision)),
-            metadata: {
-              ...('metadata' in body && typeof body.metadata === 'object' ? body.metadata : {}),
-              ...(head === undefined ? {} : { resourceVersion: String(head) }),
-            },
-          }
-        : withRevision(body, revision);
+    const served = servedAt(body, stamped.list, await revisionsOf(c, path, stamped.kind), head);
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     return new Response(JSON.stringify(served), { status: response.status, headers });

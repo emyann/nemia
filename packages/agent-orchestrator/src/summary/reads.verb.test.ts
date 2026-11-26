@@ -128,7 +128,10 @@ test('a folder that is gone is said gone, whatever its factory', () => {
     `The workflow folder ${gone} is gone. Nothing here is read from it: ${FROZEN}`,
   );
   assert.equal(Effect.runSync(workflowsOf(runOf(repo, gone, 'gone-folder', false), ROOT)).warning, `The workflow folder ${gone} is gone.`);
-  assert.equal(Effect.runSync(workflowsOf(runOf(repo, gone, 'no-such-factory', false), ROOT)).warning, `The workflow folder ${gone} is gone.`);
+  assert.equal(
+    Effect.runSync(workflowsOf(runOf(repo, gone, 'no-such-factory', false), ROOT)).warning,
+    `The workflow folder ${gone} is gone.`,
+  );
 });
 
 test('REFUSED: a run of a factory since removed is quiet while its folder reads, and names the factory when it does not', () => {

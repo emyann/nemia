@@ -59,9 +59,9 @@ describe("a factory's adds: derived while unrecorded, written whole by its first
 
 test('who uses a library item: each factory whose adds hold it, recorded or derived', () => {
   const home = store();
-  assert.deepEqual(libraryUsers(home, { kind: 'Agent', name: 'implementer' }), ['default']);
+  assert.deepEqual(factoriesNow(home, libraryUsers(home, { kind: 'Agent', name: 'implementer' })), ['default']);
   writeLibraryAdds(home, 'default', []);
-  assert.deepEqual(libraryUsers(home, { kind: 'Agent', name: 'implementer' }), [], 'a record without it');
+  assert.deepEqual(factoriesNow(home, libraryUsers(home, { kind: 'Agent', name: 'implementer' })), [], 'a record without it');
 });
 
 test("library.json reads as undefined where absent, keeps a newer tick's keys, refuses a broken file naming it, and a broken one gates every name", () => {

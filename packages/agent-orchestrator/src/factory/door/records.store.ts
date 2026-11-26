@@ -41,6 +41,7 @@ import { statusOf, statusText } from '../applied/applied.store.ts';
 import type { FactoryLevelFile } from '../../level/level.ts';
 import { APPLIED_PREFIX, FACTORIES_PREFIX, appliedKey, factoryKey, levelKey, serversKey } from './factory-keys.ts';
 import type { FactoryLayer } from './layer.store.ts';
+import type { TreeFile } from '../../archive/archive.ts';
 
 /** Opens the keyspace the records are held in, refused as opening it is. */
 type Open = Effect.Effect<Keyspace, Refusal>;
@@ -136,6 +137,7 @@ const factoryRecordsOf = ({ home, open, snapshot, read }: Context) =>
               const snap = yield* snapshotOf(home, tx.list);
               const file = yield* fromThrow(() => removedFactory(snap, name));
               yield* dropIn(tx, factoryKey(name));
+              for (const { key } of FOLDER_RECORDS) yield* dropIn(tx, key(name));
               return file;
             }),
           )
@@ -240,8 +242,8 @@ const statusRecords = ({ open, recordOf }: Context) =>
 /**
  * The records of the Factory door over the keyspace `open` opens when a method runs, as the layer's `factories`, `level`, `servers` and
  * `status`, and the factory as a start reads it (`read`), which the files half of the layer asks, and the removal of what a folder's
- * removal takes with it (`dropped`). A read asks `held`, and answers none where it answers no keyspace, so a read of a store is not a
- * store made.
+ * removal takes with it (`dropped`), the records that are files of a folder in a move (`kept`, `placed`). A read asks `held`, and
+ * answers none where it answers no keyspace, so a read of a store is not a store made.
  * @param home The store's root, under which a templated factory's tree is.
  * @param open Opens the keyspace the records are held in.
  * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
@@ -271,6 +273,31 @@ export function factoryRecords(home: string, open: Open, held: Held = open) {
         )
         .pipe(racedOn);
     });
+  const kept = (name: string) =>
+    Effect.gen(function* () {
+      const found: TreeFile[] = [];
+      for (const { file: leaf, key } of FOLDER_RECORDS) {
+        const text = yield* recordOf(key(name));
+        if (text !== undefined) found.push({ path: leaf, mode: 0o644, bytes: new TextEncoder().encode(text) });
+      }
+      return found;
+    });
+  const placed = (name: string, files: readonly TreeFile[]) =>
+    Effect.gen(function* () {
+      const mine = FOLDER_RECORDS.flatMap((record) => {
+        const file = files.find((f) => f.path === record.file);
+        return file === undefined ? [] : [{ key: record.key(name), text: new TextDecoder().decode(file.bytes) }];
+      });
+      if (mine.length === 0) return;
+      const keyspace = yield* open;
+      yield* keyspace
+        .within((tx) =>
+          Effect.gen(function* () {
+            for (const { key, text } of mine) yield* putIn(tx, key, text);
+          }),
+        )
+        .pipe(racedOn);
+    });
   return {
     factories: factoryRecordsOf(context),
     level: levelRecords(context),
@@ -278,6 +305,8 @@ export function factoryRecords(home: string, open: Open, held: Held = open) {
     status: statusRecords(context),
     read,
     dropped,
+    kept,
+    placed,
   };
 }
 
@@ -350,3 +379,9 @@ export const FACTORY_FILES: ImportKind = {
  * @param root The store's root.
  */
 export const recordsAt = (root: string) => factoryRecords(root, kindKeyspace(root, FACTORY_FILES), kindKeyspaceHeld(root, FACTORY_FILES));
+
+/**
+ * Whether `at`, a path from a factory's folder, is a file that is a record of the keyspace and not a file of the store's folder.
+ * @param at The path from the factory's folder.
+ */
+export const isRecordFile = (at: string) => FOLDER_RECORDS.some((record) => record.file === at);

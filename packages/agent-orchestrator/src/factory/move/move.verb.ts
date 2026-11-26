@@ -20,8 +20,6 @@ import { workedOn, type Factory } from '../factory.ts';
 import { volumesFromRepos, type FileVolume } from '../from-repos/from-repos.ts';
 import { CardDoor } from '../../cards/cards.store.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
-import { levelOf, levelText } from '../../level/level.store.ts';
-import { serversOf, serversTextOf } from '../servers/servers.store.ts';
 import { ProposalDoor } from '../../proposal/proposal.store.ts';
 import { CardName } from '../../inbox/inbox.model.ts';
 import { cardsListed, parseInboxCard } from '../../inbox/index.ts';
@@ -42,8 +40,6 @@ import {
   repoOnTarget,
   volumeKey,
   volumeOnTarget,
-  withRecords,
-  withoutRecords,
 } from './move.ts';
 
 /** The top folder a factory's folder is packed under: a fixed word, since an archive's top is a name a factory's need not be. */
@@ -68,13 +64,7 @@ export const factoryExported = Effect.fn('factoryExported')(function* (name: str
   const record = yield* door.factories.read(id);
   if (isDefaultFactory(record))
     return yield* Effect.fail(new Conflict({ message: `${name} is the default factory, which no move takes.` }));
-  const level = yield* door.level.read(id);
-  const servers = yield* door.servers.read(id);
-  const packed = withRecords(folder.files, {
-    level: level === undefined ? undefined : levelText(level),
-    servers: Object.keys(servers).length ? serversTextOf(undefined, servers) : undefined,
-  });
-  const archive = packed.length ? (yield* tried(() => packArchive(PACKED_AS, packed))).archive.toString('base64') : '';
+  const archive = folder.files.length ? (yield* tried(() => packArchive(PACKED_AS, folder.files))).archive.toString('base64') : '';
   const template = record.template === undefined ? undefined : yield* templateGiven(record.template.source);
   const instruction = yield* instructionCarried(record);
   const { cards, left } = how.cards === 'stay' ? { cards: [], left: [] } : yield* cardsOf(name);
@@ -294,9 +284,7 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
         message: `${name} cannot be filed here:\n${decision.refused.map((why) => `  ${why}`).join('\n')}\nNothing was filed.`,
       }),
     );
-  const sent = yield* tried(() => withoutRecords(folderSent(write.export.folder.archive)));
-  const level = yield* tried(() => (sent.level === undefined ? undefined : levelOf(sent.level, name)));
-  const servers = yield* tried(() => serversOf(sent.servers, name));
+  const files = yield* tried(() => folderSent(write.export.folder.archive));
   const cards = yield* tried(() => write.export.cards.map((card) => cardSent(card, name, write.from)));
   const instruction = source.template === undefined ? write.export.instruction?.words : undefined;
   const factory = factoryOnTarget(source, {
@@ -307,7 +295,7 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
     instructionKept: instruction !== undefined,
     ...(template === undefined ? {} : { template }),
   });
-  const placed = folderOnTarget(sent.files, {
+  const placed = folderOnTarget(files, {
     renamed: renamedFolders(source, decision.repos),
     ...(instruction === undefined ? {} : { instruction }),
   });
@@ -316,8 +304,6 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
   const filed = yield* Effect.gen(function* () {
     yield* door.folder.place(id, placed);
     wrote.folder = true;
-    if (level !== undefined) yield* door.level.write(id, level);
-    if (Object.keys(servers).length) yield* door.servers.write(id, servers);
     const { schedules, costLines, ...unscheduled } = factory;
     const file = yield* door.factories.create(factory.template === undefined ? factory : { ...unscheduled, schedules: {} });
     wrote.file = true;

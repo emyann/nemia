@@ -14,7 +14,7 @@ import { runNamespace } from '../run-list/index.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { isRefusal, Missing } from '../refusal/refusal.ts';
+import { Missing } from '../refusal/refusal.ts';
 import { fromThrow } from '../door/door.store.ts';
 import type { Fills } from '../folder/folder.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
@@ -133,7 +133,9 @@ const factoryRead = Effect.fnUntraced(function* (run: Run, home: string) {
   const name = runNamespace(run.factory);
   const read = doorAt(home, (door) => door.factories.read(FactoryName.read(name))).pipe(
     Effect.flatMap((record) =>
-      fromThrow(() => (isDefaultFactory(record) ? {} : { fills: factoryFills(home, record, path.basename(path.resolve(run.workflowDir))).fills })),
+      fromThrow(() =>
+        isDefaultFactory(record) ? {} : { fills: factoryFills(home, record, path.basename(path.resolve(run.workflowDir))).fills },
+      ),
     ),
   );
   const fills = yield* read.pipe(Effect.catch((err) => Effect.succeed({ unread: { name, gone: err instanceof Missing } })));

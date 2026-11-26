@@ -210,7 +210,7 @@ const libraryAddWritten = (factory: string, object: ProposedObject) =>
       return yield* Effect.fail(
         new Invalid({ message: `${object.metadata.name} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
       );
-    yield* tried(() => writeLibraryAdd(home, factory, verbOf(object) === 'delete' ? 'remove' : 'add', ref));
+    yield* writeLibraryAdd(home, factory, verbOf(object) === 'delete' ? 'remove' : 'add', ref);
     return uncounted(object);
   });
 

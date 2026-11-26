@@ -972,9 +972,9 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
     b.e,
     Effect.gen(function* () {
       const real = yield* RunDoor;
-      const liftOnRead = (...args: Parameters<typeof real.runs.read>) =>
+      const liftOnRead = (...args: Parameters<typeof real.runs.calledOff>) =>
         Effect.tap(
-          real.runs.read(...args),
+          real.runs.calledOff(...args),
           Effect.sync(() => {
             if (!lifted && holdText(id) !== undefined) {
               lifted = true;
@@ -982,7 +982,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
             }
           }),
         );
-      const door = { ...real, runs: { ...real.runs, read: liftOnRead } };
+      const door = { ...real, runs: { ...real.runs, calledOff: liftOnRead } };
       return yield* advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(RunDoor, door));
     }),
   );

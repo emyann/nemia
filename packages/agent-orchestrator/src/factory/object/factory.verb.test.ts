@@ -1,8 +1,8 @@
 /**
  * The factories as objects (factory.verb.ts), off a listing as `nemia factory` reads it, its file beside it, and the controller's status
  * file in a scratch store: the default factory listed first and got, a stray file listed with its error, the generation and the status
- * read, and the commands a person types for it; and a factory's home read whole (`factoryHomeOf`), on the Factory door's memory
- * stand-in, named by the digest a run's copy takes, and its refusals. Their page and selection are `src/object/listed.verb.test.ts`'s.
+ * read, and the commands a person types for it; and a factory's home read whole (`factoryHomeOf`), in a scratch store, its tree copied in,
+ * named by the digest a run's copy takes, and its refusals. Their page and selection are `src/object/listed.verb.test.ts`'s.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -14,10 +14,10 @@ import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory.ts';
 import { factoryCommands, factoryObjectsOf, followOf, type FactoryListed } from './factory.verb.ts';
 import { volumeBase } from '../volume/volume.ts';
-import { doorFrom, done } from '../../../test/door-walks.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
 import { factoriesNow } from '../../../testing.ts';
-import { factoryDoorMemory } from '../door/memory.store.ts';
+import { StoreRoot } from '../../config/root.store.ts';
+import { treeDir } from '../applied/applied.store.ts';
 import type { Factory } from '../factory.ts';
 import { freezeHomeFiles } from '../../frozen/frozen.store.ts';
 import { factoryHomeOf } from './factory.verb.ts';
@@ -188,19 +188,23 @@ test("a cloned volume's origin is on its spec, and a volume given no URL has non
   );
 });
 
-/** A store of its own: the Factory door over memory, and `shop` filed in it on `tree`, where one is given. */
+/** A store of its own, in a scratch folder: `shop` filed in it, a copy of `tree` rendered as its tree where one is given. */
 function homeStore(tree: string | undefined) {
-  const layer = factoryDoorMemory();
+  const root = scratch('wf-home-store-door-');
   const factory: Factory = {
     name: 'shop',
     volumes: [],
     workflows: [],
     hires: {},
     schedules: {},
-    ...(tree === undefined ? {} : { template: { source: '/templates/shop', version: '1.0.0', params: {} }, tree }),
+    ...(tree === undefined ? {} : { template: { source: '/templates/shop', version: '1.0.0', params: {} } }),
   };
-  done(doorFrom(FactoryDoor, layer).factories.create(factory));
-  return (name: string) => Effect.runPromiseExit(factoryHomeOf(name).pipe(Effect.provide(layer)));
+  factoriesNow(
+    root,
+    Effect.flatMap(FactoryDoor, (door) => door.factories.create(factory)),
+  );
+  if (tree !== undefined) fs.cpSync(tree, treeDir(root, 'shop'), { recursive: true, verbatimSymlinks: true });
+  return (name: string) => Effect.runPromiseExit(factoryHomeOf(name).pipe(Effect.provideService(StoreRoot, root)));
 }
 
 /** A tree whose home holds a memory file, a skill and an executable script. */

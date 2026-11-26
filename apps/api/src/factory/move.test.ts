@@ -404,6 +404,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
   s.test(
     "an upgrade to the target's version merges against the base that moved: the tree's edit kept, the new version's change taken",
     async () => {
+      await reconciled(target, OLDER);
       const plan = await answered<FactoryPlan>(send(target, 'POST', '/api/factories/mill/diff', { to: '0.2.0' }));
       assert.equal(plan.kind, 'upgrade');
       if (plan.kind !== 'upgrade') return;

@@ -245,6 +245,7 @@ const OWN = [
   'src/factory/instruction.store.ts',
   'src/factory/door/factories.store.ts',
   'src/factory/door/records.store.ts',
+  'src/factory/door/layer.store.ts',
 ];
 
 /** The seam's calls in a file, comment lines left out. */

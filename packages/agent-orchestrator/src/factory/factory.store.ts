@@ -355,6 +355,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory) {
       'workflowRepos',
       factory.workflowRepos !== undefined && Object.keys(factory.workflowRepos).length ? factory.workflowRepos : undefined,
     );
+    kept('labelValues', factory.labelValues);
   }
   named('schedules', factory.schedules, Object.keys(factory.schedules).length > 0);
   kept('instruction', factory.instruction);

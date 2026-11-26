@@ -109,11 +109,6 @@ describe("a store's marker files imported into its keyspace once, moved aside an
 describe('a guarded write is one transaction', () => {
   test('two cancels at once keep the first time, two holds put at once leave one, and two words said take 1 and 2', () => {
     const { root, door } = stored('m-race');
-    const [a, b] = act(Effect.all([door.runs.cancel(idOf('m-race')), door.runs.cancel(idOf('m-race'))], { concurrency: 'unbounded' })) as [
-      string,
-      string,
-    ];
-    assert.equal(a, b);
     const holds = act(
       Effect.all([door.holds.put(idOf('m-race'), ['x'], {}), door.holds.put(idOf('m-race'), ['y'], {})], { concurrency: 'unbounded' }),
     ) as unknown[];
@@ -123,6 +118,11 @@ describe('a guarded write is one transaction', () => {
         concurrency: 'unbounded',
       }),
     );
+    const [a, b] = act(Effect.all([door.runs.cancel(idOf('m-race')), door.runs.cancel(idOf('m-race'))], { concurrency: 'unbounded' })) as [
+      string,
+      string,
+    ];
+    assert.equal(a, b);
     assert.deepEqual(markerKeys(root, 'm-race'), ['cancelled', 'hold', 'said/1', 'said/2']);
   });
   test('a hold lifted by a person writes who, and the hold is gone', () => {

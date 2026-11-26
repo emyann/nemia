@@ -231,17 +231,12 @@ describe('the import files the factory on the target, clones its repositories, a
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
     assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
   });
-  test('its tree’s edits, its level and its servers as records of the target, and none of what stays', () => {
+  test('its tree’s edits, its level and its servers, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));
     const implement = files.find((f) => f.path === 'tree/workflows/press/implement.md');
     assert.equal(new TextDecoder().decode(implement?.bytes), '---\n---\nBuild it, edited.\n');
     assert.deepEqual(done(dst.factories.level.read(NAME)), { level: 'auto', since: SINCE });
     assert.deepEqual(done(dst.factories.servers.read(NAME)), { docs: { type: 'sse', url: 'https://docs.example/mcp' } });
-    assert.deepEqual(
-      files.filter((f) => f.path === 'level.json' || f.path === 'servers.json'),
-      [],
-      'neither is a file of the folder it was packed with',
-    );
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
   });
   test('its places are all untrusted, for the person to trust', () => {

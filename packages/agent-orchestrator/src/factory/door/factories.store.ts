@@ -35,7 +35,7 @@ import { StoreRoot } from '../../config/root.store.ts';
 import { DEFAULT_FACTORY_RECORD, Factory as FactoryModel, FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { defaultNamedRefusal, foundFactory, treeChecked } from '../factory.store.ts';
 import { folderPlacedAt, folderReadAt, folderRemovedAt } from './folder.store.ts';
-import { factoryRecords, recordsAt } from './records.store.ts';
+import { factoryRecords, isRecordFile, recordsAt } from './records.store.ts';
 import type { FactoryDoorShape, FactoryLayer, FactoryRead } from './layer.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten } from '../rules/rules.store.ts';
 import {
@@ -232,7 +232,23 @@ export const factoryLayerOf = (records: ReturnType<typeof factoryRecords>, files
     rules: files.rules,
     instruction: files.instruction,
     folder: {
-      ...files.folder,
+      read: (name) =>
+        Effect.gen(function* () {
+          const folder = yield* files.folder.read(name);
+          const asRecords = yield* records.kept(name);
+          const held = new Set(asRecords.map((file) => file.path));
+          const all = [...folder.files.filter((file) => !held.has(file.path)), ...asRecords];
+          return { ...folder, files: all.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)) };
+        }),
+      place: (name, placing) =>
+        Effect.gen(function* () {
+          const where = yield* files.folder.place(
+            name,
+            placing.filter((file) => !isRecordFile(file.path)),
+          );
+          yield* records.placed(name, placing);
+          return where;
+        }),
       remove: (name) =>
         Effect.gen(function* () {
           const files_ = yield* files.folder.remove(name);

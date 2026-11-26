@@ -499,8 +499,8 @@ the client id alone, polls the token endpoint (adding 5 s on `slow_down`), holds
 spawn with the client id and no secret, and lays `Authorization: Bearer <token>` over the server's headers where it builds
 `Options.mcpServers` (`withTokens`) and in the state read. GitHub's doc lists no client secret for a device poll or for refreshing a
 device-flow token. The token is in the spawn's in-memory `mcpTokens`, never in the task's `config`, which is journalled. **Not
-measured:** that Claude Code, handed the header inline, connects to GitHub's server with it, and that the SDK keeps the header off nothing
-the child can read: it spells `Options.mcpServers` onto the child's argv, so the token is in the process table while a session runs.
+measured:** that Claude Code, handed the header inline, connects to GitHub's server with it. The SDK spells `Options.mcpServers` onto the
+child's argv, so the token is in the process table while a session runs.
 
 What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, and again on
 0.3.323 and 2.1.323, 2026-11-13, and on 0.3.325 and 2.1.325, 2026-11-14, with the same bodies, off the installed files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):

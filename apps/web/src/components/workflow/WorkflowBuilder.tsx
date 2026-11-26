@@ -449,7 +449,7 @@ function AddStep({
     >
       <div className="grid gap-2 @md/page:grid-cols-[12rem_minmax(0,1fr)]">
         <div className="space-y-1">
-          <TextField label="Step name" value={name} onChange={setName} placeholder="review" inputClassName="font-mono" />
+          <TextField label="Step name" value={name} onChange={setName} placeholder="verify" inputClassName="font-mono" />
           {refused && <p className="text-body-small text-failure">{refused}</p>}
         </div>
         <TextField label="What it is told" multiline value={body} onChange={setBody} />

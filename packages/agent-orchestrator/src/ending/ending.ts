@@ -391,7 +391,7 @@ export const merges = (steps: readonly StepSpec[]) => steps.some(endsOnBase);
  * then acceptance, and what becomes of the branch is still a person's (`merges`). Usually one; several only where a workflow ends wide.
  *
  * An ending with no gate is none of these: it is filed by its workflow, once the step before it that can send the work back passes
- * (`quick`'s land, routed by its review), and there is nothing for a person to decide about it. It still lands on its check
+ * (a landing the review before it routes), and there is nothing for a person to decide about it. It still lands on its check
  * (`landsOnCheck`), which is what the landing reads.
  * @param steps The workflow's steps.
  * @param run The run's gates.

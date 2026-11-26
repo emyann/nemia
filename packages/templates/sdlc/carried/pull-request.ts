@@ -240,7 +240,8 @@ function pulls(branch: string) {
 /**
  * The line the engineer types to push her branch, then what she does with the server, for a refusal that asks for one: the pull request
  * is opened with `create_pull_request` (`owner`, `repo`, `head`, `base`, `title`, `body`, never `draft`) where `list_pull_requests`
- * finds none open for her head, and brought up to date with `update_pull_request` (its pull request's number, `title`, `body`) where it finds one.
+ * finds none open for her head, and brought up to date with `update_pull_request` (its pull request's number, `title`, `body`)
+ * where it finds one.
  */
 const OPEN_LINE =
   'node "$WF_CARRIED_FILES/pull-request.ts" branch, then the GitHub server\'s `create_pull_request` (or `update_pull_request` ' +

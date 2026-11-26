@@ -856,3 +856,15 @@ describe("GET /api/factories/:name/home: a factory's home read whole, for a clie
     }
   });
 });
+
+test("a factory's label values, as its file states them, are served on its spec, and none where it states none", async () => {
+  const file = path.join(root, 'factories', 'solo.json');
+  const was = fs.readFileSync(file, 'utf8');
+  try {
+    assert.equal((await get<Factory>('/api/factories/solo')).body.spec.labelValues, undefined);
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(was), labelValues: { work: ['feature', 'fix'] } }));
+    assert.deepEqual((await get<Factory>('/api/factories/solo')).body.spec.labelValues, { work: ['feature', 'fix'] });
+  } finally {
+    fs.writeFileSync(file, was);
+  }
+});

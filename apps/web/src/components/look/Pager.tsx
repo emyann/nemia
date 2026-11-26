@@ -2,12 +2,13 @@ import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderTrailOf, pageSaid, rowsSaid, trailSearch, type PageAt } from '@/lib/finished';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from '../nav/routeLink';
+import { Body, Label } from '@/components/ui/ds';
 
 const PageLink = routeLink(AriaLink);
 
 /** An outlined button of the pager, in the label face: quiet, dimmed by its ink where it leads nowhere, and ringed as the kit rings. */
 const BUTTON = cn(
-  'inline-flex h-8 items-center border border-outline px-3 font-label-large text-label-large uppercase text-on-surface hover:bg-surface-container-high data-disabled:border-outline-variant data-disabled:text-on-surface-variant data-disabled:hover:bg-transparent',
+  'inline-flex h-8 items-center border border-outline px-3 uppercase text-on-surface hover:bg-surface-container-high data-disabled:border-outline-variant data-disabled:text-on-surface-variant data-disabled:hover:bg-transparent',
   focusRing(),
 );
 
@@ -26,13 +27,17 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
   if (trail === null) {
     return (
       <AriaLink isDisabled className={BUTTON} {...mark}>
-        {children}
+        <Label size="large" component="span">
+          {children}
+        </Label>
       </AriaLink>
     );
   }
   return (
     <PageLink to="." search={searchAt(trail)} className={BUTTON} {...mark}>
-      {children}
+      <Label size="large" component="span">
+        {children}
+      </Label>
     </PageLink>
   );
 }
@@ -45,9 +50,12 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
 export function Pager({ trail, next, count, total, size }: PageAt) {
   const at = { trail, next, count, total, size };
   return (
-    <div
+    <Body
+      size="small"
+      component="div"
+      colorRole="on-surface-variant"
       data-pager
-      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono text-body-small text-on-surface-variant"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono"
     >
       <span data-pager-rows>{rowsSaid(at)}</span>
       <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
@@ -61,6 +69,6 @@ export function Pager({ trail, next, count, total, size }: PageAt) {
           Older
         </PageButton>
       </div>
-    </div>
+    </Body>
   );
 }

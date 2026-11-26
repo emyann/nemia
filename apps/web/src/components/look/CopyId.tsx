@@ -1,5 +1,5 @@
 import { Check, Copy, type LucideIcon } from 'lucide-react';
-import { Focusable, IconButton, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, IconButton, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { ink } from '@/lib/meaning';
 import { useCopy, type CopySaid } from '@/lib/useCopy';
@@ -25,7 +25,7 @@ const [COPY, COPIED] = [glyphOf(Copy), glyphOf(Check)];
 const PULLED = '-my-2 -ml-0.75';
 
 /** How the id is drawn: the mono face, on one line, quiet. */
-const ID = 'font-mono text-body-small whitespace-nowrap text-on-surface-variant';
+const ID = 'font-mono whitespace-nowrap text-on-surface-variant';
 
 /**
  * A run's id, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve pixels across and
@@ -43,7 +43,9 @@ export function CopyId({ id, short = false, room }: { id: string; short?: boolea
       {short ? (
         <TooltipTrigger delay={300}>
           <Focusable>
-            <span
+            <Body
+              size="small"
+              component="span"
               data-run-id
               role="img"
               aria-label={id.slice(-4)}
@@ -53,14 +55,14 @@ export function CopyId({ id, short = false, room }: { id: string; short?: boolea
               className={cn(ID, copied && ink.alive, focusRing())}
             >
               {id.slice(-4)}
-            </span>
+            </Body>
           </Focusable>
           <Tooltip>{id}</Tooltip>
         </TooltipTrigger>
       ) : (
-        <span data-run-id style={room ? { minWidth: `${room}ch` } : undefined} className={ID}>
+        <Body size="small" component="span" data-run-id style={room ? { minWidth: `${room}ch` } : undefined} className={ID}>
           {id}
-        </span>
+        </Body>
       )}
       <IconButton
         size="xsmall"

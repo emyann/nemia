@@ -8,7 +8,7 @@ const meta: Meta<typeof ChatAskMany> = { title: 'Frame/ChatAskMany', args: { onA
 export default meta;
 
 /** Where an ask stands in its story: her side sheet's width, on its ground. */
-const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)', display: 'flex', flexDirection: 'column' as const };
+const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-background)', display: 'flex', flexDirection: 'column' as const };
 
 /** One of her questions, by its header and words. */
 const question = (header: string, words: string) => ({

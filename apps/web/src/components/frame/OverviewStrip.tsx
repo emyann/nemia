@@ -28,7 +28,7 @@ const DAEMON_TAG: Record<DaemonTone, 'alive' | 'neutral' | 'error'> = {
 };
 
 /** A small mono figure, in the muted ink. */
-const FIGURE = 'shrink-0 font-mono text-body-small whitespace-nowrap text-on-surface-variant';
+const FIGURE = 'shrink-0 font-mono whitespace-nowrap';
 
 /**
  * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames that wrap by
@@ -117,13 +117,16 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
     <div data-strip="today" className="flex flex-col gap-2.5 pt-3 pr-5 pb-3.5 pl-[18px]">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Heading>Your factories · today</Heading>
-        <span
+        <Body
+          size="small"
+          component="span"
+          colorRole="on-surface-variant"
           data-strip-readout
           title="Runs in flight and sessions at work, against the caps this machine runs with."
           className={cn('ml-auto', FIGURE)}
         >
           {readoutOf(strip)}
-        </span>
+        </Body>
         <CutTag>
           {daemonTag === 'alive' ? (
             <MeaningTag data-strip-daemon={dot.kind} title={dot.title} hue="alive" className="uppercase">
@@ -170,9 +173,9 @@ function Agents({ strip }: { strip: Strip }) {
     <div data-strip="agents" className="flex flex-col gap-2 px-[18px] py-3">
       <div className="flex items-center gap-3">
         <Heading>Agents at work</Heading>
-        <span data-strip-agents className={cn('ml-auto', FIGURE)}>
+        <Body size="small" component="span" colorRole="on-surface-variant" data-strip-agents className={cn('ml-auto', FIGURE)}>
           {hired === null ? count : `${count} OF ${hired}`}
-        </span>
+        </Body>
       </div>
       {strip.rows.map((row) => {
         const words = `${row.agent} · ${row.step} · ${row.title}`;
@@ -189,7 +192,9 @@ function Agents({ strip }: { strip: Strip }) {
                 {words}
               </Body>
             </span>
-            <span className={FIGURE}>{row.atWork}</span>
+            <Body size="small" component="span" colorRole="on-surface-variant" className={FIGURE}>
+              {row.atWork}
+            </Body>
           </div>
         );
       })}
@@ -199,7 +204,7 @@ function Agents({ strip }: { strip: Strip }) {
         </Body>
       )}
       {strip.rows.length === 0 && (
-        <Body size="small" colorRole="on-surface-variant" className="contain-inline-size">
+        <Body size="small" className="contain-inline-size">
           No agent at work.
         </Body>
       )}

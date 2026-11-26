@@ -16,6 +16,7 @@ import type { Frozen } from '../../lib/frozen';
 import { TextLink } from '../look';
 import type { StepPartModel } from '../../lib/stepPart';
 import { PartGave } from './part/PartGave';
+import { Body, Label } from '@/components/ui/ds';
 
 /**
  * `index` is the step's place in the run's order, which is the order the CLI's `ls` lists it in. `waitingOnYou` is whether the
@@ -37,6 +38,44 @@ export type StepNodeData = {
   gave?: StepPartModel['gave'];
 };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
+
+/** A step's band of the calls its fence refused, `denied`: how many, in failure's ink, the refusal's words on its tooltip. */
+function DeniedBand({ denied }: { denied: NonNullable<StepView['denied']> }) {
+  return (
+    <Body
+      size="small"
+      data-denied
+      title={denied.words}
+      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-failure"
+    >
+      {deniedNodeText(denied.calls)}
+    </Body>
+  );
+}
+
+/** What cuts a spec line's value to its lines. */
+const CLAMP = { 2: 'line-clamp-2', 3: 'line-clamp-3' } as const;
+
+/**
+ * A step's spec, a fact a line, under its node: each line's label, quiet, and its value in mono, cut to `clamp` lines with the whole on
+ * its tooltip.
+ */
+function SpecLines({ lines, clamp }: { lines: ReturnType<typeof specLines>; clamp: 2 | 3 }) {
+  return (
+    <Body size="small" component="div" className="contents">
+      <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
+        {lines.map(([label, value, title = value]) => (
+          <div key={label} className="flex min-w-0 gap-1.5">
+            <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+            <dd className={`min-w-0 font-mono break-words text-on-surface ${CLAMP[clamp]}`} title={title}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Body>
+  );
+}
 
 /**
  * One step on the canvas: which step, what it runs on, and what it is doing now.
@@ -88,9 +127,9 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-on-surface-variant'}`}>
+          <Label size="small" component="span" className={`uppercase ${gate ? 'text-yours' : 'text-on-surface-variant'}`}>
             {gate ? 'human gate' : headOf(node, index)}
-          </span>
+          </Label>
           {running && (
             <span
               role="img"
@@ -99,9 +138,9 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
             />
           )}
         </div>
-        <p className="mt-0.5 truncate text-body-medium font-semibold" title={step.name}>
+        <Body size="medium" className="mt-0.5 truncate font-semibold" title={step.name}>
           {step.name}
-        </p>
+        </Body>
         <RunsOnOrGave step={step} gave={data.gave} line={nodeLine(node, spec)} />
       </div>
 
@@ -109,45 +148,39 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip codes={step} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
-        <span className="font-mono text-body-small text-on-surface-variant">
+        <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
           {attemptLine(step.attempts, live, now) ?? unfiledLine(step.taskId, node, spec)}
-        </span>
+        </Body>
       </div>
 
       {cost && (
-        <p
+        <Body
+          size="small"
           data-cost={over ? 'over' : 'within'}
           title={
             step.budget
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-failure' : 'text-on-surface-variant'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono ${over ? 'font-semibold text-failure' : 'text-on-surface-variant'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
-        </p>
+        </Body>
       )}
 
       {gate && <GateBand word={PERSON[state].rail} need={need ? { kind: need.kind, said: nodeNeed(need, step) } : null} />}
       {!gate && need && (
-        <p
+        <Body
+          size="small"
           data-need={need.kind}
           title={needText(need)}
-          className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
+          className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-on-yours-container"
         >
           {needNodeText(need)}
-        </p>
+        </Body>
       )}
-      {step.denied && (
-        <p
-          data-denied
-          title={step.denied.words}
-          className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-failure"
-        >
-          {deniedNodeText(step.denied.calls)}
-        </p>
-      )}
+      {step.denied && <DeniedBand denied={step.denied} />}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
@@ -168,7 +201,11 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
         <PartGave step={step} gave={gave} size="S" />
       </div>
     );
-  return <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{line}</p>;
+  return (
+    <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+      {line}
+    </Body>
+  );
 }
 
 /**
@@ -312,29 +349,20 @@ export function SpecNode({
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
-        <span className="text-label-small uppercase text-on-surface-variant">
+        <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
           {node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index)}
-        </span>
-        <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
+        </Label>
+        <Body size="medium" className="mt-0.5 truncate font-semibold" title={name}>
           {name}
-        </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{nodeLine(node, spec)}</p>
+        </Body>
+        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+          {nodeLine(node, spec)}
+        </Body>
       </div>
 
       {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
 
-      {lines.length > 0 && node?.kind !== 'workflow' && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
-          {lines.map(([label, value, title = value]) => (
-            <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-on-surface" title={title}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      {lines.length > 0 && node?.kind !== 'workflow' && <SpecLines lines={lines} clamp={3} />}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
@@ -391,29 +419,24 @@ function BuildingNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-label-small uppercase text-on-surface-variant">{stepLabel(index)}</span>
+          <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+            {stepLabel(index)}
+          </Label>
           {build.unsaved && (
-            <span className="rounded-full bg-yours-container px-1.5 text-label-small text-on-yours-container">unsaved</span>
+            <Label size="small" component="span" className="rounded-full bg-yours-container px-1.5 text-on-yours-container">
+              unsaved
+            </Label>
           )}
         </div>
-        <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
+        <Body size="medium" className="mt-0.5 truncate font-semibold" title={name}>
           {name}
-        </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{runsOn(spec)}</p>
+        </Body>
+        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+          {runsOn(spec)}
+        </Body>
       </div>
 
-      {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
-          {lines.map(([label, value, title = value]) => (
-            <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-              <dd className="line-clamp-2 min-w-0 font-mono break-words text-on-surface" title={title}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      {lines.length > 0 && <SpecLines lines={lines} clamp={2} />}
 
       <Handle type="source" position={sourcePosition} title={`Drag to a step that waits on ${name}`} className={`${HANDLE} !bg-outline`} />
       <Handle
@@ -455,19 +478,21 @@ function RouteBand({
 }) {
   if (node.kind === 'workflow')
     return routed?.kind === 'sent' ? (
-      <p data-sent={routed.card} className="truncate border-t border-outline-variant px-3 py-1 text-body-small">
+      <Body size="small" data-sent={routed.card} className="truncate border-t border-outline-variant px-3 py-1">
         <span className="text-on-surface-variant">sent </span>
         <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
           {routed.card}
         </TextLink>
-      </p>
+      </Body>
     ) : null;
   const proposes = routed?.kind === 'proposes' ? routed.route : null;
   return (
-    <p
+    <Body
+      size="small"
+      colorRole="on-surface-variant"
       data-routes
       title={taken ? `It took the route ${taken}.` : proposes ? `It proposes the route ${proposes}.` : 'No route taken yet.'}
-      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-on-surface-variant"
+      className="truncate border-t border-outline-variant px-3 py-1 font-mono"
     >
       {routes.map((route, i) => (
         <span key={route}>
@@ -483,21 +508,22 @@ function RouteBand({
         </span>
       ))}
       {proposes && <span data-proposes={proposes}>{` · proposes ${proposes}`}</span>}
-    </p>
+    </Body>
   );
 }
 
 /** A gate's band under its node: the rail's word for the state, then what it waits for, whole on hover. */
 function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; said: string } | null }) {
   return (
-    <p
+    <Body
+      size="small"
       data-gate-band
       title={need?.said}
-      className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
+      className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-on-yours-container"
     >
       <span className="font-semibold">{word}</span>
       {need && <span data-need={need.kind}>{` · ${need.said}`}</span>}
-    </p>
+    </Body>
   );
 }
 

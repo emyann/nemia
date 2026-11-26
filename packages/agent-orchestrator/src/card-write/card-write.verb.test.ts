@@ -16,6 +16,9 @@ import { CardDoor } from '../cards/cards.store.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { aRun } from '../../test/run-walks.ts';
+import { aFactory } from '../../test/factory-walks.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { factoryDoorMemory } from '../factory/door/memory.store.ts';
 
 const QUEUED = '2026-11-01T10:00:00.000Z';
 
@@ -45,7 +48,10 @@ const asIs = () => ({
  * A program run over fresh memory doors with runs `r-1` and `r-2` and the card `cache-a1` (`text`) planted first, a run started from
  * the card where `started`: its exit, and the card's text after it.
  */
-function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started?: boolean } = {}) {
+function over<A, E>(
+  program: Effect.Effect<A, E>,
+  opts: { text?: string; started?: boolean; labelValues?: Readonly<Record<string, readonly string[]>> } = {},
+) {
   const read = Effect.gen(function* () {
     return yield* (yield* CardDoor).cards.read(CardName.read('cache-a1'));
   });
@@ -54,11 +60,12 @@ function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started
     yield* runs.create(aRun('r-1'));
     yield* runs.create(aRun('r-2'));
     if (opts.started) yield* runs.create({ ...aRun('r-3'), from: { inbox: 'cache-a1' } });
+    if (opts.labelValues) yield* (yield* FactoryDoor).factories.create(aFactory('alpha', { labelValues: opts.labelValues }));
     yield* (yield* CardDoor).cards.add(CardName.read('cache-a1'), opts.text ?? PLANTED);
     const exit = yield* Effect.exit(program);
     return { exit, text: yield* read };
   });
-  return Effect.runSync(all.pipe(Effect.provide(Layer.mergeAll(runDoorMemory(), cardDoorMemory()))));
+  return Effect.runSync(all.pipe(Effect.provide(Layer.mergeAll(runDoorMemory(), cardDoorMemory(), factoryDoorMemory()))));
 }
 
 /** The refusal an exit failed with: its kind and exit code. */
@@ -164,6 +171,20 @@ describe('each refusal by its kind, and the file left as it was', () => {
       assert.equal(text, PLANTED, 'nothing written');
     });
   }
+});
+
+test('REFUSED: a label changed to a value its factory does not take is Invalid, nothing written; one that stands, sent back, is written', () => {
+  const values = { team: ['infra'] };
+  const refused = over(replaceCard('cache-a1', 'alpha', { ...asIs(), metadata: { labels: { team: 'store' } } }), { labelValues: values });
+  assert.deepEqual(refusal(refused.exit), ['Invalid', 2]);
+  assert.equal(refused.text, PLANTED, 'nothing written');
+  const taken = over(replaceCard('cache-a1', 'alpha', { ...asIs(), metadata: { labels: { team: 'infra' } } }), { labelValues: values });
+  assert.equal(Exit.isSuccess(taken.exit), true, String(taken.exit));
+  const standing = over(replaceCard('cache-a1', 'alpha', { ...asIs(), spec: { ...asIs().spec, body: 'Cache it all.' } }), {
+    labelValues: values,
+  });
+  assert.equal(Exit.isSuccess(standing.exit), true, 'team: core stands from before the rules, and is not judged');
+  assert.match(standing.text ?? '', /team: core/);
 });
 
 describe("an old card's retired repo: written back as read is kept, changed is refused, left out is taken off", () => {

@@ -13,6 +13,7 @@ import {
   labelRefusal,
   labelsRefusal,
   labelsText,
+  labelValuesOf,
   metadataLabels,
   parseLabelEdits,
   type LabelChange,
@@ -92,6 +93,24 @@ describe('parseLabelEdits: key=value sets, key- removes, and anything else, or o
     test(`refused: ${row.rule}`, () => {
       const parsed = parseLabelEdits(row.texts);
       assert.ok('refused' in parsed, row.texts.join(' '));
+      names(parsed.refused, row.named);
+    });
+});
+
+describe('labelValuesOf: a factory states the values each key takes as key=value words apart by whitespace', () => {
+  test('each key its values, in the order first written', () =>
+    assert.deepEqual(labelValuesOf('work=feature work=fix\n  area=cli'), { values: { work: ['feature', 'fix'], area: ['cli'] } }));
+  test('a word written twice is kept once', () => assert.deepEqual(labelValuesOf('work=fix work=fix'), { values: { work: ['fix'] } }));
+  for (const text of ['', '   ', '\n']) test(`none: ${JSON.stringify(text)}`, () => assert.deepEqual(labelValuesOf(text), { values: {} }));
+  for (const row of [
+    { rule: 'no =', text: 'work', named: '"work"' },
+    { rule: 'a value no label takes', text: 'work=a:b', named: '"a:b"' },
+    { rule: 'an empty value', text: 'work=', named: '"work="' },
+    { rule: 'a key Nemia sets itself', text: 'factory=x', named: 'factory' },
+  ])
+    test(`refused: ${row.rule}`, () => {
+      const parsed = labelValuesOf(row.text);
+      assert.ok('refused' in parsed, row.text);
       names(parsed.refused, row.named);
     });
 });

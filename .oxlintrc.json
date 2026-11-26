@@ -700,7 +700,7 @@
     {
       "files": ["apps/web/src/components/run/RunCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 83, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -727,7 +727,6 @@
     {
       "files": ["apps/web/src/components/step/StepNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }]
       }
     },

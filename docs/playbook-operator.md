@@ -252,6 +252,9 @@ rm "$S"/node_modules; git worktree remove "$S"
      work=measure:internal"`. Then the owner turns on "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →
      General); `ci` and `release-label` are both among main's required checks already. Runs started before the factory moved keep their frozen scripts:
      label their pull requests by hand.
+  6. **Once, after sdlc 5.5.0 lands**: upgrade the factory onto it with `--set "labelValues=work=feature work=fix work=docs
+     work=cleanup work=measure"`, the values `pullRequestLabels` reads, so `nemia inbox add`, the board, `nemia label` and `nemia
+     start --label` refuse any other `work=` when it is written, rather than the run's push hours later.
 - **`npm install` in the main checkout**, at a gap, after a landing that changed `package-lock.json` or a bin: the steps' worktrees
   link the main checkout's `node_modules`. The daemon and its sessions no longer read it; check the tree stays clean.
 - Never stop the daemon with the harness's task-stop, by a name pattern, or by a hand restart of the unit: `nemia upgrade` restarts it,

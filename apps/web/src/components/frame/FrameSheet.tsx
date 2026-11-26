@@ -49,7 +49,7 @@ export function FrameSheet({ path, feed }: { path: string; feed: FeedStatus }) {
       <SideSheet
         variant="standard"
         isOpen={fold.sheet === 'docked'}
-        className="h-[calc(100svh-var(--frame-foot))] w-[400px] min-w-[400px] rounded-none bg-surface"
+        className="h-[calc(100svh-var(--frame-foot))] w-[400px] min-w-[400px] rounded-none bg-background"
       >
         {fold.sheet === 'docked' && content}
       </SideSheet>

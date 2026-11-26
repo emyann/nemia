@@ -26,6 +26,7 @@ import { StepPageLink } from '../StepParts';
 import { StepBody, Told } from '../Told';
 import { Fold } from './Fold';
 import { FolderTree } from '../../run/FolderTree';
+import { Body, Label } from '@/components/ui/ds';
 
 /** The detail, as its part's model has it. */
 type Detail = Exclude<StepPartModel['detail'], 'none'>;
@@ -36,19 +37,21 @@ function ShownTry({ step }: { step: StepView }) {
   if (!shown) return null;
   const outcome = outcomeOf(shown, step.taskId === null ? 'Not filed yet.' : 'No closeout yet.');
   return (
-    <section aria-label="The try shown" data-shown-try={shown.try} className="space-y-1 text-body-small">
-      <p className="font-medium" title={shown.note ?? undefined}>
-        {tryLabel(shown, step.tries)}
-        {shown.current && <span className="font-normal text-on-surface-variant"> · current</span>}
-      </p>
-      <p className="font-mono break-all text-on-surface-variant">{shown.taskId ?? 'not filed'}</p>
-      <p className="flex flex-wrap gap-x-3">
-        <span data-attempts>{attemptsWord(shown.attempts)}</span>
-        {shown.check && <CheckVerdictWords verdict={shown.check.verdict} />}
-      </p>
-      <OutcomeHead outcome={outcome} />
-      {shown.closeout && <AsItCame raw={shown.closeout.raw} />}
-    </section>
+    <Body size="small" component="div" className="contents">
+      <section aria-label="The try shown" data-shown-try={shown.try} className="space-y-1">
+        <p className="font-medium" title={shown.note ?? undefined}>
+          {tryLabel(shown, step.tries)}
+          {shown.current && <span className="font-normal text-on-surface-variant"> · current</span>}
+        </p>
+        <p className="font-mono break-all text-on-surface-variant">{shown.taskId ?? 'not filed'}</p>
+        <p className="flex flex-wrap gap-x-3">
+          <span data-attempts>{attemptsWord(shown.attempts)}</span>
+          {shown.check && <CheckVerdictWords verdict={shown.check.verdict} />}
+        </p>
+        <OutcomeHead outcome={outcome} />
+        {shown.closeout && <AsItCame raw={shown.closeout.raw} />}
+      </section>
+    </Body>
   );
 }
 
@@ -69,11 +72,11 @@ function Ended({ at, how }: { at: string | null; how: string }) {
  */
 const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined) => (
   <span className="flex min-w-0 flex-col gap-1">
-    <span data-denied className={`font-mono text-body-small ${ink.yours}`}>
+    <Body size="small" component="span" data-denied className={`font-mono ${ink.yours}`}>
       {calls.join(', ')}
-    </span>
+    </Body>
     {cause && (
-      <span data-denied-cause={cause.factory} className="text-body-small text-on-surface-variant">
+      <Body size="small" component="span" data-denied-cause={cause.factory}>
         Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
         withholds {cause.place.withheld}.{' '}
         {cause.place.never ?? (
@@ -81,7 +84,7 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined) 
             Trust it: <code className="font-mono whitespace-nowrap text-on-surface">{cause.trust}</code>
           </>
         )}
-      </span>
+      </Body>
     )}
   </span>
 );
@@ -102,7 +105,7 @@ function useDeniedCause(run: RunDetail, asked: boolean) {
  */
 function FolderFiles({ step }: { step: StepView }) {
   return (
-    <div aria-label="Files" data-files className="text-body-small text-on-surface-variant">
+    <Body size="small" component="div" colorRole="on-surface-variant" aria-label="Files" data-files>
       {step.filesError === null ? (
         <>
           Files in its folder:
@@ -111,7 +114,7 @@ function FolderFiles({ step }: { step: StepView }) {
       ) : (
         <span data-files-error>{step.filesError}</span>
       )}
-    </div>
+    </Body>
   );
 }
 
@@ -124,9 +127,9 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
   if (step.taskId === null)
     return (
       <>
-        <p data-unfiled className="text-body-small text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" data-unfiled>
           {step.approve && run.cancelledAt === null ? 'not filed yet: it waits at its gate' : 'not filed yet'}
-        </p>
+        </Body>
         {step.gate && <Facts rows={[['gate', gateWord(step.gate, endsTheRun(step))]]} />}
       </>
     );
@@ -161,29 +164,31 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
 
 /** The step's tries on the clock: each try's session and check, when each was spawned and how long it queued and ran. */
 function StepTimeline({ step }: { step: StepView }) {
-  if (step.timeline.length === 0) return <p className="text-body-small text-on-surface-variant">Nothing of it on the clock yet.</p>;
+  if (step.timeline.length === 0) return <Body size="small">Nothing of it on the clock yet.</Body>;
   return (
-    <ol aria-label="Its time" className="space-y-1 font-mono text-body-small">
-      {step.timeline.map((t) => (
-        <li key={t.try} data-timeline-try={t.try} className="flex flex-wrap gap-x-3">
-          <span>
-            round {t.round} · try {t.try}
-          </span>
-          {t.session && (
+    <Body size="small" component="div" className="contents">
+      <ol aria-label="Its time" className="space-y-1 font-mono">
+        {step.timeline.map((t) => (
+          <li key={t.try} data-timeline-try={t.try} className="flex flex-wrap gap-x-3">
             <span>
-              session: queued {t.session.queued}, ran {t.session.ran}
-              {t.session.spawnedAt && <> · {when(t.session.spawnedAt)}</>}
+              round {t.round} · try {t.try}
             </span>
-          )}
-          {t.check && (
-            <span>
-              check: queued {t.check.queued}, ran {t.check.ran}
-            </span>
-          )}
-          {t.used && <span>{t.used.used}</span>}
-        </li>
-      ))}
-    </ol>
+            {t.session && (
+              <span>
+                session: queued {t.session.queued}, ran {t.session.ran}
+                {t.session.spawnedAt && <> · {when(t.session.spawnedAt)}</>}
+              </span>
+            )}
+            {t.check && (
+              <span>
+                check: queued {t.check.queued}, ran {t.check.ran}
+              </span>
+            )}
+            {t.used && <span>{t.used.used}</span>}
+          </li>
+        ))}
+      </ol>
+    </Body>
   );
 }
 
@@ -195,9 +200,9 @@ function NowFacts({ step }: { step: StepView }) {
   const current = step.tries.find((t) => t.current)?.try;
   if (current === undefined || step.shown === null || step.shown === current) return null;
   return (
-    <p data-now-facts={current} className="text-label-medium text-on-surface-variant">
+    <Label size="medium" component="p" colorRole="on-surface-variant" data-now-facts={current}>
       The step now, on its current try ({current})
-    </p>
+    </Label>
   );
 }
 
@@ -224,10 +229,10 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
           {detail.spec ? (
             <Facts rows={specRows(detail.spec, step.filed)} />
           ) : (
-            <p className="text-body-small text-on-surface-variant">
+            <Body size="small">
               No spec: the workflow the run is judged by does not have this step — the one it froze as it started, or on a record from
               before runs froze one, its folder.
-            </p>
+            </Body>
           )}
         </Fold>
         <StepBody body={detail.body} layers={detail.layers} />

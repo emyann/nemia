@@ -1,2 +1,0 @@
-apps/web/src/components/run/RunHeader.tsx#text-label-medium
-apps/web/src/components/run/RunHeader.tsx#text-title-large

@@ -2,7 +2,7 @@ import type { WorkflowPageAddress } from '@/lib/api/address';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { namespaceOf } from '@/lib/factories';
-import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { workflowTarget } from '../workflow/WorkflowLink';
 import { CopyId } from './CopyId';
@@ -32,11 +32,13 @@ export function QuietLabels({ labels, keys = false }: { labels: Readonly<LabelMa
             data-label={`${key}=${value}`}
             aria-label={`${key}=${value}`}
             className={cn(
-              'text-body-small font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
+              'font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
               keys && 'border border-outline-variant px-1.5',
             )}
           >
-            {keys ? `${key}=${value}` : value}
+            <Body size="small" component="span">
+              {keys ? `${key}=${value}` : value}
+            </Body>
           </TextLink>
           <Tooltip>{`${key}=${value}`}</Tooltip>
         </TooltipTrigger>
@@ -120,7 +122,13 @@ export function RunMeta({
   const where = <Where factory={namespaceOf(run.factory)} workflowDir={run.workflowDir} workflowPage={workflowPage} />;
   if (whole)
     return (
-      <span data-run-meta className="flex min-w-0 flex-col gap-1.5 text-body-small font-medium text-on-surface-variant">
+      <Body
+        size="small"
+        component="span"
+        colorRole="on-surface-variant"
+        data-run-meta
+        className="flex min-w-0 flex-col gap-1.5 font-medium"
+      >
         <span className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1">
           <CopyId id={run.id} />
           {where}
@@ -131,10 +139,16 @@ export function RunMeta({
             <QuietLabels labels={run.labels} keys />
           </span>
         )}
-      </span>
+      </Body>
     );
   return (
-    <span data-run-meta className="flex min-w-0 items-center gap-3.5 text-body-small font-medium whitespace-nowrap text-on-surface-variant">
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
+      data-run-meta
+      className="flex min-w-0 items-center gap-3.5 font-medium whitespace-nowrap"
+    >
       <CopyId id={run.id} short />
       {where}
       {labelled && (
@@ -146,6 +160,6 @@ export function RunMeta({
           </span>
         </span>
       )}
-    </span>
+    </Body>
   );
 }

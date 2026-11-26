@@ -1,2 +1,0 @@
-apps/web/src/components/run/Artifacts.tsx#text-body-small
-apps/web/src/components/run/Artifacts.tsx#text-label-small

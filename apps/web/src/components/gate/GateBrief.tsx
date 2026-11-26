@@ -11,6 +11,7 @@ import { FactList, LINK } from '../step/Facts';
 import { Gate } from './Gate';
 import { Markdown } from '../markdown/Markdown';
 import { StepPolicy } from '../step/Told';
+import { Body, Label } from '@/components/ui/ds';
 
 type Step = StepView;
 
@@ -58,7 +59,9 @@ export function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       data-asked="approve"
       className="space-y-3 rounded border border-yours bg-surface-container-low p-3"
     >
-      <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
+      <Label size="medium" component="h3" className="text-yours uppercase">
+        Waiting on you
+      </Label>
       <p data-brief="waits" className="break-words">
         {brief.waits}
       </p>
@@ -110,16 +113,20 @@ function Waits({
       data-asked={kind}
       className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
     >
-      <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
+      <Label size="medium" component="h3" className="text-yours uppercase">
+        Waiting on you
+      </Label>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink
         to="/runs/$runId"
         params={{ runId: run.id }}
         hash={anchor ? stepAnchor(anchor) : 'decide'}
         data-answer-link
-        className={cn('text-body-small', LINK)}
+        className={cn('', LINK)}
       >
-        Answer it on the run's page
+        <Body size="small" component="span">
+          Answer it on the run's page
+        </Body>
       </RouteLink>
     </section>
   );

@@ -1,24 +1,46 @@
 /**
  * What the inbox's writes print of a Card the api answered (`objects`' `Card`): its factory by its namespace, its labels as kubectl's
  * LABELS column shows them, and the keys its spec carries as one line names them; a workflow given as a path refused, exit 2; and a
- * card's text as typed, a file's read here where it names one (`textOrFile`).
+ * card's text as typed, a file's read here where it names one, and a path to no file refused (`textOrFile`, `ideaOf`).
  */
 import fs from 'node:fs';
 import { type Card, DEFAULT_NAMESPACE } from 'objects';
 import { Refused } from '../../refused.ts';
 import { textOf } from '../files.ts';
+import type { IdeaOf } from '../../../contracts/idea.contract.ts';
 
 /**
- * What `command` was typed as text: a file's text, read here, where it names one; else the words. A folder is refused, exit 2, naming
- * `forms`, the ways to type it.
+ * What words typed as an idea are, from the words and what the machine has at that path: a file's text where they name a file; a folder
+ * refused; one word that reads as a path (it holds a `/` or ends in `.md`) and names nothing refused, as a path to no file; else the words
+ * themselves. Pure, and proved by `contracts/idea.contract.ts`.
+ * @param given The words as typed.
+ * @param at What the machine has at the path the words would name.
+ */
+export const ideaOf: IdeaOf = (given, at) => {
+  if (at === 'file') return { kind: 'file' };
+  if (at === 'folder') return { kind: 'refused', reason: 'folder' };
+  const oneWord = !given.includes(' ') && !given.includes('\t') && !given.includes('\n');
+  if (oneWord && (given.includes('/') || given.endsWith('.md'))) return { kind: 'refused', reason: 'no-file' };
+  return { kind: 'words' };
+};
+
+/**
+ * What `command` was typed as text: a file's text, read here, where it names one; else the words (`ideaOf`). A folder, and one word that
+ * reads as a path to no file, are refused, exit 2, naming `forms`, the ways to type it.
  * @param given The text as typed: a file's path, or the words themselves.
  * @param command The command's name, said in a refusal.
- * @param forms The ways to type the text, said in the refusal of a folder.
+ * @param forms The ways to type the text, said in a refusal.
  */
 export const textOrFile = (given: string, command: string, forms: string) => {
-  const at = fs.statSync(given, { throwIfNoEntry: false });
-  if (at?.isDirectory()) throw new Refused(`${given} is a directory, and nemia ${command} takes text or one file: ${forms}.`);
-  return at ? textOf(given, command) : given;
+  const stat = fs.statSync(given, { throwIfNoEntry: false });
+  const idea = ideaOf(given, stat === undefined ? 'none' : stat.isDirectory() ? 'folder' : 'file');
+  if (idea.kind === 'refused' && idea.reason === 'folder')
+    throw new Refused(`${given} is a directory, and nemia ${command} takes text or one file: ${forms}.`);
+  if (idea.kind === 'refused')
+    throw new Refused(
+      `${given} is no file here, and reads as a path: check it, or type the idea in words, with a space in them, if no file was meant: ${forms}. Nothing was sent.`,
+    );
+  return idea.kind === 'file' ? textOf(given, command) : given;
 };
 
 /**

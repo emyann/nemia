@@ -16,3 +16,6 @@ export const CHOICE = 'items-start rounded border border-outline-variant px-3 py
 
 /** The frame a floor (a canvas of nodes) is drawn in. */
 export const FLOOR_BOX = 'overflow-hidden rounded border border-outline-variant';
+
+/** The floor of a run's page, one of the pages read most: ruled above and below and boxed by nothing, so a node on it is a first box. */
+export const FLOOR_RULED = 'overflow-hidden border-y border-outline-variant';

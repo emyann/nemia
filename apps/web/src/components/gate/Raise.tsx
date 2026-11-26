@@ -12,7 +12,7 @@ import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { Asks, QuestionSeries, RecommendButton } from './Questions';
 import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
 import type { Frozen } from '../../lib/frozen';
-import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Body, Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 import { AmountField } from '../field/AmountField';
 
@@ -57,12 +57,14 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   if (taken) return <RaiseAsked step={offer.step} said={taken} />;
 
   return (
-    <li
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
       data-by={offer.by}
-      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
     >
       <RaiseHead offer={offer} asks={asks} />
       <form
@@ -107,7 +109,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
-    </li>
+    </Body>
   );
 }
 
@@ -116,7 +118,10 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
   return (
     <>
       <p className="break-words">
-        <strong>{offer.step}</strong> <span className="font-mono text-body-small">{offer.message}</span>
+        <strong>{offer.step}</strong>{' '}
+        <Body size="small" component="span" className="font-mono">
+          {offer.message}
+        </Body>
       </p>
       {asks &&
         (offer.needs ? (
@@ -126,11 +131,11 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
             {OFFERS.answer.said}
           </p>
         ))}
-      <p className="text-body-small break-words text-on-surface-variant">
+      <Body size="small" className="break-words">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
-      </p>
+      </Body>
     </>
   );
 }
@@ -180,7 +185,7 @@ function RaiseModes({
       orientation="horizontal"
       value={mode}
       onChange={(m) => onMode(m as RetryMode)}
-      className="gap-x-3 gap-y-1 text-body-small"
+      className="gap-x-3 gap-y-1"
     >
       {modes.map((m) => (
         <Radio key={m} value={m}>
@@ -194,12 +199,12 @@ function RaiseModes({
 /** A raise once the api has its ask, as the row says it until the run is read again: the try or the round asked. */
 function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
-    <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
+    <Body size="medium" component="li" data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-on-surface-variant">
+      <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
         {said}
-      </span>
-    </li>
+      </Body>
+    </Body>
   );
 }
 

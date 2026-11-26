@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'reac
 import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, CardContent, Title } from '@/components/ui/ds';
+import { Body, Button, Card, CardContent, Title } from '@/components/ui/ds';
 import { levelQuery, putLevel } from '@/lib/api/nemia';
 import { storeQuery } from '@/lib/api/store';
 import type { Bar } from '@/lib/bar';
@@ -188,30 +188,28 @@ function TurnOn({ line }: { line: string | null }) {
     const { kind, words } = sessionOf(nemia);
     return (
       <div data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-        <p className="text-body-medium">Nemia is on. {words}</p>
+        <Body size="medium">Nemia is on. {words}</Body>
         <TrustLine untrusted={nemia.untrusted} />
       </div>
     );
   }
   return (
     <div data-nemia-off className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-      <p className="text-body-medium text-on-surface-variant">
-        Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
-      </p>
+      <Body size="medium">Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.</Body>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outlined" size="xsmall" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
           Turn Nemia on
         </Button>
         {line !== null && (
-          <span className="text-body-small text-on-surface-variant">
+          <Body size="small" component="span" colorRole="on-surface-variant">
             or <code className="font-mono">{line}</code>
-          </span>
+          </Body>
         )}
       </div>
       {turnOn.error && (
-        <p data-nemia-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">
+        <Body size="small" data-nemia-refused className="font-mono break-words whitespace-pre-wrap text-failure">
           {turnOn.error.message}
-        </p>
+        </Body>
       )}
     </div>
   );

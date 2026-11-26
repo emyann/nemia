@@ -84,7 +84,7 @@ const COMPONENTS: Components = {
   img: drawnImage,
   pre: ({ node }) => {
     const { code, className } = fencedCode(node);
-    return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-body-small [&_pre]:whitespace-pre" />;
+    return <CodeBlock code={code} language={languageOf(className)} className="my-3 [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
     <code

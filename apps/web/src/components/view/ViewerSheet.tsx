@@ -16,7 +16,7 @@ import { fileKey, viewedFilesOf } from '@/lib/stepPart';
 import { viewClosed, viewOf, viewOpened } from '@/lib/viewAddress';
 import { extensionOf, viewerOf, type Viewer } from '@/lib/viewers';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { Body, SideSheet, Title } from '@/components/ui/ds';
+import { Body, SideSheet } from '@/components/ui/ds';
 import { Markdown } from '../markdown/Markdown';
 import { Json } from '../step/Outcome';
 import { bytesWord } from '../run/Artifacts';
@@ -53,9 +53,9 @@ export function ViewerSheet() {
       isOpen
       onClose={close}
       title={
-        <Title size="medium" component="h2" className="min-w-0 font-mono break-all">
+        <Body size="large" component="h2" className="min-w-0 font-mono break-all">
           {view.path}
-        </Title>
+        </Body>
       }
       className="w-full sm:w-3xl"
     >

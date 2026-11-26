@@ -1,2 +1,0 @@
-apps/web/src/components/look/Trace.tsx#text-body-medium
-apps/web/src/components/look/Trace.tsx#text-body-small

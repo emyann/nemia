@@ -1,4 +1,4 @@
-import { Card, Tag } from '@/components/ui/ds';
+import { Body, Card, Tag, Title } from '@/components/ui/ds';
 import type { ListedRun, WaitingRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
@@ -44,16 +44,16 @@ function UnjudgedCard({ run }: { run: UnjudgedRun }) {
           </Tag>
         </div>
         <div className="flex flex-col items-start gap-1">
-          <h3 className="relative z-10 m-0 text-title-medium">
+          <Title size="medium" className="relative z-10 m-0">
             <TextLink to="/runs/$runId" params={{ runId: run.id }}>
               {run.id}
             </TextLink>
-          </h3>
+          </Title>
           <CopyId id={run.id} />
         </div>
-        <p data-sentence className="m-0 text-body-medium text-on-surface-variant">
+        <Body size="medium" data-sentence className="m-0">
           {run.unjudged}
-        </p>
+        </Body>
         <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className="ml-auto">
             {OPENS}

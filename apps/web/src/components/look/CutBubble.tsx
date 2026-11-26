@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cutShape, type CutSize } from './cut';
+import { Body } from '@/components/ui/ds';
 
 /** The data marks a caller names the bubble by, under its own prefix (`mark`, `lib/conversation.ts`). */
 type Marks = { [mark: `data-${string}`]: string | true | undefined };
@@ -12,16 +13,18 @@ type Marks = { [mark: `data-${string}`]: string | true | undefined };
  */
 export function CutBubble({ size = 10, pre = false, children, ...marks }: { size?: CutSize; pre?: boolean; children: ReactNode } & Marks) {
   return (
-    <div
+    <Body
+      size="medium"
+      component="div"
       {...marks}
       className={
         pre
-          ? 'bg-surface-container-highest px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface'
-          : 'bg-surface-container-highest px-3.5 py-2.5 text-body-medium text-on-surface'
+          ? 'bg-surface-container-highest px-3.5 py-2.5 whitespace-pre-wrap text-on-surface'
+          : 'bg-surface-container-highest px-3.5 py-2.5 text-on-surface'
       }
       style={{ clipPath: cutShape(size) }}
     >
       {children}
-    </div>
+    </Body>
   );
 }

@@ -1,4 +1,4 @@
-import { Cell, Column, Focusable, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
@@ -12,13 +12,10 @@ import { cn, focusRing } from '@/components/ui/ds/utils';
 import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, RunClock, RunCost, RunMeta, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
-const HEAD = 'text-label-small uppercase';
+const HEAD = 'uppercase';
 
 /** A fact in the mono face, on one line. */
-const FACT = 'font-mono text-body-small whitespace-nowrap';
-
-/** How long ago a column says something was (`agoWords`), cut to the column's room with the whole instant in its tooltip. */
-const WHEN = 'text-body-medium';
+const FACT = 'font-mono whitespace-nowrap';
 
 /** How long ago `at` was at `asOf`, in a `<time>` whose kit's tooltip says the whole instant, on hover and on focus. */
 const Ago = ({ at, asOf }: { at: string; asOf: Date }) => {
@@ -63,16 +60,20 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell className="py-2.5">
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>
-            <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block truncate text-body-large font-medium">
-              {titleOf(run)}
+            <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block truncate font-medium">
+              <Body size="large" component="span">
+                {titleOf(run)}
+              </Body>
             </TextLink>
             <Tooltip>{titleOf(run)}</Tooltip>
           </TooltipTrigger>
           <RunMeta run={run} workflowPage={workflowPage} />
         </span>
       </Cell>
-      <Cell data-finished className={cn(WHEN, 'text-on-surface-variant')}>
-        <Ago at={run.finishedAt} asOf={asOf} />
+      <Cell data-finished>
+        <Body size="medium" component="span" colorRole="on-surface-variant">
+          <Ago at={run.finishedAt} asOf={asOf} />
+        </Body>
       </Cell>
       <Cell data-clock>
         <RunClock run={run} asOf={asOf} finished />
@@ -83,16 +84,18 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell>
         <TooltipTrigger delay={300}>
           <Focusable>
-            <span
+            <Label
+              size="small"
+              component="span"
               data-ended
               role="img"
               aria-label={ended.word}
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the outcome's tooltip by focusing it
               tabIndex={0}
-              className={cn('text-label-small uppercase', run.outcome === 'failed' ? ink.failure : 'text-on-surface-variant', focusRing())}
+              className={cn('uppercase', run.outcome === 'failed' ? ink.failure : 'text-on-surface-variant', focusRing())}
             >
               {ended.word}
-            </span>
+            </Label>
           </Focusable>
           <Tooltip>{ended.title}</Tooltip>
         </TooltipTrigger>
@@ -119,19 +122,29 @@ export function FinishedTable({ page, trail }: { page: FinishedPage; trail: read
           <Table aria-label="Finished runs" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="run" isRowHeader className={HEAD}>
-                Run
+                <Label size="small" component="span">
+                  Run
+                </Label>
               </Column>
               <Column id="finished" className={cn(HEAD, 'w-[150px]')}>
-                Finished
+                <Label size="small" component="span">
+                  Finished
+                </Label>
               </Column>
               <Column id="clock" align="end" className={cn(HEAD, 'w-[160px]')}>
-                Clock
+                <Label size="small" component="span">
+                  Clock
+                </Label>
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>
-                Cost
+                <Label size="small" component="span">
+                  Cost
+                </Label>
               </Column>
               <Column id="outcome" className={cn(HEAD, 'w-[110px]')}>
-                Outcome
+                <Label size="small" component="span">
+                  Outcome
+                </Label>
               </Column>
             </TableHeader>
             <TableBody>

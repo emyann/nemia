@@ -73,7 +73,7 @@ import {
   type Factory,
   DEFAULT_NAMESPACE,
 } from '../factory/factory.ts';
-import { factoryOrNone, filedAtOnce } from '../factory/door/factories.store.ts';
+import { factoryOrNone, filedAtOnce, labelValuesJudged } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -927,10 +927,16 @@ const cardsOf = Effect.fn('cardsOf')(function* (cards: readonly string[], inputs
   return yield* Effect.fail(onlyMissing ? new Missing({ message: refused }) : new Invalid({ message: refused }));
 });
 
-/** The start's `--label` edits, parsed: refused `Invalid`, naming `--label`, where one does not parse (`parseLabelEdits`). */
+/**
+ * The start's `--label` edits, parsed: refused `Invalid`, naming `--label`, where one does not parse (`parseLabelEdits`), or where one
+ * sets a value its factory does not take for its key (`labelValuesJudged`). Only the start's own edits are judged, never the card's
+ * labels nor those its runs hand down: a queued card the daemon starts is never refused for a label that stands.
+ */
 const labelEditsOf = Effect.fnUntraced(function* (opts: StartOptions) {
   const parsed = parseLabelEdits(opts.labels?.edits ?? []);
   if ('refused' in parsed) return yield* Effect.fail(new Invalid({ message: `--label: ${parsed.refused}` }));
+  const sets = Object.fromEntries(parsed.edits.flatMap((e) => (e.op === 'set' ? [[e.key, e.value]] : [])));
+  yield* labelValuesJudged(opts.factory, sets, 'Nothing was started.');
   return parsed.edits;
 });
 

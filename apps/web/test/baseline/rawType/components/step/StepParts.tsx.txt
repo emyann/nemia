@@ -1,3 +1,0 @@
-apps/web/src/components/step/StepParts.tsx#text-body-medium
-apps/web/src/components/step/StepParts.tsx#text-body-small
-apps/web/src/components/step/StepParts.tsx#text-label-medium

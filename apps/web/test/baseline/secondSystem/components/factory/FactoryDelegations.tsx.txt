@@ -2,7 +2,6 @@ apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/alert:Ale
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/alert:AlertDescription
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/alert:AlertTitle
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/button:Button
-apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/checkbox:Checkbox
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/field:Field
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/field:FieldDescription
 apps/web/src/components/factory/FactoryDelegations.tsx#@/components/ui/field:FieldGroup

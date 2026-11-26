@@ -9,10 +9,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CHANGE_VERBS, type ChangeVerb, type Delegation, type DelegationRule } from 'objects';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { ComboBox, ComboBoxItem } from '@/components/ui/ds';
+import { Checkbox, ComboBox, ComboBoxItem } from '@/components/ui/ds';
 import {
   delegableAgentsQuery,
   type DelegableAgent,

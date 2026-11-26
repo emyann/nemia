@@ -5,6 +5,8 @@
 declare module '*/tokens/design-md.mjs' {
   /** Each pair of an ink role and the ground role it is drawn on, by their names after `--md-sys-color-`. */
   export const CONTRAST_PAIRS: readonly (readonly [string, string])[];
+  /** The component tokens a theme may write, by name, each with the part and the role the kit falls back to. */
+  export const COMPONENT_TOKENS: Readonly<Record<string, unknown>>;
   /** The contrast ratio each pair reads at, at least: WCAG AA for running text. */
   export const CONTRAST_THRESHOLD: number;
 }

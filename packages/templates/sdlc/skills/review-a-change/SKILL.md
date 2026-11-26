@@ -6,7 +6,7 @@ description: "Review a change in this repository as a second engineer would: aga
 # Review a change
 
 1. **Know what was asked**: the spec handed to you, its goal and constraints. Review the change against that, not against a change you
-   would have made.
+   would have made; what the change leaves dead is part of what was asked (step 6).
 2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it,
    in the first round; from the second, what changed since. Your closeout says what the round read, in `read`: `head`, the commit
    you reviewed (`git rev-parse HEAD`); `first`, the commit the first round reviewed; `files`, every file of the change you read, by
@@ -16,7 +16,7 @@ description: "Review a change in this repository as a second engineer would: aga
      `read.first` is its own `head`, and each finding's `missed` is false.
    - **A later round** reads your last round's `closeout.json` in your own files folder first, for its `read.head` and
      `read.first`, and carries `read.first` over unchanged. Read `git diff <last head>..HEAD`, what the engineer changed since, and
-     check each earlier finding against its reply (step 7). A new finding about code that was there, unchanged, at `read.first` is
+     check each earlier finding against its reply (step 8). A new finding about code that was there, unchanged, at `read.first` is
      what the first round missed: mark it `missed` true, so the person sees it; one about code changed since is `missed` false.
      Where that `closeout.json` is not there, say so at the top of your summary, and take `first` from the replies and `git log`.
    Read a file with Read, list a folder with Glob and search with Grep; never `grep` or a pipe in
@@ -62,9 +62,13 @@ description: "Review a change in this repository as a second engineer would: aga
    - A focused test added where a scenario already walks its story or a table already holds its function's inputs: a finding of
      kind `test` that names the scenario or the table it should join, as a checkpoint or a row. A race, a crash window, a real
      boundary or an invariant of a pure function is no such finding.
-6. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
+6. **Find what the change left dead.** Reviewing against what was asked includes what the change makes unused: code, an export, an
+   alias, a fallback, a flag, a test or a doc that nothing reaches once the change is in, or an old path kept beside what replaced it
+   with no reason the spec gives. Search the repository for each before you say so: what another package, app or template still
+   reaches is not dead. Each is a finding of kind `scope`, naming the file and line and what replaced it or why nothing reaches it.
+7. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
-7. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's
+8. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's
    replies first: a finding answered `won't fix` with a sound reason is closed. A finding you raised in an earlier round, which the
    engineer answered, and which you would raise again is not another round: the rounds would repeat. Sign off `blocked`, with
    `needs` naming each such finding, the engineer's reply, and why it still holds, for a person to settle.

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { COMPONENT_TOKENS } from '../src/components/ui/ds/tokens/design-md.mjs';
 
 const web = path.resolve(import.meta.dirname, '..');
 const GENERATED = ['theme.css', 'theme.v4.css', 'DESIGN.resolved.md'] as const;
@@ -103,5 +104,77 @@ describe("the theme: the generator's output for the board's DESIGN.md, linted, f
         'title-small': '0px',
       }),
     );
+  });
+});
+
+/** The kit's selected and active parts, each token pointed at a role: the text's ink, and `surface` where the ink is drawn upon. */
+const INK = {
+  '--md-comp-switch-selected-track-color': 'on-surface',
+  '--md-comp-switch-selected-handle-color': 'surface',
+  '--md-comp-switch-selected-hover-handle-color': 'surface-container-highest',
+  '--md-comp-switch-selected-icon-color': 'on-surface',
+  '--md-comp-checkbox-selected-container-color': 'on-surface',
+  '--md-comp-checkbox-selected-icon-color': 'surface',
+  '--md-comp-radio-button-selected-icon-color': 'on-surface',
+  '--md-comp-slider-active-track-color': 'on-surface',
+  '--md-comp-slider-active-handle-color': 'on-surface',
+  '--md-comp-slider-active-stop-indicator-container-color': 'surface',
+  '--md-comp-primary-navigation-tab-active-indicator-color': 'on-surface',
+  '--md-comp-primary-navigation-tab-with-label-text-active-label-text-color': 'on-surface',
+  '--md-comp-primary-navigation-tab-with-icon-active-icon-color': 'on-surface',
+  '--md-comp-button-text-label-text-color': 'on-surface',
+  '--md-comp-icon-button-standard-selected-icon-color': 'on-surface',
+} as const;
+
+/** The component tokens a block of theme.css writes, by name, each with the role it points at. */
+const componentRolesIn = (css: string) =>
+  Object.fromEntries([...css.matchAll(/(--md-comp-[a-z-]+):\s*var\(--md-sys-color-([a-z-]+)\)\s*;/g)].map((m) => [m[1], m[2]]));
+
+/** The light scheme's component tokens and the dark one's, the dark scheme beginning at its media query. */
+const schemesOf = (css: string) => {
+  const at = css.indexOf('@media (prefers-color-scheme: dark)');
+  return { light: componentRolesIn(css.slice(0, at)), dark: componentRolesIn(css.slice(at)) };
+};
+
+/** The component tokens `design` writes in its reference block, that its `## Where we differ from Material` section does not name. */
+const undeparted = (design: string) => {
+  const reference = design.slice(design.indexOf('## Reference CSS'));
+  const written = [...reference.matchAll(/(--md-comp-[a-z-]+):/g)].map((m) => m[1]);
+  const start = design.indexOf('## Where we differ from Material');
+  const section = design.slice(start, design.indexOf('\n## ', start + 1));
+  return written.filter((token) => !section.includes(token));
+};
+
+describe("the kit's selected parts are ink, by its component tokens", () => {
+  test('each component token is written in both schemes of the theme, to its role', () => {
+    assert.deepEqual(Object.keys(INK), Object.keys(COMPONENT_TOKENS));
+    const { light, dark } = schemesOf(fs.readFileSync(path.join(web, 'theme', 'theme.css'), 'utf8'));
+    assert.deepEqual(light, INK);
+    assert.deepEqual(dark, INK);
+  });
+  test('REFUSED: a token cut and another pointed at primary is found in the generated theme', () => {
+    const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
+    const cut = /^ *--md-comp-switch-selected-track-color:.*\n/m;
+    const radio = '--md-comp-radio-button-selected-icon-color: var(--md-sys-color-on-surface);';
+    assert.match(look, cut, 'the fixture cuts a token the look writes');
+    assert.ok(look.includes(radio), 'the fixture changes a token the look writes');
+    const other = path.join(scratch('web-theme-'), 'DESIGN.md');
+    fs.writeFileSync(
+      other,
+      look.replace(cut, '').replace(radio, '--md-comp-radio-button-selected-icon-color: var(--md-sys-color-primary);'),
+    );
+    const { light } = schemesOf(fs.readFileSync(path.join(generated(other).out, 'theme.css'), 'utf8'));
+    assert.equal('--md-comp-switch-selected-track-color' in light, false);
+    assert.equal(light['--md-comp-radio-button-selected-icon-color'], 'primary');
+  });
+  test('each component token the reference block writes has its departure under `## Where we differ from Material`', () => {
+    const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
+    assert.deepEqual(undeparted(look), []);
+    assert.ok(look.includes('--md-comp-checkbox-selected-icon-color'));
+    const start = look.indexOf('## Where we differ from Material');
+    const end = look.indexOf('\n## ', start + 1);
+    const cut =
+      look.slice(0, start) + look.slice(start, end).replaceAll('--md-comp-checkbox-selected-icon-color', 'the tick') + look.slice(end);
+    assert.deepEqual(undeparted(cut), ['--md-comp-checkbox-selected-icon-color']);
   });
 });

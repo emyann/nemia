@@ -28,7 +28,7 @@ export const Agent = Schema.Struct({
   skills: Schema.optional(Schema.Array(SkillName.OnRead)),
   harnessPrompt: Schema.optional(Schema.Literals(HARNESS_PROMPTS)),
   mcp: Schema.optional(Schema.Array(Schema.String)),
-  /** What a step may override of it (`overridable:`); absent, everything. */
+  /** What a step may override of it beyond the harness's properties, which it always may (`overridable:`); absent, everything. */
   overridable: Schema.optional(Schema.Array(Schema.Literals(OVERRIDABLE))),
   keys: Schema.Record(Schema.String, Schema.String),
   body: Schema.String,
@@ -65,7 +65,8 @@ export type Skill = typeof Skill.Type;
 
 /**
  * The agent on a step (AgentOnStep): the agent a workflow's step is given, by name — its file's `agent:` line or a factory's hire — and
- * what the step overrides of it (`overridesOf`), each within what the agent offers (`Agent.overridable`, `offerRefusal`).
+ * what the step overrides of it (`overridesOf`): the harness's properties always, the rest within what the agent offers
+ * (`Agent.overridable`, `offerRefusal`).
  */
 export const StepAgent = Schema.Struct({
   workflow: WorkflowName.OnRead,

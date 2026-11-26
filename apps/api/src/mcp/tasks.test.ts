@@ -1,15 +1,15 @@
 /**
- * The MCP port's tasks (tasks.ts), spoken to as raw JSON-RPC on the modern era with the extension declared in each request's
- * capabilities: `server/discover` declares the extension beside the files', `initialize` does not; a declared call of `upgrade` is
- * answered as a task the port follows through the upgrade's read, working until the engine settles it, then completed with the read as
- * its result (an error of it where it failed), and a cancel acknowledged with the upgrade going on; a declared call of `wait` is held,
- * asked again until a line is taken or its bound comes, then completed and stable, cancelled by `tasks/cancel`, and past the most held
- * answered as before; a call that declares nothing, and one of the legacy era, answered as before. Refusals are asserted by their code,
- * never their words.
+ * The MCP port's tasks (tasks.ts), spoken to as raw JSON-RPC on the modern era with the extension declared in each request's capabilities:
+ * `server/discover` declares the extension beside the files' and the skills', `initialize` does not; a declared call of `upgrade` is
+ * answered as a task the port follows through the upgrade's read, working until the engine settles it, then completed with the read as its
+ * result (an error of it where it failed), and a cancel acknowledged with the upgrade going on; a declared call of `wait` is held, asked
+ * again until a line is taken or its bound comes, then completed and stable, cancelled by `tasks/cancel`, and past the most held answered
+ * as before; a call that declares nothing, and one of the legacy era, answered as before. Refusals are asserted by their code, never their
+ * words.
  *
  * On the stand-ins: the runtime's test engine, which runs no command — the upgrade's task is settled by the test — and the test place for
- * the upgrades; the app's own module for the waits, its feed written by the package's own writer on the app's runtime, as
- * `server.test.ts` writes it; a second token minted through the package's `TokenDoor` under the harness's store.
+ * the upgrades; the app's own module for the waits, its feed written by the package's own writer on the app's runtime, as `server.test.ts`
+ * writes it; a second token minted through the package's `TokenDoor` under the harness's store.
  */
 import { PERSON_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'vitest';
@@ -126,10 +126,14 @@ const ownOf = (result: Record<string, unknown> | undefined) =>
 const structuredOf = (task: Record<string, unknown>) =>
   (task.result as { structuredContent?: Record<string, unknown> } | undefined)?.structuredContent;
 
-test('server/discover declares the tasks extension beside the files one; initialize, of the legacy era, the files one alone', async () => {
+test('server/discover declares the tasks extension beside the files and skills ones; initialize, of the legacy era, files and skills alone', async () => {
   const discovered = await rpc(app(), 'server/discover', {});
   const modern = (discovered.result?.capabilities as { extensions?: Record<string, unknown> } | undefined)?.extensions ?? {};
-  assert.deepEqual(Object.keys(modern).sort(), ['io.modelcontextprotocol/files', 'io.modelcontextprotocol/tasks']);
+  assert.deepEqual(Object.keys(modern).sort(), [
+    'io.modelcontextprotocol/files',
+    'io.modelcontextprotocol/skills',
+    'io.modelcontextprotocol/tasks',
+  ]);
   const res = await app().request('/mcp', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
@@ -142,7 +146,7 @@ test('server/discover declares the tasks extension beside the files one; initial
   });
   const legacy = answerOf(await res.text(), res.headers.get('content-type') ?? '');
   const extensions = (legacy.result?.capabilities as { extensions?: Record<string, unknown> } | undefined)?.extensions ?? {};
-  assert.deepEqual(Object.keys(extensions), ['io.modelcontextprotocol/files']);
+  assert.deepEqual(Object.keys(extensions).sort(), ['io.modelcontextprotocol/files', 'io.modelcontextprotocol/skills']);
 });
 
 test('a declared upgrade is a task followed through its read: working, then completed with the upgrade; a cancel lets it go on', async () => {

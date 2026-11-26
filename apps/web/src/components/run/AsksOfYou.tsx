@@ -12,7 +12,7 @@ import { container } from '@/lib/meaning';
 import { runAsksOf, type RunAsk } from '@/lib/runAsks';
 import type { RunDetail } from '@/lib/runView';
 import { setTry } from '@/lib/tryAddress';
-import { Pressable } from '@/components/ui/ds';
+import { Body, Label, Pressable } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { TextLink } from '../look';
 import { Decide } from '../gate/Decide';
@@ -81,14 +81,18 @@ export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: str
   return (
     <div data-asks={asks.length} className="space-y-2">
       {asks.length > 0 && (
-        <section aria-label="Asks of you" className={cn('space-y-1.5 rounded px-3 py-2 text-body-medium', container.yours)}>
-          <h2 className="text-label-large">Asks of you</h2>
-          <ul className="space-y-1">
-            {asks.map((ask) => (
-              <AskLine key={`${ask.kind}:${ask.step ?? ''}`} run={run.id} ask={ask} onStep={onStep} />
-            ))}
-          </ul>
-        </section>
+        <Body size="medium" component="div" className="contents">
+          <section aria-label="Asks of you" className={cn('space-y-1.5 rounded px-3 py-2', container.yours)}>
+            <Label size="large" component="h2">
+              Asks of you
+            </Label>
+            <ul className="space-y-1">
+              {asks.map((ask) => (
+                <AskLine key={`${ask.kind}:${ask.step ?? ''}`} run={run.id} ask={ask} onStep={onStep} />
+              ))}
+            </ul>
+          </section>
+        </Body>
       )}
       {decide && (
         <Fold name="decide" title="What there is to decide, and the commands">

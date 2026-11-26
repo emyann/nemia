@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { cardsPath, expectInstant, heldIn, photograph, pickIn, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectTexts, expectTwoDeep, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
   DIAMOND_RUNS,
@@ -125,6 +125,7 @@ async function visit(page: Page) {
       `${planned.name} names its workflow (${planned.workflow})`,
     );
     await expectCount(cardIn(page, bare.name).locator('[data-workflow]'), 0, `${bare.name} names no workflow, and shows none`);
+    await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
 
     await expectTexts(
       page.locator('section[aria-label="Cards"] h2 [data-queue-count]'),

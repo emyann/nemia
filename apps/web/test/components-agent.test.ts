@@ -193,7 +193,7 @@ test("a skill an agent gives named with its folder is a row as written, the repo
   const html = await routedWith(createElement(GivenSkills, { rows, none: 'None.' }));
   const [folder, gone] = html.split('data-given-skill="gone"');
   assert.match(folder, /data-given-skill="apps\/site:lay-out"[^]*<span[^>]*font-mono[^>]*>apps\/site:lay-out<\/span>/);
-  assert.match(folder, /data-skill-from="folder"[^>]*bg-surface-container-highest text-on-surface-variant[^>]*>this repository</);
+  assert.match(folder, /class="[^"]*bg-surface-container-highest text-on-surface-variant[^"]*" data-skill-from="folder">this repository</);
   assert.match(folder, /data-found-in[^>]*>Read from\s*<code[^>]*>apps\/site\/\.claude\/skills\/lay-out<\/code>/);
   assert.doesNotMatch(folder, /data-skill-link|href="\/agents\/skills\/|not found/);
   assert.match(gone, /data-skill-from="none"[^>]*>not found</);

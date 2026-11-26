@@ -24,7 +24,7 @@ import { CARD_WORDS } from '../../lib/words';
 import { useNow } from '../../lib/useNow';
 import { FactoryTag } from '../factory/FactoryTag';
 import { Instant } from '../time/Instant';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 
 /**
@@ -35,7 +35,7 @@ import { Pending } from '@/components/look';
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
+    <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="font-mono">{entry.name}</span>
       {entry.error !== null ? null : unassigned(entry) ? (
         <span data-unassigned title="It names no factory: Start gives it one.">
@@ -56,7 +56,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
         </s>
       )}
       {entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />}
-    </p>
+    </Body>
   );
 }
 
@@ -67,9 +67,9 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
 export function NoQueue({ entry }: { entry: InboxEntry }) {
   if (!queueNeedsFactory(entry)) return null;
   return (
-    <p data-no-queue className="text-body-small text-on-surface-variant">
+    <Body size="small" colorRole="on-surface-variant" data-no-queue>
       No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
-    </p>
+    </Body>
   );
 }
 
@@ -119,13 +119,15 @@ export function PageLink({ entry, entries, children }: { entry: InboxEntry; entr
 export function CardStateChip({ state }: { state: CardState }) {
   const { word, title, hue } = CARD_WORDS[state];
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
       data-card-state={state}
       title={title}
-      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${container[hue]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 font-mono leading-none ${container[hue]}`}
     >
       {word}
-    </span>
+    </Body>
   );
 }
 
@@ -136,7 +138,7 @@ export function CardStateChip({ state }: { state: CardState }) {
  */
 export function StartedAs({ startedAs, state, after }: { startedAs: readonly string[]; state: CardState | null; after?: ReactNode }) {
   return (
-    <p data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-medium text-on-surface-variant">
+    <Body size="medium" colorRole="on-surface-variant" data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
       <span>
         Started as{' '}
         {startedAs.map((id, i) => (
@@ -150,7 +152,7 @@ export function StartedAs({ startedAs, state, after }: { startedAs: readonly str
       </span>{' '}
       {state !== null && <CardStateChip state={state} />}
       {after !== undefined && <span>{after}</span>}
-    </p>
+    </Body>
   );
 }
 
@@ -170,10 +172,10 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
           <p data-title className="font-medium break-words text-on-surface-variant">
             {entry.title ?? entry.file}
           </p>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
+          <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap gap-x-3 gap-y-1">
             <span className="font-mono">{entry.name}</span>
             <span>Gone from the inbox since this page listed it.</span>
-          </p>
+          </Body>
         </div>
         <Button variant="outlined" onPress={onDismiss} className="shrink-0">
           Dismiss
@@ -192,12 +194,13 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   const { refused } = entry.tried;
   const now = useNow(60_000);
   return (
-    <p
+    <Body
+      size="small"
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-on-surface-variant'}`}
+      className={`rounded border px-3 py-2 break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-on-surface-variant'}`}
     >
       {triedLine(entry, instantWords(new Date(entry.tried.at), new Date(now)))}
-    </p>
+    </Body>
   );
 }
 
@@ -214,8 +217,12 @@ const NOT_DONE: Record<CardRefusal['action'], string> = {
 export function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
     <div data-refused={refusal.action} className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-body-medium font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</p>
-      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        {NOT_DONE[refusal.action]}. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {refusal.message}
+      </Body>
     </div>
   );
 }
@@ -229,7 +236,7 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
   return (
     <>
       {entry.queued && (
-        <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-baseline gap-x-2">
           <span
             data-queued={entry.queued.place ?? ''}
             className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
@@ -239,25 +246,26 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
           <span>
             since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
           </span>
-        </p>
+        </Body>
       )}
       {entry.clash && (
-        <p data-card-clash={entry.clash.join(' ')} className="text-body-small text-on-surface-variant">
+        <Body size="small" data-card-clash={entry.clash.join(' ')}>
           {clashWords(entry.clash)}
-        </p>
+        </Body>
       )}
       {entry.waits?.length ? (
-        <p
+        <Body
+          size="small"
           data-card-waits={entry.waits.map((w) => w.card).join(' ')}
           data-stalled={entry.waits.some((w) => w.stalled) ? 'true' : 'false'}
           className={
             entry.waits.some((w) => w.stalled)
-              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-body-small text-on-failure-container'
-              : 'text-body-small text-on-surface-variant'
+              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-on-failure-container'
+              : 'text-on-surface-variant'
           }
         >
           {waitWords(entry.name, entry.waits)}
-        </p>
+        </Body>
       ) : null}
     </>
   );

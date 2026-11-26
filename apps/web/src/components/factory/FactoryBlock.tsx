@@ -1,6 +1,6 @@
 import type { Node, NodeProps } from '@xyflow/react';
 import { Factory as FactoryIcon, TriangleAlert } from 'lucide-react';
-import { Tag } from '@/components/ui/ds';
+import { Body, Tag } from '@/components/ui/ds';
 import { offerOf, runsOf, type FactoryBlock } from '@/lib/factories';
 
 /** A block on the Factories canvas: one factory, as `openBlocks` counts it, and whether the frame's bar shows it (`inspected`). */
@@ -19,17 +19,19 @@ export const BLOCK_SIZE = { width: 288, height: 176 } as const;
 export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
   const repos = block.repos.join(', ');
   return (
-    <div
+    <Body
+      size="medium"
+      component="div"
       data-factory={block.name}
       data-inspected={block.inspected || undefined}
       style={BLOCK_SIZE}
-      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-surface-container-low p-4 text-body-medium text-on-surface shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-on-surface/10 hover:ring-on-surface/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
+      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-surface-container-low p-4 text-on-surface shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-on-surface/10 hover:ring-on-surface/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <span className="flex items-center gap-2">
         <FactoryIcon className="size-4 shrink-0 text-on-surface-variant" />
-        <span className="truncate text-body-large font-semibold" title={block.name}>
+        <Body size="large" component="span" className="truncate font-semibold" title={block.name}>
           {block.name}
-        </span>
+        </Body>
         {block.default && <Tag>default</Tag>}
       </span>
       {block.error ? (
@@ -50,6 +52,6 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
           </span>
         </>
       )}
-    </div>
+    </Body>
   );
 }

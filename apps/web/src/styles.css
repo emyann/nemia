@@ -72,7 +72,7 @@
     --xy-selection-background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
     --xy-selection-border: 1px dotted var(--md-sys-color-outline);
     --xy-minimap-background-color: var(--md-sys-color-surface-container-low);
-    --xy-minimap-mask-background-color: color-mix(in srgb, var(--md-sys-color-surface-dim) 60%, transparent);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--md-sys-color-background) 60%, transparent);
     --xy-minimap-mask-stroke-color: var(--md-sys-color-outline-variant);
     --xy-minimap-node-background-color: var(--md-sys-color-outline-variant);
     --xy-minimap-node-stroke-color: transparent;

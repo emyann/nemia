@@ -1,2 +1,0 @@
-apps/web/src/components/run/WaitingCard.tsx#text-body-medium
-apps/web/src/components/run/WaitingCard.tsx#text-title-medium

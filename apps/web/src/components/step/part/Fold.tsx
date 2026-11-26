@@ -3,7 +3,7 @@
  * one holds), so a closed fold reads nothing and holds nothing to find.
  */
 import { useState, type ReactNode } from 'react';
-import { Disclosure, DisclosurePanel, DisclosureTrigger } from '@/components/ui/ds';
+import { Disclosure, DisclosurePanel, DisclosureTrigger, Label } from '@/components/ui/ds';
 
 /**
  * The panel at its own height, unclipped: the kit's panel clips to the height it measured as it opened, and what a fold draws once
@@ -17,7 +17,9 @@ export function Fold({ name, title, open = false, children }: { name: string; ti
   return (
     <Disclosure data-fold={name} isExpanded={isExpanded} onExpandedChange={setExpanded}>
       <DisclosureTrigger className="min-h-0 px-0 py-1">
-        <span className="text-label-medium font-label-medium text-on-surface-variant uppercase">{title}</span>
+        <Label size="medium" component="span" colorRole="on-surface-variant" className="font-label-medium uppercase">
+          {title}
+        </Label>
       </DisclosureTrigger>
       <DisclosurePanel isUnstyled className={UNCLIPPED}>
         {isExpanded && <div className="space-y-3 pt-2 pb-1">{children}</div>}

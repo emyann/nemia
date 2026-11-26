@@ -1,17 +1,21 @@
 import type { WorkflowPageAddress } from '../../lib/api/address.ts';
 import { AgentLink } from '../agent/AgentParts';
 import { WorkflowLink } from '../workflow/WorkflowLink';
+import { Body, Label } from '@/components/ui/ds';
 
 /** The tag a try's run wears on Runs, on the Factory and on its own page: started from an agent's page, and not from a workflow. */
 export function TryTag({ agent }: { agent: string }) {
   return (
-    <span
+    <Label
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-try-tag={agent}
       title={`A try of the agent ${agent}, started from its page: fenced to its own folder, with a dollar to spend`}
-      className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 text-label-small leading-none text-on-surface-variant"
+      className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 leading-none"
     >
       try
-    </span>
+    </Label>
   );
 }
 
@@ -26,9 +30,9 @@ export function StartedFrom({
 }) {
   if (!run.try) return <WorkflowLink dir={run.workflowDir} page={run.workflowPage} />;
   return (
-    <span className="flex items-center gap-1.5 text-body-small text-on-surface-variant" title={run.workflowDir}>
+    <Body size="small" component="span" colorRole="on-surface-variant" className="flex items-center gap-1.5" title={run.workflowDir}>
       <TryTag agent={run.try.agent} />
       of <AgentLink from="user" name={run.try.agent} className="text-on-surface" />
-    </span>
+    </Body>
   );
 }

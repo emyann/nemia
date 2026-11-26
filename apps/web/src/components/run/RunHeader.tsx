@@ -18,6 +18,7 @@ import { ENDED } from '@/lib/words';
 import { CopyId, StatTile } from '../look';
 import { Labels } from '../field/Labels';
 import { RunMenu } from './RunMenu';
+import { Label, Title } from '@/components/ui/ds';
 
 /** The hue of where a run stands (`standingOf`): waiting on you, in flight, finished, or called off. */
 const standingHue = (standing: string) =>
@@ -82,12 +83,17 @@ export function RunHeader({ run }: { run: RunDetail }) {
     <header data-run-header className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h1 data-run-title className="m-0 min-w-0 text-title-large font-title-large break-words">
+          <Title size="large" component="h1" data-run-title className="m-0 min-w-0 font-title-large break-words">
             {titleOf(run)}
-          </h1>
-          <span data-run-state={standing} className={cn('rounded px-2 py-0.5 text-label-medium', container[standingHue(standing)])}>
+          </Title>
+          <Label
+            size="medium"
+            component="span"
+            data-run-state={standing}
+            className={cn('rounded px-2 py-0.5', container[standingHue(standing)])}
+          >
             {standing}
-          </span>
+          </Label>
         </div>
         <RunMenu run={run} />
       </div>

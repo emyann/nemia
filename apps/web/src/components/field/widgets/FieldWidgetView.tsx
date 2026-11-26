@@ -4,7 +4,7 @@
  * JSON of what no one widget draws; questions and budgets by the gate's own parts. A field not given yet is a dash.
  */
 import type { ReactNode } from 'react';
-import { Tag } from '@/components/ui/ds';
+import { Body, Label, Tag } from '@/components/ui/ds';
 import { CopyId } from '@/components/look';
 import type { FieldWidget } from '@/lib/fieldWidget';
 import type { Question } from '@/lib/api/tries';
@@ -21,14 +21,20 @@ const textOf = (value: unknown) => (typeof value === 'string' ? value : JSON.str
 
 /** What says nothing was given: a dash, muted. */
 const Dash = () => (
-  <span data-dash className="font-mono text-body-medium text-on-surface-variant">
+  <Body size="medium" component="span" colorRole="on-surface-variant" data-dash className="font-mono">
     —
-  </span>
+  </Body>
 );
 
 /** A cell's value: a string as the markdown it may be, anything else as its JSON. */
 const Cell = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? <Markdown>{value}</Markdown> : <code className="font-mono text-body-small">{textOf(value)}</code>;
+  typeof value === 'string' ? (
+    <Markdown>{value}</Markdown>
+  ) : (
+    <Body size="small" component="span" className="contents">
+      <code className="font-mono">{textOf(value)}</code>
+    </Body>
+  );
 
 /** A list of scalars, a line each, a string as its markdown. */
 function List({ items }: { items: readonly unknown[] }) {
@@ -51,32 +57,30 @@ function Table({ rows }: { rows: readonly unknown[] }) {
   const keys = [...new Set(records.flatMap((r) => Object.keys(r)))];
   return (
     <div className="max-w-full overflow-x-auto">
-      <table data-table className="w-full border-collapse text-left text-body-small">
-        <thead>
-          <tr>
-            {keys.map((key) => (
-              <th
-                key={key}
-                scope="col"
-                className="border-b border-outline-variant px-2 py-1 font-mono text-body-small text-on-surface-variant"
-              >
-                {key}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((record, i) => (
-            <tr key={i} className="border-b border-outline-variant last:border-b-0">
+      <Body size="small" component="div" className="contents">
+        <table data-table className="w-full border-collapse text-left">
+          <thead>
+            <tr>
               {keys.map((key) => (
-                <td key={key} data-cell={key} className="min-w-24 px-2 py-1 align-top">
-                  {key in record ? <Cell value={record[key]} /> : <Dash />}
-                </td>
+                <th key={key} scope="col" className="border-b border-outline-variant px-2 py-1 font-mono text-on-surface-variant">
+                  {key}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {records.map((record, i) => (
+              <tr key={i} className="border-b border-outline-variant last:border-b-0">
+                {keys.map((key) => (
+                  <td key={key} data-cell={key} className="min-w-24 px-2 py-1 align-top">
+                    {key in record ? <Cell value={record[key]} /> : <Dash />}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Body>
     </div>
   );
 }
@@ -84,16 +88,18 @@ function Table({ rows }: { rows: readonly unknown[] }) {
 /** An object's rows: each key and its value. */
 function Rows({ value }: { value: Record<string, unknown> }) {
   return (
-    <dl className="m-0 grid grid-cols-[minmax(6rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1 text-body-small">
-      {Object.entries(value).map(([key, one]) => (
-        <div key={key} className="contents">
-          <dt className="font-mono text-on-surface-variant">{key}</dt>
-          <dd className="m-0 min-w-0 break-words">
-            <Cell value={one} />
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <Body size="small" component="div" className="contents">
+      <dl className="m-0 grid grid-cols-[minmax(6rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {Object.entries(value).map(([key, one]) => (
+          <div key={key} className="contents">
+            <dt className="font-mono text-on-surface-variant">{key}</dt>
+            <dd className="m-0 min-w-0 break-words">
+              <Cell value={one} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Body>
   );
 }
 
@@ -101,11 +107,15 @@ function Rows({ value }: { value: Record<string, unknown> }) {
 function Link({ value }: { value: string }) {
   const web = /^https?:\/\//.test(value);
   return web ? (
-    <a href={value} target="_blank" rel="noreferrer" className="font-mono text-body-small break-all underline underline-offset-2">
-      {value}
-    </a>
+    <Body size="small" component="span" className="contents">
+      <a href={value} target="_blank" rel="noreferrer" className="font-mono break-all underline underline-offset-2">
+        {value}
+      </a>
+    </Body>
   ) : (
-    <span className="font-mono text-body-small break-all">{value}</span>
+    <Body size="small" component="span" className="font-mono break-all">
+      {value}
+    </Body>
   );
 }
 
@@ -123,10 +133,15 @@ function YesNo({ value, schema }: { value: unknown; schema: unknown }) {
   const description = descriptionOf(schema);
   return (
     <p>
-      <span data-yesno={value ? 'yes' : 'no'} className="text-label-large uppercase">
+      <Label size="large" component="span" data-yesno={value ? 'yes' : 'no'} className="uppercase">
         {value ? 'yes' : 'no'}
-      </span>
-      {description && <span className="text-body-small text-on-surface-variant"> — {description}</span>}
+      </Label>
+      {description && (
+        <Body size="small" component="span" colorRole="on-surface-variant">
+          {' '}
+          — {description}
+        </Body>
+      )}
     </p>
   );
 }
@@ -143,7 +158,11 @@ const DRAWS: Record<FieldWidget, (given: Given) => ReactNode | null> = {
   table: ({ value }) => (Array.isArray(value) ? <Table rows={value} /> : null),
   record: ({ value }) => (isObject(value) ? <Rows value={value} /> : null),
   yesNo: ({ value, schema }) => <YesNo value={value} schema={schema} />,
-  number: ({ value }) => <span className="font-mono text-body-large">{textOf(value)}</span>,
+  number: ({ value }) => (
+    <Body size="large" component="span" className="font-mono">
+      {textOf(value)}
+    </Body>
+  ),
   link: ({ value }) => (typeof value === 'string' ? <Link value={value} /> : null),
   commit: ({ value }) => (typeof value === 'string' ? <CopyId id={value} /> : null),
   questions: ({ name, questions }) => (questions && questions.length > 0 ? <Questions field={name} questions={questions} /> : null),
@@ -180,7 +199,9 @@ export function FieldWidgetView({
 }) {
   return (
     <section data-field={name} data-widget={widget} data-given={given || undefined} aria-label={name} className="min-w-0 space-y-1">
-      <h4 className="font-mono text-body-small text-on-surface-variant">{name}</h4>
+      <Body size="small" component="h4" colorRole="on-surface-variant" className="font-mono">
+        {name}
+      </Body>
       {given ? <Drawn name={name} widget={widget} value={value} schema={schema} questions={questions} budgets={budgets} /> : <Dash />}
     </section>
   );

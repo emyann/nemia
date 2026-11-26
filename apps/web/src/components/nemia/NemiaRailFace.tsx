@@ -24,12 +24,12 @@ const DOT = { yours: 'bg-yours', alive: 'bg-alive', failure: 'bg-failure', none:
 
 /**
  * What the face's press target looks like, over the kit's button or link: a rounded box the face fills, with no room of its own around
- * it, ringed on surface while `ringed`; the kit draws the focus.
+ * it, ringed on the background while `ringed`; the kit draws the focus.
  */
 const pressed = (ringed: boolean) =>
   cn(
     'relative inline-flex h-auto shrink-0 cursor-pointer rounded-xl p-0',
-    ringed && 'ring-2 ring-on-surface ring-offset-3 ring-offset-surface',
+    ringed && 'ring-2 ring-on-surface ring-offset-3 ring-offset-background',
   );
 
 /**
@@ -55,7 +55,7 @@ export function NemiaRailFace({
       <span
         aria-hidden
         data-nemia-face-dot={cues[0]?.hue ?? 'alive'}
-        className={cn('absolute -top-0.5 -right-0.5 size-[11px] rounded-full ring-2 ring-surface', DOT[cues[0]?.hue ?? 'alive'])}
+        className={cn('absolute -top-0.5 -right-0.5 size-[11px] rounded-full ring-2 ring-background', DOT[cues[0]?.hue ?? 'alive'])}
       />
     </>
   );

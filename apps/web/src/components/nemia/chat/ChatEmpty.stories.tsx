@@ -8,7 +8,7 @@ const meta: Meta<typeof ChatEmpty> = { title: 'Frame/ChatEmpty', args: { onSend:
 export default meta;
 
 /** Where her greeting stands in its story: her side sheet's width, on its ground. */
-const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)' };
+const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-background)' };
 
 /** Where she is: Semi-auto, keeping two factories. */
 const NEMIA: NemiaLevel = {

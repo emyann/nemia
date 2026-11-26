@@ -1,2 +1,0 @@
-apps/web/src/components/step/DebugPanel.tsx#text-body-medium
-apps/web/src/components/step/DebugPanel.tsx#text-body-small

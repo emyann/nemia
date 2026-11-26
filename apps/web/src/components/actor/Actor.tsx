@@ -1,6 +1,7 @@
 import { Bot, UserRound } from 'lucide-react';
 import { actorWords, type Actor as ActorRead } from 'objects';
 import { cn } from '../../lib/utils';
+import { Body } from '@/components/ui/ds';
 
 /**
  * Who made a write, on one line: a glyph of who it is — the person, or an agent — and objects' own words of the actor (`actorWords`),
@@ -13,13 +14,16 @@ export function Actor({ actor, className }: { actor: ActorRead | undefined; clas
   const Glyph = actor.kind === 'agent' ? Bot : UserRound;
   const words = actorWords(actor);
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-actor={actor.kind}
       title={`Made by ${words}`}
-      className={cn('inline-flex min-w-0 items-center gap-1 text-body-small text-on-surface-variant', className)}
+      className={cn('inline-flex min-w-0 items-center gap-1', className)}
     >
       <Glyph aria-hidden className="size-3.5 shrink-0" />
       <span className="break-words">{words}</span>
-    </span>
+    </Body>
   );
 }

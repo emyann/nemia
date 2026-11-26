@@ -149,7 +149,7 @@ test("a failed read's one line is marked by its kind, names what it read, says t
   ];
   for (const [error, kind] of kinds) {
     const html = await routedWith(createElement(ReadTrouble, { what: 'the agents', error, then: 'Then this.' }));
-    assert.match(html, new RegExp(`<p data-read-trouble="${kind}"`), kind);
+    assert.match(html, new RegExp(`<p [^>]*data-read-trouble="${kind}"`), kind);
     assert.ok(html.includes('the agents') && html.includes(error.message), html);
     assert.ok(html.indexOf(error.message) < html.indexOf('Then this.'), 'the next step comes after the words');
     assert.ok(!html.includes('npm run'), html);

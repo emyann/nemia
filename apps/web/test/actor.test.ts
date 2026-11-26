@@ -32,7 +32,7 @@ const ACTORS = [
 
 /** The actor lines of `html`: each one's kind and its words. */
 const actorsIn = (html: string) =>
-  [...html.matchAll(/<span data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [
+  [...html.matchAll(/<span [^>]*?data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [
     m[1],
     textsOf(m[2]).join(' '),
   ]) satisfies Array<[string, string]>;

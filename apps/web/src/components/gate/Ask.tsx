@@ -6,6 +6,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
+import { Body } from '@/components/ui/ds';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
@@ -85,8 +86,12 @@ export const roundAsk = (queryClient: QueryClient, runId: string, namespaceNow: 
 export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-body-medium font-medium text-on-failure-container">{not}. The api refused it:</p>
-      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error.message}</p>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        {not}. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {error.message}
+      </Body>
     </div>
   );
 }

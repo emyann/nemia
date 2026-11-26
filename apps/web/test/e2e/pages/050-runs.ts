@@ -37,7 +37,7 @@ import {
   runListPath,
   tipsOf,
 } from '../board.ts';
-import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
+import { expectBeneath, expectCount, expectNone, expectTexts, expectTwoDeep, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
@@ -333,7 +333,7 @@ async function titleKeepsItsBox(page: Page, open: OpenRuns) {
   await card.scrollIntoViewIfNeeded();
   const hit = await card.evaluate((article, over) => {
     const link = article.querySelector('h3 a')!;
-    const text = [...link.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)!;
+    const text = document.createTreeWalker(link, NodeFilter.SHOW_TEXT).nextNode()!;
     const was = text.nodeValue;
     text.nodeValue = over;
     try {
@@ -775,7 +775,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     throw new Refused(`an outcome is a plain word, red only when the run failed — ${inks.join(', ')}`);
   const heads = await page.locator('[data-runs-page] th').evaluateAll((all) =>
     all.map((th) => {
-      const style = getComputedStyle(th);
+      const style = getComputedStyle(th.querySelector('[data-slot=typography]') ?? th);
       return `${style.textTransform} ${style.fontSize} ${style.fontWeight}`;
     }),
   );
@@ -966,10 +966,22 @@ async function lookRules(page: Page) {
  * count cut, the pager's buttons in the face of a heading, and only the step at work alive with a pulse.
  */
 async function lookDetails(page: Page) {
-  await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
+  await expectDrawn(
+    page,
+    'th [data-slot=typography]',
+    'tracking',
+    '1.1px',
+    'a heading is the small label, tracked by a tenth of its 11 pixels',
+  );
   await expectDrawn(page, '[data-now-word] span', 'tracking', '0.72px', 'a chip is tracked by six hundredths of its 12 pixels');
   await expectDrawn(page, '[data-cut-button] [data-cut-shape]', 'tracking', '0.84px', 'the cut button, by six hundredths of its 14');
-  await expectDrawn(page, '[data-pager-newer], [data-pager-older]', 'tracking', '0.84px', "the pager's buttons, as the cut button");
+  await expectDrawn(
+    page,
+    '[data-pager-newer] [data-slot=typography], [data-pager-older] [data-slot=typography]',
+    'tracking',
+    '0.84px',
+    "the pager's buttons, as the cut button",
+  );
   await expectDrawn(
     page,
     '[data-now-word], [data-count-chip]',
@@ -977,8 +989,8 @@ async function lookDetails(page: Page) {
     TAG_CUT,
     'a chip that says a state or a count has its top-right corner cut',
   );
-  const [head] = await drawnOf(page, 'th');
-  const buttons = await drawnOf(page, '[data-pager-newer], [data-pager-older]');
+  const [head] = await drawnOf(page, 'th [data-slot=typography]');
+  const buttons = await drawnOf(page, '[data-pager-newer] [data-slot=typography], [data-pager-older] [data-slot=typography]');
   const [count] = await drawnOf(page, '[data-pager-rows]');
   if (buttons.length !== 2 || buttons.some((button) => button.face !== head.face || button.face === count.face))
     throw new Refused(
@@ -1181,6 +1193,7 @@ export default {
     const drawn = answersDrawn(page);
     try {
       await withRegated(page, drawn.last);
+      await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
     } finally {
       drawn.stop();
       regatedBack();

@@ -14,7 +14,7 @@ const meta: Meta<typeof ChatPanel> = {
 export default meta;
 
 /** Where the panel stands in its story: her side sheet's size, on its ground. */
-const SHEET = { width: 400, height: 640, padding: 16, background: 'var(--md-sys-color-surface)' };
+const SHEET = { width: 400, height: 640, padding: 16, background: 'var(--md-sys-color-background)' };
 
 /** Her chat read, nothing said yet, every press doing nothing. */
 const CHAT: NemiaChat = {

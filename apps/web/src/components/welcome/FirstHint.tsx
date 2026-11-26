@@ -4,6 +4,7 @@ import { firstBeatOf, firstRunOf } from '@/lib/firstCard';
 import type { RunView } from '@/lib/api/judged';
 import { container } from '@/lib/meaning';
 import { cn } from '@/lib/utils';
+import { Body } from '@/components/ui/ds';
 
 /** What each beat's hint says. */
 const SAYS: Readonly<Record<FirstBeat, string>> = {
@@ -25,11 +26,13 @@ export function FirstHint({ run, beat }: { run: Pick<RunView, 'labels' | 'status
       data-first-hint={beat}
       aria-label="Your first card"
       className={cn(
-        'flex flex-wrap items-center justify-between gap-3 rounded-shape-small px-4 py-3 text-body-medium',
+        'flex flex-wrap items-center justify-between gap-3 rounded-shape-small px-4 py-3',
         container[beat === 'gate' ? 'yours' : 'grey'],
       )}
     >
-      <p className="m-0">{SAYS[beat]}</p>
+      <Body size="medium" className="m-0">
+        {SAYS[beat]}
+      </Body>
       {beat === 'landed' && (
         <CutButton data-first-next to="/welcome/next">
           What next

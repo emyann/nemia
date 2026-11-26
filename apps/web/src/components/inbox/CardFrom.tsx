@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { setCardFrom, type InboxEntry } from '../../lib/api/inbox.ts';
 import type { CardRefusal } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 
 /**
  * A card's `from:`, the runs its run is handed as context: each linked to its page, and, on a card that can still start (`editable`), a
@@ -33,7 +33,7 @@ export function CardFrom({
 
   return (
     <div data-card-from className="space-y-2">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small text-on-surface-variant">
+      <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {entry.from.length ? (
           <span data-from={entry.from.join(' ')}>
             reads{' '}
@@ -55,7 +55,7 @@ export function CardFrom({
             {editing ? 'Done' : 'Change'}
           </Button>
         )}
-      </p>
+      </Body>
       {editing && editable && (
         <ContextPicker label="Reads as context" selected={shown} onChange={(runs) => write.mutate(runs)} disabled={write.isPending} />
       )}

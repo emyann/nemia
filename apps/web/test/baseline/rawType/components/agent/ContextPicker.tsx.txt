@@ -1,2 +1,0 @@
-apps/web/src/components/agent/ContextPicker.tsx#text-body-medium
-apps/web/src/components/agent/ContextPicker.tsx#text-body-small

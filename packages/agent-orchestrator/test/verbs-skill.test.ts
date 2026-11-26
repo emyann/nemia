@@ -305,17 +305,17 @@ const guidanceUnsaid = (skill: string, guidance: readonly Guidance[], outside: r
 };
 
 test("every paragraph of the port's guidance is in her skill's Start here in its shell form, but those the outside seat's alone", () => {
-  assert.deepEqual(guidanceUnsaid(fs.readFileSync(SKILL, 'utf8'), GUIDANCE, ['resources']), []);
+  assert.deepEqual(guidanceUnsaid(fs.readFileSync(SKILL, 'utf8'), GUIDANCE, ['skills', 'resources']), []);
   assert.deepEqual(
     GUIDANCE.filter((g) => g.shell === null).map((g) => g.id),
-    ['resources'],
+    ['skills', 'resources'],
   );
 });
 
 test('REFUSED: a paragraph whose shell form is not rendered, and a second kept from her, are named', () => {
   const planted: Guidance = { id: 'answers', port: 'p', shell: 'a planted paragraph' };
   const kept: Guidance = { id: 'search', port: 'p', shell: null };
-  assert.deepEqual(guidanceUnsaid(verbsSkill(), [...GUIDANCE, planted, kept], ['resources']), [
+  assert.deepEqual(guidanceUnsaid(verbsSkill(), [...GUIDANCE, planted, kept], ['skills', 'resources']), [
     'unsaid: answers',
     "the port's alone: search",
   ]);

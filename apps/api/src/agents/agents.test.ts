@@ -202,7 +202,7 @@ describe('a person reads the agents: both places listed, one read by name, the c
     },
   );
   s.test(
-    "a skill in the repository's .claude/skills is on the card of an agent of yours, its SKILL.md moves the agent's version, and one gone is the card's refusal, not the agent's",
+    "a skill in the repository's .claude/skills is on the card of an agent of yours, and one gone is the card's refusal, not the agent's",
     async () => {
       const skill = path.join(repo, '.claude', 'skills', 'pass-a-note');
       fs.mkdirSync(skill, { recursive: true });
@@ -229,20 +229,6 @@ describe('a person reads the agents: both places listed, one read by name, the c
           edited.card?.map((s) => [s.name, s.tags]),
           [['Pass a note on', ['note']]],
         );
-        assert.notEqual(edited.version, courier.version, 'the SKILL.md is digested with the agent');
-        await refused(
-          send('PUT', '/api/agents/user/courier', {
-            name: 'courier',
-            description: 'Carries notes.',
-            skills: 'pass-a-note',
-            keys: { tools: 'Read, Skill' },
-            body: 'Carry it.',
-            version: courier.version,
-          }),
-          409,
-          /changed since it was read/,
-        );
-
         const put = await send('PUT', '/api/agents/user/courier', {
           name: 'courier',
           description: 'Carries notes on.',

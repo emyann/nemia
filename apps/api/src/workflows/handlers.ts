@@ -21,10 +21,12 @@
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
  * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Result, Schema } from 'effect';
 import {
   definitionRevision,
+  definitionRevisionNow,
   factoryDraftIn,
   foldersIn,
   libraryUsers,
@@ -36,6 +38,7 @@ import {
   workflowSpecAt,
   workflowSpecOf,
   workflowSpecReadme,
+  workflowTaken,
   workflowVersion,
   type FolderLoaded,
   workflowTable,
@@ -44,6 +47,7 @@ import { WorkflowError } from 'agent-orchestrator/workflow';
 import {
   Api,
   API_VERSION,
+  Conflict,
   Invalid,
   Missing,
   type DefinitionFiles,
@@ -337,6 +341,11 @@ async function libraryCreated(s: Served, payload: WorkflowCreate) {
     throw new Invalid({ error: `${route}: a workflow is made with its first step. Send ${SHAPE}, with one step at least.` });
   const steps = draftsOf(payload.spec.steps, route);
   const at = writing(s, name, false);
+  if (fs.statSync(at.dir, { throwIfNoEntry: false })?.isDirectory() === true)
+    throw new Conflict({
+      error: workflowTaken(at.dir, String(await s.inRequest(definitionRevisionNow('Workflow', undefined, name)))),
+      users: [],
+    });
   builderRefused(await write(at, steps, workflowSpecReadme(at.dir, payload.spec), [], payload.spec.files));
   return libraryAt(s, name, 'user');
 }

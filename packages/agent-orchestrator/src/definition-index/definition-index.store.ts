@@ -17,8 +17,7 @@ import { agentVersion } from '../agents/read.store.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { DEFINITIONS_PREFIX } from '../list-watch/index.ts';
-import { kindRevisions } from '../list-watch/kind-watch.store.ts';
+import { DEFINITIONS_PREFIX, revisionTable } from '../list-watch/index.ts';
 import { recordDue } from '../observed/observed.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { BUILTIN_SKILLS, entriesOf, skillVersion } from '../skills/read.store.ts';
@@ -209,7 +208,7 @@ export const definitionsRefreshed = Effect.fn('definitionsRefreshed')(function* 
 
 /**
  * The revision a library definition stands at once its files are read again: what a write of it compares the revision its writer read to,
- * the revision the api serves (`kindRevisions`), the highest among the records that name it.
+ * the revision the api serves (`revisionTable`), the highest among the records that name it.
  * @param kind What the definition is.
  * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
@@ -220,5 +219,7 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
   name: string,
 ) {
   yield* indexSweep();
-  return (yield* kindRevisions(kind)).of(namespace, name);
+  const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot)).pipe(Effect.orDie);
+  const held = new Map([[DEFINITIONS_PREFIX, yield* keyspace.revisions(DEFINITIONS_PREFIX)]]);
+  return revisionTable(kind, held)(namespace, name);
 });

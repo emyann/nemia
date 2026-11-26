@@ -214,7 +214,7 @@ const factoryNow = (place: ProposalPlace, factory: string) =>
  * @param kind The kind of the object.
  * @param name The object's name; for a Factory, the factory's own.
  */
-const contentNow = (place: ProposalPlace, factory: string, kind: ProposableKind, name: string) => {
+export const contentNow = (place: ProposalPlace, factory: string, kind: ProposableKind, name: string) => {
   switch (kind) {
     case 'Workflow':
       return workflowNow(place, factory, name);

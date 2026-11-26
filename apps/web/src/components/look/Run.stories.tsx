@@ -1,10 +1,11 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import type { Run as RunObject } from 'objects';
 import { Column, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { runViewOf } from '@/lib/api/judged';
 import type { WaitingRun } from '@/lib/api/runs';
+import { titleOf } from '@/lib/factory';
 import { nowMark } from '@/lib/stepMark';
 import { NOW_WORDS } from '@/lib/words';
 import { READS, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
@@ -280,5 +281,128 @@ export const Panels: Story = {
     );
     await expect(waiters).toEqual([TARGET_RUNS.c7un.metadata.name]);
     await expect(within(atWork).getByText('npx tsrs --noEmit -p apps/cli')).toBeVisible();
+  },
+};
+
+/** A title short enough to read whole on the line's width. */
+const SHORT = { ...RUN('1sw7'), brief: 'board: a short title' };
+
+/** The event a story's play sends its window to move what `Moves` holds down the page. */
+const MOVE = 'story-move';
+
+/** What it holds, moved down the page by a spacer once the window is sent `MOVE`, as a row is when a row comes in above it. */
+function Moves({ children }: { children: ReactNode }) {
+  const [moved, setMoved] = useState(false);
+  useEffect(() => {
+    const move = () => setMoved(true);
+    window.addEventListener(MOVE, move);
+    return () => window.removeEventListener(MOVE, move);
+  }, []);
+  return (
+    <>
+      <div style={{ height: moved ? 48 : 0 }} />
+      {children}
+    </>
+  );
+}
+
+/** The title link of the run drawn under the heading `name`. */
+const titleIn = (root: HTMLElement, name: string) =>
+  root.querySelector<HTMLElement>(`[data-tip-case="${name}"] [data-run-says~="title"] a`)!;
+
+/**
+ * The tooltips drawn anywhere on the page since `watching` was called, each by its box as it was drawn, and its end: every
+ * `role="tooltip"` added to the document and still on it when the watcher reads it.
+ */
+const watching = () => {
+  const drawn: DOMRect[] = [];
+  const watcher = new MutationObserver((changes) => {
+    const added = changes.flatMap((change) => [...change.addedNodes]).filter((node) => node instanceof Element);
+    const tips = added.flatMap((node) => [node, ...node.querySelectorAll('*')]).filter((one) => one.getAttribute('role') === 'tooltip');
+    drawn.push(...tips.filter((tip) => tip.isConnected).map((tip) => tip.getBoundingClientRect()));
+  });
+  watcher.observe(document.body, { childList: true, subtree: true });
+  return { drawn, stop: () => watcher.disconnect() };
+};
+
+/**
+ * A wait for React Aria to open the tooltip of `trigger`, as its delay ends: the trigger is described by one, however briefly, its
+ * description seen set or seen taken away.
+ */
+const tried = (trigger: Element) =>
+  new Promise<void>((done) => {
+    const watcher = new MutationObserver((changes) => {
+      if (!trigger.hasAttribute('aria-describedby') && changes.every((change) => change.oldValue === null)) return;
+      watcher.disconnect();
+      done();
+    });
+    watcher.observe(trigger, { attributes: true, attributeFilter: ['aria-describedby'], attributeOldValue: true });
+  });
+
+/** Whether a tooltip's box stands at the window's top-left corner, where React Aria draws one it could not place. */
+const atCorner = (box: DOMRect) => box.left < 16 && box.top < 16;
+
+/**
+ * A run's title in the kit's tooltip only where it is cut, beside its words, and never at the window's corner: a title that reads whole
+ * opens none; one cut to its line opens the whole title, its box touching the title's words; one moved down the page while its tooltip is
+ * open closes it. A press on a heading first puts React Aria in the pointer's mode, as a person's pointer does: a hover alone does not.
+ */
+export const TitleTips: Story = {
+  render: (args) => (
+    <div style={BOARD}>
+      <Headed name="whole" width={420}>
+        <span data-tip-case="whole">
+          <Run {...args} run={SHORT} size="sm" />
+        </span>
+      </Headed>
+      <Headed name="cut" width={320}>
+        <span data-tip-case="cut">
+          <Run {...args} size="sm" />
+        </span>
+      </Headed>
+      <Headed name="moved while open" width={320}>
+        <span data-tip-case="moved">
+          <Moves>
+            <Run {...args} size="sm" />
+          </Moves>
+        </span>
+      </Headed>
+    </div>
+  ),
+  play: async ({ canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByText('whole'));
+    const tips = watching();
+    const whole = titleIn(canvasElement, 'whole');
+    const wholeTried = tried(whole);
+    await userEvent.hover(whole);
+    await wholeTried;
+    await waitFor(() => expect(whole, 'a title that reads whole is described by nothing').not.toHaveAttribute('aria-describedby'));
+    await expect(tips.drawn, 'a title that reads whole opens no tooltip').toHaveLength(0);
+    await userEvent.unhover(whole);
+
+    const cut = titleIn(canvasElement, 'cut');
+    await userEvent.hover(cut);
+    const tip = await waitFor(() => {
+      const one = document.getElementById(cut.getAttribute('aria-describedby') ?? '');
+      if (one?.getAttribute('role') !== 'tooltip') throw new Error('no tooltip describes the cut title');
+      return one;
+    });
+    await expect(tip, 'the whole title').toHaveTextContent(titleOf(RUN('1sw7')));
+    const words = cut.getBoundingClientRect();
+    const box = tip.getBoundingClientRect();
+    await expect(box.bottom, 'the tooltip sits just over the title').toBeGreaterThan(words.top - 16);
+    await expect(box.bottom).toBeLessThanOrEqual(words.top + 1);
+    await expect(box.right, 'the tooltip overlaps the title’s words across').toBeGreaterThan(words.left);
+    await expect(box.left).toBeLessThan(words.right);
+    await userEvent.unhover(cut);
+
+    const moved = titleIn(canvasElement, 'moved');
+    await userEvent.hover(moved);
+    await waitFor(() => expect(moved).toHaveAttribute('aria-describedby'));
+    window.dispatchEvent(new Event(MOVE));
+    await waitFor(() => expect(document.querySelectorAll('[role="tooltip"]'), 'the moved title’s tooltip closes').toHaveLength(0));
+    await expect(tips.drawn.filter(atCorner), 'no tooltip at the window’s corner').toHaveLength(0);
+    tips.stop();
+    await userEvent.unhover(moved);
   },
 };

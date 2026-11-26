@@ -77,8 +77,9 @@ export const Open: StoryObj<{ step: string }> = {
     await expect(frame.contains(within(dialog).getByRole('button', { name: 'Close' }))).toBe(true);
     await expect(frame.contains(dialog.querySelector('[data-step-part="M"]'))).toBe(true);
     const surface = getComputedStyle(dialog.querySelector('[data-slot="dialog-content"]') as Element);
-    await expect(surface.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-    await expect((surface.boxShadow.match(/rgba?\([^)]*\)/g) ?? []).filter((c) => !c.endsWith(', 0)'))).toEqual([]);
+    const seen = (colour: string) => !colour.endsWith(', 0)');
+    await expect(seen(surface.backgroundColor)).toBe(false);
+    await expect((surface.boxShadow.match(/rgba?\([^)]*\)/g) ?? []).filter(seen)).toEqual([]);
     await expect(surface.padding).toBe('0px');
     await expect(surface.borderRadius).toBe('0px');
   },

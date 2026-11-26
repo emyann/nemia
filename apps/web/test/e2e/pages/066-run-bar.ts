@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { Page, Request } from 'playwright';
-import { photograph, stepBar, themeOf } from '../board.ts';
+import { openConversation, openFromBar, photograph, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { FAKE, FOLDER } from '../seed.ts';
+import { FAKE, FOLDER, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
@@ -100,17 +100,12 @@ async function pressed(page: Page) {
   await nodeOf(page, FIRST).click();
   const first = await expectShows(page, FIRST, `a click on ${FIRST} shows it again`);
   await expectCount(first.getByRole('tab'), 0, 'the bar is one scroll, with no tabs');
-  await expectVisible(
-    first.locator(`[data-step-scope="${FIRST}"] > :first-child article[data-step-part="L"][data-step-name="${FIRST}"]`),
-    `its part whole, at L, first`,
-  );
+  await expectVisible(first.locator(`article[data-step-part="L"][data-step-name="${FIRST}"]`), `its part whole, at L`);
+  await expectCount(first.locator('section[aria-label="Its conversation"]'), 0, 'and no conversation until a person opens it');
   await nodeOf(page, OTHER).click();
   const other = await expectShows(page, OTHER, `a click on ${OTHER} switches the bar to it`);
   await expectCount(stepBar(page, FAKE.id, FIRST), 0, `and ${FIRST} is no longer shown`);
-  await expectVisible(
-    other.locator(`[data-step-scope="${OTHER}"] > section:last-child[aria-label="Its conversation"]`),
-    `${OTHER}'s bar draws its part, then its conversation under it`,
-  );
+  await expectVisible(other.locator(`article[data-step-part="L"][data-step-name="${OTHER}"]`), `${OTHER}'s bar draws its part`);
   await expectVisible(graphOf(page).locator(`.react-flow__node.selected[data-id="${OTHER}"]`), `${OTHER}'s node is drawn selected`);
 
   await settled(page);
@@ -206,14 +201,15 @@ async function opened(page: Page) {
   await nodeOf(page, OTHER).click();
   const bar = await expectShows(page, OTHER, `a click on ${OTHER} shows it`);
   const where = await bar.boundingBox();
+  const talk = await openConversation(page, bar);
   await expectVisible(
-    bar
-      .locator('section[aria-label="Its conversation"]')
-      .getByText('No session of it has started, so there is no conversation yet.', { exact: true }),
-    `the conversation of ${OTHER}, none of whose sessions started, says it has none yet, under its part`,
+    talk.getByText('No session of it has started, so there is no conversation yet.', { exact: true }),
+    `the conversation of ${OTHER}, none of whose sessions started, says it has none yet`,
   );
+  await talk.getByRole('button', { name: 'Back to the step', exact: true }).click();
+  await expectVisible(bar.locator(`article[data-step-part="L"][data-step-name="${OTHER}"]`), `Back shows ${OTHER}'s part again`);
   await idle(page);
-  await bar.getByRole('link', { name: 'Open', exact: true }).click();
+  await openFromBar(page, bar);
   await expectAt(page, session, `the bar's Open opens ${OTHER}'s session`);
   await expectNoConversation(page, `${OTHER}'s session page, opened from the bar, says it has no conversation to show`);
   await visit(page, RUN);
@@ -240,8 +236,67 @@ async function keepsTheStart(page: Page) {
   await expectVisible(bar, 'a click on the empty canvas leaves the start of a run open, with its brief');
   if (barInUrl(page) !== start) throw new Refused(`and the address keeps bar=${start} — it is ${page.url()}`);
   await expectCount(bar.getByRole('link', { name: 'Open', exact: true }), 0, 'the start of a run is no page, so the bar offers no Open');
+  await expectCount(bar.locator('button[data-bar-menu]'), 0, 'nor a menu to hold one');
   await bar.getByRole('button', { name: 'Close', exact: true }).click();
   await expectClosed(page, 'its Close closes it');
+}
+
+/**
+ * The conversation of the step whose session is on disk, opened from its bar's menu while each read is held (`slowConversations`), and
+ * left by Back while its read is still out; opened again, and left by its closeout's Read what it said for the part at its Said; opened
+ * again and left by a switch to another step, whose bar shows its card, and back, which shows the first step's card and reads nothing;
+ * then opened and left by Close. No conversation is read before it is opened, and the board leaves each read to answer, the watch counting
+ * any it abandons.
+ */
+async function talks(page: Page) {
+  const asked: string[] = [];
+  const ask = (request: Request) => {
+    if (TRANSCRIPT.test(new URL(request.url()).pathname)) asked.push(request.url());
+  };
+  page.on('request', ask);
+  try {
+    await nodeOf(page, SESSION.step).click();
+    const bar = await expectShows(page, SESSION.step, `a click on ${SESSION.step} shows it`);
+    await expectVisible(bar.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"]`), `${SESSION.step}'s part is drawn`);
+    await idle(page);
+    if (asked.length) throw new Refused(`the bar reads no conversation until a person opens it — asked ${asked.join(', ')}`);
+    await openConversation(page, bar);
+    await bar.getByRole('button', { name: 'Back to the step', exact: true }).click();
+    await expectVisible(
+      bar.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"]`),
+      'Back, the read still out, shows the part',
+    );
+    const talk = await openConversation(page, bar);
+    await expectVisible(talk.locator('[data-session-closeout]'), `${SESSION.step}'s conversation is drawn once read`);
+    await talk.getByRole('button', { name: 'Read what it said', exact: true }).click();
+    await expectCount(talk, 0, "its closeout's Read what it said leaves the conversation");
+    await expectVisible(
+      bar.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"] [data-part-said]`),
+      'for the part, at what it said',
+    );
+
+    await openConversation(page, bar);
+    await idle(page);
+    const read = asked.length;
+    await nodeOf(page, OTHER).click();
+    const other = await expectShows(page, OTHER, `a click on ${OTHER} switches the bar on ${SESSION.step}'s conversation to it`);
+    await expectVisible(other.locator(`article[data-step-part="L"][data-step-name="${OTHER}"]`), `${OTHER}'s card is drawn`);
+    await expectCount(other.locator('section[aria-label="Its conversation"]'), 0, 'and no conversation: the choice was the other step’s');
+    await nodeOf(page, SESSION.step).click();
+    const again = await expectShows(page, SESSION.step, `a click on ${SESSION.step} switches the bar back`);
+    await expectVisible(again.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"]`), `${SESSION.step}'s card again`);
+    await expectCount(again.locator('section[aria-label="Its conversation"]'), 0, 'not its conversation, which was left with the switch');
+    await idle(page);
+    if (asked.length !== read)
+      throw new Refused(`no conversation is read once the bar moved off it — asked ${asked.slice(read).join(', ')}`);
+    await openConversation(page, again);
+    await again.getByRole('button', { name: 'Close', exact: true }).click();
+    await expectClosed(page, 'Close closes the bar on its conversation');
+    await idle(page);
+  } finally {
+    page.off('request', ask);
+  }
+  if (!asked.length) throw new Refused(`opening ${SESSION.step}'s conversation reads it`);
 }
 
 /** How long the page holds each read of a step's conversation before the api is asked it. */
@@ -266,9 +321,9 @@ export default {
    * A run's canvas and the frame's side sheet: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node
    * shows it, the same node again closes it, another switches it, the bar one scroll with no tabs, and the nodes are fitted clear of the
    * bar; the empty canvas closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus
-   * back to the node; Open and a double click open the step's session, its second click landing where the narrowed canvas put it, and a
-   * step with no session asks no conversation. Each read of a conversation is held a moment, so the bar closed or switched while one is
-   * out proves the board leaves it to answer rather than abort it.
+   * back to the node; the menu's Open and a double click open the step's session, its second click landing where the narrowed canvas put
+   * it, and a step with no session asks no conversation. No conversation is read until the menu's Open conversation shows it in place of
+   * the part; each read is held a moment, so Back and Close while one is out prove the board leaves it to answer rather than abort it.
    */
   name: 'run-bar',
   route: RUN,
@@ -278,6 +333,7 @@ export default {
     await presses(page);
     await keys(page);
     await opens(page);
+    await talks(page);
     await keepsTheStart(page);
   },
 } satisfies PageSpec;

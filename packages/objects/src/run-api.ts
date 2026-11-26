@@ -278,7 +278,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
       sensitive: Schema.optionalKey(
         Schema.String.annotate({
           description:
-            'Comma-separated globs whose changed files the decision shows in full (nemia decide --sensitive); else the defaults.',
+            'Comma-separated globs whose changed files the decision shows in full (nemia decide --sensitive); else the `radius.checkAffecting` of its factory, none where it sets none.',
         }),
       ),
       diffs: Schema.optionalKey(

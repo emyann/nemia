@@ -180,6 +180,16 @@ const filedOf = Effect.fn('filedOf')(function* (listing: FactoryListing, home: s
     ...(listing.labelValues === undefined || Object.keys(listing.labelValues).length === 0
       ? {}
       : { labelValues: Object.fromEntries(Object.entries(listing.labelValues).map(([key, values]) => [key, [...values]])) }),
+    ...(listing.radius === undefined
+      ? {}
+      : {
+          radius: {
+            agentFacing: [...listing.radius.agentFacing],
+            checkAffecting: [...listing.radius.checkAffecting],
+            lessons: [...listing.radius.lessons],
+          },
+        }),
+    ...(listing.firstWorkflow === undefined ? {} : { firstWorkflow: listing.firstWorkflow }),
     ...(listing.revisions === undefined ? {} : { revisions: listing.revisions }),
     ...(listing.template === undefined
       ? {}

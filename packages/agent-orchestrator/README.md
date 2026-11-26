@@ -2387,13 +2387,8 @@ it files the step.
   file git ignores, which never reaches the branch. Every pass until the check is filed copies only what
   changed, so a pass that dies halfway loses nothing, and nothing is written through a link a step made in
   its directory.
-- **The step's check is given it** as `WF_ARTIFACTS`. An ending's check (`workspace: base`) runs the e2e on
-  the merge staged in the checkout, after the ending's gate, so its pictures are of the merged tree and are
-  read by nobody once the merge has landed. On the pass that writes a landing's `{ commit }`, the tick removes
-  every regular `.png` directly in the ending's directory that its closeout does not name, never through a
-  link, and writes `e2e-pictures.txt` in their place: why, the check's log, and each name with its size
-  (`dropLandedPictures`). A check that refused or did not finish lands nothing, and keeps every picture, the
-  failed page's among them. The pictures a reviewer read are implement's, in its own directory, and stay.
+- **The step's check is given it** as `WF_ARTIFACTS`. An ending's check (`workspace: base`) runs on
+  the merge staged in the checkout, after the ending's gate.
 - **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
   root is read from `<dir>`, where it was collected, or else from the branch, as before collection — so a run
   from before it reads as it did, worktree or not. A file whose copy something the step made in `<dir>` refused
@@ -4908,7 +4903,7 @@ holding a concurrency slot forever.
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
 | `src/branches/merges.verb.ts` | whether each branch ahead of a run's base still merges onto it, by the place's trial merges (`mergesOf`): what a run's decision says under each branch ahead |
 | `src/branches/changes.store.ts` | what a repository run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
-| `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
+| `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`) and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
 | `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`, then its builtin skills, `BUILTIN_SKILLS`, found last), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |

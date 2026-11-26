@@ -23,7 +23,6 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
-import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import { closeoutAsked, closeoutReader, parentsRead, spendReader, taskPhasesRead, type Parents } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { readRun } from '../tick/told.verb.ts';
@@ -189,9 +188,6 @@ const mainClaim = Effect.fnUntraced(function* (
  * work. Level-triggered: after a restart, of the daemon or the machine, the pass reads the checkout and the engine as they are, and lands
  * then a merge whose session and check have both stopped running.
  *
- * Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): they are removed before the
- * record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
- *
  * What the pass does when the place says a merge is staged in the checkout with nothing of the ending running: a merge that is not this
  * run's — every commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is
  * this run's is committed only if its check passed on it, and aborted otherwise.
@@ -237,17 +233,8 @@ export const landEnding = Effect.fnUntraced(function* (
   if (!due) return { notes: [] as string[], landed: false };
   const name = ending.name;
   const write = (landed: LandingRecord, note: string) => {
-    const dropped =
-      'commit' in landed
-        ? dropLandedPictures(home, run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
-        : undefined;
     run.steps[name] = { ...record, landed };
-    const freed = dropped?.removed.length
-      ? [
-          `${name}: removed the ${dropped.removed.length} ${dropped.removed.length === 1 ? 'picture' : 'pictures'} its check took of the merged tree (${sizeOf(dropped.bytes)}); ${LANDED_PICTURES} says what they were`,
-        ]
-      : [];
-    return { notes: [`${name}: ${note}`, ...freed], landed: true };
+    return { notes: [`${name}: ${note}`], landed: true };
   };
   const again = (why: string) => ({ notes: [`${name}: ${why}: the next tick tries again`], landed: false });
   if (due.act === 'wait') return again(`the run read no state of its checkout, so it neither commits nor aborts its merge (${due.why})`);

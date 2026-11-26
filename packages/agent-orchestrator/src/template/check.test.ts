@@ -332,6 +332,12 @@ describe('the check of a template folder: the whole folder passes, and each rule
     assertRefused(values('work=a:b'), 'nemia.yaml', ['spec', 'labelValues'], '"a:b"');
     assertRefused(values('work'), 'nemia.yaml', ['spec', 'labelValues'], '"work"');
   });
+  test('a firstWorkflow naming no workflow of the template is refused, one a parameter writes is read once rendered', () => {
+    const first = (name: string) => refusalsOf((d) => (d['nemia.yaml'].spec.firstWorkflow = name));
+    assert.deepEqual(first('dev'), []);
+    assert.deepEqual(first('${{ parameters.check }}'), []);
+    assertRefused(first('nope'), 'nemia.yaml', ['spec', 'firstWorkflow'], 'set spec.firstWorkflow to one of');
+  });
   test("a skill the folder lacks is refused, an agent's or a step's, and a place skill nemia ships is present", () => {
     assertRefused(
       refusalsOf((d) => d[AGENT].spec.skills.push('nope')),

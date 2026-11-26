@@ -4,6 +4,7 @@
  * a name-level difference said as a warning; the kinds behind the files are the orchestrator's (`driftNow`). And what a person
  * said of the try a step is on: its gate's approval, or a loop's acceptance, which is `nemia approve` of a loop (`gateOf`).
  */
+import { tallyIn } from '../tally/tally.ts';
 import { endWords, type AttemptEnd, type EngineOutcome } from '../views/views-words.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { sessionRanOn, type SessionHarness, type SessionRelease } from '../release/index.ts';
@@ -77,7 +78,8 @@ export type StepReply = { finding: string; answer: string; why: string };
  * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
  * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
  *
- * `shapes` is the shape (objects' `FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`, absent where it marked
+ * `tallies` is each count its step declares (`tally:`), valued by `tallyIn` off this closeout, in the step's order, empty where it declares
+ * none. `shapes` is the shape (objects' `FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`, absent where it marked
  * none — as on a run frozen before shapes were kept.
  *
  * `questions` is what it asks a person through its question fields (`askedQuestions`): each field whose schema is the package's shape
@@ -98,6 +100,7 @@ export type StepCloseout = {
   replies: StepReply[] | null;
   schema: Record<string, unknown>;
   shapes?: Record<string, FieldShape>;
+  tallies: { tally: string; value: number | null }[];
   questions: Asked[];
   raw: unknown;
 };
@@ -238,6 +241,7 @@ export function closeoutIn(
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
     schema: Object.fromEntries(fields.map((field) => [field, declared[field]])),
     ...shapesServed(step, fields),
+    tallies: (step.tally ?? []).map((tally) => ({ tally, value: tallyIn(tally, c.output) })),
     questions: askedQuestions(step, c),
     raw: said,
   } satisfies StepCloseout | null;

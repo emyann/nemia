@@ -4,7 +4,7 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, with no gate unless the run is started with one at land."
 spec:
-  version: 5.9.0
+  version: 5.10.0
   rules:
     path: RULES.md
   parameters:
@@ -65,6 +65,18 @@ spec:
       type: string
       description: "The values filing takes for each label key the factory names, as key=value words apart by spaces, so work=feature work=fix takes work=feature and work=fix and refuses any other work=, while a key it names not is free. A card filed, applied or labelled, a run labelled and a start's own labels that give such a key another value are refused at that moment, nothing written. List here the values pullRequestLabels reads, so a card is refused when it is filed rather than when its run reaches the pull request. Empty (the default) refuses nothing."
       default: ""
+    radiusAgentFacing:
+      type: string
+      description: "The files a branch changes that its agents read as instructions, globs apart by spaces: nemia decide lists a changed one as agent-facing, since a change to it changes every step after it. A folder is written with a trailing /. Empty names none."
+      default: "**/CLAUDE.md **/AGENTS.md **/.claude/ **/.codex/ **/.mcp.json **/README.md"
+    radiusCheckAffecting:
+      type: string
+      description: "The files a branch changes that decide what its checks mean, globs apart by spaces: nemia decide lists a changed one as check-affecting and shows its whole diff, since a change could edit one to make its check pass. Name the repository's check scripts, its dependencies, its compiler and lint settings and its tests. A folder is written with a trailing /. Empty names none."
+      default: "**/package.json **/package-lock.json **/tsconfig*.json **/*.test.* **/test/"
+    radiusLessons:
+      type: string
+      description: "The files where the next agent reads what this one learned, globs apart by spaces: nemia decide's lesson line counts a changed one. A folder is written with a trailing /. Empty names none, and the lesson line says nothing was written."
+      default: "**/CLAUDE.md **/AGENTS.md docs/"
     areas:
       type: string
       description: The areas a card's title and its area= label name, in the words RULES.md writes them in.
@@ -74,6 +86,11 @@ spec:
       description: "The Nemia store whose factories, workflows and inbox every agent's fence refuses to edit, written as Claude Code reads a path in a permission rule: ~/ for one under your home, and two slashes for any other absolute path (//srv/nemia), since one slash reads from the settings' folder and the deny would match nothing."
       default: ~/.agent-workflows
   labelValues: "${{ parameters.labelValues }}"
+  radius:
+    agentFacing: "${{ parameters.radiusAgentFacing }}"
+    checkAffecting: "${{ parameters.radiusCheckAffecting }}"
+    lessons: "${{ parameters.radiusLessons }}"
+  firstWorkflow: quick
   triggers:
     front-door:
       selector: "sdlc/stage=sprint,sdlc/state=ready-to-work"

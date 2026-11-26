@@ -84,6 +84,24 @@ describe('closeoutIn: the shape of each field it serves', () => {
   });
 });
 
+describe('closeoutIn: the counts a step declares', () => {
+  const said = { apiVersion: 'nemia/v1', outcome: 'done', summary: 's', artifacts: [], issues: [{ open: true }, { open: false }] };
+  const served = (step: StepSpec) =>
+    closeoutIn(STORE, RUN, 'implement', step, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views, [
+      step,
+    ])!;
+  test('each tally its step declares is valued off the closeout, in the step order', () => {
+    const c = served({ ...STEP, tally: ['issues', 'issues.open'] } as unknown as StepSpec);
+    assert.deepEqual(c.tallies, [
+      { tally: 'issues', value: 2 },
+      { tally: 'issues.open', value: 1 },
+    ]);
+  });
+  test('a step that declares none serves none, whatever its output holds', () => {
+    assert.deepEqual(served(STEP).tallies, []);
+  });
+});
+
 describe("what a step's values and files link: valueOf, folderFiles, artifactOf", () => {
   test('valueOf links an http(s) address', () => {
     assert.equal(valueOf({ name: 'a', value: 'http://x.test/a' }).link, 'http://x.test/a');

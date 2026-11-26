@@ -67,9 +67,6 @@ export {
 } from './config/config.store.ts';
 export { StoreRoot, storeConfigLayer, storeRootLayer } from './config/root.store.ts';
 export {
-  AGENT_FACING,
-  CHECK_AFFECTING,
-  LESSON,
   branchesToRead,
   countsLine,
   inFullLines,

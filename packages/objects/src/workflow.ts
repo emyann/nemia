@@ -399,7 +399,7 @@ export type NeedFix = typeof NeedFix.Type;
 
 /**
  * A machine need a workflow or a place declares: its name, what it is in words, the shell command whose exit 0 says it is in place, the
- * fixes that put it there, `fills`, the name of a place's need whose fixes this one's come before (sdlc fills the git identity), and
+ * fixes that put it there, `fills`, the name of a place's need whose fixes this one's come before (a git identity, say), and
  * `scope` (`NEED_SCOPES`: `machine` where left out, `repository` for a need checked and fixed in each factory's repository).
  */
 export const Need = Schema.Struct({
@@ -409,7 +409,7 @@ export const Need = Schema.Struct({
   fixes: Schema.optionalKey(Schema.Array(NeedFix).annotate({ description: 'The fixes that put the need in place.' })),
   fills: Schema.optionalKey(
     Schema.String.annotate({
-      description: "The name of a place's need whose fixes this one's come before, as sdlc fills the git identity.",
+      description: "The name of a place's need whose fixes this one's come before, a git identity, say.",
     }),
   ),
   scope: Schema.optionalKey(

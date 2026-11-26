@@ -43,7 +43,8 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
 });
 
 /**
- * The revision each object of `kind` stands at, as of one read of its records, and the keyspace head the read was made at.
+ * The revision each object of `kind` stands at, as of one read of its records, the revision a write of its spec waits on (`specOf`,
+ * which leaves out the records its status reads), and the keyspace head the read was made at.
  * @param kind The kind served.
  */
 export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: WatchedKind) {
@@ -52,7 +53,7 @@ export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: Watched
   const head = yield* keyspace.head;
   const held = new Map<string, ReadonlyMap<string, number>>();
   for (const prefix of prefixesOf(kind)) held.set(prefix, yield* keyspace.revisions(prefix));
-  return { of: revisionTable(kind, held), head } as const;
+  return { of: revisionTable(kind, held), specOf: revisionTable(kind, held, true), head } as const;
 });
 
 /** The keyspace's head of the store `StoreRoot` names: the position a list read after it stands at least at. */

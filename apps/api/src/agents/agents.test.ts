@@ -155,7 +155,7 @@ describe('a person reads the agents: both places listed, one read by name, the c
     assert.equal(reviewer.keys.output, 'review.schema.json');
     assert.equal(reviewer.schema?.file, 'review.schema.json');
     assert.match(reviewer.schema?.text ?? '', /"properties"/);
-    assert.match(reviewer.version, /^[0-9a-f]{16}$/);
+    assert.match(reviewer.version, /^[0-9]+$/);
     assert.deepEqual(reviewer.usedBy, [{ from: 'repo', workflow: 'dev', step: 'review' }]);
     assert.equal(reviewer.error, null);
     assert.ok(!all.some((a) => a.name === 'README'), 'the README is no agent');
@@ -729,15 +729,11 @@ describe('a write of an agent the api or the package refuses â€” the repositoryâ
       /takes the resourceVersion the Agent was read at/,
     );
     await refused(
-      send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer', version: '0123456789abcdef' }),
+      send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer', version: '1' }),
       409,
-      /^agents\/reviewer\.md changed since it was read/,
+      /^the Agent reviewer changed since it was read/,
     );
-    await refused(
-      send('PUT', '/api/agents/user/nobody', { ...scribe, name: 'nobody', version: '0123456789abcdef' }),
-      404,
-      /^Nothing is at that name/,
-    );
+    await refused(send('PUT', '/api/agents/user/nobody', { ...scribe, name: 'nobody', version: '1' }), 404, /^Nothing is at that name/);
     const reviewer = (await listed()).find((a) => a.from === 'user' && a.name === 'reviewer')!;
     const inUse = await refused(send('DELETE', '/api/agents/user/reviewer', { version: reviewer.version }), 409, /default/);
     assert.deepEqual(inUse.users, ['default'], 'the default factory resolves reviewer from the library, so its removal names it');

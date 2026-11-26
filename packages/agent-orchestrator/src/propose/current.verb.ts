@@ -35,13 +35,22 @@ import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { indexSweep } from '../definition-index/definition-index.store.ts';
-import { kindRevisions } from '../list-watch/kind-watch.verb.ts';
+import { kindRevisions } from '../list-watch/kind-watch.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
 export type ProposalPlace = { readonly home: string };
 
 /** An object as it is now: the version it is served at, null where nothing is at its name, and its spec where something is. */
-export type Current = { readonly version: string | null; readonly spec?: unknown };
+export type Current = { readonly version: string | null; readonly spec?: unknown; readonly specVersion?: number };
+
+/**
+ * Whether a proposal read the object at a version a write still follows: the version served now, or an older one where only what its
+ * status reads moved since.
+ * @param now The object as it is now.
+ * @param read The `resourceVersion` the proposal read it at, none where it names none.
+ */
+export const readFresh = (now: Current, read: string | undefined) =>
+  now.version === read || (now.specVersion !== undefined && read !== undefined && /^\d+$/.test(read) && Number(read) >= now.specVersion);
 
 /** Nothing at the name. */
 const NONE: Current = { version: null };
@@ -250,9 +259,9 @@ export const currentOf = (place: ProposalPlace, factory: string, kind: Proposabl
         ? Effect.succeed(now)
         : Effect.gen(function* () {
             yield* indexSweep();
-            const { of } = yield* kindRevisions(kind);
-            const version = String(of(kind === 'Factory' ? undefined : factory, name));
-            return { ...now, version } satisfies Current;
+            const { of, specOf } = yield* kindRevisions(kind);
+            const space = kind === 'Factory' ? undefined : factory;
+            return { ...now, version: String(of(space, name)), specVersion: specOf(space, name) } satisfies Current;
           }).pipe(Effect.provideService(StoreRoot, place.home)),
     ),
   );

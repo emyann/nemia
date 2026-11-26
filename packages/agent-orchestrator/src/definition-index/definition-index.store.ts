@@ -17,8 +17,8 @@ import { agentVersion } from '../agents/read.store.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { DEFINITIONS_PREFIX } from '../list-watch/kind-watch.ts';
-import { kindRevisions } from '../list-watch/kind-watch.verb.ts';
+import { DEFINITIONS_PREFIX } from '../list-watch/index.ts';
+import { kindRevisions } from '../list-watch/kind-watch.store.ts';
 import { recordDue } from '../observed/observed.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { BUILTIN_SKILLS, entriesOf, skillVersion } from '../skills/read.store.ts';
@@ -111,10 +111,10 @@ const definitionsIn = (scope: string, folder: string) => {
 /** The record's text: the JSON of its keys in order. */
 const textOf = (found: DefinitionFound) => JSON.stringify({ digest: found.digest, path: found.path });
 
-/** What Nemia ships (its skills, its builtin templates), read once by the process: it changes with a release, which restarts the daemon. */
+/** What Nemia has built in (its skills, its builtin templates), read once by the process: it changes with a release, which restarts it. */
 const BUILTIN = new Map<string, readonly DefinitionFound[]>();
 
-/** The definitions Nemia ships, found once per folder of builtin templates. */
+/** The definitions Nemia has built in, found once per folder of builtin templates. */
 const builtinFound = (templates: string) => {
   const kept = BUILTIN.get(templates);
   if (kept !== undefined) return kept;
@@ -134,7 +134,7 @@ const builtinFound = (templates: string) => {
 
 /**
  * Every definition of the store `home` and where it is held: each factory's tree and the repositories it works on, the person's library,
- * and what Nemia ships (its skills and its builtin templates).
+ * and what Nemia has built in (its skills and its builtin templates).
  * @param home The store's root.
  * @param factories Each factory with the folder of its tree, and the repositories it works on.
  * @param templates The folder of builtin templates.

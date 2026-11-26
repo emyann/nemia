@@ -95,3 +95,12 @@ test('a library agent is at its record in every namespace; a factory-tree one in
 test('every watched kind is made of some record', () => {
   for (const kind of WATCHED_KIND_NAMES) assert.ok(WATCHED_KINDS[kind].length > 0, kind);
 });
+
+test('a factory is at its status records too, but the revision a write of its spec waits on leaves them out', () => {
+  const held = new Map([
+    ['/registry/factories/', new Map([['/registry/factories/acme', 4]])],
+    ['/registry/applied/', new Map([['/registry/applied/acme', 9]])],
+  ]);
+  assert.equal(revisionTable('Factory', held)(undefined, 'acme'), 9);
+  assert.equal(revisionTable('Factory', held, true)(undefined, 'acme'), 4);
+});

@@ -3,9 +3,9 @@
  * edit is one write, a removed file a tombstone; and a write of a definition names the revision it was read at (`definitionRevisionNow`).
  */
 import { test } from 'vitest';
+import { scratch } from 'test-kit/scratch';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
@@ -14,7 +14,7 @@ import { definitionKey, definitionRevisionNow, indexSweep } from './definition-i
 
 /** A store of its own, the library's agents folder in it with the agent `coder`, and what it holds in the index. */
 const stored = () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-index-'));
+  const home = scratch('nemia-index-');
   const agents = path.join(home, 'workflows', 'agents');
   fs.mkdirSync(agents, { recursive: true });
   const file = path.join(agents, 'coder.md');

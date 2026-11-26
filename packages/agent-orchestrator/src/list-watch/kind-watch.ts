@@ -25,8 +25,16 @@ export const objectChange: ObjectChangeOf = (after, own) => {
  */
 type Target = { readonly namespace: string | null; readonly name: string | null };
 
-/** A prefix of the keyspace a kind's objects read, whether its records are the objects' own, and the object a key under it names. */
-type Source = { readonly prefix: string; readonly own: boolean; readonly target: (rest: string) => Target | null };
+/**
+ * A prefix of the keyspace a kind's objects read, whether its records are the objects' own, whether they are what the object's status
+ * reads (`status`, which a write of the spec does not wait on), and the object a key under it names.
+ */
+type Source = {
+  readonly prefix: string;
+  readonly own: boolean;
+  readonly status?: true;
+  readonly target: (rest: string) => Target | null;
+};
 
 /** The kinds a list serves that are watched from a revision. */
 export const WATCHED_KIND_NAMES = [
@@ -93,9 +101,9 @@ export const WATCHED_KINDS = {
   ],
   Factory: [
     { prefix: '/registry/factories/', own: true, target: ofFactoryNamed },
-    { prefix: '/registry/levels/', own: false, target: ofFactoryNamed },
-    { prefix: '/registry/applied/', own: false, target: ofFactoryNamed },
-    { prefix: '/registry/servers/', own: false, target: ofFactoryNamed },
+    { prefix: '/registry/levels/', own: false, status: true, target: ofFactoryNamed },
+    { prefix: '/registry/applied/', own: false, status: true, target: ofFactoryNamed },
+    { prefix: '/registry/servers/', own: false, status: true, target: ofFactoryNamed },
   ],
   Hire: [
     { prefix: '/registry/factories/', own: false, target: ofFactory },
@@ -103,16 +111,16 @@ export const WATCHED_KINDS = {
   ],
   Schedule: [
     { prefix: '/registry/factories/', own: false, target: ofFactory },
-    { prefix: '/registry/applied/', own: false, target: ofFactory },
+    { prefix: '/registry/applied/', own: false, status: true, target: ofFactory },
   ],
   Trigger: [
     { prefix: '/registry/factories/', own: false, target: ofFactory },
-    { prefix: '/registry/applied/', own: false, target: ofFactory },
+    { prefix: '/registry/applied/', own: false, status: true, target: ofFactory },
   ],
   Volume: [{ prefix: '/registry/factories/', own: false, target: ofFactory }],
   McpServer: [
     { prefix: '/registry/factories/', own: false, target: ofFactory },
-    { prefix: '/registry/servers/', own: false, target: ofFactory },
+    { prefix: '/registry/servers/', own: false, status: true, target: ofFactory },
   ],
   LibraryAdd: [{ prefix: '/registry/factories/', own: false, target: ofFactory }],
   Agent: [{ prefix: DEFINITIONS_PREFIX, own: true, target: definitionOf('agent') }],
@@ -176,13 +184,15 @@ export const changesOf = (kind: WatchedKind, after: number, rows: readonly (RowS
  * The revision each object of `kind` is at: the highest among the live records that name it.
  * @param kind The kind served.
  * @param held Each prefix of the kind with the live records under it and their revisions.
+ * @param specOnly Whether the records its status reads are left out: the revision a write of its spec waits on.
  */
-export const revisionTable = (kind: WatchedKind, held: ReadonlyMap<string, ReadonlyMap<string, number>>) => {
+export const revisionTable = (kind: WatchedKind, held: ReadonlyMap<string, ReadonlyMap<string, number>>, specOnly = false) => {
   const exact = new Map<string, number>();
   const named = new Map<string, number>();
   const inSpace = new Map<string, number>();
   let all = 0;
-  for (const source of WATCHED_KINDS[kind] as readonly Source[]) {
+  const sources = (WATCHED_KINDS[kind] as readonly Source[]).filter((source) => !(specOnly && source.status === true));
+  for (const source of sources) {
     for (const [key, revision] of held.get(source.prefix) ?? []) {
       const target = source.target(key.slice(source.prefix.length));
       if (target === null) continue;

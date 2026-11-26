@@ -21,11 +21,15 @@ const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire']);
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
 
-const stampedOf = (body: unknown) => {
+const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   if (typeof body !== 'object' || body === null || !('kind' in body) || typeof body.kind !== 'string') return undefined;
+  if (body.kind === 'Table') {
+    const kind = asked.map(watchedListOf).find((k) => k !== undefined);
+    return kind === undefined ? undefined : { kind, list: true, table: true };
+  }
   const list = watchedListOf(body.kind);
-  if (list !== undefined) return { kind: list, list: true };
-  return isWatchedKind(body.kind) ? { kind: body.kind, list: false } : undefined;
+  if (list !== undefined) return { kind: list, list: true, table: false };
+  return isWatchedKind(body.kind) ? { kind: body.kind, list: false, table: false } : undefined;
 };
 
 /** `object` with the revision it stands at as its `metadata.resourceVersion`, where it is an object with metadata. */
@@ -53,6 +57,13 @@ const servedAt = (
   revision: (namespace: string | undefined, name: string) => number,
   head: number | undefined,
 ) => {
+  if (list && typeof body === 'object' && body !== null && 'rows' in body && Array.isArray(body.rows)) {
+    const metadata = 'metadata' in body && typeof body.metadata === 'object' ? body.metadata : {};
+    const rows = body.rows.map((row: unknown) =>
+      typeof row === 'object' && row !== null && 'object' in row ? { ...row, object: withRevision(row.object, revision) } : row,
+    );
+    return { ...body, rows, metadata: { ...metadata, ...(head === undefined ? {} : { resourceVersion: String(head) }) } };
+  }
   if (!list || typeof body !== 'object' || body === null || !('items' in body) || !Array.isArray(body.items))
     return withRevision(body, revision);
   const metadata = 'metadata' in body && typeof body.metadata === 'object' ? body.metadata : {};
@@ -85,7 +96,7 @@ export const revisioned =
     if (indexed && !reads) await c.var.runtime.runPromise(definitionsRefreshed(true));
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
     const body: unknown = await response.clone().json();
-    const stamped = stampedOf(body);
+    const stamped = stampedOf(body, kinds);
     if (stamped === undefined) return response;
     const served = servedAt(body, stamped.list, await revisionsOf(c, path, stamped.kind), head);
     const headers = new Headers(response.headers);

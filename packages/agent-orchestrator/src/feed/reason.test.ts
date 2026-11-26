@@ -143,9 +143,6 @@ const ACT_WORDS: readonly Case[] = [
   { kind: 'Run', word: 'cancel asked', note: 'at 2026-10-16T04:00:00.000Z', reason: 'CancelAsked' },
   { kind: 'Run', word: 'hold put', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldPut' },
   { kind: 'Run', word: 'hold lifted', note: 'since 2026-10-16T04:00:00.000Z', reason: 'HoldLifted' },
-  { kind: 'Run', word: 'assigned', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneePut' },
-  { kind: 'Run', word: 'given back', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeGivenBack' },
-  { kind: 'Run', word: 'assignee ran out', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeLapsed' },
   { kind: 'Step', word: 'nothing started', note: 'try 1', reason: 'SpawnFailed' },
   { kind: 'Step', word: 'session lost', note: 'try 3', reason: 'SessionLost' },
 ];
@@ -160,6 +157,13 @@ const ONE_SHOTS: readonly Case[] = [
   { kind: 'Step', word: `${DENIED}Bash(grep)`, note: 'try 2', reason: 'ToolDenied' },
   { kind: 'Step', word: `${DENIED}Skill(look)`, note: 'try 1', reason: 'ToolDenied' },
   { kind: 'Daemon', word: 'daemon started', note: 'first daemon on this store', reason: 'DaemonStarted' },
+];
+
+/** A run's assignee as the feed words it: put and given back by a person, and the lapse by the tick, which judges it. */
+const ASSIGNEE_LINES: readonly Case[] = [
+  { kind: 'Run', word: 'assigned', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneePut' },
+  { kind: 'Run', word: 'given back', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeGivenBack' },
+  { kind: 'Run', word: 'assignee ran out', note: 'since 2026-10-16T04:00:00.000Z', reason: 'AssigneeLapsed' },
 ];
 
 /**
@@ -216,6 +220,7 @@ const CASES: readonly Case[] = [
   ...FORMER_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
+  ...ASSIGNEE_LINES,
   ...STORE_LINES,
   ...FACTORY_LINES,
 ];
@@ -398,6 +403,15 @@ describe('typeOf, messageOf and sourceOf: how serious a line is, what a person r
       ACT_WORDS.map((c) => sourceOf(c.reason)),
       ['person', 'person', 'person', 'person', 'runtime', 'runtime'],
       "the owner's four verbs are a person's deed and the two faults the runtime's",
+    );
+    assert.deepEqual(
+      ASSIGNEE_LINES.map((c) => [c.reason, sourceOf(c.reason), isOnce(c.reason), typeOf(c.reason), waitsOf(c.reason)]),
+      [
+        ['AssigneePut', 'person', true, 'Normal', false],
+        ['AssigneeGivenBack', 'person', true, 'Normal', false],
+        ['AssigneeLapsed', 'tick', true, 'Normal', false],
+      ],
+      "an assignee is put and given back by a person; its lapse is the tick's own deed, since the pass judges it",
     );
     assert.equal(sourceOf('ToolDenied'), 'runtime', 'a call the harness denied is the runtime telling us');
     assert.equal(sourceOf('DaemonStarted'), 'daemon');

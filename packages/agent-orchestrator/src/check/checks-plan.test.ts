@@ -47,26 +47,6 @@ describe("a step's checks resolve into the plan the pass files by", () => {
     );
   });
 
-  test('usesCheckout: false, as a boolean or as text, is carried on the plan; true or absent leaves the check using the checkout', () => {
-    assert.deepEqual(
-      planOf(
-        'checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    usesCheckout: false\n  - name: c\n    run: three\n    usesCheckout: "false"\n  - name: d\n    run: four\n    usesCheckout: true',
-      ),
-      [
-        { name: 'a', run: 'one', after: [] },
-        { name: 'b', run: 'two', after: ['a'], usesCheckout: false },
-        { name: 'c', run: 'three', after: ['b'], usesCheckout: false },
-        { name: 'd', run: 'four', after: ['c'] },
-      ],
-    );
-  });
-
-  test('a check that uses no checkout renders back with its usesCheckout: false, and the render reads as the same plan', () => {
-    const read = parseWorkflow('implement', step('checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    usesCheckout: false'));
-    assert.deepEqual(parseWorkflow('implement', renderStep(read)).checks, read.checks);
-    assert.equal(read.checks?.[1]?.usesCheckout, false);
-  });
-
   test('check: <line> is one check named check, waiting on nothing', () => {
     const read = parseWorkflow('implement', step('check: npm test'));
     assert.deepEqual(stepChecks(read), [{ name: 'check', run: 'npm test', after: [] }]);
@@ -99,11 +79,10 @@ describe('each shape of checks: the loader cannot take is refused at load', () =
     ['a name outside the word', 'checks:\n  - name: A b\n    run: one'],
     ['no run:', 'checks:\n  - name: a'],
     ['an enabled: that is no boolean', 'checks:\n  - name: a\n    run: one\n    enabled: maybe'],
-    ['a usesCheckout: that is no boolean', 'checks:\n  - name: a\n    run: one\n    usesCheckout: maybe'],
+    ['a usesCheckout: key, which no check takes', 'checks:\n  - name: a\n    run: one\n    usesCheckout: false'],
     ['every check turned off', 'checks:\n  - name: a\n    run: one\n    enabled: false'],
     ['a check with both run: and condition:', 'checks:\n  - name: a\n    run: one\n    condition: ready'],
     ['a condition: that is no name', 'checks:\n  - name: a\n    condition: Not A Name'],
-    ['a usesCheckout: on a condition', 'checks:\n  - name: a\n    condition: ready\n    usesCheckout: false'],
     ['an item that is no map', 'checks:\n  - npm test'],
   ];
   for (const [what, lines] of refusals) {

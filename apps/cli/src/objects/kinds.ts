@@ -88,8 +88,8 @@ type Writes = {
  */
 export type KindCalls = {
   readonly list: {
-    readonly in?: (namespace: string, labelSelector: readonly string[]) => Call<Page | Table>;
-    readonly all?: (labelSelector: readonly string[]) => Call<Page | Table>;
+    readonly in?: (namespace: string, labelSelector: readonly string[], fieldSelector?: string) => Call<Page | Table>;
+    readonly all?: (labelSelector: readonly string[], fieldSelector?: string) => Call<Page | Table>;
   };
   readonly get: {
     readonly in?: (namespace: string, name: string) => Call<Served>;
@@ -100,6 +100,12 @@ export type KindCalls = {
 
 /** A list's query: the page asked, and the selectors, sent as `labelSelector` where any was given. */
 const query = (labelSelector: readonly string[], page: PageAsked) => (labelSelector.length ? { ...page, labelSelector } : page);
+
+/** The Run list's query: a list's, and `fieldSelector` where one was given. */
+const runQuery = (labelSelector: readonly string[], fieldSelector: string | undefined, page: PageAsked) => ({
+  ...query(labelSelector, page),
+  ...(fieldSelector === undefined ? {} : { fieldSelector }),
+});
 
 /** `spec` read by `decode`, or why it is not one: the decoder's own words. */
 function decoded<S>(decode: (spec: unknown) => S, spec: unknown) {
@@ -145,8 +151,8 @@ const params = ({ namespace, name }: Applied) => ({ params: { namespace, name } 
 export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
   Run: {
     list: {
-      in: (namespace, s) => (c) => everyPage((page) => c.runs.list({ params: { namespace }, query: query(s, page) })),
-      all: (s) => (c) => everyPage((page) => c.runs.listAll({ query: query(s, page) })),
+      in: (namespace, s, f) => (c) => everyPage((page) => c.runs.list({ params: { namespace }, query: runQuery(s, f, page) })),
+      all: (s, f) => (c) => everyPage((page) => c.runs.listAll({ query: runQuery(s, f, page) })),
     },
     get: {
       in: (namespace, name) => (c) => c.runs.get({ params: { namespace, name } }),

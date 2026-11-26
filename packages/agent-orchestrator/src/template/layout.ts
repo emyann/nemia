@@ -279,8 +279,8 @@ const STEP: Shape = {
     check: 'words',
     checks: {
       list: {
-        fields: { name: 'string', run: 'words', after: 'strings', enabled: 'boolean', usesCheckout: 'boolean' },
-        required: ['name', 'run'],
+        fields: { name: 'string', run: 'words', condition: 'string', after: 'strings', enabled: 'boolean' },
+        required: ['name'],
       },
     },
     run: 'words',

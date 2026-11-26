@@ -110,7 +110,7 @@ const LABELS: Record<string, string> = {
  */
 const ORDER = Object.keys(LABELS);
 
-const SEE = 'get_usage is experimental: see README.md, The quota on the board';
+const SEE = 'get_usage is experimental: see apps/api/README.md, The quota on the board';
 
 /**
  * `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days.
@@ -215,7 +215,7 @@ function readOf(asked: Asked, now: number) {
       return {
         ...none,
         state: 'failed',
-        said: `The api's engine would not ask Claude Code for the quota (${asked.said}): this is the engine refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine the api runs has no claude harness that answers a quota: see README.md, The quota on the board.`,
+        said: `The api's engine would not ask Claude Code for the quota (${asked.said}): this is the engine refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine the api runs has no claude harness that answers a quota: see apps/api/README.md, The quota on the board.`,
       } satisfies Read as Read;
     case 'no-plan':
       return {

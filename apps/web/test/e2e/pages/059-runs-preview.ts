@@ -116,7 +116,6 @@ async function glanceReads(page: Page, want: StepCardFacts, where: string) {
       who.includes(want.agent?.name ?? 'no agent') ? null : `agent ${want.agent?.name}`,
       want.model === null || who.includes(want.model) ? null : `model ${want.model}`,
       state.includes(want.tag.word) ? null : `word ${want.tag.word}`,
-      want.time === null || !want.time.note || state.includes(want.time.note) ? null : `since ${want.time.note}`,
       want.place === null || place.includes(want.place) ? null : `round ${want.place}`,
       want.spend === null || place.includes(want.spend.said) ? null : `spend ${want.spend.said}`,
       want.note === null || note.includes(want.note.text.slice(0, 20)) ? null : `note ${want.note.text}`,

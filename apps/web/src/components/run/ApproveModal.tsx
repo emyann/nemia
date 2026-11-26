@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { XIcon } from 'lucide-react';
-import { IconButton, ModalDialog } from '@/components/ui/ds';
+import { IconButton, ModalDialog, Title } from '@/components/ui/ds';
 import { CutPress } from '@/components/look';
 import { agentsQuery } from '@/lib/api/agents';
 import { useRunRead } from '@/lib/runView';
@@ -46,7 +46,9 @@ export function ApproveAction({ run, step }: { run: { id: string }; step: string
           <GateAnswered.Provider value={close}>
             <div data-approve-modal className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-4 px-1">
-                <h2 className="m-0 text-title-medium text-on-surface">{said}</h2>
+                <Title size="medium" component="h2" className="m-0">
+                  {said}
+                </Title>
                 <IconButton variant="standard" size="xsmall" icon={XIcon} aria-label="Close" onPress={close} className="shrink-0" />
               </div>
               <Opened run={run.id} step={step} />

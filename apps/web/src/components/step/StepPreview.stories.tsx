@@ -27,8 +27,8 @@ export const Focused: StoryObj = {
     bar.focus();
     const glance = await waitFor(() => {
       const found = document.querySelector<HTMLElement>('[data-step-glance]');
-      expect(found).not.toBeNull();
-      return found!;
+      if (!found) throw new Error('the glance is not open yet');
+      return found;
     });
     await expect(glance.scrollHeight).toBe(glance.clientHeight);
   },

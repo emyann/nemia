@@ -24,7 +24,7 @@ const SURFACE: CSSProperties = {
   padding: '12px 16px 8px',
   borderRadius: 12,
   background: 'var(--md-sys-color-surface-container)',
-  boxShadow: '0 1px 6px rgb(0 0 0 / 0.3)',
+  border: '1px solid var(--md-sys-color-outline-variant)',
 };
 
 /** The glance of the step `design` of `run`, on the tooltip's surface, with the run's own answer read. */
@@ -67,7 +67,7 @@ export const ToCome: StoryObj = {
   play: ({ canvasElement }) => small(canvasElement, 'come'),
 };
 
-/** A step whose check refused it. */
+/** A step that failed. */
 export const Failed: StoryObj = {
   render: () => glance(RUNS.failed),
   play: ({ canvasElement }) => small(canvasElement, 'failed'),

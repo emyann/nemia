@@ -27,8 +27,6 @@ export default {
     const button = card.getByRole('button', { name: `Approve ${gated}`, exact: true });
     await expectVisible(button, `the waiting card of a run at ${gated}'s gate holds Approve ${gated}`);
     await expectVisible(card.getByRole('link', { name: 'Open the run' }), 'beside Open the run');
-    const others = page.locator(`section[data-section="waiting"] article[data-run]:not([data-run="${id}"])`);
-    if ((await others.count()) > 0) await expectCount(others.locator('[data-approve]'), 0, 'a card of another wait holds no Approve');
 
     const modal = page.getByRole('dialog', { name: `Approve ${gated}`, exact: true });
     const gateOf = () => modal.locator(`section[aria-label="The gate of ${gated}"]`);

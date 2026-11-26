@@ -63,7 +63,9 @@ export function StepGlance({ head }: { head: Head }) {
           )}
         </Row>
       ) : (
-        <ReadingLines widths={['w-3/4']} className="gap-1 text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadingLines widths={['w-3/4']} className="gap-1" />
+        </Body>
       )}
       {head.note !== 'none' && (
         <Body size="small" component="div" data-glance="note" colorRole="on-surface-variant" className="line-clamp-2 break-words">

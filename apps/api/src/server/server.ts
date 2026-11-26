@@ -28,6 +28,7 @@
  *   a daemon.json that is there and cannot be read (`Failed`).
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the default harness, asked at most once a keep
  *   however many boards read (`QuotaAsker`). Every case is a 200 with a sentence.
+ * - `GET /api/models` — the models each harness lists, as the daemon last recorded them (`modelsOf`).
  * - `GET /api/stats` — the flow numbers of every run in the store, as `nemia stats --json` prints them (`statsOf`, stats/stats.ts).
  * - `GET /api/pause` — the store's pause, what still finishes under it, each session it parked and each check it holds (`PAUSED`).
  * - `GET /api/pause/now` — what a pause at once would stop, `{ interrupts, cost }` (`PAUSE_NOW`), read off one view of the engine.
@@ -79,7 +80,7 @@ import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 import { Api, type Health } from 'objects';
 import { capabilitiesWithSteps, pageRead, unreadAnswer } from '../capabilities/index.ts';
 import { repoNeeded } from '../factory/place.ts';
-import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
+import { ceilingsOf, feedOpened, metricsOf, modelsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
 import { statsOf } from '../stats/stats.ts';
 import { engineRead } from '../store.ts';
@@ -160,6 +161,7 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('quota', () =>
       answered(({ e, env, quota }) => quota({ env, harness: DEFAULT_HARNESS, ask: () => engineRead('quota', e.quota(DEFAULT_HARNESS)) })),
     )
+    .handle('models', () => answered(async ({ home }) => modelsOf(home)))
     .handle('stats', ({ query: { labelSelector, ...query }, request }) =>
       answered((s) => statsOf({ ...query, selector: [...[labelSelector ?? []].flat(), ...selectorsOf(request)] }, s)),
     )

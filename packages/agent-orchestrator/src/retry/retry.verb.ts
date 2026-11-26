@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { configRefusal, tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { listedModels } from '../harness/models.store.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
@@ -85,6 +86,7 @@ export const retryRun = Effect.fn('retry')(function* (
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
   const place = yield* PlaceService;
+  const lists = listedModels(yield* StoreRoot);
   let heads: { read: Readonly<Record<string, string>> | undefined } | undefined;
   const tipOf = (branch: string) => (heads ??= { read: headsNow(run, place) }).read?.[branch];
   const refusal = (asks: readonly RetryAsk[]) =>
@@ -102,6 +104,7 @@ export const retryRun = Effect.fn('retry')(function* (
       spendOf,
       checkKills(views, run, steps),
       tipOf,
+      lists,
     );
 
   const refused = refusal((yield* (yield* RunDoor).asks.read(RunId.read(id))).asks);

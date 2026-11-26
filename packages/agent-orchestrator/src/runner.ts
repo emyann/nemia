@@ -279,6 +279,7 @@ export { inboxDir } from './record/files.store.ts';
 export { keptRuns, RunDoor, runFound } from './runs/runs.store.ts';
 export { RECORD_CEILING } from './keyspace/keyspace.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
+export { recordedModels, type ModelRecord, type RecordedModels } from './harness/models.store.ts';
 export { alive } from './process/alive.store.ts';
 export {
   beat,

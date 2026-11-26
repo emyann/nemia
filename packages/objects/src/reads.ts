@@ -161,6 +161,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'server.metrics': ONE,
   'server.daemon': ONE,
   'server.quota': ONE,
+  'server.models': ONE,
   'server.stats': { shape: 'part', narrow: ['from', 'to'] },
   'server.paused': ONE,
   'server.pauseNow': ONE,

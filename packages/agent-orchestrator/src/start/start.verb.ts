@@ -80,6 +80,7 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { inheritedLabels, parseLabelEdits, type Inherited, type LabelChange, type Labels, type LeftOut } from '../labels/labels.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { listedModels } from '../harness/models.store.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -166,7 +167,7 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
 ) {
   const home = yield* StoreRoot;
   const read = yield* stepsIn(workflowDir, places, factory);
-  const unmodelled = modelsRefusal(read, models, modelSaid);
+  const unmodelled = modelsRefusal(read, models, modelSaid, listedModels(home));
   if (unmodelled) return yield* Effect.fail(new Invalid({ message: unmodelled }));
   const steps = withModels(read, models);
   const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);

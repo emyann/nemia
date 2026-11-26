@@ -39,8 +39,7 @@ import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } 
 import { carries, heard, pauseAskVoid, retriesDue, retryable, type CheckKillOf } from './retry.ts';
 import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';
-import { autoDropped } from '../workflow/index.ts';
-import { modeOf } from '../former/former.ts';
+import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/model-words.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { checksPhase } from '../check/index.ts';
@@ -61,6 +60,7 @@ type Asked = {
   spendOf: SpendOf;
   checkKillOf: CheckKillOf;
   tipOf: TipOf;
+  lists: ModelLists | undefined;
 };
 
 /**
@@ -80,8 +80,7 @@ type Judged = Asked &
 /**
  * Why `nemia retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
- * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
- * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
+ * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` its harness does not list by that id, or on which a step in `auto` would run in `default` (`stepModelJudged`, as the load refuses it on the step's own `model:`); a cancelled run, which files
  * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `nemia pause --now` wrote that is void
  * (`pauseAskVoid`) too, said as set aside by the next pass, which alone moves it; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted;
@@ -137,6 +136,7 @@ export function retryRefusal(
   spendOf: SpendOf = () => undefined,
   checkKillOf: CheckKillOf = () => undefined,
   tipOf: TipOf = () => undefined,
+  lists?: ModelLists,
 ) {
   const asked: Asked = {
     steps,
@@ -153,6 +153,7 @@ export function retryRefusal(
     spendOf,
     checkKillOf,
     tipOf,
+    lists,
   };
   const step = askedStep(asked);
   if (typeof step === 'string') return step;
@@ -171,7 +172,7 @@ export function retryRefusal(
 
 /**
  * The step asked for — or why the ask is refused before its standing is read: words or a budget that cannot ride on it, a step the run
- * does not have, a flag a remote step cannot take, a model an `auto` step would drop, and a run cancelled, pruned or held.
+ * does not have, a flag a remote step cannot take, a model its harness does not list or that drops the step's mode, and a run cancelled, pruned or held.
  */
 function askedStep(asked: Asked) {
   const { steps, run, name, how, command } = asked;
@@ -183,13 +184,9 @@ function askedStep(asked: Asked) {
     (how.model === undefined ? undefined : remoteRetryRefusal(step, 'model', how.model, command)) ??
     (how.budget === undefined ? undefined : remoteRetryRefusal(step, 'budget', how.budget, command));
   if (remote) return remote;
-  const dropped = how.model === undefined ? undefined : autoDropped(step.harness, how.model, modeOf(step));
-  if (dropped) {
-    return (
-      `\`--model ${how.model}\`: ${name} ${dropped}. The step's mode is frozen with the run, so ask for a model that keeps \`auto\` — ${command} --model sonnet, or opus, or fable — ` +
-      `or, to run it on ${how.model}, start a run of a folder whose step names a mode the model keeps: \`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules.`
-    );
-  }
+  const words =
+    how.model === undefined ? undefined : modelWords(how.model, stepModelJudged(how.model, step, asked.lists), listedFor(step.harness, asked.lists));
+  if (words) return `\`--model ${how.model}\`: ${name}: ${words} The step's mode is frozen with the run.`;
   if (run.cancelledAt) {
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with nemia start.`;
   }

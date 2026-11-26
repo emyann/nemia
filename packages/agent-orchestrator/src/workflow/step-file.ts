@@ -17,7 +17,6 @@ import {
   type StepSpec,
   WorkflowError,
 } from '../step/step.ts';
-import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
 import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten } from '../check/index.ts';
@@ -375,8 +374,6 @@ export function stepFrom(
       `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`,
     );
   }
-  autoRefusal(name, harness, meta.model, meta.permissionMode);
-
   return {
     name,
     after,
@@ -421,40 +418,6 @@ export function stepFrom(
     rounds: roundsOf(name, meta.loop, meta.rounds),
     ...routingOf(name, meta),
   } satisfies StepSpec;
-}
-
-/**
- * Refused: a Claude Code step that runs in `auto` — named, or the mode it is filed with when it names none — on a model that drops it
- * (`autoDropped`). The refusal names the modes that keep what the step is for.
- */
-function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined) {
-  const dropped = autoDropped(harness, model, permissionMode);
-  if (!dropped) return;
-  refuse(
-    `${step}: \`model: ${model}\` ${dropped}. Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`,
-  );
-}
-
-/**
- * Why a Claude Code session filed in the mode a step names, or in none, would not run in it on `model`, as
- * the words after what names the model: `names no \`permissionMode:\`, …, and Claude Code drops \`auto\` …`. `undefined` when it would:
- * on a harness whose fence reach drops no word on that model (`fenceReach`): codex, which has sandboxes and not modes, a model that keeps
- * `auto`, or any mode but `auto`. Such a session says
- * `default` from its first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording
- * for the load's refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
- * @param harness The step's harness; undefined for the default one.
- * @param model The model the session runs on; undefined for the harness's default.
- * @param permissionMode The mode the step names; undefined for none.
- */
-export function autoDropped(harness: string | undefined, model: string | undefined, permissionMode: string | undefined) {
-  const reach = fenceReach(harness ?? DEFAULT_HARNESS, model);
-  const mode = permissionMode ?? reach?.given;
-  if (!reach || mode === undefined || !reach.dropped.includes(mode)) return undefined;
-  const asked =
-    permissionMode === undefined
-      ? `names no \`permissionMode:\`, so it is filed in \`${mode}\`, the runtime's default`
-      : `says \`permissionMode: ${mode}\``;
-  return `${asked}, and Claude Code drops \`${mode}\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about`;
 }
 
 /**

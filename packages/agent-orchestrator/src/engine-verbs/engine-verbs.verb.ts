@@ -43,6 +43,7 @@ const ENGINE_VERBS = {
   interrupt: { changes: 'all' },
   answerAsk: { changes: 'all' },
   quota: { changes: 'all' },
+  models: { changes: 'none' },
   mcpState: { phase: 'runtime', changes: 'none' },
   mcpSignIn: { phase: 'runtime', changes: 'none' },
   mcpSignInState: { phase: 'runtime', changes: 'none' },

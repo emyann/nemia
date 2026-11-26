@@ -2,7 +2,7 @@
  * The face of `workflow/`: one step file read and written, the steps of a folder checked together, and a step's tools judged against
  * what its session will be allowed, each re-exported by name.
  */
-export { autoDropped, parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
+export { parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
 export {
   agentDeniesOf,
   directoryFence,

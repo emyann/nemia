@@ -175,6 +175,8 @@ export type StepAttempts = {
     release: SessionRelease | null;
     /** Its harness, by the name its task was filed with, and the version the harness said it runs; null where it said none. */
     harness: SessionHarness | null;
+    /** The model its session ran on, as the harness reported it (`Attempt.ranOn`); null where it said none. */
+    model: string | null;
   } | null;
 };
 
@@ -393,6 +395,7 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
             ...endWords(state, latest),
             endedAt: latest.endedAt ?? null,
             ...sessionRanOn(latest, state.harness ?? DEFAULT_HARNESS, releases),
+            model: latest.ranOn ?? null,
           }
         : null,
   } satisfies StepAttempts;

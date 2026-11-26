@@ -14,6 +14,7 @@ import { Actor } from './token.ts';
 import { describedNumber, describedOne } from './meta.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
+import { HarnessModels } from './models.ts';
 import { Ceilings, Daemon, Metrics, PassesRead, Quota, SeriesRead } from './server-machine.ts';
 import { FEED_LINE_EVENTS, type FeedStreamEventName, FINISHING_KINDS, INTERRUPT_KINDS, STATS_BY } from './words.ts';
 import { SubscriptionScope } from './subscription.ts';
@@ -572,6 +573,10 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('quota', '/api/quota', { success: Quota, error: readErrors }).annotate(
     OpenApi.Description,
     "Reads the subscription's quota as the board is given it: its windows when fresh, or why there are none. Answers Quota.",
+  ),
+  HttpApiEndpoint.get('models', '/api/models', { success: HarnessModels, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the models each harness lists for a session, by canonical id, as the daemon last recorded them: an agent, a step, a card and a retry name a model by one of these ids. Answers HarnessModels.",
   ),
   HttpApiEndpoint.get('stats', '/api/stats', { query: StatsQuery, success: Stats, error: readErrors }).annotate(
     OpenApi.Description,

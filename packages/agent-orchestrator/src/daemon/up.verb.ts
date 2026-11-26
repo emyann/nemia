@@ -13,7 +13,9 @@ import type { PlaceDeclared } from '../place/place.ts';
 import { NeedsMemory, needsMemo } from '../needs/needs.verb.ts';
 import type { Readiness } from 'objects';
 import { needs, readied } from '../needs/sweep.verb.ts';
-import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
+import type { ListedModel } from 'agent-runtime/vocabulary';
+import { recordModels } from '../harness/models.store.ts';
+import { modelsHarnesses, over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../factory/schedule/schedule.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/index.ts';
@@ -59,7 +61,7 @@ export type QuotaAsk = (harness: string) => Effect.Effect<HarnessQuota, unknown>
  * (`repo`); the kind of daemon it is (`holder`); the calling process's own series a collector reads by their increase, born at zero
  * with the daemon's (`series`, `DAEMON_SERIES`); what to do once the lease is taken and before the first pass, in the lease's scope
  * (`onTaken` — where the api serves, and `nemia up` says what it holds); how a harness's quota is asked (`quota`, `QuotaAsk`), the
- * engine's own unless given; and how this host is asked whether it holds a memory limit (`scope`, the runtime's `scopeRefusal` unless
+ * engine's own unless given; how a harness's models are asked (`models`, `ModelsAsk`), the engine's own unless given; and how this host is asked whether it holds a memory limit (`scope`, the runtime's `scopeRefusal` unless
  * given).
  */
 export type UpOptions = {
@@ -69,6 +71,7 @@ export type UpOptions = {
   series?: ReadonlyArray<Metric.Metric<never, unknown>>;
   onTaken?: (taken: TakenStore) => Effect.Effect<void, unknown, Scope.Scope>;
   quota?: QuotaAsk;
+  models?: ModelsAsk;
   scope?: (parent?: string) => string | undefined;
 };
 
@@ -80,6 +83,41 @@ export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_REA
 
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
 const QUOTA_EVERY_MS = 600_000;
+
+/** How often the daemon asks each harness which models it lists, and records the answer. */
+const MODELS_EVERY_MS = 3_600_000;
+
+/** How a harness's models are asked: the engine's `models`, an effect that fails where the harness could not be asked. */
+export type ModelsAsk = (harness: string) => Effect.Effect<readonly ListedModel[] | undefined, unknown>;
+
+/**
+ * Each harness's models (`modelsHarnesses`) asked through `ask` — the engine's `models` of `e` unless given — and recorded in the store at
+ * `home` (`recordModels`) at `at`: a harness that answers a list replaces its own record whole; one that fails, dies or lists none leaves
+ * the record as it was, so a failed ask never forgets what the harness last said.
+ * @param e The engine to ask.
+ * @param home The store's home folder, whose `models.json` the daemon alone writes.
+ * @param at When the asks are made, as an ISO time.
+ * @param names The harnesses to ask.
+ * @param ask How a harness is asked.
+ */
+export const askedModels = Effect.fn('askedModels')(function* (
+  e: Engine,
+  home: string,
+  at: string,
+  names: readonly string[] = modelsHarnesses(),
+  ask: ModelsAsk = (name) => e.models(name),
+) {
+  for (const name of names) {
+    const listed = yield* Effect.suspend(() => ask(name)).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+      Effect.catchDefect(() => Effect.succeed(undefined)),
+    );
+    if (listed === undefined) continue;
+    yield* Effect.try({ try: () => recordModels(home, name, listed, at), catch: (err) => err }).pipe(
+      Effect.catch(() => Effect.void),
+    );
+  }
+});
 
 /**
  * The quota's gauges, set at each good reading by harness and window (`five_hour`, `seven_day`, …, as the harness names them): the
@@ -349,7 +387,7 @@ const volumesMoved = Effect.gen(function* () {
 });
 
 /** The daemon `up` runs with its event loop watched: its doc says what it does. */
-const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions) =>
+const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, models, scope }: UpOptions) =>
   Effect.gen(function* () {
     const config = yield* StoreConfig;
     const home = yield* StoreRoot;
@@ -381,6 +419,13 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, s
         Effect.suspend(() => askedQuota(e, reading, quotaHarnesses(), quota)).pipe(
           Effect.andThen((next) => Effect.sync(() => (reading = next))),
           Effect.andThen(Effect.sleep(QUOTA_EVERY_MS)),
+        ),
+      ),
+    );
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.suspend(() => askedModels(e, home, new Date().toISOString(), modelsHarnesses(), models)).pipe(
+          Effect.andThen(Effect.sleep(MODELS_EVERY_MS)),
         ),
       ),
     );

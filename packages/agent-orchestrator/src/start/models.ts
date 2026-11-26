@@ -5,8 +5,7 @@
  */
 import type { StepSpec } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { autoDropped } from '../workflow/index.ts';
-import { modeOf } from '../former/former.ts';
+import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/model-words.ts';
 
 /** The model each step a run names runs on, by the step's name: every other step runs on its agent's. */
 export type RunModels = Readonly<Record<string, string>>;
@@ -42,14 +41,15 @@ export const modelsText = (models: RunModels) =>
 /**
  * Why a run of `steps` cannot run on `models`, said by `said` (`--model implement=fable`, or a card's line) — or undefined where it can:
  * a step the workflow does not have; `inherit`, a subagent's word no step's session can take; a step on a remote agent, which runs as its
- * operator configured it; and a step whose mode the model drops (`autoDropped`), naming the
- * models that keep it, as `nemia retry --model` is refused. What the harness refuses of the config the step is then filed with is the
+ * operator configured it; and a model the step's harness does not list by that id, where its list is recorded (`stepModelJudged`): an
+ * alias, naming the id, an unlisted word, naming the ids, or a model that drops the step's mode or effort, as `nemia retry --model` is refused. What the harness refuses of the config the step is then filed with is the
  * start's next question (`configRefused`), asked of the steps with the models set (`withModels`).
  * @param steps The workflow's steps.
  * @param models The model of each step named, by the step's name.
  * @param said What named a step's model, as a refusal opens on.
+ * @param lists The models each harness lists, as the store recorded them; undefined where none is, and then no model is judged.
  */
-export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, said: (step: string) => string) {
+export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, said: (step: string) => string, lists?: ModelLists) {
   for (const [name, model] of Object.entries(models)) {
     const step = steps.find((s) => s.name === name);
     if (!step) return `${said(name)}: the workflow has no step ${name} — its steps are ${steps.map((s) => s.name).join(', ')}.`;
@@ -57,9 +57,9 @@ export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, sai
       return `${said(name)}: \`inherit\` is a subagent's word for its caller's model, and a step's session has no caller. Name a model: ${name}=sonnet.`;
     if (isRemoteHarness(step.harness))
       return `${said(name)}: ${name} runs on \`harness: ${step.harness}\`, a remote A2A agent, which runs as its operator configured it: A2A carries no model, and the runtime refuses a task filed with one. Leave ${name} out.`;
-    const dropped = autoDropped(step.harness, model, modeOf(step));
-    if (dropped)
-      return `${said(name)}: ${name} ${dropped}. Name a model that keeps it — ${name}=sonnet, or opus, or fable — or start a workflow whose step names a mode the model keeps.`;
+    const judged = stepModelJudged(model, step, lists);
+    const words = modelWords(model, judged, listedFor(step.harness, lists));
+    if (words) return `${said(name)}: ${name}: ${words}`;
   }
   return undefined;
 }

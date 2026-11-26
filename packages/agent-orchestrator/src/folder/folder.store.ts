@@ -56,6 +56,7 @@ import {
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
 import { fenceKeyOf } from '../harness/harness.ts';
+import type { ModelLists } from '../workflow/model-words.ts';
 import { entriesOf } from '../skills/read.store.ts';
 
 /**
@@ -67,8 +68,9 @@ import { entriesOf } from '../skills/read.store.ts';
  * @param dir The workflow's folder.
  * @param found The agents and skills already found, which the steps are resolved against.
  * @param fills What a factory gives the steps: the agent each is hired and its rules; undefined where no factory gives any.
+ * @param lists The models each harness lists as the store recorded them, which each step's model is judged against; undefined for none.
  */
-export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills) {
+export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills, lists?: ModelLists) {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -89,6 +91,7 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills) {
     found.agents,
     found.skills,
     fills,
+    lists,
   ) satisfies StepSpec[];
 }
 

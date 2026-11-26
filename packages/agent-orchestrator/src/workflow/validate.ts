@@ -3,7 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, type StepSpec, WorkflowError } from '../step/step.ts';
+import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, STEP_KEYS, type StepSpec, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -140,48 +140,11 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
   ['loop', 'it asks for no round'],
 ];
 
-/** The keys a wait node (`waitsFor:`) cannot take, each with why: it runs nothing, so only its conditions judge it. */
-const WAIT_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
-  ['agent', 'it runs no session'],
-  ['run', 'it runs no command'],
-  ['check', 'its conditions are its checks'],
-  ['checkMemory', 'it runs no check of its own'],
-  ['checkFailurePolicy', 'it runs no check of its own'],
-  ['resume', 'it continues no session'],
-  ['workspace', 'it works in no workspace of its own'],
-  ['retries', 'a False refuses it and waits on a person, who asks `nemia retry`'],
-  ['budget', 'it spends nothing'],
-  ['loop', 'it asks for no round'],
-  ['rounds', 'it asks for no round'],
-  ['routes', 'a condition is a node of its own'],
-  ['route', 'a condition is a node of its own'],
-  ['workflow', 'a workflow node files a card and runs nothing'],
-  ['card', 'a card node files a card and runs nothing'],
-  ['output', 'it signs off with no closeout of its own'],
-  ['input', 'it reads nothing handed on'],
-  ['tally', 'it signs off with no closeout of its own'],
-  ['skills', 'it runs no session'],
-  ['mcp', 'it runs no session'],
-  ['harness', 'it runs no session'],
-  ['model', 'it runs no session'],
-  ['effort', 'it runs no session'],
-  ['context', 'it runs no session'],
-  ['permissionMode', 'it runs no session'],
-  ['sandbox', 'it runs no session'],
-  ['tools', 'it runs no session'],
-  ['disallowedTools', 'it runs no session'],
-  ['allowedTools', 'it runs no session'],
-  ['denials', 'it runs no session'],
-  ['remote', 'it runs no session'],
-  ['deadlineSeconds', 'it runs no session'],
-  ['memory', 'it runs no session'],
-  ['memoryRequest', 'it runs no session'],
-  ['writable', 'it writes nothing'],
-  ['reads', 'it reads nothing'],
-  ['slot', 'it takes no slot of its own'],
-  ['ends', 'a condition is a node of its own'],
-  ['relabel', 'a card node files a card and runs nothing'],
-];
+/**
+ * The keys a wait node (`waitsFor:`) takes: when it waits, what it waits on, where it stands and whether a person approves it. `checks` is
+ * its conditions, laid by the loader.
+ */
+const WAIT_TAKES: readonly string[] = ['name', 'body', 'after', 'when', 'gate', 'place', 'waitsFor', 'checks'];
 
 /**
  * Refused: a command node (`run:`) with a key it cannot take (`COMMAND_REFUSED`), an instruction of its own, or no `agent:`. A command acts
@@ -218,10 +181,10 @@ function validateWaits(steps: readonly StepSpec[]) {
   const inLoop = new Set(steps.filter((s) => s.loop).flatMap((s) => loopSpan(steps, s)));
   for (const s of steps) {
     if (s.waitsFor === undefined) continue;
-    const refused = WAIT_REFUSED.find(([key]) => s[key] !== undefined);
+    const refused = STEP_KEYS.find((key) => !WAIT_TAKES.includes(key) && s[key] !== undefined);
     if (refused)
       throw new WorkflowError(
-        `${s.name}: \`waitsFor:\` makes it a wait node, which takes no \`${refused[0]}:\` — ${refused[1]}. Delete the \`${refused[0]}:\` line, or the \`waitsFor:\` line to make it a step.`,
+        `${s.name}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${refused}:\`. Delete the \`${refused}:\` line, or the \`waitsFor:\` line to make it a step.`,
       );
     if (s.body.trim())
       throw new WorkflowError(

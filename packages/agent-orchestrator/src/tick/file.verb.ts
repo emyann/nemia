@@ -83,8 +83,7 @@ import { sessionTokenFor, stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
-import { fileWaits } from '../wait-node/wait-node.verb.ts';
-import { isWaitNode, waitCheck } from '../wait-node/index.ts';
+import { isWaitNode, waitCheck, waitRecord } from '../wait-node/index.ts';
 import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
@@ -798,6 +797,22 @@ const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, lands: 
   if ((yield* depsBefore(f, name, workspace))?.deps.tree !== 'failed') return undefined;
   f.notes.push(`${name}: its worktree's node_modules could not be installed: its check runs no command, and ends with no verdict`);
   return 'unprovisioned' as const;
+});
+
+/**
+ * Lay the record of each ready wait node, until the pass may file no more: no task is filed, its checks are laid (`waitRecord`) and the
+ * pass that files any step's checks files its conditions. Answers with the nodes laid; the caller files the rest.
+ */
+const fileWaits = Effect.fn('fileWaits')(function* (f: Filing, ready: readonly string[]) {
+  const laid: string[] = [];
+  for (const name of ready) {
+    const step = stepNamed(f, name);
+    if (!isWaitNode(step)) continue;
+    if (!(yield* f.mayFile)) break;
+    f.run.steps[name] = waitRecord(f.run, step);
+    laid.push(name);
+  }
+  return laid;
 });
 
 /**

@@ -441,10 +441,11 @@ describe('a permission of hers is an ask: waiting, drawn as the form, answered i
     if (own?.kind !== 'own') throw new Error('a permission of hers is her own to draw');
     assert.equal(own.own.kind === 'permission' ? own.own.permission.command : undefined, FACTS.command);
   });
-  test('its tag says it asks to run while it waits, and that it was answered once chosen', async () => {
+  test('its tag says it asks to run while it waits, a question asking, and that it was answered once chosen', async () => {
     await import('./tsx.ts');
     const { askTag } = await import('../src/components/nemia/chat/ChatAsk.tsx');
     assert.deepEqual(askTag(permission()), { words: 'Asks to run', hue: 'yours' });
+    assert.deepEqual(askTag(asked('question', [EXPLAINED])), { words: 'asking', hue: 'yours' });
     assert.deepEqual(askTag(permission(FACTS, { [PERMISSION_QUESTION.question]: 'Allow once' })), { words: 'Answered', hue: 'grey' });
   });
   test('drawn, it shows what the SDK handed over and the command as typed, Deny picked where the SDK leans to no', async () => {

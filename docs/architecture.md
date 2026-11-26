@@ -651,7 +651,7 @@ keyspace (`<kind>Records`), its memory stand-in the same code over a keyspace in
 imported by one decision (`src/keyspace/import.store.ts`, an `ImportKind` per kind: its folders, and for each file its key, where it is
 moved aside and how its text reads), each file the first time a process opens the keyspace after it, moved under `<root>/imported/` and
 never deleted; a file that does not read is left where it was. The keyspace is its owner's alone: `db/` is 0700 and `state.db` 0600. A
-run's markers and the factory's record are still files.
+run's markers and the factory's record stay files until a card of their own moves them.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the

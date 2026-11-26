@@ -200,7 +200,7 @@ of its kind, never from an older file that looks alike:
   door one engine over it (`<kind>Records`) and its stand-in the same code over a keyspace in memory. A kind's files of before are
   imported by its `ImportKind` (`src/keyspace/import.store.ts`) the first time a process opens the keyspace, and moved under
   `<root>/imported/`: a test that plants a file of before reads it back only after the import (`kindsTakenUp`, the testing entry), and
-  one that plants a record writes it (`plantRecord`, `plantCard`). A run's markers and the factory's record are still files.
+  one that plants a record writes it (`plantRecord`, `plantCard`). A run's markers and the factory's record stay files until a card of their own moves them.
 - **A proposal is read and written through the Proposal door (`ProposalDoor`, `src/proposal/proposal.store.ts`), over the keyspace**
   (`src/keyspace/keyspace.store.ts`, `<root>/db/state.db`, one SQLite file laid out as Kine's), rooted as the Factory door is. Its
   methods answer Effects that may suspend, with no synchronous layer: a test runs a program that reaches it with `runPromise`

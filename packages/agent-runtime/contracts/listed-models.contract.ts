@@ -52,9 +52,10 @@ const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>
       condition: ({ output }) => noneTwice(output.map((m) => m.id)),
     },
     anAliasNamesItsModel: {
-      description: 'A word that resolves to another id is kept among that model’s aliases',
+      description:
+        'A word that resolves to another id is kept among that model’s aliases (with everyRowsIdIsListed: every such word is kept by the model listed for it)',
       condition: ({ input: [rows], output }) =>
-        rows.every((r) => idOf(r) === r.value || output.some((m) => m.id === idOf(r) && m.aliases.includes(r.value))),
+        output.every((m) => rows.every((r) => idOf(r) !== m.id || r.value === m.id || m.aliases.includes(r.value))),
     },
     onlyAWordThatResolvesToIt: {
       description: 'An alias of a model is a row’s word that resolves to it, and never the id itself',

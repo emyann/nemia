@@ -460,7 +460,7 @@ describe('retryRefusal: what `nemia retry` refuses, and what it says to do inste
         LISTED,
       ),
       '`--model claude-haiku-4-5`',
-      '`permissionMode: dontAsk`',
+      'drops `auto`',
       'claude-opus-5-5',
     );
     names(

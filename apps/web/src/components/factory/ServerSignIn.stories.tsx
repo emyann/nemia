@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { SignInView, type SignInShown } from './ServerSignIn';
+import { SignInView, signInShownOf, type SignInShown } from './ServerSignIn';
 
 /**
- * A server's sign-in on its row, in each place it stands: offered on `needs-auth`, waiting by a code, or with the address to open and
+ * A server's sign-in on its row, in each place it stands: offered on `needs-auth`, and on `pending` and `failed` for a server whose
+ * record has `oauth`, nothing for one without it, waiting by a code, or with the address to open and
  * the field to
  * paste the address the browser landed on, ended with why and the press to try again, connected with Sign out, and refused in the api's
  * words — a paste refused among them. No node test can judge how each reads, so each is
@@ -37,6 +38,30 @@ const view = (shown: SignInShown, refused: string | null = null, pasted = '') =>
     />
   </div>
 );
+
+/** The row's sign-in as the board decides it from the server's `state` and whether its record has `oauth`, no sign-in held. */
+const decided = ({ state, oauth }: { state: string; oauth: boolean }) => {
+  const shown = signInShownOf(state, oauth, undefined);
+  return shown === null ? <div style={BOX} data-server-sign-in-none /> : view(shown);
+};
+
+/** A server that signs in through Nemia, read `pending`, as one with no sign-in can settle: the press that starts one. */
+export const OfferedAtPending: StoryObj<{ state: string; oauth: boolean }> = {
+  args: { state: 'pending', oauth: true },
+  render: decided,
+};
+
+/** A server that signs in through Nemia, read `failed`: the press that starts one all the same. */
+export const OfferedAtFailed: StoryObj<{ state: string; oauth: boolean }> = {
+  args: { state: 'failed', oauth: true },
+  render: decided,
+};
+
+/** A server without `oauth`, read `pending`: no sign-in is drawn, as before. */
+export const NotOfferedWithoutOauth: StoryObj<{ state: string; oauth: boolean }> = {
+  args: { state: 'pending', oauth: false },
+  render: decided,
+};
 
 /** A sign-in by a code started: the code in large type, the provider's page to type it at, when it stops, and Cancel. */
 export const WaitingByCode: StoryObj<{ started: typeof DEVICE }> = {

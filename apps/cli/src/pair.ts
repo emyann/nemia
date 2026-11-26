@@ -5,8 +5,8 @@
  * it was answered (`POST /api/pairings/:id/claim`) every `PAIR_EVERY_MS` until the claim answers the token minted for it. The token goes
  * straight into the client's config (`configWritten`, mode 0600) as the context `--context` names, the url's host by default, which is
  * then the one in use; it is printed nowhere. A pairing that lapsed or that the server does not hold ends it, exit 1, naming `nemia
- * pair` again. Last it prints the line that points Claude Code's nemia plugin at the server, `NEMIA_URL=<url>`, for a shell profile:
- * the plugin's header comes from `nemia config headers`.
+ * pair` again. Last it prints the line that connects a Claude Code session to the server's MCP port (`connectingLine`): its tools,
+ * its instructions and Nemia's skills come with it, and its header from `nemia config headers`.
  *
  * No token of the context in use is sent to `url`: that token is another server's (`askedBare`).
  */
@@ -16,6 +16,15 @@ import { Conflict, Missing } from 'objects';
 import { configRead, configWritten } from './context.ts';
 import { askedBare } from './objects.ts';
 import { Refused } from './refused.ts';
+
+/**
+ * The line that adds the MCP port of the server at `server` to Claude Code for every project of the person's (`claude mcp add-json`, which
+ * takes a `headersHelper` where `claude mcp add` takes none): the port's url, and its header printed by `nemia config headers` at each
+ * connection, so no token is written in.
+ * @param server The server's origin, as the context keeps it.
+ */
+export const connectingLine = (server: string) =>
+  `claude mcp add-json --scope user nemia '${JSON.stringify({ type: 'http', url: new URL('/mcp', server).href, headersHelper: 'nemia config headers' })}'`;
 
 /** The verb that pairs this client with a server: `nemia pair <url>`. */
 export const PAIR_VERB = 'pair';
@@ -132,7 +141,7 @@ export async function pair(args: readonly string[], env: NodeJS.ProcessEnv = pro
       );
       process.stdout.write(
         `paired: context ${name} ${held ? 'changed' : 'added'} (${server}), and in use; its token is in your nemia config, never printed.\n` +
-          `For Claude Code's nemia plugin, put this line in your shell profile:\n\n  export NEMIA_URL=${server}\n`,
+          `To operate it from Claude Code, its tools and Nemia's skills with it, run this line once:\n\n  ${connectingLine(server)}\n`,
       );
       return 0;
     }

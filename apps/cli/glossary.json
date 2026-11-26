@@ -97,11 +97,11 @@
     },
     {
       "term": "Pair",
-      "meaning": "`nemia pair <url>`: this machine asks the server for a pairing, shows its code, waits for the person's approval there, and writes the context with the token the claim minted, 0600 and never printed (`apps/cli/src/pair.ts`); it then prints the `NEMIA_URL` line for Claude Code's plugin."
+      "meaning": "`nemia pair <url>`: this machine asks the server for a pairing, shows its code, waits for the person's approval there, and writes the context with the token the claim minted, 0600 and never printed (`apps/cli/src/pair.ts`); it then prints the `claude mcp add-json` line that connects a Claude Code session to the server's MCP port, its header from `nemia config headers`."
     },
     {
       "term": "Headers",
-      "meaning": "`nemia config headers`: the one verb that prints a token, as `{\"Authorization\":\"Bearer …\"}` on stdout for a harness's connection (the nemia plugin's `headersHelper`): `NEMIA_TOKEN` first, then the context's, then this machine's own (`apps/cli/src/context.ts`)."
+      "meaning": "`nemia config headers`: the one verb that prints a token, as `{\"Authorization\":\"Bearer …\"}` on stdout for a harness's connection (a host's MCP entry's `headersHelper`, as the line `nemia pair` prints sets it): `NEMIA_TOKEN` first, then the context's, then this machine's own (`apps/cli/src/context.ts`)."
     },
     {
       "term": "Own session",

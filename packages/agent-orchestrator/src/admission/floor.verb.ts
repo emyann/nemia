@@ -9,7 +9,7 @@ import { Effect, Result } from 'effect';
 import type { ProposalCaller } from '../caller/index.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
-import { NEMIA_FLOOR } from '../nemia/nemia.ts';
+import { NEMIA_FLOOR } from '../nemia/index.ts';
 import { askedOf, policyAllows, type AdmissionEntry, type Typed } from './admission.ts';
 import { policyReadOf, waitRead } from './admit.verb.ts';
 import { agentClassOf } from './class.ts';

@@ -24,6 +24,7 @@ const mill: Exclude<FactoryListing, { error: string }> = {
 const there = new Set(['/data/notes']);
 const volumes = volumesOf(mill, '2026-11-01T00:00:00.000Z', {
   home: '/store',
+  at: { stamp: () => '4', head: '4' },
   isDirectory: (at) => there.has(at),
   runs: [
     { id: 'run-1', phase: 'running', volumes: [{ path: '/data/notes', readOnly: true }] },

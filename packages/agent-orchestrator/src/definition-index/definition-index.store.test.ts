@@ -1,6 +1,7 @@
 /**
  * The definition index (`indexSweep`): a definition file written once is one record, a sweep that sees nothing new writes nothing, an
- * edit is one write, a removed file a tombstone; and a write of a definition names the revision it was read at (`definitionRevisionNow`).
+ * edit is one write, a removed file a tombstone; and a read or a write of a definition numbers it with no write (`definitionRevisionNow`): a
+ * definition no sweep has numbered is the next revision.
  */
 import { test } from 'vitest';
 import { scratch } from 'test-kit/scratch';
@@ -10,7 +11,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { definitionKey, definitionRevisionNow, indexSweep } from './definition-index.store.ts';
+import { definitionJudged, definitionKey, definitionRevisionNow, indexSweep } from './definition-index.store.ts';
 
 /** A store of its own, the library's agents folder in it with the agent `coder`, and what it holds in the index. */
 const stored = () => {
@@ -43,10 +44,38 @@ test('a definition file gives one record, a second sweep writes nothing, an edit
   assert.equal(await s.held(), undefined, 'a removed file is no record');
 });
 
-test('the revision a write names is the one the files hold now: an edit since the read moves it', async () => {
+test('a definition no sweep has numbered reads as the next revision, and a read writes nothing', async () => {
   const s = stored();
+  const head = await s.head();
   const read = await s.run(definitionRevisionNow('Agent', undefined, 'coder'));
+  assert.equal(read, head + 1, 'a definition nobody has numbered is one past the head');
   assert.equal(await s.run(definitionRevisionNow('Agent', undefined, 'coder')), read, 'the same files, the same revision');
+  assert.equal(await s.head(), head, 'a read writes no record');
+  assert.equal(await s.held(), undefined, 'and numbers nothing');
+});
+
+test("a sweep gives the definition its record's revision, which a hand edit since the sweep moves with no write", async () => {
+  const s = stored();
+  await s.run(indexSweep());
+  const record = await s.held();
+  assert.ok(record !== undefined);
+  const head = await s.head();
+  assert.equal(await s.run(definitionRevisionNow('Agent', undefined, 'coder')), record.revision, "the record's revision once numbered");
   fs.appendFileSync(s.file, 'Edited by hand.\n');
-  assert.ok((await s.run(definitionRevisionNow('Agent', undefined, 'coder'))) > read, 'a hand edit since the read moved it');
+  assert.equal(await s.run(definitionRevisionNow('Agent', undefined, 'coder')), head + 1, 'a hand edit reads as the next revision');
+  assert.equal(await s.head(), head, 'and writes nothing');
+  await s.run(indexSweep());
+  assert.equal((await s.held())?.revision, await s.run(definitionRevisionNow('Agent', undefined, 'coder')), 'a sweep numbers it again');
+});
+
+test('a writer that names the revision it read is refused Conflict where a hand edit moved it, with the index untouched', async () => {
+  const s = stored();
+  const read = String(await s.run(definitionRevisionNow('Agent', undefined, 'coder')));
+  await s.run(definitionJudged('Agent', undefined, 'coder', read, 'write'));
+  fs.appendFileSync(s.file, 'Edited by hand.\n');
+  await s.run(indexSweep());
+  const refused = await Effect.runPromise(
+    Effect.flip(definitionJudged('Agent', undefined, 'coder', read, 'write')).pipe(Effect.provide(StoreRoot.layer(s.home))),
+  );
+  assert.equal(refused._tag, 'Conflict');
 });

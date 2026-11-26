@@ -19,7 +19,7 @@ import { storeGiven } from '../../test/config-given.ts';
 import { foldersLoaded, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows.verb.ts';
 import { runWith as runEngine } from '../runner.ts';
 import { engineOf } from '../runtime-client.ts';
-import { workflowVersion } from '../folder/version.store.ts';
+import { definitionRevisionNow } from '../definition-index/definition-index.store.ts';
 import { removeWorkflowAt } from '../folder/write.store.ts';
 import * as verbs from '../inbox/inbox.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -123,16 +123,19 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
   assert.equal(fs.existsSync(dir), false);
 });
 
-/** The version a remove of the folder `dir` is handed: the one it is at, where it is a folder; none where it is not. */
-function versionAt(dir: string) {
+/** The version a remove of the folder `dir` is handed: the revision it is served at, where it is a folder; none where it is not. */
+async function versionAt(dir: string) {
   return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()
-    ? { version: Effect.runSync(Effect.provideService(workflowVersion(dir, { home: ROOT }), StoreRoot, ROOT)) }
+    ? { version: String(await runWith(e(), definitionRevisionNow('Workflow', undefined, path.basename(dir)))) }
     : {};
 }
 
-/** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */
-const remove = (dir: string) =>
-  runWith(e(), WORKFLOWS_REMOVE.handler({ from: 'user', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }));
+/** The folder of yours `dir` removed through the entry, by its name, at the revision it is at, as the api hands it. */
+const remove = async (dir: string) =>
+  runWith(
+    e(),
+    WORKFLOWS_REMOVE.handler({ from: 'user', name: path.relative(path.join(ROOT, 'workflows'), dir), ...(await versionAt(dir)) }),
+  );
 
 /** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
 async function refused(dir: string, kind: new (...args: never[]) => Error, message: string) {

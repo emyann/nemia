@@ -230,21 +230,26 @@ async function cardSays(page: Page, run: WaitingRun) {
   await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'its own steps as its graph');
   await expectCount(card.locator('[data-step-name]'), 0, 'a graph that names no step under its nodes');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
-  await expectCount(card.locator('[data-cut-button]'), 1, 'and only one');
-  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each node of its graph a button that opens its step's card");
+  const approvals = await card.locator('[data-approve]').count();
+  await expectCount(card.locator('[data-cut-button]'), 1 + approvals, 'and no other but Approve, where the run waits at an approval');
+  await expectCount(
+    card.locator('button[data-step-bar]'),
+    run.steps.length,
+    'each node of its graph a button that opens its step in the sheet',
+  );
   const clocks = await card.locator('button[data-clock-words]').count();
   if (clocks > 1) throw new Refused(`the card of ${run.id} draws its clock once — it draws ${clocks}`);
   await expectCount(
     card.locator('button:not([data-step-bar])'),
-    1 + (run.cost && run.tokens ? 1 : 0) + clocks,
-    'and no control more than the copy of its id and the previews of its clock and its cost: nothing is decided from the list',
+    1 + approvals + (run.cost && run.tokens ? 1 : 0) + clocks,
+    'and no control more than the copy of its id, Approve and the previews of its clock and its cost: nothing is decided from the list',
   );
 }
 
 /** Where a card's button stands against its rail, and how far its right edge is from the foot's. */
 const footOf = (card: Locator) =>
   card.locator('[data-foot]').evaluate((foot) => {
-    const [rail, button] = ['[data-run-steps]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+    const [rail, button] = ['[data-run-steps]', 'a[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
     return {
       beside: button.top < rail.bottom && button.bottom > rail.top,
       fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
@@ -391,7 +396,7 @@ async function byKeyboard(page: Page, run: WaitingRun) {
   );
   await card.locator('button[data-step-bar]').last().focus();
   await page.keyboard.press('Escape');
-  await expectCount(page.locator('[data-slot="preview-card"]'), 0, "Escape on the rail's last bar leaves no step's card open");
+  await expectCount(page.locator('[data-slot="tooltip"] [data-step-glance]'), 0, "Escape on the rail's last bar leaves no glance open");
 
   page.on('request', hear);
   await page.keyboard.press('Tab');
@@ -479,7 +484,7 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage) {
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
   await page.mouse.move(0, 0);
-  await expectCount(page.locator('[data-slot="preview-card"]'), 0, "no step's card left open by a pointer resting on a bar");
+  await expectCount(page.locator('[data-slot="tooltip"] [data-step-glance]'), 0, 'no glance left open by a pointer resting on a bar');
   for (const [control, up, down, where] of controls) {
     await control.scrollIntoViewIfNeeded();
     const off = await missed(control, 23, up, down);

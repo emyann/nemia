@@ -89,7 +89,9 @@ function pass(runs: string, rules: readonly Rule[], more: Record<string, string>
   const log = path.join(bin, 'conditions.jsonl');
   const file = path.join(bin, 'runs.json');
   fs.writeFileSync(file, runs);
+  const outside = fs.realpathSync(scratch('wf-ci-watch-cwd-'));
   const ran = spawnSync(process.execPath, [SCRIPT, '--check', 'ci', ...flags, '--once'], {
+    cwd: outside,
     env: {
       PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
       HOME: bin,
@@ -115,7 +117,13 @@ function pass(runs: string, rules: readonly Rule[], more: Record<string, string>
       tried: at('--try'),
     };
   });
-  return { code: ran.status, err: ran.stderr, written, calls: gh.calls() };
+  const calls = gh.calls();
+  assert.deepEqual(
+    calls.filter((call) => call.cwd === outside),
+    [],
+    "no gh call is made from the watcher's own folder, which is no repository: each reads GitHub from the step's workspace",
+  );
+  return { code: ran.status, err: ran.stderr, written, calls };
 }
 
 /** The calls of `gh` whose words hold `words`. */

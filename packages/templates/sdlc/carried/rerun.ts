@@ -32,9 +32,10 @@ export const runIdOf = (entry: Check) => /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exe
 /**
  * The attempt GitHub says the workflow run `id` is on; `undefined` where it cannot be read or is no number.
  * @param id The workflow run's id.
+ * @param cwd The folder `gh` runs in, a checkout of the repository the run belongs to.
  */
-export function attemptOfRun(id: string) {
-  const ran = run('gh', ['api', `repos/{owner}/{repo}/actions/runs/${id}`]);
+export function attemptOfRun(id: string, cwd: string) {
+  const ran = run('gh', ['api', `repos/{owner}/{repo}/actions/runs/${id}`], cwd);
   try {
     const said = ran.status === 0 ? (JSON.parse(ran.out) as { run_attempt?: unknown }).run_attempt : undefined;
     return typeof said === 'number' ? said : undefined;
@@ -48,14 +49,15 @@ export function attemptOfRun(id: string) {
  * context pending, green, or only cancelled, skipped or neutral. Once: only a run GitHub says is on its first attempt, so whichever
  * watcher asks, a run is re-run once at most. Answers the runs re-run and the lines that say why a run was not.
  * @param ours The CI context's entries of the commit.
+ * @param cwd The folder `gh` runs in, a checkout of the repository the runs belong to.
  */
-export function rerunOnce(ours: readonly Check[]) {
+export function rerunOnce(ours: readonly Check[], cwd: string) {
   const red = ours.filter(judgedRed);
   if (seenOf(ours) !== 'failed' || !red.length) return undefined;
   const lines = red.filter((entry) => !runIdOf(entry)).map((entry) => `  not re-run: ${nameOf(entry)} names no job of an Actions run`);
   const runs = [...new Set(red.flatMap((entry) => runIdOf(entry) ?? []))].filter((id) => {
-    const attempt = attemptOfRun(id);
-    const asked = attempt === 1 ? run('gh', ['run', 'rerun', id, '--failed']) : undefined;
+    const attempt = attemptOfRun(id, cwd);
+    const asked = attempt === 1 ? run('gh', ['run', 'rerun', id, '--failed'], cwd) : undefined;
     const not = asked
       ? `\`gh run rerun ${id} --failed\` failed: ${asked.err.split('\n')[0]}`
       : `its attempt is ${attempt ?? 'unread'}, not 1`;

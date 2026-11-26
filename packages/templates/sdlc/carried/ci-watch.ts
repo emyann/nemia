@@ -245,7 +245,7 @@ function redOf(cwd: string, ours: readonly Entry[], entries: readonly Entry[], c
   const second = secondOf(cwd, ours, entries, check);
   if (second.due === 'report') return { red: 'change' as Red, line: second.line };
   const runs = [...new Set(ours.filter(judgedRed).flatMap((entry) => runIdOf(entry) ?? []))];
-  const again: Red = runs.some((id) => attemptOfRun(id) === 1) ? 'rerun' : 'again';
+  const again: Red = runs.some((id) => attemptOfRun(id, cwd) === 1) ? 'rerun' : 'again';
   return { red: again, line: second.line };
 }
 
@@ -262,7 +262,7 @@ function afterRerun(cwd: string, entries: readonly Entry[], check: string) {
     const runId = runIdOf(entry);
     const jobId = jobIdOf(entry);
     if (!(nameOf(entry) === check && judgedRed(entry) && runId && jobId)) return entry;
-    const now = attemptOfRun(runId);
+    const now = attemptOfRun(runId, cwd);
     const then = hinted<{ run_attempt?: unknown }>(cwd, 'api', `repos/{owner}/{repo}/actions/jobs/${jobId}`)?.run_attempt;
     return typeof now === 'number' && typeof then === 'number' && then < now ? { ...entry, status: 'IN_PROGRESS' } : entry;
   });
@@ -557,7 +557,7 @@ function headSaid(a: Asked, act: Act, r: HeadReading) {
     return { status: 'Unknown' as const, message: [`${r.head} was queued by GitHub and never started:`, ...done.lines].join('\n') };
   }
   if (act === 'rerun') {
-    const again = rerunOnce(r.ourEntries);
+    const again = rerunOnce(r.ourEntries, a.cwd);
     if (!again?.runs.length) return falsely(a, r, again?.lines ?? []);
     const done = `${r.head} was red, and the failed jobs of run ${again.runs.join(', ')} were re-run once:`;
     return { status: 'Unknown' as const, message: [done, r.red.line, ...again.lines].join('\n') };
@@ -669,7 +669,7 @@ function readMerge(a: Asked, pr: Pr, oid: string, check: string) {
   const ci: Ci = found === 'absent' && !declaresAt(a.cwd, oid) && !declaresAt(a.cwd, parent) ? 'undeclared' : found;
   const tip = ci === 'failed' || ci === 'superseded' ? tipAt(a.cwd, oid, pr.baseRefName, check) : { read: 'none' as const };
   const runs = ci === 'failed' ? [...new Set(ours.filter(judgedRed).flatMap((entry) => runIdOf(entry) ?? []))] : [];
-  const red: Red = runs.some((id) => attemptOfRun(id) === 1) ? 'rerun' : 'again';
+  const red: Red = runs.some((id) => attemptOfRun(id, a.cwd) === 1) ? 'rerun' : 'again';
   return { entries, ours, ci, tip, red };
 }
 
@@ -714,7 +714,7 @@ function mergeSaid(a: Asked, act: Act, r: MergeReading) {
   const retry = `  Then: nemia retry ${a.id} ${a.step.name}`;
   if (act === 'pass') return { status: 'True' as const, message: mergePassSaid(r) };
   if (act === 'rerun') {
-    const again = rerunOnce(ours);
+    const again = rerunOnce(ours, a.cwd);
     if (again?.runs.length)
       return { status: 'Unknown' as const, message: `${at} was red, and the failed jobs of run ${again.runs.join(', ')} were re-run once` };
     return { status: 'False' as const, message: [...reddened(l, oid, entries, undefined, again?.lines ?? [], false), retry].join('\n') };

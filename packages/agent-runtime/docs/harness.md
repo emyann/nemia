@@ -467,25 +467,40 @@ What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
   store, and so whether a sign-in completes and a second session finds it. `izq1-measurement.md` measured both on 0.3.270; neither was
   re-run here, so the GitHub sign-in card either carries those two or measures them itself.
 
-What the GitHub sign-in card measured of the CLI that stores the secret, **Claude Code 2.1.308, 2026-10-22**, each with a throwaway
-`CLAUDE_CONFIG_DIR` and a scratch cwd, a fake secret, and no browser (`harness/mcp-sign-in.ts` is built on these):
+What the GitHub sign-in card measured of the CLI, **Claude Code 2.1.308, 2026-10-22**, each with a throwaway `CLAUDE_CONFIG_DIR` and a
+scratch cwd, and no browser (`harness/mcp-sign-in.ts`, the browser road, is built on these; a server whose provider offers a code signs in
+by `harness/mcp-device.ts` instead, and no longer stores a client secret through `claude mcp add`):
 
-- **`claude mcp add --scope local --transport http --header … --client-id … --client-secret --callback-port 8791 <name> <url>`, with
-  `MCP_CLIENT_SECRET` set, files the secret under `mcpOAuthClientConfig["<name>|<sha256(JSON.stringify({type,url,headers}))[:16]>"]`**
-  — the same key an inline session computes (finding 6 of `izq1-measurement.md`, there written at `--scope user`) — and adds the server to
+- **`claude mcp add --scope local --transport http --header … --client-id … --callback-port 8791 <name> <url>` files a server under `name|<sha256(JSON.stringify({type,url,headers}))[:16]>`**
+  — the same key an inline session computes (finding 6 of `izq1-measurement.md`, there written at `--scope user`; with
+  `--client-secret`, which Nemia no longer gives, the CLI also filed a secret under `mcpOAuthClientConfig[<key>]`) — and adds the server to
   `.claude.json`'s `projects[<cwd>].mcpServers` alone, so no session in another folder gains it.
 - **`--header` takes many values**: given last before the name, it reads the name as one more header and the add fails, `missing
   required argument 'name'`. So the headers go before the other options.
 - **`claude mcp remove --scope local <name>`, from the same cwd, deletes both `mcpOAuthClientConfig[<key>]` and `mcpOAuth[<key>]`**,
-  the stored secret and a stored token planted under that key. So a sign-out is that remove: a later session handed the same bytes finds
-  neither, and reads `needs-auth`; a sign-in after it stores the secret again.
+  a stored secret and a stored token planted under that key. So a browser sign-out is that remove: a later session handed the same bytes
+  finds neither, and reads `needs-auth`.
 - **A remove finds the key only through a server added under the name**: with a token planted under `name|<key>` and no server
   added, `claude mcp remove --scope local <name>` exits 1 (`No MCP server named … in local scope`) and leaves the token; `claude mcp
-  add --scope local` with no secret, then the remove, deletes it. A sign-in handed no secret adds no server, so a sign-out always adds
+  add --scope local` with no secret, then the remove, deletes it. A browser sign-in adds no server, so a sign-out always adds
   first (`clearSignIn`); where one is already added the CLI refuses the second add, and the remove clears both. `mcpClearAuth` is not used: above, it resolved `{}` and
   left the sign-in in flight, and what it clears of a completed sign-in is unmeasured.
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.
+
+**A sign-in by a code, and the token the runtime holds (2026-11-26, Agent SDK 0.3.325).** The SDK runs no OAuth flow itself: its MCP page
+(`code.claude.com/docs/en/agent-sdk/mcp`) says a host that completes the flow passes the access token in the server's `headers`
+(`McpHttpServerConfig.headers`, `sdk.d.ts:1284`), and a server with no usable token reads `needs-auth`. So for a server whose provider
+advertises the device grant (RFC 8628) — read from its protected resource metadata (RFC 9728) then its authorization server's (RFC 8414),
+GitHub's at `https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/` and
+`https://github.com/.well-known/oauth-authorization-server/login/oauth` — the runtime asks the provider's device endpoint for a code with
+the client id alone, polls the token endpoint (adding 5 s on `slow_down`), holds the token and its refresh token in
+`<root>/mcp-tokens/<name>-<hash>.json` (mode 0600, the hash that of the server's `type`, `url` and `headers`), refreshes it before each
+spawn with the client id and no secret, and lays `Authorization: Bearer <token>` over the server's headers where it builds
+`Options.mcpServers` (`withTokens`) and in the state read. GitHub's doc lists no client secret for a device poll or for refreshing a
+device-flow token. The token is in the spawn's in-memory `mcpTokens`, never in the task's `config`, which is journalled. **Not
+measured:** that Claude Code, handed the header inline, connects to GitHub's server with it, and that the SDK keeps the header off nothing
+the child can read: it spells `Options.mcpServers` onto the child's argv, so the token is in the process table while a session runs.
 
 What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, and again on
 0.3.323 and 2.1.323, 2026-11-13, and on 0.3.325 and 2.1.325, 2026-11-14, with the same bodies, off the installed files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):

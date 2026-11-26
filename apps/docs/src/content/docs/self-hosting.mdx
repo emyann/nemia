@@ -125,8 +125,10 @@ because Tailscale tunnels it.
 ## 5. GitHub
 
 A factory on GitHub pushes each run's branch with git (`packages/templates/sdlc/carried/pull-request.ts`), labels and
-waits on its pull request with the GitHub CLI, and opens it through the GitHub MCP server, which the factory adds and signs in. The daemon clones a repository named by its URL with git too. All of it uses the
-server's own credentials. **Nemia holds none.** So the server's Nemia user signs in to GitHub once.
+waits on its pull request with the GitHub CLI, and opens it through the GitHub MCP server, which the factory adds. The daemon clones a repository named by its URL with git too. Git and the GitHub CLI
+use the server's own credentials, which **Nemia does not hold**, so the server's Nemia user signs in to GitHub once. The GitHub MCP server is
+signed in from the board's settings page by typing a short code at `github.com/login/device`, with no address to copy: Nemia holds that
+token itself, refreshes it, and hands it to each session.
 
 The `sdlc` template's `build` and `quick` declare these as needs, each with its fix: a run of one waits before its first session while
 one is missing, naming it, and starts by itself once it is met. On the board's Setup page, or on the server:

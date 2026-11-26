@@ -34,7 +34,8 @@ import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { kindRevisions } from '../list-watch/kind-watch.store.ts';
+import { kindRevisions } from '../list-watch/kind-revisions.verb.ts';
+import { definitionsSwept } from '../definition-index/definition-index.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
 export type ProposalPlace = { readonly home: string };
@@ -247,6 +248,13 @@ export const contentNow = (place: ProposalPlace, factory: string, kind: Proposab
           );
   }
 };
+
+/**
+ * The definitions of the store numbered, so a proposal that is filed reads each at the revision it keeps until its files move: a
+ * definition not yet numbered is served at one that moves with every write, and the apply would find it changed.
+ * @param place Where the proposal is read: the store's root.
+ */
+export const definitionsNumberedFor = (place: ProposalPlace) => definitionsSwept().pipe(Effect.provideService(StoreRoot, place.home));
 
 /**
  * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision it is served at (the keyspace's; a

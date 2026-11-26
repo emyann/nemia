@@ -22,7 +22,7 @@ import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/kind-watch.ts';
+import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/index.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import { recordDue } from '../observed/observed.ts';
 import { indexedRevision } from './definition-index.ts';
@@ -94,7 +94,10 @@ const together = (versions: readonly (string | null)[]) => {
   return held.length === 1 ? (held[0] ?? null) : createHash('sha256').update(held.join('\0')).digest('hex').slice(0, 16);
 };
 
-/** What `there` of a door says is held: its version, none where nothing is at the name. */
+/**
+ * What `there` of a door says is held: its version, none where nothing is at the name.
+ * @param there What the door says is at the name.
+ */
 export const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
 
 /**
@@ -294,7 +297,7 @@ export const definitionsNumbered = Effect.fn('definitionsNumbered')(function* ()
     const at = indexedRevision(record === undefined ? null : { value: record.value, revision: record.revision }, text, head);
     if (at !== null) numbered.set(key, at);
   }
-  return { head, held: numbered as ReadonlyMap<string, number> };
+  return { head, held: numbered };
 });
 
 /**

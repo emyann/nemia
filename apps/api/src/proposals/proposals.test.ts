@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { definitionsIndexed, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { LISTED_WITHOUT, TABLE_ACCEPT, filesHeld, type Delegation, type Proposal, type Table } from 'objects';
 import { AnswerBound } from '../layer.ts';
@@ -132,6 +132,7 @@ const ask = (url: string, method: string, body?: unknown, bearer?: string) =>
 
 /** The `dev` workflow as the namespace serves it, its plan step's body replaced by `body`, at the version it was read. */
 async function devChanged(body: string) {
+  await definitionsIndexed(root);
   const res = await app().request(`${ns}/workflows/dev`);
   assert.equal(res.status, 200, 'the workflow reads');
   const now = (await res.json()) as {
@@ -153,6 +154,7 @@ type ServedStep = { name: string; keys: Record<string, unknown>; body: string };
  * it was read.
  */
 async function fencedChanged(change: (step: ServedStep) => ServedStep) {
+  await definitionsIndexed(root);
   const res = await app().request(`${ns}/workflows/fenced`);
   assert.equal(res.status, 200, 'the workflow reads');
   const now = (await res.json()) as { metadata: { resourceVersion?: string }; spec: { steps: ServedStep[] } };
@@ -301,6 +303,7 @@ const folderBytes = (name: string) => {
 
 /** The Workflow `name` as the namespace serves it. */
 const served = async (name: string) => {
+  await definitionsIndexed(root);
   const res = await app().request(`${ns}/workflows/${name}`);
   assert.equal(res.status, 200, 'the workflow reads');
   return (await res.json()) as import('objects').Workflow;

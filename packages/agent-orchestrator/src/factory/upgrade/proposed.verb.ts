@@ -14,7 +14,7 @@ import { Conflict } from '../../refusal/refusal.ts';
 import type { ProposalCaller } from '../../caller/index.ts';
 import { sessionCaller } from '../../token/caller.verb.ts';
 import { proposeProgram } from '../../propose/propose.verb.ts';
-import { currentOf, type ProposalPlace } from '../../propose/current.verb.ts';
+import { currentOf, definitionsNumberedFor, type ProposalPlace } from '../../propose/current.verb.ts';
 import { ResolutionProposer, type ResolutionProposed } from './proposer.verb.ts';
 
 /**
@@ -24,6 +24,7 @@ import { ResolutionProposer, type ResolutionProposed } from './proposer.verb.ts'
 const proposedBy = (caller: ProposalCaller, place: ProposalPlace) =>
   ((factory, kind, name, spec, why) =>
     Effect.gen(function* () {
+      yield* definitionsNumberedFor(place);
       const now = yield* currentOf(place, factory, kind, name);
       const verb = spec === undefined ? 'delete' : now.version === null && kind !== 'Factory' ? 'create' : 'update';
       const object: ProposedObject = {

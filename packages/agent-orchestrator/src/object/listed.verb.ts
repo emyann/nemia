@@ -13,8 +13,8 @@ import { API_VERSION } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { kindRevisions } from '../list-watch/kind-watch.store.ts';
-import type { WatchedKind } from '../list-watch/kind-watch.ts';
+import { kindRevisions } from '../list-watch/kind-revisions.verb.ts';
+import type { WatchedKind } from '../list-watch/index.ts';
 import { pageOf, type Paged } from './page.ts';
 
 /** What a list of objects is asked: its namespace (none for every namespace's), `?limit=`, `?continue=`, its selectors, OR'd. */

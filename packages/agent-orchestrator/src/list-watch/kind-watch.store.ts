@@ -1,27 +1,18 @@
 /**
  * A kind's watch from a revision, read off the keyspace (`Keyspace.since`) of the store `StoreRoot` names: the changes written after a
- * revision to the objects of a kind (`kindReplay`), and the revision each of its objects stands at (`kindRevisions`), both from the records
- * `WATCHED_KINDS` says the kind is made of. A GET writes nothing here; nothing is kept between two reads.
+ * revision to the objects of a kind (`kindReplay`); the revision each of its objects stands at is `kindRevisions`, beside it, from the
+ * records `WATCHED_KINDS` says the kind is made of. A GET writes nothing here; nothing is kept between two reads.
  */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
-import { definitionsNumbered } from '../definition-index/definition-index.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import {
-  changesOf,
-  DEFINITIONS_PREFIX,
-  revisionTable,
-  WATCHED_KINDS,
-  type KindChange,
-  type RowSeen,
-  type WatchedKind,
-} from './kind-watch.ts';
+import { changesOf, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
 
 /** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
 type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
 
 /** The prefixes of the keyspace a kind is made of, each once. */
-const prefixesOf = (kind: WatchedKind) => [...new Set(WATCHED_KINDS[kind].map((s) => s.prefix))];
+export const prefixesOf = (kind: WatchedKind) => [...new Set(WATCHED_KINDS[kind].map((s) => s.prefix))];
 
 /**
  * The changes after revision `after` to the objects of `kind`: each object, or each of a namespace, whose records moved, as it is sent
@@ -51,28 +42,6 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
   const changes: readonly KindChange[] = changesOf(kind, after, rows, before);
   const replayed: KindReplay = { changes, head };
   return replayed;
-});
-
-/**
- * The revision each object of `kind` stands at, as of one read of its records, the revision a write of its spec waits on (`specOf`,
- * which leaves out the records its status reads), and the keyspace head the read was made at. The definitions' revisions are worked
- * out with no write (`definitionsNumbered`).
- * @param kind The kind served.
- */
-export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: WatchedKind) {
-  const home = yield* StoreRoot;
-  const keyspace = yield* keyspaceAt(keyspaceFile(home)).pipe(Effect.orDie);
-  const held = new Map<string, ReadonlyMap<string, number>>();
-  let head = yield* keyspace.head;
-  for (const prefix of prefixesOf(kind)) {
-    if (prefix !== DEFINITIONS_PREFIX) held.set(prefix, yield* keyspace.touched(prefix));
-    else {
-      const numbered = yield* definitionsNumbered();
-      held.set(prefix, numbered.held);
-      head = Math.max(head, numbered.head);
-    }
-  }
-  return { of: revisionTable(kind, held), specOf: revisionTable(kind, held, true), head } as const;
 });
 
 /** The keyspace's head of the store `StoreRoot` names: the position a list read after it stands at least at. */

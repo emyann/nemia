@@ -7,7 +7,7 @@
  * write (`kindRevisions`).
  */
 import type { Context as RequestContext } from 'hono';
-import { isWatchedKind, keyspaceHead, kindRevisions, type WatchedKind } from 'agent-orchestrator';
+import { isWatchedKind, kindRevisions, type WatchedKind } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 import type { Listed } from '../watch/watch.ts';
 
@@ -89,11 +89,8 @@ export const revisioned =
     const kinds = kindsAt(request.method, path);
     if (!kinds.some((kind) => stampedOf({ kind }) !== undefined)) return list(c, request);
     const reads = request.method === 'GET';
-    const lists = kinds.some((kind) => {
-      const of = watchedListOf(kind);
-      return of !== undefined && API_STAMPED.has(of);
-    });
-    const head = reads && lists ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
+    const listed = kinds.map(watchedListOf).find((of) => of !== undefined && API_STAMPED.has(of));
+    const head = reads && listed !== undefined ? (await c.var.runtime.runPromise(kindRevisions(listed))).head : undefined;
     const response = await list(c, request);
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
     const body: unknown = await response.clone().json();

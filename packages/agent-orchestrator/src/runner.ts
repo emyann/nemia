@@ -450,7 +450,8 @@ export {
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/index.ts';
 export { isWatchedKind, type KindChange, type WatchedKind } from './list-watch/index.ts';
-export { keyspaceHead, kindReplay, kindRevisions } from './list-watch/kind-watch.store.ts';
+export { keyspaceHead, kindReplay } from './list-watch/kind-watch.store.ts';
+export { kindRevisions } from './list-watch/kind-revisions.verb.ts';
 export { cardHeld } from './cards/cards.store.ts';
 export { definitionJudged, definitionRevisionNow } from './definition-index/definition-index.store.ts';
 export { runWatchVersion } from './runlist/runlist.ts';

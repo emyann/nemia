@@ -34,7 +34,7 @@ export function StepInspector({ run, step, talk, onBack }: { run: RunDetail; ste
   if (!talk) return <StepPart view={run} step={step.name} size="L" agents={agents.data} here frame={onTheBar} />;
   return (
     <section data-step-scope={step.name} aria-label="Its conversation" className="flex flex-col gap-2">
-      <Button variant="text" size="xsmall" icon={ArrowLeft} onPress={onBack} className="self-start">
+      <Button variant="outlined" size="xsmall" icon={ArrowLeft} onPress={onBack} className="self-start">
         Back to the step
       </Button>
       <Activity key={`${run.id}/${step.name}`} run={run} step={step} />

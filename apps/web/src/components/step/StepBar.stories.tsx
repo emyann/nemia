@@ -7,6 +7,7 @@ import type { StepTranscript } from 'objects';
 import { StepBar, StepPanel } from './StepBar';
 import { transcriptPath } from '@/lib/api/steps';
 import { CODES, runOf, stepOf, tryOf } from '../../../.storybook/fixtures/steps';
+import { streamsOf } from '../../../.storybook/streams';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** A step at work, its session started: a conversation the bar follows once it is opened. */
@@ -55,24 +56,6 @@ const followed = [
   sse(`${transcriptPath(AT_WORK.id, 'design')}/stream`, () => undefined),
 ];
 
-/** Every EventSource the page opens while `during` runs, each the browser's own, watched and passed through. */
-async function streamsOpenedBy(during: () => Promise<void>) {
-  const opened: EventSource[] = [];
-  const Real = window.EventSource;
-  window.EventSource = class extends Real {
-    constructor(url: string | URL, init?: EventSourceInit) {
-      super(url, init);
-      opened.push(this);
-    }
-  };
-  try {
-    await during();
-  } finally {
-    window.EventSource = Real;
-  }
-  return opened;
-}
-
 /** The bar's ⋯ menu in `canvas`, opened, and its item `label` pressed. */
 async function pick(canvas: HTMLElement, label: string) {
   await userEvent.click(within(canvas).getByRole('button', { name: 'More actions' }));
@@ -116,6 +99,7 @@ function Sheet({ children }: { children: ReactNode }) {
  * followed while it shows, and Back closes its stream: none is left open.
  */
 export const TheCard: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: { at: AT, msw: { handlers: followed } },
   render: () => (
     <Sheet>
@@ -136,23 +120,20 @@ export const TheCard: StoryObj<typeof meta> = {
     const items = await within(canvasElement.ownerDocument.body).findAllByRole('menuitem');
     await expect(items.map((item) => item.textContent)).toEqual(['Open', 'Open conversation']);
 
-    const opened = await streamsOpenedBy(async () => {
+    const streams = await streamsOf(async () => {
       await userEvent.click(items[1]);
       await canvas.findByText('The panel is the step’s card now.');
       await waitFor(() => expect(canvas.getByText('Followed as it runs.')).toBeVisible());
       await userEvent.click(canvas.getByRole('button', { name: 'Back to the step' }));
     });
     await expect(canvasElement.querySelector('[data-step-part="L"]'), 'Back shows the card again').not.toBeNull();
-    await expect(opened.length, 'its stream was opened while it showed').toBe(1);
-    await expect(
-      opened.map((stream) => stream.readyState),
-      'and none is left open',
-    ).toEqual([EventSource.CLOSED]);
+    await expect(streams, 'its stream was opened while it showed, and Back left none open').toEqual({ opened: 1, open: 0 });
   },
 };
 
 /** The step's conversation, opened from the bar's menu: Back to the card, its compact tail followed as it runs, the way to the whole. */
 export const ItsConversation: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: { at: AT, msw: { handlers: followed } },
   render: () => (
     <Sheet>

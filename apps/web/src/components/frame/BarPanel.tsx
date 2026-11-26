@@ -88,7 +88,7 @@ function useFocusReturn(bar: RefObject<HTMLElement | null>) {
 }
 
 /** An item of a bar's ⋯ menu after its Open: its id, the words it says, and what pressing it does. */
-export type BarItem = { id: string; label: string; onAction: () => void };
+type BarItem = { id: string; label: string; onAction: () => void };
 
 /** Where the bar fills the sheet: over the sheet's own padding, its whole height. */
 const FILLS = '-m-4 h-[calc(100%+2rem)]';

@@ -29,10 +29,12 @@ test('a schedule is named by its workflow in its factory, its status the listing
       refused: null,
     },
     mill,
+    { stamp: () => '4', head: '4' },
   );
   assert.ok(Schema.is(Schedule)(s));
   assert.equal(s.metadata.name, 'nightly');
   assert.equal(s.metadata.namespace, 'mill');
+  assert.equal(s.metadata.resourceVersion, '4', 'the version is the stamp the keyspace gave');
   assert.deepEqual(s.spec, { cron: '0 3 * * *', brief: 'tidy' });
   assert.deepEqual(s.status, { since: '2026-10-01T00:00:00.000Z', next: '2026-11-05T03:00:00.000Z' });
 });

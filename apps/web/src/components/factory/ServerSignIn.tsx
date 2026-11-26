@@ -1,6 +1,7 @@
 /**
- * A server's sign-in on its row of a factory's settings page: Sign in where the server reads `needs-auth`, Sign out where it reads
- * `connected`, and nothing for any other state.
+ * A server's sign-in on its row of a factory's settings page, for a server whose record signs in through Nemia (`oauth`): Sign out
+ * where it reads `connected`, nothing where it reads `disabled`, and Sign in at every other state — `needs-auth`, `pending`, `failed`
+ * and a state unread alike, since a server with no sign-in can settle on any of them. A server without `oauth` draws nothing.
  *
  * A person only signs in. The press starts a sign-in the engine holds, and the board draws what it answered: a code to type at the
  * provider's page, where the provider offers one, or an address to open in the browser, where the provider sends the browser back to a
@@ -206,21 +207,28 @@ export function SignInView({
   );
 }
 
-/** Where a sign-in stands, from the server's state and the engine's word on its sign-in, read on every load. */
-const shownOf = (state: string | null, held: SignInState | undefined) => {
+/**
+ * Where a sign-in stands, from the server's record, its state and the engine's word on its sign-in, read on every load: `null` where
+ * nothing is drawn. Exported for its stories.
+ * @param state The servers' read's word for the server's state, `null` where it was unread.
+ * @param oauth Whether the server's record signs it in through Nemia (`oauth`): a server without it draws nothing.
+ * @param held The engine's word on the server's sign-in, undefined until it is read.
+ */
+export const signInShownOf = (state: string | null, oauth: boolean, held: SignInState | undefined) => {
+  if (!oauth) return null satisfies SignInShown | null;
   if (held?.state === 'waiting' && held.started) return { at: 'waiting', started: held.started } satisfies SignInShown | null;
   if (held?.state === 'expired' || held?.state === 'failed')
     return { at: 'ended', why: held.why ?? `The sign-in ${held.state}.` } satisfies SignInShown | null;
-  if (state === 'needs-auth') return { at: 'offer' } satisfies SignInShown | null;
   if (state === 'connected') return { at: 'connected' } satisfies SignInShown | null;
-  return null satisfies SignInShown | null;
+  if (state === 'disabled') return null satisfies SignInShown | null;
+  return { at: 'offer' } satisfies SignInShown | null;
 };
 
 /**
- * The sign-in of `server` of the factory `factory`, whose state the servers' read said `state`: drawn where it is `needs-auth` or
- * `connected`, or a sign-in the engine holds waits or ended.
+ * The sign-in of `server` of the factory `factory`, whose state the servers' read said `state`: drawn where its record has `oauth`
+ * (`signInShownOf`), its sign-in's state read only then.
  */
-export function ServerSignIn({ factory, server, state }: { factory: string; server: string; state: string | null }) {
+export function ServerSignIn({ factory, server, state, oauth }: { factory: string; server: string; state: string | null; oauth: boolean }) {
   const queryClient = useQueryClient();
   const servers = factoryServersQuery(factory);
   const stateQuery = signInStateQuery(factory, server);
@@ -236,12 +244,12 @@ export function ServerSignIn({ factory, server, state }: { factory: string; serv
     onSuccess: () => setPasted(''),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: stateQuery.queryKey, exact: true }),
   });
-  const held = useQuery(stateQuery).data;
+  const held = useQuery({ ...stateQuery, enabled: oauth }).data;
   const connected = held?.state === 'connected';
   useEffect(() => {
     if (connected) void queryClient.invalidateQueries({ queryKey: servers.queryKey, exact: true });
   }, [connected, queryClient, servers.queryKey]);
-  const shown = shownOf(state, held);
+  const shown = signInShownOf(state, oauth, held);
   if (shown === null) return null;
   const failed = signIn.error ?? signOut.error ?? complete.error;
   return (

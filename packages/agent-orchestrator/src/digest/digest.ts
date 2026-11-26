@@ -1,10 +1,9 @@
 /**
- * The one recipe of a `resourceVersion` that is a digest (`versionDigest`): the sha256 of a text, cut to 16 hex characters — the same
- * text, the same word, across a restart too. A value's is the digest of its JSON (`valueVersion`). Every kind whose version says what it
- * holds takes it here: a card's text, a run, a factory's part, an agent's files, a skill held in memory. An event's, a delegation's and
- * a proposal's `resourceVersion` are no digest but a position — the byte after the event's line in the feed (`feedPosition`), when the
- * delegation was written (`writtenPosition`), the revision of the proposal's record in the keyspace (`src/keyspace/keyspace.store.ts`)
- * — and are named so where they are made. Pure.
+ * The one recipe of a version that is a digest (`versionDigest`): the sha256 of a text, cut to 16 hex characters — the same text, the
+ * same word, across a restart too. A value's is the digest of its JSON (`valueVersion`). A digest is a content's own version, never a
+ * served object's `resourceVersion` but a run's (until the run's status is a record): the definition index's records hold one, and a door's
+ * compare-and-swap judges by it. A watched kind serves the keyspace revision of its last change (`atRevisions`), an event the byte after
+ * its line in the feed (`feedPosition`). Pure.
  */
 import { createHash } from 'node:crypto';
 

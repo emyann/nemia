@@ -2268,7 +2268,7 @@ checks:
 - **Each entry is `{ name, run | condition, after?, enabled? }`.** `run:` is a shell line, as a GitHub Actions step's, and `condition: <name>` in its place waits on a condition a program or a person writes; a `name` is lower-case
   words joined by `-`. A check with no `after:` waits on the one above it, so a plain list is a chain; `after: []` waits on nothing, and
   two such run side by side; `after: [a, b]` waits on both. `enabled: false` takes a check out and hands its waits on to the checks
-  that waited on it. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
+  that waited on it; a template writes it as `enabled: "${{ parameters.<name> }}"` for a boolean parameter, which a factory's apply renders as `true` or `false`. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
   off, and `check:` beside `checks:`.
 - **A condition check holds no checkout.** An ending (`workspace: base`) works in the repository's own checkout, and holds it until every
   check that runs a command there has passed; a `condition:` check runs nothing there, as a wait on a CI service at the commit that

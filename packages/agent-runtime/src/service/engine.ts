@@ -413,9 +413,10 @@ export type EngineShape = {
   readonly models: (harness: string) => Effect.Effect<readonly ListedModel[] | undefined, RunnerError>;
   /**
    * The state of each of `servers` — a record of them, every one in one short-lived Claude Code session with the servers
-   * inline, asked once and ended (`mcpServersRead`): `connected`, `needs-auth`, `failed`, `pending` or `disabled`, the harness's own
-   * words carried and never re-worded, with the tool count of a connected one and the error of a failed one. No turn begins, so the
-   * read costs no token; it costs one CLI spawn, whatever the record's size. No task is touched and nothing is journalled.
+   * inline, asked until no server is `pending` or `MCP_SETTLE_MS` passed, and ended (`mcpServersRead`): `connected`, `needs-auth`,
+   * `failed`, `pending` or `disabled`, the harness's own words carried and never re-worded, with the tool count of a connected one
+   * and the error of a failed one. No turn begins, so the read costs no token; it costs one CLI spawn, whatever the record's size.
+   * No task is touched and nothing is journalled.
    *
    * The bytes handed over are `mcpServerOf`'s, the same a task's own session will be given, so a sign-in made against what this read
    * judged is the sign-in that session finds.

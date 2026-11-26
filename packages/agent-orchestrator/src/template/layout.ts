@@ -212,11 +212,15 @@ export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: Readonl
   return [...manifest, ...outside, ...folderRefusals(folder.files)];
 }
 
-/** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source. */
+/**
+ * A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, a string for a `flag` (a boolean a parameter
+ * writes), and `not-yet` for a git or url source.
+ */
 type Leaf =
   | 'string'
   | 'number'
   | 'boolean'
+  | 'flag'
   | 'strings'
   | 'lines'
   | 'text'
@@ -279,7 +283,7 @@ const STEP: Shape = {
     check: 'words',
     checks: {
       list: {
-        fields: { name: 'string', run: 'words', condition: 'string', after: 'strings', enabled: 'boolean' },
+        fields: { name: 'string', run: 'words', condition: 'string', after: 'strings', enabled: 'flag' },
         required: ['name'],
       },
     },
@@ -502,6 +506,7 @@ const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknow
   string: [(v) => typeof v === 'string', 'a string'],
   number: [(v) => typeof v === 'number', 'a number'],
   boolean: [(v) => typeof v === 'boolean', 'true or false'],
+  flag: [(v) => typeof v === 'boolean' || typeof v === 'string', 'true or false, or a string a parameter writes as one'],
   strings: [isStrings, 'a list of strings'],
   lines: [isLines, 'a list of strings and {path: <file>} items, each file a YAML list of strings'],
   words: [(v) => typeof v === 'string' || isParam(v), 'a string or {param: <name>}'],

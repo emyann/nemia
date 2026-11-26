@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { sweepLoop } from '../forget/prune/free.verb.ts';
 import { keyspaceAt, keyspaceFile } from './keyspace.store.ts';
-import { indexSweep, sweepBegun } from '../definition-index/definition-index.store.ts';
+import { indexSweep } from '../definition-index/definition-index.store.ts';
 
 /** How often the daemon compacts the keyspace: every 5 minutes, as etcd's history is kept by Kubernetes. */
 const KEYSPACE_COMPACT_EVERY = '5 minutes';
@@ -33,7 +33,4 @@ export const compaction = () =>
 const DEFINITIONS_EVERY = '2 seconds';
 
 /** The definition index's sweep of the store `StoreRoot` names, for as long as the daemon runs (`sweepLoop`). */
-export const definitionSweep = () =>
-  Effect.sync(sweepBegun).pipe(
-    Effect.andThen(sweepLoop(() => indexSweep(), DEFINITIONS_EVERY, 'The definition index could not be read this sweep')),
-  );
+export const definitionSweep = () => sweepLoop(() => indexSweep(), DEFINITIONS_EVERY, 'The definition index could not be read this sweep');

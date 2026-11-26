@@ -13,6 +13,8 @@ import { Cause, Effect, Exit, Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory.ts';
 import { factoryCommands, factoryObjectsOf, followOf, type FactoryListed } from './factory.verb.ts';
+import { atRevisions } from '../../object/listed.verb.ts';
+import { indexSweep } from '../../definition-index/definition-index.store.ts';
 import { volumeBase } from '../volume/volume.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
 import { factoriesNow } from '../../../testing.ts';
@@ -63,7 +65,12 @@ const listed: FactoryListed = {
   untrusted: [{ factory: 'acme', place: repo, harness: 'Claude Code', folder: repo, withheld: 'its hooks', never: null }],
 };
 
-const objects = factoriesNow(home, factoryObjectsOf(listed, home));
+const objectsOf = (read: FactoryListed) =>
+  factoriesNow(
+    home,
+    Effect.flatMap(atRevisions('Factory', home), (at) => factoryObjectsOf(read, home, at)),
+  );
+const objects = objectsOf(listed);
 const byName = (name: string) => objects.find((o) => o.metadata.name === name);
 
 test('the default factory is listed first, on no repository, offering every workflow and hiring no one', () => {
@@ -101,7 +108,7 @@ test('a stray file is listed with why it does not read, and hides no other', () 
 
 test('every object decodes as the objects say a Factory is, and its resourceVersion stands when its status alone moves', () => {
   for (const o of objects) assert.ok(Schema.is(FactorySchema)(o), o.metadata.name);
-  const without = factoriesNow(home, factoryObjectsOf({ ...listed, untrusted: [] }, home)).find((o) => o.metadata.name === 'acme');
+  const without = objectsOf({ ...listed, untrusted: [] }).find((o) => o.metadata.name === 'acme');
   assert.notDeepEqual(without?.status, byName('acme')?.status, 'the status moved');
   assert.equal(
     without?.metadata.resourceVersion,
@@ -109,35 +116,35 @@ test('every object decodes as the objects say a Factory is, and its resourceVers
     'as metadata.generation, a status write moves no version',
   );
   assert.equal(
-    factoriesNow(home, factoryObjectsOf(listed, home)).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
+    objectsOf(listed).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
     byName('acme')?.metadata.resourceVersion,
     'the same read is the same version',
   );
 });
 
-test("a Factory's resourceVersion moves with its rules and its instruction, read beside its spec and status", () => {
-  const versionOf = (name: string) =>
-    factoriesNow(home, factoryObjectsOf(listed, home)).find((o) => o.metadata.name === name)?.metadata.resourceVersion;
+test("a Factory's resourceVersion is a keyspace revision that its rules and its instruction, once indexed, move", async () => {
+  const versionOf = (name: string) => objectsOf(listed).find((o) => o.metadata.name === name)?.metadata.resourceVersion;
+  const sweep = () => Effect.runPromise(indexSweep().pipe(Effect.provide(StoreRoot.layer(home))));
   const rules = path.join(home, 'factories', 'acme', 'RULES.md');
   const instruction = path.join(repo, 'NEMIA.md');
-  const plain = versionOf('acme');
-  const seen = [plain];
-  const moves = (what: string) => {
+  await sweep();
+  const seen = [versionOf('acme')];
+  const moves = async (what: string) => {
+    await sweep();
     const now = versionOf('acme');
+    assert.match(now ?? '', /^\d+$/, what);
     assert.ok(!seen.includes(now), what);
     assert.equal(versionOf('acme'), now, `the same read is the same version, ${what}`);
     seen.push(now);
   };
   fs.writeFileSync(rules, 'Be kind.\n');
-  moves('rules written');
+  await moves('rules written');
   fs.writeFileSync(instruction, 'We build tools.\n');
-  moves('instruction written');
+  await moves('instruction written');
   fs.writeFileSync(rules, 'Be brief.\n');
-  moves('rules edited');
+  await moves('rules edited');
   fs.rmSync(rules);
-  moves('rules removed');
   fs.rmSync(instruction);
-  assert.equal(versionOf('acme'), plain, 'a factory that keeps neither again has the version of its spec alone');
   assert.equal(versionOf('default'), byName('default')?.metadata.resourceVersion, "the default factory's version does not move");
 });
 
@@ -178,7 +185,7 @@ test("a cloned volume's origin is on its spec, and a volume given no URL has non
   };
   const { name: _n, file: _f, ...millFiled } = mill;
   fs.writeFileSync(mill.file, JSON.stringify(millFiled));
-  const served = factoriesNow(home, factoryObjectsOf({ factories: [mill], untrusted: [] }, home)).find((o) => o.metadata.name === 'mill');
+  const served = objectsOf({ factories: [mill], untrusted: [] }).find((o) => o.metadata.name === 'mill');
   assert.equal(served?.spec.volumes.at(0)?.origin, 'https://h/o/r.git');
   assert.ok(served && Schema.is(FactorySchema)(served));
   assert.equal(

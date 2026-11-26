@@ -7,7 +7,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, dropStoredFactory, store, storeFactory } from '../world.ts';
+import { OUT, dropStoredFactory, numberedDefinitions, store, storeFactory } from '../world.ts';
 
 /** The factory the page writes, on the checkout, offering WORKFLOWS' workflow of yours. */
 const FACTORY = 'proposing-e2e';
@@ -188,6 +188,7 @@ const send = (page: Page, method: 'PUT' | 'DELETE', at: string, body: unknown) =
  * her session would have made it: the door's own decode reads it back. Its name.
  */
 async function proposed(page: Page) {
+  numberedDefinitions();
   const hire = await page.evaluate(
     async (to) => (await (await fetch(to)).json()) as { metadata: { resourceVersion: string } },
     `/api/namespaces/${FACTORY}/hires/${HIRE}`,

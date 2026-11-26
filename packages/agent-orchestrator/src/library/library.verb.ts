@@ -4,7 +4,6 @@
  * on each call, and a read writes nothing: a factory with no record keeps its adds derived until its first add or removal writes the record
  * whole.
  */
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddList } from 'objects';
@@ -18,7 +17,7 @@ import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Effect } from 'effect';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
-import { objectsListed, type ObjectQuery } from '../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../object/listed.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { BuiltinServer, FactoryServer } from '../factory/servers/index.ts';
@@ -184,29 +183,19 @@ const missingFix = (factory: string, ref: LibraryRef) =>
   `${ref.kind} ${ref.name} is no longer in the library: make it again there, or take the add off with nemia library rm ${ref.kind} ${ref.name} --factory ${factory}.`;
 
 /**
- * The add `ref` of the factory `name` as an object, with what it is there, the factories as `listing` reads them.
+ * What the add `ref` of the factory `name` is there, the factories as `listing` reads them: its spec and its status.
  * @param listing The store's factories, as the Factory door lists them.
  * @param home The store's root.
  * @param name The factory's name.
  * @param ref The add.
  * @param recorded Whether the factory's adds are its record's.
  */
-function addObjectIn(listing: readonly FactoryListing[], home: string, name: string, ref: LibraryRef, recorded: boolean) {
+function addStateIn(listing: readonly FactoryListing[], home: string, name: string, ref: LibraryRef, recorded: boolean) {
   const held = libraryOrigin(home, ref);
   const own = ownOrigins(listing, name, ref);
   const state = libraryAddState([...own, ...(held === undefined ? [] : [held])]);
   const shadowedBy = state === 'shadowed' ? own[0] : undefined;
   return {
-    apiVersion: API_VERSION,
-    kind: 'LibraryAdd',
-    metadata: {
-      name: addName(ref),
-      namespace: name,
-      creationTimestamp: recordedAt(home, name),
-      resourceVersion: `sha256:${createHash('sha256')
-        .update(JSON.stringify([ref.kind, ref.name, recorded]))
-        .digest('hex')}`,
-    },
     spec: { kind: ref.kind, name: ref.name },
     status: {
       state,
@@ -215,6 +204,29 @@ function addObjectIn(listing: readonly FactoryListing[], home: string, name: str
       ...(held !== undefined && { origin: held }),
       ...(state === 'missing' && { message: missingFix(name, ref) }),
     },
+  } satisfies Pick<LibraryAdd, 'spec' | 'status'>;
+}
+
+/**
+ * The add `ref` of the factory `name` as an object, with what it is there, the factories as `listing` reads them.
+ * @param listing The store's factories, as the Factory door lists them.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param ref The add.
+ * @param recorded Whether the factory's adds are its record's.
+ * @param at The revisions of the LibraryAdd kind.
+ */
+function addObjectIn(listing: readonly FactoryListing[], home: string, name: string, ref: LibraryRef, recorded: boolean, at: AtRevisions) {
+  return {
+    apiVersion: API_VERSION,
+    kind: 'LibraryAdd',
+    metadata: {
+      name: addName(ref),
+      namespace: name,
+      creationTimestamp: recordedAt(home, name),
+      resourceVersion: at.stamp(name, addName(ref)),
+    },
+    ...addStateIn(listing, home, name, ref, recorded),
   } satisfies LibraryAdd as LibraryAdd;
 }
 
@@ -225,8 +237,11 @@ function addObjectIn(listing: readonly FactoryListing[], home: string, name: str
  * @param ref The add.
  * @param recorded Whether the factory's adds are its record's.
  */
-export const libraryAddObject = (home: string, name: string, ref: LibraryRef, recorded: boolean) =>
-  Effect.flatMap(listedAt(home), (listing) => fromThrow(() => addObjectIn(listing, home, name, ref, recorded)));
+export const libraryAddObject = Effect.fn('libraryAddObject')(function* (home: string, name: string, ref: LibraryRef, recorded: boolean) {
+  const at = yield* atRevisions('LibraryAdd', home);
+  const listing = yield* listedAt(home);
+  return yield* fromThrow(() => addObjectIn(listing, home, name, ref, recorded, at));
+});
 
 /**
  * The add named `addname`, `<kind>.<name>`, read as a reference; undefined where it names no kind of the library.
@@ -262,7 +277,8 @@ export const writeLibraryAdd = Effect.fn('writeLibraryAdd')(function* (
   if (refused !== null) return yield* Effect.fail(new Missing({ message: refused.message }));
   const now = does === 'add' ? (added ? adds : [...adds, ref]) : adds.filter((a) => !sameAdd(a, ref));
   yield* tried(() => writeLibraryAdds(home, name, now));
-  return yield* tried(() => addObjectIn(listing, home, name, ref, true) satisfies LibraryAdd);
+  const at = yield* atRevisions('LibraryAdd', home);
+  return yield* tried(() => addObjectIn(listing, home, name, ref, true, at) satisfies LibraryAdd);
 });
 
 /**
@@ -308,7 +324,7 @@ export const addsMissingNow = (home: string) =>
         return [{ factory, missing: true, message: e instanceof Error ? e.message : String(e) }];
       }
       if (adds === undefined) return [];
-      const fixes = adds.flatMap((ref) => addObjectIn(listing, home, factory, ref, true).status.message ?? []);
+      const fixes = adds.flatMap((ref) => addStateIn(listing, home, factory, ref, true).status.message ?? []);
       return [{ factory, missing: fixes.length > 0, ...(fixes.length > 0 && { message: fixes.join(' ') }) }];
     });
   });
@@ -388,13 +404,15 @@ export const libraryAddWritten = (factory: string, does: 'add' | 'remove', addna
  * @param query The list's query: its selector, limit and token.
  */
 export const libraryAddList = Effect.fn('libraryAddList')(function* (home: string, name: string, query: ObjectQuery) {
+  const at = yield* atRevisions('LibraryAdd', home);
   const listing = yield* listedAt(home);
   const { recorded, adds } = addsIn(listing, home, name);
   const listed: LibraryAddList = yield* objectsListed(
     'LibraryAdd',
-    adds.map((ref) => addObjectIn(listing, home, name, ref, recorded)),
+    adds.map((ref) => addObjectIn(listing, home, name, ref, recorded, at)),
     query,
     'library add',
+    at.head,
   );
   return listed;
 });
@@ -407,6 +425,7 @@ export const libraryAddList = Effect.fn('libraryAddList')(function* (home: strin
  */
 export const libraryAddNamed = Effect.fn('libraryAddNamed')(function* (home: string, name: string, addname: string) {
   const ref = refOf(addname);
+  const at = yield* atRevisions('LibraryAdd', home);
   const listing = yield* listedAt(home);
   const { recorded, adds } = addsIn(listing, home, name);
   if (ref === undefined || !adds.some((a) => sameAdd(a, ref)))
@@ -415,5 +434,5 @@ export const libraryAddNamed = Effect.fn('libraryAddNamed')(function* (home: str
         message: `${name} has no add ${addname}: list them with GET /api/namespaces/${name}/libraryadds, or add it with nemia library add.`,
       }),
     );
-  return addObjectIn(listing, home, name, ref, recorded) satisfies LibraryAdd;
+  return addObjectIn(listing, home, name, ref, recorded, at) satisfies LibraryAdd;
 });

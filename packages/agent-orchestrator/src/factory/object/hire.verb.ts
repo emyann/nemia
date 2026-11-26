@@ -22,7 +22,7 @@ const SETTING_KEYS: readonly string[] = Object.keys(HireSettings.fields);
 import { Conflict, type Invalid, Missing } from '../../refusal/refusal.ts';
 import { WorkflowDoor } from '../../workflows/workflows.store.ts';
 import { factoryFiled } from './factory.verb.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /**
  * A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and its first repository, none
@@ -132,8 +132,8 @@ const offered = Effect.fn('offered')(function* (f: HiringFactory, home: string) 
 const collided = (namespace: string, name: string, held: readonly HiredStep[]) =>
   `the Hire ${name} of ${namespace} names ${held.map((s) => `the step ${s.step} of ${s.workflow}`).join(' and ')}, whose names join to one: rename one of the steps, or one of the workflows, so that no two join to ${name}`;
 
-/** The Hires of the factory `f`, at the store `home`, filed at `filedAt`, each a step it offers. */
-export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: string, filedAt: string) {
+/** The Hires of the factory `f`, at the store `home`, filed at `filedAt` and at the revisions `at`, each a step it offers. */
+export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: string, filedAt: string, at: AtRevisions) {
   const read = [];
   for (const [workflow, dir] of yield* offered(f, home))
     read.push(...(yield* workflowHires(f, home, workflow, dir).pipe(Effect.orElseSucceed(() => []))));
@@ -146,7 +146,7 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
     return {
       apiVersion: API_VERSION,
       kind: 'Hire',
-      metadata: { name, namespace: f.name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+      metadata: { name, namespace: f.name, creationTimestamp: filedAt, resourceVersion: at.stamp(f.name, name) },
       spec,
       status,
     } satisfies Hire;
@@ -170,8 +170,9 @@ const hiringOf = Effect.fn('hiringOf')(function* (home: string, namespace: strin
 
 /** A page of the Hires of the factory `namespace` (`HireList`), read now at the store `home`. */
 export const hireList = Effect.fn('hireList')(function* (home: string, namespace: string, query: ObjectQuery) {
+  const at = yield* atRevisions('Hire', home);
   const { factory, filedAt } = yield* hiringOf(home, namespace);
-  const listed: HireList = yield* objectsListed('Hire', yield* hiresOf(factory, home, filedAt), query, 'hire');
+  const listed: HireList = yield* objectsListed('Hire', yield* hiresOf(factory, home, filedAt, at), query, 'hire', at.head);
   return listed;
 });
 
@@ -209,6 +210,7 @@ export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: str
 
 /** The Hire `name` of the factory `namespace` as an object, read now; refused as `hireNamedIn` refuses. */
 export const hireObject = Effect.fn('hireObject')(function* (home: string, namespace: string, name: string) {
+  const at = yield* atRevisions('Hire', home);
   const { factory, filedAt } = yield* hiringOf(home, namespace);
-  return yield* hireNamedIn(yield* hiresOf(factory, home, filedAt), namespace, name);
+  return yield* hireNamedIn(yield* hiresOf(factory, home, filedAt, at), namespace, name);
 });

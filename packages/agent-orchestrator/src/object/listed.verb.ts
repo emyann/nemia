@@ -4,7 +4,7 @@
  * `remainingItemCount` counts what the selector keeps. That page is the one list page (`pageListed`, its envelope `listOf`), which the
  * cards, the runs and the definitions the api serves page by too, each by its own key and labels; the events, read from a cursor in the
  * feed's order, share its selector's refusal (`selectorsRefused`) and its envelope. Beside it what each object is stamped with: its
- * `resourceVersion` (`versionOf`) and its `creationTimestamp` off a file (`bornAt`). A factory's parts, a template and a subscription are
+ * `resourceVersion` (`atRevisions`) and its `creationTimestamp` off a file (`bornAt`). A factory's parts, a template and a subscription are
  * listed through it.
  */
 import fs from 'node:fs';
@@ -12,7 +12,9 @@ import { Effect } from 'effect';
 import { API_VERSION } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
-import { valueVersion } from '../digest/digest.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { kindRevisions } from '../list-watch/kind-revisions.verb.ts';
+import type { WatchedKind } from '../list-watch/index.ts';
 import { pageOf, type Paged } from './page.ts';
 
 /** What a list of objects is asked: its namespace (none for every namespace's), `?limit=`, `?continue=`, its selectors, OR'd. */
@@ -26,15 +28,24 @@ export type ObjectQuery = {
 /** An object of any kind here: what a list reads of it, its name and labels. */
 type Named = { readonly metadata: { readonly name: string; readonly labels?: Readonly<Record<string, string>> } };
 
+/** The revisions a kind's objects stand at as of one read of the keyspace: each object's `resourceVersion`, and the head its list is at. */
+export type AtRevisions = {
+  readonly stamp: (namespace: string | undefined, name: string) => string;
+  readonly head: string;
+};
+
 /**
- * The `resourceVersion` of an object: a digest of its spec and status as they encode, and of the sub-resources read beside them, `parts`,
- * where it has any (a Factory's rules and instruction). Without `parts` the digest is the spec's and the status's alone.
- * @param spec The object's spec, as it encodes.
- * @param status The object's status, as it encodes.
- * @param parts The sub-resources read beside them, or undefined where the object has none.
+ * The revision each object of `kind` stands at, read once and before the objects are, so a watch from a list's head loses no change
+ * between the two: an object's `resourceVersion` is `stamp` of its namespace and name, the highest revision among the records it is made
+ * of (`WATCHED_KINDS`); a list's is `head`. It writes nothing.
+ * @param kind The kind served.
+ * @param home The store's root.
  */
-export const versionOf = (spec: unknown, status: unknown, parts?: unknown) =>
-  valueVersion(parts === undefined ? { spec, status } : { spec, status, parts });
+export const atRevisions = (kind: WatchedKind, home: string) =>
+  Effect.map(
+    kindRevisions(kind).pipe(Effect.provideService(StoreRoot, home)),
+    ({ of, head }) => ({ stamp: (namespace, name) => String(of(namespace, name)), head: String(head) }) satisfies AtRevisions,
+  );
 
 /**
  * When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`.
@@ -88,20 +99,25 @@ export const pageListed = <T>(items: readonly T[], query: Omit<ObjectQuery, 'nam
   >;
 };
 
-/** A list's metadata: how many objects are after the page, and the token of the next one. */
-export type ListedMeta = { remainingItemCount: number; continue?: string };
+/** A list's metadata: how many objects are after the page, the token of the next one, and the keyspace head it was read at. */
+export type ListedMeta = { remainingItemCount: number; continue?: string; resourceVersion?: string };
 
 /**
  * The `<kind>List` of a page: its envelope, the page's count and token, and `items`, the page's objects.
  * @param kind The kind of the objects listed, which the envelope's kind ends with `List`.
  * @param page The page's count of what is after it and its next token, if any.
  * @param items The page's objects, as served.
+ * @param head The keyspace head the list was read at (`atRevisions`), none for a list of a kind the keyspace does not watch.
  */
-export const listOf = <const K extends string, T>(kind: K, page: Omit<Paged<unknown>, 'items'>, items: T[]) =>
+export const listOf = <const K extends string, T>(kind: K, page: Omit<Paged<unknown>, 'items'>, items: T[], head?: string) =>
   ({
     apiVersion: API_VERSION,
     kind: `${kind}List`,
-    metadata: { remainingItemCount: page.remainingItemCount, ...(page.continue !== undefined ? { continue: page.continue } : {}) },
+    metadata: {
+      remainingItemCount: page.remainingItemCount,
+      ...(page.continue !== undefined ? { continue: page.continue } : {}),
+      ...(head === undefined ? {} : { resourceVersion: head }),
+    },
     items,
   }) satisfies { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] };
 
@@ -114,9 +130,16 @@ const byMetadata: ListedBy<Named> = { key: (o) => o.metadata.name, labels: (o) =
  * @param items Every object of the kind, before the query's selectors keep any.
  * @param query The list's query: its limit, its continue token and its label selectors.
  * @param what The kind as a person reads it, named in the selector's refusal.
+ * @param head The keyspace head the objects were stamped at (`atRevisions`), the list's own `resourceVersion`.
  */
-export const objectsListed = <const K extends string, T extends Named>(kind: K, items: readonly T[], query: ObjectQuery, what: string) =>
-  Effect.map(pageListed(items, query, what, byMetadata), (page) => listOf(kind, page, [...page.items])) satisfies Effect.Effect<
+export const objectsListed = <const K extends string, T extends Named>(
+  kind: K,
+  items: readonly T[],
+  query: ObjectQuery,
+  what: string,
+  head?: string,
+) =>
+  Effect.map(pageListed(items, query, what, byMetadata), (page) => listOf(kind, page, [...page.items], head)) satisfies Effect.Effect<
     { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] },
     Invalid
   > as Effect.Effect<{ apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] }, Invalid>;

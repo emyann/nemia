@@ -219,7 +219,7 @@ const startOf = (entry: Check) => {
 };
 
 /** What makes two rollup entries runs of one check: a status context's name, or a check run's name within its workflow. */
-export const checkKey = (entry: Check) =>
+const checkKey = (entry: Check) =>
   entry.context !== undefined ? `status ${entry.context}` : `run ${entry.name ?? ''}\u0000${entry.workflowName ?? ''}`;
 
 /**
@@ -269,8 +269,8 @@ export type Landing = { number: number; url: string; oid: string; onto: string; 
 /** Where a person reads a commit of the repository the landing's pull request is of. */
 const commitUrl = (l: Landing, sha: string) => `${l.url.replace(/\/pull\/\d+$/, '')}/commit/${sha}`;
 
-/** What every refusal of the wait says: the merge stands, and nothing was taken back. */
-export const stands = (l: Landing) => `  The merge stands and nothing was taken back: #${l.number} is on \`${l.onto}\`.`;
+/** What every refusal of a red merge says: the merge stands, and nothing was taken back. */
+const stands = (l: Landing) => `  The merge stands and nothing was taken back: #${l.number} is on \`${l.onto}\`.`;
 
 /** Why the merge's own `ours`, `superseded`, carry no verdict: every run cancelled, or none reported. */
 export const noVerdict = (ours: readonly Check[]) =>

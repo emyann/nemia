@@ -46,7 +46,7 @@ import { declaresCi } from './ci-log.ts';
 import { PERSONS_EXIT, Refusal, authed, base, git, noGh, run, type Ran, seconds, sleep } from './exec.ts';
 
 /**
- * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
+ * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or a head CI cannot judge — which no
  * change to the branch answers: said as any other, and exit 78 (`PERSONS_EXIT`), which the step's `checkFailurePolicy:` names, so the
  * run waits on the person rather than try the step again.
  */
@@ -55,7 +55,7 @@ class PersonsRefusal extends Refusal {}
 /**
  * How long, in seconds, the push reads the pull request's head again for before it refuses one that is not `HEAD`: GitHub moves the head
  * a moment after the push, and a read straight away can refuse a round whose push had landed. It is bounded and
- * short — the check waits on CI for far longer after it — and `WF_PR_HEAD_SECONDS` lowers it for a test.
+ * short, and `WF_PR_HEAD_SECONDS` lowers it for a test.
  */
 const HEAD_SECONDS = 30;
 

@@ -250,6 +250,25 @@ function redOf(cwd: string, ours: readonly Entry[], entries: readonly Entry[], c
 }
 
 /**
+ * `entries` with each red job of the CI context `check` that an earlier attempt of its run made read as not over: after the failed jobs
+ * are re-run, GitHub shows the first attempt's red until the next attempt reports, and that red is no verdict of the new one. Each job
+ * says its own `run_attempt`, which the run's current attempt is compared with; a job or a run that cannot be read stays as it was.
+ * @param cwd The step's workspace, which `gh` reads GitHub from.
+ * @param entries The context's entries of the commit.
+ * @param check The CI context's name.
+ */
+function afterRerun(cwd: string, entries: readonly Entry[], check: string) {
+  return entries.map((entry) => {
+    const runId = runIdOf(entry);
+    const jobId = jobIdOf(entry);
+    if (!(nameOf(entry) === check && judgedRed(entry) && runId && jobId)) return entry;
+    const now = attemptOfRun(runId);
+    const then = hinted<{ run_attempt?: unknown }>(cwd, 'api', `repos/{owner}/{repo}/actions/jobs/${jobId}`)?.run_attempt;
+    return typeof now === 'number' && typeof then === 'number' && then < now ? { ...entry, status: 'IN_PROGRESS' } : entry;
+  });
+}
+
+/**
  * `entries` with each cancelled job of the CI context `check` that GitHub cut off at its time limit read as GitHub's own conclusion for
  * it, `TIMED_OUT`: a red, re-run once as any red. A job cancelled without the mark, or that names no job, stays cancelled.
  */
@@ -466,7 +485,7 @@ const conflictSaid = (pr: Pr, check: string) =>
 
 /** What GitHub says of the context `check` at the head of `pr`: the verdict, the red's kind and a stuck queue. */
 function readCi(a: Asked, pr: Pr, check: string, served: ServedStepCheck) {
-  const entries = timedOut(a.cwd, latest(pr.statusCheckRollup ?? []), check);
+  const entries = afterRerun(a.cwd, timedOut(a.cwd, latest(pr.statusCheckRollup ?? []), check), check);
   const ourEntries = named(entries, check);
   const found = ciOf(entries, check);
   const ci: Ci = found === 'absent' && !declaresAt(a.cwd, pr.headRefOid) && !declaresAt(a.cwd, pr.baseRefName) ? 'undeclared' : found;
@@ -643,7 +662,7 @@ function judgeMerge(a: Asked, served: ServedStepCheck, check: string, waits: boo
 
 /** What GitHub says of the context `check` at the merge commit `oid` of `pr`: the verdict, the red's kind and the base's tip. */
 function readMerge(a: Asked, pr: Pr, oid: string, check: string) {
-  const entries = latest(entriesAt(a.cwd, oid));
+  const entries = afterRerun(a.cwd, latest(entriesAt(a.cwd, oid)), check);
   const ours = named(entries, check);
   const found = ciOf(entries, check);
   const parent = api<{ parents?: { sha?: string }[] }>(a.cwd, `commits/${oid}`).parents?.[0]?.sha ?? `${oid}^1`;

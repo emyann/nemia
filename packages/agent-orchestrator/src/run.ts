@@ -8,8 +8,8 @@
  */
 export { durationWord } from './usage/usage.ts';
 /**
- * The shell a step's `check:` runs under, and its deadlines, a round's and a landing's, for a template's tests that run a rendered check
- * as a run would and hold a script's own bounds under them (`packages/templates`), from the `agent-orchestrator/run` subpath.
+ * The shell a step's `check:` runs under, for a template's tests that run a rendered check as a run would (`packages/templates`), from
+ * the `agent-orchestrator/run` subpath.
  */
 export { checkArgv } from './check/index.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */

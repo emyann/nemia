@@ -190,27 +190,37 @@ test('a step that is not checking, or whose checks before the condition have not
   }
 });
 
-test('a red the logs do not call the change’s is re-run once, across a restart read from run_attempt, then False', () => {
+test('a red the logs do not call the change’s is re-run once; the first attempt’s red is no verdict while the re-run is awaited, and a red of the new attempt writes False', () => {
   const { repo, head } = placed();
-  const rules = (attempt: number) =>
+  const rules = (attempt: number, jobAttempt: number) =>
     [
       { when: 'pr list', out: pull(head, [RED]) },
       { when: 'actions/jobs/5678/logs', out: 'Run npm ci\nnpm error network timeout' },
+      { when: 'actions/jobs/5678', out: JSON.stringify({ run_attempt: jobAttempt }) },
       { when: 'actions/runs/1234', out: JSON.stringify({ run_attempt: attempt }) },
     ] satisfies Rule[];
-  const first = pass(runOf(implement(repo)), rules(1));
+  const first = pass(runOf(implement(repo)), rules(1, 1));
   assert.equal(first.code, 0, first.err);
   assert.equal(asked(first.calls, 'run rerun 1234 --failed').length, 1, 'the failed jobs are re-run');
   assert.deepEqual(
     first.written.map((w) => w.status),
     ['Unknown'],
   );
-  const restarted = pass(runOf(implement(repo)), rules(2));
-  assert.equal(restarted.code, 0, restarted.err);
-  assert.equal(asked(restarted.calls, 'run rerun').length, 0, 'a run past its first attempt is never re-run again');
+  const awaiting = pass(runOf(implement(repo)), rules(2, 1));
+  assert.equal(awaiting.code, 0, awaiting.err);
+  assert.equal(asked(awaiting.calls, 'run rerun').length, 0, 'a run past its first attempt is never re-run again');
   assert.deepEqual(
-    restarted.written.map((w) => w.status),
+    awaiting.written.map((w) => w.status),
+    ['Unknown'],
+    'the red of the first attempt is not a verdict while the re-run has not reported',
+  );
+  const red = pass(runOf(implement(repo)), rules(2, 2));
+  assert.equal(red.code, 0, red.err);
+  assert.equal(asked(red.calls, 'run rerun').length, 0);
+  assert.deepEqual(
+    red.written.map((w) => w.status),
     ['False'],
+    'a red of the re-run itself is the verdict',
   );
 });
 

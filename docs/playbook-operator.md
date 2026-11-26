@@ -514,7 +514,7 @@ Nemia off, Semi-auto stops at every gate, Auto is what the person's custom instr
 **For this factory's instruction (building Nemia):** the layers and `docs/architecture.md`; trial merges against main and every landing
 ahead; a web change's pictures are the implementer's, read by the reviewer; command-table and frame cards collide, so chain them; restart
 the daemon after code landings, paused, until release and upgrade (since replaced by `nemia upgrade`, *After a landing*); store names and the `wf/` branch prefix stay; a landing check has its
-own deadline (2700 s), measured from a week of landings, now bounding a receipt and its 2400 s wait on main's `ci` at the merge rather than a suite; a landing merges the run's own
+own deadline (2700 s), measured from a week of landings, now bounding a receipt rather than a suite (main's `ci` at the merge is the condition `base-ci`, written by the `ci-watch` program); a landing merges the run's own
 green pull request and nothing is pushed by hand.
 
 **For the steps of `build`:** implement pictures the pages a web change touches (light, dark, the phone where it matters); review reads them

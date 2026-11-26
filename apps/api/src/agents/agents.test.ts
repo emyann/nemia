@@ -155,7 +155,7 @@ describe('a person reads the agents: both places listed, one read by name, the c
     assert.equal(reviewer.keys.output, 'review.schema.json');
     assert.equal(reviewer.schema?.file, 'review.schema.json');
     assert.match(reviewer.schema?.text ?? '', /"properties"/);
-    assert.match(reviewer.version, /^[0-9a-f]{16}$/);
+    assert.match(reviewer.version, /^[0-9]+$/);
     assert.deepEqual(reviewer.usedBy, [{ from: 'repo', workflow: 'dev', step: 'review' }]);
     assert.equal(reviewer.error, null);
     assert.ok(!all.some((a) => a.name === 'README'), 'the README is no agent');
@@ -346,14 +346,23 @@ describe('a person reads the agents: both places listed, one read by name, the c
         const { agents: read } = (await runWith(engine(process.env), AGENTS_ENTRY.handler({ repo }))) as AgentsRead;
         assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'user')?.custom, 'the package read the custom file');
         const board = (one: object) => {
-          const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
+          const {
+            given: _given,
+            untried: _untried,
+            fills: _fills,
+            factories: _factories,
+            version: _version,
+            ...rest
+          } = one as Record<string, unknown>;
           return rest;
         };
-        assert.deepEqual(all.map(board), read, 'each with the file of its custom instructions, or null, as the package read it');
+        assert.deepEqual(all.map(board), read.map(board), 'each with the file of its custom instructions, or null, as the package read it');
         const res = await readAt('/api/agents/user/reviewer/card');
         assert.equal(res.status, 200, await res.clone().text());
         const { card } = (await runWith(engine(process.env), CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'user' }))) as CardRead;
-        assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
+        const served = ((await res.json()) as { card: { version: string } }).card;
+        assert.match(served.version, /^[1-9][0-9]*$/, "the card's version is the revision a save is held to");
+        assert.deepEqual({ ...served, version: null }, { ...card, version: null });
       } finally {
         clearCustomInstructions(root, 'reviewer', repo);
       }
@@ -729,15 +738,11 @@ describe('a write of an agent the api or the package refuses â€” the repositoryâ
       /takes the resourceVersion the Agent was read at/,
     );
     await refused(
-      send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer', version: '0123456789abcdef' }),
+      send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer', version: '1' }),
       409,
-      /^agents\/reviewer\.md changed since it was read/,
+      /^the Agent reviewer changed since it was read/,
     );
-    await refused(
-      send('PUT', '/api/agents/user/nobody', { ...scribe, name: 'nobody', version: '0123456789abcdef' }),
-      404,
-      /^Nothing is at that name/,
-    );
+    await refused(send('PUT', '/api/agents/user/nobody', { ...scribe, name: 'nobody', version: '1' }), 404, /^Nothing is at that name/);
     const reviewer = (await listed()).find((a) => a.from === 'user' && a.name === 'reviewer')!;
     const inUse = await refused(send('DELETE', '/api/agents/user/reviewer', { version: reviewer.version }), 409, /default/);
     assert.deepEqual(inUse.users, ['default'], 'the default factory resolves reviewer from the library, so its removal names it');

@@ -10,7 +10,6 @@ import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import type { CardEdit } from 'objects';
 import { editCard } from './card-edit.verb.ts';
-import { cardVersion } from './card-write.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
@@ -21,6 +20,9 @@ import { aRun } from '../../test/run-walks.ts';
 const QUEUED = '2026-11-01T10:00:00.000Z';
 
 /** The card planted, in the default factory: a workflow, a gate, a label. */
+/** The revision a card filed first stands at in a keyspace of its own: its record's, the first row written. */
+const FILED_AT = '1';
+
 const PLANTED = ['---', 'workflow: build', 'gate: plan', 'labels:', '  team: core', '---', '', 'Add a cache.', '', 'All of it.', ''].join(
   '\n',
 );
@@ -81,7 +83,7 @@ test('a card retitled and cut keeps its name and labels, and takes the text: its
     assert.equal(exit.value.card.name, 'add-a-cache-x1y2');
     assert.equal(exit.value.written, true);
   }
-  assert.notEqual(cardVersion(text ?? ''), cardVersion(PLANTED), 'its version moved');
+  assert.notEqual(text, PLANTED, 'the text moved');
 });
 
 describe("a text in the card's own words is written: its factory or its labels sent back as the card has them", () => {
@@ -121,7 +123,7 @@ test('a text with no after: takes the wait off', () => {
 });
 
 test('a text the card already reads as writes nothing, and its version stays', () => {
-  const { exit, text } = over(editCard('add-a-cache-x1y2', 'default', edit(PLANTED, cardVersion(PLANTED))));
+  const { exit, text } = over(editCard('add-a-cache-x1y2', 'default', edit(PLANTED, FILED_AT)));
   assert.equal(Exit.isSuccess(exit), true, String(exit));
   if (Exit.isSuccess(exit)) assert.equal(exit.value.written, false);
   assert.equal(text, PLANTED);

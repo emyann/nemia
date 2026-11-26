@@ -1,6 +1,6 @@
 /**
  * The head of a step's part (`headOf`, lib/stepPart.ts): who the step is given, its word as a cut tag, its name with its tries and
- * rounds, and, from the preview card's size up, its time, its session's five facts, its spend, its one note and its one action; whole,
+ * rounds, and, from the modal's size up, its time, its session's five facts, its spend, its one note and its one action; whole,
  * its check and its gate besides. While the run's own answer is read, it says so in place of what it has not read.
  */
 import { ChevronRight, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
@@ -31,7 +31,7 @@ function Key({ children, className }: { children: string; className?: string }) 
 }
 
 /** The step's word as a cut tag. */
-function StateTag({ head }: { head: Head }) {
+export function StateTag({ head }: { head: Head }) {
   return (
     <CutTag edge={head.tag.variant === 'outlined'}>
       {head.tag.color === 'alive' ? (
@@ -174,12 +174,13 @@ const wholeFacts = (head: Head) => [
 ];
 
 /**
- * The head at `size`: on the graph's node (S), its name and word, its tries and its note on a line; as the preview card (M) and whole
+ * The head at `size`: on the graph's node (S), its name and word, its tries and its note on a line; in the waiting card's modal
+ * (M) and whole
  * (L), its agent, its time, its facts — whole, its check and gate too — its spend, its note and its action, a link to the step's page
- * (`action`: the card's always, the whole part's where it stands off the step's page).
+ * (`action`: the whole part's where it stands off the step's page).
  */
 export function PartHead({ head, size, action: asked }: { head: Head; size: PartSize; action?: boolean }) {
-  const action = asked ?? size === 'M';
+  const action = asked ?? false;
   if (size === 'S')
     return (
       <div data-step-head="S" data-step-kind={head.kind} className="flex min-w-0 flex-col gap-1">

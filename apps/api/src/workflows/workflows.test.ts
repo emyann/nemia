@@ -18,7 +18,7 @@ import { story } from 'test-kit/checkpoints';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { Effect } from 'effect';
-import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
+import { definitionRevisionNow, StoreRoot } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
@@ -50,7 +50,9 @@ const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 /** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
 const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
-const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+/** The revision the api serves the workflow `name` of the library at now (the index read again), as a write is held to it. */
+const revisionOf = async (name: string) =>
+  String(await Effect.runPromise(definitionRevisionNow('Workflow', undefined, name).pipe(Effect.provideService(StoreRoot, root))));
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('objects').WorkflowStepPage;
@@ -228,7 +230,11 @@ describe("a person reads the workflows on the board, opens a step's page, and is
 
       const listing = await everyOrigin<WorkflowListing>(app, 'workflows', 'default', ON_REPO);
       for (const w of listing)
-        assert.equal(w.version, versionOf(w.dir), `${w.name}: at the version its files are at, which a save from the board carries`);
+        assert.equal(
+          w.version,
+          await revisionOf(w.name),
+          `${w.name}: at the revision the api serves it at, which a save from the board carries`,
+        );
       assert.deepEqual(listing, [
         {
           name: 'broken',
@@ -242,7 +248,7 @@ describe("a person reads the workflows on the board, opens a step's page, and is
           schemas: [],
           files: [],
           folderTeam: false,
-          version: versionOf(broken),
+          version: await revisionOf('broken'),
           error: refused,
           unfilled: null,
         },
@@ -295,7 +301,7 @@ describe("a person reads the workflows on the board, opens a step's page, and is
           files: [{ path: 'review.json', text: again }],
           /** Neither works in folders: a folder team is every step saying `workspace: folder` (folder-run.test.ts lists one). */
           folderTeam: false,
-          version: versionOf(good),
+          version: await revisionOf('good'),
           error: null,
           /** Listed in the default factory, whose steps are never unfilled. */
           unfilled: null,
@@ -321,7 +327,7 @@ describe("a person reads the workflows on the board, opens a step's page, and is
           schemas: [],
           files: [],
           folderTeam: false,
-          version: versionOf(mine),
+          version: await revisionOf('mine'),
           error: null,
           unfilled: null,
         },

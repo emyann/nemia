@@ -13,7 +13,7 @@
  * 2. Change only if still at that revision: a write naming a revision its key no longer holds is refused `stale`, the door's `Conflict`,
  *    the api's 409 (`staleRevisionRefused`); a write naming none overwrites, as in Kubernetes (`writtenExactlyWhenNothingRefuses`). Beside
  *    the decision, Kine's unique index on `(name, prev_revision)` refuses a second hand that read the same row (`prevIsLatestRow`).
- * 3. Watch from a revision, within the history compaction keeps: `watchStart` and `compactTo`.
+ * 3. Watch from a revision, within the history compaction keeps, at least the last 5 minutes of it: `watchStart` and `compactTo`.
  * 4. A transaction across several records: each write of it decided in turn against the head the one before it left, in one SQLite
  *    transaction, rolled back whole on the first refusal. Its rows take consecutive revisions committed together, as Kine's rows do,
  *    where etcd assigns a transaction one revision: the owner's choice. Held by the store's tests, not by a law.
@@ -233,27 +233,32 @@ const watchStartSpec = spec<(from: number, compacted: number, head: number) => W
 /** `watchStart`'s type, which `src/keyspace/keyspace.ts` takes and the store's `since` asks before it reads a row. */
 export type WatchStartOf = Implementation<typeof watchStartSpec>;
 
-const compactToSpec = spec<(head: number, compacted: number, retain: number) => number>({
-  requires: ({ input: [head, compacted, retain] }) => whole(head) && whole(compacted) && whole(retain) && compacted <= head,
+/** The head a sweep saw, as far as the store has it: never past the head, since a revision is never given back. */
+const seenAt = (seen: number, head: number) => Math.min(seen, head);
+
+const compactToSpec = spec<(head: number, compacted: number, seen: number) => number>({
+  requires: ({ input: [head, compacted, seen] }) => whole(head) && whole(compacted) && whole(seen) && compacted <= head,
   ensures: {
     neverBack: {
       description: 'A compaction never moves the compacted revision back: a watch refused gone stays refused',
       condition: ({ input: [, compacted], output }) => output >= compacted,
     },
     keepsTheWindow: {
-      description: 'A compaction keeps the last `retain` revisions, unless they were compacted already',
-      condition: ({ input: [head, compacted, retain], output }) => output <= Math.max(compacted, head - retain),
+      description:
+        'A compaction keeps every revision written after the head the last sweep of at least the window ago saw, so a watch can resume from any revision of the window',
+      condition: ({ input: [head, compacted, seen], output }) => output <= Math.max(compacted, seenAt(seen, head)),
     },
-    dropsWhatIsOutside: {
-      description: 'A compaction reaches every revision older than the last `retain`',
-      condition: ({ input: [head, , retain], output }) => output >= head - retain,
+    reachesWhatTheWindowLeft: {
+      description: 'A compaction reaches every revision at or before the head the last sweep of at least the window ago saw',
+      condition: ({ input: [head, , seen], output }) => output >= seenAt(seen, head),
     },
   },
 });
 
 /**
- * `compactTo`'s type, which `src/keyspace/keyspace.ts` takes: the revision a compaction removes superseded rows up to, as Kine's
- * compaction keeps its minimum of retained revisions.
+ * `compactTo`'s type, which `src/keyspace/keyspace.ts` takes: the revision a compaction removes superseded rows up to, given the head
+ * the latest sweep of at least the window ago saw (`seen`, 0 where none did), as Kubernetes compacts every 5 minutes to the revision of
+ * the sweep before. The sweeps' heads and times are kept in the keyspace's file (`kine_sweeps`), so a restart carries nothing.
  */
 export type CompactTo = Implementation<typeof compactToSpec>;
 

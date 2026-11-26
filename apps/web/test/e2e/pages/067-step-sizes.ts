@@ -17,9 +17,9 @@ const words = async (scope: Locator, mark: string, what: string) => {
 
 export default {
   /**
-   * One step, one head, at every size: a step of the first run in flight with a bar on Runs, read as the preview card its bar opens (M),
+   * One step, one head, at every size: a step of the first run in flight with a bar on Runs, read as the glance its bar shows (M),
    * as its node on the run's graph (S), as its row in the run's ledger and in the step bar (L). Its word — its state's tag, the node's
-   * status chip — is the same at all four, and its spend the same on the card, the ledger's row and the bar, the node's cost line, where
+   * status chip — is the same at all four, and its spend the same in the glance, the ledger's row and the bar, the node's cost line, where
    * it draws one, saying the same figure: the node draws its word and its spend by the same rules as the part's head (`stateWordsOf`).
    * The bar follows a live step's conversation, a stream that never idles, so the page is left on the run with no bar open.
    */
@@ -32,14 +32,14 @@ export default {
     const step = (await bar.getAttribute('data-step-bar'))!;
     await page.mouse.move(0, 0);
     await bar.hover();
-    const card = page.locator('[data-slot="preview-card"]');
-    await expectVisible(card.locator('[data-step-card]'), `${step}'s bar opens its preview card`);
+    const card = page.locator('[data-slot="tooltip"] [data-step-glance]');
+    await expectVisible(card, `${step}'s bar shows its glance`);
     const m = {
-      tag: await words(card, '[data-step-tag]', 'the card says its word'),
+      tag: await words(card, '[data-step-tag]', 'the glance says its word'),
       spend: await words(card, '[data-step-spend]', 'its spend'),
     };
     await settled(page);
-    await photograph(card, path.join(OUT, `step-sizes-card-${await themeOf(page)}.png`));
+    await photograph(card, path.join(OUT, `step-sizes-glance-${await themeOf(page)}.png`));
 
     await page.goto(new URL(`/runs/${run}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);
@@ -60,10 +60,16 @@ export default {
       spend: await words(inBar, '[data-step-spend]', 'and its spend'),
     };
     const tags = [m.tag, s.tag, ledger.tag, barred.tag];
-    const spends = [m.spend, ledger.spend, barred.spend];
-    if (new Set(tags).size !== 1 || new Set(spends).size !== 1 || (costs !== null && !m.spend.includes(costs)))
+    const bare = (text: string) => text.replace(/\s+/g, '');
+    const spends = [ledger.spend, barred.spend];
+    if (
+      new Set(tags).size !== 1 ||
+      new Set(spends).size !== 1 ||
+      !bare(ledger.spend).includes(bare(m.spend)) ||
+      (costs !== null && !m.spend.includes(costs))
+    )
       throw new Refused(
-        `${step} of ${run} says one word and one spend at every size — card ${JSON.stringify(m)}, node ${JSON.stringify({ ...s, costs })}, ledger ${JSON.stringify(ledger)}, bar ${JSON.stringify(barred)}`,
+        `${step} of ${run} says one word and one spend at every size — glance ${JSON.stringify(m)}, node ${JSON.stringify({ ...s, costs })}, ledger ${JSON.stringify(ledger)}, bar ${JSON.stringify(barred)}`,
       );
     await page.goto(new URL(`/runs/${run}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);

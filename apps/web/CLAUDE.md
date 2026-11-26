@@ -176,7 +176,7 @@ here.
   (`@lg/page:text-display-small @lg/page:font-display-small`), is no `rawType` entry. The four most-read pages' own view, every file of
   `src/components` and `src/routes` their routes' imports reach (`READ_PAGES`, walked by `test/reach.ts`, the walk the stories'
   hand-over shares), holds no raw type class at all, listed or not; the walk stops at the files that open a view of their own over the
-  page (`OVER`, each with why: `run/RunMenu.tsx`, `step/StepPreview.tsx`), whose dialogs and popovers keep their type for a later card.
+  page (`OVER`, each with why: `run/RunMenu.tsx`, `run/ApproveModal.tsx`), whose dialogs and popovers keep their type for a later card.
   `expectTwoDeep` (`test/e2e/checks.ts`), asserted by those four pages' e2e files, refuses a text three boxes deep (`DESIGN.md`: a view is
   two boxes deep at most), naming each and the boxes it sits in. The
   baseline is a folder, `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
@@ -252,9 +252,8 @@ here.
   `checks.ts`). An age a page asserts is written mid-minute, never on the minute the board floors to (`290-daemon.ts`).
 - A page that holds a read with `route` routes before its `goto`: the feed's replay reads the run again right after the load.
 - A page whose state changes at its end waits for what it reads again before its last assertion, or its picture is taken mid-read.
-- A window resized across 600 pixels swaps every rail bar's button a render later (`useSheetPreview`): wait for the mode the bar says
-  (`data-step-preview`) before reading one, and scope it by its section, since the runs page itself is an `article`
-  (`059-runs-preview.ts`).
+- A diamond's glance is the kit's rich tooltip (`step/StepGlance.tsx`), opened by the pointer and by the focus, never a preview card; a press
+  on the diamond opens its step in the frame's bar (`?bar=step:<run>/<step>`), which `059-runs-preview.ts` reads.
 - The engine's task view carries no filing time; its feed does: a store written by hand writes `engine/feed.jsonl` too (`seedFeed`).
 - A journal line written by hand goes on `engine/feed.jsonl` too, and its take-back cuts the feed back: the api keeps a run judged at
   rest until a line for its tasks reaches the feed (`informerRead` in the orchestrator's `rest/informer.verb.ts`, which also keeps a moving run within the pass that judged it;
@@ -299,7 +298,7 @@ here.
   for none; a budget as its author writes it is `budgetWord` (`$16`, `$2.50`). How a run ended, its word, sentence and hue, is `ENDED`.
 - What this browser keeps (a layout, the open runs, the chat's unsent message) goes through `lib/stored.ts`
   (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
-  (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
+  (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile` and `useReducedMotion`
   read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
 - A page lays out by its column, never by the window: the frame's `<main data-frame-page>` is the named container `@container/page`
   (`routes/__root.tsx`), narrower than the window beside her docked sheet. A page's or a part's layout variant is `@<size>/page:` by the

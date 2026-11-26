@@ -247,8 +247,8 @@ export default {
       const { error } = (await answered.json()) as { error?: string };
       if (
         answered.status() !== 409 ||
-        !error?.startsWith(`${mineDir} has changed since it was read at version `) ||
-        !error.includes('Nothing was written. Read the folder again')
+        !error?.startsWith(`the Workflow ${yours.name} changed since it was read (it is at revision `) ||
+        !error.includes('read it again')
       ) {
         throw new Refused(
           `the api refuses a save of a folder changed by hand since it was read — it answered ${answered.status()}: ${JSON.stringify(error)}`,

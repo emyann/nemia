@@ -37,7 +37,7 @@ import { FactoryName } from '../factory/factory.model.ts';
 import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
 import { wire } from '../factory/wiring/wire.verb.ts';
 import { withoutEntry } from '../factory/wiring/index.ts';
-import { treeDir, type ProposalPlace } from '../propose/current.verb.ts';
+import { contentNow, treeDir, type ProposalPlace } from '../propose/current.verb.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import type { Entry } from '../factory/applied/applied.store.ts';
 import { verbOf } from '../propose/propose.verb.ts';
@@ -53,6 +53,16 @@ const agentDraftOf = (name: string, spec: AgentSpec) => ({
   keys: spec.keys ?? {},
   body: spec.instructions ?? '',
 });
+
+/**
+ * The content digest of the object `object` names as its files hold it now, which the folder writers compare their write to: the
+ * proposal's own version, a revision, was judged fresh before the apply, and the writers read files.
+ * @param place Where the proposal is applied.
+ * @param factory The factory's name.
+ * @param object The object the proposal writes.
+ */
+const digestNow = (place: ProposalPlace, factory: string, object: ProposedObject) =>
+  Effect.map(contentNow(place, factory, object.kind, object.metadata.name), (now) => now.version ?? undefined);
 
 /** The revision a write of `kind`'s `name` at `version` made, the ledger's number. */
 const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
@@ -116,7 +126,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
     const { places, fills } = yield* factoryWriteOf(place.home, factory, name);
     const door = (yield* WorkflowDoor).workflows;
     if (verbOf(object) === 'delete') {
-      yield* door.remove(dir, object.metadata.resourceVersion, [], places);
+      yield* door.remove(dir, yield* digestNow(place, factory, object), [], places);
       return uncounted(object);
     }
     const spec = object.spec as WorkflowSpec;
@@ -130,7 +140,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
           ...(readme !== undefined && { readme }),
           ...(spec.files !== undefined && { files: spec.files, whole: true }),
         },
-        object.metadata.resourceVersion,
+        yield* digestNow(place, factory, object),
         places,
         fills,
       ),
@@ -145,11 +155,11 @@ const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObj
     const name = AgentName.read(object.metadata.name);
     const door = (yield* AgentDoor).agents;
     if (verbOf(object) === 'delete') {
-      yield* door.remove(name, object.metadata.resourceVersion, { dir, anywhere: true });
+      yield* door.remove(name, yield* digestNow(place, factory, object), { dir, anywhere: true });
       return uncounted(object);
     }
     const spec = object.spec as AgentSpec;
-    const written = yield* door.write(name, agentDraftOf(name, spec), object.metadata.resourceVersion, {
+    const written = yield* door.write(name, agentDraftOf(name, spec), yield* digestNow(place, factory, object), {
       dir,
       anywhere: true,
       ...(spec.output !== undefined && { schema: spec.output }),
@@ -168,7 +178,7 @@ const skillWritten = (place: ProposalPlace, factory: string, object: ProposedObj
     const written = yield* (yield* SkillDoor).skills.write(
       SkillName.read(object.metadata.name),
       { name: object.metadata.name, ...spec, ...(files !== undefined && { files }) },
-      object.metadata.resourceVersion,
+      yield* digestNow(place, factory, object),
       at,
       { anywhere: true },
     );

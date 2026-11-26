@@ -60,11 +60,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/select:SelectValue': kit('Select'),
   '@/components/ui/separator:Separator': kit('Divider'),
   '@/components/ui/textarea:Textarea': kit('TextField', 'multiline'),
-  'react-aria-components:PopoverContext': {
-    kind: 'ask',
-    what: "a preview card anchored to an element other than its trigger (a bar's whole rail), and opened without its entering animation",
-    run: null,
-  },
   'react-aria-components:RouterProvider': {
     kind: 'exempt',
     why: "the kit's Link and Button route href through it, and the kit exports none",

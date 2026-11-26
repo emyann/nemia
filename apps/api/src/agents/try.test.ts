@@ -17,7 +17,7 @@
  * claude.ai. The repository's own agents are `critic` and `grader`, the second with a result schema beside it.
  */
 import { root } from '../../test/harness.ts';
-import { asListing, everyOrigin } from '../../test/definitions.ts';
+import { everyOrigin } from '../../test/definitions.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -187,10 +187,7 @@ describe('a person tries an agent of theirs: a folder run fenced with a dollar, 
     ]) {
       assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
     }
-    const agent = asListing<AgentListing>(
-      (await (await app().request(`/api/namespaces/default/agents/scribe?origin=user&${ON_REPO}`)).json()) as never,
-    );
-    assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
+    assert.match(text, /^# version [0-9a-f]{16}$/m, "and records the agent's version it was written at");
 
     const run = JSON.parse(recordText(root, runKey(first)) ?? '');
     assert.deepEqual(run.place, { kind: 'folder' }, 'a folder run');
@@ -231,14 +228,11 @@ describe('a person tries an agent of theirs: a folder run fenced with a dollar, 
     assert.equal((await remove(second)).status, 200);
 
     fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
-    const agent = asListing<AgentListing>(
-      (await (await app().request(`/api/namespaces/default/agents/scribe?origin=user&${ON_REPO}`)).json()) as never,
-    );
+    const recorded = (text: string) => /^# version (\S+)$/m.exec(text)?.[1];
+    const before = recorded(fs.readFileSync(folder, 'utf8'));
     const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
-    assert.ok(
-      fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
-      "the agent edited, its version moves: the next try's folder is written again at the version the agent is at",
-    );
+    const after = recorded(fs.readFileSync(folder, 'utf8'));
+    assert.ok(after !== undefined && after !== before, "the agent edited, its version moves: the next try's folder is written again at it");
     ended(third);
     assert.equal((await remove(third)).status, 200);
   });

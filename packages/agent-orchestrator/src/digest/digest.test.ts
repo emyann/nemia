@@ -1,12 +1,11 @@
 /**
  * The one recipe of a digest `resourceVersion` (`versionDigest`, digest.ts): sixteen hex characters of a text's sha256, the same for the
- * same text and another for another; a value's the digest of its JSON (`valueVersion`); and the kinds that stamp one take it here — a
- * card's text. A proposal's version is its record's revision in the keyspace, no digest.
+ * same text and another for another; a value's the digest of its JSON (`valueVersion`); and the files' versions take it here. A card's, a
+ * proposal's and a delegation's version is a revision of the keyspace, no digest.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cardVersion } from '../card-write/card-write.verb.ts';
 import { valueVersion, versionDigest } from './digest.ts';
 
 test("a digest is the first sixteen hex characters of the text's sha256, the same text's the same, another's another", () => {
@@ -19,8 +18,4 @@ test("a digest is the first sixteen hex characters of the text's sha256, the sam
 test("a value's digest is its JSON's, so a value that encodes the same is the same version", () => {
   assert.equal(valueVersion({ spec: 1, status: null }), versionDigest('{"spec":1,"status":null}'));
   assert.notEqual(valueVersion({ spec: 1 }), valueVersion({ spec: 2 }));
-});
-
-test("a card's version is taken by the one recipe", () => {
-  assert.equal(cardVersion('---\nworkflow: build\n---\nDo it.\n'), versionDigest('---\nworkflow: build\n---\nDo it.\n'));
 });

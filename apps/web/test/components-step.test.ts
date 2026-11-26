@@ -3632,8 +3632,8 @@ test("a step's part draws its slots by its size: on the node its head, what it a
   assert.match(small, /<p [^>]*data-part-gave="S"/);
   const card = await sized('M');
   assert.deepEqual(slots(card), ['step-head', 'part-asks', 'part-said', 'part-gave']);
-  assert.match(card, /data-step-card="true"/, 'the preview card keeps its mark');
-  assert.match(card, /data-step-action="true"/);
+  assert.match(card, /data-step-card="true"/, "the modal's card keeps its mark");
+  assert.doesNotMatch(card, /data-step-action/, 'the modal is the reading and the approving: no link to the step page');
   const whole = await sized('L');
   assert.deepEqual(slots(whole), ['step-head', 'part-asks', 'part-said', 'part-gave', 'part-detail']);
   assert.doesNotMatch(whole, /data-step-card/);

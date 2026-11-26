@@ -31,7 +31,7 @@ import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { readmeComposed } from '../folder/folder.ts';
-import { currentOf, workflowStepsWritten, type ProposalPlace } from './current.verb.ts';
+import { currentOf, readFresh, workflowStepsWritten, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
 import { skillFilesRefusal } from '../skills/skills.ts';
@@ -204,7 +204,7 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
           message: `${label} is not there to ${verb}: propose it with verb create, or list what is there (nemia get ${RESOURCE_PLURALS[object.kind]} -n ${factory}).`,
         }),
       );
-    if (verb !== 'create' && now.version !== object.metadata.resourceVersion)
+    if (verb !== 'create' && !readFresh(now, object.metadata.resourceVersion))
       return yield* Effect.fail(
         new Conflict({
           message: `${label} was read at ${object.metadata.resourceVersion ?? 'none'} and is now at ${now.version}: read it again as its files hold it (nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}) and propose its spec as it reads.`,

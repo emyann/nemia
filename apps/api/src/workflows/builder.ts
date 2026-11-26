@@ -11,9 +11,9 @@
  * with the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder
  * leaves no schema behind under "nothing written".
  *
- * A save carries the `version` the folder was listed at (`workflowVersion`), and is refused (409, `workflowStale`) when the folder holds
- * something else: a step edited, added or removed by hand while the board had it open would otherwise be written over, or deleted, from a
- * draft that never saw it.
+ * A save carries the `version` the folder was listed at (the revision the api serves it at), and is refused (409, `workflowStale`) when
+ * the folder holds something else: a step edited, added or removed by hand while the board had it open would otherwise be written over,
+ * or deleted, from a draft that never saw it.
  *
  * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes
  * nothing into a checkout. Every write passes the guard (guard.ts) before its body is read.
@@ -21,7 +21,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Predicate, Schema } from 'effect';
-import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, WORKFLOWS_WRITE, workflowVersion } from 'agent-orchestrator';
+import {
+  AgentDoor,
+  definitionRevisionNow,
+  HARNESS_CHOICES,
+  remoteAgents,
+  SkillDoor,
+  WORKFLOWS_WRITE,
+  workflowVersion,
+} from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -475,7 +483,7 @@ export async function write(
       'user',
       dir,
       loadedAt(await loadedOf(e, { placeService, config, trace }, [dir], repo, home), dir),
-      await inRequest(workflowVersion(dir, places)),
+      String(await inRequest(definitionRevisionNow('Workflow', undefined, name))),
     ),
     written: [...result.written.filter(unpasted), ...schemasWritten].sort(),
     kept: [...result.kept.filter(unpasted), ...kept].sort(),

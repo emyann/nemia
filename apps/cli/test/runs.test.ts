@@ -237,6 +237,20 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
   assert.ok(kept.out.includes('mind the cache'), kept.out);
 });
 
+test('nemia assign puts a run in hand, a second refused while it stands, and --off gives it back', async () => {
+  const id = await started('Assign me.');
+  const held = () => JSON.parse(markerText(store.root, id, 'assignee') ?? 'null') as { name: string; forMs: number } | null;
+  const put = await store.nemia(['assign', id, '--to', 'ann', '--why', 'reading it', '--for', '2h']);
+  assert.equal(put.code, 0, put.err);
+  assert.deepEqual([held()?.name, held()?.forMs], ['ann', 7_200_000]);
+  assert.match(put.out, new RegExp(`nemia assign ${id} --off`));
+  const again = await store.nemia(['assign', id]);
+  assert.equal(again.code, 1, `a Conflict exits 1: ${again.out}${again.err}`);
+  const back = await store.nemia(['assign', id, '--off']);
+  assert.equal(back.code, 0, back.err);
+  assert.equal(held(), null);
+});
+
 test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and of a run with no record, what was left under its id', async () => {
   const id = await started('Cancel me.');
   const cancelled = await store.nemia(['cancel', id]);

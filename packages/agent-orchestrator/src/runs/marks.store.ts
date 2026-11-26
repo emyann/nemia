@@ -16,8 +16,8 @@ import { pauseStands } from '../pause/pause.store.ts';
 import { Conflict, type Refusal } from '../refusal/refusal.ts';
 import type { Labels } from '../labels/labels.ts';
 import { dropFiles, filesAt } from '../record/files.store.ts';
-import { cancelledIn, holdIn, isSaid, labelsIn, prunedIn, runsDir, type RunMarks } from '../record/record.store.ts';
-import type { Hold, Pruned, RunStore, SaidBefore } from '../record/record.ts';
+import { assigneeIn, cancelledIn, holdIn, isSaid, labelsIn, prunedIn, runsDir, type RunMarks } from '../record/record.store.ts';
+import type { Assignee, Hold, Pruned, RunStore, SaidBefore } from '../record/record.ts';
 import { fromThrow, type DoorOf } from '../door/door.store.ts';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import type { RunId } from '../record/record.model.ts';
@@ -166,6 +166,38 @@ const holdMethods = ({ inside, held }: Marking) =>
     stands: (id) => holds(held, id, runMarkKey(id, 'hold')),
   }) satisfies Shape['holds'];
 
+/** The run's assignee: put exclusively, ended only while the one put at `at` stands, its receipt written in the same transaction. */
+const assigneeMethods = ({ inside, held }: Marking) =>
+  ({
+    put: (id, said) =>
+      inside((tx) =>
+        Effect.gen(function* () {
+          if ((yield* tx.get(runMarkKey(id, 'assignee'))) !== undefined) return null as Assignee | null;
+          const { forMs, name, why, actor } = said;
+          const assignee: Assignee = {
+            at: new Date().toISOString(),
+            forMs,
+            ...(name ? { name } : {}),
+            ...(why ? { why } : {}),
+            ...(actor ? { actor } : {}),
+          };
+          yield* tx.write(runMarkKey(id, 'assignee'), create(JSON.stringify(assignee, null, 2)));
+          return assignee;
+        }),
+      ),
+    end: (id, at, how, actor?: Actor) =>
+      inside((tx) =>
+        Effect.gen(function* () {
+          const there = yield* tx.get(runMarkKey(id, 'assignee'));
+          if (there === undefined || assigneeIn(there.value).at !== at) return false;
+          yield* put(tx, runMarkKey(id, 'unassigned'), JSON.stringify({ since: at, how, ...(actor ? { actor } : {}) }, null, 2));
+          yield* tx.write(runMarkKey(id, 'assignee'), remove);
+          return true;
+        }),
+      ),
+    stands: (id) => holds(held, id, runMarkKey(id, 'assignee')),
+  }) satisfies Shape['assignees'];
+
 /** What `nemia rm` wrote down of the tasks of a run it forgets. */
 const forgettingMethods = ({ inside, held }: Marking) =>
   ({
@@ -286,6 +318,7 @@ export function markerMethods(home: string, open: Opened, held: Held) {
     filesAt: (id: string) => fromThrow(() => filesAt(home, id)),
     dropFiles: (id: string) => fromThrow(() => dropFiles(home, id)),
     holds: holdMethods(marking),
+    assignees: assigneeMethods(marking),
     said,
     labels,
     refresh,
@@ -310,7 +343,7 @@ const strayMarks = (home: string) =>
     .filter((entry) => !MARKER_ENDINGS.some(({ end }) => entry.endsWith(end)))
     .map((entry) => ({
       entry: path.join(runsDir(home), entry),
-      why: 'a run keeps a file beside its record only as one of its markers (cancelled, pruned, hold, unheld, labels, refresh, said)',
+      why: 'a run keeps a file beside its record only as one of its markers (cancelled, pruned, hold, unheld, assignee, unassigned, labels, refresh, said)',
     }));
 
 /**
@@ -323,8 +356,9 @@ const markerRead = (marker: RunMarker) => (text: string) =>
     : { value: text };
 
 /**
- * The marker files of a store from before the keyspace: each `runs/<id>.<marker>` (`cancelled`, `pruned`, `hold`, `unheld`, `labels`,
- * `refresh`) at `/registry/runmarks/<id>/<marker>`, each word of `runs/<id>.said/<n>.json` at `.../said/<n>`, and each
+ * The marker files of a store from before the keyspace: each `runs/<id>.<marker>` (`cancelled`, `pruned`, `hold`, `unheld`, `assignee`,
+ * `unassigned`,
+ * `labels`, `refresh`) at `/registry/runmarks/<id>/<marker>`, each word of `runs/<id>.said/<n>.json` at `.../said/<n>`, and each
  * `forgetting/<id>.json`
  * of a run `nemia rm` forgot at `/registry/forgetting/<id>`: what the kind's import takes up, in the text each held. A labels file that
  * is no

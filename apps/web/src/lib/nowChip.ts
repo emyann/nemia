@@ -6,13 +6,13 @@
 import type { WaitOn } from 'objects';
 import type { ChipTone, ChipToneOf, NowCase, NowStands } from '../../contracts/now-chip.contract.ts';
 import type { RunView } from './api/judged.ts';
-import type { StepState } from './status.ts';
+import { type StepState, waitsOnPerson } from './status.ts';
 
 export type { ChipTone } from '../../contracts/now-chip.contract.ts';
 
 /**
  * The chip's colour: yellow where the row waits on a person, whatever its step stands as; else violet at work, red where it failed,
- * outlined where it waits on a run, a run slot, a hold or its turn, and grey at rest alone.
+ * outlined where it waits on a run, a run slot, a hold, its assignee or its turn, and grey at rest alone.
  * @param now Where the row's step stands, and whether the row waits on a person.
  */
 export const chipTone: ChipToneOf = (now: NowCase) => {
@@ -37,18 +37,20 @@ const ON: Record<WaitOn, NowStands> = { run: 'waitsOnARun', base: 'waitsOnARun',
 
 /**
  * Where a row's step stands, as its chip reads it: at work, failed, at rest; held where a person holds the run and the step has not
- * started, or the hold stops it; a step not started by what it waits on; and a step that waits on a person's word, still to come, whose
- * chip `chipTone` draws yellow by the row's own wait.
+ * started, or the hold stops it; a step that waits on a person's word in a run someone has in hand, assigned; a step not started by what
+ * it waits on; and a step that waits on a person's word, still to come, whose chip `chipTone` draws yellow by the row's own wait.
  * @param state The step's state (`stepState`).
  * @param on What thing the step waits on, or null where it waits on none.
  * @param held Whether a person holds the run.
+ * @param assigned Whether someone has the run in hand (its `assignee`).
  */
-export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean) {
+export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean, assigned = false) {
   if (AT_WORK.has(state)) return 'atWork';
   if (FAILED.has(state)) return 'failed';
   if (state === 'held') return 'held';
   const notStarted = state === 'waiting' || state === 'waiting-for-slot';
   if (notStarted && held) return 'held';
+  if (assigned && !held && waitsOnPerson(state, false)) return 'assigned';
   if (state === 'waiting-for-slot') return 'waitsForASlot';
   if (state === 'waiting' && on !== null) return ON[on];
   return AT_REST.has(state) ? 'atRest' : 'toCome';

@@ -164,6 +164,20 @@ describe("each action answers its status on the run's namespaced path, and refus
     assert.equal(lifted.status, 200, JSON.stringify(lifted.body));
     assert.deepEqual([lifted.body.id, lifted.body.lifted], [R, true]);
   });
+  test('an assignee put and given back answer 200, and a second put while one stands, or a give-back of none, is its Conflict, 409', async () => {
+    const put = await answered(await send('POST', `${run(OTHER)}/assignee`, { to: 'ann', why: 'Reading it.', for: '2h' }));
+    assert.equal(put.status, 200, JSON.stringify(put.body));
+    assert.deepEqual([put.body.id, put.body.ended, (put.body.assignee as { name?: string }).name], [OTHER, false, 'ann']);
+    const again = await answered(await send('POST', `${run(OTHER)}/assignee`, {}));
+    assert.equal(again.status, 409, JSON.stringify(again.body));
+    const back = await answered(await send('DELETE', `${run(OTHER)}/assignee`));
+    assert.equal(back.status, 200, JSON.stringify(back.body));
+    assert.deepEqual([back.body.id, back.body.ended], [OTHER, true]);
+    const none = await answered(await send('DELETE', `${run(OTHER)}/assignee`));
+    assert.equal(none.status, 409, JSON.stringify(none.body));
+    const wrong = await answered(await send('POST', `${run(OTHER)}/assignee`, { for: 'ten' }));
+    assert.equal(wrong.status, 422, JSON.stringify(wrong.body));
+  });
   test('REFUSED: a run or a step the store lacks, and a run addressed in another namespace, are each 404', async () => {
     for (const [method, address, body] of [
       ['POST', `${run('ra-none')}/steps/plan/approve`, {}],
@@ -334,6 +348,16 @@ describe('each write keeps who acted, by the token its request presented, and th
     assert.deepEqual([hold.by, hold.actor], ['ann', session], 'the hold answered with both');
     assert.deepEqual((await status(OTHER)).holding?.actor, session, "and served on the run's holding");
     assert.equal((await send('DELETE', `${run(OTHER)}/hold`)).status, 200);
+  });
+  test("an assignee put with no `to` is named by no one but its caller: no name made up, the person's actor kept, and served on the run", async () => {
+    record('ra-by-assign', { implement: null });
+    const put = await answered(await send('POST', `${run('ra-by-assign')}/assignee`, {}));
+    assert.equal(put.status, 200, JSON.stringify(put.body));
+    const assignee = put.body.assignee as { name?: string; actor?: unknown };
+    assert.deepEqual([assignee.name, assignee.actor], [undefined, person], 'answered with the caller, and no name');
+    const served = (await status('ra-by-assign')).assignee;
+    assert.deepEqual([served?.name, served?.actor], [undefined, person], 'and served on the run');
+    assert.equal((await send('DELETE', `${run('ra-by-assign')}/assignee`)).status, 200);
   });
   test('a card sent on calls off the run that waited on it, as who sent it, answered and served on the run', async () => {
     task('t-by-resent', 'succeeded', BLOCKED);

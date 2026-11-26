@@ -90,6 +90,7 @@ const RUN: WaitingRun = {
   waiting: null,
   holdUntil: [],
   holding: null,
+  assignee: null,
   status: 'awaiting approval',
   phase: 'waiting',
   reason: 'AwaitingApproval',

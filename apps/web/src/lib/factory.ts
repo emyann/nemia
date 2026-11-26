@@ -29,10 +29,15 @@ import type { Frozen } from './frozen.ts';
  * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
- * @param run The run: its status, whether it moves, and what it waits on and who holds it, where the listing says them.
+ *
+ * So is a run that asks something of a person (`asksOfAPerson`) that someone has in hand (`assignee`): it is theirs, not the person's.
+ * @param run The run: its status, whether it moves, what it waits on, who holds it, what it asks and who has it in hand, where the
+ * listing says them.
  */
-export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>) =>
-  run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
+export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held & { waitingOnYou?: RunView['waitingOnYou'] }>) =>
+  run.moving ||
+  (Boolean(run.assignee) && asksOfAPerson({ ...run, cancelledAt: run.cancelledAt ?? null, waitingOnYou: run.waitingOnYou ?? [] })) ||
+  (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
  * The runs of the light answer as one list: those that wait on a person, then those in flight, each run once. Every run the board calls
@@ -42,7 +47,12 @@ export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>)
 export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }) => [...open.waiting, ...open.inFlight];
 
 /** What `inFlight` and `waitsOnYou` read beside their own fields, each read as absent where a listing lacks it. */
-type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancelledAt?: string | null };
+type Held = {
+  waiting?: RunView['waiting'];
+  holding?: RunView['holding'];
+  assignee?: RunView['assignee'];
+  cancelledAt?: string | null;
+};
 
 /**
  * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
@@ -53,14 +63,31 @@ type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancel
 export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => run.toDecide ?? null;
 
 /**
- * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
- * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
- * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
- * nobody, whatever its steps last said.
+ * Whether what is to decide about the run is the person's move: there is something (`toDecideOf`) and nobody has the run in hand
+ * (`assignee`), as `waitsOnYou` says of what the run asks. The yellow of a card, its count and its chip follow this, never
+ * `toDecideOf` alone.
+ * @param run The run, by the api's `toDecide` and its `assignee`.
+ */
+export const toDecideOfYou = (run: { toDecide?: Frozen<RunToDecide> | null; assignee?: unknown }) =>
+  toDecideOf(run) !== null && !run.assignee;
+
+/**
+ * Whether anything of the run is asked of a person, whoever has it in hand: a step does (`waitingOnYou`) — at its gate anywhere in
+ * the run, or signed off blocked — or a run it waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for,
+ * either way — or a hold on it only a person lifts (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there).
+ * Not once it is cancelled: a cancelled run waits on nobody, whatever its steps last said.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
-export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
+const asksOfAPerson = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
+
+/**
+ * Whether the run waits on you, the package's one decider mirrored (`waitsOnYou`, the orchestrator's phase.ts): it asks something of a
+ * person (`asksOfAPerson`) and nobody has it in hand (`assignee`). A run someone has in hand is in flight (`inFlight`), its asks still
+ * offered to anyone who may answer them.
+ * @param run The run: the steps that wait on you, when it was called off, what it waits on, who holds it and who has it in hand.
+ */
+export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) => asksOfAPerson(run) && !run.assignee;
 
 /**
  * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it

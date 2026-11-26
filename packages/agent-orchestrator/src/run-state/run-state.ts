@@ -7,7 +7,8 @@
  * (`Listed`), so the list's own summary is handed as it is.
  */
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
-import { waitsOnYou } from '../phase/phase.ts';
+import { asksOfAPerson, waitsOnYou } from '../phase/phase.ts';
+import type { KindOf } from '../../contracts/waits-on-you.contract.ts';
 
 /** What the rules read of a run's summary, as the whole list answers it. */
 export type Listed = {
@@ -22,16 +23,19 @@ export type Listed = {
   holding: { waitingOnYou: boolean } | null;
   atWork: { endedAt: string | null } | null;
   toDecide: { kind: string } | null;
+  assignee: { at: string } | null;
 };
 
 /**
  * The kind of a listed run, asked in this order so each run has one: `waiting`, it waits on a person (`waitsOnYou`), though something
- * of it may still move; else `inFlight`, something of it moves, or it is running and waits on nobody; else `finished`.
+ * of it may still move; else `inFlight`, something of it moves, it asks something someone has in hand (`asksOfAPerson`, with an
+ * assignee), or it is running and waits on nobody; else `finished`.
  * @param run The listed run.
  */
-export const kindOf = (run: Listed) => {
+export const kindOf: KindOf = (run) => {
   if (waitsOnYou(run)) return 'waiting';
-  if (run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou)) return 'inFlight';
+  if (run.moving || asksOfAPerson(run) || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou))
+    return 'inFlight';
   return 'finished';
 };
 

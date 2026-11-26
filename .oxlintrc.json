@@ -786,12 +786,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/rest/rest.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/brief/brief.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],

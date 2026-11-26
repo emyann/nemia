@@ -20,6 +20,9 @@ import {
   type Hold,
   type Run,
   type Unheld,
+  type Assignee,
+  type AssigneeEnd,
+  type Unassigned,
   type Pruned,
 } from './record.ts';
 import { workStands, type RoundAsk } from '../status/status.ts';
@@ -289,6 +292,41 @@ function unheldIn(text: string) {
   return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined;
 }
 
+/** The longest time an assignee is read with, in milliseconds: 23 hours, as `--for` takes. */
+const MOST_FOR_MS = 23 * 3_600_000;
+
+/**
+ * Who has the run in hand as its record's text reads. A text that does not read as one still has the run in someone's hand, put at no
+ * instant for an hour, so only `nemia assign --off` or the run's end takes it away.
+ * @param text What the assignee record holds.
+ */
+export function assigneeIn(text: string) {
+  const json = jsonOr(text);
+  const [at, forMs] = [fieldOf(json, 'at'), fieldOf(json, 'forMs')];
+  const [name, why] = [wordsOf(fieldOf(json, 'name'), BY_CAP), wordsOf(fieldOf(json, 'why'), WHY_CAP)];
+  return {
+    at: isText(at) ? at : '',
+    forMs: isAmount(forMs) && Number.isSafeInteger(forMs) && forMs >= 1_000 && forMs <= MOST_FOR_MS ? forMs : 3_600_000,
+    ...(name ? { name } : {}),
+    ...(why ? { why } : {}),
+    ...actorIn(fieldOf(json, 'actor')),
+  } satisfies Assignee;
+}
+
+/** The ways an assignee ends, as a receipt says them. */
+const ENDS: readonly AssigneeEnd[] = ['given-back', 'lapsed', 'ended'];
+
+/**
+ * How the run's last assignee ended as its record's text reads: undefined where it does not read as a receipt.
+ * @param text What the unassigned record holds.
+ */
+function unassignedIn(text: string) {
+  const json = jsonOr(text);
+  const [since, how] = [fieldOf(json, 'since'), fieldOf(json, 'how')];
+  const end = ENDS.find((e) => e === how);
+  return (isText(since) && end ? { since, how: end, ...actorIn(fieldOf(json, 'actor')) } : undefined) satisfies Unassigned | undefined;
+}
+
 /**
  * A run's labels as their record's text reads: undefined for none.
  * @param text What the labels record holds.
@@ -326,8 +364,20 @@ function saidIn(words: readonly string[]) {
 /**
  * A run's markers as its records hold them: each marker's text where the run has it, and the words said to its steps in the order kept.
  */
-export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'labels']?: string } & {
+export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'assignee' | 'unassigned' | 'labels']?: string } & {
   readonly said?: readonly string[];
+};
+
+/**
+ * Who has the run in hand and how its last assignee ended, as the run's markers hold them, each where its record is there.
+ * @param marks The run's markers.
+ */
+const assignedIn = (marks: RunMarks) => {
+  const unassigned = marks.unassigned === undefined ? undefined : unassignedIn(marks.unassigned);
+  return {
+    ...(marks.assignee === undefined ? {} : { assignee: assigneeIn(marks.assignee) }),
+    ...(unassigned ? { unassigned } : {}),
+  } satisfies Pick<Run, 'assignee' | 'unassigned'>;
 };
 
 /**
@@ -365,6 +415,7 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
     ...(unheld ? { unheld } : {}),
+    ...assignedIn(marks),
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),
     ...(acceptances.length ? { acceptances } : {}),
@@ -395,7 +446,20 @@ export const recordIn = (id: string, text: string, where: string) =>
     }
     if (!isRunRecord(raw)) throw new UnreadableRecord(where, id, recordRefusal(raw));
     const read = { ...raw };
-    for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
+    for (const key of [
+      'approvals',
+      'acceptances',
+      'pruned',
+      'hold',
+      'unheld',
+      'assignee',
+      'unassigned',
+      'labels',
+      'saidBefore',
+      'pause',
+      'cordon',
+    ])
+      delete read[key];
     const { workflow, ...unfrozen } = read;
     return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;
   });

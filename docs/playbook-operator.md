@@ -545,7 +545,8 @@ English; never push or open a pull request unless asked.
 - **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `nemia quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
-  `nemia hold` (`--until`, or none to hold until `--off`; `--why`, `--off`), `nemia pause` (`--timeout <d>`; `--now` cuts the calls at once, no try spent) and
+  `nemia hold` (`--until`, or none to hold until `--off`; `--why`, `--off`), `nemia assign` (`--to`, `--why`, `--for <d>`, `--off`: a run
+  in someone's hand, which leaves waiting on you while it stands), `nemia pause` (`--timeout <d>`; `--now` cuts the calls at once, no try spent) and
   `nemia resume`, `nemia pause-timeout`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; `nemia upgrade` (`--timeout <d>`) and
   `nemia version`;
   scratch worktrees for verification.

@@ -5,8 +5,10 @@
  * `branchStandings`.
  */
 import type { Settings } from '../config/config.store.ts';
-import { Effect } from 'effect';
-import type { Actor, QueuedFor, QueuedTask } from 'objects';
+import { Clock, Effect } from 'effect';
+import type { Actor, QueuedFor, QueuedTask, RunAssignee } from 'objects';
+
+export type { RunAssignee };
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords, queuedForOf } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
@@ -22,7 +24,10 @@ import type { Assessment } from '../tick/assess.ts';
 import type { RunRead } from '../tick/told.verb.ts';
 import type { Decision, Landed } from '../decide/decide.ts';
 import { inFlight, type CheckoutHold } from '../cap/cap.ts';
-import { isRepositoryRun, type Run } from '../record/record.ts';
+import { type Assignee, isRepositoryRun, type Run } from '../record/record.ts';
+import { assigneeStanding, assigneeWord, type AssigneeStanding } from '../assignee/assignee.ts';
+import { asksOfAPerson, RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
+import { waitingSinceOf } from '../timeline/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { CheckVerdict } from '../check/index.ts';
@@ -245,6 +250,73 @@ function holdingOf(run: Run, holds: readonly Wait[]) {
 }
 
 /**
+ * Where a run's assignee stands at `now` (`assigneeStanding`), from what its judgement read: whether the run asks anything of a person
+ * (`asksOfAPerson`, which an assignee does not change), since when — the earliest open wait on a person, as the list dates it
+ * (`waitingSinceOf`), or the assignment where the record dates none — and whether it is still in play. The one judgement of it: the
+ * run's object serves it (`judge`), and the tick ends an assignee by it (`assigneesEnded`, tick.verb.ts), so the two never part.
+ * @param assignee Who has the run, as its file says.
+ * @param asks Whether the run asks anything of a person now.
+ * @param asksSince When its present ask began, an ISO 8601 time; null where the record dates none.
+ * @param inPlay Whether the run's phase is still in play.
+ * @param now The instant judged at, in epoch milliseconds.
+ */
+export function assigneeStandingOf(assignee: Assignee, asks: boolean, asksSince: string | null, inPlay: boolean, now: number) {
+  const parsed = Date.parse(assignee.at);
+  const at = Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+  const since = asksSince === null ? NaN : Date.parse(asksSince);
+  return assigneeStanding({
+    at,
+    forMs: assignee.forMs,
+    asksSince: asks ? (Number.isSafeInteger(since) && since >= 0 ? since : at) : null,
+    inPlay,
+    now,
+  });
+}
+
+/**
+ * Who has a run in hand (`RunAssignee`), in the package's words: who, why, and when it comes back to the person if its ask is not
+ * answered; null for a run nobody has in hand, and one whose assignee lapsed or ended (`standing`), though its file is still there.
+ * @param assignee Who has the run, as its file says; undefined where nobody does.
+ * @param standing Where that assignee stands now (`assigneeStandingOf`).
+ */
+export function runAssigneeOf(assignee: Assignee | undefined, standing: AssigneeStanding | null) {
+  if (!assignee || standing?.kind !== 'stands') return null;
+  const comesBackAt = standing.comesBackAt === null ? null : new Date(standing.comesBackAt).toISOString();
+  return {
+    at: assignee.at,
+    forMs: assignee.forMs,
+    comesBackAt,
+    word: assigneeWord(assignee, comesBackAt),
+    ...(assignee.name ? { name: assignee.name } : {}),
+    ...(assignee.why ? { why: assignee.why } : {}),
+    ...(assignee.actor ? { actor: assignee.actor } : {}),
+  } satisfies RunAssignee;
+}
+
+/**
+ * Who has run `run` in hand as it is judged now (`runAssigneeOf`): its assignee's standing read at the clock's now, timed from when its
+ * present ask began (`waitingSinceOf`) where it asks anything of a person (`asksOfAPerson`); null for a run nobody has in hand.
+ * @param run The run, with its assignee's file as the record reads it.
+ * @param views The engine's views of its tasks, which date the end of a waiting step's last try.
+ * @param steps The run's steps, in its workflow's order.
+ * @param asked What the run asks of a person now: the steps waiting on you, the runs it waits on and its hold.
+ * @param inPlay Whether the run's phase is still in play.
+ */
+const assigneeJudged = Effect.fnUntraced(function* (
+  run: Run,
+  views: Views,
+  steps: readonly StepSpec[],
+  asked: Pick<Parameters<typeof asksOfAPerson>[0], 'waitingOnYou' | 'waiting' | 'holding'> & { holding: { at: string } | null },
+  inPlay: boolean,
+) {
+  if (!run.assignee) return null;
+  const asks = asksOfAPerson({ ...asked, cancelledAt: run.cancelledAt, assignee: null });
+  const since = asks ? waitingSinceOf(run, views, steps, asked.waitingOnYou, asked.holding?.waitingOnYou ? asked.holding.at : null) : null;
+  const now = yield* Clock.currentTimeMillis;
+  return runAssigneeOf(run.assignee, assigneeStandingOf(run.assignee, asks, since, inPlay, now));
+});
+
+/**
  * The engine's own word for a task — `working`, `needs-human`, `succeeded` — as `nemia ls` shows it (`wordOfView`): `unknown`
  * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
  * and `succeeded` for a task held open that was closed after it signed, which it calls `between-attempts` until its next pass settles it.
@@ -363,6 +435,8 @@ type Judged = {
   waiting: RunWaiting | null;
   /** A person's hold on it (`holdingOf`). */
   holding: RunHolding | null;
+  /** Who has it in hand, as it stands at the judgement's instant (`runAssigneeOf`); null where nobody does, or their time ran out. */
+  assignee: RunAssignee | null;
   /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
   asked: ReadonlyMap<string, Retry>;
   /** Every ask that carried a message, waiting or consumed (the Run door): what says a try was answered (`answerOf`). */
@@ -547,6 +621,8 @@ export const judge = Effect.fn('judge')(function* (
   const due = lifts ? read.assessOf(unheld) : { ready, check, retry, round };
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
+  const codes = runCodes(status, holding?.runs ?? null, read.steps);
+  const assignee = yield* assigneeJudged(run, views, steps, { waitingOnYou, waiting, holding }, RUN_PHASE_IN_PLAY[codes.phase]);
   return {
     words: new Map(read.steps.map((s) => [s.name, s.message])),
     codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
@@ -557,13 +633,14 @@ export const judge = Effect.fn('judge')(function* (
     waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
-    ...runDoor(runCodes(status, holding?.runs ?? null, read.steps)),
+    ...runDoor(codes),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
       (tickReads &&
         ((due.ready.length > 0 && !waiting?.waitingOnYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
+    assignee,
     asked: new Map(read.assessed.due.retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers: read.answers,
     spendOf: read.spendOf,

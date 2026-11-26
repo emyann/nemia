@@ -267,7 +267,7 @@ export function storeRecordAt(root: string, key: string, text: string) {
 }
 
 /** A marker a person keeps beside a run (`plantMarker`, the orchestrator's testing entry). */
-export type StoredMarker = 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'labels' | 'refresh';
+export type StoredMarker = 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'assignee' | 'unassigned' | 'labels' | 'refresh';
 
 /**
  * The text of the run `id`'s marker in the seeded store, or null where it has none.

@@ -1,5 +1,6 @@
 import { Check, Copy, type LucideIcon } from 'lucide-react';
-import { Body, Focusable, IconButton, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, IconButton, TooltipTrigger } from '@/components/ui/ds';
+import { HeldTooltip } from './HeldTooltip';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { ink } from '@/lib/meaning';
 import { useCopy, type CopySaid } from '@/lib/useCopy';
@@ -57,7 +58,7 @@ export function CopyId({ id, short = false, room }: { id: string; short?: boolea
               {id.slice(-4)}
             </Body>
           </Focusable>
-          <Tooltip>{id}</Tooltip>
+          <HeldTooltip>{id}</HeldTooltip>
         </TooltipTrigger>
       ) : (
         <Body size="small" component="span" data-run-id style={room ? { minWidth: `${room}ch` } : undefined} className={ID}>

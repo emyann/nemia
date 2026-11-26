@@ -21,7 +21,7 @@ import type { HoldKeepsOut } from '../../contracts/rest-hold.contract.ts';
  * inputs, would decide the same and do nothing.
  */
 export type RestFacts = {
-  run: Pick<Run, 'workflow' | 'pruned' | 'hold' | 'cancelledAt'>;
+  run: Pick<Run, 'workflow' | 'pruned' | 'hold' | 'assignee' | 'cancelledAt'>;
   status: Assessment['status'];
   /** What the pass found due: a step to file, a check, a try, a round, or one waiting on the repository's checkout. */
   due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout'>;
@@ -56,7 +56,7 @@ export type RestFacts = {
  * person, at a gate or on a question — or it is pruned; its workflow is frozen on its record (a record without one reads its folder,
  * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
  * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run
- * waited on, no slot. Pure.
+ * waited on, no slot — nor the clock's: no assignee on a run nobody cancelled, whose time runs out with no input the memo watches. Pure.
  * @param f What the pass read of the run.
  */
 export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
@@ -71,6 +71,16 @@ export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
 export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
 /**
+ * The files a person keeps beside a run that keep it out of the memo while it is not called off: a hold, whose runs land on their own,
+ * and an assignee, who lapses with time. Pure.
+ * @param run The run's record: its hold, its assignee and whether it was called off.
+ */
+const personFilesOut = (run: RestFacts['run']) => [
+  ...(holdKeepsOut({ held: Boolean(run.hold), cancelled: Boolean(run.cancelledAt) }) ? ['hold'] : []),
+  ...(run.assignee && !run.cancelledAt ? ['assignee'] : []),
+];
+
+/**
  * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
  * none for a run at rest. What the tick's check of its memo names when a full pass finds a run not at rest, and what a count of a store's
  * runs by clause is made of. Pure.
@@ -80,7 +90,7 @@ export function restBlockers(f: RestFacts) {
   const out: string[] = [];
   if (f.status === 'running' && !f.run.pruned) out.push('status');
   if (!f.run.workflow) out.push('workflow');
-  if (holdKeepsOut({ held: Boolean(f.run.hold), cancelled: Boolean(f.run.cancelledAt) })) out.push('hold');
+  out.push(...personFilesOut(f.run));
   if (!f.settled) out.push('settled');
   if (f.acted) out.push('acted');
   for (const key of ['ready', 'check', 'retry', 'round', 'waitingOnCheckout'] as const) if (f.due[key].length) out.push(`due.${key}`);
@@ -140,6 +150,8 @@ export const RUN_INPUTS = {
   pruned: 'stamp',
   hold: 'stamp',
   unheld: 'stamp',
+  assignee: 'stamp',
+  unassigned: 'stamp',
   labels: 'stamp',
   said: 'stamp',
   refresh: 'stamp',
@@ -167,6 +179,8 @@ export const STAMPED_KEYS: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = 
   pruned: runMarkKey('<id>', 'pruned'),
   hold: runMarkKey('<id>', 'hold'),
   unheld: runMarkKey('<id>', 'unheld'),
+  assignee: runMarkKey('<id>', 'assignee'),
+  unassigned: runMarkKey('<id>', 'unassigned'),
   labels: runMarkKey('<id>', 'labels'),
   said: saidPrefix('<id>'),
   refresh: runMarkKey('<id>', 'refresh'),

@@ -77,6 +77,7 @@ const PINNED: Record<string, string[]> = {
     'CONCLUDED',
     'cardRepoRefusal',
     'HOLD',
+    'ASSIGN',
     'CANCEL',
     'ROUTE',
     'WAIT',

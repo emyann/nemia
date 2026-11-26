@@ -168,6 +168,7 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['skills write', 'cli'],
       ['cancel', 'typed'],
       ['hold', 'cli'],
+      ['assign', 'cli'],
       ['wait', 'typed'],
       ['rm', 'cli'],
       ['prune', 'cli'],

@@ -16,6 +16,7 @@ import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { ListedPhase } from '../list/list.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { AsksOfAPerson, WaitFacts, WaitsOnYou } from '../../contracts/waits-on-you.contract.ts';
 import type { AnswerVia, RUN_PHASE_OF as RUN_PHASES_OF, RunPhase, RunReason, STEP_PHASE_OF, StepPhase, StepReason, WaitOn } from 'objects';
 
 /**
@@ -328,18 +329,22 @@ export function runCodes(status: RunStatus, holding: readonly unknown[] | null, 
   return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }
 
-/** What a run says of who it waits on: the steps a person has to act on, the runs its roots wait on, and the hold on it. */
-export type WaitFacts = {
-  readonly cancelledAt: string | null | undefined;
-  readonly waitingOnYou: readonly string[];
-  readonly waiting: { readonly waitingOnYou: boolean } | null;
-  readonly holding: { readonly waitingOnYou: boolean } | null;
-};
+export type { WaitFacts };
 
 /**
- * Whether a run waits on a person — the one decider of it: nobody called it off, and a step of it waits on one, or a run it waits on never
- * lands without one, or a hold on it only a person lifts. What the list's state reads (`kindOf` in run-state.ts). Pure.
+ * Whether anything of a run is a person's to answer, whoever has it in hand: nobody called it off, and a step of it waits on one, or a run
+ * it waits on never lands without one, or a hold on it only a person lifts. What an assignee's clock runs on (`assigneeStanding`), and
+ * what the list dates an ask by. Pure.
  * @param run What the run says of who it waits on: whether it was called off, its steps waiting on a person, its wait and its hold.
  */
-export const waitsOnYou = (run: WaitFacts) =>
+export const asksOfAPerson: AsksOfAPerson = (run) =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
+
+/**
+ * Whether a run waits on a person — the one decider of it: it asks something of a person (`asksOfAPerson`) and nobody has it in hand
+ * (`assignee`, null once the assignee no longer stands). What the list's state reads (`kindOf` in run-state.ts), and so `nemia ls`, the
+ * bell and the board's counts. An ask in someone's hand is still asked, and anyone may still answer it. Pure.
+ * @param run What the run says of who it waits on: whether it was called off, its steps waiting on a person, its wait, its hold and who
+ * has it in hand.
+ */
+export const waitsOnYou: WaitsOnYou = (run) => asksOfAPerson(run) && run.assignee === null;

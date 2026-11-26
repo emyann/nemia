@@ -62,7 +62,8 @@ export const askName = ({ of, step, n }: AskKey) => `${ASK_WORDS[of]}-${step}-${
 export const askKey = (id: string, key: AskKey) => askKeyOf(id, askName(key));
 
 /**
- * Where every run's markers are, each run's under its id: its cancellation, pruning, hold, labels, refresh ask and the words said to its
+ * Where every run's markers are, each run's under its id: its cancellation, pruning, hold, assignee, labels, refresh ask and the words
+ * said to its
  * steps.
  */
 export const RUNMARKS_PREFIX = '/registry/runmarks/';
@@ -74,10 +75,11 @@ export const RUNMARKS_PREFIX = '/registry/runmarks/';
 export const FORGETTING_PREFIX = '/registry/forgetting/';
 
 /**
- * The markers a run carries by a key of their own, each the text its file held: called off, pruned, held, who lifted a hold, labelled,
+ * The markers a run carries by a key of their own, each the text its file held: called off, pruned, held, who lifted a hold, assigned,
+ * how an assignee ended, labelled,
  * asked to refresh.
  */
-export const RUN_MARKERS = ['cancelled', 'pruned', 'hold', 'unheld', 'labels', 'refresh'] as const;
+export const RUN_MARKERS = ['cancelled', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'refresh'] as const;
 
 /** One of a run's markers. */
 export type RunMarker = (typeof RUN_MARKERS)[number];

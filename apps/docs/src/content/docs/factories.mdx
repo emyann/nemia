@@ -265,7 +265,7 @@ source's runs and callers.
   cloned may remain on its disk, and a second try reuses it.
 - **The move never trusts the factory.** Type `nemia factory trust <name>` under the target's context once you have read what it
   trusts.
-- **An MCP server's sign-in does not follow.** Its token is kept in the harness's own store on the machine whose daemon signed in, not
+- **An MCP server's sign-in does not follow.** Its token is kept in the runtime's or the harness's own store on the machine whose daemon signed in, not
   in the factory's folder: on the target, press _Sign in_ on the server's row again ([from a remote
   browser](/install/#signing-in-from-a-remote-browser) where the daemon runs on a server).
 - **The source keeps its factory**, untouched, until you type `nemia factory rm <name>` under the source's context. Until then both

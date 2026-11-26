@@ -246,7 +246,8 @@ export const pollOnce = async (tokenEndpoint: string, clientId: string, deviceCo
 
 /**
  * A held token's refresh: the refresh grant with the client id and the refresh token, no secret. Answers the new grant, or `refused`
- * where the provider answered without one (`invalid_grant` among them): the refresh token is spent or gone. A network failure throws.
+ * where the provider answered with an OAuth `error` (`invalid_grant` among them) below a 5xx and not a 429: the refresh token is spent
+ * or gone. A network failure, a 5xx, a 429 or an answer with neither grant nor error throws: the token is not taken for spent.
  * @param tokenEndpoint The provider's token endpoint, kept with the token.
  * @param clientId The server's OAuth client id, kept with the token.
  * @param refreshToken The refresh token held.
@@ -254,5 +255,10 @@ export const pollOnce = async (tokenEndpoint: string, clientId: string, deviceCo
 export const refreshOnce = async (tokenEndpoint: string, clientId: string, refreshToken: string) => {
   const answered = await asked(tokenEndpoint, formOf({ client_id: clientId, grant_type: 'refresh_token', refresh_token: refreshToken }));
   const { grant } = grantOf(answered.body);
-  return grant ?? ('refused' as const);
+  if (grant !== undefined) return grant;
+  const error = textOf(answered.body.error);
+  if (error === null || answered.status >= 500 || answered.status === 429) {
+    throw new Error(`${tokenEndpoint} gave no refresh (status ${answered.status}${error === null ? '' : `, ${error}`}). Try again.`);
+  }
+  return 'refused' as const;
 };

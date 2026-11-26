@@ -181,9 +181,7 @@ export function SignInView({
           <Button variant="outlined" size="xsmall" icon={pending ? Pending : undefined} isDisabled={pending} onPress={onSignOut}>
             Sign out
           </Button>
-          <span className="text-body-small text-on-surface-variant">
-            Nemia keeps the sign-in fresh and hands it to every session of this factory.
-          </span>
+          <span className="text-body-small text-on-surface-variant">Sessions of this factory reach what was granted at the provider.</span>
         </div>
       ) : shown.at === 'waiting' ? (
         <Waiting name={name} started={shown.started} pending={pending} pasting={pasting} onCancel={onSignOut} />

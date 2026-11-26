@@ -12,6 +12,7 @@ import { Effect } from 'effect';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { scratch } from 'test-kit/scratch';
+import { keptRequest } from './claude/attached-file.ts';
 import { dropToken, heldToken, holdToken, REFRESH_MARGIN_MS, tokenFileOf, tokened, TOKENS_FOLDER, withTokens } from './mcp-token.ts';
 import type { SpawnRequest, RemoteMcpServer } from './seam.ts';
 
@@ -137,6 +138,19 @@ describe('heldToken: a token due is refreshed before a session is handed it', ()
     assert.equal(fs.existsSync(tokenFileOf(root, 'github', GITHUB)), true);
   });
 
+  test('a refresh the provider failed to answer (503, 429, a page with no error) removes nothing', async () => {
+    const root = scratch('ae-mcp-token-');
+    holdToken(root, 'github', GITHUB, grant('at-1'), FROM, T0);
+    for (const status of [503, 429, 200]) {
+      refreshing(() => new HttpResponse('<html>try later</html>', { status, headers: { 'content-type': 'text/html' } }));
+      assert.equal(await heldToken(root, 'github', GITHUB, T0 + 9 * HOUR), undefined);
+      assert.equal(fs.existsSync(tokenFileOf(root, 'github', GITHUB)), true, `status ${status}`);
+    }
+    refreshing(() => HttpResponse.json({ error: 'temporarily_unavailable' }, { status: 503 }));
+    assert.equal(await heldToken(root, 'github', GITHUB, T0 + 9 * HOUR), undefined);
+    assert.equal(fs.existsSync(tokenFileOf(root, 'github', GITHUB)), true);
+  });
+
   test('a due token whose refresh token has lapsed is gone, and no request is made', async () => {
     const root = scratch('ae-mcp-token-');
     holdToken(root, 'github', GITHUB, { ...grant('at-1'), refreshExpiresInSeconds: 3600 }, FROM, T0);
@@ -182,6 +196,12 @@ describe('tokened: a spawn is handed the tokens on `mcpTokens`, and the task’s
       [undefined, undefined],
     );
   });
+});
+
+test('keptRequest, which an attached session’s run file holds, carries no token and no brief', () => {
+  const kept = keptRequest({ name: 'ae/t/1', brief: 'work', cwd: '/x', mcpTokens: { github: 'planted-token' } });
+  assert.equal(JSON.stringify(kept).includes('planted-token'), false);
+  assert.equal('brief' in kept, false);
 });
 
 test('withTokens lays Authorization over a server’s own headers, and leaves a server with no token as it is', () => {

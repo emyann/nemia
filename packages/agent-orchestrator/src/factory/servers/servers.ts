@@ -85,7 +85,7 @@ export const factoryServerRefusal = (server: unknown) => {
     }
     const credential = Object.keys(headers).find((h) => h.toLowerCase() === REFUSED_HEADER);
     if (credential) {
-      return `\`${credential}\` is a credential, and a factory's record is a plain file: nothing a person types enters it. A factory's server signs in instead — the sign-in writes the token into the harness's own store, where no run reads it — so take the header off and sign the server in. Every other header is kept, the toolset headers included.`;
+      return `\`${credential}\` is a credential, and a factory's record is a plain file: nothing a person types enters it. A factory's server signs in instead — the sign-in keeps the token in the runtime's own store, never in the record — so take the header off and sign the server in. Every other header is kept, the toolset headers included.`;
     }
   }
   return undefined;

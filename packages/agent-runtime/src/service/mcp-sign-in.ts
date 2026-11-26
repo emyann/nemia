@@ -45,7 +45,8 @@ const CALLBACK_REFUSALS = ['none-waiting', 'unreadable', 'elsewhere', 'denied', 
 
 /**
  * A sign-in or sign-out this engine will not make, and why. `held` says it is refused because a sign-in already waits on the callback
- * port — another's sign-in, or this server's own — which passes once that one settles or expires; every other refusal is the ask's own.
+ * port — another's sign-in, or this server's own — or a sign-in by a code already waits for this server, which passes once that one
+ * settles or expires; every other refusal is the ask's own.
  * `callback` says why a pasted callback was refused (`mcpSignInCallback`), and is absent on every other refusal.
  */
 export class McpSignInRefused extends Schema.TaggedError<McpSignInRefused>()('McpSignInRefused', {
@@ -243,6 +244,7 @@ const clearedFromClaude = async (cli: McpCli | string, name: string, server: Rem
  */
 const devicesHeld = (states: Map<string, McpSignInState>, root: string, pace: number) => {
   const holds = new Map<string, DeviceHold>();
+  const starting = new Set<string>();
   const start = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, route: DeviceRoute, clientId: string) {
     const code = yield* Effect.tryPromise({
       try: () => deviceCodeOf(route.deviceAuthorizationEndpoint, clientId),
@@ -273,8 +275,24 @@ const devicesHeld = (states: Map<string, McpSignInState>, root: string, pace: nu
     states.delete(name);
     return true;
   };
-  return { start, cancel, has: (name: string) => holds.has(name) };
+  const claim = (name: string) => {
+    if (holds.has(name) || starting.has(name)) return false;
+    starting.add(name);
+    return true;
+  };
+  return { start, cancel, claim, release: (name: string) => starting.delete(name) };
 };
+
+/** The road `server` signs in by, asked of its provider; refused, in words that say to try again, where the provider cannot be reached. */
+const routeAsked = (seams: SignInSeams, name: string, server: RemoteMcpServer) =>
+  Effect.tryPromise({
+    try: () => (seams.route ?? routeOf)(server),
+    catch: (e) =>
+      new McpSignInRefused({
+        message: `the provider of \`${name}\` could not be asked how to sign in: ${(e as Error).message}`,
+        held: false,
+      }),
+  });
 
 /**
  * The four verbs over the harnesses this engine has, the hold of each waiting browser sign-in kept here by its callback port
@@ -334,18 +352,13 @@ export const mcpSignInVerbsOf = (
     const refused = signInRefusal(name, server) ?? noClaude();
     const clientId = server.oauth?.clientId;
     if (refused || clientId === undefined) return yield* refuse(refused ?? noClient(name));
-    if (devices.has(name)) {
+    if (!devices.claim(name)) {
       return yield* refuse(`a sign-in to \`${name}\` already waits. Type its code at the provider, or cancel it and sign in again.`, true);
     }
-    const route = yield* Effect.tryPromise({
-      try: () => (seams.route ?? routeOf)(server),
-      catch: (e) =>
-        new McpSignInRefused({
-          message: `the provider of \`${name}\` could not be asked how to sign in: ${(e as Error).message}`,
-          held: false,
-        }),
-    });
-    return route.route === 'device' ? yield* devices.start(name, server, route, clientId) : yield* browser(name, server);
+    return yield* Effect.gen(function* () {
+      const route = yield* routeAsked(seams, name, server);
+      return route.route === 'device' ? yield* devices.start(name, server, route, clientId) : yield* browser(name, server);
+    }).pipe(Effect.ensuring(Effect.sync(() => devices.release(name))));
   });
 
   const mcpSignInState = (name: string) => Effect.sync(() => states.get(name) ?? { state: 'none' }) satisfies Effect.Effect<McpSignInState>;

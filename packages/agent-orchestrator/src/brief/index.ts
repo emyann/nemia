@@ -7,5 +7,5 @@ export type { ToldLayers } from './brief.ts';
 export { contextSection, handedParts } from './handed.ts';
 export type { HandedPart, ParentCloseout } from './handed.ts';
 export { briefParts, inParts } from './parts.ts';
-export { acceptedLines, gateLines, retrySection, SIGNOFF } from './brief-sections.ts';
+export { acceptedLines, gateLines, REPLIES_OWED, retrySection, SIGNOFF } from './brief-sections.ts';
 export type { RetryBriefing } from './brief-sections.ts';

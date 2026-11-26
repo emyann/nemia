@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
+import { loadSkills } from '@modelcontextprotocol/server/ext/skills/node';
 import { compress } from 'hono/compress';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
@@ -8,6 +9,7 @@ import {
   feedHubLayer,
   gitPlaceLayer,
   informerLayer,
+  NEMIA_SKILLS,
   needsMemoryLayer,
   runningRelease,
   storeConfigLayer,
@@ -22,7 +24,7 @@ import { ApiConfig, type ApiEnv, ReadMemo, type Services } from './layer.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
-import { mcpPort } from './mcp/index.ts';
+import { mcpPort, type PortSkills, SKILLS_CACHE_HINT } from './mcp/index.ts';
 import { saidRequest } from './request/request.ts';
 import { Followings } from './steps/index.ts';
 import { Engine } from './store.ts';
@@ -85,6 +87,20 @@ let bundle: Promise<string> | undefined;
 /** The OpenAPI page's viewer script, read from the installed package once and kept: a reread would serve the same file. */
 const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
 
+let skills: Promise<PortSkills> | undefined;
+/**
+ * Nemia's skills as the MCP port serves them: her skills folder (`NEMIA_SKILLS`) read once by the SDK's loader and kept, since it
+ * changes only with a release. A folder that does not read fails each request of `/mcp` alone, never the rest of the api, so its
+ * rejection is handled here and met again by each request that waits on it.
+ */
+const nemiaSkills = () => {
+  if (skills === undefined) {
+    skills = loadSkills(NEMIA_SKILLS, { cacheHint: SKILLS_CACHE_HINT });
+    skills.catch(() => undefined);
+  }
+  return skills;
+};
+
 /** The board's folder read off the disk, afresh on each request: a rebuild is served at once. */
 const boardFiles: BoardFiles = {
   isFile: (file) =>
@@ -104,10 +120,11 @@ const boardFiles: BoardFiles = {
  * (`.all(MOUNT, mount(runtime))`, objects/serve.ts): its body decoded by the endpoint's Schema (a 400 naming the `field`), its handler
  * in the folder of its group (runs/, steps/, decide/, server/, nemia/, workflows/, agents/, skills/, factory/, proposals/, objects/),
  * each calling the package's verbs by type, and a GET answering a `…List` watched on `?watch=true` (watch/watch.ts) and a `Table` where
- * the request accepts one (objects/table.ts). Only the three OpenAPI routes stay outside it: the document, its page and the page's
- * script (openapi/); and the MCP port, `/mcp` (`mcpPort`, mcp/port.ts), a protocol host whose tools call the `Api`'s endpoints through
- * this app's own `fetch`, mounted before the `Api`. After the mount, a GET of any other path is a page of the board, served from its
- * built files (`boardOf`, board/board.ts, its files read here: `boardFiles`). A path none serves is the api's own 404 (`noRoute`).
+ * the request accepts one (objects/table.ts). Only the three OpenAPI routes stay outside it: the document, its page and the page's script
+ * (openapi/); and the MCP port, `/mcp` (`mcpPort`, mcp/port.ts), a protocol host whose tools call the `Api`'s endpoints through this app's
+ * own `fetch`, and which serves Nemia's skills, read here (`nemiaSkills`), mounted before the `Api`. After the mount, a GET of any other
+ * path is a page of the board, served from its built files (`boardOf`, board/board.ts, its files read here: `boardFiles`). A path none
+ * serves is the api's own 404 (`noRoute`).
  *
  * Every answer, the board's files, the OpenAPI routes, the MCP port and the refusals among them, is compressed where the request
  * accepts it (Hono's `compress`, its defaults kept: gzip before deflate, nothing under 1,024 bytes, and no `text/event-stream`, so a
@@ -134,7 +151,7 @@ export function appOf(layer: Layer.Layer<Services>) {
     .route('/', referenceOf(viewerScript))
     .all(
       '/mcp',
-      mcpPort(() => app),
+      mcpPort(() => app, nemiaSkills()),
     )
     .all(MOUNT, mount(runtime))
     .get(BOARD_ROUTE, boardOf(boardFiles))

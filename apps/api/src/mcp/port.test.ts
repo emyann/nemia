@@ -6,7 +6,8 @@
  * still pending is told to its caller as progress, every interval, where the caller gave a progress token; and the feed's resources on
  * the modern era: declared subscribable, a listen of a view acknowledged and told of each new line, a read answering it, a URI no view
  * refused -32602 holding nothing, and a closed listen letting its view go; a file a tool reads handed over as a link, which a read of
- * the resource answers. Statuses, refusal words and
+ * the resource answers; and Nemia's skills by the Skills extension in both eras, every one of her skills folder listed, got and each
+ * of its files read and checked against its digest and size, an unknown skill or file refused -32602. Statuses, refusal words and
  * whether an error carries words are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine and the test place; a run planted as its record alone, nothing of it filed; the tokens
@@ -20,16 +21,18 @@ import path from 'node:path';
 import { Effect, Layer, Schema } from 'effect';
 import { Hono } from 'hono';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { SKILLS_EXTENSION_ID, SkillsClient } from '@modelcontextprotocol/client/ext/skills';
+import { loadSkills } from '@modelcontextprotocol/server/ext/skills/node';
 import { testEngine } from 'agent-runtime/testing';
 import { approvalKey, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
-import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { CLI_VERBS, NEMIA_SKILLS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { until } from '../../test/waits.ts';
 import { Beats } from '../layer.ts';
 import { Api, type Decidable, EventList, QUOTA_STATES, RUN_STATES } from 'objects';
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
-import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
+import { mcpPort, PORT_LIST_TTL_MS, SKILLS_CACHE_HINT } from './port.ts';
 import { portTools } from './tools.ts';
 import { FILES_EXTENSION } from './files.ts';
 import { TASKS_EXTENSION } from './tasks.ts';
@@ -38,6 +41,9 @@ import { fileRead, fileUriOf } from './links.ts';
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 const app = eachTest(() => appOver(standIn(), stand()));
+
+/** Nemia's skills as the port serves them, loaded strictly: a skill the catalog would drop with a warning fails the test instead. */
+const SKILLS = loadSkills(NEMIA_SKILLS, { strict: true, cacheHint: SKILLS_CACHE_HINT });
 
 /** A program over the token door of the harness's store, run. */
 const door = <A, E>(use: (d: TokenDoorShape) => Effect.Effect<A, E>) =>
@@ -263,6 +269,7 @@ for (const era of ERAS)
     for (const name of ['ls', 'show', 'decide', 'approve', 'retry', 'inbox_add', 'inbox_start', 'say', 'closeout', 'try'])
       assert.ok(named.includes(name), `the instructions name ${name}`);
     for (const name of named) assert.ok(names.has(name), `${name}, named by the instructions, is a tool the port lists`);
+    assert.ok(instructions.includes('skill://operate/SKILL.md'), 'the instructions point at the operate skill');
     const ls = tools.find((t) => t.name === 'ls');
     assert.ok(
       ls !== undefined && 'fieldSelector' in (ls.inputSchema.properties ?? {}),
@@ -434,7 +441,7 @@ test("REFUSED 401 at the port: no token, a session's token, a token never minted
 
 for (const era of ERAS)
   test(`${era}: a pending wait given a progress token is told progress every interval, the interval injected short`, async () => {
-    const port = new Hono().all('/mcp', mcpPort(app, { progressEveryMs: 20 }));
+    const port = new Hono().all('/mcp', mcpPort(app, SKILLS, { progressEveryMs: 20 }));
     const client = await connected(() => port, era);
     const told: number[] = [];
     const result = await client.callTool(
@@ -470,8 +477,8 @@ test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_
   assert.equal(discovered?.resultType, 'complete');
   assert.deepEqual(
     (discovered?.capabilities as { extensions?: unknown } | undefined)?.extensions,
-    { ...FILES_EXTENSION, ...TASKS_EXTENSION },
-    'server/discover advertises the files extension, inline, and the tasks extension',
+    { ...FILES_EXTENSION, ...TASKS_EXTENSION, [SKILLS_EXTENSION_ID]: { directoryRead: true } },
+    "server/discover advertises the files extension, inline, the tasks extension, and the skills extension, whose catalog reads a skill's folder",
   );
   await client.close();
 });
@@ -558,6 +565,10 @@ test('in the modern era the port declares resources.subscribe and lists the feed
     resourceTemplates.some((t) => t.uriTemplate === 'nemia:///api/events{?labelSelector*}'),
     'the feed is a template',
   );
+  assert.ok(
+    resourceTemplates.some((t) => t.uriTemplate === 'nemia://{+path}'),
+    'a file a tool hands over is a template',
+  );
   await modern.close();
   const legacy = await connected(app, 'legacy');
   assert.ok(legacy.getServerCapabilities()?.resources !== undefined, 'legacy: resources');
@@ -566,7 +577,7 @@ test('in the modern era the port declares resources.subscribe and lists the feed
 });
 
 test("subscriptions/listen of nemia:///api/events is acknowledged, told of a new feed line, its read answers that line's Event, and its close lets the view go", async (t) => {
-  const port = mcpPort(feedApp);
+  const port = mcpPort(feedApp, SKILLS);
   const host = new Hono().all('/mcp', port);
   const client = await connected(() => host, 'modern');
   const uri = 'nemia:///api/events';
@@ -591,7 +602,7 @@ test("subscriptions/listen of nemia:///api/events is acknowledged, told of a new
 });
 
 test('REFUSED -32602: a listen naming nemia:///api/runs, the templates named, no view opened', async () => {
-  const port = mcpPort(feedApp);
+  const port = mcpPort(feedApp, SKILLS);
   const res = await new Hono().all('/mcp', port).request('/mcp', {
     method: 'POST',
     headers: {
@@ -668,4 +679,62 @@ test('REFUSED: a link read past the bound answers no content and names the path 
   const missing = await fileRead(gone, fileUriOf(gone) ?? assert.fail(`${gone} names a file the api serves`), from, app());
   assert.equal(missing.kind, 'refused', 'a file the api does not have is refused, not read');
   assert.ok(missing.kind === 'refused' && missing.message.includes('404'), "with the api's status");
+});
+
+/** The folders of Nemia's skills folder, each a skill: what the port lists. */
+const shippedSkills = () =>
+  fs
+    .readdirSync(NEMIA_SKILLS, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
+
+for (const era of ERAS)
+  test(`${era}: the port serves every skill of Nemia's folder, operate among them, each file read and checked against its digest and size`, async () => {
+    const client = await connected(app, era);
+    const skills = new SkillsClient(client);
+    assert.equal(skills.supported, true, 'the skills extension is declared');
+    const listing = await skills.list();
+    const names = shippedSkills();
+    assert.ok(names.includes('operate'), 'operate ships in her folder');
+    assert.deepEqual(
+      listing.skills.map((s) => s.uri).sort(),
+      names.map((name) => `skill://${name}/SKILL.md`),
+    );
+    if (era === 'modern') {
+      assert.equal(listing.ttlMs, PORT_LIST_TTL_MS);
+      assert.equal(listing.cacheScope, 'private');
+    } else assert.equal(listing.ttlMs, undefined, 'a legacy host is given no cache hint');
+    for (const listed of listing.skills) {
+      const { skill } = await skills.get(listed.uri);
+      assert.equal(skill.uri, listed.uri);
+      const files = skill.resources === 'dynamic' ? assert.fail(`${skill.uri} lists its files`) : skill.resources;
+      for (const file of files) {
+        const read = await skills.read(skill, file.uri);
+        assert.equal(read.verified, true, `${file.uri} checked`);
+      }
+    }
+    const verbs = listing.skills.find((s) => s.uri === 'skill://verbs/SKILL.md');
+    assert.ok(
+      Array.isArray(verbs?.resources) && verbs.resources.some((r) => r.uri === 'skill://verbs/tools.md'),
+      "verbs' tools.md travels with it",
+    );
+    await client.close();
+  });
+
+/** The JSON-RPC code `run` was refused with, or none where it answered. */
+const refusedCode = async (run: () => Promise<unknown>) => {
+  try {
+    await run();
+  } catch (error) {
+    return (error as { code?: unknown }).code;
+  }
+  return undefined;
+};
+
+test('REFUSED -32602: skills/get of a skill the port does not serve, and resources/read of a file no skill lists', async () => {
+  const client = await connected(app, 'modern');
+  assert.equal(await refusedCode(() => new SkillsClient(client).get('skill://none/SKILL.md')), -32602, 'an unknown skill');
+  assert.equal(await refusedCode(() => client.readResource({ uri: 'skill://verbs/none.md' })), -32602, 'an unknown file');
+  await client.close();
 });

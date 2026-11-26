@@ -2,14 +2,15 @@
  * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable HTTP, served by
  * the SDK's `createMcpHandler` in both eras of the spec — the modern (`server/discover`, each request carrying its version in `_meta`,
  * every result its `resultType`, the tool list its `ttlMs` and `cacheScope`) and the legacy (`initialize`, each request answered on its
- * own) — a fresh low-level `Server` for each request (`portServer`), serving the tools generated from the command table (`portTools`,
- * tools.ts) in its order. A call of a tool is a request to the endpoint its verb links, presenting the caller's own `Authorization`, handed
- * to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and nothing of tokens or refusals is said
- * again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`, and a file the api serves as its bytes as a
- * `resource_link` to it, never its bytes (links.ts); anything else is the tool's error, in the api's own words, which say what to do next.
+ * own) — a fresh `McpServer` for each request (`portServer`), serving the tools generated from the command table (`portTools`, tools.ts)
+ * in its order, set by hand on its low-level `server`. A call of a tool is a request to the endpoint its verb links, presenting the
+ * caller's own `Authorization`, handed to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and
+ * nothing of tokens or refusals is said again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`, and a file the
+ * api serves as its bytes as a `resource_link` to it, never its bytes (links.ts); anything else is the tool's error, in the api's own
+ * words, which say what to do next.
  *
- * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults
- * its link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
+ * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults its
+ * link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
  * `tableLines` as `nemia` prints them, the token of the next page on a last line; and no answer passes `ANSWER_BOUND` (`answerFit`): a
  * page past it is asked again shorter, and any other answer past it refused with how to narrow it, never cut.
  *
@@ -17,6 +18,14 @@
  * declares `resources.subscribe`, and a `subscriptions/listen` naming views is held here (`listened`) while the SDK's own listen router
  * acknowledges it and writes each `notifications/resources/updated` the views publish through its `notify` (views.ts); a 2025-era
  * server lists and reads them alone.
+ *
+ * Nemia's skills are served by MCP's Skills extension (`io.modelcontextprotocol/skills`): her skills folder whole (the orchestrator's
+ * `NEMIA_SKILLS`, `operate` among them, her role said to a session outside the store), each skill at `skill://<name>/SKILL.md` with its
+ * files beside it, listed by `skills/list`, answered by `skills/get` and read by `resources/read`, the same for every caller and changed
+ * only by a release. The SDK's own catalog serves them (`SkillCatalog`, attached to each request's server), never handlers of the
+ * port's: it checks each file it reads against the digest and size it published. The entry reads the folder once (`loadSkills` in
+ * app.ts) and hands the port the catalog. Since the catalog registers its template through the `McpServer`, which then owns the
+ * `resources/*` methods, the feed's templates and the files a tool hands over are registered through it too (`servesFeed`).
  *
  * A modern call that declares MCP's tasks extension, of a tool whose link says a task (`LinkTask`, `objects`), is answered as a task the
  * caller reads with `tasks/get` (tasks.ts): followed through the endpoint that reads what the call started, keeping nothing, or asked
@@ -35,19 +44,22 @@ import {
   INVALID_PARAMS,
   type McpHttpHandler,
   type McpRequestContext,
+  McpServer,
   ProtocolError,
   readRequestBody,
   ResourceNotFoundError,
-  Server,
+  ResourceTemplate,
+  type ServerContext,
   type Tool,
 } from '@modelcontextprotocol/server';
+import type { SkillCatalog } from '@modelcontextprotocol/server/ext/skills';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
 import { FILES_EXTENSION, inlined } from './files.ts';
 import { fileRead, fileUriOf, linkOf } from './links.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
-import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
+import { FEED_TEMPLATES, type FeedView, SCHEME, viewOf } from './resources.ts';
 import {
   createdOf,
   declaresTasks,
@@ -72,6 +84,15 @@ export const PROGRESS_EVERY_MS = 30_000;
  * daemon upgraded under a connected host shows its tools within that. A legacy host is given none: its era has no such field.
  */
 export const PORT_LIST_TTL_MS = 300_000;
+
+/**
+ * How long a host of the modern era may answer the skills' lists and files from its cache: as long as the tool list
+ * (`PORT_LIST_TTL_MS`), by its caller alone, since they change only with a release. Given to the catalog as the entry loads it.
+ */
+export const SKILLS_CACHE_HINT = { ttlMs: PORT_LIST_TTL_MS, cacheScope: 'private' } as const;
+
+/** The catalog of skills the port serves, as the entry loads it from her skills folder. */
+export type PortSkills = SkillCatalog;
 
 /** What the port calls a tool's endpoint through: the app it is mounted on. */
 export type Fetching = { readonly fetch: (request: Request) => Response | Promise<Response> };
@@ -303,50 +324,69 @@ const listed = (tool: PortTool) =>
 type Era = McpRequestContext['era'];
 
 /**
- * The feed's resources on `server`: none listed by name (`resources/list` is empty: the feed is its templates), the templates read off
- * the `Api` (`FEED_TEMPLATES`, resources.ts), and a read of a view answered from `views` (its newest events, under `ANSWER_BOUND`), a URI
- * that names none refused as a resource not found, in words naming the templates, and one the api refuses with its words. A URI of a file
- * a tool handed over as a link (links.ts) is read through the app `appOf` gives, with the caller's token.
+ * The template of every URI of the port's scheme no feed template matches as written — a feed with no selector or two, a file a tool
+ * handed over as a link (links.ts) — so each is read by the same read as the feed's.
  */
-function servesFeed(server: Server, views: FeedViews, appOf: () => Fetching) {
-  const templates = FEED_TEMPLATES.map(({ uriTemplate, name, title, description, mimeType }) => ({
-    uriTemplate,
-    name,
-    title,
-    description,
-    mimeType,
-  }));
-  server.setRequestHandler('resources/list', () => ({ resources: [] }));
-  server.setRequestHandler('resources/templates/list', () => ({ resourceTemplates: templates }));
-  server.setRequestHandler('resources/read', async ({ params }, ctx) => {
-    const file = fileUriOf(params.uri);
-    const named = viewOf(params.uri);
-    if (file === undefined && named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
-    const from = ctx.http?.req;
-    if (from === undefined)
-      throw new ProtocolError(INVALID_PARAMS, `${params.uri} is read over HTTP alone: POST the read to the api's /mcp`);
-    if (file !== undefined) {
-      const read = await fileRead(params.uri, file, from, appOf());
-      if (read.kind === 'refused') throw new ProtocolError(INVALID_PARAMS, read.message);
-      return { contents: [read.content] };
-    }
-    if (named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
-    const text = await views.read(named.view, from);
-    if (typeof text !== 'string') throw new ProtocolError(INVALID_PARAMS, text.refused);
-    return { contents: [{ uri: params.uri, mimeType: 'application/json', text }] };
-  });
+const FILE_TEMPLATE = {
+  uriTemplate: `${SCHEME}://{+path}`,
+  name: 'files',
+  title: 'A file a tool handed over',
+  description: `A file the api serves, as a tool hands it over as a resource_link (${SCHEME}:///api/...): read it with resources/read.`,
+} as const;
+
+/**
+ * A read of `uri` of the port's scheme: a file a tool handed over as a link (links.ts), read through the app `appOf` gives with the
+ * caller's token; else a view of the feed, answered from `views` (its newest events, under `ANSWER_BOUND`), a URI that names none refused
+ * as a resource not found, in words naming the templates, and one the api refuses with its words.
+ */
+async function feedRead(uri: string, ctx: ServerContext, views: FeedViews, appOf: () => Fetching) {
+  const file = fileUriOf(uri);
+  const named = viewOf(uri);
+  if (file === undefined && named.kind === 'none') throw new ResourceNotFoundError(uri, named.message);
+  const from = ctx.http?.req;
+  if (from === undefined) throw new ProtocolError(INVALID_PARAMS, `${uri} is read over HTTP alone: POST the read to the api's /mcp`);
+  if (file !== undefined) {
+    const read = await fileRead(uri, file, from, appOf());
+    if (read.kind === 'refused') throw new ProtocolError(INVALID_PARAMS, read.message);
+    return { contents: [read.content] };
+  }
+  if (named.kind === 'none') throw new ResourceNotFoundError(uri, named.message);
+  const text = await views.read(named.view, from);
+  if (typeof text !== 'string') throw new ProtocolError(INVALID_PARAMS, text.refused);
+  return { contents: [{ uri, mimeType: 'application/json', text }] };
+}
+
+/**
+ * The feed's resources on `mcp`, each registered through it: the templates read off the `Api` (`FEED_TEMPLATES`, resources.ts), and last
+ * the template of every other URI of the port's scheme (`FILE_TEMPLATE`), each read by `feedRead`, from the URI as the SDK parsed it.
+ * None is listed by name: the feed is its templates.
+ */
+function servesFeed(mcp: McpServer, views: FeedViews, appOf: () => Fetching) {
+  const templates: readonly { uriTemplate: string; name: string; title: string; description: string; mimeType?: string }[] = [
+    ...FEED_TEMPLATES,
+    FILE_TEMPLATE,
+  ];
+  for (const { uriTemplate, name, title, description, mimeType } of templates)
+    mcp.registerResource(
+      name,
+      new ResourceTemplate(uriTemplate, { list: undefined }),
+      { title, description, ...(mimeType === undefined ? {} : { mimeType }) },
+      (uri, _variables, ctx) => feedRead(uri.href, ctx, views, appOf),
+    );
 }
 
 /**
  * The server that answers one request of `/mcp`, in whichever era it speaks (the SDK's `createMcpHandler` asks for one per request):
  * it says what Nemia is (`PORT_INSTRUCTIONS`) on `initialize` and on `server/discover`, lists `tools` in the order given, each list
  * cacheable by its caller alone for `PORT_LIST_TTL_MS` in the modern era, and answers a call through `app` (`called`), presenting the
- * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
- * go beside these. In the modern era it declares the tasks extension and serves its methods (`servesTasks`, tasks.ts), and a call
- * that declares it, of a tool whose link says a task, is answered as one where `taskAnswerOf` says so (`taskCalled`).
+ * caller's own request; it serves `skills` by the Skills extension (the SDK's catalog, attached first, its `skill://` template and its
+ * methods its own). Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it, go
+ * beside these. In the modern era it declares the tasks extension and serves its methods (`servesTasks`, tasks.ts), and a call that
+ * declares it, of a tool whose link says a task, is answered as one where `taskAnswerOf` says so (`taskCalled`).
  * @param tools The port's tools, listed in this order.
  * @param appOf What gives the app a call is answered by.
  * @param progressEveryMs How often a call that asks for progress is told it, in milliseconds.
+ * @param skills The catalog of Nemia's skills the server serves.
  * @param feed The era the request speaks, the feed's views and the tasks the port holds, where the feed is offered as resources and
  *   tasks are served; none where they are not.
  */
@@ -354,24 +394,27 @@ export function portServer(
   tools: readonly PortTool[],
   appOf: () => Fetching,
   progressEveryMs: number,
+  skills: PortSkills,
   feed?: { readonly era: Era; readonly views: FeedViews; readonly held: HeldTasks },
 ) {
   const modern = feed?.era === 'modern' ? feed : undefined;
   const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
   const list = tools.map(listed);
-  const server = new Server(SERVER_INFO, {
-    capabilities: {
-      tools: {},
-      ...(feed === undefined ? {} : { resources: feed.era === 'modern' ? { subscribe: true } : {} }),
-      extensions: modern === undefined ? FILES_EXTENSION : { ...FILES_EXTENSION, ...TASKS_EXTENSION },
-    },
+  const mcp = new McpServer(SERVER_INFO, {
+    capabilities: { extensions: modern === undefined ? FILES_EXTENSION : { ...FILES_EXTENSION, ...TASKS_EXTENSION } },
     instructions: PORT_INSTRUCTIONS,
     cacheHints: {
       'tools/list': { ttlMs: PORT_LIST_TTL_MS, cacheScope: 'private' },
       'resources/read': { ttlMs: 0, cacheScope: 'private' },
     },
   });
-  if (feed !== undefined) servesFeed(server, feed.views, appOf);
+  skills.attach(mcp);
+  const server = mcp.server;
+  server.registerCapabilities({ tools: {} });
+  if (feed !== undefined) {
+    servesFeed(mcp, feed.views, appOf);
+    if (feed.era === 'modern') server.registerCapabilities({ resources: { subscribe: true } });
+  }
   if (modern !== undefined) servesTasks(server, tools, appOf, modern.held);
   server.setRequestHandler('tools/list', () => ({ tools: list }));
   server.setRequestHandler('tools/call', async ({ params }, ctx) => {
@@ -409,7 +452,7 @@ export function portServer(
       }).pipe(Effect.scoped),
     );
   });
-  return server;
+  return mcp;
 }
 
 /** The URIs a `subscriptions/listen` request asks `notifications/resources/updated` of, or none where `body` is no such request. */
@@ -522,17 +565,20 @@ export async function listened(request: Request, handler: McpHttpHandler, views:
  * is answered as JSON, or as a stream where its call is told progress; a legacy one (`initialize`, then each request on its own)
  * by the SDK's stateless leg, which streams; a GET or a DELETE is a 405, as the port keeps no stream or session of its own. The tools
  * are generated once, as the handler is made, in the command table's order, and the tasks it holds in its memory made once beside them
- * (`heldTasks`, tasks.ts), which `liveTasks()` counts at work.
+ * (`heldTasks`, tasks.ts), which `liveTasks()` counts at work; the skills are the catalog `skills` holds once it is loaded, which each
+ * request waits on, and a catalog that failed to load fails each request of `/mcp` alone.
  * @param appOf What gives the app the port is mounted on.
+ * @param skills The catalog of Nemia's skills, as the entry loads it (`loadSkills` over the orchestrator's `NEMIA_SKILLS`).
  */
 export function mcpPort(
   appOf: () => Fetching,
+  skills: Promise<PortSkills>,
   { progressEveryMs = PROGRESS_EVERY_MS, heldMost = HELD_MOST, heldBoundMs = HELD_MOST_MS }: PortOptions = {},
 ) {
   const tools = portTools(TABLE, CLI_VERBS, Api);
   const views: FeedViews = feedViews(appOf, (uri) => handler.notify.resourceUpdated(uri));
   const held = heldTasks({ most: heldMost, boundMs: heldBoundMs, keepMs: HELD_KEEP_MS });
-  const handler = createMcpHandler((ctx) => portServer(tools, appOf, progressEveryMs, { era: ctx.era, views, held }), {
+  const handler = createMcpHandler(async (ctx) => portServer(tools, appOf, progressEveryMs, await skills, { era: ctx.era, views, held }), {
     legacy: 'stateless',
     responseMode: 'auto',
   });

@@ -17,8 +17,9 @@
  * beside it of what that set would let git run a program by (`RUNS_A_PROGRAM_DENIES`), write a file by (`WRITES_A_FILE_DENY`) or read
  * outside the repository by (`READS_OUTSIDE_DENIES`), and `wc` read a list of paths by (`WC_READS_A_LIST_DENY`). Both are planted here
  * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
- * that refuses its own spellings, and each plain read still asked. Beside them, the reads of a pull request a repository's settings may allow a reviewer (`GH_ALLOWS`), and
- * the denies of every other form of gh they reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
+ * that refuses its own spellings, and each plain read still asked. Beside them, the reads of a pull request a
+ * repository's settings may allow a reviewer (`GH_ALLOWS`), and the denies of every other form of gh they
+ * reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
  * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does; and a tool's own help
  * and version (`HELP_ALLOWS`), each line proven to reach no alias, extension, flag or other command (`HELP_REFUSED`). The planted lines
  * are sdlc's own, read from its fence files (`SDLC_FENCES`), so a line dropped there is refused here by the test of what it refuses.
@@ -1041,7 +1042,7 @@ test('a step that measures nothing denies each compiler whole, and REFUSED witho
   }
 });
 
-/** The pull request's reads a repository's settings may allow, planted on the reviewer beside the read set: the spellings its gh denies hold. */
+/** The pull request's reads a repository's settings may allow, planted on the reviewer beside the read set. */
 const GH_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
 
 /**

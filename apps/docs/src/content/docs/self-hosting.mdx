@@ -124,8 +124,8 @@ because Tailscale tunnels it.
 
 ## 5. GitHub
 
-A factory on GitHub pushes each run's branch with git and opens its pull request with the GitHub CLI
-(`packages/templates/sdlc/carried/pull-request.ts`). The daemon clones a repository named by its URL with git too. All of it uses the
+A factory on GitHub pushes each run's branch with git (`packages/templates/sdlc/carried/pull-request.ts`), labels and
+waits on its pull request with the GitHub CLI, and opens it through the GitHub MCP server, which the factory adds and signs in. The daemon clones a repository named by its URL with git too. All of it uses the
 server's own credentials. **Nemia holds none.** So the server's Nemia user signs in to GitHub once.
 
 The `sdlc` template's `build` and `quick` declare these as needs, each with its fix: a run of one waits before its first session while

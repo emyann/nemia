@@ -389,9 +389,10 @@ export const isParam = (value: unknown): value is ParamRef =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.param === 'string';
 
 /**
- * An expression written inside a string or a text: `${{ parameters.<name> }}`, or `${{ case(parameters.<name>, '<then>', '<otherwise>') }}`,
- * GitHub Actions' `case` limited to one predicate that is a parameter and two single-quoted literals with no quote inside. Spaces inside
- * the braces and the parentheses are optional. A shell's `$VAR` and `${VAR}` are none.
+ * An expression written inside a string or a text: `${{ parameters.<name> }}`, or
+ * `${{ case(parameters.<name>, '<then>', '<otherwise>') }}`, GitHub Actions' `case` limited to one predicate that is a
+ * parameter and two single-quoted literals with no quote inside. Spaces inside the braces and the
+ * parentheses are optional. A shell's `$VAR` and `${VAR}` are none.
  */
 const PARAMETER_EXPRESSION =
   /\$\{\{\s*(?:parameters\.([A-Za-z_][A-Za-z0-9_]*)|case\(\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*\))\s*\}\}/g;

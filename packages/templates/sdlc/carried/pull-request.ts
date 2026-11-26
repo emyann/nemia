@@ -389,7 +389,8 @@ function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, r
 }
 
 /**
- * The labels of `pr` set to `want`, through REST (`issues/<n>/labels`), never `gh pr edit`, whose GraphQL query asks for the project cards GitHub refuses since it deprecated Projects (classic): what it lacks of `want` added, and
+ * The labels of `pr` set to `want`, through REST (`issues/<n>/labels`), never `gh pr edit`, whose GraphQL query asks for the project cards
+ * GitHub refuses since it deprecated Projects (classic): what it lacks of `want` added, and
  * what it carries of `givable` and not of `want` removed, a label no rule gives left as it is. The line that says what it set.
  */
 function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }) {

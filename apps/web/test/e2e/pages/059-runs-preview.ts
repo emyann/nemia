@@ -237,8 +237,9 @@ export default {
   /**
    * A step's diamond on the runs page: each is a button named by its step and word. Hovered or focused it shows a small card of a few
    * lines that never scrolls — the agent and model, the word and since, the round and spend, the last line — as the api answers them,
-   * with none of the session's static facts. A click, or Enter, opens that step in the frame's side sheet, left by a navigation to the runs page. The Clock
-   * cell's own preview opens beside it, by the pointer and by the keyboard, at both widths, and the two do not fight. Writes nothing.
+   * with none of the session's static facts. A click, or Enter, opens that step in the frame's side sheet, left by a navigation to the
+   * runs page. The Clock cell's own preview opens beside it, by the pointer and by the keyboard, at both widths, and the two do not
+   * fight. Writes nothing.
    */
   name: 'runs-preview',
   route: '/runs',

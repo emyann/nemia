@@ -40,7 +40,11 @@ export const Program = Schema.Struct({
   }),
   metadata: ObjectMeta,
   spec: ProgramSpec,
-  status: Schema.optionalKey(ProgramStatus),
+  status: Schema.optionalKey(
+    ProgramStatus.annotate({
+      description: "Where the factory's program runs now; absent on a template's declaration, which no factory runs yet.",
+    }),
+  ),
 }).annotate({ identifier: 'Program' });
 export type Program = typeof Program.Type;
 

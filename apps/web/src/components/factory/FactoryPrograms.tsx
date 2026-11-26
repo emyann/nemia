@@ -5,7 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import type { Program } from 'objects';
-import { Tag } from '@/components/ui/ds';
+import { Body, Tag, Title } from '@/components/ui/ds';
 import { factoryProgramsQuery } from '@/lib/api/factories';
 
 /**
@@ -17,24 +17,26 @@ function ProgramRow({ program: p }: { program: Program }) {
   return (
     <li data-factory-program={p.metadata.name} className="flex flex-col gap-2 rounded-shape-medium border border-outline-variant p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-title-small">{p.metadata.name}</span>
+        <Title size="small" component="span">
+          {p.metadata.name}
+        </Title>
         <Tag variant="outlined" data-program-phase={phase}>
           {phase}
         </Tag>
-        <span className="text-body-medium text-on-surface-variant">
+        <Body size="medium" component="span" colorRole="on-surface-variant">
           writes {p.spec.writes.length === 0 ? 'no condition' : p.spec.writes.join(', ')}
-        </span>
+        </Body>
       </div>
       {p.status?.since !== undefined && (
-        <p className="text-body-medium text-on-surface-variant">
+        <Body size="medium" colorRole="on-surface-variant">
           {phase === 'Down' ? 'Down' : 'Up'} since {p.status.since}, started again {p.status.restarts}{' '}
           {p.status.restarts === 1 ? 'time' : 'times'}.
-        </p>
+        </Body>
       )}
       {p.status?.message !== undefined && (
-        <p data-program-fix className="text-body-medium">
+        <Body size="medium" data-program-fix>
           {p.status.message}
-        </p>
+        </Body>
       )}
     </li>
   );
@@ -47,11 +49,13 @@ export function FactoryPrograms({ name }: { name: string }) {
   return (
     <section aria-label="Programs" data-factory-programs={name} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-title-medium">Programs</h2>
-        <p className="text-body-medium text-on-surface-variant">
+        <Title size="medium" component="h2">
+          Programs
+        </Title>
+        <Body size="medium" colorRole="on-surface-variant">
           What this factory's template keeps running for it: each writes the conditions that steps wait on. The daemon starts one again when
           it ends.
-        </p>
+        </Body>
       </div>
       <ul className="flex flex-col gap-2">
         {data.map((p) => (

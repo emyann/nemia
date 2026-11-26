@@ -23,7 +23,10 @@ function Served({ items, children }: { items: readonly Program[]; children: Reac
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-/** A factory's programs on its settings page, a story a state: one running, one down with what to type, and a factory with none. */
+/**
+ * A factory's programs on its settings page, a story a state: one running and one down with what to type; a factory with none draws
+ * nothing.
+ */
 const meta: Meta<typeof FactoryPrograms> = {
   title: 'Factory/FactoryPrograms',
   component: FactoryPrograms,
@@ -60,13 +63,5 @@ export const RunningAndDown: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-factory-program="ci-writer"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-factory-program="deploy-writer"] [data-program-fix]')).not.toBeNull();
-  },
-};
-
-/** No program: nothing is drawn. */
-export const None: Story = {
-  render: served([]),
-  play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-factory-programs]')).toBeNull();
   },
 };

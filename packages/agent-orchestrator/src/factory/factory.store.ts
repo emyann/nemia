@@ -101,8 +101,9 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * name (`workflowRepos`), where it is made from no
  * template (one made from a template keeps it in its tree's wiring, as an attach writes it); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
- * a file written before the counter; a volume's `name`; its own card triggers, by name (`triggers`), kept here as its schedules are. A key
- * a later `nemia` writes is kept.
+ * a file written before the counter; a volume's `name`; its own card triggers, by name (`triggers`), kept here as its schedules are; and
+ * the values each label key it names takes (`labelValues`), where it is made from no template (one made from a template keeps them in
+ * its tree's wiring, rendered from its manifest). A key a later `nemia` writes is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -116,6 +117,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
+    labelValues: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(Schema.String))),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -182,32 +184,34 @@ function factoryFile(home: string, name: string) {
 }
 
 /**
- * The workflows, hires, revisions policy and workflows' repositories of a templated factory `name`: its tree's, none while the tree is
- * not rendered, or why they do not read.
+ * The workflows, hires, revisions policy, workflows' repositories and label values of a templated factory `name`: its tree's, none while
+ * the tree is not rendered, or why they do not read.
  */
 function treeWiringOf(home: string, name: string) {
   const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
-  const { workflows, hires, revisions, workflowRepos } = read.wiring;
+  const { workflows, hires, revisions, workflowRepos, labelValues } = read.wiring;
   return {
     workflows,
     hires,
     ...(revisions === undefined ? {} : { revisions }),
     ...(workflowRepos === undefined ? {} : { workflowRepos }),
+    ...(labelValues === undefined ? {} : { labelValues }),
   };
 }
 
 /**
  * The factory `name` its file's `content` says: none attached, hired or scheduled when the file names none, and where its instruction is
- * kept and whether its runs follow merged revisions only when the file says. A factory made from a template reads its workflows, hires
- * and revisions policy from its tree (`tree`), or why they do not read; its schedules, from its file.
+ * kept and whether its runs follow merged revisions only when the file says. A factory made from a template reads its workflows, hires,
+ * revisions policy and label values from its tree (`tree`), or why they do not read; its schedules, from its file.
  */
 function factoryOf(home: string, name: string, content: FactoryFile) {
   const template = content.template;
   const own = {
     ...(content.revisions === undefined ? {} : { revisions: content.revisions }),
     ...(content.workflowRepos === undefined ? {} : { workflowRepos: content.workflowRepos }),
+    ...(content.labelValues === undefined ? {} : { labelValues: content.labelValues }),
   };
   const wiring =
     template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {}, ...own } : treeWiringOf(home, name);

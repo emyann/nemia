@@ -93,7 +93,8 @@ The rules reach the open as `--labels` on the line the implement step's note ren
 refused. Where there are rules and the run's labels match none of them, the open and the push refuse before anything is pushed, exit 78,
 a person's, naming each key the rules read, the values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: a pull
 request no rule labels would fail a check that reads its labels, and only the merge would find out. A pull request opened by hand gets
-no label from it.
+no label from it. The factory's `labelValues` parameter (`key=value` words, the values
+`pullRequestLabels` reads) refuses that same label earlier, when the card is filed or labelled, so the run never reaches the push with it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
 <id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the

@@ -16,6 +16,10 @@ import { CardName } from '../inbox/inbox.model.ts';
 import { inboxNameRefusal, labelledText, noCardLine, parseInboxCard } from '../inbox/index.ts';
 import { inboxCards } from '../inbox/inbox.store.ts';
 import { tried } from '../runtime-client.ts';
+import { labelValuesJudged } from '../factory/door/factories.store.ts';
+
+/** The labels of `labels` whose value is not the one `was` holds: what an edit gives, never a value that stands. */
+const changedOf = (was: Labels, labels: Labels) => Object.fromEntries(Object.entries(labels).filter(([key, value]) => was[key] !== value));
 
 /** `edits` parsed and applied to `current`, or the refusal of either, as `Invalid` naming the command typed. */
 const edited = (command: string, current: Labels, edits: readonly string[], overwrite: boolean) => {
@@ -30,7 +34,8 @@ const edited = (command: string, current: Labels, edits: readonly string[], over
 /**
  * `nemia label run <id> <edit>... [--overwrite]`: the run's person labels edited and written whole (`runs.labels.put`), any run — in
  * flight, waiting or finished. Refused before anything is written: an id that is not a run's (`Invalid`), a run the store does not have
- * (`Missing`, naming `nemia ls`), and an edit `parseLabelEdits` or `labelEdits` refuses (`Invalid`).
+ * (`Missing`, naming `nemia ls`), an edit `parseLabelEdits` or `labelEdits` refuses (`Invalid`), and a value it sets that the run's
+ * factory does not take for its key (`labelValuesJudged`, `Invalid`).
  */
 export const labelRun = Effect.fn('labelRun')(function* (id: string, edits: readonly string[], overwrite = false) {
   const command = `nemia label run ${id}`;
@@ -42,6 +47,7 @@ export const labelRun = Effect.fn('labelRun')(function* (id: string, edits: read
     return yield* Effect.fail(new Missing({ message: `${command}: the store has no run ${id}. Label one nemia ls lists, by its id.` }));
   const was = run.labels ?? {};
   const labels = yield* edited(command, was, edits, overwrite);
+  yield* labelValuesJudged(run.factory, changedOf(was, labels), 'Nothing was labelled.');
   yield* door.labels.put(RunId.read(id), labels);
   const out: Labelled = { kind: 'Run', name: id, labels, was };
   return out;
@@ -52,7 +58,8 @@ export const labelRun = Effect.fn('labelRun')(function* (id: string, edits: read
  * and its body kept (`labelledText`), a started card's too. Refused before anything is written: a name that is not a card's (`Invalid`),
  * a card the inbox does not have (`Missing`, naming `nemia inbox` and the cards there are), a card that does not read (`tried`, its
  * reader's refusal as the failure), and an edit
- * `parseLabelEdits` or `labelEdits` refuses (`Invalid`).
+ * `parseLabelEdits` or `labelEdits` refuses (`Invalid`), and a value it sets that the card's factory does not take for its key
+ * (`labelValuesJudged`, `Invalid`).
  */
 export const labelCard = Effect.fn('labelCard')(function* (name: string, edits: readonly string[], overwrite = false) {
   const command = `nemia label inbox ${name}`;
@@ -68,6 +75,7 @@ export const labelCard = Effect.fn('labelCard')(function* (name: string, edits: 
   const card = yield* tried(() => parseInboxCard(`${name}.md`, text));
   const was = card.labels ?? {};
   const labels = yield* edited(command, was, edits, overwrite);
+  yield* labelValuesJudged(card.factory, changedOf(was, labels), 'Nothing was labelled.');
   yield* door.cards.rewrite(card$, yield* tried(() => labelledText(card, labels)));
   const out: Labelled = { kind: 'Card', name, labels, was };
   return out;

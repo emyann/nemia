@@ -15,6 +15,9 @@ import { cardDoorMemory } from '../cards/memory.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { RunId } from '../record/record.model.ts';
 import { aRun } from '../../test/run-walks.ts';
+import { aFactory } from '../../test/factory-walks.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { factoryDoorMemory } from '../factory/door/memory.store.ts';
 
 /** A program run over fresh memory doors, a run `r-1` and a card `cache-a1` planted first: its exit. */
 function over<A, E>(program: Effect.Effect<A, E>, card = '---\nworkflow: build\nfrom: a-1x2y\n---\nCache the views.\n') {
@@ -99,4 +102,47 @@ describe('REFUSED: an unknown run, an unknown card, a malformed edit, a reserved
       assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
       names(err.message, ...facts);
     });
+});
+
+describe('REFUSED: a label its factory does not take, on a run or a card of it, nothing written; a key it names not passes', () => {
+  const card = '---\nworkflow: build\nfactory: alpha\n---\nCache the views.\n';
+  const inAlpha = <A, E>(program: Effect.Effect<A, E>) => {
+    const plant = Effect.gen(function* () {
+      yield* (yield* FactoryDoor).factories.create(aFactory('alpha', { labelValues: { work: ['feature', 'fix'] } }));
+      const runs = yield* RunDoor;
+      yield* runs.runs.create({ ...aRun('r-2'), factory: 'alpha' });
+      yield* runs.labels.put(RunId.read('r-2'), { work: 'store' });
+      yield* (yield* CardDoor).cards.add(CardName.read('cache-a1'), card);
+    });
+    const layer = Layer.mergeAll(runDoorMemory(), cardDoorMemory(), factoryDoorMemory());
+    return Effect.runSync(Effect.exit(Effect.andThen(plant, program).pipe(Effect.provide(layer))));
+  };
+  test('labelRun and labelCard setting work=store are Invalid, naming it, and the labels are as they were', () => {
+    const run = inAlpha(
+      Effect.gen(function* () {
+        const refused = yield* Effect.flip(labelRun('r-2', ['work=other', 'team=core'], true));
+        const after = yield* (yield* RunDoor).runs.read(RunId.read('r-2'));
+        return { refused, labels: after.labels };
+      }),
+    );
+    const ran = value(run);
+    assert.equal(ran.refused._tag, 'Invalid');
+    assert.deepEqual(ran.labels, { work: 'store' }, 'nothing written');
+    const overwritten = refusal(inAlpha(labelRun('r-2', ['work=other'], true)));
+    assert.deepEqual([overwritten._tag, overwritten.exitCode], ['Invalid', 2]);
+    names(overwritten.message, 'work=other', 'fix');
+    const carded = inAlpha(
+      Effect.gen(function* () {
+        const refused = yield* Effect.flip(labelCard('cache-a1', ['work=store']));
+        return { refused, text: yield* (yield* CardDoor).cards.read(CardName.read('cache-a1')) };
+      }),
+    );
+    const read = value(carded);
+    assert.equal(read.refused._tag, 'Invalid');
+    assert.equal(read.text, card, 'nothing written');
+  });
+  test('a key the factory names not is set on a run whose work=store stands, and a value it takes is set', () => {
+    assert.deepEqual(value(inAlpha(labelRun('r-2', ['area=x']))).labels, { work: 'store', area: 'x' });
+    assert.deepEqual(value(inAlpha(labelCard('cache-a1', ['work=fix']))).labels, { work: 'fix' });
+  });
 });

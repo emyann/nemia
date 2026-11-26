@@ -366,13 +366,13 @@ describe('what a try refuses, and what it is fenced to: the default factory, rul
     });
   });
   test("an agent whose `overridable:` line leaves out `fence` is refused a try before anything is written, in the try's words, and its listing says the same; offered, it is tried", async () => {
-    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, skills\nmodel: sonnet\n---\nSay what you see.\n');
-    const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
+    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: skills\nmodel: sonnet\n---\nSay what you see.\n');
+    const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: skills`/);
     assert.ok(why.includes('`fence`') && why.includes('try'), why);
     assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
     const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
     assert.equal(agents.find((agent) => agent.from === 'user' && agent.name === 'closed')?.untried?.why, why);
-    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
+    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: fence\nmodel: sonnet\n---\nSay what you see.\n');
     const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
     ended(id);
     assert.equal((await remove(id)).status, 200);

@@ -9,7 +9,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
-import { OVERRIDABLE } from '../workflow/index.ts';
+import { HARNESS_PROPERTIES, OVERRIDABLE } from '../workflow/index.ts';
 import { selectorsRefusal } from '../watch/selector.ts';
 import { labelValuesOf } from '../label-spelling/label-spelling.ts';
 import {
@@ -332,17 +332,27 @@ const agentRefusals = (held: Held) =>
 
 /** Each word of an agent's `overridable` that is none of `OVERRIDABLE`, refused at its place, as the agent's file refuses it. */
 const overridableRefusals = (file: string, offered: unknown) =>
-  (Array.isArray(offered) ? offered : []).flatMap((word, i) =>
-    typeof word === 'string' && !(OVERRIDABLE as readonly string[]).includes(word)
-      ? [
+  (Array.isArray(offered) ? offered : []).flatMap((word, i) => {
+    if (typeof word !== 'string') return [];
+    if ((HARNESS_PROPERTIES as readonly string[]).includes(word)) {
+      return [
+        {
+          file,
+          at: ['spec', 'overridable', i],
+          message: `\`${word}\` is a property of the harness, which is always a step's to override: take it off \`overridable\`.`,
+        },
+      ];
+    }
+    return (OVERRIDABLE as readonly string[]).includes(word)
+      ? []
+      : [
           {
             file,
             at: ['spec', 'overridable', i],
             message: `\`${word}\` is not something a step may override: name those of ${OVERRIDABLE.join(', ')} this agent offers, or remove \`overridable\`, and a step may override all of them.`,
           },
-        ]
-      : [],
-  );
+        ];
+  });
 
 /**
  * What the harness and blocks of `holder`, an agent's spec or a step's overrides at `at`, break: a harness that is none, any block where

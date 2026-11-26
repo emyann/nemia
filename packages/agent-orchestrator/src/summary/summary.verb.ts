@@ -38,6 +38,7 @@ import { RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
 import { judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
 import {
   needsOf,
+  type RunAssignee,
   type RunHolding,
   type RunStatus,
   type RunToDecide,
@@ -100,6 +101,11 @@ export type RunSummary = {
    * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
    */
   holding: RunHolding | null;
+  /**
+   * Who has the run in hand (`RunAssignee`), as it stands at the judgement's instant; null where nobody does, or their time ran out. While
+   * it stands the run waits on nobody else (`waitsOnYou`), and what it asks is still asked.
+   */
+  assignee: RunAssignee | null;
   /**
    * The run in one word, as the feed and `nemia tick` say it: `running`, `succeeded`, `cancelled`; `failed` for a run in which a step
    * broke; `awaiting approval` for one stopped at its gates alone; `waiting` for one a person's word stops otherwise.
@@ -208,7 +214,7 @@ export type RunSummary = {
  */
 export type JudgedFields = Pick<
   RunSummary,
-  'status' | 'phase' | 'reason' | 'on' | 'via' | 'moving' | 'cost' | 'atWork' | 'tokens' | 'waiting' | 'holding' | 'toDecide'
+  'status' | 'phase' | 'reason' | 'on' | 'via' | 'moving' | 'cost' | 'atWork' | 'tokens' | 'waiting' | 'holding' | 'assignee' | 'toDecide'
 >;
 
 /** What `judgedFields` reads of a run's judgement (`judge`). */
@@ -225,6 +231,7 @@ export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: 
   return {
     waiting: judged.waiting,
     holding: judged.holding,
+    assignee: judged.assignee,
     ...runSaid(judged),
     moving: judged.moving,
     cost: judged.cost,
@@ -242,6 +249,7 @@ export function unjudgedFields() {
   return {
     waiting: null,
     holding: null,
+    assignee: null,
     status: 'running',
     phase: 'running',
     reason: 'Running',

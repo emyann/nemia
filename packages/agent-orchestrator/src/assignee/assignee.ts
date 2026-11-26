@@ -12,6 +12,7 @@ import type {
   AssigneeStanding,
   AssigneeStandingOf,
 } from '../../contracts/assignee.contract.ts';
+import { type Actor, actorWords } from 'objects';
 
 export type { AssignPut, AssignStop, AssigneeClock, AssigneeStanding };
 
@@ -43,8 +44,11 @@ export const assigneeStanding: AssigneeStandingOf = (c) => {
   return c.now < due ? { kind: 'stands', comesBackAt: due } : { kind: 'lapsed', at: due };
 };
 
-/** Who has the run, as a refusal or a line says it: their name, else the caller the api resolved, else someone. */
-const whoOf = (a: { name?: string; actor?: { name?: string } }) => a.name ?? a.actor?.name ?? 'someone';
+/** Who has the run, as a refusal or a line says it: their name, else the caller the api resolved (`actorWords`), else someone. */
+const whoOf = (a: Who) => a.name ?? (a.actor ? actorWords(a.actor) : 'someone');
+
+/** Who has a run in hand, as a refusal or a line names them: the name given, and the caller who put it. */
+type Who = { name?: string; actor?: Actor };
 
 /**
  * Why `id` takes no assignee, naming what to do instead, for a stop `assignStop` said.
@@ -52,7 +56,7 @@ const whoOf = (a: { name?: string; actor?: { name?: string } }) => a.name ?? a.a
  * @param stop What of the run refuses it.
  * @param standing Who has it in hand already, read off the record, for the `assigned` stop.
  */
-export const assignRefusal = (id: string, stop: AssignStop, standing?: { name?: string; actor?: { name?: string } }) => {
+export const assignRefusal = (id: string, stop: AssignStop, standing?: Who) => {
   switch (stop) {
     case 'cancelled':
       return `${id} was cancelled, so nothing of it will be asked of anyone: nemia ls ${id}.`;
@@ -71,7 +75,7 @@ export const assignRefusal = (id: string, stop: AssignStop, standing?: { name?: 
  * @param a Who has the run, and why.
  * @param comesBackAt When it comes back, an ISO 8601 time; null while nothing is timed.
  */
-export const assigneeWord = (a: { name?: string; why?: string; actor?: { name?: string } }, comesBackAt: string | null) =>
+export const assigneeWord = (a: Who & { why?: string }, comesBackAt: string | null) =>
   `${whoOf(a)} has it in hand${a.why ? ` (${a.why})` : ''} — ${
     comesBackAt === null ? 'not timed while it asks nothing' : `back to you at ${comesBackAt} if unanswered`
   }`;

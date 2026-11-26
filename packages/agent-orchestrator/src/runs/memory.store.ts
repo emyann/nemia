@@ -15,7 +15,20 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, AskWritten, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
+import type {
+  AskKey,
+  AskOf,
+  AskWritten,
+  Assignee,
+  Hold,
+  PersonRequest,
+  Pruned,
+  Run,
+  SaidBefore,
+  TakenBack,
+  Unassigned,
+  Unheld,
+} from '../record/record.ts';
 import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
 import { askDoneKey, askKeyOf, askName, claimKey, runKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
@@ -36,7 +49,7 @@ const keyOf = (person: PersonRequest) =>
 const nameOf = (key: AskKey) => askName(key);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause'] as const;
+const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'saidBefore', 'pause'] as const;
 const recordOf = (run: Run) => {
   const kept: Record<string, unknown> = { ...unrouted(run) };
   for (const key of COMPOSED) delete kept[key];
@@ -54,6 +67,8 @@ type State = {
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
   unheld: Map<string, Unheld>;
+  assignees: Map<string, Assignee>;
+  unassigned: Map<string, Unassigned>;
   labels: Map<string, Labels>;
   said: Map<string, Array<SaidBefore & { step: string }>>;
   refresh: Map<string, { at: string }>;
@@ -71,6 +86,8 @@ const stateOf = () =>
     pruned: new Map(),
     holds: new Map(),
     unheld: new Map(),
+    assignees: new Map(),
+    unassigned: new Map(),
     labels: new Map(),
     said: new Map(),
     refresh: new Map(),
@@ -108,6 +125,8 @@ function readOf(st: State, id: string) {
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
     ...(unheld !== undefined ? { unheld: structuredClone(unheld) } : {}),
+    ...(st.assignees.has(id) ? { assignee: structuredClone(st.assignees.get(id)) } : {}),
+    ...(st.unassigned.has(id) ? { unassigned: structuredClone(st.unassigned.get(id)) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
     ...saidBeforeOf(st, id),
     ...(approvals.length ? { approvals } : {}),
@@ -136,6 +155,8 @@ function forgetOf(st: State, id: string) {
     [st.pruned, `${id}.pruned`],
     [st.holds, `${id}.hold`],
     [st.unheld, `${id}.unheld`],
+    [st.assignees, `${id}.assignee`],
+    [st.unassigned, `${id}.unassigned`],
     [st.refresh, `${id}.refresh`],
     [st.labels, `${id}.labels`],
     [st.said, `${id}.said/`],
@@ -340,6 +361,32 @@ function holdsOf(st: State) {
   } satisfies RunsLayer['holds'];
 }
 
+function assigneesOf(st: State) {
+  return {
+    put: (id, { forMs, name, why, actor }) => {
+      if (st.assignees.has(id)) return null;
+      const assignee: Assignee = {
+        at: new Date().toISOString(),
+        forMs,
+        ...(name ? { name } : {}),
+        ...(why ? { why } : {}),
+        ...(actor ? { actor: structuredClone(actor) } : {}),
+      };
+      st.assignees.set(id, assignee);
+      touch(st, id);
+      return structuredClone(assignee);
+    },
+    end: (id, at, how, actor) => {
+      if (st.assignees.get(id)?.at !== at) return false;
+      st.unassigned.set(id, { since: at, how, ...(actor ? { actor: structuredClone(actor) } : {}) });
+      st.assignees.delete(id);
+      touch(st, id);
+      return true;
+    },
+    stands: (id) => st.assignees.has(id),
+  } satisfies RunsLayer['assignees'];
+}
+
 /** What was said to the run's steps before each was filed, by step, in the order kept, as `saidBefore` composes it; none where none. */
 function saidBeforeOf(st: State, id: string) {
   const byStep: Record<string, SaidBefore[]> = {};
@@ -406,6 +453,7 @@ function memoryRuns() {
     runs: runsOf(st),
     asks: asksGroup(st),
     holds: holdsOf(st),
+    assignees: assigneesOf(st),
     said: saidOf(st),
     labels: labelsOf(st),
     refresh: refreshOf(st),

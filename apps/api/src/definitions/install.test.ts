@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { TemplateRenders, type Running } from 'agent-orchestrator';
-import { BuiltinTemplates } from 'agent-orchestrator/testing';
+import { BuiltinTemplates, definitionsIndexed } from 'agent-orchestrator/testing';
 import type { Agent, FactoryList, ProposalList, Skill, Workflow, WorkflowStepPage } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
@@ -215,6 +215,7 @@ describe('an install with no repository and no factory named: yours is created, 
     );
     const proposals = await got<ProposalList>('/api/namespaces/pmill/proposals');
     assert.deepEqual(proposals.items, []);
+    await definitionsIndexed(home);
     const dev = await got<Workflow>('/api/namespaces/pmill/workflows/dev');
     const made = await send('POST', '/api/namespaces/pmill/proposals', {
       objects: [

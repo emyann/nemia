@@ -32,8 +32,13 @@ const planting = <A, E, R>(planted: Planted, program: Effect.Effect<A, E, R>) =>
   });
 
 /** `program` run on a fresh memory door after `planted`. */
-const over = <A, E>(planted: Planted, program: Effect.Effect<A, E>) =>
-  Effect.runSyncExit(planting(planted, program).pipe(Effect.provide(subscriptionDoorMemory())));
+const over = <A, E>(planted: Planted, program: Effect.Effect<A, E, StoreRoot>) =>
+  Effect.runSyncExit(
+    planting(planted, program).pipe(
+      Effect.provide(subscriptionDoorMemory()),
+      Effect.provideService(StoreRoot, scratch('subscription-memory-')),
+    ),
+  );
 
 /** The success of `exit`, or a failure of the test naming what it failed with. */
 const ok = <A, E>(exit: Exit.Exit<A, E>) => {
@@ -82,14 +87,13 @@ describe('a delivery written for another task or another from reads as the subsc
     });
 });
 
-test('a get answers the subscription by its name, its version changing with its status', () => {
+test('a get answers the subscription by its name, its version a keyspace revision', () => {
   const planted = { subscriptions: { mill: aSubscription('nemia-1') } };
   const one = ok(over(planted, subscriptionObject('mill')));
   Schema.decodeUnknownSync(Subscription)(one);
   assert.equal(one.kind, 'Subscription');
   assert.equal(one.metadata.name, 'mill');
-  const moved = ok(over({ ...planted, deliveries: { mill: aDelivery(300, 'nemia-1') } }, subscriptionObject('mill')));
-  assert.notEqual(moved.metadata.resourceVersion, one.metadata.resourceVersion);
+  assert.match(one.metadata.resourceVersion, /^\d+$/);
 });
 
 test('a name no subscription has is Missing', () => {
@@ -116,4 +120,22 @@ test('at a store, a delivery that does not read says why in status.error, and th
   assert.equal(one.status.since, undefined);
   assert.equal(typeof one.status.error, 'string');
   assert.notEqual(one.metadata.creationTimestamp, new Date(0).toISOString());
+});
+
+test('at a store, a subscription and a list of them stand at the revision of the records they are made of, which a delivery moves', () => {
+  const root = scratch('subscription-revisions-');
+  const program = Effect.gen(function* () {
+    yield* planting({ subscriptions: { mill: aSubscription('nemia-1') } }, Effect.void);
+    const before = yield* subscriptionObject('mill');
+    yield* planting({ subscriptions: {}, deliveries: { mill: aDelivery(300, 'nemia-1') } }, Effect.void);
+    const after = yield* subscriptionObject('mill');
+    const list = yield* subscriptionList({});
+    return { before, after, list };
+  });
+  const { before, after, list } = ok(
+    Effect.runSyncExit(program.pipe(Effect.provide(subscriptionDoorAt(root)), Effect.provideService(StoreRoot, root))),
+  );
+  assert.ok(Number(after.metadata.resourceVersion) > Number(before.metadata.resourceVersion), 'a delivery moved the version');
+  assert.match(list.metadata.resourceVersion ?? '', /^\d+$/);
+  assert.ok(Number(list.metadata.resourceVersion) >= Number(after.metadata.resourceVersion), 'the list is at the head, past each item');
 });

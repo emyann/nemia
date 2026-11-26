@@ -352,6 +352,15 @@ export function dropStoredCard(name: string) {
 }
 
 /**
+ * The definitions of the seeded store numbered once, as the daemon's sweep numbers them (`--no-tick` runs none): a page that reads a
+ * workflow, edits its folder by hand and expects the api to find it moved reads it after this, since a definition not yet numbered is
+ * served at a revision no hand edit moves.
+ */
+export function numberedDefinitions() {
+  inApi('await t.definitionsIndexed(root);');
+}
+
+/**
  * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the
  * api's package on the api's environment: the api ticks nothing in the e2e (`--no-tick`), and the board's list reads where a run's result
  * stands off that file alone. Throws, with what the process printed, where the pass failed.

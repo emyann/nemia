@@ -260,12 +260,15 @@ of its kind, never from an older file that looks alike:
   table, or the object changes without a revision and a watch from one never sends it. What the informer judges from other records (a card's
   `status.state` and `runs`) moves no revision yet. A Run is at the highest of its record, markers, asks and status record. A definition stays a file and is indexed (`/registry/definitions/<scope>/<kind>/<name>`,
   `src/definition-index/`, swept by the daemon every 2 s through `recordDue`): a new place definitions are read from goes into
-  `definitionsFound`, and a write of one reads the index again first (`definitionRevisionNow`). The api, not the orchestrator's objects,
-  stamps the revision (`apps/api/src/objects/revisioned.ts`); a verb's own digest is the content's, which a writer's precondition still
-  compares where its door does (`definitionVersionRefusal`). A record's digest is the version the doors give it counted with the skills
-  of each repository a factory works on (`_repo.<factory>` for a repository's own definitions, a `factory` record for a Factory's rules
-  and instruction), so an edit of a repository's skill moves the revision of the agent that names it; the index reads the doors, never
-  the stores. A proposal's folder write is held to the content digest read at its apply (`digestNow`), its own version being a revision.
+  `definitionsFound`. A definition is numbered with no write (`definitionsNumbered`, `indexedRevision`, proved by
+  `contracts/indexed-revision.contract.ts`): its record's revision where the record still holds the files, otherwise the next revision, the
+  one a sweep would give it now; only the sweep writes the index, so no read does, in any process, and a writer judges the revision it was
+  read at (`definitionJudged`), writes, then sweeps. The orchestrator stamps a served object (`atRevisions`, `src/object/listed.verb.ts`) and
+  a list's head; the api stamps what no verb of its stamps (`apps/api/src/objects/revisioned.ts`). A digest is a content's own version
+  (a door's compare-and-swap, a record's `digest`), never a served `resourceVersion` but a run's, until its status is a record. A record's
+  digest is the version the doors give it counted with the skills of each repository a factory works on (`_repo.<factory>` for a
+  repository's own definitions, a `factory` record for a Factory's rules and instruction), so an edit of a repository's skill moves the
+  revision of the agent that names it; the index reads the doors, never the stores. A proposal's folder write is held to the content digest read at its apply (`digestNow`), its own version being a revision.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/forget/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

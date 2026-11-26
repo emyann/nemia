@@ -109,7 +109,8 @@ describe("a library skill's life: written as Nemia ships one, given, switched, m
   s.test("a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML", async () => {
     const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', change: DRAFT }));
     assert.ok('version' in made, JSON.stringify(made));
-    version = made.version;
+    assert.match(made.version, /^\d+$/, 'a write answers the revision the skill stands at');
+    version = skillVersion(dir)!;
     const text = read('tidy-notes');
     assert.equal(
       text,

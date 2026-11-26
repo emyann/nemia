@@ -6,7 +6,7 @@ import { drawEdge } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { numberedDefinitions, OUT, store } from '../world.ts';
 
 /** The workflow the `builder` page makes, and what its two steps' agents are told. */
 const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
@@ -224,6 +224,7 @@ export default {
     const seeded = fs.readFileSync(planFile, 'utf8');
     const byHand = seeded.replace('harness: codex\n', 'harness: codex\ncheck: test -f PLAN.md\n');
     if (byHand === seeded) throw new Refused(`${planFile} is seeded with harness: codex, for the edit by hand to add a check under`);
+    numberedDefinitions();
     const stale = await page.context().newPage();
     try {
       const { problems } = watch(stale);

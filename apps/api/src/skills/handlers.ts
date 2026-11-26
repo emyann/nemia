@@ -18,10 +18,12 @@ import { Effect } from 'effect';
 import {
   BUILTIN_SKILLS,
   builtinCopies,
+  definitionJudged,
   definitionRevision,
+  definitionRevisionNow,
+  skillRemoved,
   libraryUsers,
   recordBuiltinCopy,
-  SkillDoor,
   SKILLS_WRITE,
   skillCopyCommand,
   skillTable,
@@ -56,7 +58,6 @@ import {
   servedOf,
   thereOf,
   namespacedWriteRefused,
-  readAtRevision,
   writeGoes,
   writtenAt,
   type Held,
@@ -314,13 +315,15 @@ async function libraryReplaced(s: Served, name: string, payload: SkillWrite) {
     throw new Invalid({
       error: `${route} takes the resourceVersion the Skill was read at, so a skill changed since is not written over.`,
     });
-  await readAtRevision(s, 'Skill', name, read, 'write');
   if (payload.metadata.name !== undefined && payload.metadata.name !== name)
     throw new Invalid({
       error: `${route}: a skill's name is its folder, and every agent that gives it names it: write a new skill under the new name, and give it in their place.`,
     });
-  if (there === 'builtin') await copied(s, name);
-  const version = (await libraryAt(s, name, 'user')).metadata.resourceVersion;
+  if (there === 'builtin') {
+    await s.inRequest(definitionJudged('Skill', undefined, name, read, 'write'));
+    await copied(s, name);
+  }
+  const version = there === 'builtin' ? String(await s.inRequest(definitionRevisionNow('Skill', undefined, name))) : read;
   const change = 'spec' in payload ? draftOf(payload.spec, name, route) : { name, preload: payload.preload };
   await written(s, change, { version, name });
   return libraryAt(s, name, 'user');
@@ -371,10 +374,7 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
         const held = await libraryHeld(s);
         writeGoes('library', 'remove', thereOf(held, name), await s.inRequest(libraryUsers(s.home, { kind: 'Skill', name })));
         const gone = await libraryAt(s, name, 'user');
-        const read = query.resourceVersion;
-        if (read !== undefined) await readAtRevision(s, 'Skill', name, read, 'remove');
-        const version = read === undefined ? undefined : gone.metadata.resourceVersion;
-        await s.inRequest(Effect.flatMap(SkillDoor, (door) => door.skills.remove(name, librarySkills(s.home), version)));
+        await s.inRequest(skillRemoved(librarySkills(s.home), name, query.resourceVersion));
         return gone;
       }),
     )

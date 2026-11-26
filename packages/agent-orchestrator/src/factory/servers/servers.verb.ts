@@ -250,6 +250,16 @@ export const FACTORY_SERVER_RM: Served<{ file: string; removed: string }, Server
     }),
 };
 
+/**
+ * Whether a server read at `status` holds back the steps that name it until it is signed in: at `needs-auth`, and, for a server that
+ * signs in through Nemia, at `pending` and `failed` as well, the states a server with no sign-in settles on. `connected` reaches its
+ * tools, and `disabled` is the harness's own choice, which no sign-in changes.
+ * @param status The harness's word for the server's state.
+ * @param oauth Whether the server's record signs it in through Nemia (`oauth`).
+ */
+const awaitsSignIn = (status: McpServerState['status'], oauth: boolean) =>
+  status === 'needs-auth' || (oauth && (status === 'pending' || status === 'failed'));
+
 /** What a pass read of a run's factory record before it files: the servers, their states, and why a step of it may not start. */
 export type ServersBefore = {
   /** Why no step with a factory server may start now, naming the file and the command: `null` where every one may. */
@@ -274,6 +284,10 @@ const NOTHING: ServersBefore = { refusal: null, notes: [], refuses: () => null }
  * - A server that reports `needs-auth` refuses the steps that name it, on a harness that files a sign-in (`signsInMcp`); the note says
  *   the server, the factory and the sign-in to make. On any other harness nothing is refused: the servers reach the session unsigned,
  *   and a state of one there is unread rather than false.
+ * - A server that signs in through Nemia (its record has `oauth`) refuses them at `pending` and `failed` too (`awaitsSignIn`): its
+ *   session reaches GitHub, or whichever provider, only once it reads `connected`. The state stays the harness's word, settled
+ *   (`mcpServersRead` reads until no server is `pending`), never `needs-auth` decided here off a token Nemia does not hold: a sign-in
+ *   made by the browser is held by the harness, not by Nemia, so no held token is not no sign-in.
  * - A look that failed refuses nothing at all and says the states are unread, once for the pass: an absence read off a failed look is
  *   not an absence, and a step refused on a harness that was merely busy would be refused for ever.
  */
@@ -297,9 +311,12 @@ export const serversBefore = Effect.fn('serversBefore')(function* (factory: stri
     notes,
     refuses: (harness, named) => {
       if (!named?.length || !signsInMcp(harness)) return null;
-      const waiting = named.filter((name) => by.get(name)?.status === 'needs-auth');
+      const waiting = named.flatMap((name) => {
+        const status = by.get(name)?.status;
+        return status !== undefined && awaitsSignIn(status, record[name]?.oauth !== undefined) ? [{ name, status }] : [];
+      });
       if (!waiting.length) return null;
-      return `its \`mcp: ${named.join(', ')}\` names ${waiting.map((n) => `\`${n}\``).join(', ')}, which ${factory} records and which ${waiting.length > 1 ? 'report' : 'reports'} needs-auth: a session of it would reach no tool of ${waiting.length > 1 ? 'those servers' : 'that server'}. Sign ${waiting.length > 1 ? 'them' : 'it'} in on the factory's settings page, then the next pass files the step`;
+      return `its \`mcp: ${named.join(', ')}\` names ${waiting.map((w) => `\`${w.name}\` (${w.status})`).join(', ')}, which ${factory} records and which ${waiting.length > 1 ? 'are' : 'is'} not signed in: a session of it would reach no tool of ${waiting.length > 1 ? 'those servers' : 'that server'}. Sign ${waiting.length > 1 ? 'them' : 'it'} in on the factory's settings page, then the next pass files the step`;
     },
   } satisfies ServersBefore;
 });

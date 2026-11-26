@@ -2,10 +2,11 @@
  * What a harness says of the MCP servers it was handed: the other half of `mcp.ts`, which is about the config handed in.
  *
  * `mcpServerStatus()` is a method on the Agent SDK's `query()` object (`sdk.d.ts:3209`), so a state can be read only from inside a
- * session. A session's first answer can be `pending`, since MCP startup is not blocking (measured 0.3.308), and this read makes
- * exactly one ask: it carries whatever that answer said. A settled word is a second read's — the page presses Check again for one —
- * and `MCP_STATE_MS` gives a server no time to settle: it is a deadline that ends the session, as its own refusal says by naming the
- * read again as the fix.
+ * session. A session's first answer can be `pending`, since MCP startup is not blocking (measured 0.3.308): the hosted GitHub server,
+ * handed with no token, answered `pending` at 0.4 s and `needs-auth` from 3.4 s on, in one session (`docs/harness.md`). So the read
+ * asks again in the same session while any server is `pending` (`settledStatus`), once a second, for at most `MCP_SETTLE_MS`, and
+ * carries the last answer: a word still `pending` then is a server that did not settle in that time. `MCP_STATE_MS` is the deadline
+ * that ends the session, as its own refusal says by naming the read again as the fix.
  *
  * The read opens one short-lived Claude Code session with **every** server of a record inline (`mcpServerOf`, the one
  * producer, so the bytes judged here are the bytes a task's own session will run), asks it once, and ends it. Its input is a stream
@@ -49,6 +50,45 @@ export type McpServersRead =
  */
 export const MCP_STATE_MS = 45_000;
 
+/** How long a read keeps asking a session whose servers still say `pending`, inside `MCP_STATE_MS`. */
+export const MCP_SETTLE_MS = 30_000;
+
+/** How long a read waits between two asks of one session while a server still says `pending`. */
+const SETTLE_PACE_MS = 1_000;
+
+/**
+ * What `status` answers once no server it names is `pending`, asked again every `paceMs` until then, for at most `withinMs`, or until
+ * `stop` fires: the last answer, whatever it said, so a server that never settles is carried `pending` rather than failing the look.
+ * Exported only for the tests that import it.
+ * @param status One ask of an open session for its servers' states.
+ * @param stop The caller's bound: once it fires, no ask follows, and the last answer is carried.
+ * @param withinMs How long to keep asking while a server says `pending`.
+ * @param paceMs How long to wait between two asks.
+ */
+export const settledStatus = async (
+  status: () => Promise<readonly McpServerStatus[]>,
+  stop: AbortSignal,
+  withinMs: number = MCP_SETTLE_MS,
+  paceMs: number = SETTLE_PACE_MS,
+) => {
+  const until = Date.now() + withinMs;
+  let said = await status();
+  while (said.some((s) => s.status === 'pending') && !stop.aborted && Date.now() + paceMs <= until) {
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        stop.removeEventListener('abort', done);
+        resolve();
+      };
+      const timer = setTimeout(done, paceMs);
+      stop.addEventListener('abort', done, { once: true });
+    });
+    if (stop.aborted) break;
+    said = await status();
+  }
+  return said;
+};
+
 /**
  * The one ask of a harness this file makes, as a seam: a session opened with `servers` inline, its MCP states, its end. A test gives
  * its own and counts the sessions opened; `claudeMcpStatus` is the real one.
@@ -71,7 +111,7 @@ export type McpStatusAsk = (
  * starts has it taken out.
  *
  * Its prompt is a stream that yields nothing and is closed only after the states are read: a turn begins when a word is pushed, and
- * none ever is.
+ * none ever is. The states are asked until they settle (`settledStatus`), all in this one session.
  *
  * `end` is the session's end — the held prompt released and the SDK's own controller aborted, so the child goes — and it is safe to
  * call twice: it runs on the caller's `stop` and again when the ask returns, whichever comes first.
@@ -105,7 +145,7 @@ const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => 
   stop.addEventListener('abort', end, { once: true });
   const q = query({ prompt: held, options });
   try {
-    return await q.mcpServerStatus();
+    return await settledStatus(() => q.mcpServerStatus(), stop);
   } finally {
     stop.removeEventListener('abort', end);
     end();
@@ -132,9 +172,9 @@ const saidOf = (s: McpServerStatus) => ({
 });
 
 /**
- * The state of each server of `servers`, read in one session (`how.ask`, the real one by default, `how.withinMs` its bound): every
- * server of the record named once, in the record's own order, with what the harness said of it — and a server the harness named not at
- * all left `pending`, since it was handed and has reported nothing.
+ * The state of each server of `servers`, read in one session (`how.ask`, the real one by default, which asks until no server is
+ * `pending`, and `how.withinMs` its bound): every server of the record named once, in the record's own order, with what the harness
+ * said of it — and a server the harness named not at all left `pending`, since it was handed and has reported nothing.
  *
  * A look that failed answers `{ read: false, why }`, naming what to type: a task whose server's state could not be read is filed, not
  * refused.

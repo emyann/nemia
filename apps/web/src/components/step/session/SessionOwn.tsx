@@ -7,6 +7,7 @@
  * It lives in the step session's own folder, not the family's: a brief, a told turn and a closeout are one conversation's alone, and
  * the family folder holds what both conversations draw. Every data mark is written under the prefix its caller names (`mark`).
  */
+import { use } from 'react';
 import { FlagIcon, ScrollTextIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/look';
@@ -17,6 +18,7 @@ import { closeoutOf, type ToolCall } from '@/lib/transcript';
 import { Button } from '@/components/ui/ds';
 import type { SessionOwn as Own } from '@/lib/sessionItems';
 import { cn } from '@/lib/utils';
+import { SaidAway } from './saidAway';
 
 /** How tall the brief grows before it scrolls inside itself. */
 const BRIEF_CAP = 'max-h-96 overflow-y-auto';
@@ -99,10 +101,12 @@ function toSaid(from: Element, step: string) {
 const SAID_MARGIN = 16;
 
 /**
- * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part above the talk (`Said`);
- * in any other shape, the statement as given; a harness that refused it says so beneath.
+ * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part (`Said`) — above the talk,
+ * or, where the talk stands in the part's place (`SaidAway`), shown again in its place; in any other shape, the statement as given; a
+ * harness that refused it says so beneath.
  */
 function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: string }) {
+  const away = use(SaidAway);
   const closeout = closeoutOf(call);
   const refused = call.result?.isError === true ? call.result.text : null;
   return (
@@ -119,8 +123,13 @@ function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: 
           </span>
         )}
         {closeout && (
-          <Button variant="outlined" size="xsmall" {...mark(marks, 'to-said')} onPress={(event) => toSaid(event.target, step)}>
-            Read what it said, above
+          <Button
+            variant="outlined"
+            size="xsmall"
+            {...mark(marks, 'to-said')}
+            onPress={(event) => (away ? away() : toSaid(event.target, step))}
+          >
+            {away ? 'Read what it said' : 'Read what it said, above'}
           </Button>
         )}
       </p>

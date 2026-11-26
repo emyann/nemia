@@ -344,6 +344,17 @@ const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now
   }) satisfies OwnFacts;
 
 /**
+ * The hue of the frame of the step `step` of `run`, as its part's head wears it (`headOf`): read from the run's row alone, so a frame
+ * drawn around the part (the step's bar) wears it before the part is drawn.
+ * @param run The run, as its row carries its steps.
+ * @param step The step's name.
+ */
+export function hueOfStep(run: HeadInput['run'], step: string) {
+  const codes = run.steps.find((s) => s.name === step) ?? UNLISTED;
+  return hueOf(stepState(codes, run.cancelledAt !== null, run.holding != null));
+}
+
+/**
  * The head of the step `step` of `run`: what the run's row knows at once (its state, its agent, its model), and once the run's own answer
  * is read, its tries, time, facts, spend, check, gate and note — each `none` until then, or where it does not apply.
  */

@@ -1,11 +1,13 @@
 /**
- * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
- * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
- * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
+ * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK at the keyspace head;
+ * a card filed, relabelled, tried and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED naming the card and the revision that
+ * removed it; a watch from a revision (a list's, an event's) sent the objects changed after it and no state, refused 410 where
+ * compaction removed the revision, 400 past the head or for no version; a labelSelector kept on every read, a card relabelled out of it
+ * DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
  * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every
  * GET list of the `Api` watchable; the watch's query refused before any stream; the feed's reader let go when the request is aborted; and
  * the Event list's watch resumed from a `resourceVersion` (a page's, or the last event's), sent no state, its refusals 400, 410 and 422.
- * The resync beat is shortened (`Beats.watch`), never waited out.
+ * The beats are shortened (`Beats.feed`, `Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'vitest';
@@ -20,7 +22,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
-import { cardKey, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, compactedAt, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -86,7 +88,7 @@ async function watch(t: Waiter, url: string, over: { request: typeof app.request
 const named = (e: WatchEvent) => (e.type === 'BOOKMARK' ? '' : e.object.metadata.name);
 const changes = (events: readonly WatchEvent[], name: string) => events.filter((e) => named(e) === name).map((e) => e.type);
 
-test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed ADDED, relabelled MODIFIED, dropped DELETED with its last object', async (t) => {
+test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed ADDED, relabelled MODIFIED, dropped DELETED', async (t) => {
   const w = await watch(t, '/api/namespaces/default/cards?watch=true');
   try {
     const initial = await w.initial();
@@ -99,8 +101,12 @@ test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed A
     dropRecord(root, cardKey('w-3'));
     await waitFor(t, () => changes(w.events, 'w-3').includes('DELETED'), "changes(w.events, 'w-3').includes('DELETED')");
     const deleted = w.events.find((e) => e.type === 'DELETED' && named(e) === 'w-3');
-    assert.equal(deleted?.type !== 'BOOKMARK' && deleted?.object.metadata.labels?.team, 'docs', 'DELETED carries the last object sent');
-    assert.deepEqual(changes(w.events, 'w-3'), ['ADDED', 'MODIFIED', 'DELETED'], 'an unchanged re-read sends nothing');
+    assert.match(
+      deleted?.type !== 'BOOKMARK' ? (deleted?.object.metadata.resourceVersion ?? '') : '',
+      /^[1-9][0-9]*$/,
+      'DELETED carries the revision',
+    );
+    assert.deepEqual(changes(w.events, 'w-3'), ['ADDED', 'MODIFIED', 'DELETED'], 'a change sends one event');
     assert.deepEqual(changes(w.events, 'w-1'), ['ADDED'], 'a card that did not change is sent once');
   } finally {
     await w.stop();
@@ -129,41 +135,79 @@ test('a watch reads its list through every page: over more cards than a page hol
   }
 });
 
-test('a card started arrives as MODIFIED, its status.runs moved though its file, and so its resourceVersion, stand', async (t) => {
+test('a card tried arrives as MODIFIED at a higher resourceVersion, its record beside it moved', async (t) => {
   card('st-1');
   const w = await watch(t, '/api/namespaces/default/cards?watch=true');
   try {
     const initial = await w.initial();
     const sent = initial.find((e) => named(e) === 'st-1');
     assert.ok(sent && sent.type !== 'BOOKMARK');
-    fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
     plantRecord(
       root,
-      runKey('r-started-st-1'),
-      JSON.stringify({
-        id: 'r-started-st-1',
-        repo: '/code/app',
-        workspace: '/code/app',
-        baseRef: 'abc123',
-        branch: 'main',
-        isolate: true,
-        brief: 'Do st-1.',
-        workflowDir: path.join(root, 'no-such-workflow'),
-        createdAt: '2026-11-05T06:00:00.000Z',
-        workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
-        steps: { implement: { taskId: 't-r-started-st-1' } },
-        from: { inbox: 'st-1' },
-      }),
+      '/registry/cardtries/st-1',
+      JSON.stringify({ at: '2026-11-05T10:00:00.000Z', text: '# st-1\n', repo: '/code/app', why: 'not offered', refused: true }),
     );
-    await waitFor(t, () => changes(w.events, 'st-1').includes('MODIFIED'), 'st-1 MODIFIED once a run names it');
+    await waitFor(t, () => changes(w.events, 'st-1').includes('MODIFIED'), 'st-1 MODIFIED once the tick has tried it');
     const modified = w.events.find((e) => e.type === 'MODIFIED' && named(e) === 'st-1');
     assert.ok(modified && modified.type !== 'BOOKMARK');
-    assert.equal(modified.object.metadata.resourceVersion, sent.object.metadata.resourceVersion, 'its resourceVersion stands');
-    assert.deepEqual((modified.object.status as { runs: string[] }).runs, ['r-started-st-1'], 'its status names the run');
+    assert.ok(
+      Number(modified.object.metadata.resourceVersion) > Number(sent.object.metadata.resourceVersion),
+      'its resourceVersion moved with the record beside it',
+    );
   } finally {
     await w.stop();
-    dropRecord(root, runKey('r-started-st-1'));
+    dropRecord(root, '/registry/cardtries/st-1');
   }
+});
+
+test('a watch from the resourceVersion of a list sends the cards changed since and no state, then follows', async (t) => {
+  card('rv-1');
+  const list = (await (await app.request('/api/namespaces/default/cards')).json()) as {
+    metadata: { resourceVersion: string };
+    items: { metadata: { name: string; resourceVersion: string } }[];
+  };
+  assert.match(list.metadata.resourceVersion, /^[0-9]+$/, 'the list says the keyspace head it was read at');
+  assert.ok(
+    list.items.every((o) => Number(o.metadata.resourceVersion) <= Number(list.metadata.resourceVersion)),
+    'no card is past the list',
+  );
+  card('rv-1', { team: 'moved' });
+  const w = await watch(t, `/api/namespaces/default/cards?watch=true&resourceVersion=${list.metadata.resourceVersion}`);
+  try {
+    const initial = await w.initial();
+    assert.deepEqual(
+      initial.map((e) => `${e.type} ${named(e)}`),
+      ['MODIFIED rv-1'],
+      'only the card that changed after the list, and none of the others',
+    );
+    card('rv-2');
+    await waitFor(t, () => changes(w.events, 'rv-2').includes('ADDED'), 'a card filed after is ADDED');
+    const bookmarks = w.events.filter((e) => e.type === 'BOOKMARK');
+    assert.match(bookmarks[0]?.object.metadata.resourceVersion ?? '', /^[0-9]+$/, 'a BOOKMARK says the head');
+  } finally {
+    await w.stop();
+    dropRecord(root, cardKey('rv-1'));
+    dropRecord(root, cardKey('rv-2'));
+  }
+});
+
+test('a resourceVersion of a watch past the head is refused 400, one that is no version 400, and one compaction removed 410', async () => {
+  const url = (rv: string) => `/api/namespaces/default/cards?watch=true&resourceVersion=${rv}`;
+  const list = (await (await app.request('/api/namespaces/default/cards')).json()) as { metadata: { resourceVersion: string } };
+  const head = Number(list.metadata.resourceVersion);
+  for (const rv of [String(head + 1000), 'abc', '007', '-1']) {
+    const res = await app.request(url(rv));
+    assert.equal(res.status, 400, rv);
+    assert.match(((await res.json()) as { error: string }).error, /resourceVersion/, `${rv} names the key`);
+  }
+  card('gone-1');
+  const T0 = 1_000_000;
+  compactedAt(root, 300_000, T0);
+  compactedAt(root, 300_000, T0 + 300_001);
+  const expired = await app.request(url('0'));
+  assert.equal(expired.status, 410, 'a revision older than what compaction kept');
+  assert.equal(typeof ((await expired.json()) as { error: unknown }).error, 'string');
+  dropRecord(root, cardKey('gone-1'));
 });
 
 test('a labelSelector keeps its cards on every read, and a card relabelled out of it arrives as DELETED', async (t) => {

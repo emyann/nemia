@@ -130,12 +130,16 @@ export const isWatchedKind = (kind: string): kind is WatchedKind => Object.hasOw
 /** One row a watch is handed: the key, its revision, the revision of its life's first row, whether it deletes. */
 export type RowSeen = { readonly key: string; readonly revision: number; readonly createRevision: number; readonly deleted: boolean };
 
-/** What the watch sends of one object or one namespace's objects: where it is, how it changed and the revision it is at. */
+/**
+ * What the watch sends of one object or one namespace's objects: where it is, how it changed, the revision it is at and whether its
+ * own record stands (so an object a read of the list leaves out is one a selector or a namespace keeps from the watcher: DELETED).
+ */
 export type KindChange = {
   readonly namespace: string | null;
   readonly name: string | null;
   readonly change: 'ADDED' | 'MODIFIED' | 'DELETED';
   readonly revision: number;
+  readonly standing: boolean;
 };
 
 /**
@@ -163,7 +167,7 @@ export const changesOf = (kind: WatchedKind, after: number, rows: readonly (RowS
   return [...seen.values()]
     .flatMap(({ target, own, revision }) => {
       const change = objectChange(after, own);
-      return change === 'unseen' ? [] : [{ ...target, change, revision } satisfies KindChange];
+      return change === 'unseen' ? [] : [{ ...target, change, revision, standing: own !== null && !own.deleted } satisfies KindChange];
     })
     .sort((a, b) => a.revision - b.revision);
 };

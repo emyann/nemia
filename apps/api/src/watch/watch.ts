@@ -259,10 +259,15 @@ const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly Kin
   const sent = new Set<string>();
   return changes.flatMap((change) => {
     if (change.change === 'DELETED') return change.name === null ? [] : [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
-    return [...(read?.objects.values() ?? [])].flatMap((object) => {
-      const named = change.name === null || object.metadata.name === change.name;
-      const placed = change.namespace === null || object.metadata.namespace === change.namespace;
-      if (!named || !placed || revisionOf(object) <= after || sent.has(keyOf(object))) return [];
+    const found = [...(read?.objects.values() ?? [])].filter(
+      (object) =>
+        (change.name === null || object.metadata.name === change.name) &&
+        (change.namespace === null || object.metadata.namespace === change.namespace),
+    );
+    if (found.length === 0 && change.name !== null && change.standing && change.change === 'MODIFIED')
+      return [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+    return found.flatMap((object) => {
+      if (revisionOf(object) <= after || sent.has(keyOf(object))) return [];
       sent.add(keyOf(object));
       return [frameOf({ type: change.change, object })];
     });

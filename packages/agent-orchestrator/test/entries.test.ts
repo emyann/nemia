@@ -1023,6 +1023,7 @@ const PINNED: Record<string, string[]> = {
     'hireAgentAt',
     'plantFactory',
     'plantKey',
+    'compactedAt',
     'readFactoriesAt',
     'readFactoryAt',
     'readFactoryLevel',

@@ -619,7 +619,11 @@ test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash 
 test('REFUSED at shipped defaults: a change at a version the skill has moved on from, of a skill not there, or under another name', async () => {
   const { version } = await detail('user', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
-  await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
+  await refused(
+    put('/api/skills/yours/always', { version, preload: false }),
+    409,
+    /^the Skill always changed since it was read \(it is at revision /,
+  );
   await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^Nothing is at that name/);
   const now = (await detail('user', 'always')).version;
   await refused(

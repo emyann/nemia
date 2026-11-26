@@ -504,19 +504,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
       assert.equal(res.status, 200, await res.clone().text());
       const saved = (await res.json()) as WorkflowSaved;
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'as-listed' && w.from === 'user'),
-        'answered as the listing reads it',
-      );
+      const listing = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'as-listed' && w.from === 'user');
+      assert.deepEqual(saved.workflow, listing && { ...listing, version: saved.workflow.version }, 'answered as the listing reads it');
+      assert.equal(saved.workflow.version, await revisionOf('as-listed'), 'at the revision the api serves it at');
     },
   );
   s.test(

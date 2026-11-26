@@ -30,7 +30,7 @@ notes of implement, review and land each open with the answer and hold a part fo
   pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
-- **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes and opens a pull request, its check runs
+- **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes its branch and opens a pull request through the factory's `github` MCP server, its check runs
   `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's checks are a
   receipt, then `base-ci`, the wait on the base branch's CI, which runs once the checkout is given back to the next run's ending.
   Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
@@ -41,9 +41,11 @@ The CI context the scripts wait on and land on is the factory's `ciCheck` parame
 them, by default). Either way, the implement step's check runs the factory's own check, its `implementCheck` parameter (`true`, the default,
 checks nothing), after `parts.ts check` and before the push or the local check.
 
-Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the frozen files as the others are: it
-pushes this run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the
-branch, never a draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same
+Implement pushes its branch with `pull-request.ts branch`, read from the frozen files as the others are: it pushes this run's own
+branch, never another and never the base and never forced, calls no GitHub, and prints the repository, head, base and commit. Grace
+then opens or updates the one pull request of the branch through the server (`list_pull_requests`, then `create_pull_request` or
+`update_pull_request`, never a draft), her fence allowing those two and refusing its merge, its pushes and its run trigger, and puts the
+address on her closeout as an artifact value. Her check pushes again through the same
 script and refuses unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is
 read again for up to 30 s before the refusal — then runs the round check, then, unless GitHub says the pull request conflicts with its
 base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (`START_SECONDS`
@@ -64,9 +66,8 @@ said in the pass or the refusal; a dispatched run checks the branch head, not th
 context stays the last word. A dispatch GitHub refuses is a person's refusal at once, naming the stuck run and the dispatch to type, with
 `-f` for each input the workflow requires, then the retry. A dispatched run's red, whose entry links its run rather than a job, is
 told apart, re-run and read as any other: its failing jobs and their lines are read from the run. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
-the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
-those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
-`gh`.
+the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself, through the server's `pull_request_read` (`get`, `get_status`,
+`get_check_runs`); it holds no `gh` allow beyond a tool's help, and its fence still refuses every form of `gh`.
 
 When the implement step's check refuses, either way — a red, cancelled or missing CI context, `probe.ts`, `parts.ts`, the factory's own check or the
 local check — the run tries implement again on its own, up to twice a round (`retries: 2`), continuing its session, each try under the
@@ -85,18 +86,14 @@ again, `nemia retry <run> implement --recheck`, where its branch has not moved s
 step over its budget, a call denied under `denials: fail`, a check that did not finish, a blocked sign-off. Past the second try, a
 refusal waits on a person as it did before.
 
-The open labels the pull request as it creates or updates it, and the push again each round, from the run's own labels (`WF_LABELS`,
+The push check labels the pull request each round, from the run's own labels (`WF_LABELS`,
 which the run gives every session and check), by the rules the factory's `pullRequestLabels` parameter sets (each
 `<key>=<value>:<label>`, the rules apart by spaces; empty, the default, labels nothing): it adds the labels the rules give the run and
 removes any other a rule could give, so a relabelled card is followed and a label a person put on that no rule gives is left alone,
 through REST and never `gh pr edit`. A malformed rule, or a label a rule gives that the repository lacks, is the check's refusal before
-anything is pushed. GitHub has no labelled create, so the open sets the labels through REST the moment the pull request exists, in the
-same call, before a CI job that reads them can start: a check that reads a pull request's labels never sees the run's unlabelled.
-The rules reach the open as `--labels` on the line the implement step's note renders from the parameter, and an open without the flag is
-refused. Where there are rules and the run's labels match none of them, the open and the push refuse before anything is pushed, exit 78,
+anything is pushed. The server's label tool, `issue_write`, replaces a pull request's whole list, so it stays refused to Grace and the labels stay with the check: the pull request is unlabelled from Grace's create until the check's push, and a CI job that reads labels only when the pull request is opened sees none. The rules reach the check as `--labels`. Where there are rules and the run's labels match none of them, the push refuses before anything is pushed, exit 78,
 a person's, naming each key the rules read, the values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: a pull
-request no rule labels would fail a check that reads its labels, and only the merge would find out. A pull request opened by hand gets
-no label from it. The factory's `labelValues` parameter (`key=value` words, the values
+request no rule labels would fail a check that reads its labels, and only the merge would find out. A pull request opened by hand is labelled by it too. The factory's `labelValues` parameter (`key=value` words, the values
 `pullRequestLabels` reads) refuses that same label earlier, when the card is filed or labelled, so the run never reaches the push with it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
@@ -218,10 +215,7 @@ release for the machine into Nemia's tools folder, its sum checked, no sudo); an
 https://github.com/login/device, then `gh auth setup-git`. The third, `git-identity`, fills the git place's need of the same name: its
 first fix sets git's name and email from the account gh is signed in to, the email its noreply address
 `<id>+<login>@users.noreply.github.com` (`needs.ts identity`); the place's own fix, which asks for a name and an email, comes after it.
-The fourth, `ci-server`, holds only where the `ciServer` parameter names an MCP server, the one implement loads (its `mcp:` line, which a blank
-parameter leaves out) to read a red CI's runs and job logs: its check asks the api whether the factory has added it (`nemia get
-mcpservers/<name> -n "$WF_FACTORY"`, the factory a workflow's check is told), and it has no fix to start, since a server is added and
-signed in by a person, on the factory's settings page; a workflow with it unmet still loads, its runs held as by any need.
+The fourth, `github-server`, holds only where `github` is true: the factory's `github` MCP server, which Grace opens her pull request through and Agora reads it through (the `mcp:` line of implement and review, which `case(parameters.github, 'github', '')` writes and a blank leaves out). Its check asks the api whether the factory has added it (`nemia get mcpservers/github -n "$WF_FACTORY"`, the factory a workflow's check is told), and it has no fix to start, since a server is added and signed in by a person, on the factory's settings page; one added and not signed in holds each step at filing, whose note names the sign-in. Where `github` is false it is met and no step loads a server.
 The fifth, `browser`, holds either way and says `scope: repository`, so it is checked and fixed in the factory's repository: `needs.ts
 browser` resolves there the `playwright-core` the steps' browser tools run (the one `@playwright/mcp` resolves, else the repository's
 own) and is met where its `chromium.executablePath()` is on disk, the build named where it is not; where the repository holds neither,

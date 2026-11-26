@@ -87,6 +87,13 @@ describe("a template's parameters given values: typed, defaulted, substituted, a
     assert.deepEqual(substitute({ a: shell }, { n: 3 }), { a: shell });
     assert.equal(interpolated(shell, { n: 3 }), shell);
   });
+  test('a case writes its first text where its boolean is true and its second where it is false, and refuses a parameter that is no boolean', () => {
+    const text = "mcp: ${{ case(parameters.g, 'github', '') }}|${{case( parameters.g ,'a','b' )}}";
+    assert.equal(interpolated(text, { g: true }), 'mcp: github|a');
+    assert.equal(interpolated(text, { g: false }), 'mcp: |b');
+    assert.throws(() => interpolated(text, { g: 'x' }), Error);
+    assert.throws(() => interpolated(text, {}), Error);
+  });
   test('an expression naming a parameter the template does not declare is refused, in a string and in a text', () => {
     assert.throws(
       () => substitute({ a: ['${{ parameters.m }}'] }, { n: 3 }),

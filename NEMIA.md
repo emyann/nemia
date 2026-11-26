@@ -86,7 +86,7 @@ a run that passes it is the person's to continue.
 
 ## Never
 
-- Push, open a pull request or merge into `main` by hand: a run opens its pull request through `packages/templates/sdlc/workflows/build/pull-request.ts`
-  and merges it through `packages/templates/sdlc/workflows/build/landing.ts`, at its ending step, once its review passes, or
+- Push, open a pull request or merge into `main` by hand: a run pushes through `packages/templates/sdlc/carried/pull-request.ts`, its implement step opens the pull request through the GitHub server,
+  and a run merges it through `packages/templates/sdlc/carried/landing.ts`, at its ending step, once its review passes, or
   after the person approves it on a run started with `--gate land`.
 - Stop a process by its name: a run is cancelled with `nemia cancel`, held with `nemia hold`.

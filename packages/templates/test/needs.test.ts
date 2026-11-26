@@ -4,8 +4,8 @@
  * the PATH, signed in with the `workflow` scope, and a git identity, which the account fills; where it is false nothing of GitHub holds
  * a run: the two gh checks are met, whatever the machine has. Either way a run needs the Chromium the steps' browser tools open
  * (`browser`), checked and fixed in the factory's repository (`scope: repository`) by the carried `needs.ts`, whose fix the server runs.
- * Where `ciServer` names an MCP server, a run needs its factory to have added it (`ci-server`), asked of the api by `nemia get`; where it
- * is empty, nothing.
+ * Where `github` is true, a run needs its factory to have added the `github` MCP server (`github-server`), asked of the api by `nemia
+ * get`; where it is false, nothing.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -56,7 +56,7 @@ for (const github of [true, false]) {
       const needs = needsOf(tree, workflow);
       assert.deepEqual(
         needs.map((need) => need.name),
-        ['gh', 'gh-sign-in', 'git-identity', 'ci-server', 'browser'],
+        ['gh', 'gh-sign-in', 'git-identity', 'github-server', 'browser'],
         workflow,
       );
       const of = (name: string) => needs.find((need) => need.name === name);
@@ -123,18 +123,18 @@ function checkedWith(check: string, added: readonly string[], calls: string) {
   }).status;
 }
 
-test('ci-server is missing where the factory has not added the server ciServer names, met once it has, and met with no ask where ciServer is empty', async () => {
-  const named = await renderedSdlc(['github=true', 'ciServer=github']);
-  const empty = await renderedSdlc(['github=true']);
+test('github-server is missing where github is true and the factory has not added the server, met once it has, and met with no ask where github is false', async () => {
+  const on = await renderedSdlc(['github=true']);
+  const off = await renderedSdlc(['github=false']);
   for (const workflow of LANDING) {
-    const check = needsOf(named.tree, workflow).find((need) => need.name === 'ci-server')?.check ?? 'exit 9';
+    const check = needsOf(on.tree, workflow).find((need) => need.name === 'github-server')?.check ?? 'exit 9';
     const calls = path.join(scratch('nemia-needs-calls-'), 'calls');
     assert.notEqual(checkedWith(check, [], calls), 0, `${workflow}: a factory that has not added github is told the need`);
     assert.equal(checkedWith(check, ['github'], calls), 0, `${workflow}: met once the factory has added it`);
     assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n'), Array(2).fill('get mcpservers/github -n acme -o name'));
     const none = path.join(scratch('nemia-needs-calls-'), 'calls');
-    const unnamed = needsOf(empty.tree, workflow).find((need) => need.name === 'ci-server')?.check ?? 'exit 9';
-    assert.equal(checkedWith(unnamed, [], none), 0, `${workflow}: no server named, nothing needed`);
+    const unneeded = needsOf(off.tree, workflow).find((need) => need.name === 'github-server')?.check ?? 'exit 9';
+    assert.equal(checkedWith(unneeded, [], none), 0, `${workflow}: no GitHub, nothing needed`);
     assert.equal(fs.existsSync(none), false, `${workflow}: and the api is not asked`);
   }
 });

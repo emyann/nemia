@@ -4,6 +4,7 @@
  * `${{ parameters.<name> }}` inside one of its strings written with it (`substitute`); and each expression of a text written the same
  * way (`interpolated`). A shell's `$VAR` and `${VAR}` are no expression, and stay as they are. Pure.
  */
+import type { ExpressionWritten } from '../../../contracts/expression-written.contract.ts';
 import { isMap, isParam, writeExpressions, type Parameter } from '../../template/index.ts';
 
 /** A parameter's value: a string, a number or a boolean, as its declaration types it. */
@@ -93,17 +94,40 @@ export function overlaid(declared: Readonly<Record<string, Parameter>>, held: Pa
 }
 
 /**
- * `text` with each `${{ parameters.<name> }}` in it written with the value `params` gives. Refused: a name `params` lacks.
+ * What one expression is written as given its parameter's value (`undefined` where the template does not declare it): a plain one as the
+ * value, a `case` as its first text where the boolean is true and its second where it is false. Refused: an undeclared parameter, and a
+ * `case` over one that is no boolean.
+ * @param expression The expression the parser found.
+ * @param value The parameter's value, or `undefined` where there is none.
+ */
+export const expressionWritten: ExpressionWritten = (expression, value) => {
+  if (value === undefined) return { kind: 'refused', reason: 'undeclared' };
+  if (expression.kind === 'plain') {
+    if (typeof value === 'string') return { kind: 'written', text: value };
+    return { kind: 'written', text: typeof value === 'boolean' ? (value ? 'true' : 'false') : `${value}` };
+  }
+  if (typeof value !== 'boolean') return { kind: 'refused', reason: 'not-boolean' };
+  return { kind: 'written', text: value ? expression.then : expression.otherwise };
+};
+
+/**
+ * `text` with each expression in it written with the value `params` gives (`expressionWritten`). Refused: a name `params` lacks, and a
+ * `case` over a parameter that is no boolean.
  * @param text The text to write.
  * @param params The parameters' values, by name.
  */
 export function interpolated(text: string, params: Params) {
-  return writeExpressions(text, (name) => {
-    if (!Object.hasOwn(params, name))
+  return writeExpressions(text, (expression) => {
+    const { name } = expression;
+    const written = expressionWritten(expression, Object.hasOwn(params, name) ? params[name] : undefined);
+    if (written.kind === 'written') return written.text;
+    if (written.reason === 'undeclared')
       throw new Error(
         `\${{ parameters.${name} }} names a parameter the template does not declare: declare ${name} in nemia.yaml's parameters, or remove the expression.`,
       );
-    return String(params[name]);
+    throw new Error(
+      `\${{ case(parameters.${name}, ...) }} reads ${name}, which is no boolean: declare ${name} as a boolean in nemia.yaml's parameters, or write \${{ parameters.${name} }}.`,
+    );
   });
 }
 

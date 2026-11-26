@@ -39,7 +39,7 @@ type Held = {
   agents: ReadonlyMap<string, Record<string, unknown>>;
   skills: ReadonlySet<string>;
   manifest: Record<string, unknown>;
-  parameters: ReadonlySet<string>;
+  parameters: ReadonlyMap<string, unknown>;
 };
 
 /** The spec of the document in `file`, a map, or an empty one where it is not. */
@@ -75,7 +75,11 @@ function heldOf(folder: ReadFolder, packageSkills: readonly string[]) {
     agents,
     skills: new Set([...foldersOf(folder.files, 'skills'), ...packageSkills]),
     manifest,
-    parameters: new Set(isMap(manifest.parameters) ? Object.keys(manifest.parameters) : []),
+    parameters: new Map(
+      isMap(manifest.parameters)
+        ? Object.entries(manifest.parameters).map(([name, declared]) => [name, isMap(declared) ? declared.type : undefined])
+        : [],
+    ),
   };
 }
 
@@ -468,8 +472,12 @@ function optionRefusal(harness: string, flags: Knobs['flags'], key: string) {
 }
 
 /** Every `{ param }`, every `${{ parameters.<name> }}` of a string and every `{ path }` in `value`, each where it stands. */
-function refsIn(value: unknown, at: At, found: { params: Array<[string, At]>; paths: Array<[string, At]> }) {
-  if (typeof value === 'string') for (const { name } of expressionsIn(value)) found.params.push([name, at]);
+function refsIn(value: unknown, at: At, found: { params: Array<[string, At]>; paths: Array<[string, At]>; cases: Array<[string, At]> }) {
+  if (typeof value === 'string')
+    for (const { name, expression } of expressionsIn(value)) {
+      found.params.push([name, at]);
+      if (expression.kind === 'case') found.cases.push([name, at]);
+    }
   else if (isParam(value)) found.params.push([value.param, at]);
   else if (isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string') found.paths.push([value.path, at]);
   else if (Array.isArray(value)) value.forEach((item, i) => refsIn(item, [...at, i], found));
@@ -480,7 +488,7 @@ function refsIn(value: unknown, at: At, found: { params: Array<[string, At]>; pa
 const namedPaths = (folder: ReadFolder) =>
   new Set(
     [...folder.documents.values()].flatMap((doc) => {
-      const found = { params: [], paths: [] as Array<[string, At]> };
+      const found = { params: [], paths: [] as Array<[string, At]>, cases: [] };
       refsIn(doc, [], found);
       return found.paths.map(([path]) => path).filter((path) => !pathRefusal(path));
     }),
@@ -492,10 +500,14 @@ const pathRefusal = (path: string) =>
     ? `${path} is not a file of the template: a path is relative to its root, never absolute, never through ..`
     : undefined;
 
+/** The refusal of a `case` at `where` over the parameter `name`, which nemia.yaml declares with a type other than boolean. */
+const notBoolean = (name: string, where: string) =>
+  `${where}: case(parameters.${name}, ...) reads ${name}, which nemia.yaml does not declare as a boolean: declare it type: boolean, or write \${{ parameters.${name} }}.`;
+
 /** What each document's `{ param }` and `{ path }` name that the folder lacks: a parameter the manifest does not declare, or a file. */
 function refRefusals(folder: ReadFolder, held: Held) {
   return [...folder.documents].flatMap(([file, doc]) => {
-    const found = { params: [] as Array<[string, At]>, paths: [] as Array<[string, At]> };
+    const found = { params: [] as Array<[string, At]>, paths: [] as Array<[string, At]>, cases: [] as Array<[string, At]> };
     refsIn(doc, [], found);
     const params = found.params
       .filter(([name]) => !held.parameters.has(name))
@@ -504,13 +516,16 @@ function refRefusals(folder: ReadFolder, held: Held) {
         at,
         message: `${spelled(at)} names the parameter ${name}, which nemia.yaml does not declare: declare it under spec.parameters.`,
       }));
+    const cases = found.cases
+      .filter(([name]) => held.parameters.has(name) && held.parameters.get(name) !== 'boolean')
+      .map(([name, at]) => ({ file, at, message: notBoolean(name, spelled(at)) }));
     const paths = found.paths.flatMap(([path, at]) => {
       const why =
         pathRefusal(path) ??
         (folder.files.includes(path) ? undefined : `${path} is not in the template: carry the file, or name one there is.`);
       return why === undefined ? [] : [{ file, at, message: `${spelled(at)}: ${why}` }];
     });
-    return [...params, ...paths];
+    return [...params, ...cases, ...paths];
   });
 }
 
@@ -538,18 +553,22 @@ function renderedTexts(folder: ReadFolder, held: Held) {
 function textRefusals(folder: ReadFolder, held: Held, text: (file: string) => string) {
   return renderedTexts(folder, held).flatMap((file) => {
     const words = text(file);
-    return expressionsIn(words)
-      .filter(({ name }) => !held.parameters.has(name))
-      .map(({ name, index }) => {
-        const before = words.slice(0, index).split('\n');
-        return {
+    return expressionsIn(words).flatMap(({ name, index, expression }) => {
+      const declared = held.parameters.has(name);
+      if (declared && (expression.kind === 'plain' || held.parameters.get(name) === 'boolean')) return [];
+      const before = words.slice(0, index).split('\n');
+      return [
+        {
           file,
           at: [],
           line: before.length,
           col: (before.at(-1)?.length ?? 0) + 1,
-          message: `\${{ parameters.${name} }} names the parameter ${name}, which nemia.yaml does not declare: declare it under spec.parameters, or remove the expression.`,
-        };
-      });
+          message: declared
+            ? notBoolean(name, 'a text')
+            : `\${{ parameters.${name} }} names the parameter ${name}, which nemia.yaml does not declare: declare it under spec.parameters, or remove the expression.`,
+        },
+      ];
+    });
   });
 }
 

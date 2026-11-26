@@ -409,7 +409,7 @@ export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'faile
 /** One of `SIGN_IN_STATES`. */
 export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
 
-/** The road a sign-in takes: a code the person types at the provider's page (`device`), or an address the person's browser opens (`browser`). */
+/** The road a sign-in takes: a code typed at the provider's page (`device`), or an address the person's browser opens (`browser`). */
 export const SIGN_IN_ROUTES = ['device', 'browser'] as const;
 
 /** One of `SIGN_IN_ROUTES`. */

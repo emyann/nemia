@@ -72,7 +72,10 @@ test("the sign-in's answers are the Api's endpoints', both roads decode, and one
 });
 
 test('REFUSED: a sign-in by a code with no code, a road off its words, and an ending off its words', () => {
-  assert.equal(answered('mcpservers', 'signIn', { route: 'device', verificationUri: 'https://github.com/login/device', until: 'x' }), undefined);
+  assert.equal(
+    answered('mcpservers', 'signIn', { route: 'device', verificationUri: 'https://github.com/login/device', until: 'x' }),
+    undefined,
+  );
   assert.equal(answered('mcpservers', 'signIn', { route: 'telepathy', authUrl: 'https://x.example', until: 'x' }), undefined);
   assert.equal(answered('mcpservers', 'signOut', { ended: 'vanished' }), undefined);
 });

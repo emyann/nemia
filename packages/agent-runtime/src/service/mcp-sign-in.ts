@@ -230,6 +230,13 @@ const cliFor = (seams: SignInSeams, executable: string | undefined, harnessBin: 
   ) satisfies McpCli | string;
 };
 
+/** Claude Code's sign-in of `server` cleared in `cwd` by `cli`, or why not: no CLI was found, or the remove failed. */
+const clearedFromClaude = async (cli: McpCli | string, name: string, server: RemoteMcpServer, cwd: string) => {
+  if (typeof cli === 'string') return cli;
+  mkdirSync(cwd, { recursive: true });
+  return clearSignIn(cli, name, server, cwd);
+};
+
 /**
  * The sign-ins by a code this engine holds, by server name: `start` asks the provider for a code and polls for the token in the
  * background (`pollDevice`), `has` says whether one waits, and `cancel` ends it, its state forgotten.
@@ -295,7 +302,6 @@ export const mcpSignInVerbsOf = (
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
   const declared = declaredOf(harnesses);
   const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
-  const cliOf = () => cliFor(seams, executable, harnessBin);
   const browser = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const port = server.oauth?.callbackPort;
     if (port === undefined) return yield* refuse(noCallbackPort(name));
@@ -358,10 +364,7 @@ export const mcpSignInVerbsOf = (
     }
     states.delete(name);
     if (dropToken(root, name, server)) return { ended: 'signed-out' as const } satisfies McpSignedOut;
-    const cli = cliOf();
-    if (typeof cli === 'string') return yield* refuse(cli);
-    mkdirSync(cwd, { recursive: true });
-    const why = yield* Effect.promise(() => clearSignIn(cli, name, server, cwd));
+    const why = yield* Effect.promise(() => clearedFromClaude(cliFor(seams, executable, harnessBin), name, server, cwd));
     if (why) return yield* refuse(why);
     return { ended: 'signed-out' as const } satisfies McpSignedOut;
   });

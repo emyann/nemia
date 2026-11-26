@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SignInView, type SignInShown } from './ServerSignIn';
 
 /**
- * A server's sign-in on its row, in each place it stands: offered on `needs-auth`, waiting with the address to open and the field to
+ * A server's sign-in on its row, in each place it stands: offered on `needs-auth`, waiting by a code, or with the address to open and
+ * the field to
  * paste the address the browser landed on, ended with why and the press to try again, connected with Sign out, and refused in the api's
  * words — a paste refused among them. No node test can judge how each reads, so each is
  * drawn here.
@@ -17,6 +18,10 @@ const BOX: CSSProperties = { width: 720 };
 const AUTH = 'https://github.com/login/oauth/authorize?client_id=Iv23liQBfm9prqhvXkuY&state=story';
 
 const UNTIL = '2026-10-22T12:05:00.000Z';
+
+const BROWSER = { route: 'browser', authUrl: AUTH, until: UNTIL } as const;
+
+const DEVICE = { route: 'device', userCode: 'WDJB-MJHT', verificationUri: 'https://github.com/login/device', until: UNTIL } as const;
 
 /** The view of `github`'s sign-in at `shown`, its paste field holding `pasted`, pressing nothing. */
 const view = (shown: SignInShown, refused: string | null = null, pasted = '') => (
@@ -33,27 +38,26 @@ const view = (shown: SignInShown, refused: string | null = null, pasted = '') =>
   </div>
 );
 
+/** A sign-in by a code started: the code in large type, the provider's page to type it at, when it stops, and Cancel. */
+export const WaitingByCode: StoryObj = { render: () => view({ at: 'waiting', started: DEVICE }) };
+
 /** A server that reads needs-auth: the press that starts a sign-in. */
 export const Offered: StoryObj = { render: () => view({ at: 'offer' }) };
 
-/** A sign-in started: the address to open in the browser, when it stops waiting, and the empty field to paste back into. */
-export const Waiting: StoryObj = { render: () => view({ at: 'waiting', authUrl: AUTH, until: UNTIL }) };
+/** A sign-in by the browser started: the address to open, when it stops waiting, the empty field to paste back into, and Cancel. */
+export const Waiting: StoryObj = { render: () => view({ at: 'waiting', started: BROWSER }) };
 
 /** A waiting sign-in with the address the browser landed on pasted, Complete ready to press. */
 export const Pasted: StoryObj = {
   render: () =>
-    view(
-      { at: 'waiting', authUrl: AUTH, until: UNTIL },
-      null,
-      'http://localhost:8791/callback?code=3f1c9a0e2b7d4c6e8a10&state=pYk2v9Qm4sT7wX1z',
-    ),
+    view({ at: 'waiting', started: BROWSER }, null, 'http://localhost:8791/callback?code=3f1c9a0e2b7d4c6e8a10&state=pYk2v9Qm4sT7wX1z'),
 };
 
 /** A paste the api refused, in its own words, the sign-in still waiting and the field still holding what was pasted. */
 export const PasteRefused: StoryObj = {
   render: () =>
     view(
-      { at: 'waiting', authUrl: AUTH, until: UNTIL },
+      { at: 'waiting', started: BROWSER },
       'what was pasted for `github` is not the address its sign-in sends the browser back to. Paste the address your browser landed on after you approved, starting http://localhost:8791/callback.',
       'http://localhost:3000/factories/default/settings',
     ),

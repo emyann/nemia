@@ -347,7 +347,7 @@ export type TestEngine = {
   readonly plantMcpState: (name: string, state: TestMcpState) => void;
   /** Makes every `mcpState` read a look that failed, with `why`; `undefined` lets them read again. */
   readonly failMcpState: (why: string | undefined) => void;
-  /** Each `mcpSignIn` asked and not refused, in order: the server's name, and the road the stand-in took (a callback port is the browser). */
+  /** Each `mcpSignIn` asked and not refused, in order: the server's name, and the road it took (a callback port: the browser). */
   readonly signIns: Array<{ readonly name: string; readonly route: McpSignInStarted['route'] }>;
   /** Each `mcpSignOut` asked and not refused, by the server's name, in order. */
   readonly signOuts: string[];

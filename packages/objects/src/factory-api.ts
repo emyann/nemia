@@ -404,7 +404,10 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     params: cardParams,
     success: SignInState,
     error: objectErrors,
-  }).annotate(OpenApi.Description, "Reads where signing a factory's MCP server in stands, with the code or address a waiting sign-in answered. Answers SignInState."),
+  }).annotate(
+    OpenApi.Description,
+    "Reads where signing a factory's MCP server in stands, with the code or address a waiting sign-in answered. Answers SignInState.",
+  ),
   HttpApiEndpoint.post('signInCallback', '/api/namespaces/:namespace/mcpservers/:name/sign-in/callback', {
     params: cardParams,
     payload: SignInCallback,
@@ -418,7 +421,10 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     params: cardParams,
     success: SignedOut,
     error: objectErrors,
-  }).annotate(OpenApi.Description, "Cancels a waiting sign-in of a factory's MCP server, or signs it out, removing what it held. Answers SignedOut."),
+  }).annotate(
+    OpenApi.Description,
+    "Cancels a waiting sign-in of a factory's MCP server, or signs it out, removing what it held. Answers SignedOut.",
+  ),
 ) {}
 
 /** A factory's schedules, in its namespace, each named by its workflow. */

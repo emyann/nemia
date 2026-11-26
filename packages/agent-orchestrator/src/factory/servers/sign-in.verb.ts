@@ -79,7 +79,7 @@ export const serverSignInCallback = Effect.fn('serverSignInCallback')(function* 
   return yield* e.mcpSignInCallback(server, url).pipe(Effect.mapError(kindOf));
 });
 
-/** `server`'s waiting sign-in cancelled, or its sign-in removed, so a session handed it reads `needs-auth` until a person signs in again. */
+/** `server`'s waiting sign-in cancelled, or its sign-in removed: a session handed it then reads `needs-auth` until a person signs in. */
 export const serverSignOut = Effect.fn('serverSignOut')(function* (factory: string, server: string, home: string) {
   const found = yield* recorded(factory, server, home, 'signed out of');
   const e = yield* EngineService;

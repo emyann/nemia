@@ -4,7 +4,8 @@
  * the value stored, `headerWritten`) and taken off (`server rm`), each answered with what it wrote (`written`); its sign-in to one
  * started (a code to type at the provider, or an address to open), read (a waiting one answers what it started with), completed by the
  * browser with the address a person's browser landed on (the body's `url`, which no answer or log carries) and cancelled or signed out
- * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each handed to the engine, which holds the sign-in; and the store's
+ * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each handed to the engine, which holds the sign-in; and
+ * the store's
  * library of servers, in no namespace (`/api/mcpservers`): the user library's beside Nemia's builtins, each with the factories that add
  * it, kept at the store's level, a builtin never removed and one a factory adds refused its removal naming each.
  */

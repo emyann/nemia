@@ -136,6 +136,8 @@ export type SignInCallback = typeof SignInCallback.Type;
 
 /** A server's sign-in ended: how. */
 export const SignedOut = Schema.Struct({
-  ended: Schema.Literals(SIGN_IN_ENDINGS).annotate({ description: 'How the sign-in ended: a waiting one cancelled, or the one the server held removed.' }),
+  ended: Schema.Literals(SIGN_IN_ENDINGS).annotate({
+    description: 'How the sign-in ended: a waiting one cancelled, or the one the server held removed.',
+  }),
 });
 export type SignedOut = typeof SignedOut.Type;

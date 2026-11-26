@@ -37,8 +37,8 @@ hold a part for each.
 ## What a machine needs before a run starts
 
 The same needs as [`build`](../build/README.md) (*What a machine needs before a run starts*), declared in `workflow.yaml`: `gh` and
-`gh-sign-in` where `github` is true, the git identity, filled from the account gh is signed in to, `ci-server` where `ciServer`
-names a server, and `browser`, the Chromium build the browser tools' own Playwright launches, checked and installed in the factory's
+`gh-sign-in` where `github` is true, the git identity, filled from the account gh is signed in to, `github-server` where `github`
+is true, and `browser`, the Chromium build the browser tools' own Playwright launches, checked and installed in the factory's
 repository. The sign-in with no terminal is not measured yet, as that section says.
 
 ## The implement step's check

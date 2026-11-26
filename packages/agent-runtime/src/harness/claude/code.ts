@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Sighting } from '../../core/index.ts';
+import { claudeModels } from './models.ts';
 import { claudeQuota } from './quota.ts';
 import { claudeHeardFile } from './heard.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -390,6 +391,10 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached) => {
     ...answerOf(attached),
     quota: claudeQuota({
       heardFile: claudeHeardFile(root),
+      ...(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
+      ...(options.harnessBin === undefined ? {} : { harnessBin: options.harnessBin }),
+    }),
+    models: claudeModels({
       ...(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
       ...(options.harnessBin === undefined ? {} : { harnessBin: options.harnessBin }),
     }),

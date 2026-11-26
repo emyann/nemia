@@ -11,7 +11,6 @@
  * alone (`test/vocabulary-door.test.ts`).
  */
 export {
-  CLAUDE_AUTO_DROPPED,
   CLAUDE_CONTEXT_TOKENS,
   CLAUDE_EFFORTS,
   CLAUDE_PERMISSION_MODES,

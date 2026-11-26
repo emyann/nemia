@@ -100,7 +100,7 @@ export type OpenUsage = (command: string | undefined) => UsageAsk;
  * The input of an ask's query: it yields no message, and ends only once the ask is done with it. A query whose input has ended closes
  * the child's stdin, on which Claude Code exits — so the question would race the exit were the input to end at once.
  */
-const heldInput = () => {
+export const heldInput = () => {
   let release = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;

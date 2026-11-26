@@ -31,14 +31,9 @@
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
  *
- * The third case measures, on the same process, which models Claude Code drops `auto` on: each model `CLAUDE_AUTO_DROPPED` lists and
- * each alias the refusals advise as keeping it, filed in `auto`, its mode read by the reader the engine uses (`ranIn`): the last its
- * `init` or `status` lines name. Not the `init` line's alone: Claude Code can print it before it settles the mode, and say the settled
- * one on a `status` line after it — on 2.1.322, `claude-haiku-4-5` and `claude-sonnet-4-5` each printed `init` with
- * `auto` and then `status` with `default` in 1 run of 10, and `default` on both in the other 9, so a case that read the `init` line
- * failed on a coin flip. Both ran in `default` in all 10, and `haiku` and `sonnet` in `auto` in all 10. The list is a measurement of
- * one Claude Code, so it is made again at each bump by this case rather than carried; each `init` line is handed over as
- * `sdk-<version>-auto-<model>.json`.
+ * The third case asks the harness its models (`claudeModels`, no session, no money): the list holds the model the `init` line names for
+ * `opus` (`OPUS_TODAY`), under that id and with `opus` among its aliases, and each model's row says whether it keeps `auto`, which
+ * Nemia reads in place of a list of its own. The answer is handed over as `sdk-<version>-models.json`.
  *
  * The last two measure what a session in a factory's home meets (`docs/harness.md`, *A session in one folder, working on another*):
  * whether, its added folders' memory files loaded (`CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`), the settings'
@@ -68,7 +63,7 @@ import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { CLAUDE_CODE_VERSION, OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';
-import { CLAUDE_AUTO_DROPPED, fenceReach } from '../src/vocabulary.ts';
+import { claudeModels } from '../src/harness/claude/index.ts';
 
 const skip = process.env.AE_LIVE === '1' ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 
@@ -204,37 +199,15 @@ test.skipIf(skip)(
   },
 );
 
-/**
- * The models measured for `auto`: every one `CLAUDE_AUTO_DROPPED` lists, and every alias the refusals advise as keeping it. A model
- * names its own `init` file, so the list and its measurement are handed over together.
- */
-const AUTO_MEASURED: readonly string[] = [...CLAUDE_AUTO_DROPPED, 'haiku', 'sonnet', 'opus', 'fable'];
-
 test.skipIf(skip)(
-  'each model, filed in `auto`, runs in `auto`, or in `default` exactly where `CLAUDE_AUTO_DROPPED` lists it',
-  { timeout: 10 * 60_000 },
+  'the harness lists the model `opus` resolves to by its canonical id, with the alias kept',
+  { timeout: 2 * 60_000 },
   async () => {
-    const runs = await Promise.all(
-      AUTO_MEASURED.map(async (model) => ({
-        model,
-        ...(await jobRun(`ae/live/auto/${model}`, { model, permissionMode: 'auto', tools: [] })),
-      })),
-    );
-    for (const { model, stdout, code, err } of runs) {
-      const init = initOf(stdout);
-      assert.ok(init, `${model} printed its init line (exit ${code}): ${stdout.slice(0, 300)} ${err}`);
-      handOver(`sdk-${SDK_VERSION}-auto-${model}.json`, `${JSON.stringify(init)}\n`);
-      const dropped = fenceReach('claude', model)?.dropped.includes('auto') === true;
-      const ranIn = claudeStreamOutput(stdout).ranIn;
-      assert.equal(
-        ranIn,
-        dropped ? 'default' : 'auto',
-        `${model} (${init.model}) was filed in \`auto\`, and ran in ${ranIn} (its init line said ${init.permissionMode}), on Claude Code ` +
-          `${init.claude_code_version}. Measure it 10 times as packages/agent-runtime/docs/harness.md says (\`auto\` on haiku) before ` +
-          `CLAUDE_AUTO_DROPPED (src/harness/claude/vocabulary.ts) moves, and move it, with the docs that repeat it, on a card of its own`,
-      );
-      assert.equal(code, 0, `and ${model} ran to a result: ${err}`);
-    }
+    const listed = await Effect.runPromise(claudeModels());
+    handOver(`sdk-${SDK_VERSION}-models.json`, `${JSON.stringify(listed)}\n`);
+    const opus = listed.find((m) => m.id === OPUS_TODAY);
+    assert.ok(opus, `the list holds ${OPUS_TODAY}: ${listed.map((m) => m.id).join(', ')}`);
+    assert.ok(opus.aliases.includes('opus'), `and says \`opus\` resolves to it: ${opus.aliases.join(', ')}`);
   },
 );
 

@@ -7,8 +7,8 @@
  * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
  * a person's words handed to a session while it runs, which the engine journals and never acts on. And an
  * eighth, `find`: one session by its name, without observing every other, for a read that needs only which
- * session it is. And a ninth, `quota`: what the harness's subscription has left, asked of the harness and of no session. Swap the
- * layer and the same engine drives a different harness; `Runner.test()` drives
+ * session it is. And a ninth, `quota`: what the harness's subscription has left, asked of the harness and of no session. And a
+ * tenth, `models`: the models the harness lists for a session, asked the same way. Swap the layer and the same engine drives a different harness; `Runner.test()` drives
  * nothing at all, which is how the engine's tests cost zero dollars.
  *
  * Several harnesses, one seam (`composite`). A task says which harness it wants; this dispatches `spawn` to that one and
@@ -24,6 +24,7 @@ import { own } from '../core/own.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { causeWords, RunnerError } from './error.ts';
 import type { Telemetry } from './telemetry.ts';
+import type { ListedModel } from '../../contracts/listed-models.contract.ts';
 import type { OriginOf } from '../../contracts/origin.contract.ts';
 import type { TranscriptOriginKind } from './origin-kinds.ts';
 import { ORIGIN_KINDS } from './origin-kinds.ts';
@@ -235,7 +236,7 @@ export type Observation = {
  * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
  * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
  * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same. Nor does
- * `quota`: optional, and asked of the harness, never of a session.
+ * `quota` and `models`: optional, and asked of the harness, never of a session.
  *
  * An optional verb renamed on its way through the seam is dropped by every adapter that takes the old type, with no error: keep the
  * old verb beside the new one until each adapter is moved, and test the verb through the `Engine` service.
@@ -333,6 +334,12 @@ export type RunnerOps = {
    * nowhere. Every way an ask can go is a `HarnessQuota`, so it fails only where the seam between it and its caller does.
    */
   readonly quota?: Effect.Effect<HarnessQuota, RunnerError>;
+  /**
+   * The models the harness lists for a session, by canonical id (`ListedModel`), asked of the harness once and of no session. Optional,
+   * for a harness that can tell (Claude Code: the SDK's `supportedModels()`). Journalled nowhere; it fails with the reason it could not
+   * be answered.
+   */
+  readonly models?: Effect.Effect<readonly ListedModel[], RunnerError>;
   /**
    * Why this runner would not take a task, as a sentence that says what to write instead — or `undefined`. Asked by `file`
    * before anything is journalled, so a task no harness could start is never a promise the loop keeps trying to honour.

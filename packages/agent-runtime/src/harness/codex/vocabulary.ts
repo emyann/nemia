@@ -64,7 +64,6 @@ const codexReach = () =>
     given: CODEX_DEFAULT_SANDBOX,
     writes: CODEX_SANDBOXES.indexOf('workspace-write'),
     unasking: [],
-    dropped: [],
     refusing: [],
     unfenced: [],
     granted: {},

@@ -32,10 +32,6 @@ const idOf = (row: ModelRow) => row.resolvedModel ?? row.value;
 /** Whether `list` holds no name twice. */
 const noneTwice = (list: readonly string[]) => list.every((name, i) => !list.slice(0, i).includes(name));
 
-/** Whether `a` and `b` hold the same words in the same order, or are both absent. */
-const sameList = (a: readonly string[] | undefined, b: readonly string[] | undefined) =>
-  a === undefined || b === undefined ? a === b : a.length === b.length && a.every((w, i) => w === b[i]);
-
 const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>({
   requires: ({ input: [rows] }) => rows.every((r) => r.value !== '' && r.resolvedModel !== ''),
   ensures: {
@@ -70,7 +66,7 @@ const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>
             first !== undefined &&
             m.name === first.displayName &&
             m.keepsAuto === first.supportsAutoMode &&
-            sameList(m.efforts, first.supportedEffortLevels)
+            (m.efforts === undefined) === (first.supportedEffortLevels === undefined)
           );
         }),
     },

@@ -1,7 +1,7 @@
 /**
  * What a harness declares it can do, read by every check that used to name a harness: whether a task asks of its harness something the
  * harness does not declare (`misplacedOf`), which harnesses of an engine take a capability, to name in a refusal's fix (`takersOf`), and
- * which harness an Engine verb that is not a task's goes to (`verbHarnessOf`): `quota`, the MCP verbs, `hold`, the drains.
+ * which harness an Engine verb that is not a task's goes to (`verbHarnessOf`): `quota`, `models`, the MCP verbs, `hold`, the drains.
  *
  * A harness's declaration is one list of the words below (`HarnessDeclaration.can`, agent-runtime, src/harness/declaration.ts), one per
  * harness, Claude Code's included: a new harness is its declaration and its driver. A runner a consumer brings as its own declares
@@ -19,7 +19,8 @@ import { type Implementation, spec } from '@emyann/tsverify';
  *   `pictures` (shown in a session's first message), `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config
  *   it takes;
  * - `keepsOpen`: a session kept open until stopped (`restartPolicy: 'Always'`); `holdsCalls`: a call held open for a person (`mayAsk`);
- * - `interrupt`, `answerAsk`, `quota`, `mcp` (`mcpState`, `mcpSignIn`, `mcpSignInState`, `mcpSignOut`), `hold`, `drain` (its sessions'
+ * - `interrupt`, `answerAsk`, `quota`, `models` (the models it lists), `mcp` (`mcpState`, `mcpSignIn`,
+ *   `mcpSignInState`, `mcpSignOut`), `hold`, `drain` (its sessions'
  *   calls held, and their deadlines paused, while the store's drain stands): an Engine verb it answers.
  */
 export type Capability =
@@ -41,6 +42,7 @@ export type Capability =
   | 'interrupt'
   | 'answerAsk'
   | 'quota'
+  | 'models'
   | 'mcp'
   | 'hold'
   | 'drain';

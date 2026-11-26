@@ -53,6 +53,7 @@ export const unkeptVerbs = () => ({
   admit: unkept('admit'),
   follow: unkept('follow'),
   path: unkept('path'),
+  models: unkept('models'),
   close: unkept('close'),
   watch: unkept('watch'),
   tallied: unkept('tallied'),

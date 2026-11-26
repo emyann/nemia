@@ -122,6 +122,7 @@ export type {
   SweepReport,
 } from './core/engine/index.ts';
 export type { BodyEntry, BodyOps, BodyRef } from './core/engine/index.ts';
+export type { ListedModel } from '../contracts/listed-models.contract.ts';
 export type { IoCounts } from './core/engine/index.ts';
 
 export { Runner, RunnerError, testOps } from './harness/index.ts';
@@ -197,7 +198,7 @@ export { denialText, fold, nameFor } from './core/index.ts';
  * One namespace, imported and exported by name, as every barrel here re-exports (`test/layout.test.ts`).
  */
 export { RuntimeModel };
-export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { CLAUDE_PIN, CLAUDE_SDK_VERSION } from './harness/claude/vocabulary.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { CLAUDE_RULES, type ClaudeRules, type Dated } from './harness/claude/rules.ts';

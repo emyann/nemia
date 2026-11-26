@@ -2337,6 +2337,7 @@ export function seed(root: string, now = Date.now()) {
       {
         id,
         repo,
+        factory: FACTORIES.hiring.name,
         workspace: repo,
         baseRef,
         branch: 'main',

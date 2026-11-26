@@ -6,8 +6,8 @@ import { CutButton, CutPress } from './CutButton';
 import { ON_CARD } from './stories.fixture';
 
 /**
- * The look's filled button with two cut corners: a link to a route, quiet, a button that is pressed, a press that is disabled, and a
- * press still out.
+ * The look's filled button with two cut corners: a link to a route, quiet, a quiet one beside a filled one, a button that is pressed, a
+ * press that is disabled, and a press still out.
  */
 const meta: Meta = { title: 'Look/CutButton' };
 export default meta;
@@ -38,6 +38,27 @@ export const Quiet: StoryObj<typeof CutButton> = {
     await expect(link.getAttribute('data-quiet')).toBe('true');
     const fill = getComputedStyle(link.querySelector('[data-cut-shape]')!).backgroundColor;
     await expect(fill.endsWith(', 0)'), `a quiet button paints no ground: ${fill}`).toBe(true);
+  },
+};
+
+/**
+ * A filled press and a quiet link side by side, as a waiting card's Approve and Open the run: one height and one shape, the filled
+ * one's, set apart by fill against hairline alone.
+ */
+export const Beside: StoryObj<typeof CutButton> = {
+  args: { quiet: true, beside: true },
+  render: (args) => (
+    <div style={{ ...ON_CARD, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <CutPress>Approve design</CutPress>
+      <CutButton {...args} to="." search={{ read: 'button' } as never}>
+        Open the run
+      </CutButton>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const [press, link] = [...canvasElement.querySelectorAll('[data-cut-shape]')].map((shape) => shape.getBoundingClientRect());
+    await expect(link.height, 'the quiet one is as tall as the filled one').toBe(press.height);
+    await expect(link.top, 'and stands on its line').toBe(press.top);
   },
 };
 

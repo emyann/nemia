@@ -169,7 +169,7 @@ async function expected(page: Page, run: string, step: string) {
     Object.fromEntries(names.map((name, i) => [name, tries[i].tries ?? []])),
     Object.fromEntries(names.map((name, i) => [name, 'error' in told[i] ? null : told[i]])),
   );
-  return stepCardOf({ run: row, step, detail, agents, now: new Date() });
+  return stepCardOf({ run: row, step, detail, agents, unchecked: () => true, now: new Date() });
 }
 
 /** That `card` says the agent, the time box's label, the five facts and the action the rule gives. */

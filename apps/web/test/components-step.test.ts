@@ -1353,7 +1353,7 @@ test('a questions field is drawn as its questions, read-only, the recommended ma
 test("a try that ended with no statement says the machine's reason in its detail, unsigned, in a sentence", async () => {
   const unsigned: StepAttempts = {
     count: 1,
-    latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned', release: null, harness: null },
+    latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned', release: null, harness: null, model: null },
   };
   const run = runWith(null);
   const step = { ...run.steps[0], tries: [{ ...run.steps[0].tries[0], attempts: unsigned, closeout: null }] };

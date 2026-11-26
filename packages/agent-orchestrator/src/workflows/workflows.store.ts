@@ -20,6 +20,7 @@
  * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`), refused where it was
  * given none (`test/root-given.test.ts`).
  */
+import { listedModels } from '../harness/models.store.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -280,7 +281,7 @@ function workflowFiles(home: string) {
     workflows: {
       list: (holder) => workflowsIn(holder),
       around,
-      read: (dir, found, fills) => loadWorkflowsWith(dir, found, fills),
+      read: (dir, found, fills) => loadWorkflowsWith(dir, found, fills, listedModels(home)),
       named: (dir) => versionNamed(dir),
       there: (dir, gathered) => {
         const stat = fs.lstatSync(dir, { throwIfNoEntry: false });

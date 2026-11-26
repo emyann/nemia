@@ -219,6 +219,11 @@ export const HARNESSES: Readonly<Record<string, HarnessConfig>> & {
 export const quotaHarnesses = () => Object.keys(HARNESSES).filter((name) => declarationOf(name)?.can.includes('quota') === true);
 
 /**
+ * The harnesses the daemon asks for their models (`up`): each of the engine's that declares it lists some (`models`).
+ */
+export const modelsHarnesses = () => Object.keys(HARNESSES).filter((name) => declarationOf(name)?.can.includes('models') === true);
+
+/**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
  * `maxConcurrent` from `WF_MAX_CONCURRENT` (`maxConcurrent` in `config.store.ts`), the filed `priority` first. A value the variable
  * refuses gives the engine no ceiling, so nothing is admitted: the tick refuses its pass on the same read (`ceilings`), so the daemon

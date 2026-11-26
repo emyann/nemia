@@ -5,6 +5,7 @@
  * agents and skills reads: it imports neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none
  * of it.
  */
+import { listedModels } from '../harness/models.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -131,7 +132,7 @@ export function writeWorkflowAt(
   const carried = new Map(files.map((file) => [file.path, file.text] as const));
   const dropped = droppedOf(at, entries, carried, whole);
   const read = (file: string) => carried.get(file) ?? (dropped.includes(file) ? undefined : there(file));
-  const parsed = parseFolder(texts, read, agents, skills, fills);
+  const parsed = parseFolder(texts, read, agents, skills, fills, listedModels(home));
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];

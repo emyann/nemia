@@ -72,7 +72,7 @@ test('a check turn is filed as a job of the harness on its turn model, in its he
   assert.ok(fence);
   assert.equal(
     (filed.config as Readonly<Record<string, unknown>> | undefined)?.[fence],
-    HARNESS_DECLARATIONS[HARNESS]?.reach?.(needs?.turnModel).held,
+    HARNESS_DECLARATIONS[HARNESS]?.reach?.().held,
     'it runs in its held fence',
   );
   assert.equal(filed.config?.budgetUsd, TURN_BUDGET_USD);

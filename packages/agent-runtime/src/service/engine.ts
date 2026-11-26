@@ -106,6 +106,7 @@ import { attachedSessions, putDrain, type Attached } from '../harness/claude/ind
 import { liftHolderDrain, liftSessionDrain, putSessionDrain } from '../core/engine/drain.ts';
 import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
+import type { ListedModel } from '../../contracts/listed-models.contract.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
 import { TaskId } from '../core/model.ts';
 
@@ -403,6 +404,13 @@ export type EngineShape = {
    * runner without `quota`), naming the ones that do.
    */
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
+  /**
+   * The models the harness `harness` lists for a session, by canonical id (`RunnerOps.models`), asked of the harness and of no session:
+   * one ask each call, nothing kept and nothing journalled. `undefined` where the harness lists none: one this engine does not have, or
+   * whose runner has no `models` (`codex`, a command, a remote A2A agent) — never a failure; a harness that could not be asked fails
+   * with the reason, as a `RunnerError`.
+   */
+  readonly models: (harness: string) => Effect.Effect<readonly ListedModel[] | undefined, RunnerError>;
   /**
    * The state of each of `servers` — a record of them, every one in one short-lived Claude Code session with the servers
    * inline, asked once and ended (`mcpServersRead`): `connected`, `needs-auth`, `failed`, `pending` or `disabled`, the harness's own
@@ -702,6 +710,15 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, declared: readonly Harnes
   });
 
 /**
+ * `models` over `runners`: the models the harness named lists (`RunnerOps.models`), or `undefined` for one this engine does not have or
+ * whose runner lists none. Traced only where it asks a harness, as `Engine.models`.
+ */
+const modelsVerbOf = (runners: Record<string, SeamOps>) => (harness: string) => {
+  const ask = own(runners, harness)?.models;
+  return ask === undefined ? Effect.succeed(undefined) : ask.pipe(Effect.withSpan('Engine.models', { attributes: { harness } }));
+};
+
+/**
  * `ops` with its observes counted into `observed`, under `name`, on the way (`ObserveCount`): each call, its time, what it listed, the
  * registries it asked (`spawned`), and whether it left anything unread, a failed look counting as unread.
  */
@@ -786,9 +803,10 @@ const askedVerbsOf = (
 ) =>
   ({
     quota: quotaVerbOf(runners, declared, fallback),
+    models: modelsVerbOf(runners),
     mcpState: mcpStateVerbOf(harnesses, root, executable, undefined, harnessBin),
     ...mcpSignInVerbsOf(harnesses, root, executable, {}, harnessBin),
-  }) satisfies Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'>;
+  }) satisfies Pick<EngineShape, 'quota' | 'models' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'>;
 
 /**
  * A look at the harness `harness` that failed with `cause`, as a view reads it: nothing seen, and the session `name` — the last

@@ -288,10 +288,11 @@ export const StepAttempts = Schema.Struct({
           version: Schema.String.annotate({ description: 'The version of the harness.' }),
         }),
       ).annotate({ description: 'The harness it ran on; null where it did not say.' }),
+      model: NullString.annotate({ description: 'The model its session ran on, as the harness reported it; null where it did not say.' }),
     }),
   ).annotate({
     description:
-      'How the latest attempt went: when it started and ended, how and why it ended, the release and the harness it ran on; null before the first.',
+      'How the latest attempt went: when it started and ended, how and why it ended, the release, the harness and the model it ran on; null before the first.',
   }),
 }).annotate({ identifier: 'StepAttempts', description: "How many attempts a try's task made, and how the latest went." });
 export type StepAttempts = typeof StepAttempts.Type;

@@ -6,7 +6,7 @@ import type { AttemptEnd, AttemptOutcome } from '../src/lib/api/tries.ts';
 
 const ended = (reason: AttemptEnd, how: AttemptOutcome = 'failed') => ({
   count: 1,
-  latest: { startedAt: 'a', ended: how, endedAt: 'b', reason, release: null, harness: null },
+  latest: { startedAt: 'a', ended: how, endedAt: 'b', reason, release: null, harness: null, model: null },
 });
 const said = (outcome: 'done' | 'blocked') =>
   ({
@@ -74,7 +74,10 @@ test("with no statement and no reason â€” running, not filed, a harness's done â
       {
         closeout: null,
         unreadable: null,
-        attempts: { count: 1, latest: { startedAt: 'a', ended: null, endedAt: null, reason: null, release: null, harness: null } },
+        attempts: {
+          count: 1,
+          latest: { startedAt: 'a', ended: null, endedAt: null, reason: null, release: null, harness: null, model: null },
+        },
       },
       'No closeout yet.',
     ),

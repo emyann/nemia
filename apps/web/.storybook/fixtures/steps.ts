@@ -119,6 +119,7 @@ export const tryOf = (n: number, codes: Codes, ended: boolean, closeout: StepClo
             reason: 'harness',
             release: null,
             harness: null,
+            model: null,
           },
         },
 }) satisfies StepTry;

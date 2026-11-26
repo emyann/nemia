@@ -15,7 +15,7 @@ spec:
   output:
     path: agents/argus/output.schema.json
   claude:
-    model: opus
+    model: claude-opus-5-5
     effort: high
     context: 200k
     fence:

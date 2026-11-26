@@ -183,10 +183,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  *
  * `agent-orchestrator/run` is one fewer since the volumes' face no longer re-exports `factory/volume/origin-params.ts`, which nothing
  * imported through it.
+ *
+ * Both are two more since a step's model is judged against its harness's list: `workflow/models.ts` and `workflow/model-words.ts`, pure
+ * modules that touch no disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 220, effect: 15 },
-  'agent-orchestrator/workflow': { all: 157, effect: 15 },
+  'agent-orchestrator/run': { all: 222, effect: 15 },
+  'agent-orchestrator/workflow': { all: 159, effect: 15 },
 };
 
 const isEffectModule = (url: string) => url.includes('/node_modules/effect/');

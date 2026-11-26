@@ -1068,27 +1068,6 @@ describe('REFUSED at shipped defaults: a step and the agent it names, one row pe
       'a session the step starts',
       "`resume: plan` continues plan's",
     ],
-    ...['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'].flatMap(
-      (model) =>
-        [
-          [
-            `F21: \`model: ${model}\` on an agent with no mode, filed in \`auto\`, which Claude Code drops`,
-            () => loadWorkflows(team(`---\nmodel: ${model}\n---\nYou build.\n`, {})),
-            'build: `agent: builder` names an agent',
-            'whose file is refused',
-            `agents/builder.md: \`model: ${model}\``,
-            'no `permissionMode:`',
-            "filed in `auto`, the runtime's default",
-            'Claude Code drops `auto` on that model',
-          ],
-          [
-            `F21: \`model: ${model}\` on a step that says \`permissionMode: auto\``,
-            () => loadWorkflows(team('---\n---\nx\n', {}, `---\nagent: builder\nmodel: ${model}\npermissionMode: auto\n---\n`)),
-            `build: \`model: ${model}\` says \`permissionMode: auto\``,
-            'Claude Code drops `auto`',
-          ],
-        ] satisfies Refused[],
-    ),
     [
       "a step's mcp: line with an empty name, under the step's name",
       () => lookOf(scoutWith(''), 'mcp: a,, b\n'),
@@ -1147,10 +1126,8 @@ describe('REFUSED at shipped defaults: a step and the agent it names, one row pe
     names(broken, 'acme', 'its file is refused', 'agents/scout.md: `after` is wiring.');
     for (const words of [unknown, none, broken]) assert.doesNotMatch(words, /`agent: scout`/);
   });
-  test('and let through where the rule does not reach: a mode the model keeps, a model that keeps auto, codex, no model', () => {
-    assert.equal(loadWorkflows(team('---\nmodel: claude-haiku-4-5\npermissionMode: dontAsk\n---\nx\n', {})).length, 1);
+  test('and let through where no list is recorded: a model named in any word, codex, no model', () => {
     assert.equal(loadWorkflows(team('---\nmodel: sonnet\n---\nx\n', {})).length, 1);
-    assert.equal(loadWorkflows(team('---\nmodel: haiku\n---\nx\n', {})).length, 1, 'the alias keeps `auto`');
     assert.equal(loadWorkflows(team('---\nharness: codex\nmodel: claude-haiku-4-5\n---\nx\n', {})).length, 1);
     assert.equal(loadWorkflows(team('---\n---\nx\n', {})).length, 1);
     assert.equal(loadWorkflows(team(skilled, skills)).length, 1, 'a step that takes no tool from its agent');

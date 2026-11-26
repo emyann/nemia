@@ -113,7 +113,10 @@ export function runWith(note: string | null) {
         closeout: null,
         unreadable: null,
         check: null,
-        attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null } },
+        attempts: {
+          count: 1,
+          latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null, model: null },
+        },
         used: UNMEASURED,
         spent: null,
         budget: null,
@@ -133,7 +136,7 @@ export function runWith(note: string | null) {
             answer: null,
             attempts: {
               count: 1,
-              latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null },
+              latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness', release: null, harness: null, model: null },
             },
           },
         ],
@@ -199,7 +202,7 @@ export const tookAt = '2026-09-13T00:12:30.000Z';
 
 export const ranOnce: StepAttempts = {
   count: 1,
-  latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness', release: null, harness: null },
+  latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness', release: null, harness: null, model: null },
 };
 
 export const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}) =>
@@ -290,7 +293,10 @@ export const threeTries: StepTry[] = [
     on: null,
     via: null,
     message: 'running (working)',
-    attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null, release: null, harness: null } },
+    attempts: {
+      count: 2,
+      latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null, release: null, harness: null, model: null },
+    },
     check: { name: 'check', command: 'npm test', started: null, ended: null, taskId: null, verdict: null, refused: null },
     closeout: null,
     unreadable: null,

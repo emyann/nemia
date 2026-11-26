@@ -5,6 +5,7 @@
  * (`exportTree`), read through the loader's own readers and checked before the door writes it. What a template is read from and
  * written to is the door's: nothing here writes the disk.
  */
+import type { ModelLists } from '../workflow/index.ts';
 import { SHIPPED_PLACE_NEEDS } from '../place/place.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,8 +108,10 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
  * Nemia's own skills, the place's and the builtin ones, a template may name (`packageSkillNames`). Pure.
  * @param tree The template's tree as read: its files and the problems the read found.
  * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
+ * @param lists The models each harness lists, as the store recorded them, which the agents' models are judged against; none where
+ * undefined.
  */
-export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]) {
+export function checkedTree(tree: TemplateTree, packageSkills: readonly string[], lists?: ModelLists) {
   const problems = [...tree.problems];
   const { folder, parsed } = readTemplateFolder(tree.name, tree.files, problems);
   const byPath = new Map(tree.files.map((f) => [f.path, f]));
@@ -116,7 +119,7 @@ export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]
     const found = byPath.get(file);
     return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
   };
-  for (const refusal of checkTemplate(folder, [...packageSkills], text, (file) => sharedLinesOf(text(file)), SHIPPED_PLACE_NEEDS)) {
+  for (const refusal of checkTemplate(folder, [...packageSkills], text, (file) => sharedLinesOf(text(file)), SHIPPED_PLACE_NEEDS, lists)) {
     const doc = parsed.get(refusal.file);
     const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
     problems.push({ file: refusal.file, ...at, message: refusal.message });

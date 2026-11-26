@@ -4,15 +4,10 @@
 export { claudeCodeOps } from './code.ts';
 export { claudeQuota, EXECUTABLE_VARIABLE, quotaExecutable, quotaOfRefusal, quotaOfUsage, usageEnv, usageOptions } from './quota.ts';
 export type { OpenUsage } from './quota.ts';
+export { claudeModels, listedOf } from './models.ts';
+export type { ListedModel, ModelRow, OpenModels } from './models.ts';
 export { claudeHeardFile, heardOf, keepHeard, readHeard } from './heard.ts';
-export {
-  CLAUDE_AUTO_DROPPED,
-  CLAUDE_CONTEXT_TOKENS,
-  CLAUDE_EFFORTS,
-  CLAUDE_PERMISSION_MODES,
-  bridgeAsked,
-  claudeRefuses,
-} from './vocabulary.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 export type { ClaudeFlags } from './vocabulary.ts';
 export { attachedSessions, LET_GO_MS, type Attached } from './attached.ts';
 export { putDrain } from './attached-file.ts';

@@ -36,6 +36,7 @@ export const CAPABILITIES: readonly Capability[] = [
   'interrupt',
   'answerAsk',
   'quota',
+  'models',
   'mcp',
   'hold',
   'drain',
@@ -61,8 +62,9 @@ export type HarnessKnobs = {
  * A harness's fence, as the words that set it: `by` is what fences a session, a permission mode or a sandbox; `rank` how wide each word
  * is, wider higher and equal as wide; `given` the word a task naming none runs in; `writes` the lowest rank that writes in the session's
  * directory unasked; `held` the word a session held to its directory runs in, where the harness has one; `unasking` the words a
- * background session runs in without stopping to ask a person, `held` first; `dropped` the words the harness runs as another on the
- * model asked about; `refusing` the words a session refuses in what no allow rule reaches, rather than asking about it, so that a tool
+ * background session runs in without stopping to ask a person, `held` first; `autoMode` the word of the mode its models'
+ * `supportsAutoMode` speaks of, where it lists models and has one; `refusing` the words a session refuses in what no allow rule
+ * reaches, rather than asking about it, so that a tool
  * the session is given and neither a rule nor the word itself grants can never be called; `unfenced` the tools it calls inside its own
  * directory with no rule naming them, whatever the word; and `granted` the tools one word alone runs with no rule, by that word, a word
  * granting none being absent. The last three are empty for a harness whose fence takes no allow rule.
@@ -74,7 +76,7 @@ export type FenceReach = {
   writes: number;
   held?: string;
   unasking: readonly string[];
-  dropped: readonly string[];
+  autoMode?: string;
   refusing: readonly string[];
   unfenced: readonly string[];
   granted: Readonly<Record<string, readonly string[]>>;
@@ -126,7 +128,7 @@ export type HarnessNeeds = {
  * - `ownKey`: the key of a task's config its own flags go under (`config.claude`, `config.codex`), carried whole;
  * - `knobs`: its knobs (`HarnessKnobs`), for a caller that writes settings for it;
  * - `contextTokens`: the windows it takes, where `can` lists `contextTokens`;
- * - `reach`: what its fence words reach on a model (`FenceReach`);
+ * - `reach`: what its fence words reach (`FenceReach`);
  * - `unruled`: the characters its permission rules cannot carry in a path;
  * - `asks`: what each neutral ask becomes in its own config — a function of the repository for `trustRepository`, the config itself for
  *   `remoteControl` — an ask it has none for being dropped;
@@ -141,7 +143,7 @@ export type HarnessDeclaration = {
   readonly ownKey?: 'claude' | 'codex';
   readonly knobs?: HarnessKnobs;
   readonly contextTokens?: { readonly least: number; readonly most: number };
-  readonly reach?: (model: string | undefined) => FenceReach;
+  readonly reach?: () => FenceReach;
   readonly unruled?: RegExp;
   readonly asks?: { readonly trustRepository?: (repo: string) => OwnArgs; readonly remoteControl?: OwnArgs };
   readonly runsBrief?: true;

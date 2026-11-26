@@ -24,6 +24,7 @@ const VERB_OPS: readonly [Capability, keyof RunnerOps][] = [
   ['interrupt', 'interrupt'],
   ['answerAsk', 'answer'],
   ['quota', 'quota'],
+  ['models', 'models'],
 ];
 
 describe('each shipped harness declares what its driver does, and no more', () => {

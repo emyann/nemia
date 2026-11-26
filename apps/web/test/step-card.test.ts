@@ -50,7 +50,7 @@ const aTry = (n: number, round = 1) =>
   }) satisfies Step['tries'][number];
 
 /** The card of `name` on a run of design, implement, review whose steps say `words`, its answer's steps `steps`. */
-function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada') {
+function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada', unchecked?: () => boolean) {
   const listed = summary(Object.entries(words));
   const row = { ...listed, steps: listed.steps.map((s) => ({ ...s, spec: s.name === name && agent ? givenAgent(agent) : null })) };
   return stepCardOf({
@@ -58,6 +58,7 @@ function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent:
     step: name,
     detail: detail({ steps }),
     agents: [{ name: 'Ada', role: 'Software engineer' }],
+    unchecked,
     now: NOW,
   }) satisfies StepCardFacts;
 }
@@ -214,6 +215,39 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
       { key: 'Context', value: '400k tokens' },
       { key: 'Permission', value: 'auto' },
     ]);
+  });
+  test('the Model fact says the model the session ran on, with the one it was asked for beside it where they differ', () => {
+    const modelOf = (model: string | null, asked: string | null = 'opus', unchecked?: () => boolean) =>
+      cardOf(
+        'implement',
+        STATUSES,
+        [
+          quiet('implement', 'running (working)', {
+            tries: [aTry(1)],
+            spec: { ...step().spec!, model: asked },
+            filed: { ...step().filed!, model: asked },
+            attempts: {
+              count: 1,
+              latest: { startedAt: NOW.toISOString(), ended: null, endedAt: null, reason: null, release: null, harness: null, model },
+            },
+          }),
+        ],
+        undefined,
+        unchecked,
+      ).facts?.find((fact) => fact.key === 'Model')?.value;
+    assert.equal(modelOf('claude-opus-5-5'), 'claude-opus-5-5 · asked opus');
+    assert.equal(modelOf('claude-opus-5-5', 'claude-opus-5-5'), 'claude-opus-5-5');
+    assert.equal(modelOf(null), 'opus', 'a session that said none shows what it was asked for');
+    assert.equal(
+      modelOf(null, 'opus', () => true),
+      'opus · not checked',
+      'a harness with no recorded list says its models are not checked',
+    );
+    assert.equal(
+      modelOf(null, 'opus', () => false),
+      'opus',
+      'one whose list is recorded says nothing',
+    );
   });
   test('no card says its place among the run\'s steps: "step x of y" is the rail\'s', () => {
     const cards = [

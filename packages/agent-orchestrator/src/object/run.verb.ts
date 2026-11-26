@@ -365,6 +365,21 @@ const runObjectOf = Effect.fnUntraced(function* (
 const runVersion = valueVersion;
 
 /**
+ * A run's metadata as its object carries it before a revision is given: its name, its namespace, when it was made and its whole map of
+ * labels (`metadataLabels`).
+ * @param run The run's record.
+ */
+export const runMetadataOf = (run: Run) => {
+  const { factory, workflow } = runLabels(run);
+  return {
+    name: run.id,
+    namespace: runNamespace(run.factory),
+    creationTimestamp: run.createdAt,
+    labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
+  };
+};
+
+/**
  * The run's object before its disk parts (`withDiskParts`), built off its reading in hand (`RunReading`): what the RunList builds a run of
  * its page with, having judged and read the page in one batch, and keeps beside its judgement. Its `resourceVersion` is the digest of
  * what it holds (`runVersion`), which `withDiskParts` digests again with the parts it lays.
@@ -377,13 +392,7 @@ export const runObjectCore = Effect.fnUntraced(function* (
   const kinds = listed ? [] : inRequest ? yield* Effect.promise(() => inRequest(driftNow(run))) : yield* driftNow(run);
   const stepAt: StepAt = { ...at, used: consumption(at.views, run), said, listed };
   const steps = yield* Effect.forEach(at.names, (name) => stepStatusOf(name, stepAt), { concurrency: 'unbounded' });
-  const { factory, workflow } = runLabels(run);
-  const metadata = {
-    name: run.id,
-    namespace: runNamespace(run.factory),
-    creationTimestamp: run.createdAt,
-    labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
-  };
+  const metadata = runMetadataOf(run);
   const spec = specOf(run, at);
   const status: RunStatus = {
     ...judgedFields(run, at.judged, at.views),

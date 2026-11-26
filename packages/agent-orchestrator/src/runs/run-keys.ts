@@ -16,11 +16,20 @@ const CLAIMS_PREFIX = '/registry/claims/';
 /** Where every run's asks are, each run's under its id. */
 export const ASKS_PREFIX = '/registry/asks/';
 
+/** Where every run's observed status is: a status's key is its run's id beneath it, written by the daemon's pass alone. */
+export const RUNSTATUS_PREFIX = '/registry/runstatus/';
+
 /**
  * The key of a run's record.
  * @param id The run's id.
  */
 export const runKey = (id: string) => `${RUNS_PREFIX}${id}`;
+
+/**
+ * The key of a run's observed status record.
+ * @param id The run's id.
+ */
+export const runStatusKey = (id: string) => `${RUNSTATUS_PREFIX}${id}`;
 
 /**
  * The key of the claim a run holds on the card it was started from.

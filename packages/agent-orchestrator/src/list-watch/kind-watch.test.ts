@@ -104,3 +104,43 @@ test('a factory is at its status records too, but the revision a write of its sp
   assert.equal(revisionTable('Factory', held)(undefined, 'acme'), 9);
   assert.equal(revisionTable('Factory', held, true)(undefined, 'acme'), 4);
 });
+
+test('a run is at the highest of its record, its markers, its asks and its status record, whatever namespace asks', () => {
+  const held = new Map([
+    ['/registry/runs/', new Map([['/registry/runs/r1', 3]])],
+    ['/registry/runmarks/', new Map([['/registry/runmarks/r1/hold', 6]])],
+    ['/registry/asks/', new Map([['/registry/asks/r1/done/approve-plan-1', 5]])],
+    [
+      '/registry/runstatus/',
+      new Map([
+        ['/registry/runstatus/r1', 9],
+        ['/registry/runstatus/r2', 2],
+      ]),
+    ],
+  ]);
+  const of = revisionTable('Run', held);
+  assert.equal(of('default', 'r1'), 9);
+  assert.equal(of(undefined, 'r2'), 2);
+  assert.equal(of('acme', 'r3'), 0);
+  assert.equal(
+    revisionTable('Run', held, true)('default', 'r1'),
+    6,
+    'the revision a write of its spec waits on leaves its status record out',
+  );
+});
+
+test('a row under any prefix of a run names the run: its status record moves it MODIFIED, its record removed is DELETED', () => {
+  const changes = changesOf('Run', 4, [
+    row('/registry/runmarks/', 'r1/cancelled', 6, 6),
+    row('/registry/runstatus/', 'r2', 7, 7),
+    row('/registry/runs/', 'r3', 8, 1, true),
+  ]);
+  assert.deepEqual(
+    changes.map((c) => [c.name, c.change]),
+    [
+      ['r1', 'MODIFIED'],
+      ['r2', 'MODIFIED'],
+      ['r3', 'DELETED'],
+    ],
+  );
+});

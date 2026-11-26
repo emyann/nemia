@@ -31,7 +31,7 @@ const measuredToNowSpec = spec<(state: RunState | undefined) => boolean>({
 });
 
 /**
- * `measuredToNow`'s type, which `src/run-status/run-status.ts` takes: whether the frame of a run in `state` (`status.state`, undefined where its
- * status carries no frame) has its `wallMs` and `clock` measured to the instant its list was read at.
+ * `measuredToNow`'s type, which `src/run-status/run-status.ts` takes: whether the frame of a run in `state` (`status.state`, undefined
+ * where its status carries no frame) has its `wallMs` and `clock` measured to the instant its list was read at.
  */
 export type MeasuredToNow = Implementation<typeof measuredToNowSpec>;

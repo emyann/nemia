@@ -694,7 +694,7 @@ const PINNED: Record<string, string[]> = {
     'definitionRevisionNow',
     'definitionsRefreshed',
     'sweepBegun',
-    'runWatchVersion',
+    'runHeld',
     'factoryCommandsOf',
     'factoryList',
     'factoryObject',

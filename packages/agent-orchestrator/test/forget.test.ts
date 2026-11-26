@@ -536,7 +536,8 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       names(pending, 'implement is pending', 'cancelled at', `nemia rm ${ids.running}`);
       board().settle(`${ids.running}-implement`, 'stopped');
       assert.equal((await stage.runWith(e(), forgetRun(ids.running))).kind, 'forgotten', 'once it has settled, not before');
-      for (const id of [ids.ready, ids.asked, ids.child]) await stage.runWith(e(), cancelRun(id));
+      for (const id of [ids.ready, ids.asked, ids.child, ids.parent]) await stage.runWith(e(), cancelRun(id));
+      board().settle(`${ids.parent}-implement`, 'stopped');
       for (const id of [ids.ready, ids.asked, ids.parent])
         assert.equal(
           (await stage.runWith(e(), forgetRun(id))).kind,

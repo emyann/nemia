@@ -25,7 +25,7 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const word = `held until ${until} succeeds`;
-    const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has landed; to go on before then: nemia hold ${id} --off`;
+    const advice = `nothing of ${id} is filed, and nothing is asked of you, until ${until} has succeeded; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     const card = cardOf(page, id);

@@ -91,10 +91,7 @@ export async function hold(args: Args) {
   return 0;
 }
 
-/**
- * What `nemia release` prints of the release written.
- * @param released What the release answered: the run, and the release as written.
- */
+/** What `nemia release` prints of the release written. */
 export const releaseLines = ({ id, released }: RunReleased) => [
   `${id}  waiters released at ${released.at} — every run that waits on it goes on at the next tick, whatever became of it`,
 ];

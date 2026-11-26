@@ -161,7 +161,7 @@ test('a hold on a pruned run is refused, and a hold on or until a folder run, a 
   git(repo, 'checkout', '-q', '-b', 'release');
   const onRelease = await runPlaced(startRun({ brief: 'onto release', repo, workflowDir: oneStep() }));
   git(repo, 'checkout', '-q', 'main');
-  const dropped = await aDone(b, repo);
+  const dropped = await aRunning(b, repo);
   git(repo, 'worktree', 'remove', '--force', runRecord(ROOT, dropped.id).steps.implement.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/${LINE_NAME}`);
   for (const until of [folder.id, inPlace.id, onRelease.id, dropped.id]) {

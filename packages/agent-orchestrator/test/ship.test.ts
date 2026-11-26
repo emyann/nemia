@@ -48,6 +48,7 @@ import {
   forgetRun,
   list,
   mergeRun,
+  release,
   retryRun,
   roundRun,
   startRun,
@@ -1753,6 +1754,7 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
         true,
         "the merge-only run's parent has landed",
       );
+      await stage.runWith(e(), release(parent.id));
       const other = await at.atTheGate({ repo });
       plantRecord(ROOT, (await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [parent.id] }));

@@ -15,13 +15,13 @@ Generated from the command table and the Api, never edited by hand: from the rep
     it (nemia workflows lists them); a card's own workflow: where it names
     one. A path to a workflow folder, and a folder of cards, are refused:
     file each card (nemia inbox add <card>) and start it by its name
-    --after <runId>: file nothing of this run until nemia decide says that
-    run has landed — finished, and its result branch on the base
-    branch — and start from the base as it is then; once per run.
+    --after <runId>: file nothing of this run until that run has succeeded
+    (nemia ls says succeeded), or a person ran nemia release on it; the
+    run starts from the base branch as it is then; once per run.
     --from <runId>: hand this run what that run concluded, as context,
-    and wait on nothing: landed or still in flight, it is read once,
-    when this run's steps are filed, and said not landed, not judged
-    until it has landed; once per run.
+    and wait on nothing: succeeded or still in flight, it is read once,
+    when this run's steps are filed, and said not succeeded, not judged
+    until it has succeeded; once per run.
     --gate <step>: that step's closeout waits for nemia approve before
     anything after it is filed, as a step's own gate: true does; once
     per step. An inbox card's gate: <step> is one more
@@ -71,7 +71,7 @@ Its arguments:
 - inputs (--input at a shell): The files handed to its steps (`--input <file>`), each by its name.
 - workflow: The workflow to run, by name.
 - from: Where the workflow is read from when both the repository and the user library have it: repo or user.
-- after (--after at a shell): The runs its first steps wait on to land (--after), by id.
+- after (--after at a shell): The runs its first steps wait on to succeed (--after), by id.
 - context (--from at a shell): The runs whose conclusions it is handed as context (--context), by id; it does not wait on them.
 - cards (--card at a shell): The inbox cards it is handed, by name.
 - brief (<brief> at a shell): What the run is asked to do.
@@ -87,13 +87,13 @@ Its arguments:
     it (nemia workflows lists them); a card's own workflow: where it names
     one. A path to a workflow folder, and a folder of cards, are refused:
     file each card (nemia inbox add <card>) and start it by its name
-    --after <runId>: file nothing of this run until nemia decide says that
-    run has landed — finished, and its result branch on the base
-    branch — and start from the base as it is then; once per run.
+    --after <runId>: file nothing of this run until that run has succeeded
+    (nemia ls says succeeded), or a person ran nemia release on it; the
+    run starts from the base branch as it is then; once per run.
     --from <runId>: hand this run what that run concluded, as context,
-    and wait on nothing: landed or still in flight, it is read once,
-    when this run's steps are filed, and said not landed, not judged
-    until it has landed; once per run.
+    and wait on nothing: succeeded or still in flight, it is read once,
+    when this run's steps are filed, and said not succeeded, not judged
+    until it has succeeded; once per run.
     --gate <step>: that step's closeout waits for nemia approve before
     anything after it is filed, as a step's own gate: true does; once
     per step. An inbox card's gate: <step> is one more
@@ -139,7 +139,7 @@ Its arguments:
 - name: The object's name, unique in its namespace for its kind.
 - workflow: The workflow its run is started on, by name; the card's own `workflow:` when it names none.
 - from: Retired, read and ignored: the factory finds the workflow.
-- after (--after at a shell): The runs its first steps wait on to land, by id.
+- after (--after at a shell): The runs its first steps wait on to succeed, by id.
 - context (--from at a shell): The runs whose conclusions it is handed as context, by id; it does not wait on them.
 - brief (<brief> at a shell): The brief given in place of the card's body.
 - label (--label at a shell): The labels the run is started with, each as `key=value` or `key-` to take one off.
@@ -156,7 +156,7 @@ Its arguments:
     what a run started with --from <runId> would be handed of it, now
 ```
 
-Reads what a run started now with this run as context would be handed: whether it has landed, and its ## From run section. Answers Concluded.
+Reads what a run started now with this run as context would be handed: whether it has succeeded, and its ## From run section. Answers Concluded.
 
 Calls `GET /api/runs/:name/concluded`.
 
@@ -232,7 +232,7 @@ Its arguments:
 - repo: Retired and refused: the factory places the card's run.
 - factory (--factory at a shell): The factory the card is filed in.
 - label (--label at a shell): The labels the card is filed with, each as `key=value`.
-- after (--after at a shell): The cards it waits on, by name: it is queued and started only once each has landed.
+- after (--after at a shell): The cards it waits on, by name: it is queued and started only once each has succeeded.
 - files: The files the card carries, each a File uploaded to the card's namespace first, by its id.
 
 ## inbox_queue
@@ -2088,23 +2088,23 @@ Its arguments:
 
 ```text
   nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
-    file nothing more of a run until other runs land, as --after would
+    file nothing more of a run until other runs succeed, as --after would
     have: what is in flight finishes, nothing new is filed, and nothing
-    is asked of you — nemia ls and nemia decide say held until <run> lands, and
+    is asked of you — nemia ls and nemia decide say held until <run> succeeds, and
     what a step asks is asked once the hold lifts. The tick lifts it when
-    every run named has landed. With no --until, the run is held until a
+    every run named has succeeded (or been released: nemia release). With no --until, the run is held until a
     person lifts it (--off), and no tick lifts it: nemia ls and nemia
     decide say held until a person lifts it. Refused of a run cancelled,
-    pruned, finished or already held, and of a run named that is unknown,
+    pruned, succeeded or already held, and of a run named that is unknown,
     the run itself, or one that already waits on it, through --after or a
     hold.
-    --why: the reason, shown beside held until <run> lands wherever it is
+    --why: the reason, shown beside held until <run> succeeds wherever it is
     said; --by: who puts the hold (default: your OS user).
     nemia hold <runId> --off: lift the hold now, and the next tick goes on as
     if it had never been put
 ```
 
-Puts a hold on the run, until the runs the body names land or, naming none, until a person lifts it, recording who put it. Answers RunHeld.
+Puts a hold on the run, until the runs the body names succeed or, naming none, until a person lifts it, recording who put it. Answers RunHeld.
 
 Calls `POST /api/namespaces/:namespace/runs/:name/hold`.
 
@@ -2112,7 +2112,7 @@ Its arguments:
 
 - namespace: The namespace, a run's factory (default for one that names none).
 - name: The run's name.
-- until (--until at a shell): The runs the hold waits on to land (--until); left out, a hold only a person lifts.
+- until (--until at a shell): The runs the hold waits on to succeed (--until); left out, a hold only a person lifts.
 - why (--why at a shell): The person's words for why, one line.
 - by (--by at a shell): Who puts the hold, one line.
 
@@ -2120,17 +2120,17 @@ Its arguments:
 
 ```text
   nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
-    file nothing more of a run until other runs land, as --after would
+    file nothing more of a run until other runs succeed, as --after would
     have: what is in flight finishes, nothing new is filed, and nothing
-    is asked of you — nemia ls and nemia decide say held until <run> lands, and
+    is asked of you — nemia ls and nemia decide say held until <run> succeeds, and
     what a step asks is asked once the hold lifts. The tick lifts it when
-    every run named has landed. With no --until, the run is held until a
+    every run named has succeeded (or been released: nemia release). With no --until, the run is held until a
     person lifts it (--off), and no tick lifts it: nemia ls and nemia
     decide say held until a person lifts it. Refused of a run cancelled,
-    pruned, finished or already held, and of a run named that is unknown,
+    pruned, succeeded or already held, and of a run named that is unknown,
     the run itself, or one that already waits on it, through --after or a
     hold.
-    --why: the reason, shown beside held until <run> lands wherever it is
+    --why: the reason, shown beside held until <run> succeeds wherever it is
     said; --by: who puts the hold (default: your OS user).
     nemia hold <runId> --off: lift the hold now, and the next tick goes on as
     if it had never been put
@@ -2139,6 +2139,26 @@ Its arguments:
 Lifts the run's hold now, recording who lifted it. Answers RunHeld, lifted.
 
 Calls `DELETE /api/namespaces/:namespace/runs/:name/hold`.
+
+Its arguments:
+
+- namespace: The namespace, a run's factory (default for one that names none).
+- name: The run's name.
+
+## release
+
+```text
+  nemia release <runId>
+    let go every run that waits on this one — --after, hold --until and a
+    card's after: alike — as if it had succeeded. For a run that will not
+    succeed on its own: one that failed or was cancelled and whose work you
+    merged by hand. Written once, never taken back. Refused of a run
+    that has already succeeded or been released.
+```
+
+Lets go every run that waits on this one (--after, a hold --until, a card after:) as if it had succeeded, for a run that will not on its own, recording who did. Written once, never taken back. Answers RunReleased.
+
+Calls `POST /api/namespaces/:namespace/runs/:name/release`.
 
 Its arguments:
 

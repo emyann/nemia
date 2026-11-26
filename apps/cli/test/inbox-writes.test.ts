@@ -170,7 +170,7 @@ test('a card edited keeps the after: its text names, said with the wait it had, 
   write(text, '---\nafter: other-c3d4\n---\nLand the third slice\n');
   const moved = await store.nemia(['inbox', 'edit', name, text]);
   ok(moved, 'inbox edit, after: changed');
-  assert.match(moved.out, /^ {2}after: other-c3d4 — queued and started once each has landed \(was first-a1b2\)$/m);
+  assert.match(moved.out, /^ {2}after: other-c3d4 — queued and started once each has succeeded \(was first-a1b2\)$/m);
   assert.match(cardOn(store.root, name) ?? '', /^after: other-c3d4$/m);
   const off = await store.nemia(['inbox', 'edit', name, 'Land the third slice\n']);
   ok(off, 'inbox edit, no after:');

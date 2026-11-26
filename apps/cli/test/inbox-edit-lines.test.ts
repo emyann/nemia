@@ -28,17 +28,17 @@ const START = /next pass/;
 test('a wait kept is said as inbox add says it', () => {
   const lines = editedLines(aCard('2', { after: ['a-1x2y'] }), aCard('1', { after: ['a-1x2y'] }));
   assert.equal(lines.length, 3);
-  assert.equal(lines[2], '  after: a-1x2y — queued and started once each has landed');
+  assert.equal(lines[2], '  after: a-1x2y — queued and started once each has succeeded');
 });
 
 test('a wait changed names the cards it was on', () => {
   const lines = editedLines(aCard('2', { after: ['b-3z4w'] }), aCard('1', { after: ['a-1x2y'] }));
-  assert.equal(lines[2], '  after: b-3z4w — queued and started once each has landed (was a-1x2y)');
+  assert.equal(lines[2], '  after: b-3z4w — queued and started once each has succeeded (was a-1x2y)');
 });
 
 test('a wait given to a card that had none is said with no was', () => {
   const lines = editedLines(aCard('2', { after: ['b-3z4w'] }), aCard('1'));
-  assert.equal(lines[2], '  after: b-3z4w — queued and started once each has landed');
+  assert.equal(lines[2], '  after: b-3z4w — queued and started once each has succeeded');
 });
 
 test('a wait taken off from a card not queued names the cards it was on, and says no start', () => {

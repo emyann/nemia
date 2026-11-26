@@ -237,6 +237,16 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
   assert.ok(kept.out.includes('mind the cache'), kept.out);
 });
 
+test('nemia release lets go the runs that wait on a run, and a second release is refused', async () => {
+  const id = await started('Release my waiters.');
+  const released = await store.nemia(['release', id]);
+  assert.equal(released.code, 0, released.err);
+  assert.ok(markerText(store.root, id, 'released') !== undefined);
+  assert.match(released.out, new RegExp(`^${id}  waiters released`));
+  const again = await store.nemia(['release', id]);
+  assert.equal(again.code, 1, `a Conflict exits 1: ${again.out}${again.err}`);
+});
+
 test('nemia assign puts a run in hand, a second refused while it stands, and --off gives it back', async () => {
   const id = await started('Assign me.');
   const held = () => JSON.parse(markerText(store.root, id, 'assignee') ?? 'null') as { name: string; forMs: number } | null;

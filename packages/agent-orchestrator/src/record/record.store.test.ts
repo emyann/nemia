@@ -430,6 +430,12 @@ describe('who acted reads off each file a person writes where it says, and a fil
     plantMarker(ROOT, 'r-held-by', 'hold', JSON.stringify({ at: AT, until: [], by: 'ann' }));
     assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann' });
   });
+  test('a release reads its time and actor beside the record, and a run with none reads none', () => {
+    put('r-freed', aRecord('r-freed'));
+    assert.equal('released' in runRecord(ROOT, 'r-freed'), false);
+    plantMarker(ROOT, 'r-freed', 'released', JSON.stringify({ at: AT, actor: person }));
+    assert.deepEqual(runRecord(ROOT, 'r-freed').released, { at: AT, actor: person });
+  });
   test('a cancellation reads its time from the plain text a former nemia wrote, and its time and actor from the JSON one writes now', () => {
     put('r-called', aRecord('r-called'));
     plantMarker(ROOT, 'r-called', 'cancelled', `${AT}\n`);

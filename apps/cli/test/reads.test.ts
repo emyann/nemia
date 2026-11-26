@@ -367,7 +367,7 @@ test('`nemia ls` says what waits on you: a step blocked in its word, with `nemia
   assert.ok(row, listed.out);
   assert.match(row, /review succeeded · BLOCKED/, "the blocked step in its word, in the run's status");
   assert.match(row, /waiting on you: review — nemia decide r-parity/, 'what waits on you, and the command that answers it');
-  assert.match(listed.out, /^r-held .*held until r-parity lands.*nemia hold r-held --off/m, 'a hold, and what lifts it');
+  assert.match(listed.out, /^r-held .*held until r-parity succeeds.*nemia hold r-held --off/m, 'a hold, and what lifts it');
   assert.match(listed.out, /^r-after .*waiting on you: .*r-missing/m, 'a run waited on that never lands');
   const wide = await nemia(['ls', '-o', 'wide']);
   assert.match(wide.out, /^NAME .* WAITS +LABELS +STEPS$/m, 'wide, each step');
@@ -755,7 +755,7 @@ const ONE_RUN: Readonly<Record<string, readonly string[]>> = {
   'r-held': [
     'r-held  The run r-held',
     '   build          pending              ',
-    '   → held until r-parity lands (why: merge conflicts; by operator)  —  nemia hold r-held --off lifts it',
+    '   → held until r-parity succeeds (why: merge conflicts; by operator)  —  nemia hold r-held --off lifts it',
   ],
   'r-landed': [
     'r-landed  The run r-landed',

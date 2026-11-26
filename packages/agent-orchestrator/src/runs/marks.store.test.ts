@@ -125,6 +125,16 @@ describe('a guarded write is one transaction', () => {
     assert.equal(a, b);
     assert.deepEqual(markerKeys(root, 'm-race'), ['cancelled', 'hold', 'said/1', 'said/2']);
   });
+  test('two releases at once keep the first: the second is answered null, and one marker stands', () => {
+    const { root, door } = stored('m-free');
+    const both = act(
+      Effect.all([door.released.put(idOf('m-free')), door.released.put(idOf('m-free'), { kind: 'person', token: 'laptop' })], {
+        concurrency: 'unbounded',
+      }),
+    ) as unknown[];
+    assert.equal(both.filter((r) => r !== null).length, 1);
+    assert.deepEqual(markerKeys(root, 'm-free'), ['released']);
+  });
   test('a hold lifted by a person writes who, and the hold is gone', () => {
     const { root, door } = stored('m-lift');
     const hold = act(door.holds.put(idOf('m-lift'), [], {})) as { at: string };

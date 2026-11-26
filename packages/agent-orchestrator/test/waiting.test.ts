@@ -611,6 +611,18 @@ describe('`nemia start --after` reads no branch: a parent whose branch is droppe
     );
     assert.equal(runsWritten(), before, 'nothing written');
   });
+  test('REFUSED: `nemia release` of a run that is not there, of one that has succeeded, and a second release — nothing is written', async () => {
+    await assert.rejects(releasing('nobody-x9'), refusedNaming('Missing', 'no such run: nobody-x9', 'nemia release <runId>'));
+    const done = await aParent(repo, { work: 'done.txt' });
+    await tick(done.run.id);
+    await assert.rejects(releasing(done.run.id), refusedNaming('Conflict', `${done.run.id} has succeeded`));
+    assert.equal(runRecord(ROOT, done.run.id).released, undefined);
+    const failed = await aParent(repo, { signed: false });
+    board().settle(`${failed.run.id}-implement`, 'failed');
+    await tick(failed.run.id);
+    await releasing(failed.run.id);
+    await assert.rejects(releasing(failed.run.id), refusedNaming('Conflict', `${failed.run.id}'s waiters were released at`));
+  });
   test('a parent that succeeded, its branch dropped unmerged, frees its child, which starts from the base as it is without the parent’s work', async () => {
     const p = await aParent(repo, { work: 'dropped.txt' });
     await tick(p.run.id);

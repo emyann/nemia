@@ -33,8 +33,6 @@ import {
  */
 export type AttachedState = 'working' | 'idle' | 'parked' | 'completed' | 'failed' | 'canceled';
 
-export type { AttachedBridge } from './session-bridge.ts';
-
 const RunFileSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,

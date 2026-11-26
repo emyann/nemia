@@ -35,7 +35,7 @@ const linear = (channel: number) => {
 };
 
 /** A colour's relative luminance, as WCAG 2 defines it. */
-export const luminance = ([r, g, b]: Rgb) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+const luminance = ([r, g, b]: Rgb) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
 
 /** The contrast ratio of two colours, from 1 to 21, whichever is the lighter. */
 export function ratio(a: Rgb, b: Rgb) {

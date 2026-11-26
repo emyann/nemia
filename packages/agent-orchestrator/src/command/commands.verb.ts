@@ -62,7 +62,7 @@ const READS: readonly (Command | Served)[] = [
 ];
 
 /** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
-export const RAN: readonly Ran[] = [TICK, UP];
+const RAN: readonly Ran[] = [TICK, UP];
 
 /** Every command with a handler defined once, in the order `nemia`'s help lists them: the in-process CLI's list of entries. */
 export const COMMANDS: readonly (Command | Served)[] = [

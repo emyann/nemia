@@ -265,7 +265,7 @@ const levelHeld = (read: () => FactoryLevelFile | undefined) => {
  * (`rewriteFactoryAt`) and by a level written that changes it, of a factory that has a file.
  * @param home The store's root.
  */
-export function factoryFiles(home: string) {
+function factoryFiles(home: string) {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
   const instructionOf = (name: string, notDone: string) =>
     instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) =>
@@ -371,7 +371,7 @@ export const factoryOrNone = (name: string | undefined) =>
  * @param offences The labels refused, each with the values its key takes.
  * @param notDone What the caller did not do, said last.
  */
-export const labelValuesRefusal = (factory: string, offences: readonly LabelValueOffence[], notDone: string) => {
+const labelValuesRefusal = (factory: string, offences: readonly LabelValueOffence[], notDone: string) => {
   const each = offences.map((o) => `${o.key}=${o.value}: the factory ${factory} takes ${o.key}=${o.takes.join('|')}`).join('; ');
   const first = offences[0];
   const again =
@@ -516,13 +516,3 @@ export const templatedTreeOf = (home: string, name: string, who: string) => temp
  */
 export const factoryDoorFiles = (root: string) =>
   Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root))) satisfies Layer.Layer<never>;
-
-/**
- * The factory `name` filed in the store `home`, read through the door at once, for `verb`: refused as `filedFactory` refuses it, the
- * default factory among it, which has no spec of its own.
- * @param home The store's root.
- * @param name The factory's name.
- * @param verb The `nemia factory` verb that asks, named in the default factory's refusal.
- */
-export const factoryAtOnce = (home: string, name: string, verb: FactoryWrite) =>
-  Effect.runSync(Effect.provide(filedFactory(name, verb), factoryDoorFiles(home)));

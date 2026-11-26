@@ -11,7 +11,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 /** The moment every planted line is written from. */
-export const T0 = Date.parse('2026-10-15T12:00:00.000Z');
+const T0 = Date.parse('2026-10-15T12:00:00.000Z');
 
 /** `s` seconds after `T0`, as a time is written. */
 export const at = (s: number) => new Date(T0 + s * 1000).toISOString();

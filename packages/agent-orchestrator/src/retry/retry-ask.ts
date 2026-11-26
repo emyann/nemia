@@ -28,7 +28,7 @@ export const FORMER_MODES = { nudge: 'continue' } as const satisfies Readonly<Re
  * A mode or a try's cause under the word it has now: a former spelling (`FORMER_MODES`) as its mode, anything else as it is. Pure.
  * @param value The mode or cause as it was read.
  */
-export const upgradeMode = (value: unknown) =>
+const upgradeMode = (value: unknown) =>
   typeof value === 'string' && Object.hasOwn(FORMER_MODES, value) ? FORMER_MODES[value as keyof typeof FORMER_MODES] : value;
 
 /**

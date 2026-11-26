@@ -270,7 +270,7 @@ export const honoursAsks: HonoursAsks = (run) => MARK_MEANS[marksOf(run)].honour
  * The marks a run carries, as its record reads with them composed on it (`runMarkOf`): called off, pruned, held.
  * @param run The run's record, with when it was called off, its prune marker and its hold, each absent where it has none.
  */
-export const marksOf = (run: { cancelledAt?: string | null | undefined; pruned?: unknown; hold?: unknown }) =>
+const marksOf = (run: { cancelledAt?: string | null | undefined; pruned?: unknown; hold?: unknown }) =>
   runMarkOf({ cancelled: Boolean(run.cancelledAt), pruned: run.pruned !== undefined, held: run.hold !== undefined });
 
 /**
@@ -373,7 +373,7 @@ export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<StepS
 export type RouteBy = 'table' | 'script' | 'judge' | 'person';
 
 /** The route a condition answered on a try, copied onto its record once (`StepRecord.route`). */
-export type RouteRecord = { route: string; try: number; by: RouteBy };
+type RouteRecord = { route: string; try: number; by: RouteBy };
 
 export type StepRecord = {
   taskId: string | null;
@@ -440,7 +440,7 @@ export type LackedFile = { path: string; why: string };
  * That the files the closeout of task `taskId` named were read off the disk, and those the run did not have then: none, or why for each,
  * by its path as the closeout gave it.
  */
-export type FilesRead = { taskId: string; lacked: Readonly<Record<string, string>> };
+type FilesRead = { taskId: string; lacked: Readonly<Record<string, string>> };
 
 /**
  * The files the closeout of the task a step is on named that the run did not have (`StepRecord.filesRead`): none of another task's.
@@ -585,6 +585,7 @@ export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] }
 /**
  * The verb a person's ask answers with: a try or a round (`nemia retry`, `--round` for a round), a yes at a gate or to a loop out of
  * rounds (`nemia approve`), the base brought into a loop's work (`nemia refresh --base`).
+ * @public
  */
 export type AskKind = 'retry' | 'approve' | 'refresh';
 
@@ -608,19 +609,6 @@ export type PersonRequest =
   | { kind: 'approve'; of: 'gate'; ask: Approval }
   | { kind: 'approve'; of: 'loop'; ask: Acceptance }
   | { kind: 'refresh'; of: 'base'; ask: RoundAsk & { merge: MergeOf } };
-
-/**
- * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, when it was asked, and
- * the landing refused on that commit, where one was (`MergeOf`).
- */
-export type MergeAskHeld = {
-  loop: string;
-  round: number;
-  onto: string;
-  sha: string;
-  at: string;
-  landing?: { step: string; check: string };
-};
 
 /**
  * What writing a person's ask did, and `where` a person finds its file: written; or not, since a file already stood at its name — `stray`

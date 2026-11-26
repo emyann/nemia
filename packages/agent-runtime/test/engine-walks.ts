@@ -59,10 +59,10 @@ function toldOf(value: unknown, key?: string): unknown {
 }
 
 /** What a walk answered, as both sides say it. */
-export const told = (value: unknown) => toldOf(value === undefined ? null : JSON.parse(JSON.stringify(value)));
+const told = (value: unknown) => toldOf(value === undefined ? null : JSON.parse(JSON.stringify(value)));
 
 /** What a verb answers: its answer, `null` for none, or `{ refused }` naming the tag of what it failed with. */
-export async function asked<A, E>(verb: Effect.Effect<A, E>) {
+async function asked<A, E>(verb: Effect.Effect<A, E>) {
   const exit = await Effect.runPromiseExit(verb);
   if (Exit.isSuccess(exit)) return (exit.value ?? null) satisfies A | null | { refused: string };
   const failed = Cause.squash(exit.cause) as { _tag?: string; message?: string };
@@ -848,7 +848,7 @@ export const unwalked = (
 ) => verbs.filter((verb) => !walks[verb]?.length && !unkept.includes(verb)) satisfies string[];
 
 /** What `walk` answers on `side`, as both sides say it. */
-export const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
+const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
 
 /** The walks of `verb` that a side `sideOf` makes, a new one for each, does not answer as the contract says, by name. */
 export async function failing(verb: Kept, sideOf: () => Side) {

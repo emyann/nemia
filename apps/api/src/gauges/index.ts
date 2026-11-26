@@ -3,7 +3,6 @@
  * the feed and the quota.
  */
 export { ceilingsOf, metricsOf } from './ceilings.ts';
-export type { Ceilings, MetricRead } from './ceilings.ts';
 export { readDaemon } from './daemon.ts';
 export { feedOpened } from './feed.ts';
 export { QuotaAsker } from './quota.ts';

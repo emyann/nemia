@@ -104,7 +104,7 @@ export function tip(bare: string, branch: string) {
 }
 
 /** The pull request the rules below answer with. */
-export const PR = { number: 7, url: 'https://github.com/o/r/pull/7' };
+const PR = { number: 7, url: 'https://github.com/o/r/pull/7' };
 
 /** The URL a `ci` check run points at, which names the workflow run its log is read from. */
 export const CI_URL = 'https://github.com/o/r/actions/runs/1234/job/5678';

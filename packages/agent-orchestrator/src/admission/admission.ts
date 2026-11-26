@@ -71,7 +71,7 @@ const FACTORY_KEY = 'factory';
  * What a typed command names: its runs and its factories, each value of its spec's `runId` and `factory` keys; `unread` where its words do
  * not parse by its spec, though the spec takes one of them.
  */
-export type Named = { runs: string[]; factories: string[]; unread: boolean };
+type Named = { runs: string[]; factories: string[]; unread: boolean };
 
 /** A shell redirection (`>`, `2>&1`, `<in`), which is no word of the command; a bare operator takes the word after it. */
 const REDIRECT = /^\d*[<>]/;

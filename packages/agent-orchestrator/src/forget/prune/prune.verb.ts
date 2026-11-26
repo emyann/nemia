@@ -92,7 +92,7 @@ export const prune = Effect.fn('prune')(function* (
 });
 
 /** A run ready to prune as a listing says it: each worktree and its files with what removing them frees, nothing touched. */
-export const prunableOf = ({ run, worktrees, files }: Sized) =>
+const prunableOf = ({ run, worktrees, files }: Sized) =>
   ({
     id: run.id,
     kind: 'prunable',

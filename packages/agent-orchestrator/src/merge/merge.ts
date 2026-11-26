@@ -53,7 +53,7 @@ export type MergeReads = {
  * A trial merge of a branch onto the base branch, as `mergeWordOf` reads the place's (`trialMerges`): clean, conflicted, or not known,
  * with git's words.
  */
-export type Trial = { clean: boolean } | { error: string };
+type Trial = { clean: boolean } | { error: string };
 
 /** A trial merge of a branch onto the base branch, and the commit the base branch was at as the place tried it: null where it read none. */
 export type Tried = { readonly trial: Trial; readonly base: string | null };
@@ -67,7 +67,7 @@ export type MergeAsk = RoundAsk & { merge: MergeOf };
  * @param looping The looping step whose loop the merge was asked of.
  * @param asks The asks written on the run.
  */
-export const mergePending = (run: Run, looping: StepSpec, asks: readonly RoundAsk[]) =>
+const mergePending = (run: Run, looping: StepSpec, asks: readonly RoundAsk[]) =>
   asks.find((a) => a.merge && a.step === looping.name && a.merge.target === looping.loop && a.merge.try === tryOf(run, a.merge.target) + 1);
 
 /**

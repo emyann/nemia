@@ -33,14 +33,14 @@ export type FactoryInstruction = {
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const instructionFolder = (home: string, name: string) => instructionFolderAt(home, name);
+const instructionFolder = (home: string, name: string) => instructionFolderAt(home, name);
 
 /**
  * The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`).
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function instructionFolderAt(home: string, name: string) {
+function instructionFolderAt(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name);

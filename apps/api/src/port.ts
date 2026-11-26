@@ -2,8 +2,7 @@ import { BIND_PUBLIC_VARIABLE, bindExposure, everyOf, kindOfBind, MAX_EVERY_MS }
 import type { BindOf, BindRefusal } from '../contracts/bind.contract.ts';
 import { asked, isAddress, LOOPBACK } from './address/address.ts';
 
-export type { Bind, BindRefusal } from '../contracts/bind.contract.ts';
-export { asked, isAddress, LOOPBACK } from './address/address.ts';
+export { isAddress, LOOPBACK } from './address/address.ts';
 
 /** The port the api listens on when `PORT` is not set and it ticks: the daemon's, the one the web app's preview points at. */
 export const DEFAULT_PORT = 8787;
@@ -15,7 +14,7 @@ export const DEFAULT_PORT = 8787;
 export const VIEWER_PORT = 8788;
 
 /** The one flag the api takes: it serves the board and ticks nothing, holding no lease on the store. */
-export const NO_TICK = '--no-tick';
+const NO_TICK = '--no-tick';
 
 /**
  * What the api's process does, read off its arguments: with none it ticks the store every `DEFAULT_EVERY_MS`; with one interval in
@@ -143,7 +142,7 @@ export function portOf(value: string | undefined, ticks = true) {
  * connection five minutes, so the server keeps one ten seconds more. The CLI's fetch (undici) reads the `Keep-Alive: timeout=` this
  * sends and closes its own before it.
  */
-export const KEEP_ALIVE_MS = 310_000;
+const KEEP_ALIVE_MS = 310_000;
 
 /**
  * The server's timeouts, handed to Node's `http.createServer` (main.ts, through `serve`'s `serverOptions`): `keepAliveTimeout` at

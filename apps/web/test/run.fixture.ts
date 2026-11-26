@@ -23,7 +23,7 @@ type Codes = Pick<Step, 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** The codes of a check that passed, runs, refused with exit 1, or did not finish. */
 export const PASSED = { result: 'passed', exit: 0 } as const;
-export const RUNNING = { result: 'running', exit: null } as const;
+const RUNNING = { result: 'running', exit: null } as const;
 export const EXIT_1 = { result: 'failed', exit: 1 } as const;
 export const UNFINISHED = { result: 'unfinished', exit: null } as const;
 
@@ -31,7 +31,7 @@ export const UNFINISHED = { result: 'unfinished', exit: null } as const;
  * The codes the api carries beside each word a test names a step by, as the listing sets them where it builds that word
  * (`agent-orchestrator`'s list.ts): a row is built from its word and these, never the board's reading of the word.
  */
-export const CODES = {
+const CODES = {
   pending: { phase: 'pending', reason: 'Pending', on: null, via: null, verdict: null },
   waiting: { phase: 'pending', reason: 'Pending', on: null, via: null, verdict: null },
   'waiting on r-0': { phase: 'pending', reason: 'Waiting', on: 'run', via: null, verdict: null },
@@ -95,7 +95,7 @@ export const triedAs = (word: Word) =>
   }) satisfies Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'>;
 
 /** What a try's session consumed, measured in part: a count nobody measured is absent. */
-export const used = (extra: Partial<StepUsed> = {}) =>
+const used = (extra: Partial<StepUsed> = {}) =>
   ({
     usage: { responses: 12, costUsd: 1.25, inputTokens: 9_000 },
     used: '12 responses',

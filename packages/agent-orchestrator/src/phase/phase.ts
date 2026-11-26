@@ -231,7 +231,7 @@ type RunStatus = Assessment['status'];
  * The reason each of `assess`'s statuses names. A running run a person holds is `Waiting` on `run`, and a `waiting` run takes its first
  * waiting step's reason, which the caller knows and this does not (`runCodes`).
  */
-export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
+const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
   running: { reason: 'Running' },
   succeeded: { reason: 'Succeeded' },
   failed: { reason: 'Failed' },
@@ -241,7 +241,7 @@ export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
 };
 
 /** The phase each run reason stands in: a run a person stops is `waiting`, and a held one `pending`, as a step waiting on a thing is. */
-export const RUN_PHASE_OF: typeof RUN_PHASES_OF = {
+const RUN_PHASE_OF: typeof RUN_PHASES_OF = {
   Running: 'running',
   Waiting: 'pending',
   Succeeded: 'succeeded',

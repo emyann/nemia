@@ -326,6 +326,7 @@ export function textIn(bytes: Uint8Array) {
  * exactly as given; one given without, its instruction under `diskBlock`, the frontmatter the README on disk opens with.
  * @param diskBlock The frontmatter block the README on disk opens with, its fences included; empty where it opens with none.
  * @param given The README given to the write, and whether it opens with a frontmatter of its own; undefined for none.
+ * @public
  */
 export const readmeWritten: ReadmeWrittenOf = (diskBlock, given) => {
   if (given === undefined) return undefined;

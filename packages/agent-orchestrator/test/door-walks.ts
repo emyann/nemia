@@ -49,7 +49,7 @@ export function told(value: unknown, root: string): unknown {
 }
 
 /** Every method of a door, as `<group>.<method>`. */
-export const methodsOf = (door: object) =>
+const methodsOf = (door: object) =>
   Object.entries(door).flatMap(([group, methods]) => Object.keys(methods as object).map((m) => `${group}.${m}`)) satisfies string[];
 
 /** The methods of `door` no walk of `walks` names in its `<group>.<method>` key. */

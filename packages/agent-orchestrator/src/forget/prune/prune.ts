@@ -15,7 +15,7 @@ import { sizeOf } from '../../artifacts/artifacts.ts';
 import type { Decision } from '../../decide/decide.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 import type { Untaken, UntakenWhy } from '../../../contracts/sweep-untaken.contract.ts';
-import type { LeftBehindOf, LeftProcess, LeftVerdict, SweptRun } from '../../../contracts/left-behind.contract.ts';
+import type { LeftBehindOf } from '../../../contracts/left-behind.contract.ts';
 import { runOver } from '../../run-ending/run-ending.ts';
 import type { RunStatusWord } from 'objects';
 
@@ -302,6 +302,7 @@ export const freedLine = (p: Pick<Pruning, 'id' | 'worktrees'>) =>
 /**
  * Why the sweep leaves a finished run out of its candidates until a person acts (`sweep-untaken.contract.ts`), or null. Pure.
  * @param r What the rule reads of the run: its status, whether it is at rest, a repository's, held, and froze a workflow.
+ * @public
  */
 export const untaken: Untaken = (r) => {
   if (r.atRest || !r.repository || (r.status !== 'succeeded' && r.status !== 'cancelled')) return null;
@@ -338,14 +339,11 @@ export function untakenWords(run: Run, why: UntakenWhy) {
   return `its record froze no workflow, so no pass finds it at rest and no sweep frees it: free it by hand, nemia prune ${run.id}`;
 }
 
-/** One process as the sweep reads it, one run as it reads it, and what it does with the one against the other. */
-export type { LeftProcess, LeftVerdict, SweptRun };
-
 /** The variable a session is given its step's files by (`STEP_FILES`, `filed.ts`), a folder under `<home>/runs/<id>/`. */
-export const STEP_FILES_MARK = 'WF_STEP_FILES';
+const STEP_FILES_MARK = 'WF_STEP_FILES';
 
 /** The variable a check is given its step's files by (`checkEnvOf`), a folder under `<home>/runs/<id>/` too. */
-export const ARTIFACTS_MARK = 'WF_ARTIFACTS';
+const ARTIFACTS_MARK = 'WF_ARTIFACTS';
 
 /**
  * The variables a process is told apart by: what the sweep asks `/proc` for. Each names a folder of one store, so a process is never

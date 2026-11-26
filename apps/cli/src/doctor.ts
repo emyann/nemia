@@ -43,7 +43,7 @@ import { Refused } from './refused.ts';
 import { blocksOf } from './watch/watch.ts';
 
 /** The verb, as a person types it. */
-export const DOCTOR_VERB = 'doctor';
+const DOCTOR_VERB = 'doctor';
 
 /** The word the verb was spelled before it was `doctor`: refused where typed, naming `nemia doctor` (`retiredVerb`). */
 export const RETIRED_VERB = 'readiness';
@@ -66,10 +66,10 @@ export const retiredVerb = () =>
   );
 
 /** The client's own pieces' names. */
-export const CLIENT_PIECES = ['server-reached', 'token-accepted', 'local-bin-on-path'] as const;
+const CLIENT_PIECES = ['server-reached', 'token-accepted', 'local-bin-on-path'] as const;
 
 /** One of `CLIENT_PIECES`. */
-export type ClientPiece = (typeof CLIENT_PIECES)[number];
+type ClientPiece = (typeof CLIENT_PIECES)[number];
 
 /**
  * What each of the client's pieces costs while missing: no run is started from here on a server it cannot reach or that refuses its
@@ -126,7 +126,7 @@ const serverRead = (env: NodeJS.ProcessEnv) =>
  * run was ever started on the server, as it answered.
  * @param env The environment read for the context in use, the store and the token.
  */
-export async function doctorRead(env: NodeJS.ProcessEnv = process.env) {
+async function doctorRead(env: NodeJS.ProcessEnv = process.env) {
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   const pieces: ReadinessPiece[] = [];

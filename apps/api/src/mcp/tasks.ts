@@ -43,9 +43,6 @@ import type { TaskAnswerOf } from '../../contracts/task-answer.contract.ts';
 import type { Fetching } from './port.ts';
 import type { PortTool } from './tools.ts';
 
-export type { TaskAnswer, TaskAsked, TaskEra, TaskKind } from '../../contracts/task-answer.contract.ts';
-export type { FollowedState } from '../../contracts/followed-state.contract.ts';
-
 /** The tasks extension as the port declares it among its capabilities' `extensions`: an empty object says it is supported. */
 export const TASKS_EXTENSION = { [TASKS_EXTENSION_ID_V2]: {} };
 
@@ -87,6 +84,7 @@ export const taskAnswerOf: TaskAnswerOf = (asked) => {
  * @param phase The phase the read answered.
  * @param succeeded The phases that end it well.
  * @param failed The phases that end it badly.
+ * @public
  */
 export const followedStateOf: FollowedStateOf = (phase, succeeded, failed) => {
   if (succeeded.includes(phase)) return 'succeeded';

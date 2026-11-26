@@ -11,6 +11,7 @@ import type { FactoryLevelFile } from '../../level/level.ts';
  * The generation of a factory after a write: the one it read as, 1 for a file with none, and one more where the write changed its spec.
  * @param before The generation the file read as, or null for a file with none.
  * @param specChanged Whether the write changed the factory's spec.
+ * @public
  */
 export const generationAfter: GenerationAfter = (before, specChanged) => {
   const was = before ?? 1;
@@ -44,7 +45,7 @@ const specKey = (factory: Factory) =>
  * @param was The factory as its file held it.
  * @param now The factory as it is to be written.
  */
-export const specDiffers = (was: Factory, now: Factory) => specKey(was) !== specKey(now);
+const specDiffers = (was: Factory, now: Factory) => specKey(was) !== specKey(now);
 
 /**
  * `now` as the door writes it over `was`: its generation counted by `generationAfter`, whatever generation `now` itself carries, one more

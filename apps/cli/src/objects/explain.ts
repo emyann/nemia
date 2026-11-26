@@ -15,6 +15,7 @@ import { Refused } from '../refused.ts';
  * The field at `path` and the fields directly under it, or a refusal where the kind has none there (`contracts/explain.contract.ts`).
  * @param rows The kind's fields as rows, each with its path and its parent's.
  * @param path The field's path asked for, dot-separated; empty for the object itself.
+ * @public
  */
 export const explained: ExplainedOf = (rows, path) => {
   const field = rows.find((r) => r.path === path);
@@ -22,7 +23,7 @@ export const explained: ExplainedOf = (rows, path) => {
   return { field: path === '' ? null : (field ?? null), fields: rows.filter((r) => r.parent === path) };
 };
 
-export const EXPLAIN_HELP = `nemia explain <resource>[.<field>]...
+const EXPLAIN_HELP = `nemia explain <resource>[.<field>]...
 
 Say what a resource the api serves is: its kind, version, scope and verbs, and its fields, each with its type and what it means; or
 one field and the fields under it (nemia explain card.spec.from). The resources are those discovery lists (GET /api).

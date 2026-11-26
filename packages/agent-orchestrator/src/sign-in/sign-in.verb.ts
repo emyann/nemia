@@ -72,10 +72,10 @@ const tokenGiven = () =>
     : piped()) satisfies Promise<string>;
 
 /** What `set` did: the file it wrote. */
-export type ClaudeTokenSet = { readonly file: string };
+type ClaudeTokenSet = { readonly file: string };
 
 /** `nemia <TOKEN_NAME> set`: the token read off stdin and kept, mode 0600. */
-export const CLAUDE_TOKEN_SET: Command<ClaudeTokenSet> = {
+const CLAUDE_TOKEN_SET: Command<ClaudeTokenSet> = {
   name: `${TOKEN_NAME} set`,
   usage: '',
   help: [

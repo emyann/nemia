@@ -16,16 +16,16 @@ import type { CallState, ChatFrom, SaidAfter } from 'objects';
 import { framedFor } from './framed.ts';
 import { speakerNameRefusal } from './speaker-name.ts';
 
-export type { Speaker, SpeakerRefused } from '../../contracts/speaker.contract.ts';
-export { AGENT_OPENS, AGENT_WRITES } from '../say/agent-frame/agent-frame.ts';
+export type { Speaker } from '../../contracts/speaker.contract.ts';
 export { framedFor } from './framed.ts';
 export { speakerNameRefusal } from './speaker-name.ts';
-export { PERSON_FRAME, RESERVED_SPEAKERS, SPEAKER_NAME_MAX, wellSpelt } from './speaker-words.ts';
+export { SPEAKER_NAME_MAX } from './speaker-words.ts';
 
 /**
  * Who a message is from (`ChatFrom`, objects' `CHAT_FROM`): the task's agent (`agent`), the person, the keeper, whose words are a quiet
  * marker, or another agent that wrote to the task in its chat with a token of its own (`peer`, the message carrying its `name`);
  * and where a tool call stands (`CallState`, objects' `CALL_STATES`): done, at work, failed, not begun, or waiting on the person.
+ * @public
  */
 export type { CallState, ChatFrom };
 
@@ -222,7 +222,7 @@ export const speakerRefusal: SpeakerRefusal = (speaker) => {
 };
 
 /** How an agent is given a token of its own to speak with, as a refusal of a retired `from` or `--as` names it. */
-export const AGENT_TOKEN_FORM = 'nemia token add <name> --agent <agent>';
+const AGENT_TOKEN_FORM = 'nemia token add <name> --agent <agent>';
 
 /**
  * Why words that say who they are from (`from`, the retired `--as`) are refused, or null where they are not: words that name an agent
@@ -261,7 +261,7 @@ export const CHAT_TEXT_MAX = 8000;
 const MARKER_MAX = 120;
 
 /** What a turn the person stopped is drawn as: the keeper's quiet marker on the record, in the words the board shows. */
-export const STOPPED = 'Stopped';
+const STOPPED = 'Stopped';
 
 /** The key a said is claimed by: its attempt and its time. */
 const saidKey = (attempt: number, at: string) => `${attempt} ${at}`;
@@ -500,9 +500,6 @@ export const answeredBefore = (asks: readonly Ask[], answers: readonly AskAnswer
   return answers.filter((answer) => same.has(answer.id)).at(-1);
 };
 
-/** How the board draws an ask. */
-export type AskDrawn = 'actions' | 'form' | 'many';
-
 /**
  * Which drawing an ask takes: `many`, a tab per question and a Submit, for more than one question; `actions`, her proposal's buttons,
  * for one question whose every choice explains nothing — a description she deliberately left empty; `form`, the radio fieldset, for
@@ -647,12 +644,9 @@ const asked = (e: ChatEvent): e is Extract<ChatEvent, { kind: ChatAskKind }> =>
 export const asksWaiting = (events: readonly ChatEvent[]) =>
   events.filter((e) => asked(e) && e.chose === undefined && e.cutAt === undefined).length;
 
-/** A page of a chat: its events, oldest first, and the id to ask `before` for the page older than it, null where there is none. */
-export type ChatPage = { events: ChatEvent[]; before: string | null };
-
 /** The most events a page holds, and how many when none is asked. */
-export const PAGE_MAX = 200;
-export const PAGE_DEFAULT = 50;
+const PAGE_MAX = 200;
+const PAGE_DEFAULT = 50;
 
 /**
  * The `limit` events before the event `before`, or the last `limit` where none is named. Refused (`Invalid`) for a limit that is no

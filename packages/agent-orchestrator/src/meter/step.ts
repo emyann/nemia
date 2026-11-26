@@ -55,9 +55,6 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>) 
   return { ...attributes };
 }
 
-/** The four labels a step is known by, beside a run or an outcome: the factory, the workflow, the step and its agent. */
-export type StepKeys = { factory: string; workflow: string; step: string; agent: string };
-
 /**
  * The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder.
  * @param run The run, its factory and its workflow's folder.
@@ -288,9 +285,6 @@ export type WaitFact = {
   to: string;
   ms: number;
 };
-
-/** When a wait began and ended, and the ms between: never negative. */
-export type Waited = { from: string; to: string; ms: number };
 
 /** The interval from `from` to `to`, or null where either is not known. */
 const between = (from: string | null | undefined, to: string | null | undefined) =>

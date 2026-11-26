@@ -25,7 +25,7 @@ import { answersOf } from './answers.ts';
  * Dollars as the store prints them: two places, or three figures under a cent.
  * @param usd The amount, in dollars.
  */
-export const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A cap in dollars as a person wrote it: whole where it is whole. */
 const budgetWord = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));

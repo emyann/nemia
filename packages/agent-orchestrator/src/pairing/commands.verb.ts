@@ -88,13 +88,13 @@ const leaseUrl = (home: string) => {
 };
 
 /** `nemia pairings ls`. */
-export const PAIRINGS_LS: Served<PairingList> = {
+const PAIRINGS_LS: Served<PairingList> = {
   ...PAIRINGS_LS_WORDS,
   handler: () => Effect.flatMap(StoreRoot, (home) => tried(() => pairingsListed(home, Date.now()))),
 };
 
 /** `nemia pairings approve <code>`. */
-export const PAIRINGS_APPROVE: Served<Pairing> = {
+const PAIRINGS_APPROVE: Served<Pairing> = {
   ...PAIRINGS_APPROVE_WORDS,
   handler: (args: Args) => Effect.flatMap(StoreRoot, (home) => tried(() => pairingApproved(home, String(args.code ?? ''), Date.now()))),
 };
@@ -109,10 +109,10 @@ const linkHandler = (args: Args) =>
   );
 
 /** `nemia board link [--base <url>]`. */
-export const BOARD_LINK: Served<LinkMinted> = { ...BOARD_LINK_WORDS, handler: linkHandler };
+const BOARD_LINK: Served<LinkMinted> = { ...BOARD_LINK_WORDS, handler: linkHandler };
 
 /** `nemia open [--base <url>]`: the same link, which the client opens in this machine's browser. */
-export const OPEN: Served<LinkMinted> = { ...OPEN_WORDS, handler: linkHandler };
+const OPEN: Served<LinkMinted> = { ...OPEN_WORDS, handler: linkHandler };
 
 /** The pairing commands, in the order `nemia`'s help lists them. */
 export const PAIRING_COMMANDS: readonly Served[] = [PAIRINGS_LS, PAIRINGS_APPROVE, BOARD_LINK, OPEN] as readonly Served[];

@@ -2,9 +2,7 @@
  * What an upgrade carries (`upgradeCarries`, typed by `contracts/harness-needs.contract.ts`): the harnesses installed at the new
  * release's pins before it switches. Pure; `carry.store.ts` reads the tools folder and the releases' trees and runs the installs.
  */
-import type { HarnessesHeld, UpgradeCarries } from '../../contracts/harness-needs.contract.ts';
-
-export type { HarnessesHeld };
+import type { UpgradeCarries } from '../../contracts/harness-needs.contract.ts';
 
 /**
  * The harnesses `held` names, activated or bundled, that the new release pins (`pinned`), each once, in the order `pinned` gives.

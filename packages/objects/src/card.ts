@@ -296,7 +296,7 @@ export const Card = Schema.Struct({
 export type Card = typeof Card.Type;
 
 /** A card as a list serves it: its object without its idea's markdown or its file's text, its title kept as data. */
-export const CardListed = Schema.Struct({
+const CardListed = Schema.Struct({
   ...Card.fields,
   spec: CardSpec.mapFields(Struct.omit(['body'])).annotate({
     description:
@@ -306,7 +306,7 @@ export const CardListed = Schema.Struct({
     description: "What Nemia read of the card, its title among it, without its file's text, which a read of the card answers.",
   }),
 }).annotate({ description: "A card as a list serves it, without its files' content (LISTED_WITHOUT)." });
-export type CardListed = typeof CardListed.Type;
+type CardListed = typeof CardListed.Type;
 
 /** A page of the inbox's cards, each without its body. */
 export const CardList = listOf('Card', CardListed);

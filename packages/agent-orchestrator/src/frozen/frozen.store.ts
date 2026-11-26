@@ -50,7 +50,7 @@ export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string) =
  * The home folder of a factory's tree (`tree`), `home/` in it, where its template gave one.
  * @param tree The factory's tree, or undefined for a factory made by hand, which has none.
  */
-export const homeDirOf = (tree: string | undefined) => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
+const homeDirOf = (tree: string | undefined) => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
 
 /**
  * The factory's home in its tree (`homeDirOf`), where it is a folder; undefined where the factory has no tree or its tree no `home/`.

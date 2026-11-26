@@ -11,7 +11,7 @@
  */
 import type { PauseEvent, PauseMode, PauseMoved } from '../../contracts/pause-machine.contract.ts';
 
-export type { PauseEvent, PauseMode, PauseMove, PauseRefusal } from '../../contracts/pause-machine.contract.ts';
+export type { PauseEvent, PauseMode } from '../../contracts/pause-machine.contract.ts';
 
 /** A mode a pause stands in: every mode but `none`. */
 export type PausedMode = Exclude<PauseMode, 'none'>;
@@ -82,11 +82,8 @@ export const DRAIN_OF: Readonly<Record<PauseMode, 'lift' | 'put' | 'leave'>> = {
   cut: 'put',
 };
 
-/** One move the machine draws: from a mode to another, by the event that makes it. */
-export type PauseEdge = { readonly from: PauseMode; readonly to: PauseMode; readonly event: PauseEvent };
-
 /** Every move `pauseMove` makes between two modes, read off it: each mode asked each event. */
-export const pauseEdges = () =>
+const pauseEdges = () =>
   PAUSE_MODES.flatMap((from) =>
     (Object.keys(PAUSE_EVENTS) as PauseEvent[]).flatMap((event) => {
       const move = pauseMove(from, event);
@@ -94,6 +91,9 @@ export const pauseEdges = () =>
     }),
   );
 
-/** The store's pause as a Mermaid state diagram: every move `pauseMove` makes, by the fact that makes it. */
+/**
+ * The store's pause as a Mermaid state diagram: every move `pauseMove` makes, by the fact that makes it.
+ * @public
+ */
 export const pauseDiagram = () =>
   ['stateDiagram-v2', '  [*] --> none', ...pauseEdges().map((e) => `  ${e.from} --> ${e.to}: ${PAUSE_EVENTS[e.event]}`)].join('\n');

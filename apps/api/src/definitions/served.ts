@@ -17,13 +17,13 @@ export type Origin = DefinitionOrigin;
 export type Held<T> = { name: string; origin: Origin; item: T };
 
 /** A definition served: what it was read as, and the origin that shadows it, if one does. */
-export type Served<T> = Held<T> & { shadowedBy: Origin | null };
+type Served<T> = Held<T> & { shadowedBy: Origin | null };
 
 /**
  * `asked`, the `?origin=` of a read, as an origin, or `Invalid` naming the words it takes.
  * @param asked The read's origin query, or undefined where it names none.
  */
-export function originAsked(asked: string | undefined) {
+function originAsked(asked: string | undefined) {
   if (asked === undefined) return undefined;
   const origin = DEFINITION_ORIGINS.find((o) => o === asked);
   if (origin === undefined)

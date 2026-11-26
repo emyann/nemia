@@ -34,7 +34,7 @@ const Parameter = Schema.Struct({
  * version, with the parameters a factory gives it, the agents it hires into its workflows' steps, and the workflows it holds; and the
  * digest of its content (`contentDigest`), none where a path is longer than an archive holds.
  */
-export const Template = Schema.Struct({
+const Template = Schema.Struct({
   source: TemplateSource.OnRead,
   name: TemplateName,
   version: Schema.String,
@@ -43,6 +43,7 @@ export const Template = Schema.Struct({
   workflows: Schema.Array(WorkflowName.OnRead),
   digest: Schema.optional(Schema.String),
 }).annotate({ identifier: 'Template' });
+/** @public */
 export type Template = typeof Template.Type;
 
 /** A file of a tree written: its path in the folder, its permission bits, its bytes (`TreeFile`, `archive.ts`). */

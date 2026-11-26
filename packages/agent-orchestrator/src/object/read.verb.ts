@@ -39,9 +39,6 @@ const judgedOn = Effect.fnUntraced(function* (e: Engine, home: string, run: Run)
   return { one: one ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`))), git };
 });
 
-/** What the run is judged as (`judge`), when it is. */
-export type { JudgedRun } from '../summary/judgement.verb.ts';
-
 /** What `stepsReading` read once of a run: its steps judged, their checks, and none of the clock. */
 export type StepsReading = Judgement & {
   readonly e: Engine;

@@ -13,7 +13,7 @@ import { skillLayers } from '../agents/agents.ts';
 import type { RunKeys } from './stats.ts';
 
 /** What a mark is about: a frozen step, an agent's instructions, or a rendered skill. */
-export type MarkKind = 'step' | 'agent' | 'skill';
+type MarkKind = 'step' | 'agent' | 'skill';
 
 /**
  * One item a run froze, by its kind and name: its digest, null where the run's record or its rendered folder does not say, and the steps

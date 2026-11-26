@@ -31,7 +31,7 @@ export const WHOLE = 'whole';
  * count no byte and are never taken for empty; whether each folder itself read (`read`); and what the walk cost, the `names` it read
  * or tried to and the `bursts` it yielded after.
  */
-export type Walk = {
+type Walk = {
   readonly bytes: number[];
   readonly kinds: Record<string, number>[];
   readonly unread: number[];

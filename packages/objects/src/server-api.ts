@@ -487,7 +487,7 @@ export type FeedWait = typeof FeedWait.Type;
  * `GET /api/feed/wait`'s query: `labelSelector`, a label query given once or again (`-l`), each kept as `nemia watch -l` takes it;
  * `from`, the cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
  */
-export const FeedWaitQuery = {
+const FeedWaitQuery = {
   labelSelector: Schema.optionalKey(
     Schema.Union([Schema.String, Schema.Array(Schema.String)]).annotate({
       description: 'A label query, given once or again, each as `nemia watch -l` takes it.',

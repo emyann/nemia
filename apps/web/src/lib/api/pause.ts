@@ -8,7 +8,7 @@ import { PauseAnswer, PauseNowRead, Paused, Resumed } from 'objects';
 import { pace } from '../feed.ts';
 import { call, read, write } from './objects.ts';
 
-export type { Interrupt, Pause, PauseAnswer, Paused, PauseNowRead } from 'objects';
+export type { Interrupt, Pause, Paused } from 'objects';
 
 /** A task still at work under the pause: a session, a check, or a landing's check; `stopping`, `resumed` and `calling` as it is. */
 export type Finishing = Paused['finishing'][number];

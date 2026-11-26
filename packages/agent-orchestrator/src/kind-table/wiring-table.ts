@@ -28,7 +28,7 @@ import type {
 import { column, firstLine, tableOf } from './table-of.ts';
 
 /** The columns of a schedule's row, in the order its cells are. */
-export const SCHEDULE_COLUMNS: readonly TableColumnDefinition[] = [
+const SCHEDULE_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The schedule's name: the workflow it starts.", 0),
   column('Cron', 'The cron its runs start at.', 0),
   column('Next', 'Its next fire, where it fires again.', 0),
@@ -62,7 +62,7 @@ const scheduleCells = ({ metadata, spec, status }: Schedule) => [
 export const scheduleTable = (list: ScheduleList) => tableOf(list, SCHEDULE_COLUMNS, scheduleCells) satisfies Table;
 
 /** The columns of a trigger's row, in the order its cells are. */
-export const TRIGGER_COLUMNS: readonly TableColumnDefinition[] = [
+const TRIGGER_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The trigger's name.", 0),
   column('When', 'When it fires: at its cron, or on the cards its label selector matches.', 0),
   column('Target', 'The workflow it sends to.', 0),
@@ -99,7 +99,7 @@ const triggerCells = (trigger: Trigger) => [
 export const triggerTable = (list: TriggerList) => tableOf(list, TRIGGER_COLUMNS, triggerCells) satisfies Table;
 
 /** The columns of a hire's row, in the order its cells are. */
-export const HIRE_COLUMNS: readonly TableColumnDefinition[] = [
+const HIRE_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The hire's name, <workflow>.<step>.", 0),
   column('Agent', 'The agent that fills the step.', 0),
   column('Filled', 'Who fills the step.', 0),
@@ -129,7 +129,7 @@ const hireCells = ({ metadata, spec, status }: Hire) => [
 export const hireTable = (list: HireList) => tableOf(list, HIRE_COLUMNS, hireCells) satisfies Table;
 
 /** The columns of a library add's row, in the order its cells are. */
-export const LIBRARY_ADD_COLUMNS: readonly TableColumnDefinition[] = [
+const LIBRARY_ADD_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The add's name, <kind>.<name>.", 0),
   column('Kind', 'The kind of the library item added.', 0),
   column('Item', "The library item's name.", 0),
@@ -157,7 +157,7 @@ const libraryAddCells = ({ metadata, spec, status }: LibraryAdd) => [
 export const libraryAddTable = (list: LibraryAddList) => tableOf(list, LIBRARY_ADD_COLUMNS, libraryAddCells) satisfies Table;
 
 /** The columns of a volume's row, in the order its cells are. */
-export const VOLUME_COLUMNS: readonly TableColumnDefinition[] = [
+const VOLUME_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The volume's name.", 0),
   column('Path', "The folder's absolute path on the machine.", 0),
   column('Read-only', 'Whether steps only read the folder.', 0, 'boolean'),
@@ -183,7 +183,7 @@ const volumeCells = ({ metadata, spec, status }: Volume) => [
 export const volumeTable = (list: VolumeList) => tableOf(list, VOLUME_COLUMNS, volumeCells) satisfies Table;
 
 /** The columns of a delegation's row, in the order its cells are. */
-export const DELEGATION_COLUMNS: readonly TableColumnDefinition[] = [
+const DELEGATION_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The delegation's name: the agent it lets approve.", 0),
   column('Rules', 'How many rules it holds.', 0, 'integer'),
   column('Verbs', 'The verbs its rules let the agent approve.', 0),
@@ -206,7 +206,7 @@ export const delegationTable = (list: DelegationList) =>
   ]) satisfies Table;
 
 /** The columns of a subscription's row, in the order its cells are. */
-export const SUBSCRIPTION_COLUMNS: readonly TableColumnDefinition[] = [
+const SUBSCRIPTION_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The subscription's name.", 0),
   column('Task', 'The runtime task that is told.', 0),
   column('Selectors', "The feed's selectors it matches.", 0),
@@ -234,7 +234,7 @@ const subscriptionCells = ({ metadata, spec, status }: Subscription) => [
 export const subscriptionTable = (list: SubscriptionList) => tableOf(list, SUBSCRIPTION_COLUMNS, subscriptionCells) satisfies Table;
 
 /** The columns of an event's row, in the order its cells are. */
-export const EVENT_COLUMNS: readonly TableColumnDefinition[] = [
+const EVENT_COLUMNS: readonly TableColumnDefinition[] = [
   column('At', 'When the line was written.', 0),
   column('Type', "The line's type.", 0),
   column('Reason', 'The reason a machine selects on.', 0),

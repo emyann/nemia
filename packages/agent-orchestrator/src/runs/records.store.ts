@@ -160,7 +160,7 @@ const MergeAskSchema = Schema.StructWithRest(
  * @param step The loop's target, from its name.
  * @param n The target's try that merges, from its name.
  */
-export function mergeAskIn(text: string, step: string, n: number) {
+function mergeAskIn(text: string, step: string, n: number) {
   const held = heldText(text);
   if ('unreadable' in held) return held.unreadable satisfies RoundAsk | string;
   const read = readAs(MergeAskSchema, held.read);

@@ -37,7 +37,7 @@ import { divergence, keptIn, keptLooked, releasableOf, TickMemo, TickMemoDiverge
 import { CEILING_INSTEAD } from './filing.ts';
 import { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
 
-export { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
+export { ReconcileRefused } from './reconcile-refusal.ts';
 import { ownPool, runsUnder, toAdmit, type AdmissionRule, type AdmissionWait } from '../admission.ts';
 import { notedOf } from './noted.ts';
 import { instantNow } from './now.ts';
@@ -668,7 +668,7 @@ const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: Read
  * The grain a memory wait's room is compared in, 256 MiB: a wait whose room lies in the same grain as the one on record is the same
  * wait, so a busy machine writes a `waits` entry per grain its memory moves, never one per pass.
  */
-export const ROOM_STEP = 256 * 2 ** 20;
+const ROOM_STEP = 256 * 2 ** 20;
 
 /**
  * Whether two waits say the same to a person: both the engine unschedulable, the same pool and ceiling, or the same need, the same

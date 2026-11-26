@@ -1,0 +1,75 @@
+// knip, the finder of unused files, exports and dependencies, over every workspace: `npx knip` from the root. What it reports is
+// removed; what it cannot see is named here as an entry or a kept dependency, each with what reaches it.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      // The tools a person or a test runs by path with `node`: none is imported.
+      "entry": [
+        "tools/coverage/{record,compare}.ts",
+        "tools/release/{release,archive}.ts",
+        "tools/store-measure/{report,loop}.ts",
+        "tools/observe/profile/preload.ts",
+        "tools/observe/render/{render,reap,hold}.ts"
+      ]
+    },
+    "packages/agent-runtime": {
+      // The bins the runtime spawns by path (`ae-worker.ts`, `ae-claude-job.ts`), and the fixtures its tests spawn by path.
+      "entry": ["bin/*.ts", "test/fixtures/**/*.ts"]
+    },
+    "packages/agent-orchestrator": {
+      // The bins, and the fixtures and the child its tests spawn by path.
+      "entry": ["bin/*.ts", "test/fixtures/**/*.ts", "test/exporting-child.ts"]
+    },
+    "packages/templates": {
+      // What a run executes by path from its frozen copy: a template's carried scripts and its workflows' scripts, and the release cut.
+      "entry": ["released.ts", "*/carried/*.ts", "*/workflows/**/*.ts"]
+    },
+    "apps/api": {
+      // `print.ts`, run by path to print the OpenAPI document, the page bin, and the fixtures tests spawn by path.
+      "entry": ["src/openapi/print.ts", "bin/*.ts", "test/fixtures/**/*.ts"]
+    },
+    "apps/docs": {
+      // Astro's content config, which Astro loads by its name, and the dev server its tests spawn by path.
+      "entry": ["src/content.config.mjs", "test/dev.ts"]
+    },
+    "apps/web": {
+      // What the e2e runs by path: its worker, each page (loaded by `pages.ts` from the folder), the story runners and the scripts a
+      // person runs; and the look's door, which the design system's bundle reads whole by its path (`tools/design-system`).
+      "entry": [
+        "test/e2e/worker.ts",
+        "test/e2e/pages/*.ts",
+        "test/e2e/stories/*.ts",
+        "test/e2e/broken-page.ts",
+        "test/e2e/contrast-report.ts",
+        "test/e2e/look-photos.ts",
+        "src/components/look/index.ts"
+      ],
+      // The `designmd` linter the kit's `ds-theme` skill runs on DESIGN.md (`npx designmd lint`).
+      "ignoreDependencies": ["@google/design.md"]
+    },
+    "tools/guards": {
+      // The fixtures the guards hand a tool by path.
+      "entry": ["test/fixtures/**/*.ts"]
+    },
+    "tools/design-system": {
+      // The card runner, bundled by its path into each card's script (`src/cards/previews.ts`).
+      "entry": ["src/cards/runner.ts"],
+      // lucide-react is imported by the entry the producer writes and bundles; tailwindcss by the stylesheet it compiles (`@import`).
+      "ignoreDependencies": ["lucide-react", "tailwindcss"]
+    }
+  },
+  // The kit's skills, vendored unchanged, and MSW's worker, served as a file.
+  "ignore": ["apps/web/.claude/**", "apps/web/.storybook/public/**"],
+  "ignoreIssues": {
+    // A contract's laws and types are read by tsverify by their names, never imported.
+    "**/contracts/*.contract.ts": ["exports", "types"],
+    // The design system kit, vendored as shipped (`.gitattributes`): taken whole at each update.
+    "apps/web/src/components/ui/ds/**": ["files", "exports", "types", "duplicates"],
+    // Two names for one shape, each a word of the api (a Spec and the body a write sends; a caller's kind and a token's holder):
+    // folding one into the other renames a served word, which is no dead code.
+    "packages/objects/src/{delegation,proposal,schedule,trigger,words}.ts": ["duplicates"]
+  },
+  // Programs of the machine a test or a script runs, never a package: Codex's CLI, systemd's, and the installed `nemia`.
+  "ignoreBinaries": ["codex", "systemd-run", "nemia"]
+}

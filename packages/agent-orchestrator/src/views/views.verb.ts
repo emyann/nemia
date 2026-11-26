@@ -500,6 +500,7 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
  * What a check said, off the engine: the verdict of its latest attempt (`attemptVerdict`), and the last lines of each stream the runtime
  * kept (`checkStreams`), `lines` of each: `nemia decide`'s screen unless asked for more, as a try is (`REFUSAL_LINES`). Fails with a
  * refusal a read rejected with; dies of anything else.
+ * @public
  */
 export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string, lines = CHECK_TAIL_LINES) {
   const e = yield* EngineService;
@@ -531,7 +532,7 @@ export const refusalWholeRead = Effect.fn('refusalWhole')(function* (command: st
  * under its name — the marked lines come from the log, which keeps only the end, and are `partial`. A read that rejects, with anything, is
  * `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read throws.
  */
-export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
+const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
   const e = yield* EngineService;
   const read = yield* Effect.exit(checkStreams(e, taskId));
   if (Exit.isFailure(read)) return { step, command, unreadable: unreadWords(taskId, read.cause) } satisfies CheckHanded;

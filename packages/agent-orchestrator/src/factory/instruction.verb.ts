@@ -131,7 +131,7 @@ export const FACTORY_INSTRUCT: Served<Instructed, InstructInput> = {
  * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`, through
  * the Factory door. Refused, writing nothing: as `FACTORY_INSTRUCT` says.
  */
-export const instructed = ({ factory: name, words, clear }: InstructInput) =>
+const instructed = ({ factory: name, words, clear }: InstructInput) =>
   Effect.gen(function* () {
     const door = (yield* FactoryDoor).instruction;
     const factory = FactoryName.read(name);

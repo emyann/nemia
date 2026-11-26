@@ -24,9 +24,9 @@ export const ended = (
   ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) }) satisfies Event;
 export const signed = (n: number) => ended(n, 'succeeded', 'harness', `native-${n}`);
 /** A long-lived attempt's session first listed with no process, its harness respawning it. */
-export const gap = (n: number, ms = S) => ({ kind: 'gap', at: at(ms), attempt: n }) satisfies Event;
+const gap = (n: number, ms = S) => ({ kind: 'gap', at: at(ms), attempt: n }) satisfies Event;
 /** A long-lived attempt's session listed held in process `pid`. */
-export const held = (n: number, pid: number, ms = S) => ({ kind: 'process', at: at(ms), attempt: n, pid }) satisfies Event;
+const held = (n: number, pid: number, ms = S) => ({ kind: 'process', at: at(ms), attempt: n, pid }) satisfies Event;
 
 /** Journal shapes, by name: what a task's record can say. */
 export const JOURNALS: Record<string, Event[]> = {
@@ -144,10 +144,10 @@ const PARKED: Record<string, Event[]> = {
 };
 
 /** When the pass reads it: in the grace window and before a deadline of 40 s, or past both. */
-export const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
+const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
 /** A time more, `late`: past a respawn's gap (`RESPAWN_GAP_MS`) opened at 1 s. Asked for by `lifecycle.test.ts` alone, as `unread` is. */
 const LATE = { late: 125 * S } as const;
-export const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as const;
+const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as const;
 
 /** The corpus's name for a pass that could not read the last attempt's harness. */
 const UNREAD = 'unread';

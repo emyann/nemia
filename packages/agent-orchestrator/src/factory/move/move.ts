@@ -10,8 +10,6 @@ import type { TreeFile } from '../../archive/archive.ts';
 import { cardText, parseInboxCard } from '../../inbox/index.ts';
 import type { RepoOnTargetOf, VolumeOnTargetOf } from '../../../contracts/factory-move.contract.ts';
 
-export type { MovedVolume, RepoOnTarget, VolumeOnTarget } from '../../../contracts/factory-move.contract.ts';
-
 /** The folders under a factory's own that belong to the store that keeps them and never move with it: its proposals and delegations. */
 export const FOLDER_STAYS = ['proposals', 'delegations'] as const;
 
@@ -196,7 +194,7 @@ export function folderOnTarget(
  * The line a moved card's body ends with: where it came from, its name there and its factory's.
  * @param moved Where the card came from (the source's name), its name there and its factory's.
  */
-export const movedLine = (moved: { readonly from: string; readonly name: string; readonly factory: string }) =>
+const movedLine = (moved: { readonly from: string; readonly name: string; readonly factory: string }) =>
   `Moved from ${moved.from}: the card ${moved.name} of the factory ${moved.factory}.`;
 
 /**

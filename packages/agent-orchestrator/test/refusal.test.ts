@@ -180,9 +180,12 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * `agent-orchestrator/run` was one more once a run's asks became records of the keyspace: `runs/run-keys.ts`, the keys `forget/forget.ts`
  * named a run's asks by. It is one fewer again since `forget/forget.ts` names each ask by the command that takes it back (`askOffLine`),
  * and reads no key.
+ *
+ * `agent-orchestrator/run` is one fewer since the volumes' face no longer re-exports `factory/volume/origin-params.ts`, which nothing
+ * imported through it.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 221, effect: 15 },
+  'agent-orchestrator/run': { all: 220, effect: 15 },
   'agent-orchestrator/workflow': { all: 157, effect: 15 },
 };
 

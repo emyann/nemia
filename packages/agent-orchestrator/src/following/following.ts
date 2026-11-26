@@ -41,9 +41,6 @@ export type FollowedAttempt = { taskId: string; attempt: number };
  */
 export type StepNow = { taskId: string | null; attempt: number; live: boolean; settled: boolean };
 
-/** Where a following goes from a read: follow an attempt, wait for the step's next line of the feed, or end, the step finished. */
-export type Next = { follow: FollowedAttempt } | 'wait' | 'finished';
-
 /**
  * Where the following of a step at `at` goes, the step read as `now`. A live attempt that is not the one followed is followed: the
  * record's task changed (a try), or its task has a later attempt (a person's answer, the next turn). Else a settled task has finished the

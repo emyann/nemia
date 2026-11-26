@@ -9,14 +9,14 @@ import { asked } from '../objects.ts';
 import { Refused } from '../refused.ts';
 
 /** The verb, as a person types it. */
-export const DAEMON_VERB = 'daemon';
+const DAEMON_VERB = 'daemon';
 
 /**
  * What `nemia daemon` prints of the api's answer: its line, or, `json`, its state, holder, pid and url as one JSON line.
  * @param answer The api's answer of `GET /api/daemon`.
  * @param json Whether `--json` was typed, which prints the one JSON line.
  */
-export const daemonLines = (answer: Daemon, json: boolean) =>
+const daemonLines = (answer: Daemon, json: boolean) =>
   json ? [JSON.stringify({ state: answer.kind, by: answer.by, pid: answer.pid, url: answer.url })] : [answer.line];
 
 /**

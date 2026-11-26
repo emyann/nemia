@@ -20,7 +20,7 @@ import {
 } from 'objects';
 import { factories, library, hireName, hires, mcpServers, schedules, triggers } from './objects.ts';
 
-export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
+export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInState } from 'objects';
 
 /**
  * The template a factory is made from: where it is, the version wanted and the parameters given; the version its tree was last applied

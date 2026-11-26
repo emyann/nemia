@@ -19,7 +19,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
  * @param run The run the condition is of.
  * @param steps The workflow's steps.
  */
-export const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]) =>
+const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]) =>
   steps.find((s) => s.after.includes(condition) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent))?.name;
 
 /**
@@ -30,7 +30,7 @@ export const settledBy = (condition: string, run: Run, steps: readonly StepSpec[
  * @param step The step named as the condition.
  * @param route The route given.
  */
-export function routeRefused(run: Run, steps: readonly StepSpec[], step: string, route: string) {
+function routeRefused(run: Run, steps: readonly StepSpec[], step: string, route: string) {
   const condition = steps.find((s) => s.name === step);
   const line = `nemia route ${run.id} <condition> <route>`;
   if (!condition) return new Missing({ message: `${run.id} has no step ${step}. Name one of its conditions: ${line}.` });

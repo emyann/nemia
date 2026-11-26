@@ -61,7 +61,7 @@ export type WorkflowDraft = {
 };
 
 /** What a write answers: what was written, and the version the folder is at after it, which the door reads once the layer wrote. */
-export type WorkflowSaved = WorkflowWritten & { readonly version: string };
+type WorkflowSaved = WorkflowWritten & { readonly version: string };
 
 /**
  * A layer of the Workflow door, as plain synchronous methods: the workflows a holder folder holds, by name; where a write of a folder finds
@@ -140,7 +140,7 @@ const stepChecked = inWritersWords(StepName.OnCreate);
  * the folder reads as a step or its README. Pure, and asked by the door before either layer, so both refuse the same names.
  * @param name The name of the file the draft carries.
  */
-export function carriedNameRefusal(name: string) {
+function carriedNameRefusal(name: string) {
   if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
     return `${JSON.stringify(name)} is not a file's name in the workflow's folder: a draft carries the files directly in it. Move the file up into the draft folder, or leave it out.`;
   if (name.toLowerCase().endsWith('.md'))
@@ -170,7 +170,7 @@ const workflowChecked = inWritersWords(Workflow);
  * @param dir The workflow's folder.
  * @param draft The draft: its steps and the files it carries.
  */
-export const draftedWorkflow = (dir: string, draft: WorkflowDraft) => ({
+const draftedWorkflow = (dir: string, draft: WorkflowDraft) => ({
   dir,
   name: path.basename(dir),
   steps: draft.steps.map((step) => ({
@@ -266,7 +266,7 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs) {
  * read given none looks beside the folder alone.
  * @param home The store's root folder.
  */
-export function workflowFiles(home: string) {
+function workflowFiles(home: string) {
   const around = (dir: string, places?: Places) => places ?? placesAroundAt(home, dir);
   return {
     workflows: {

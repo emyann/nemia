@@ -116,7 +116,7 @@ const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStarted
  * A card's own `repo:`, which is retired and was not read.
  * @param repo The `repo:` the card names.
  */
-export const ignoredRepoLine = (repo: string) =>
+const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**
@@ -124,7 +124,7 @@ export const ignoredRepoLine = (repo: string) =>
  * @param card The card started.
  * @param waitedOn The cards of its `after:` that had not landed.
  */
-export const waitedOnLine = (card: string, waitedOn: readonly string[]) =>
+const waitedOnLine = (card: string, waitedOn: readonly string[]) =>
   `started although ${card} waits on ${waitedOn.join(', ')}, not landed yet — its run starts from the base as it is now, without their work`;
 
 /** The line of a start whose api said nothing of the run: it started, and what reads it. */

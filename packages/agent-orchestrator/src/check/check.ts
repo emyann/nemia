@@ -195,7 +195,7 @@ export const INSTALL_ARGS = ['install', '--no-save', '--no-audit', '--no-fund'] 
 export const INSTALL = `npm ${INSTALL_ARGS.join(' ')}`;
 
 /** What the log says of an install that failed, before the check ends with no exit code. */
-export const INSTALL_FAILED = '[nemia check] install failed, exit';
+const INSTALL_FAILED = '[nemia check] install failed, exit';
 
 /**
  * What the pass found of a worktree's `node_modules` it could not install from its `package-lock.json`, before the check filed in it: the

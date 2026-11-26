@@ -22,7 +22,7 @@ import type { Adoption, AdoptedCard } from './adopt.ts';
 type RenderedAt = { version: string; params: FactoryTemplate['params']; entries: readonly Entry[] };
 
 /** What a takeover of a factory reads besides its judgement's input: its store rules' file, where they say words. */
-export type AdoptionRead = { adoption: Adoption; rules: string | null };
+type AdoptionRead = { adoption: Adoption; rules: string | null };
 
 /** The digest of the folder `dir`, or null where it is not there. */
 const folderDigest = (dir: string) => (fs.existsSync(dir) ? digestOf(entriesIn(dir)) : null);

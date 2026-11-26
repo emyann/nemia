@@ -14,7 +14,7 @@ const { name: COMMAND } = INBOX_QUEUE_WORDS;
  * What `nemia inbox queue` prints of the card queued: when and where in the queue, on what, and how the tick starts it.
  * @param card The card as the api answers it after it is queued.
  */
-export const queuedLines = (card: Card) => {
+const queuedLines = (card: Card) => {
   const name = card.metadata.name;
   const { place, queueLength, factoryRepo } = card.status;
   const at = queueLength === undefined ? `${place ?? '?'} in the queue` : `${place ?? '?'} of ${queueLength}`;

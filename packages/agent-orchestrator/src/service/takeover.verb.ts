@@ -50,7 +50,7 @@ export type Started = {
 };
 
 /** The command a take-over runs under unless it is named: the install that hands the store to the service. */
-export const INSTALL_BY = 'nemia service install';
+const INSTALL_BY = 'nemia service install';
 
 /** How a take-over's lines open: the install with the pid it was given, or the command that runs it. */
 const opening = (pid: number, by: string) => (by === INSTALL_BY ? `${by} --take-over ${pid}` : by);
@@ -62,7 +62,7 @@ const opening = (pid: number, by: string) => (by === INSTALL_BY ? `${by} --take-
  * @param lease The store's lease as it reads now.
  * @param by The command asking, which the words open on; install's where not given.
  */
-export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY) {
+function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY) {
   const said = opening(pid, by);
   if (lease.kind !== 'ticking')
     return `${said}: no daemon ticks the store (${lease.kind}): install without --take-over starts the service.`;
@@ -216,7 +216,7 @@ const firstPassDue = (lease: DaemonStanding, pid: number) =>
  * @param by The command asking, which a refusal opens on.
  * @param left What becomes of the store's pause, said at the end of a refusal.
  */
-export const firstPassed = (pid: number, host: TakeoverHost, service: Started, by: string, left: string) =>
+const firstPassed = (pid: number, host: TakeoverHost, service: Started, by: string, left: string) =>
   Effect.gen(function* () {
     yield* Effect.sync(() => host.say(`pid ${pid} ticks the store: waiting for its first pass`));
     const lease = yield* Effect.repeat(

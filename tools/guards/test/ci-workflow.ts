@@ -185,7 +185,7 @@ export const allowlistStep = (workflow: Workflow) =>
  * GitHub's own action, taken by major tag: the pointer floats to its latest release, and a third party's never matches. This clause and
  * those below it hold every workflow of the repository, each taking the file's name for the sentence that names it.
  */
-export const OWN_ACTION = /^actions\/[a-z][a-z\d-]*@v\d+$/;
+const OWN_ACTION = /^actions\/[a-z][a-z\d-]*@v\d+$/;
 
 /** A step that takes an action this workflow may not take. */
 export function actionDrift(workflow: Workflow, file: string = FILE) {
@@ -215,13 +215,13 @@ export function targetDrift(text: string, file: string = FILE) {
  * A run step that reaches the network: the lockfile's install, the browser's, a release fetched by hand, a call of GitHub's CLI, a
  * push or a fetch of git, and the release tool, whose verbs call both. Every action here reaches the network.
  */
-export const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b|(?:^|[\s;&|(])gh\s|\bgit (?:push|fetch)\b|tools\/release\/release\.ts/;
+const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b|(?:^|[\s;&|(])gh\s|\bgit (?:push|fetch)\b|tools\/release\/release\.ts/;
 
 /** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
-export const reachesNetwork = (step: Step) => step.uses !== undefined || NETWORK.test(step.run ?? '');
+const reachesNetwork = (step: Step) => step.uses !== undefined || NETWORK.test(step.run ?? '');
 
 /** A bound as GitHub takes it: a whole number of minutes above zero. */
-export const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
+const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
 
 /**
  * A job with no `timeout-minutes`, a step that reaches the network with none, and a step whose bound is not under its job's. Without
@@ -258,14 +258,13 @@ export function stallDrift(workflow: Workflow, file: string = FILE) {
  * with the run's token is set by GitHub Actions, the app branch protection pins. So a dispatched run of a required check posts its
  * context as a status too: pending as its job starts, its result as it ends.
  */
-export const STATUSES = '/statuses/';
+const STATUSES = '/statuses/';
 
 /** The event a status is posted on, and no other: on a push or a pull request the check run already counts. */
-export const DISPATCHED = "github.event_name == 'workflow_dispatch'";
+const DISPATCHED = "github.event_name == 'workflow_dispatch'";
 
 /** The steps of `job` that post a commit status. */
-export const statusSteps = (job: Job | undefined) =>
-  (job?.steps ?? []).filter((step) => step.run?.includes(STATUSES) === true) satisfies Step[];
+const statusSteps = (job: Job | undefined) => (job?.steps ?? []).filter((step) => step.run?.includes(STATUSES) === true) satisfies Step[];
 
 /**
  * A required context a dispatched run does not post as a status, posted on another event, under another name, on another commit, by a

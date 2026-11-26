@@ -33,7 +33,7 @@ const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecis
  * A span of time in its two largest units: `45s`, `3m05s`, `2h07m`, `1d03h`.
  * @param ms The span, in ms; below zero reads as none.
  */
-export function durationWord(ms: number) {
+function durationWord(ms: number) {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const two = (n: number) => String(n).padStart(2, '0');
   if (s < 60) return `${s}s`;

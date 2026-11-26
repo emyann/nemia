@@ -34,7 +34,7 @@ import {
   type FactoryParts,
 } from './template.store.ts';
 
-export const TEMPLATE_HELP = `nemia template lint <folder|archive>
+const TEMPLATE_HELP = `nemia template lint <folder|archive>
 nemia template export <folder> --from <repo> [--factory <name>]
 nemia template pack <folder> [--out <file>]
 nemia template unpack <archive> <dir>
@@ -86,7 +86,7 @@ const CHECK_SPEC: Spec = {
 const digestLine = (digest: string | undefined) => `digest of the content: ${digest ?? 'none'}`;
 
 /** The folder or archive `folder`, read through the Template door and checked: it passes with its digest, or every problem is refused. */
-export const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {
+const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {
   const read = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(folder)));
   const { problems, digest } = checkedTree(read, packageSkillNames());
   if (problems.length)

@@ -9,21 +9,7 @@
  * own is left: `GET /api/inbox/:name` and `PUT` and `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
 import { readFactoryAtOnce } from 'agent-orchestrator';
-import type { CardFile, CardFileRef } from 'objects';
-
-/**
- * What a card filed hands the package: the idea, and the keys the card writes. `repo` is retired, and handed on only for the package to
- * refuse it in its own words (`addToInbox`), so the api says no second sentence of its own.
- */
-export type Filing = {
-  text: string;
-  workflow?: string;
-  repo?: string;
-  factory?: string;
-  label?: string[];
-  after?: string[];
-  files?: CardFileRef[];
-};
+import type { CardFile } from 'objects';
 
 /**
  * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory, its labels, the cards it

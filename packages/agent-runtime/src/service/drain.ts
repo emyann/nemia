@@ -19,7 +19,7 @@ export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefus
  * Why `drain` refuses its holder, or `undefined` for a process id or null.
  * @param holder What `drain` was handed: the process id of the engine that holds the attached sessions, or null to let their calls go.
  */
-export const drainRefusalOf = (holder: unknown) =>
+const drainRefusalOf = (holder: unknown) =>
   holder === null || (Number.isInteger(holder) && (holder as number) > 0)
     ? undefined
     : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
@@ -38,7 +38,7 @@ export const drainChecked = (holder: unknown) => {
  * grace that is no length of time, or a key it does not read, would put a drain no job judges as asked.
  * @param args Every argument `drainSessions` was handed: one `{ graceMs }`, or null to lift the drain.
  */
-export const drainSessionsRefusalOf = (args: readonly unknown[]) => {
+const drainSessionsRefusalOf = (args: readonly unknown[]) => {
   const [given] = args;
   const grace = (o: object) => Object.keys(o).length === 1 && Number.isSafeInteger((o as { graceMs?: unknown }).graceMs);
   return args.length === 1 &&

@@ -23,16 +23,16 @@ import { clientRelease, releaseMet } from './release.ts';
 import { servedAt } from './where.ts';
 
 /** The setting that turns the start off, as the orchestrator reads it. */
-export const START_OFF = 'NEMIA_DAEMON_START';
+const START_OFF = 'NEMIA_DAEMON_START';
 
 /** The path whose answer says a daemon is ready: any answer, a refusal among them, says something listens and speaks HTTP. */
-export const READY_PATH = '/api/health';
+const READY_PATH = '/api/health';
 
 /**
  * How long a started daemon has to answer `READY_PATH`: fifteen seconds, some ten times a cold start of the api on this machine, so a
  * loaded machine still gets there, while a person is told within a quarter of a minute that it did not come up.
  */
-export const READY_WITHIN_MS = 15_000;
+const READY_WITHIN_MS = 15_000;
 
 /** How long one probe waits for an answer before it says the daemon took the connection and is silent. */
 const PROBE_MS = 1_000;
@@ -93,7 +93,7 @@ export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env) 
  * @param daemon The release the daemon's health says, null where it says none.
  * @param client This client's release, null for a checkout.
  */
-export function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null) {
+function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null) {
   if (releaseMet(client, daemon) !== 'differs') return base;
   throw new Refused(
     `nemia ${verb}: this nemia is ${client ?? 'a checkout'} and the daemon at ${base} runs ${daemon ?? 'a checkout'}, and a client asks only a daemon of its own release. ` +
@@ -143,7 +143,7 @@ export const readyAt = (urlNow: () => string | undefined, withinMs: number, env:
  * @param env The environment the start runs with and the lease is read by: `NEMIA_DAEMON_START`, the store, the token.
  * @param withinMs How long the started daemon has to answer, in ms: `READY_WITHIN_MS` where it is left out.
  */
-export async function daemonStarted(verb: string, env: NodeJS.ProcessEnv = process.env, withinMs: number = READY_WITHIN_MS) {
+async function daemonStarted(verb: string, env: NodeJS.ProcessEnv = process.env, withinMs: number = READY_WITHIN_MS) {
   if (env[START_OFF] === 'off') throw unserved(verb, true);
   const { code, stdout } = await captured(['daemon', '--json'], env);
   const said = code === 0 ? urlIn(stdout) : undefined;
@@ -158,14 +158,11 @@ const remoteDown = (verb: string, name: string, server: string) =>
     `nemia ${verb}: the daemon of the context ${name}, at ${server}, takes no connection. See that it runs there (\`nemia service status\` on its machine), check its address with \`nemia config get-contexts\`, or read this machine's store after \`nemia config use-context local\``,
   );
 
-/** A daemon made ready for a read: its base url, and the release its health says (`Health.release`), null where it says none. */
-export type Served = { readonly base: string; readonly release: string | null };
-
 /**
- * The daemon a read asks, ready (`Served`): under a remote context its server, where something listens there, never a daemon started
- * here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the read's own
- * bound then says — else one started now and waited for (`daemonStarted`). Refused where the daemon says a release other than `client`,
- * this client's own (`releaseHeld`).
+ * The daemon a read asks, ready, its base url and the release its health says: under a remote context its server, where something
+ * listens there, never a daemon started here; else this store's lease's, where something listens there — answering, or holding the
+ * connection silent, which the read's own bound then says — else one started now and waited for (`daemonStarted`). Refused where the
+ * daemon says a release other than `client`, this client's own (`releaseHeld`).
  * @param verb The verb the person typed, named in a refusal.
  * @param env The environment read for the context in use, the store and the token.
  * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.

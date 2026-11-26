@@ -44,7 +44,7 @@ export function placeSplit(place: Place, other: Place, verbs: readonly PlaceVerb
 }
 
 /** A place whose asks of one verb wait on the test (`placeHeld`): the place, and what the test reads and does of those asks. */
-export type HeldPlace<V extends PlaceVerb> = {
+type HeldPlace<V extends PlaceVerb> = {
   readonly place: Place;
   /** Rung each time an ask of the verb comes in and waits. */
   readonly bell: Bell;

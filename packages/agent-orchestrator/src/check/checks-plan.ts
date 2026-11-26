@@ -10,7 +10,7 @@ import { readFrontmatter, type FrontmatterValue } from '../frontmatter/frontmatt
 import { refuse, type CheckSpec } from '../step/step.ts';
 
 /** What a check's name is: a word of lower-case letters, digits and dashes, opening on a letter, as a task id carries it. */
-export const CHECK_NAME = /^[a-z][a-z0-9-]*$/;
+const CHECK_NAME = /^[a-z][a-z0-9-]*$/;
 
 const ENTRY_KEYS = ['name', 'run', 'after', 'enabled', 'usesCheckout'] as const;
 

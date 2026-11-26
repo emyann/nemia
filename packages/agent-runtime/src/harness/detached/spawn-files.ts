@@ -64,7 +64,7 @@ const sizeOf = (p: string) => {
 };
 
 /**
- * What the worker writes on the harness's stdin for the run `r` (`RunInput`): its brief as the spec's own line, and the `inbox`
+ * What the worker writes on the harness's stdin for the run `r`: its brief as the spec's own line, and the `inbox`
  * read on from where it stands now, so a run spawned again under a name finds no words said to the one before it. Nothing for a
  * spec whose harness is given no input.
  * @param spec The harness the run is spawned on, by its `input`.

@@ -230,12 +230,6 @@ export type HarnessOutput = {
 
 export { WORKER } from './start-worker.ts';
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
-/**
- * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
- * on — the inbox's size when the run was spawned, so a run spawned again under a name finds no words said to the one
- * before it — until a line of the harness's output `closesOn`.
- */
-export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 /**
  * A run's sighting, field for field: its state, `failed` where it is read as failed (`lookOf`); its closeout the file its harness wrote
@@ -714,7 +708,7 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
  *      (`spawnFiles`): a re-spawn of the same attempt must not find the previous one's answer waiting for it, nor a stop
  *      asked of it; it is given the closeout's schema, the servers its task names and no more, and, for a spec with
  *      `needsRequest`, the spawn request itself. The inbox is never written or cleared: it is the person's, and a run
- *      spawned again under the name starts past what was said to the one before it (`RunInput.from`).
+ *      spawned again under the name starts past what was said to the one before it.
  *   4. Writes the run file before the launch, with no pid: the run is intended, and a crash here leaves a file that says
  *      so. The worker overwrites it with its own pid the moment it starts, keeping what the spawn wrote. A resumed run of a
  *      spec with `resumeCostCarried` carries its parent's totals on it (`carried`), found among the run files once, here.

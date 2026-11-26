@@ -8,7 +8,7 @@ import type { FloorNarrowingWord, FloorRefusalWord } from 'objects';
 import type { FloorAnswer, FloorCall, FloorNarrowing, FloorOf, FloorRefusal } from '../../contracts/token-floor.contract.ts';
 import { atLeast } from '../level/level.ts';
 
-export type { FloorAnswer, FloorCall, FloorHolder, FloorNarrowing, FloorRefusal } from '../../contracts/token-floor.contract.ts';
+export type { FloorAnswer, FloorCall, FloorRefusal } from '../../contracts/token-floor.contract.ts';
 
 /** Whether two types are the same, both ways. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

@@ -3,8 +3,6 @@ import { queryOptions } from '@tanstack/react-query';
 import { YourStore } from 'objects';
 import { call, read } from './objects.ts';
 
-export type { YourStore } from 'objects';
-
 /** Your store's folders and lines: read once, since they change only when the api restarts. */
 export const storeQuery = queryOptions({
   queryKey: ['store'],

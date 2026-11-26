@@ -6,8 +6,6 @@
 import type { BlockedRechecked } from '../../contracts/blocked-recheck.contract.ts';
 import { SETTLED, type StepRecord, type TaskPhase } from '../record/record.ts';
 
-export type { BlockedRecheck, BlockedRecheckRead, BlockedRecheckWhy } from '../../contracts/blocked-recheck.contract.ts';
-
 /** Where a step's branch is now, as its caller read it: undefined where it did not, and on a folder run, which has no branch. */
 export type TipOf = (branch: string) => string | undefined;
 

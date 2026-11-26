@@ -12,7 +12,6 @@ export {
   lessonOf,
   parseGlobs,
   resultSteps,
-  routedResult,
   resultTips,
   landedOver,
   tipBranches,

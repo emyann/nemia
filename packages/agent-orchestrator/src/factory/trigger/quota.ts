@@ -8,7 +8,7 @@
 import type { ReachedWorkflow, ReachStepKind, TriggerQuotaOf } from '../../../contracts/trigger-quota.contract.ts';
 import type { StepSpec } from '../../step/step.ts';
 
-export type { ReachedWorkflow, ReachStepKind, TriggerQuota } from '../../../contracts/trigger-quota.contract.ts';
+export type { ReachedWorkflow } from '../../../contracts/trigger-quota.contract.ts';
 
 /** A step as the walk reads it: whether it is a card node and of which kind, the workflow it files for, and its condition's eval. */
 export type ReachStep = Pick<StepSpec, 'workflow' | 'route' | 'card'>;

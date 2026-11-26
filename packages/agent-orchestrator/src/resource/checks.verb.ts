@@ -130,7 +130,7 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown) =>
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  * @param name The check's name: `check` for a step's `check: <line>`; a named check whose task the engine does not hold is not filed yet.
  */
-export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr, name = 'check') {
+function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr, name = 'check') {
   const view = taskId === undefined ? undefined : views.get(taskId);
   if (!taskId || (name !== 'check' && view === undefined))
     return { name, command, started: null, ended: null, taskId: null, verdict: null, refused: null } satisfies StepCheck as StepCheck;

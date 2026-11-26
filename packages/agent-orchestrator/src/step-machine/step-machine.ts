@@ -9,8 +9,6 @@
 import type { StepStatus } from '../record/record.ts';
 import type { StepMove } from '../../contracts/step-machine.contract.ts';
 
-export type { StepTransition } from '../../contracts/step-machine.contract.ts';
-
 /** One move of a step's word, from a state to another, on the fact that makes it. */
 export type StepEdge = { from: StepStatus; to: StepStatus; event: string };
 

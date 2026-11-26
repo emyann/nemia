@@ -212,7 +212,7 @@ export type RunSummary = {
  * it still moves, what it cost, how long it has been at work and the tokens it used, what it waits on and is held until, and what a person
  * has to decide. The list's row (`RunSummary`) and the run's object carry them from here alone (`judgedFields`).
  */
-export type JudgedFields = Pick<
+type JudgedFields = Pick<
   RunSummary,
   'status' | 'phase' | 'reason' | 'on' | 'via' | 'moving' | 'cost' | 'atWork' | 'tokens' | 'waiting' | 'holding' | 'assignee' | 'toDecide'
 >;

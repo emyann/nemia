@@ -5,9 +5,9 @@
  * runtime (`fix.verb.ts`). Typed by `contracts/needs.contract.ts`, which proves the first three.
  */
 import type { Need, NeedFix } from 'objects';
-import type { FixOrigin, FixRefusal, FixRefusalOf, NeedRan, NeedRead, NeedsHolding, NeedStateOf } from '../../contracts/needs.contract.ts';
+import type { FixOrigin, FixRefusalOf, NeedRan, NeedRead, NeedsHolding, NeedStateOf } from '../../contracts/needs.contract.ts';
 
-export type { FixOrigin, FixRefusal, NeedRan, NeedRead };
+export type { FixOrigin, NeedRan };
 
 /**
  * What one check's run says of its need: exit 0 met, any other exit missing, and no answer in its time or no shell `unknown`.

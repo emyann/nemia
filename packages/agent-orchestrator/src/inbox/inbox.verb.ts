@@ -118,7 +118,7 @@ export type InboxStart = {
  * `waitedOn` is the cards of its `after:` that had not landed, on a start that is not the queue's (`landed` given): a person's start goes
  * ahead of the wait, and says so.
  */
-export type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: string; queueLeft?: string; waitedOn?: string[] };
+type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: string; queueLeft?: string; waitedOn?: string[] };
 
 /**
  * Where a card is started: its workflow's name — `opts.workflow`, else the card's `workflow:` where it is a name — the repository, and the
@@ -538,7 +538,7 @@ const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, landed: RunLan
  * card that names none), its name, and what a person reads of each such wait (`waitSaid`) — what the feed says a stalled wait begun and
  * ended by.
  */
-export type StalledWait = { factory: string; card: string; waits: string[] };
+type StalledWait = { factory: string; card: string; waits: string[] };
 
 /**
  * What the inbox owes the feed now: each card of a factory that the card triggers of its factory would send to two workflows (`clash`),

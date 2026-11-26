@@ -16,9 +16,6 @@ import { mergeWord, mergeWordOf, type MergeWord, type StandingMerge } from '../b
 /** A result branch of another run on the base: the run's id and its branch ahead of the base. */
 export type Theirs = { run: string; branch: string };
 
-/** One trial asked of the place: merge `branch` onto `onto`. */
-export type TrialAsked = { onto: string; branch: string };
-
 /** A branch of this run that does not merge cleanly onto another run's (`theirs`): `ours`, the merge as git says it, and that in words. */
 export type Collision = Theirs & { ours: string; merge: MergeWord; said: string };
 

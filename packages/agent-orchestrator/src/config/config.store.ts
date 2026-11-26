@@ -353,8 +353,7 @@ export const folderRoots = (env: Env) => {
  * that the person's folder listing names nothing inside it; Nemia's daemon keeps its engine under `WF_ROOT`.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const engineStore = (env: Env) =>
-  env.AE_ROOT?.trim() ? path.resolve(env.AE_ROOT.trim()) : path.join(os.homedir(), '.agent-engine');
+const engineStore = (env: Env) => (env.AE_ROOT?.trim() ? path.resolve(env.AE_ROOT.trim()) : path.join(os.homedir(), '.agent-engine'));
 
 /**
  * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
@@ -362,7 +361,7 @@ export const engineStore = (env: Env) =>
  * folders. Unset, by default, every such start is refused.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const defaultFactoryStarts = (env: Env) => env.WF_DEFAULT_FACTORY_STARTS === '1';
+const defaultFactoryStarts = (env: Env) => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /**
  * `WF_EXPOSED`, whether the store is marked exposed — reached from beyond this machine, through a bind, a proxy or a tunnel — so that the
@@ -412,7 +411,7 @@ export const servedNamesOf = (exposed: boolean, bound: string, declared: readonl
  * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const sessionToken = (env: Env) => env.WF_SESSION_TOKEN || undefined;
+const sessionToken = (env: Env) => env.WF_SESSION_TOKEN || undefined;
 
 /**
  * The daemon's per-session variables: what it sets on each session it starts, and so what no process but a session's starts with — the

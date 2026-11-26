@@ -28,7 +28,7 @@ import { eachTest, runGiven, runOver } from './placed.ts';
 import { steeredClock, type Steered } from './steered.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 
-export { story, type Story, type Teller } from 'test-kit/checkpoints';
+export { story, type Teller } from 'test-kit/checkpoints';
 
 /** The runner's `runWith`, as a test hands it on. */
 type RunWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) => Promise<A>;

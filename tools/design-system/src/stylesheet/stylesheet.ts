@@ -49,7 +49,7 @@ export const lightToo = (css: string) => css.replace(/^:root \{/m, ':root, [data
  * @param theme the rewritten theme's path.
  * @param grain the rewritten grain's path.
  */
-export const rewrittenStyles = (styles: string, theme: string, grain: string) => {
+const rewrittenStyles = (styles: string, theme: string, grain: string) => {
   const rewritten = styles
     .replace(/^@import '(@fontsource|\.\.\/theme)[^\n]*\n/gm, '')
     .replace("@import './components/look/symbols.css';\n", '')

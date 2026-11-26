@@ -191,7 +191,7 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null) {
  *
  * @param spec the step's spec, read for its harness and its sandbox
  */
-export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>) =>
+const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>) =>
   spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode';
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
@@ -203,7 +203,7 @@ const toolsWord = (tools: readonly string[] | null) => (tools === null ? null : 
  * apart, `above what it asks`, where it passed what admission counted the session at.
  * @param memory What the try was filed with in memory and peaked at.
  */
-export const memoryWords = (memory: NonNullable<StepFiledView['memory']>) => {
+const memoryWords = (memory: NonNullable<StepFiledView['memory']>) => {
   const { request, limit, askedBytes, peakBytes } = memory;
   const above = peakBytes !== null && askedBytes !== null && peakBytes > askedBytes;
   const peak = peakBytes === null ? 'peak not measured' : `peaked ${memoryBytesWord(peakBytes)}`;

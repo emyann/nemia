@@ -204,7 +204,7 @@ const sessionTokens = (open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effe
  * @param open Opens the keyspace the tokens are held in, refused as opening it is.
  * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
  */
-export function tokenRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal> = open) {
+function tokenRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal> = open) {
   return {
     tokens: sessionTokens(open, held),
     persons: {
@@ -343,15 +343,6 @@ export const mintPersonToken = (home: string, name: string, now: Date = new Date
   atRoot(home, (door) => door.persons.mint(name, holder, now));
 
 /**
- * Mints a person's token under `name`, or the first free `name-2`, `name-3`… at the root `home` (`persons.mintFree`), at once.
- * @param home The store's root folder.
- * @param name The name to mint under, or to count on from where it is taken.
- * @param now When it is minted, written as its `createdAt`.
- */
-export const mintPersonTokenFree = (home: string, name: string, now: Date = new Date()) =>
-  atRoot(home, (door) => door.persons.mintFree(name, now));
-
-/**
  * The record of the person's token whose digest is `digest` at the root `home` (`persons.read`), at once, or null.
  * @param home The store's root folder.
  * @param digest The token's digest (`tokenDigest`).
@@ -419,10 +410,10 @@ export const sessionTokenFor = (run: Pick<Run, 'id' | 'factory'>, step: Pick<Ste
  * clear.
  */
 /** The file under the store that holds the person's credential, as the client reads it. */
-export const CREDENTIAL_FILE = 'credential';
+const CREDENTIAL_FILE = 'credential';
 
 /** The name the store's credential is minted under, or the first free one after it. */
-export const CREDENTIAL_NAME = 'local';
+const CREDENTIAL_NAME = 'local';
 
 /**
  * The credential's file under the store `home`.

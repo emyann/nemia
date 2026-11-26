@@ -9,10 +9,10 @@ import ts from 'typescript';
 export const SPAWNS = ['execFileSync', 'execFile', 'spawn', 'spawnSync', 'execCounted'];
 
 /** The calls that run a shell line: their first argument is the whole line, which runs git when its first word is git. */
-export const SHELLS = ['exec', 'execSync'];
+const SHELLS = ['exec', 'execSync'];
 
 /** The modules whose calls take a path. */
-export const PATH_MODULES = ['node:path', 'node:fs', 'node:fs/promises', 'path', 'fs', 'fs/promises'];
+const PATH_MODULES = ['node:path', 'node:fs', 'node:fs/promises', 'path', 'fs', 'fs/promises'];
 
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */
 export type FileFacts = { consts: ReadonlyMap<string, string>; pathNames: ReadonlySet<string> };
@@ -58,7 +58,7 @@ export function calleeRoot(call: ts.CallExpression) {
 }
 
 /** Whether a shell line runs git: its first word is git. */
-export const shellRunsGit = (parts: readonly string[]) => /^\s*git(\s|$)/.test(parts[0] ?? '');
+const shellRunsGit = (parts: readonly string[]) => /^\s*git(\s|$)/.test(parts[0] ?? '');
 
 /** The arguments of `call`, a list among them given as its elements. */
 export const argumentsOf = (call: ts.CallExpression) =>

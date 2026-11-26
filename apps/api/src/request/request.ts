@@ -16,7 +16,7 @@ import { routeAt } from '../objects/endpoints.ts';
  * the route as the router matched it, left off where nothing but the wildcard did (`routeOf`), which is what OTel's semantics ask of a
  * request that reached no route.
  */
-export type RequestAttributes = {
+type RequestAttributes = {
   readonly 'http.request.method': string;
   readonly 'url.path': string;
   readonly 'http.response.status_code': number;
@@ -48,7 +48,7 @@ export const routeOf = (c: Context<ApiEnv>) =>
  * The HTTP attributes of `c` once it is answered: its method, its path, its status, and its route where one matched.
  * @param c The request's context, once it is answered.
  */
-export const attributesOf = (c: Context<ApiEnv>) => {
+const attributesOf = (c: Context<ApiEnv>) => {
   const route = routeOf(c);
   return {
     'http.request.method': c.req.method,

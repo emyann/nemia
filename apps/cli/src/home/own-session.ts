@@ -6,7 +6,7 @@
  */
 import type { OwnSessionOf, SessionEnv, StaleCopiesOf } from '../../contracts/own-session.contract.ts';
 
-export type { OwnSession, OwnSessionPlace, SessionFlag, SessionEnv } from '../../contracts/own-session.contract.ts';
+export type { OwnSession } from '../../contracts/own-session.contract.ts';
 
 /** Whether `inner` is `outer` or a folder under it. */
 const within = (inner: string, outer: string) => inner === outer || inner.startsWith(outer + '/');

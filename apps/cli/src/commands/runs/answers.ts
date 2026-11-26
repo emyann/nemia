@@ -84,7 +84,7 @@ export function numberedAnswers(questions: readonly Question[], typed: readonly 
  * @param runId The run's id.
  * @param step The step's name.
  */
-export async function askedNow(command: string, runId: string, step: string) {
+async function askedNow(command: string, runId: string, step: string) {
   const { tries } = await asked(command, (c) => c.steps.tries({ params: { runId, step }, query: {} }));
   const current = tries.find((t) => t.current) ?? tries.at(-1);
   return (current?.closeout?.questions ?? []).flatMap((asked) => asked.questions);

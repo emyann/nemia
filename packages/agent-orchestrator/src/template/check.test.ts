@@ -523,6 +523,21 @@ describe('the check of a template folder: the whole folder passes, and each rule
     };
     assert.deepEqual(refusalsOf(declared, withRules, ['git'], texts), []);
   });
+  test('a case over a parameter nemia.yaml declares with a type other than boolean is refused, in a check and in a text, and over a boolean it passes', () => {
+    const workflow = 'workflows/dev/workflow.yaml';
+    const cased = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = "go ${{ case(parameters.flag, 'a', '') }}");
+    const declare = (type: string) => (d: Record<string, any>) => {
+      cased(d);
+      d['nemia.yaml'].spec.parameters.flag = { type, description: 'A flag.', default: type === 'boolean' ? true : 'x' };
+    };
+    assertRefused(refusalsOf(declare('string')), workflow, ['spec', 'steps', 1, 'check'], 'flag');
+    assert.deepEqual(refusalsOf(declare('boolean')), []);
+    assertRefused(refusalsOf(cased), workflow, ['spec', 'steps', 1, 'check'], 'flag');
+    const texts = { 'workflows/dev/review.md': "Wait ${{ case(parameters.flag, 'a', 'b') }}." };
+    const asString = (d: Record<string, any>) =>
+      (d['nemia.yaml'].spec.parameters.flag = { type: 'string', description: 'A flag.', default: 'x' });
+    assertRefused(refusalsOf(asString, undefined, ['git'], texts), 'workflows/dev/review.md', [], 'flag');
+  });
   test("an effort, a fence key or word, a context and an option the harness lacks are refused, through the runtime's knobs", () => {
     const block = (harness: string, profile: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = profile));
     const at = (harness: string, ...rest: string[]) => ['spec', harness, ...rest];

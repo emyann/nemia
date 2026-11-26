@@ -43,7 +43,6 @@ const TREES = await rendered([
       'landingInstall=x install',
       'landingCheckMemory=256Mi',
       'lightMemoryRequest=768Mi',
-      'ciServer=github',
     ],
   },
   { name: 'plain', template: COPY },
@@ -238,14 +237,14 @@ test("build's and quick's implement try again on their own twice when their chec
     }
 });
 
-test("build's and quick's implement load the MCP server ciServer names, and none where it is empty, writing no mcp: line", () => {
+test("build's and quick's implement and review load the github MCP server where github is true, and no step does where it is false, writing no mcp: line", () => {
   for (const workflow of ['build', 'quick']) {
-    const implement = (name: string) => loaded(name, workflow).find((step) => step.name === 'implement');
-    assert.deepEqual(implement('set')?.mcp, ['github'], `set: ${workflow}/implement`);
-    assert.equal(implement('plain')?.mcp, undefined, `plain: ${workflow}/implement`);
-    assert.equal(Object.hasOwn(stepIn(treeOf('plain'), workflow, 'implement').front, 'mcp'), false, `plain: ${workflow}/implement`);
-    for (const step of loaded('set', workflow).filter((one) => one.name !== 'implement'))
-      assert.equal(step.mcp, undefined, `set: ${workflow}/${step.name} loads no server`);
+    const withServer = ['implement', 'review'];
+    for (const step of loaded('set', workflow))
+      assert.deepEqual(step.mcp, withServer.includes(step.name) ? ['github'] : undefined, `set: ${workflow}/${step.name}`);
+    for (const step of loaded('plain', workflow)) assert.equal(step.mcp, undefined, `plain: ${workflow}/${step.name}`);
+    for (const step of withServer)
+      assert.equal(Object.hasOwn(stepIn(treeOf('plain'), workflow, step).front, 'mcp'), false, `plain: ${workflow}/${step}`);
   }
 });
 

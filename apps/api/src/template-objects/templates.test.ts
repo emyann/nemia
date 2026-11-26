@@ -1,7 +1,8 @@
 /**
  * The builtin templates on the api, on a scratch builtin folder, never the package's own: listed and read as `Template`s, and each one's
  * documents — its workflows, agents, skills and programs — served as the Workflows, Agents, Skills and Programs a namespace serves, read
- * from its render with its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled by the template's
+ * from its render with its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled
+ * by the template's
  * hires as in a factory applied from it; a document it lacks a 404, an unknown
  * template a 404, and one that does not render with its defaults a 422 on its documents while the template itself still reads.
  *

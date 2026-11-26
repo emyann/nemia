@@ -24,7 +24,7 @@ export const BAR = 4.5;
  * How much of a grain's tile its far end leaves out: the speck is read at the strength only this share of the tile's pixels is past.
  * No eye reads the one strongest pixel of a tile.
  */
-const GRAIN_TAIL = 0.02;
+export const GRAIN_TAIL = 0.02;
 
 /** A colour as sRGB: red, green and blue from 0 to 255. */
 export type Rgb = readonly [number, number, number];

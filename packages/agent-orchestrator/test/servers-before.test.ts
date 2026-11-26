@@ -42,7 +42,7 @@ test('a step whose factory server reports needs-auth is refused, and the same st
   const read = await before();
   assert.equal(read.refusal, null, 'the record reads: nothing refuses every step');
   const refused = read.refuses('claude', ['github', 'docs']);
-  assert.match(refused!, new RegExp(`\`mcp: github, docs\` names \`github\`, which ${factory()} records and which reports needs-auth`));
+  assert.match(refused!, new RegExp(`\`mcp: github, docs\` names \`github\` \\(needs-auth\\), which ${factory()} records`));
   assert.match(refused!, /a session of it would reach no tool of that server/, 'why it is not started');
   assert.ok(refused!.includes("the factory's settings page"), refused!);
   assert.ok(refused!.includes('the next pass files the step'), refused!);
@@ -50,6 +50,23 @@ test('a step whose factory server reports needs-auth is refused, and the same st
   assert.equal(read.refuses('claude', undefined), null, 'a step that names no server: filed');
   assert.equal(read.refuses('claude', ['repo']), null, 'a name the factory does not record: filed');
   assert.deepEqual(read.notes, [], 'and nothing is noted when every state was read');
+});
+
+test('a server that signs in through Nemia (`oauth`) refuses its steps at every state but connected and disabled; one without keeps needs-auth alone', async () => {
+  writeFactoryServers(ROOT, factory(), { github: GITHUB, docs: DOCS });
+  for (const status of ['pending', 'failed', 'needs-auth'] as const) {
+    engine().plantMcpState('github', { status });
+    engine().plantMcpState('docs', { status: 'pending' });
+    const read = await before();
+    const refused = read.refuses('claude', ['github']);
+    assert.ok(refused, `github at ${status}: a session of it would reach no tool of GitHub`);
+    assert.match(refused, new RegExp(`\`github\` \\(${status}\\)`), 'the state it read, named beside the server');
+    assert.equal(read.refuses('claude', ['docs']), null, 'docs, with no oauth, at pending: filed, as before');
+  }
+  engine().plantMcpState('github', { status: 'connected', tools: 46 });
+  assert.equal((await before()).refuses('claude', ['github']), null, 'connected: filed, whoever holds the token');
+  engine().plantMcpState('github', { status: 'disabled' });
+  assert.equal((await before()).refuses('claude', ['github']), null, 'disabled: no sign-in would change it, so nothing is held back for one');
 });
 
 test('the same step on a harness that files no sign-in of its own IS filed: it is shown its servers, never refused them', async () => {

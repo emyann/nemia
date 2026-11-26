@@ -72,9 +72,9 @@ function Sizes({ run, whole = true }: { run: RunDetail; whole?: boolean }) {
 
 /**
  * The step's card at M drawn in `canvas`, in its state: its card's kind, its frame in the step's hue, its five facts whole, a meter
- * only where a spend and its budget are measured, its label the card's small caps as its facts' labels, and its one action.
+ * only where a spend and its budget are measured, its label the card's small caps as its facts' labels, and no link to the step's page.
  */
-async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: string) {
+async function cardAtM(canvas: HTMLElement, kind: string, hue: string) {
   const card = canvas.querySelector<HTMLElement>('[data-step-part="M"]')!;
   const frame = card.closest('[data-cut-frame]');
   await expect(frame?.getAttribute('data-cut-frame'), "its frame's hue").toBe(hue);
@@ -88,22 +88,24 @@ async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: s
     );
     await expect(spent, "the meter's label is the card's small caps, as its facts' labels").toEqual({ ...fact, case: 'uppercase' });
   }
-  const named = (name: string) => name.toLowerCase().includes(action.toLowerCase());
-  await expect(within(card).queryAllByRole('link', { name: named }).length, `one action, ${action}`).toBe(1);
+  await expect(
+    card.querySelector('[data-step-action]'),
+    "no link to the step's page: the modal is the reading and the approving",
+  ).toBeNull();
   return card;
 }
 
 /** A step to come: when it starts, nothing said and nothing given yet. */
 export const ToCome: StoryObj = {
   render: () => <Sizes run={RUNS.toCome} />,
-  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'come', 'none', 'Open the step')),
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'come', 'none')),
 };
 
 /** A step at work: its session running, nothing given yet, its spend not measured yet. */
 export const AtWork: StoryObj = {
   render: () => <Sizes run={RUNS.atWork} />,
   play: async ({ canvasElement }) => {
-    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    const card = await cardAtM(canvasElement, 'work', 'alive');
     await expect(card.textContent).toMatch(/not measured yet/);
   },
 };
@@ -116,7 +118,7 @@ export const AtWorkSpending: StoryObj<{ run: RunDetail }> = {
   args: { run: RUNS.spendingSoFar },
   render: ({ run }) => <Sizes run={run} />,
   play: async ({ canvasElement }) => {
-    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    const card = await cardAtM(canvasElement, 'work', 'alive');
     await expect(card.querySelector('[data-step-spend="words"]')?.textContent).toMatch(/^Spent\s*\$32\.32 so far/);
     await expect(card.textContent).not.toMatch(/not measured yet/);
   },
@@ -130,7 +132,7 @@ export const WaitingToStart: StoryObj<{ run: RunDetail }> = {
   args: { run: RUNS.queued },
   render: ({ run }) => <Sizes run={run} />,
   play: async ({ canvasElement }) => {
-    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    const card = await cardAtM(canvasElement, 'work', 'alive');
     for (const fact of ['waits for memory', '2Gi', '1.5Gi', '2.5Gi']) await expect(card.textContent).toContain(fact);
   },
 };
@@ -142,14 +144,14 @@ export const WaitingToStart: StoryObj<{ run: RunDetail }> = {
 export const WaitsOnYou: StoryObj = {
   parameters: { a11y: { test: 'todo' } },
   render: () => <Sizes run={RUNS.waitsOnYou} whole={false} />,
-  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'gate', 'yours', 'Read and approve')),
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'gate', 'yours')),
 };
 
 /** A step done: what it said, then each field it gave by its widget, its picture a thumbnail. */
 export const Done: StoryObj = {
   parameters: { a11y: { test: 'todo' } },
   render: () => <Sizes run={RUNS.done} />,
-  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'done', 'none', 'Open the step')),
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'done', 'none')),
 };
 
 /** The run at work whose session reports another model than the one its step asked for. */
@@ -167,7 +169,7 @@ export const RanOnAnotherModel: StoryObj<{ run: RunDetail }> = {
   args: { run: ranElsewhere() },
   render: ({ run }) => <Sizes run={run} whole={false} />,
   play: async ({ canvasElement }) => {
-    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    const card = await cardAtM(canvasElement, 'work', 'alive');
     await expect(card.querySelector('[data-step-facts]')?.textContent).toContain('the-long-model-id · asked opus');
   },
 };

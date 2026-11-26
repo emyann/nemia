@@ -739,12 +739,6 @@
       }
     },
     {
-      "files": ["apps/web/src/lib/gate.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 37]
-      }
-    },
-    {
       "files": ["apps/web/src/lib/prune.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]

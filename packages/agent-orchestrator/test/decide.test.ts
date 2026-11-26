@@ -10,6 +10,8 @@
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
 import { keysUnder, listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
+import { createFactoryAt, rewriteRun } from '../testing.ts';
+import { inRadiusFactory, RADIUS } from './radius.fixture.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -64,6 +66,9 @@ const stage = staged({ runWith, main, engineOf, env: ENV });
 const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(ROOT)));
+
+/** The run `opts` start, in a factory of its own that sets `RADIUS`: what its decision flags is that factory's. */
+const started = async (opts: Parameters<typeof startRun>[0]) => inRadiusFactory(ROOT, (await stage.runPlaced(startRun(opts))).id);
 
 /** A run this file started on a repository, as `changesOf` reads one: a repository run. */
 const repositoryRun = (run: Run) => {
@@ -153,7 +158,7 @@ const ending = (last: string, body: string, agent?: string, under = ROOT) => {
  */
 const awaiting = async (implementKeys = '') => {
   const repo = aRepo();
-  const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(implementKeys) }));
+  const run = await started({ brief: 'add sub', repo, workflowDir: folder(implementKeys) });
   await tick(run.id);
   const work = runRecord(ROOT, run.id).steps.implement;
   commitIn(work.workspace!, {
@@ -336,6 +341,29 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       'the globs choose what is read whole, not what is true: the radius still names the check file',
     );
   });
+  s.test(
+    "the radius is the run's factory's: a factory that names other files has those flagged, and one that names none flags nothing",
+    async () => {
+      const own = runRecord(ROOT, a.run.id).factory;
+      const in_ = async (name: string, radius?: typeof RADIUS) => {
+        createFactoryAt(ROOT, { name, volumes: [], workflows: [], hires: {}, schedules: {}, ...(radius ? { radius } : {}) });
+        rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: name });
+        const { d } = await decidable(a.run.id);
+        const [touched] = d.touched;
+        assert.ok(touched && !('error' in touched.radius), JSON.stringify(touched));
+        return { radius: touched.radius, inFull: d.sensitive.flatMap((b) => b.files.map((f) => f.path)) };
+      };
+      try {
+        const other = await in_('other-radius', { agentFacing: ['**/add.ts'], checkAffecting: ['**/add.ts'], lessons: [] });
+        assert.deepEqual([other.radius.agentFacing, other.radius.checkAffecting], [['packages/x/src/add.ts'], ['packages/x/src/add.ts']]);
+        assert.deepEqual(other.inFull, ['packages/x/src/add.ts'], 'and its diff is the one read in full');
+        const none = await in_('no-radius');
+        assert.deepEqual([none.radius.agentFacing, none.radius.checkAffecting, none.inFull], [[], [], []]);
+      } finally {
+        rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: own });
+      }
+    },
+  );
   s.test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
     const world = stage.place().world;
     world.branch(a.repo, 'wf/source-docs', { 'packages/x/src/docs/strings.ts': 'export const title = "Docs";\n' });
@@ -343,17 +371,17 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       'packages/x/src/docs/strings.ts': 'export const title = "Docs";\n',
       'packages/x/docs/features.md': 'what is left\n',
     });
-    const read = (branch: string) => lessonLine(changesOf(stage.place().place, a.run, [branch]));
+    const read = (branch: string) => lessonLine(changesOf(stage.place().place, a.run, [branch], RADIUS));
     assert.equal(read('wf/source-docs'), 'lesson  nothing written where the next agent reads');
     assert.equal(read('wf/package-docs'), 'lesson  packages/x/docs/features.md +1 −0');
-    const [gone] = changesOf(stage.place().place, a.run, ['wf/never']);
+    const [gone] = changesOf(stage.place().place, a.run, ['wf/never'], RADIUS);
     assert.ok('error' in gone.radius && /wf\/never/.test(gone.radius.error), 'a branch that is gone is not read as nothing');
     assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
   });
   s.test(
     "a measured cost on both reads: the decision's beside what each step used, with the api and tool time, and the run's; `nemia ls` beside each step's word and on the run's line — and a run nobody measured says no dollar",
     async () => {
-      const run = await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
+      const run = await started({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
       await tick(run.id);
       settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED, usage: { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 } });
       await tick(run.id);
@@ -493,7 +521,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       const dir = ending('ship', 'Ship it.\n');
       const add = 'packages/x/src/add.ts';
       const working = async (file: string, text: string, settled: boolean) => {
-        const run = await stage.runPlaced(startRun({ brief: `write ${file}`, repo, workflowDir: dir }));
+        const run = await started({ brief: `write ${file}`, repo, workflowDir: dir });
         await tick(run.id);
         const work = runRecord(ROOT, run.id).steps.implement;
         commitIn(work.workspace!, { [file]: text }, `write ${file}`);
@@ -542,7 +570,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       );
       const LANDS = "Land this run's result on main: stage the merge of its branch, and sign off with the commit message.";
       const atGate = async (note: string) => {
-        const run = await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('land', note, 'otto', team) }));
+        const run = await started({ brief: 'add sub', repo: aRepo(), workflowDir: ending('land', note, 'otto', team) });
         await tick(run.id);
         commitIn(
           runRecord(ROOT, run.id).steps.implement.workspace!,
@@ -584,7 +612,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     'a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its commands',
     async () => {
       const repo = aRepo();
-      const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
+      const run = await started({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });
       await tick(run.id);
       commitIn(
         runRecord(ROOT, run.id).steps.implement.workspace!,
@@ -657,7 +685,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       const repo = aRepo();
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: base\nslot: none\n---\nWatch the runs.\n');
-      const run = await stage.runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: dir }));
+      const run = await started({ brief: 'supervise this repository', repo, workflowDir: dir });
       await tick(run.id);
       settle(`${run.id}-supervise`, 'succeeded', { closeout: blocked('Merge add-sub, or hold it?', 'add-sub is ready to merge.') });
       await tick(run.id);
@@ -671,7 +699,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
         'packages/x/test/add.test.ts': "import assert from 'node:assert';\nassert.ok(true);\n",
         'CLAUDE.md': 'a lesson somebody else wrote\n',
       });
-      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(runRecord(ROOT, run.id)), ['main']);
+      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(runRecord(ROOT, run.id)), ['main'], RADIUS);
       assert.ok(
         !('error' in moved) && moved.changes.length === 2,
         `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -690,7 +718,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       );
       assert.equal(decided.answering.supervise, `to answer it:  nemia retry ${run.id} supervise --message "<answer>"`);
 
-      const direct = await stage.runPlaced(startRun({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false }));
+      const direct = await started({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
       stage.place().world.branch(repo, 'main', { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` });
       await tick(direct.id);
       settle(`${direct.id}-implement`, 'failed');
@@ -733,7 +761,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
   const s = story(test);
   let id = '';
   s.test('a blocked step is told the nemia retry --message that answers it, and nothing is answered yet', async () => {
-    id = (await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }))).id;
+    id = (await started({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false })).id;
     await tick(id);
     settle(`${id}-implement`, 'succeeded', { closeout: blocked('Rename --flag, or keep it?') });
     await tick(id);
@@ -819,7 +847,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
         ['unsigned', 'succeeded', (a: Awaiting) => a.unsigned],
       ] as const;
       for (const [own, phase, banner] of cases) {
-        const run = await stage.runPlaced(startRun({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false }));
+        const run = await started({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false });
         await tick(run.id);
         settle(`${run.id}-implement`, phase, { usage: { costUsd: 3.4 } });
         const { d, decided } = await decidable(run.id);
@@ -838,7 +866,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
   s.test(
     "UNSIGNED after the run's own nudge: the decision and `nemia ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours",
     async () => {
-      const run = await stage.runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
+      const run = await started({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false });
       await tick(run.id);
       settle(`${run.id}-implement`, 'succeeded', { closedOut: false });
       assert.deepEqual(
@@ -871,7 +899,7 @@ describe('a run on two branches, side by side: each read, each in full, the long
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
     fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
-    id = (await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }))).id;
+    id = (await started({ brief: 'add sub', repo: aRepo(), workflowDir: dir })).id;
     assert.deepEqual((await tick(id)).filed.sort(), ['docs', 'implement']);
     commitIn(runRecord(ROOT, id).steps.implement.workspace!, { 'sub.ts': 'export const sub = (a, b) => a - b;\n' }, 'add sub.ts');
     commitIn(

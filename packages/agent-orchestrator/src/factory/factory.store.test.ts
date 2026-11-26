@@ -649,6 +649,16 @@ describe('the values each label key takes: a hand-made factory reads its record,
     assert.deepEqual(fileOf('mill').labelValues, { work: ['feature', 'fix'] });
     assert.deepEqual(readFactoryAt(ROOT, 'mill').labelValues, { work: ['feature', 'fix'] });
   });
+  test("a hand-made factory's record states its radius and first workflow, and a verb that writes it back keeps them", () => {
+    const repo = fresh();
+    addFactoryAt(ROOT, { name: 'mill', volumes: [`${repo}:rw`] });
+    const radius = { agentFacing: ['**/GUIDE.md'], checkAffecting: ['**/Makefile'], lessons: ['docs/'] };
+    plantFactory(ROOT, 'mill', JSON.stringify({ ...fileOf('mill'), radius, firstWorkflow: 'build' }));
+    assert.deepEqual(readFactoryAt(ROOT, 'mill').radius, radius);
+    assert.equal(readFactoryAt(ROOT, 'mill').firstWorkflow, 'build');
+    attachWorkflowAt(ROOT, { factory: 'mill', workflow: 'build' });
+    assert.deepEqual([fileOf('mill').radius, fileOf('mill').firstWorkflow], [radius, 'build']);
+  });
   test("a templated factory reads its tree's wiring, never its record's", () => {
     fresh();
     plantFactory(

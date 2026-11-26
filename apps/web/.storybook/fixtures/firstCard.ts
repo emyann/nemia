@@ -49,12 +49,12 @@ const commandsOf = (follows: boolean) => ({
     : {}),
 });
 
-/** A factory named `name` as the api serves it, offering `workflows` and given `volumes`. */
+/** A factory named `name` as the api serves it, offering `workflows`, given `volumes`, and naming `quick` for a first card. */
 const factoryFixture = (name: string, workflows: string[], volumes: FactoryVolume[]) => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
-  spec: { hires: {}, volumes, workflows },
+  spec: { hires: {}, volumes, workflows, firstWorkflow: 'quick' },
   status: { conditions: [], untrusted: [] },
 }) satisfies Factory;
 

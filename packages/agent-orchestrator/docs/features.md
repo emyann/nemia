@@ -2823,19 +2823,7 @@ and `wf decide`'s list. Ship's are taken after the ship's gate, so no person rea
 `<page>-<theme>-failed.png` and the pages before it show how far it got. When it passes, the run commits, and nothing shows them but
 `wf decide`'s list of names and sizes.
 
-What was built: on the pass that writes a landing's `{ commit }` — the commit made on the check's exit 0, or found on HEAD after a restart
-— `landEnding` removes every regular `.png` directly in the ending's directory that its closeout does not name, never through a link, and
-writes `e2e-pictures.txt` in their place: why, where the check's output and stderr are, and each name with its size (`dropLandedPictures`
-in artifacts/artifacts.store.ts). The note is written before anything is removed and left as it is after, so a pass that dies halfway leaves the whole list
-and the next removes the rest. An abort, an untouched landing, a refused check and one that did not finish keep every picture.
-
-Why not a hardlink of byte-identical files: once a landed ship keeps no pictures there is no pair across steps left on a pass, and within
-a step the files are still written to — `collectArtifacts` copies onto a file that has a link, which would write through it into the
-other name. The pairs within one set (`builder` and `builder-saved`, and a few more, about 2.7 MB a set) are left.
-
-The saving, measured on a fixture of the store's shape (`ship.test.ts`: 252 pictures of 194 KB): 48.9 MB freed a landed web run, less a
-note of a few KB. On the owner's store as it is, the 21 runs whose ship landed a commit hold 453 MB of such pictures: that much would
-have been freed, 12% of `runs/`. Forward only: runs landed before this keep them, and nothing reclaims them yet.
+What was built, and then removed: the landing dropped the ending's unnamed pictures and wrote a note in their place. Nothing of the shipped team writes a picture there now, so the code and its note are gone.
 
 Left for later:
 

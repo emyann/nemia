@@ -107,6 +107,9 @@ export type Program = { readonly run: string; readonly writes: readonly string[]
  * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`).
  * `programs`: the programs its template declares (`programs/<name>/program.yaml`), by name, read from its tree's wiring, which the
  * daemon keeps running for it (`programs()`).
+ * `radius`: the globs of the files a branch changes that its team wants shown at decide (`agentFacing`, `checkAffecting`, `lessons`),
+ * kept as `labelValues` is, rendered from its manifest's `spec.radius`; none flags nothing. `firstWorkflow`: the workflow a first
+ * card on it runs in, from its manifest's `spec.firstWorkflow`.
  */
 export type Factory = {
   name: string;
@@ -124,6 +127,8 @@ export type Factory = {
   triggers?: Readonly<Record<string, CardTrigger>>;
   labelValues?: Readonly<Record<string, readonly string[]>>;
   programs?: Readonly<Record<string, Program>>;
+  radius?: { readonly agentFacing: readonly string[]; readonly checkAffecting: readonly string[]; readonly lessons: readonly string[] };
+  firstWorkflow?: string;
   generation?: number;
 };
 

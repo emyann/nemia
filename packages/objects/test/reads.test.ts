@@ -74,6 +74,7 @@ const closeoutOf = (body: number) =>
     missing: [],
     replies: null,
     schema: { short: {}, long: {} },
+    tallies: [],
     questions: [],
     raw: { whole: true },
   }) satisfies StepCloseout;

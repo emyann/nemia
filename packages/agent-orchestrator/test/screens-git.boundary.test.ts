@@ -10,6 +10,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
+import { inRadiusFactory, RADIUS } from './radius.fixture.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -221,9 +222,12 @@ const repositoryRunOf = (run: Run) => {
   return run;
 };
 
+/** The run `placed` started, filed in a factory of its own that sets `RADIUS`: what its decision flags is that factory's. */
+const radiused = async (placed: Promise<Run>) => repositoryRunOf(inRadiusFactory(ROOT, (await placed).id));
+
 /** `nemia start`, for real, over a fresh repository, the steps working in the checkout itself. */
 const started = async (dir: string) =>
-  repositoryRunOf(await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
+  radiused(runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
 
 /** `run`'s whole decision as facts (`decisionFacts`), read on the git place over this file's store, the globs `sensitive` names in full. */
 const whole = async (e: Engine, run: RepositoryRun, sensitive?: readonly string[]) =>
@@ -360,7 +364,7 @@ describe("what a step is told and what it shows, in the git place's words: a fan
       fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
       fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
       const joined = async (left: [string, string], right: [string, string]) => {
-        const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
+        const run = await radiused(runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir })));
         const b = board();
         assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).filed.sort(), ['left', 'right']);
         for (const [step, [file, text]] of [
@@ -646,7 +650,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
     'the whole decision of a run waiting on you, once a pass has read where its branch stands: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and land and drop — each task viewed once and the feed never read',
     async () => {
       const repo = aPackage();
-      const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: checked(), isolate: false })));
+      const run = await radiused(runPlaced(startRun({ brief: 'add sub', repo, workflowDir: checked(), isolate: false })));
       const branch = `wf/${run.id}`;
       branchOff(repo, branch, () => {
         fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
@@ -701,7 +705,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
         write(a.repo, 'logo.png', new Uint8Array([0, 1, 2, 0, 255]));
         write(a.repo, 'NOTES', 'one\n');
       });
-      const [moved] = changesOf(builtinGitPlace, a.run, ['wf/moved']);
+      const [moved] = changesOf(builtinGitPlace, a.run, ['wf/moved'], RADIUS);
       const r = moved.radius;
       assert.ok(!('error' in r), JSON.stringify(r));
       assert.deepEqual(
@@ -730,7 +734,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
       );
       assert.match(moved.inFull as string, /^rename to packages\/x\/spec\/add\.test\.ts$/m);
 
-      const [gone] = changesOf(builtinGitPlace, a.run, ['wf/never']);
+      const [gone] = changesOf(builtinGitPlace, a.run, ['wf/never'], RADIUS);
       const notKnown = `what this run changed is not known: the place has no branch wf/never in ${a.repo}`;
       assert.deepEqual(gone, { branch: 'wf/never', radius: { error: notKnown }, inFull: { error: notKnown }, notes: { error: notKnown } });
     },
@@ -740,7 +744,7 @@ describe("a run waiting on you, on git: its whole decisions, what its branches t
       write(a.repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
       write(a.repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
     });
-    const [lint] = changesOf(builtinGitPlace, a.run, ['wf/lint']);
+    const [lint] = changesOf(builtinGitPlace, a.run, ['wf/lint'], RADIUS);
     assert.ok(!('error' in lint.radius), JSON.stringify(lint.radius));
     assert.deepEqual(lint.radius.checkAffecting, ['.oxlintrc.json']);
     assert.match(lint.inFull as string, /^\+\{ "rules": \{ "no-console": "off" \} \}$/m);
@@ -806,7 +810,7 @@ describe('the whole decisions of a run through its tries and on two branches', (
     'the whole decision of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered',
     async () => {
       const run = repositoryRunOf(
-        await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: checked(), isolate: false })),
+        await radiused(runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: checked(), isolate: false }))),
       );
       const { e, settle } = timed();
       const running = (retrying: unknown[]) => ({
@@ -873,7 +877,7 @@ describe('the whole decisions of a run through its tries and on two branches', (
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
       fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
-      const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: dir })));
+      const run = await radiused(runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: dir })));
       const { e, settle } = timed();
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       const committed = (step: string, file: string, text: string) => {

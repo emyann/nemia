@@ -223,6 +223,9 @@ async function unlabelRun(page: Page, id: string) {
   if (store !== undefined) dropStoredMarker(id, 'labels');
 }
 
+/** The workflow the factory made names for a first card, whose tree this page writes. */
+const FIRST_WORKFLOW = 'quick';
+
 /** The workflows sdlc's render gives a factory made from it, which the board's first card picks quick among. */
 const SDLC_WORKFLOWS = ['build', 'intake', 'janitor', 'quick'];
 
@@ -242,7 +245,11 @@ const factoryFolder = (name: string) => {
 function rendered(name: string, workflows: readonly string[]) {
   const tree = path.join(factoryFolder(name), 'tree');
   fs.mkdirSync(tree, { recursive: true });
-  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows, hires: {} }, null, 2));
+  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows, hires: {}, firstWorkflow: FIRST_WORKFLOW }, null, 2));
+  const quick = path.join(tree, 'workflows', FIRST_WORKFLOW);
+  fs.mkdirSync(quick, { recursive: true });
+  fs.writeFileSync(path.join(quick, 'implement.md'), '---\nplace: git\nharness: claude\n---\nBuild the change.\n');
+  fs.writeFileSync(path.join(quick, 'land.md'), '---\nplace: git\nharness: claude\nafter: implement\nworkspace: base\n---\nLand it.\n');
 }
 
 /**

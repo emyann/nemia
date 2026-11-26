@@ -109,7 +109,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`; its own card triggers, by name (`triggers`), kept here as its schedules are; and
  * the values each label key it names takes (`labelValues`), where it is made from no template (one made from a template keeps them in
- * its tree's wiring, rendered from its manifest). A key a later `nemia` writes is kept.
+ * its tree's wiring, rendered from its manifest); and, kept the same way, its `radius` and `firstWorkflow`. A key a later `nemia` writes
+ * is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -124,6 +125,14 @@ const FactoryFileSchema = Schema.StructWithRest(
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
     labelValues: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+    radius: Schema.optionalKey(
+      Schema.Struct({
+        agentFacing: Schema.Array(Schema.String),
+        checkAffecting: Schema.Array(Schema.String),
+        lessons: Schema.Array(Schema.String),
+      }),
+    ),
+    firstWorkflow: Schema.optionalKey(Schema.String),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -192,7 +201,7 @@ function treeWiringOf(home: string, name: string) {
   const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
-  const { workflows, hires, revisions, workflowRepos, labelValues, programs } = read.wiring;
+  const { workflows, hires, revisions, workflowRepos, labelValues, programs, radius, firstWorkflow } = read.wiring;
   return {
     workflows,
     hires,
@@ -200,6 +209,8 @@ function treeWiringOf(home: string, name: string) {
     ...(workflowRepos === undefined ? {} : { workflowRepos }),
     ...(labelValues === undefined ? {} : { labelValues }),
     ...(programs === undefined ? {} : { programs }),
+    ...(radius === undefined ? {} : { radius }),
+    ...(firstWorkflow === undefined ? {} : { firstWorkflow }),
   };
 }
 
@@ -214,6 +225,8 @@ function factoryOf(home: string, name: string, content: FactoryFile) {
     ...(content.revisions === undefined ? {} : { revisions: content.revisions }),
     ...(content.workflowRepos === undefined ? {} : { workflowRepos: content.workflowRepos }),
     ...(content.labelValues === undefined ? {} : { labelValues: content.labelValues }),
+    ...(content.radius === undefined ? {} : { radius: content.radius }),
+    ...(content.firstWorkflow === undefined ? {} : { firstWorkflow: content.firstWorkflow }),
   };
   const wiring =
     template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {}, ...own } : treeWiringOf(home, name);
@@ -357,6 +370,8 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory) {
       factory.workflowRepos !== undefined && Object.keys(factory.workflowRepos).length ? factory.workflowRepos : undefined,
     );
     kept('labelValues', factory.labelValues);
+    kept('radius', factory.radius);
+    kept('firstWorkflow', factory.firstWorkflow);
   }
   named('schedules', factory.schedules, Object.keys(factory.schedules).length > 0);
   kept('instruction', factory.instruction);

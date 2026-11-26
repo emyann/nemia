@@ -493,6 +493,22 @@ describe('what a render refuses by name, with nothing of it to write', () => {
     assert.deepEqual(none.refusals, []);
     assert.equal('labelValues' in none.wiring, false);
   });
+  test("the radius's globs, rendered from parameters into the wiring and the factory's file, and the first workflow passed through", () => {
+    const { dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { ...spec.parameters, g: { type: 'string', default: '' } };
+      spec.radius = { agentFacing: '${{ parameters.g }}', checkAffecting: '**/a.json  **/test/', lessons: '' };
+      spec.firstWorkflow = 'dev';
+    });
+    const taken = rendered(dir, ['g=**/GUIDE.md **/AGENTS.md']).out;
+    assert.deepEqual(taken.refusals, []);
+    const radius = { agentFacing: ['**/GUIDE.md', '**/AGENTS.md'], checkAffecting: ['**/a.json', '**/test/'], lessons: [] };
+    assert.deepEqual(taken.wiring.radius, radius);
+    assert.equal(taken.wiring.firstWorkflow, 'dev');
+    const filed = JSON.parse(taken.files.find((f) => f.path === 'factory.json')?.text ?? '{}');
+    assert.deepEqual([filed.radius, filed.firstWorkflow], [radius, 'dev']);
+    assert.deepEqual(rendered(dir, ['g=']).out.wiring.radius?.agentFacing, [], 'an empty string renders an empty list');
+  });
   test("REFUSED by name: a step's output.path outside its workflow's folder", () => {
     const { dir } = exported();
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {

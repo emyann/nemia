@@ -209,6 +209,22 @@ function programRefusals(held: Held) {
 }
 
 /**
+ * The manifest's `firstWorkflow` written whole that names no workflow of workflows/. One a parameter writes is read once rendered.
+ */
+function firstWorkflowRefusals(held: Held) {
+  const written = held.manifest.firstWorkflow;
+  if (typeof written !== 'string' || written.includes('${{') || held.workflows.has(written)) return [];
+  const offered = [...held.workflows.keys()].join(', ') || 'none';
+  return [
+    {
+      file: 'nemia.yaml',
+      at: ['spec', 'firstWorkflow'],
+      message: `firstWorkflow names ${written}, no workflow of workflows/: set spec.firstWorkflow to one of ${offered}, or delete it.`,
+    },
+  ];
+}
+
+/**
  * What a list of skills at `at` names that the folder lacks and no skill of Nemia's own is; a skill named with its folder
  * (`givenSkillOf`) is the repository's a run is started on, which a template names and never carries, and passes.
  */
@@ -657,6 +673,7 @@ export function checkTemplate(
     ...triggerRefusals(held),
     ...labelValuesRefusals(held),
     ...programRefusals(held),
+    ...firstWorkflowRefusals(held),
     ...originRefusals(held),
     ...agentRefusals(held),
     ...modelRefusals(held, lists),

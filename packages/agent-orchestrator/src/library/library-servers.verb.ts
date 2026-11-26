@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../object/listed.verb.ts';
 import { specOf } from '../factory/object/mcp-server.verb.ts';
 import { headersKept, writeRefusal } from '../factory/servers/servers.verb.ts';
 import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/index.ts';
@@ -29,15 +29,17 @@ export const libraryServerThere = (home: string, name: string) => {
  * The library's MCP servers as objects, in no namespace: the user library's, each header masked, then each builtin no user server of its
  * name shadows, each with the factories that add it.
  * @param home The store's root.
+ * @param at The revisions of the McpServer kind, read now where none are given.
  */
-export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* (home: string) {
+export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* (home: string, at?: AtRevisions) {
+  const stamps = at ?? (yield* atRevisions('McpServer', home));
   const mine = libraryServers(home);
   const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
-  const own = yield* Effect.all(Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt)));
+  const own = yield* Effect.all(Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt, stamps)));
   const builtin = yield* Effect.all(
     builtinServers(BUILTIN_SERVERS)
       .filter((s) => mine[s.name] === undefined)
-      .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt)),
+      .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt, stamps)),
   );
   return [...own, ...builtin].sort((a, b) =>
     a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0,
@@ -45,13 +47,13 @@ export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* 
 });
 
 /** The object of the library server `name` at `origin`, with the factories that add it. */
-const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string) =>
+const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string, at: AtRevisions) =>
   Effect.map(libraryUsers(home, { kind: 'McpServer', name }), (factories) => {
     const status = { origin, factories };
     return {
       apiVersion: API_VERSION,
       kind: 'McpServer',
-      metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+      metadata: { name, creationTimestamp: filedAt, resourceVersion: at.stamp(undefined, name) },
       spec,
       status,
     } satisfies McpServer;
@@ -91,6 +93,7 @@ export function libraryServerRemoved(home: string, name: string) {
  * @param query The list's query: its selector, limit and token.
  */
 export const libraryServerList = Effect.fn('libraryServerList')(function* (home: string, query: ObjectQuery) {
-  const listed: McpServerList = yield* objectsListed('McpServer', yield* libraryServerObjects(home), query, 'library server');
+  const at = yield* atRevisions('McpServer', home);
+  const listed: McpServerList = yield* objectsListed('McpServer', yield* libraryServerObjects(home, at), query, 'library server', at.head);
   return listed;
 });

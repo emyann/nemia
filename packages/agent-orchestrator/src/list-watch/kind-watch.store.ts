@@ -5,8 +5,9 @@
  */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
+import { definitionsNumbered } from '../definition-index/definition-index.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
-import { changesOf, revisionTable, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
+import { changesOf, DEFINITIONS_PREFIX, revisionTable, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
 
 /** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
 type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
@@ -46,15 +47,22 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
 
 /**
  * The revision each object of `kind` stands at, as of one read of its records, the revision a write of its spec waits on (`specOf`,
- * which leaves out the records its status reads), and the keyspace head the read was made at.
+ * which leaves out the records its status reads), and the keyspace head the read was made at. The definitions' revisions are worked out with no write (`definitionsNumbered`).
  * @param kind The kind served.
  */
 export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: WatchedKind) {
   const home = yield* StoreRoot;
   const keyspace = yield* keyspaceAt(keyspaceFile(home)).pipe(Effect.orDie);
-  const head = yield* keyspace.head;
   const held = new Map<string, ReadonlyMap<string, number>>();
-  for (const prefix of prefixesOf(kind)) held.set(prefix, yield* keyspace.touched(prefix));
+  let head = yield* keyspace.head;
+  for (const prefix of prefixesOf(kind)) {
+    if (prefix !== DEFINITIONS_PREFIX) held.set(prefix, yield* keyspace.touched(prefix));
+    else {
+      const numbered = yield* definitionsNumbered();
+      held.set(prefix, numbered.held);
+      head = Math.max(head, numbered.head);
+    }
+  }
   return { of: revisionTable(kind, held), specOf: revisionTable(kind, held, true), head } as const;
 });
 

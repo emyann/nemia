@@ -692,8 +692,6 @@ const PINNED: Record<string, string[]> = {
     'kindReplay',
     'kindRevisions',
     'definitionRevisionNow',
-    'definitionsRefreshed',
-    'sweepBegun',
     'runWatchVersion',
     'factoryCommandsOf',
     'factoryList',

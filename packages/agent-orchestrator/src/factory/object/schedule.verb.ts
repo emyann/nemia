@@ -14,14 +14,15 @@ import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import { scheduleRun, schedulesListed, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import { factoryFiled } from './factory.verb.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /**
  * The object of the schedule `s`, which the factory `listing`'s file holds.
  * @param s The schedule as listed.
  * @param listing The factory's file, which reads, that holds the schedule.
+ * @param at The revisions of the Schedule kind.
  */
-export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>) => {
+export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>, at: AtRevisions) => {
   const since = listing.schedules[s.workflow]?.since ?? '';
   const spec: Schedule['spec'] = {
     cron: s.cron,
@@ -38,7 +39,7 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
   return {
     apiVersion: API_VERSION,
     kind: 'Schedule',
-    metadata: { name: s.workflow, namespace: s.factory, creationTimestamp: since, resourceVersion: versionOf(spec, status) },
+    metadata: { name: s.workflow, namespace: s.factory, creationTimestamp: since, resourceVersion: at.stamp(s.factory, s.workflow) },
     spec,
     status,
   } satisfies Schedule;
@@ -50,13 +51,19 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
  * @param home The store's root.
  * @param namespace The factory's name.
  * @param memo The run memo a caller that polls hands in; undefined to read every record.
+ * @param at The revisions its objects are stamped at.
  */
-export const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined) {
+export const schedulesOf = Effect.fn('schedulesOf')(function* (
+  home: string,
+  namespace: string,
+  memo: ScheduleRuns | undefined,
+  at: AtRevisions,
+) {
   const { listing } = yield* factoryFiled(home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');
   const listed = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => schedulesListed(home, runs));
-  return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
+  return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing, at));
 });
 
 /** A page of the schedules of the factory `namespace` (`ScheduleList`), read now at the store `home`, the runs through `memo`. */
@@ -66,7 +73,8 @@ export const scheduleList = Effect.fn('scheduleList')(function* (
   query: ObjectQuery,
   memo: ScheduleRuns | undefined,
 ) {
-  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, namespace, memo), query, 'schedule');
+  const at = yield* atRevisions('Schedule', home);
+  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, namespace, memo, at), query, 'schedule', at.head);
   return listed;
 });
 
@@ -77,7 +85,7 @@ export const scheduleObject = Effect.fn('scheduleObject')(function* (
   name: string,
   memo: ScheduleRuns | undefined,
 ) {
-  const found = (yield* schedulesOf(home, namespace, memo)).find((s) => s.metadata.name === name);
+  const found = (yield* schedulesOf(home, namespace, memo, yield* atRevisions('Schedule', home))).find((s) => s.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

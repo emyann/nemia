@@ -7,20 +7,20 @@ import { Effect } from 'effect';
 import { API_VERSION, PROPOSABLE_KINDS, RESOURCE_PLURALS, type Delegation, type DelegationWrite } from 'objects';
 import { Forbidden, Invalid, Missing } from '../refusal/refusal.ts';
 import type { ProposalCaller } from '../caller/index.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { atRevisions, type AtRevisions } from '../object/listed.verb.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
-
-/** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
-const writtenPosition = (record: DelegationRecord) => record.since;
 
 /**
  * A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written.
  * @param record The delegation as the store holds it: its factory, its agent, when it was written and its grants.
+ * @param at The revisions of the Delegation kind.
  */
-const delegationObject = (record: DelegationRecord) =>
+const delegationObject = (record: DelegationRecord, at: AtRevisions) =>
   ({
     apiVersion: API_VERSION,
     kind: 'Delegation',
-    metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: writtenPosition(record) },
+    metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: at.stamp(record.factory, record.agent) },
     spec: record.spec,
   }) satisfies Delegation;
 
@@ -33,7 +33,8 @@ const personOnly = (factory: string, agent: string) =>
 
 /** The delegations of `factory`, by agent. */
 export const delegationsList = Effect.fn('delegationsList')(function* (factory: string) {
-  return (yield* (yield* DelegationDoor).delegations.list(factory)).map(delegationObject);
+  const at = yield* atRevisions('Delegation', yield* StoreRoot);
+  return (yield* (yield* DelegationDoor).delegations.list(factory)).map((record) => delegationObject(record, at));
 });
 
 /** `agent`'s delegation in `factory`; `Missing` where the person wrote none. */
@@ -45,7 +46,7 @@ export const delegationGet = Effect.fn('delegationGet')(function* (factory: stri
         message: `${agent} has no delegation in ${factory}, so it approves nothing: write one with a PUT of /api/namespaces/${factory}/delegations/${agent}.`,
       }),
     );
-  return delegationObject(record);
+  return delegationObject(record, yield* atRevisions('Delegation', yield* StoreRoot));
 });
 
 /** `agent`'s delegation in `factory` written whole by `caller`, the person: the object written. */
@@ -74,7 +75,8 @@ export const delegationPut = Effect.fn('delegationPut')(function* (
       }),
     );
   const record = { factory, agent, since: new Date().toISOString(), spec };
-  return delegationObject(yield* (yield* DelegationDoor).delegations.write(record));
+  const written = yield* (yield* DelegationDoor).delegations.write(record);
+  return delegationObject(written, yield* atRevisions('Delegation', yield* StoreRoot));
 });
 
 /** `agent`'s delegation in `factory` removed by `caller`, the person: whether one was there. */

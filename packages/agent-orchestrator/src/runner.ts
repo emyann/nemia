@@ -452,7 +452,7 @@ export { watchChanges, type Versioned } from './list-watch/index.ts';
 export { isWatchedKind, type KindChange, type WatchedKind } from './list-watch/index.ts';
 export { keyspaceHead, kindReplay, kindRevisions } from './list-watch/kind-watch.store.ts';
 export { cardHeld } from './cards/cards.store.ts';
-export { definitionRevisionNow, definitionsRefreshed, sweepBegun } from './definition-index/definition-index.store.ts';
+export { definitionRevisionNow } from './definition-index/definition-index.store.ts';
 export { runWatchVersion } from './runlist/runlist.ts';
 export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';

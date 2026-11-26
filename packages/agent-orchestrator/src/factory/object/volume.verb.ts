@@ -16,20 +16,21 @@ import type { Engine } from '../../runtime-client.ts';
 import { mountingRuns, type MountingRun, type SummaryHow } from '../../summary/summary.verb.ts';
 import { factoryVolumesNamed, volumeRefusal } from '../volume/volume.ts';
 import { factoryFiled } from './factory.verb.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /** What a Volume's status is read against: the store's root, whether a path is a folder, and the runs whose records mount a volume. */
 export type VolumeWorld = {
   readonly home: string;
   readonly isDirectory: (at: string) => boolean;
   readonly runs: readonly MountingRun[];
+  readonly at: AtRevisions;
 };
 
 /**
  * The volumes of the factory `listing` as objects, filed at `filedAt`, read against `world`.
  * @param listing The factory's listing, read without error, whose volumes are named.
  * @param filedAt When the factory was filed, each volume's creation timestamp.
- * @param world What each volume's status is read against: the store's root, whether a path is a folder, and the runs that mount one.
+ * @param world What each volume's status is read against: the store's root, whether a path is a folder, and the runs that mount one, and the revisions its objects are stamped at.
  */
 export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld) =>
   factoryVolumesNamed(listing).map((v) => {
@@ -51,18 +52,24 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
     return {
       apiVersion: API_VERSION,
       kind: 'Volume',
-      metadata: { name: v.name, namespace: listing.name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+      metadata: { name: v.name, namespace: listing.name, creationTimestamp: filedAt, resourceVersion: world.at.stamp(listing.name, v.name) },
       spec,
       status,
     };
   }) satisfies Volume[] as Volume[];
 
 /** The volumes of the factory `namespace`, read now; none for the default factory; `Missing` where no factory has the name. */
-const volumesNow = Effect.fn('volumesNow')(function* (e: Engine, how: SummaryHow, namespace: string, isDirectory: (at: string) => boolean) {
+const volumesNow = Effect.fn('volumesNow')(function* (
+  e: Engine,
+  how: SummaryHow,
+  namespace: string,
+  isDirectory: (at: string) => boolean,
+  at: AtRevisions,
+) {
   const { factory, listing } = yield* factoryFiled(how.home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const runs = yield* mountingRuns(e, how);
-  return volumesOf(listing, factory.metadata.creationTimestamp, { home: how.home, isDirectory, runs });
+  return volumesOf(listing, factory.metadata.creationTimestamp, { home: how.home, isDirectory, runs, at });
 });
 
 /** A page of the volumes of the factory `namespace` (`VolumeList`), read now. */
@@ -73,7 +80,8 @@ export const volumeList = Effect.fn('volumeList')(function* (
   query: ObjectQuery,
   isDirectory: (at: string) => boolean = onDisk,
 ) {
-  const listed: VolumeList = yield* objectsListed('Volume', yield* volumesNow(e, how, namespace, isDirectory), query, 'volume');
+  const at = yield* atRevisions('Volume', how.home);
+  const listed: VolumeList = yield* objectsListed('Volume', yield* volumesNow(e, how, namespace, isDirectory, at), query, 'volume', at.head);
   return listed;
 });
 
@@ -85,7 +93,7 @@ export const volumeObject = Effect.fn('volumeObject')(function* (
   name: string,
   isDirectory: (at: string) => boolean = onDisk,
 ) {
-  const found = (yield* volumesNow(e, how, namespace, isDirectory)).find((v) => v.metadata.name === name);
+  const found = (yield* volumesNow(e, how, namespace, isDirectory, yield* atRevisions('Volume', how.home))).find((v) => v.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

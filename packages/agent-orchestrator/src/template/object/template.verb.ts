@@ -19,7 +19,8 @@ import { Context, Effect, Result, Schema } from 'effect';
 import { API_VERSION, type Template, TemplateSpec, type TemplateStatus } from 'objects';
 import { digestOf, entriesIn, stageFolder, treeWiringOf, type Entry } from '../../factory/applied/applied.store.ts';
 import { renderedAt } from '../../factory/applied/applied.verb.ts';
-import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { StoreRoot } from '../../config/root.store.ts';
+import { atRevisions, bornAt, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { checkedTree, packageSkillNames, problemLine } from '../template.store.ts';
 import { isMap } from '../index.ts';
@@ -134,13 +135,13 @@ function servedSpec(doc: unknown, place: string) {
 }
 
 /** The builtin template `name`, at `place`, as an object: read through the door and checked, or listed with why it does not read. */
-const templateAt = Effect.fn('templateAt')(function* (name: string, place: string) {
+const templateAt = Effect.fn('templateAt')(function* (name: string, place: string, at: AtRevisions) {
   const door = yield* TemplateDoor;
   const read = yield* Effect.result(door.templates.read(TemplateSource.read(place)));
   const meta = { name, creationTimestamp: bornAt(place) };
   if (Result.isFailure(read)) {
     const status: TemplateStatus = { source: place, workflows: [], agents: [], skills: [], problems: [read.failure.message] };
-    return object(meta, NO_SPEC, status);
+    return object(at, meta, NO_SPEC, status);
   }
   const checked = checkedTree(read.success, packageSkillNames());
   const { spec, problems } = servedSpec(checked.folder.documents.get('nemia.yaml'), place);
@@ -151,15 +152,15 @@ const templateAt = Effect.fn('templateAt')(function* (name: string, place: strin
     ...templateDocumentsOf(checked.files.map((file) => file.path)),
     ...(every.length ? { problems: every } : {}),
   };
-  return object(meta, spec, status, checked.digest);
+  return object(at, meta, spec, status);
 });
 
-/** A Template of `meta`, `spec` and `status`, its `resourceVersion` its digest, or a digest of its spec and status where it has none. */
-const object = (meta: { name: string; creationTimestamp: string }, spec: TemplateSpec, status: TemplateStatus, digest?: string) =>
+/** A Template of `meta`, `spec` and `status`, its `resourceVersion` the revision of its index record (`atRevisions`); its content's digest is `status.digest`. */
+const object = (at: AtRevisions, meta: { name: string; creationTimestamp: string }, spec: TemplateSpec, status: TemplateStatus) =>
   ({
     apiVersion: API_VERSION,
     kind: 'Template',
-    metadata: { ...meta, resourceVersion: digest ?? versionOf(spec, status) },
+    metadata: { ...meta, resourceVersion: at.stamp(undefined, meta.name) },
     spec,
     status,
   }) satisfies Template;
@@ -178,13 +179,14 @@ const builtinNamed = Effect.fn('builtinNamed')(function* (name: string) {
 /** A page of the builtin templates, as a `TemplateList`, sorted by name; one that does not read listed with its problems. */
 export const templateList = Effect.fn('templateList')(function* (query: ObjectQuery) {
   const folder = yield* BuiltinTemplates;
-  const items = yield* Effect.forEach(builtinTemplatesIn(folder), (name) => templateAt(name, path.join(folder, name)));
-  return yield* objectsListed('Template', items, query, 'template');
+  const at = yield* atRevisions('Template', yield* StoreRoot);
+  const items = yield* Effect.forEach(builtinTemplatesIn(folder), (name) => templateAt(name, path.join(folder, name), at));
+  return yield* objectsListed('Template', items, query, 'template', at.head);
 });
 
 /** The builtin template `name`, as a `Template`; `Missing` where no builtin template has that name. */
 export const templateObject = Effect.fn('templateObject')(function* (name: string) {
-  return yield* templateAt(name, yield* builtinNamed(name));
+  return yield* templateAt(name, yield* builtinNamed(name), yield* atRevisions('Template', yield* StoreRoot));
 });
 
 /**

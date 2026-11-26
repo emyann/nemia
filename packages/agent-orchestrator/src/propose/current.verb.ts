@@ -34,7 +34,6 @@ import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { indexSweep } from '../definition-index/definition-index.store.ts';
 import { kindRevisions } from '../list-watch/kind-watch.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
@@ -250,8 +249,8 @@ export const contentNow = (place: ProposalPlace, factory: string, kind: Proposab
 };
 
 /**
- * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision the api serves it at (the keyspace's,
- * the definition index read again first, so a hand edit since a read counts), and its spec: what a proposal's stale check and an apply
+ * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision it is served at (the keyspace's; a
+ * definition's worked out with no write, so a hand edit since a read counts), and its spec: what a proposal's stale check and an apply
  * compare the version a proposal read to. Refused as `contentNow` refuses.
  * @param place Where the proposal is read: the store's root.
  * @param factory The factory's name.
@@ -264,7 +263,6 @@ export const currentOf = (place: ProposalPlace, factory: string, kind: Proposabl
       now.version === null
         ? Effect.succeed(now)
         : Effect.gen(function* () {
-            yield* indexSweep();
             const { of, specOf } = yield* kindRevisions(kind);
             const space = kind === 'Factory' ? undefined : factory;
             return { ...now, version: String(of(space, name)), specVersion: specOf(space, name) } satisfies Current;

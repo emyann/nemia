@@ -9,7 +9,8 @@ import { Effect } from 'effect';
 import { API_VERSION, type Subscription, type SubscriptionList } from 'objects';
 import type { DeliveryKept } from '../../contracts/subscription-status.contract.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../object/listed.verb.ts';
 import { noSubscription, SubscriptionDoor, type Listed } from '../subscription/subscription.store.ts';
 import { deliveryKept, subscriptionDelivered } from './subscription.ts';
 
@@ -19,9 +20,10 @@ import { deliveryKept, subscriptionDelivered } from './subscription.ts';
  * @param listed The subscription as the store lists it.
  * @param delivered The deliverer's file read down, or undefined where none is or it did not read.
  * @param born When the subscription was made, an ISO timestamp.
+ * @param revs The revisions of the Subscription kind.
  * @param error Why the deliverer's file did not read, or undefined where it read or there is none.
  */
-const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefined, born: string, error?: string) => {
+const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefined, born: string, revs: AtRevisions, error?: string) => {
   const { task, selectors, digestEvery, from, scope } = listed.subscription;
   const at = subscriptionDelivered({ task, from }, delivered);
   const spec = { task, selectors: [...selectors], digestEvery, ...(scope !== undefined ? { scope: { atLeast: scope.atLeast } } : {}) };
@@ -35,34 +37,36 @@ const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefine
   return {
     apiVersion: API_VERSION,
     kind: 'Subscription',
-    metadata: { name: listed.name, creationTimestamp: born, resourceVersion: versionOf(spec, status) },
+    metadata: { name: listed.name, creationTimestamp: born, resourceVersion: revs.stamp(undefined, listed.name) },
     spec,
     status,
   } satisfies Subscription;
 };
 
 /** The object of `listed`, its delivery read through the door, born when its record says it was made, or at the epoch. */
-const objectOf = (listed: Listed) =>
+const objectOf = (listed: Listed, at: AtRevisions) =>
   Effect.gen(function* () {
     const door = yield* SubscriptionDoor;
     const read = yield* door.deliveries.read(SubscriptionName.read(listed.name));
     const born = listed.born ?? new Date(0).toISOString();
-    if (read === null) return subscriptionObjectOf(listed, undefined, born);
-    if ('unread' in read) return subscriptionObjectOf(listed, undefined, born, read.unread);
-    return subscriptionObjectOf(listed, deliveryKept(read.kept), born);
+    if (read === null) return subscriptionObjectOf(listed, undefined, born, at);
+    if ('unread' in read) return subscriptionObjectOf(listed, undefined, born, at, read.unread);
+    return subscriptionObjectOf(listed, deliveryKept(read.kept), born, at);
   });
 
 /** Every subscription's object, sorted by name. */
-const subscriptionObjects = Effect.gen(function* () {
+const subscriptionObjects = (at: AtRevisions) =>
+  Effect.gen(function* () {
   const door = yield* SubscriptionDoor;
   const { listed } = yield* door.subscriptions.list();
-  return yield* Effect.forEach(listed, objectOf);
+  return yield* Effect.forEach(listed, (l) => objectOf(l, at));
 });
 
 /** A page of the subscriptions, as `SubscriptionList`: those its selectors keep, sorted by name, cut by its limit after its continue. */
 export const subscriptionList = Effect.fn('subscriptionList')(function* (query: ObjectQuery) {
-  const items: Subscription[] = yield* subscriptionObjects;
-  const list: SubscriptionList = yield* objectsListed('Subscription', items, query, 'subscription');
+  const at = yield* atRevisions('Subscription', yield* StoreRoot);
+  const items: Subscription[] = yield* subscriptionObjects(at);
+  const list: SubscriptionList = yield* objectsListed('Subscription', items, query, 'subscription', at.head);
   return list;
 });
 
@@ -72,6 +76,6 @@ export const subscriptionObject = Effect.fn('subscriptionObject')(function* (nam
   const { listed } = yield* door.subscriptions.list();
   const one = listed.find((l) => l.name === name);
   if (one === undefined) return yield* noSubscription(name);
-  const object: Subscription = yield* objectOf(one);
+  const object: Subscription = yield* objectOf(one, yield* atRevisions('Subscription', yield* StoreRoot));
   return object;
 });

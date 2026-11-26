@@ -26,11 +26,14 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { Context, Data, type Duration, Effect, Schema, Stream } from 'effect';
 import {
   BOOKMARK_EVERY,
+  cardHeld,
   feedCursorRefusal,
   feedSize,
   followFeed,
   keyspaceHead,
   kindReplay,
+  parseSelectors,
+  selectsLabels,
   watchChanges,
   type KindChange,
   type Versioned,
@@ -256,7 +259,8 @@ const revisionOf = (o: WatchedObject) => Number(o.metadata.resourceVersion);
  * The frames of `changes`, each object they name sent once as it stands in `read`, in the order of the changes: an object changed after
  * `after` and still in the list as its change says (MODIFIED for each of a namespace's), DELETED the object that is gone. An object the
  * list no longer holds, or holds at a revision the watcher was sent, is sent nothing. DELETED is sent for an object this watch sent
- * (`known`, which it keeps up), or on any list asked `whole` (no namespace, no selector), never for one the watcher's filter never held.
+ * (`known`, which it keeps up), on any list asked `whole` (no namespace, no selector), or for one the watcher's filter held as of
+ * `after` (`heldBefore`).
  */
 const framesOfChanges = (
   kind: WatchedKind,
@@ -264,7 +268,7 @@ const framesOfChanges = (
   changes: readonly KindChange[],
   read: Read | undefined,
   known: Set<string>,
-  whole: boolean,
+  filter: WatchFilter,
 ) => {
   const sent = new Set<string>();
   const gone = (change: KindChange) => {
@@ -274,7 +278,15 @@ const framesOfChanges = (
         (change.namespace === null || key.slice(0, at) === change.namespace) && (change.name === null || key.slice(at + 1) === change.name)
       );
     });
-    const keys = whole && held.length === 0 ? [`${change.namespace ?? ''}/${change.name ?? ''}`] : held;
+    const space = held.length === 0 && !filter.whole ? filter.heldBefore(change) : null;
+    const keys =
+      held.length > 0
+        ? held
+        : filter.whole
+          ? [`${change.namespace ?? ''}/${change.name ?? ''}`]
+          : space === null
+            ? []
+            : [`${space}/${change.name ?? ''}`];
     return keys.map((key) => {
       known.delete(key);
       const at = key.indexOf('/');
@@ -302,9 +314,36 @@ const framesOfChanges = (
   });
 };
 
-/** Whether a list's URL asks every object of the kind: no namespace in its path and no query but the paging ones. */
-const wholeList = (url: URL) =>
-  !url.pathname.includes('/namespaces/') && [...url.searchParams.keys()].every((key) => key === 'limit' || key === 'continue');
+/**
+ * What a watch's filter says of an object removed or moved since the revision it resumes from: whether the list is asked `whole` (no
+ * namespace, no selector), and `heldBefore`, the namespace a change's object stood in as of that revision where the namespace and the label
+ * selector the watch asked kept it (so the watcher could hold it), null where they did not, or where the value or a field selector says
+ * nothing a watch can judge.
+ */
+type WatchFilter = { readonly whole: boolean; readonly heldBefore: (change: KindChange) => string | null };
+
+/**
+ * The filter of the watch of `kind` on `url`: the namespace its path names, the label selectors of its query, and how an object of the kind
+ * reads as of an earlier revision (a card by its record's text, `cardHeld`; any other by the namespace its change names and no labels).
+ * @param kind The kind watched.
+ * @param url The list's URL, `watch` and `resourceVersion` taken out.
+ */
+const watchFilterOf = (kind: WatchedKind, url: URL) => {
+  const inPath = /\/namespaces\/([^/]+)\//.exec(url.pathname)?.[1];
+  const selectors = [...url.searchParams.getAll('labelSelector'), ...url.searchParams.getAll('selector')];
+  const whole = inPath === undefined && [...url.searchParams.keys()].every((key) => key === 'limit' || key === 'continue');
+  const parsed = parseSelectors(selectors);
+  return {
+    whole,
+    heldBefore: (change) => {
+      if (change.was === null || change.name === null || url.searchParams.has('fieldSelector')) return null;
+      const described = kind === 'Card' ? cardHeld(change.name, change.was) : { namespace: change.namespace, labels: {} };
+      if (described === null || described.namespace === null) return null;
+      if (inPath !== undefined && described.namespace !== inPath) return null;
+      return selectsLabels(parsed, described.labels) ? described.namespace : null;
+    },
+  } satisfies WatchFilter;
+};
 
 /** The answer that refuses a watch from a revision the keyspace cannot replay: 410 where compaction removed it, 400 past the head. */
 const startRefused = (c: RequestContext<ApiEnv>, refused: 'gone' | 'ahead', revision: number) =>
@@ -346,7 +385,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
     const read = replay.changes.length === 0 ? undefined : await readNow();
     if (read instanceof Response) return read;
     first = {
-      frames: framesOfChanges(kind, start.revision, replay.changes, read, known, wholeList(url)).map((f) => f.data),
+      frames: framesOfChanges(kind, start.revision, replay.changes, read, known, watchFilterOf(kind, url)).map((f) => f.data),
       at: replay.head,
     };
   } else {
@@ -374,7 +413,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
         if (!('changes' in replay)) return yield* new ListRefused({ status: replay.refused === 'gone' ? 410 : 400 });
         const read = replay.changes.length === 0 ? undefined : yield* Effect.promise(readNow);
         if (read instanceof Response) return yield* new ListRefused({ status: read.status });
-        const frames = framesOfChanges(kind, state.at, replay.changes, read, known, wholeList(url));
+        const frames = framesOfChanges(kind, state.at, replay.changes, read, known, watchFilterOf(kind, url));
         state.at = replay.head;
         for (const frame of frames) yield* write(frame);
       });

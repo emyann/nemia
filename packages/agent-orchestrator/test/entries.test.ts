@@ -691,6 +691,7 @@ const PINNED: Record<string, string[]> = {
     'watchChanges',
     'isWatchedKind',
     'keyspaceHead',
+    'cardHeld',
     'kindReplay',
     'kindRevisions',
     'definitionRevisionNow',

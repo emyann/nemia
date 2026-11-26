@@ -124,7 +124,13 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   sends its state whole to every reconnect and answers a `resourceVersion` 400. The Event lists follow the feed (`eventsFollowed`,
   `src/feed-objects/events-watch.ts`) and resume from a byte of it (a page's `metadata.resourceVersion`, the feed's end, or the last
   event's), a byte the feed cannot be read from 410. A write of a library definition names the revision it was read at (`readAtRevision`,
-  the definition index read again first, so a hand edit since counts). Discovery (`GET /api`,
+  the definition index read again first, so a hand edit since counts). A GET writes nothing where this process ticks the sweep that keeps
+  the definition index (`sweepBegun`, called by `main.ts` for `ticks`); **the exception is an api served `--no-tick`**, whose GET of an
+  indexed kind reads the index again (`definitionsRefreshed(false)`) and so may write it: with no sweep a read-only GET serves revision
+  0 for a definition no sweep has numbered, and every write of one answers 409 (as CI showed in run 45865052443). The person accepted
+  the exception; card `store-the-orchestrator-s-obj-o3mx` makes every GET read-only. A watch resumed from a revision sends DELETED for an
+  object the watcher held as of it (`was`, the own record's value read by `Keyspace.before`, matched against the path's namespace and the
+  label selectors: `watchFilterOf`), and for none it could not hold. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`
   endpoints.
 - **No read answers past the app's bound** (`AnswerBound`, `ANSWER_MOST`): every group is built with `readsBounded`

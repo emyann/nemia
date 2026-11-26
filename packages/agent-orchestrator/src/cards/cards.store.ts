@@ -25,11 +25,11 @@ import path from 'node:path';
 import { Context, Effect, Layer, Option, Schema } from 'effect';
 import { checked, fromThrow, rootedDoor } from '../door/door.store.ts';
 import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
-import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
+import { cardLabels, inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
 import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.ts';
 import { asideOf, entriesIn, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
 import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts';
-import { FILE_ID_PREFIX } from 'objects';
+import { DEFAULT_NAMESPACE, FILE_ID_PREFIX } from 'objects';
 import { claimKey } from '../runs/run-keys.ts';
 
 /** The Card door's shape: the inbox's cards and the tick's tries of a queued card's start, each method answering an Effect. */
@@ -160,6 +160,26 @@ const CardRecord = Schema.Struct({ text: Schema.String, filedAt: Schema.String }
 
 /** A card's record as its value reads, or none where it does not. */
 const cardIn = Schema.decodeUnknownOption(Schema.fromJsonString(CardRecord));
+
+/**
+ * The namespace and the labels a selector reads of the card `name` as a card record's value held it, or null where the value is no card
+ * that reads: what a watch resumed from a revision asks of a card removed or relabelled since, to know whether the watcher held it.
+ * @param name The card's name.
+ * @param value The value of the card's record (`/registry/cards/<name>`) as of the revision asked.
+ */
+export const cardHeld = (name: string, value: string) => {
+  const record = cardIn(value);
+  if (Option.isNone(record)) return null;
+  try {
+    const card = parseInboxCard(`${name}.md`, record.value.text);
+    return {
+      namespace: card.factory ?? DEFAULT_NAMESPACE,
+      labels: cardLabels({ labels: card.labels ?? {}, workflow: card.workflow ?? null, factory: card.factory ?? null }),
+    };
+  } catch {
+    return null;
+  }
+};
 
 /** A try as the tick writes it; any key beside these is left unread. */
 const missedStartIn = Schema.decodeUnknownOption(Schema.fromJsonString(MissedStartModel));

@@ -152,7 +152,9 @@ export type RowSeen = { readonly key: string; readonly revision: number; readonl
 
 /**
  * What the watch sends of one object or one namespace's objects: where it is, how it changed, the revision it is at and whether its
- * own record stands (so an object a read of the list leaves out is one a selector or a namespace keeps from the watcher: DELETED).
+ * own record stands (so an object a read of the list leaves out is one a selector or a namespace keeps from the watcher: DELETED), and
+ * the value its own record held as of the revision the watch started after (`was`, null for an object made since), which says whether the
+ * watcher could hold it.
  */
 export type KindChange = {
   readonly namespace: string | null;
@@ -160,6 +162,7 @@ export type KindChange = {
   readonly change: 'ADDED' | 'MODIFIED' | 'DELETED';
   readonly revision: number;
   readonly standing: boolean;
+  readonly was: string | null;
 };
 
 /**
@@ -169,10 +172,16 @@ export type KindChange = {
  * @param kind The kind watched.
  * @param after The revision the watch starts after.
  * @param rows Every row written after `after` under a prefix of the kind, in revision order, with the prefix it was read under.
+ * @param before The value each own record that changed held as of `after`, by key (`Keyspace.before`): the `was` of its change.
  */
-export const changesOf = (kind: WatchedKind, after: number, rows: readonly (RowSeen & { readonly prefix: string })[]) => {
+export const changesOf = (
+  kind: WatchedKind,
+  after: number,
+  rows: readonly (RowSeen & { readonly prefix: string })[],
+  before: ReadonlyMap<string, string> = new Map(),
+) => {
   const sources: readonly Source[] = WATCHED_KINDS[kind];
-  const seen = new Map<string, { target: Target; own: OwnRow | null; revision: number }>();
+  const seen = new Map<string, { target: Target; own: OwnRow | null; revision: number; was: string | null }>();
   for (const row of rows) {
     const source = sources.find((s) => s.prefix === row.prefix);
     const target = source?.target(row.key.slice(row.prefix.length));
@@ -182,12 +191,13 @@ export const changesOf = (kind: WatchedKind, after: number, rows: readonly (RowS
     const own: OwnRow | null = source.own
       ? { createRevision: row.createRevision, revision: row.revision, deleted: row.deleted }
       : (held?.own ?? null);
-    seen.set(id, { target, own, revision: Math.max(row.revision, held?.revision ?? 0) });
+    const was = source.own ? (before.get(row.key) ?? null) : (held?.was ?? null);
+    seen.set(id, { target, own, revision: Math.max(row.revision, held?.revision ?? 0), was });
   }
   return [...seen.values()]
-    .flatMap(({ target, own, revision }) => {
+    .flatMap(({ target, own, revision, was }) => {
       const change = objectChange(after, own);
-      return change === 'unseen' ? [] : [{ ...target, change, revision, standing: own !== null && !own.deleted } satisfies KindChange];
+      return change === 'unseen' ? [] : [{ ...target, change, revision, standing: own !== null && !own.deleted, was } satisfies KindChange];
     })
     .sort((a, b) => a.revision - b.revision);
 };

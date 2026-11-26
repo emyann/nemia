@@ -224,6 +224,48 @@ test('a labelSelector keeps its cards on every read, and a card relabelled out o
   }
 });
 
+/** The keyspace head a list of the cards says it was read at. */
+const headOfCards = async () =>
+  ((await (await app.request('/api/namespaces/default/cards')).json()) as { metadata: { resourceVersion: string } }).metadata
+    .resourceVersion;
+
+test('a watch resumed from a revision sends DELETED for a card its selector held that was removed since, and none for one it never kept', async (t) => {
+  card('rd-1', { team: 'core' });
+  card('rd-2', { team: 'infra' });
+  const at = await headOfCards();
+  dropRecord(root, cardKey('rd-1'));
+  dropRecord(root, cardKey('rd-2'));
+  t.onTestFinished(() => dropRecord(root, cardKey('rd-1')));
+  const w = await watch(t, `/api/namespaces/default/cards?watch=true&resourceVersion=${at}&labelSelector=team%3Dcore`);
+  try {
+    const initial = await w.initial();
+    assert.deepEqual(
+      initial.map((e) => `${e.type} ${named(e)}`),
+      ['DELETED rd-1'],
+      'the card the selector kept is DELETED, the one it never kept is sent nothing',
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch resumed from a revision sends DELETED for a card relabelled out of its selector since', async (t) => {
+  card('rl-1', { team: 'core' });
+  const at = await headOfCards();
+  card('rl-1', { team: 'infra' });
+  t.onTestFinished(() => dropRecord(root, cardKey('rl-1')));
+  const w = await watch(t, `/api/namespaces/default/cards?watch=true&resourceVersion=${at}&labelSelector=team%3Dcore`);
+  try {
+    const initial = await w.initial();
+    assert.deepEqual(
+      initial.map((e) => `${e.type} ${named(e)}`),
+      ['DELETED rl-1'],
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
 /** A task's journal under the engine's store, as the engine writes it: filed, run and signed off done, settled. */
 const doneTask = (taskId: string) => {
   const at = '2026-11-05T06:00:00.000Z';

@@ -25,6 +25,7 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
   const home = yield* StoreRoot;
   const keyspace = yield* keyspaceAt(keyspaceFile(home)).pipe(Effect.orDie);
   const rows: (RowSeen & { readonly prefix: string })[] = [];
+  const before = new Map<string, string>();
   let head = Number.POSITIVE_INFINITY;
   for (const prefix of prefixesOf(kind)) {
     const since = yield* keyspace.since(after, prefix);
@@ -33,11 +34,12 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
       return refused;
     }
     head = Math.min(head, since.head);
+    if (since.changes.length > 0) for (const [key, value] of yield* keyspace.before(after, prefix)) before.set(key, value);
     for (const c of since.changes)
       rows.push({ prefix, key: c.key, revision: c.revision, createRevision: c.createRevision, deleted: c.deleted });
   }
   rows.sort((a, b) => a.revision - b.revision);
-  const changes: readonly KindChange[] = changesOf(kind, after, rows);
+  const changes: readonly KindChange[] = changesOf(kind, after, rows, before);
   const replayed: KindReplay = { changes, head };
   return replayed;
 });

@@ -232,6 +232,26 @@ describe('the keyspace on disk', () => {
     assert.deepEqual([...(await Effect.runPromise(ks.touched('/registry/t/')))], [['/registry/t/a', gone.revision]]);
   });
 
+  test('`before` reads the value a changed key held as of a revision: a removed one at its last value, a key made after at none', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('one')));
+    const c = await Effect.runPromise(ks.write('/registry/t/c', create('stays')));
+    const b = await Effect.runPromise(ks.write('/registry/t/b', create('two')));
+    await Effect.runPromise(ks.write('/registry/t/a', update('uno', a.revision)));
+    await Effect.runPromise(ks.write('/registry/t/b', { verb: 'delete', expected: b.revision, value: '' }));
+    await Effect.runPromise(ks.write('/registry/t/d', create('late')));
+    const atB = await Effect.runPromise(ks.before(b.revision, '/registry/t/'));
+    assert.deepEqual(
+      [...atB],
+      [
+        ['/registry/t/a', 'one'],
+        ['/registry/t/b', 'two'],
+      ],
+    );
+    const atC = await Effect.runPromise(ks.before(c.revision, '/registry/t/'));
+    assert.deepEqual([...atC], [['/registry/t/a', 'one']]);
+  });
+
   test('a compaction keeps what the last sweep of at least the window ago had not seen', async () => {
     const file = fileOf();
     const ks = await Effect.runPromise(keyspaceAt(file));

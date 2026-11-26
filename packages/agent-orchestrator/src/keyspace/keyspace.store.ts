@@ -142,6 +142,7 @@ export type Keyspace = {
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly within: <A, E>(body: (tx: KeyTxn) => Effect.Effect<A, E>) => Effect.Effect<A, E | KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
+  readonly before: (revision: number, prefix: string) => Effect.Effect<ReadonlyMap<string, string>>;
   readonly compact: (windowMs: number, now: number) => Effect.Effect<number>;
   readonly settings: Effect.Effect<{ readonly journal: string; readonly synchronous: number }>;
 };
@@ -278,6 +279,34 @@ const revisionsUnder = (prefix: string, deleted = false) =>
     return new Map(rows.map((row) => [row.name, row.id]));
   });
 
+/**
+ * The value each key under `prefix` that changed after `revision` held as of it: its latest row at or before `revision`, left out where
+ * that row deletes it or the key had none, so a key made after `revision` is no entry. A row stays until compaction, as Kine keeps it.
+ * @param revision The revision the values are read as of.
+ * @param prefix The prefix of the keys.
+ */
+const valuesBefore = (revision: number, prefix: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      readonly name: string;
+      readonly deleted: number;
+      readonly value: Row['value'];
+    }>`SELECT kv.name, kv.deleted, kv.value FROM kine AS kv
+      JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.id <= ${revision} AND mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
+      ON maxkv.id = kv.id
+      WHERE kv.name IN (SELECT ckv.name FROM kine AS ckv WHERE ckv.id > ${revision} AND ckv.name >= ${prefix} AND ckv.name < ${pastPrefix(prefix)})`;
+    return new Map(rows.filter((row) => row.deleted === 0).map((row) => [row.name, textOf(row.value)]));
+  });
+
+/** The connection's journal mode and synchronous level, as SQLite says them. */
+const settingsNow = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA journal_mode`;
+  const [synchronous] = yield* sql<{ synchronous: number }>`PRAGMA synchronous`;
+  return { journal: journal?.journal_mode ?? '', synchronous: synchronous?.synchronous ?? -1 };
+});
+
 /** The live records whose key begins with `prefix`, by key, each its latest row that deletes nothing. */
 const liveUnder = (prefix: string) =>
   Effect.gen(function* () {
@@ -389,6 +418,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
           }),
         ),
       ),
+    before: (revision, prefix) => read(valuesBefore(revision, prefix)),
     compact: (windowMs, now) =>
       Effect.orDie(
         inTxn(
@@ -408,14 +438,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
           }),
         ),
       ),
-    settings: read(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA journal_mode`;
-        const [synchronous] = yield* sql<{ synchronous: number }>`PRAGMA synchronous`;
-        return { journal: journal?.journal_mode ?? '', synchronous: synchronous?.synchronous ?? -1 };
-      }),
-    ),
+    settings: read(settingsNow),
   } satisfies Keyspace;
 }
 

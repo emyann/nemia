@@ -188,7 +188,7 @@ const RunFileSchema = Schema.StructWithRest(
      * from a run file spawned before it was written, whose record is never read for a spend so far.
      */
     capUsd: Schema.optional(Schema.Finite),
-    /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
+    /** For a spec with `input`: what the worker writes on the harness's stdin. Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({
         first: Schema.String,

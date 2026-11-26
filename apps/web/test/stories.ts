@@ -280,7 +280,7 @@ type ButtonSystem = 'kit' | 'shadcn';
 /** The system whose button `spec`, imported by `file`, is, with the names that are a button there; null for any other module. */
 const buttonModuleOf = (file: string, spec: string) => {
   const module = canonicalOf(file, spec);
-  if (module === '@/components/ui/button') return { system: 'shadcn', names: ['Button', 'LinkButton'] } as const;
+  if (module === '@/components/ui/button') return { system: 'shadcn', names: ['Button'] } as const;
   const at = spec.startsWith('@/')
     ? path.posix.join(SRC, spec.slice(2))
     : spec.startsWith('.')
@@ -384,7 +384,7 @@ const formOf = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement) => {
 /**
  * Each button of the kit's or shadcn's `file`'s source draws in a form *Ink and the one action* (`DESIGN.md`) refuses, once each, as
  * `<Tag form>`: filled, which is the look's cut button alone (`CutPress`, `CutButton`), a text action, which is a link (`TextLink`),
- * and a variant it cannot read. It reads a tag bound by an import of the kit's `Button` or shadcn's `Button` and `LinkButton`, and a
+ * and a variant it cannot read. It reads a tag bound by an import of the kit's `Button` or shadcn's `Button`, and a
  * name a `routeLink` of one is given. None for a file of the kit, shadcn's own `ui/`, `ai-elements/` or the look, which draw them.
  * @param file The file, from the workspace root.
  * @param source Its text.

@@ -160,7 +160,7 @@ test("a step's own skills: line adding a skill only the skill door holds reads r
  * The functions of the stores the Workflow door is over that `src`'s code still calls rather than yielding the door, a call spread into a
  * list (`...formerKeyLines(dir)`) counted as any other.
  */
-const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflow', 'removeWorkflowAt', 'formerKeyLines'];
+const SEAM = ['loadWorkflows', 'writeWorkflow', 'writeWorkflowAt', 'removeWorkflowAt', 'formerKeyLines'];
 
 /** The stores the door is over, and the door's own files: where the seam is defined, not a debt. */
 const OWN = [

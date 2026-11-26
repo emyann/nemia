@@ -548,8 +548,8 @@ writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store
 invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
 proves). What once called the folder's stores around the door is paid, and its store test refuses any use; `write.store.ts`'s
-functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), and the one
-old spelling left, `removeWorkflow`, is a plain alias of `removeWorkflowAt` in that module, the root first all the same. A read and a
+functions each take the store's root first (`writeWorkflowAt`, `removeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`,
+`placesAroundAt`). A read and a
 write parse the steps against the agents and skills the door finds through the Agent and Skill doors (`agents.found`, `skills.found`),
 at the places its layer says (`around`), and hand them to the layer: those of `workflowDoorOver`'s `defs` where given, else those the
 program is given, so a program given `agentDoorMemory()` and a store's root reads a workflow on the files whose step names an agent the
@@ -633,7 +633,7 @@ wrote is refused by the Migrator's loader inside the Migrator's transaction, nam
 Proposal door (`src/proposal/proposal.store.ts`) holds each under `/registry/proposals/<factory>/<name>`, its `resourceVersion` the
 record's revision, a write back refused `Conflict` from a revision it is no longer at. Unlike the doors above, it has no synchronous
 layer: its shape's Effects are the keyspace's, its stand-in (`proposalDoorMemory`) the same code over a keyspace in memory, and no
-`doorOf` or `atOnce` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
+`doorOf` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
 moved aside under `<root>/imported/proposals/`, never deleted.
 
 A record stays under 1.5 MiB (`RECORD_CEILING`, etcd's) and names what is larger by a pointer: a write says the keys its record points

@@ -328,9 +328,32 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
 });
 
+/** What `definitionRevisionsNow` reads: the revisions of every definition at one moment. */
+export type DefinitionRevisions = Effect.Success<ReturnType<typeof definitionRevisionsNow>>;
+
 /**
- * The revision a library definition stands at now, worked out with no write (`definitionsNumbered`): what a write of it compares the
- * revision its writer read to, the revision a reader is served (`revisionTable`), the highest among the records that name it.
+ * The revision of each definition, worked out with no write (`definitionsNumbered`) and read once: `of` is the revision a reader is
+ * served for an agent, a skill or a workflow in a namespace (`revisionTable`, the highest among the records that name it), and `words`
+ * the revision of the index's record of a factory's rules and instruction, one past the head where a sweep has not written it yet.
+ */
+export const definitionRevisionsNow = Effect.fn('definitionRevisionsNow')(function* () {
+  const { head, held } = yield* definitionsNumbered();
+  const tables = new Map([[DEFINITIONS_PREFIX, held]]);
+  const kinds = {
+    Agent: revisionTable('Agent', tables),
+    Skill: revisionTable('Skill', tables),
+    Workflow: revisionTable('Workflow', tables),
+  };
+  return {
+    head,
+    of: (kind: 'Agent' | 'Skill' | 'Workflow', namespace: string | undefined, name: string) => kinds[kind](namespace, name),
+    words: (factory: string) => held.get(definitionKey(factory, 'factory', factory)) ?? head + 1,
+  };
+});
+
+/**
+ * The revision a definition stands at now, worked out with no write (`definitionsNumbered`): what a write of it compares the revision
+ * its writer read to, the revision a reader is served (`revisionTable`), the highest among the records that name it.
  * @param kind What the definition is.
  * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
@@ -340,8 +363,7 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
   namespace: string | undefined,
   name: string,
 ) {
-  const held = new Map([[DEFINITIONS_PREFIX, (yield* definitionsNumbered()).held]]);
-  return revisionTable(kind, held)(namespace, name);
+  return (yield* definitionRevisionsNow()).of(kind, namespace, name);
 });
 
 /**

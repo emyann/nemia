@@ -1,6 +1,6 @@
 /**
  * What the three definitions — the Workflow, the Agent and the Skill — share: where one was read from (`origin`) and the origin that
- * shadows it in its namespace, the ledger's revision of it, and the A2A card entry a skill gives. Plain Schemas of JSON.
+ * shadows it in its namespace, and the A2A card entry a skill gives. Plain Schemas of JSON.
  */
 import { Schema } from 'effect';
 import { describedNumber } from './meta.ts';
@@ -11,15 +11,13 @@ export const Origin = Schema.Literals(DEFINITION_ORIGINS);
 
 /**
  * Where a definition is read from, and what the namespace does with it: `origin`; `shadowedBy`, the origin that holds its name first in
- * the namespace, absent where none does (the definition is the one the namespace resolves); and `revision`, the ledger's number for what
- * it holds now (decision 25), read without a write, absent where the ledger cannot number it.
+ * the namespace, absent where none does (the definition is the one the namespace resolves).
  */
 export const definitionStatus = {
   origin: Origin.annotate({ description: "Where it was read from: the factory, the repository, the person's library or a builtin." }),
   shadowedBy: Schema.optionalKey(
     Origin.annotate({ description: 'The origin that holds its name first in the namespace; absent where none does.' }),
   ),
-  revision: Schema.optionalKey(describedNumber("The ledger's number for what it holds now; absent where the ledger cannot number it.")),
   factories: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:

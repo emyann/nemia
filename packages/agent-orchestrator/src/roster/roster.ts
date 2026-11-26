@@ -55,8 +55,9 @@ export function inFactory<L extends { file: string }>(
 /**
  * One agent as it is read: its file's keys as written, its instructions, the result schema its `output:` names as that file holds it, the
  * skills its `skills:` gives its sessions and its `harnessPrompt:`, each as written, what its card says it can do, the file's text, its
- * version (`agentVersion`, what a write carries), the nodes that name it, and the file of a person's custom instructions for it. `error` is
- * the parser's refusal of a file that does not read, whose keys are then its lines as written, so a form can show what to fix.
+ * version (its revision, the `resourceVersion` a write carries), the nodes that name it, and the file of a person's custom instructions
+ * for it. `error` is the parser's refusal of a file that does not read, whose keys are then its lines as written, so a form can show
+ * what to fix.
  */
 export type AgentReading = {
   name: string;
@@ -138,7 +139,7 @@ function harnessPromptOf(source: string) {
  * @param dir The folder of that place.
  * @param file The agent's file.
  * @param name The agent's name.
- * @param version The agent's version.
+ * @param version The agent's revision.
  * @param usedBy The nodes that name the agent.
  */
 export const emptyReading = (from: AgentPlace, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]) => ({

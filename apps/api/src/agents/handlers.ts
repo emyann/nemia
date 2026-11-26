@@ -1,7 +1,7 @@
 /**
  * The agents group's handlers (`objects`' `Api`): a namespace's agents as objects — the repository's and yours (`agents`, the table's
  * entry), and, in a factory made from a template, its tree's (`<tree>/workflows/agents`, origin `factory`) — each with the steps that name
- * it, the hires that fill a step with it and the factories that do (`inFactory`), and the ledger's number for what its file holds now.
+ * it, the hires that fill a step with it and the factories that do (`inFactory`), and the revision it stands at.
  *
  * Writes are yours, in `default` alone (`writeGoes`): made, written at the `metadata.resourceVersion` it was read at (a `metadata.name`
  * other than the path's renames it) and removed at the `?resourceVersion=` it was read at, through `agents write` and `agents rm`; a
@@ -30,8 +30,6 @@ import {
   agentRead,
   customInstructionsFile,
   customOf,
-  definitionRevision,
-  definitionRevisionNow,
   factoriesFilling,
   inFactory,
   listedAt,
@@ -82,7 +80,7 @@ const treeAgents = (s: Served) =>
     const dir = path.join(tree, 'workflows', AGENTS_FOLDER);
     const read: AgentReading[] = [];
     for (const name of markdownNamesIn(dir)) {
-      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home });
+      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home, namespace: s.factory?.name });
       if (one) read.push(one);
     }
     return read;
@@ -130,17 +128,9 @@ async function heldIn(s: Served) {
 }
 
 /**
- * The object of one agent served, its revision read through the ledger, and the file of its custom instructions in the store `home`; with
- * neither namespace nor revision for a template's.
+ * The object of one agent served, and the file of its custom instructions in the store `home`; with no namespace for a template's.
  */
-const agentObject = (
-  home: string,
-  namespace: string | undefined,
-  origin: Origin,
-  shadowedBy: Origin | null,
-  a: LibraryAgent,
-  revision: number | undefined,
-) =>
+const agentObject = (home: string, namespace: string | undefined, origin: Origin, shadowedBy: Origin | null, a: LibraryAgent) =>
   ({
     apiVersion: API_VERSION,
     kind: 'Agent',
@@ -163,7 +153,6 @@ const agentObject = (
     status: {
       origin,
       ...(shadowedBy !== null && { shadowedBy }),
-      ...(revision !== undefined && { revision }),
       dir: a.dir,
       file: a.file,
       source: a.source,
@@ -181,29 +170,20 @@ const agentObject = (
   }) satisfies Agent;
 
 /**
- * The objects of the agents `served`: in `namespace`, with the ledger's revision, where one is given; with neither where none is (a
- * template's documents, which the ledger does not count).
- * @param s The request's services, its caller and the place it is answered in.
+ * The objects of the agents `served`, in `namespace` where one is given; with none for a template's documents.
+ * @param home The store's root.
  * @param served The agents to answer, each with its origin and what shadows it.
- * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
+ * @param namespace The namespace the objects are in; none for a template's documents.
  */
-export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string) =>
-  s.inRequest(
-    Effect.forEach(served, ({ origin, shadowedBy, item }) =>
-      namespace === undefined
-        ? Effect.succeed(agentObject(s.home, undefined, origin, shadowedBy, item, undefined))
-        : Effect.map(definitionRevision('agent', item.name, item.version), (revision) =>
-            agentObject(s.home, namespace, origin, shadowedBy, item, revision),
-          ),
-    ),
-  ) satisfies Promise<Agent[]>;
+export const agentObjectsOf = (home: string, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string) =>
+  served.map(({ origin, shadowedBy, item }) => agentObject(home, namespace, origin, shadowedBy, item)) satisfies Agent[];
 
 const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/agents`;
 
 /** The agent `name` the namespace serves (from `asked`, where one is), read now. */
 async function agentAt(s: Served, namespace: string, name: string, asked?: Origin) {
-  const [one] = await agentObjectsOf(
-    s,
+  const [one] = agentObjectsOf(
+    s.home,
     [servedNamed(addsGated(s.home, namespace, 'agents', await heldIn(s)), name, asked, listPath(namespace))],
     namespace,
   );
@@ -223,7 +203,7 @@ const libraryHeld = async (s: Served) => (await heldIn(s)).filter((h) => h.origi
 /** The library's objects of the agents `served`, in no namespace, each with the factories that add it. */
 const libraryObjectsOf = async (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>) =>
   Promise.all(
-    (await agentObjectsOf(s, served)).map(async (one) => ({
+    agentObjectsOf(s.home, served).map(async (one) => ({
       ...one,
       status: { ...one.status, factories: await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name: one.metadata.name })) },
     })),
@@ -326,8 +306,7 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
     });
   const from: 'user' | 'repo' = served.origin === 'user' ? 'user' : 'repo';
   const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }));
-  const version = String(await s.inRequest(definitionRevisionNow('Agent', undefined, name)));
-  return { card: { ...card, version }, servedOverA2A: false as const, why: A2A_WHY(name), from };
+  return { card, servedOverA2A: false as const, why: A2A_WHY(name), from };
 }
 
 const READ_ROUTE = 'POST /api/agents/read';
@@ -405,7 +384,7 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
           const { origin, ...page } = query;
           const list = listed(
             'Agent',
-            await agentObjectsOf(s, servedOf(addsGated(s.home, namespace, 'agents', await heldIn(s)), originIn(s, origin)), namespace),
+            agentObjectsOf(s.home, servedOf(addsGated(s.home, namespace, 'agents', await heldIn(s)), originIn(s, origin)), namespace),
             queryOf(page),
           );
           return table ? agentTable(list) : list;

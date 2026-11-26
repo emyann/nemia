@@ -345,11 +345,6 @@
       }
     },
     {
-      "term": "Ledger door",
-      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its keyspace layer at the store's root a program is given and a memory one over a keyspace in memory, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
-      "type": "LedgerDoorShape"
-    },
-    {
       "term": "Lint",
       "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
       "retired": [
@@ -537,16 +532,6 @@
       "term": "Release retention",
       "meaning": "what removes an installed release: the current, the two newest, and any a session in flight or a running Nemia process runs on are kept, the rest removed after `nemia upgrade` and on the daemon's sweep; nothing while a local session in flight recorded no release. The same sweep removes each upgrade leftover.",
       "type": "Retention"
-    },
-    {
-      "term": "Revision",
-      "meaning": "one entry of a kind and name's ledger: its number, a whole one from 1, the digest of the content it was given for, and when it was first seen — the model's `Revision` (`packages/agent-orchestrator/src/revisions/revisions.model.ts`), checked on an append and read nominally.",
-      "type": "Revision"
-    },
-    {
-      "term": "Revision ledger",
-      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one record per kind and name in the store's keyspace, `/registry/revisions/<kind>/<name>`, appended to in one transaction (a ledger file of before the keyspace imported and moved aside): a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
-      "type": "LedgerDoorShape"
     },
     {
       "term": "Keyspace",

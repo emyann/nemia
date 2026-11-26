@@ -176,14 +176,14 @@ export const AGENTS_TRY: Served<{ id: string }, AgentTryInput> = {
 
 /**
  * One agent of the agents folder the api resolved (`dir`), its skills found as a start on `repo` finds them (`agent`), or null where the
- * folder has no file of its name.
+ * folder has no file of its name. Its `version` is its revision in `namespace`, the library's where none is given.
  */
 export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
   name: 'agents read',
   served: [{ endpoint: 'agents.get' }],
   usage: '<from> <name>',
   help: ['one agent, read for its page'],
-  spec: apiSpec(PLACE_AND_NAME, ['dir', 'repo']),
+  spec: apiSpec(PLACE_AND_NAME, ['dir', 'repo', 'namespace']),
   writes: false,
   class: 'read',
   only: {
@@ -196,6 +196,7 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
       const agent = yield* agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
         repo: textOf(args, 'repo') ?? '',
         home: root,
+        namespace: textOf(args, 'namespace'),
       });
       return { agent };
     }),

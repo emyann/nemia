@@ -1,7 +1,7 @@
 /**
  * The builtin templates on the api, on a scratch builtin folder, never the package's own: listed and read as `Template`s, and each one's
  * documents — its workflows, agents, skills and programs — served as the Workflows, Agents, Skills and Programs a namespace serves, read
- * from its render with its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled
+ * from its render with its parameters' defaults, origin `builtin`, in no namespace, each step filled
  * by the template's
  * hires as in a factory applied from it; a document it lacks a 404, an unknown
  * template a 404, and one that does not render with its defaults a 422 on its documents while the template itself still reads.
@@ -123,11 +123,10 @@ async function get(url: string) {
   return { status: res.status, body: await res.json() };
 }
 
-/** A template's documents, each as an object no namespace holds: read from its render, `builtin`, with no ledger revision. */
-const outsideNamespaces = (o: { metadata: { namespace?: string }; status: { origin: string; revision?: number; shadowedBy?: string } }) => {
+/** A template's documents, each as an object no namespace holds: read from its render, `builtin`. */
+const outsideNamespaces = (o: { metadata: { namespace?: string }; status: { origin: string; shadowedBy?: string } }) => {
   assert.equal(o.metadata.namespace, undefined, 'a template is in no namespace');
   assert.equal(o.status.origin, 'builtin', "a template's document is Nemia's builtin");
-  assert.equal(Object.hasOwn(o.status, 'revision'), false, 'the ledger counts no revision of a template document');
   assert.equal(Object.hasOwn(o.status, 'shadowedBy'), false, "a template's document shadows nothing and nothing shadows it");
 };
 

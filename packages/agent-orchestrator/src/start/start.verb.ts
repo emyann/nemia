@@ -869,7 +869,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   yield* forgotten(tried(() => copyInputs(home, run, inputs, cards)));
   Object.assign(run, yield* forgotten(tried(() => renderAgents(home, run, steps, found, factory))));
   Object.assign(run, workedSwitches(factory, run));
-  const pinned = yield* pinsOf(run, steps, run.createdAt);
+  const pinned = yield* pinsOf(run, steps);
   if (pinned.length) run.pinned = pinned;
   yield* homeTrusted(home, run, steps);
   yield* (yield* RunDoor).runs.create(run);

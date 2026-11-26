@@ -185,7 +185,7 @@
     },
     {
       "term": "Workflow",
-      "meaning": "a folder of steps a factory resolves, served in the factory's namespace: its `spec` its steps as their files write them and the folder's other text files (`spec.files`), its `status` its origin, its typed graph, each step resolved and its revision (`Workflow`, `packages/objects/src/workflow.ts`).",
+      "meaning": "a folder of steps a factory resolves, served in the factory's namespace: its `spec` its steps as their files write them and the folder's other text files (`spec.files`), its `status` its origin, its typed graph, each step resolved (`Workflow`, `packages/objects/src/workflow.ts`).",
       "type": "Workflow"
     },
     {
@@ -258,10 +258,6 @@
       "term": "Edge kind",
       "meaning": "what an edge of a workflow's graph says: `after`, a wait; `input`, an output handed on; `loop`, a round run again; `route`, a condition's route (`EDGE_KINDS`, `packages/objects/src/words.ts`).",
       "type": "EdgeKind"
-    },
-    {
-      "term": "revision",
-      "meaning": "a definition's number in the revision ledger for what its files hold now, read without a write: `status.revision` on a Workflow, an Agent and a Skill (`definitionStatus`, `packages/objects/src/definition.ts`)."
     },
     {
       "term": "Template",

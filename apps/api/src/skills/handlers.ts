@@ -19,8 +19,8 @@ import {
   BUILTIN_SKILLS,
   builtinCopies,
   definitionJudged,
-  definitionRevision,
   definitionRevisionNow,
+  skillVersion,
   skillRemoved,
   libraryUsers,
   recordBuiltinCopy,
@@ -123,15 +123,15 @@ function specOf({ dir, error }: Row, name: string) {
 }
 
 /**
- * The objects of the skills `served`, read now: in `namespace`, with the ledger's revision, where one is given; with neither where none
- * is (a template's documents, which the ledger does not count).
+ * The objects of the skills `served`, read now: in `namespace` where one is given, each at its revision there; with none for a template's
+ * documents.
  * @param s The request's services, its caller and the place it is answered in.
  * @param served The skills to answer, each with its origin and what shadows it.
- * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
+ * @param namespace The namespace the objects are in, which each revision is read in; none for a template's documents.
  */
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string) {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
-  const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir)] as const)));
+  const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir, namespace)] as const)));
   const repo = repoLayer(s);
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>
@@ -141,7 +141,6 @@ export async function skillObjectsOf(s: Served, served: ReturnType<typeof served
         const files = shown.get(dir)?.files ?? [];
         const { spec: read, unread } = specOf(row, name);
         const spec: SkillSpec = files.length > 0 ? { ...read, files } : read;
-        const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
         const usedBy = yield* skillUsers(dir, name, repo, s.home, s.factory?.tree);
         const copyHint =
           origin === 'user'
@@ -164,7 +163,6 @@ export async function skillObjectsOf(s: Served, served: ReturnType<typeof served
           status: {
             origin,
             ...(shadowedBy !== null && { shadowedBy }),
-            ...(revision !== undefined && { revision }),
             dir,
             entry,
             error: error ?? unread,
@@ -203,7 +201,7 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
     objects.map(async (one) => {
       const name = one.metadata.name;
       const copiedAt = one.status.origin === 'user' ? copies[`Skill/${name}`] : undefined;
-      const builtinNow = copiedAt === undefined ? undefined : await builtinVersion(s, name);
+      const builtinNow = copiedAt === undefined ? undefined : builtinVersion(name);
       return {
         ...one,
         status: {
@@ -217,10 +215,8 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
 }
 
 /** The version of Nemia's builtin skill `name` now, or undefined where Nemia builds in none. */
-const builtinVersion = async (s: Served, name: string) =>
-  skillFoldersIn(BUILTIN_SKILLS).includes(name)
-    ? ((await skillShownAt(s, path.join(BUILTIN_SKILLS, name))).version ?? undefined)
-    : undefined;
+const builtinVersion = (name: string) =>
+  skillFoldersIn(BUILTIN_SKILLS).includes(name) ? (skillVersion(path.join(BUILTIN_SKILLS, name)) ?? undefined) : undefined;
 
 /** The library's skill `name` (from `asked`, where one is), read now. */
 async function libraryAt(s: Served, name: string, asked?: Origin) {
@@ -231,7 +227,7 @@ async function libraryAt(s: Served, name: string, asked?: Origin) {
 
 /** The builtin skill `name` copied to the person's, its digest at the copy recorded so a later change of it is flagged. */
 async function copied(s: Served, name: string) {
-  const version = await builtinVersion(s, name);
+  const version = builtinVersion(name);
   await s.inRequest(SKILLS_WRITE.handler({ from: 'user', copy: name, builtin: BUILTIN_SKILLS }));
   if (version !== undefined) recordBuiltinCopy(s.home, `Skill/${name}`, version);
 }

@@ -662,7 +662,7 @@ resolves it on every pass, so each new filing (a step, a retry, a round) takes t
 removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
 filing after it. Between those a pinned run never takes `agents/` again, from a worktree or
 anywhere — it reads the files only to say how far it is behind them (`driftNow`: the run page's band, and the feed's `revisions
-behind`), compared by digest with its pins and numbered without a write to the ledger: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
+behind`), compared by digest with its pins and numbered at the definitions' revisions without a write: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory
@@ -4339,7 +4339,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `revisions` (the workflow folders,
-  agents, skills and factory rules a run's kinds are resolved from, and the ledger they are numbered in — one read of each folder a pass,
+  agents, skills and factory rules a run's kinds are resolved from, and the revisions they are numbered at — one read of each folder a pass,
   shared by every run on it), `observe` (asking each harness what runs), `runtime` (the
   runtime's own pass, less its observe), `place` (every question asked of the place, a call each: the git processes it starts and
   its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`

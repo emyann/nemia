@@ -84,7 +84,7 @@ test("default's WorkflowList: each name once, the repository's first, each with 
   for (const item of body.items) {
     const graph = item.status.graph as { nodes: unknown[] };
     assert.ok(Array.isArray(graph.nodes) && graph.nodes.length > 0, `${item.metadata.name} has its nodes`);
-    assert.equal(typeof item.status.revision, 'number');
+    assert.match(item.metadata.resourceVersion, /^\d+$/, `${item.metadata.name} is served at a revision`);
   }
 });
 
@@ -243,18 +243,6 @@ test('a list is paged by limit and continue, and kept by labelSelector', async (
   assert.equal((await get(`${W}?labelSelector=%3D%3D`)).status, 422);
 });
 
-test("a workflow's revision is read and never written: the same on a second read, the ledger unchanged", async () => {
-  const ledger = path.join(root, 'revisions');
-  const was = fs.existsSync(ledger) ? fs.readdirSync(ledger, { recursive: true, encoding: 'utf8' }).sort((a, b) => a.localeCompare(b)) : [];
-  const one = (await get<Obj>(`${W}/make`)).body.status.revision;
-  const two = (await get<Obj>(`${W}/make`)).body.status.revision;
-  assert.equal(one, two);
-  assert.deepEqual(
-    fs.existsSync(ledger) ? fs.readdirSync(ledger, { recursive: true, encoding: 'utf8' }).sort((a, b) => a.localeCompare(b)) : [],
-    was,
-  );
-});
-
 test('each retired path answers 404', async () => {
   const retired: Array<[string, string]> = [
     ['POST', '/api/workflows/yours'],
@@ -276,7 +264,7 @@ test('each retired path answers 404', async () => {
   }
 });
 
-test("each status.revision is the number a run's start pins: 1 at the first start, then past 1 as the workflow, its agent and the agent's skill change and a start pins them again", async () => {
+test("each served resourceVersion is the number a run's start pins: past the first as the workflow, its agent and the agent's skill change, a skill's edit moving the other two", async () => {
   write(path.join(STORE, 'skills', 'notes', 'SKILL.md'), '---\nname: notes\ndescription: Keeps notes.\n---\nKeep notes.\n');
   write(
     path.join(STORE, 'agents', 'implementer.md'),
@@ -294,39 +282,31 @@ test("each status.revision is the number a run's start pins: 1 at the first star
     return Object.fromEntries(pins.map((p) => [`${p.kind}/${p.name}`, p.n]));
   };
   const served = async () => ({
-    'workflow/mine': (await get<Obj>(`${W}/mine?origin=user`)).body.status.revision,
-    'agent/implementer': (await get<Obj>('/api/namespaces/default/agents/implementer?origin=user')).body.status.revision,
-    'skill/notes': (await get<Obj>('/api/namespaces/default/skills/notes?origin=user')).body.status.revision,
+    'workflow/mine': Number((await get<Obj>(`${W}/mine?origin=user`)).body.metadata.resourceVersion),
+    'agent/implementer': Number((await get<Obj>('/api/namespaces/default/agents/implementer?origin=user')).body.metadata.resourceVersion),
+    'skill/notes': Number((await get<Obj>('/api/namespaces/default/skills/notes?origin=user')).body.metadata.resourceVersion),
   });
-  const first = await pinnedAtStart();
-  assert.deepEqual(
-    [first['workflow/mine'], first['agent/implementer'], first['skill/notes']],
-    [1, 1, 1],
-    'the first start pins each kind at 1',
-  );
-  assert.deepEqual(await served(), { 'workflow/mine': 1, 'agent/implementer': 1, 'skill/notes': 1 }, 'each served revision is the pin');
+  const kinds = (pins: Record<string, number>) => ({
+    'workflow/mine': pins['workflow/mine'],
+    'agent/implementer': pins['agent/implementer'],
+    'skill/notes': pins['skill/notes'],
+  });
+  const first = kinds(await pinnedAtStart());
+  assert.deepEqual(await served(), first, 'the first start pins each kind at the revision it is served at');
   write(path.join(STORE, 'mine', 'plan.md'), '---\nplace: git\nagent: implementer\n---\nWrite PLAN.md, and say why.\n');
   write(
     path.join(STORE, 'agents', 'implementer.md'),
     '---\nharness: claude\nmodel: opus\nskills: notes\n---\nYou make what the plan says, tested.\n',
   );
-  const second = await pinnedAtStart();
-  assert.deepEqual(
-    [second['workflow/mine'], second['agent/implementer'], second['skill/notes']],
-    [2, 2, 1],
-    'a start after the edit pins the workflow and the agent at 2, the skill unchanged',
-  );
-  assert.deepEqual(
-    await served(),
-    { 'workflow/mine': 2, 'agent/implementer': 2, 'skill/notes': 1 },
-    'each served revision follows the pin past 1',
-  );
+  const second = kinds(await pinnedAtStart());
+  assert.deepEqual(await served(), second, 'a start after the edit pins each at its new served revision');
+  assert.ok(second['workflow/mine']! > first['workflow/mine']!, 'the workflow moved past its first revision');
+  assert.ok(second['agent/implementer']! > first['agent/implementer']!, 'and so did the agent');
+  assert.equal(second['skill/notes'], first['skill/notes'], 'the skill nobody edited kept its revision');
   write(path.join(STORE, 'skills', 'notes', 'SKILL.md'), '---\nname: notes\ndescription: Keeps notes.\n---\nKeep notes, dated.\n');
-  const third = await pinnedAtStart();
-  assert.deepEqual(
-    third,
-    { 'workflow/mine': 3, 'agent/implementer': 3, 'skill/notes': 2 },
-    "a skill's edit moves the agent's and the workflow's pins too, the skill found beside the workflow counted in each",
-  );
-  assert.deepEqual(await served(), third, 'each served revision counts the skill as the pin does');
+  const third = kinds(await pinnedAtStart());
+  assert.deepEqual(await served(), third, 'each served revision is the pin');
+  assert.ok(third['skill/notes']! > second['skill/notes']!, "a skill's edit moves its own revision");
+  assert.ok(third['agent/implementer']! > second['agent/implementer']!, "and the agent's, which gives it");
+  assert.ok(third['workflow/mine']! > second['workflow/mine']!, "and the workflow's, which names the agent");
 });

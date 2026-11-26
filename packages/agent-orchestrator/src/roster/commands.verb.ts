@@ -4,7 +4,7 @@
  * repository the request names.
  */
 import { Effect } from 'effect';
-import { AGENTS_CARD_WORDS, AGENTS_WORDS } from 'objects';
+import { AGENTS_CARD_WORDS, AGENTS_WORDS, DEFAULT_NAMESPACE } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { agentCardRead, agentsRead } from './roster.store.ts';
 import type { AgentsRead, CardRead } from './roster.ts';
@@ -16,7 +16,7 @@ export const AGENTS: Served<AgentsRead, AgentsInput> = {
   ...AGENTS_WORDS,
   input: AgentsInput,
   /** None given, no repository's read: the api gives the repository the request is served on. */
-  handler: ({ repo }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
+  handler: ({ repo }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root, namespace: DEFAULT_NAMESPACE })),
 };
 
 /** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */

@@ -7,7 +7,7 @@
  * only those served are loaded, as a start on the repository loads them (`loadedOf`, with the factory's hires), into the object
  * (`workflowObject`): its spec the folder as its files hold it (`workflowSpecAt`), its status what the store works out of it — the
  * description, the README's needs and its instruction, the steps resolved in graph order, the typed graph (`typedGraphOf`), and
- * the ledger's number for what the folder holds now (`definitionRevision`), which a run started on it pins.
+ * its revision, which a run started on it pins.
  *
  * The store's library, in no namespace (`/api/workflows`): the person's workflows beside the builtins, each with the factories that attach
  * it. Writes are the person's, at the library alone (`writeGoes`), a write sent to a namespace refused naming its way: made with its steps
@@ -22,10 +22,10 @@
  * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
 import path from 'node:path';
-import { Effect, Result, Schema } from 'effect';
+import { Result, Schema } from 'effect';
 import {
-  definitionRevision,
   definitionRevisionNow,
+  definitionRevisionsNow,
   factoryDraftIn,
   foldersIn,
   libraryUsers,
@@ -38,7 +38,6 @@ import {
   workflowSpecOf,
   workflowSpecReadme,
   workflowTaken,
-  workflowVersion,
   type FolderLoaded,
   workflowTable,
 } from 'agent-orchestrator';
@@ -200,7 +199,6 @@ const workflowObject = (
   shadowedBy: Origin | null,
   listing: WorkflowListing,
   loaded: FolderLoaded,
-  revision: number | undefined,
 ) =>
   ({
     apiVersion: API_VERSION,
@@ -215,7 +213,6 @@ const workflowObject = (
     status: {
       origin,
       ...(shadowedBy !== null && { shadowedBy }),
-      ...(revision !== undefined && { revision }),
       dir: listing.dir,
       description: listing.description,
       needs: workflowNeeds(listing.dir),
@@ -231,13 +228,12 @@ const workflowObject = (
 
 /**
  * The objects of the folders `served`, each loaded now as a start in the request's factory would load it, its hires filling their steps:
- * in `namespace`, with the ledger's revision, where one is given; with neither where none is (a template's documents, which the ledger
- * does not count). The factory is handed to the loader whole, so a template's render, which the store does not hold, is loaded in the
- * factory of its wiring as one applied from it is. On no repository, each is loaded as one of yours is, its agents and skills looked for
- * in yours alone.
+ * in `namespace` where one is given, each at its revision there; with none for a template's documents. The factory is handed to the
+ * loader whole, so a template's render, which the store does not hold, is loaded in the factory of its wiring as one applied from it is.
+ * On no repository, each is loaded as one of yours is, its agents and skills looked for in yours alone.
  * @param s The request's services, its caller and the place it is answered in.
  * @param served The folders to answer, each with its origin and what shadows it.
- * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
+ * @param namespace The namespace the objects are in, which each revision is read in; none for a template's documents.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string) {
   const repo = repoLayer(s);
@@ -249,16 +245,12 @@ export async function workflowObjectsOf(s: Served, served: ReturnType<typeof ser
     s.home,
     s.factory,
   );
-  return s.inRequest(
-    Effect.forEach(served, ({ name, origin, shadowedBy, item: { from, dir } }) =>
-      Effect.gen(function* () {
-        const version = yield* workflowVersion(dir, placesOf(repo, s.home));
-        const revision = namespace === undefined ? undefined : yield* definitionRevision('workflow', name, version);
-        const folder = loadedAt(loaded, dir);
-        return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder, revision);
-      }),
-    ),
-  );
+  const revisions = await s.inRequest(definitionRevisionsNow());
+  return served.map(({ name, origin, shadowedBy, item: { from, dir } }) => {
+    const version = String(revisions.of('Workflow', namespace, name));
+    const folder = loadedAt(loaded, dir);
+    return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder);
+  });
 }
 
 const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/workflows`;

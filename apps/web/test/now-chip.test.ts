@@ -89,7 +89,7 @@ const row = (id: string, on: string[] = [], until: Array<[string, boolean]> = []
           },
   });
 
-describe('waitersOf: the runs of the page that wait on a run, on its checkout, or are held until it lands', () => {
+describe('waitersOf: the runs of the page that wait on a run, on its checkout, or are held until it succeeds', () => {
   test('a wait and an unlanded hold each count once', () => {
     const rows = [row('a'), row('b', ['a']), row('c', [], [['a', false]]), row('d', ['x'])];
     assert.equal(waitersOf(rows, 'a').length, 2);

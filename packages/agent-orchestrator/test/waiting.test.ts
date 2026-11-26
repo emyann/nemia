@@ -646,14 +646,17 @@ describe('`nemia start --after` reads no branch: a parent whose branch is droppe
     assert.equal(world().head(wt), tip, 'cut at the base branch’s tip');
     assert.equal(fs.existsSync(path.join(wt, 'unmerged.txt')), false, 'without the parent’s commits');
   });
-  test('a hold until a succeeded run lifts, and a hold until a failed one waits on you until the run is released', async () => {
-    const ok = await aParent(repo, { work: 'ok.txt' });
+  test('a hold until a run that succeeds lifts, and a hold until a failed one waits on you until that run is released', async () => {
+    const ok = await aParent(repo, { signed: false });
     const failed = await aParent(repo, { signed: false });
     board().settle(`${failed.run.id}-implement`, 'failed');
     await tick(failed.run.id);
     const held = await started({ brief: 'held on two', repo, workflowDir: oneStep() });
     await stage.main(['hold', held.id, '--until', ok.run.id, '--until', failed.run.id]);
-    assert.deepEqual((await tick(held.id)).filed, [], 'one of the two has not succeeded');
+    assert.deepEqual((await tick(held.id)).filed, [], 'neither has succeeded');
+    board().settle(`${ok.run.id}-implement`, 'succeeded', SIGNED);
+    await tick(ok.run.id);
+    assert.deepEqual((await tick(held.id)).filed, [], 'one has succeeded, the other failed: still held');
     await releasing(failed.run.id);
     assert.deepEqual((await tick(held.id)).filed, ['implement'], 'both released: the hold lifts, and the run goes on');
   });

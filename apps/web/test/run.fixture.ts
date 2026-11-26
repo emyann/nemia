@@ -346,7 +346,7 @@ export const detail = (extra: Partial<RunDetail> = {}) =>
     holding: {
       at: '2026-09-30T05:00:00.000Z',
       runs: [{ run: 'r-0', missing: false, cancelledAt: null, failed: false, released: false }],
-      word: 'held until r-0 lands',
+      word: 'held until r-0 succeeds',
       advice: 'wf hold r-1 --off',
       waitingOnYou: true,
     },

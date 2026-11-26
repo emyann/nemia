@@ -3,7 +3,8 @@
  * stories. One run's ending: a run to its ending's gate, approved, merged and landed on its check, and a run `--after` it; a landing read
  * again after a restart, a pause or a person's hand; a record an older nemia wrote; a place that reads the checkout oddly; and an ending
  * that stops on its own word or whose check refuses the merged tree. The ends of runs that share a repository: a result a person merged
- * by hand before its ending ran — the run has landed as git reads it, and a run `--after` it starts — and two runs of one repository at
+ * by hand before its ending ran — the run has landed as git reads it, and a run `--after` it waits all the same, since the wait reads no
+ * git — and two runs of one repository at
  * their endings, which never work in its one checkout at once. The work sent back from a run's ending: a send-back at the ending's gate,
  * an ending stopped on its base branch that sends the work back through the loop, a loop out of rounds before its ending, and `nemia
  * refresh --base`, the merge of the base into the work — where it conflicts as text, and where the ending's check refused the merged tree
@@ -1068,7 +1069,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
   );
 });
 
-describe('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it starts, and every screen agrees', () => {
+describe('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it still waits, and every screen agrees', () => {
   let filings!: string[];
   let gate!: Awaited<ReturnType<typeof at.atTheGate>>;
   beforeAll(() => {
@@ -1130,12 +1131,12 @@ describe('a result a person merged by hand before its ending ran: the run has la
     );
     assert.deepEqual(runRecord(ROOT, id).approvals ?? [], [], 'nothing was written');
   });
-  s.test("ship is never filed, pass after pass, and the child starts on git's word: its parent has landed", async () => {
+  s.test("ship is never filed, pass after pass, and the child does not start on git's word: the wait reads no git", async () => {
     const { id } = gate;
     for (const pass of [1, 2]) assert.deepEqual((await at.pass(id)).filed, [], `pass ${pass}: ship is never filed`);
     assert.deepEqual(filings, [`${id}-implement`]);
     assert.equal(runRecord(ROOT, id).steps.ship.taskId, null);
-    assert.deepEqual((await at.pass(child)).filed, ['implement']);
+    assert.deepEqual((await at.pass(child)).filed, [], 'its parent has not succeeded, merged by hand or not');
   });
   s.test('the command the refusal names is honoured once the child has started: the record is closed, with nothing to decide', async () => {
     await stage.runWith(e(), cancelRun(gate.id));

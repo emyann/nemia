@@ -44,7 +44,7 @@ const holdOn = (onYou: boolean) =>
   ({
     at: '2026-10-01T00:00:00.000Z',
     runs: [{ run: 'p', missing: onYou, cancelledAt: null, failed: false, released: false }],
-    word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
+    word: onYou ? 'held until p succeeds (no such run)' : 'held until p succeeds',
     advice: 'wf hold r --off',
     waitingOnYou: onYou,
   }) satisfies RunView['holding'];
@@ -59,13 +59,13 @@ const waitOn = (onYou: boolean) =>
   }) satisfies RunView['waiting'];
 
 describe("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", () => {
-  test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {
+  test('REFUSED: a run held until a run that may still succeed waits on nobody, and is not on the bell', () => {
     const held = run('held', { holdUntil: ['p'], holding: holdOn(false) });
     assert.equal(bellRuns([held]).length, 0);
     const lifted = run('stuck', { holdUntil: ['p'], holding: holdOn(true) });
     assert.deepEqual(
       bellRuns([held, lifted]).map((row) => [row.run, row.waitsFor]),
-      [['stuck', ['held until p lands (no such run)']]],
+      [['stuck', ['held until p succeeds (no such run)']]],
       'a hold only a person lifts is',
     );
   });

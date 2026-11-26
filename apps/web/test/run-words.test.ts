@@ -78,7 +78,7 @@ const ROWS: Record<WaitKind, { row: RunView; says: string; opens: string }> = {
   },
   hold: {
     row: summary([['design', 'waiting']], { moving: false, holding }),
-    says: 'It is held until a run that never lands on its own: lift the hold.',
+    says: 'It is held until a run that never succeeds on its own: lift the hold, or release it.',
     opens: 'Open the run',
   },
   after: {
@@ -386,7 +386,7 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
     assert.equal(nowOf({ ...at, steps: [{ ...step, budget: null }] })?.budget, null, 'a step with no budget: no ring');
     assert.equal(nowOf({ ...at, steps: [{ ...step, spent: null }] })?.budget?.spent, 0, 'nothing measured yet: none spent');
   });
-  test('what a wait says in NOW: the run it waits on, the checkout and its holder, a run slot, a hold until a run lands', () => {
+  test('what a wait says in NOW: the run it waits on, the checkout and its holder, a run slot, a hold until a run succeeds', () => {
     const onRun = summary([['land', 'waiting on r-0']], {
       waiting: {
         runs: [

@@ -1970,7 +1970,7 @@ test("a step's facts say `place` only for a step in a folder the run makes, on a
   assert.equal(placeOf({ ...inFolder, place: null }), undefined, 'nor one without the line');
 });
 
-test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits until one lands, and the faint dotted line of a run read — and a run's page's legend does not", () => {
+test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits until one succeeds, and the faint dotted line of a run read — and a run's page's legend does not", () => {
   const legendOf = (cards: boolean) =>
     withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
   const itemsOf = (html: string) =>
@@ -1984,17 +1984,17 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
   const items = itemsOf(legendOf(true));
   assert.deepEqual(
     [...items.keys()],
-    ['pending', 'running', 'done', 'loops back', 'waits until it lands', 'reads what it concluded', 'human gate', 'to decide'],
+    ['pending', 'running', 'done', 'loops back', 'waits until it succeeds', 'reads what it concluded', 'human gate', 'to decide'],
     'the edge between cards, the line of what a card reads, and the ring round a card whose result nobody has decided, which only the Factory draws',
   );
   assert.match(items.get('to decide')!, /ring-1 ring-yours/);
   const html = legendOf(true);
-  assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it lands/);
+  assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it succeeds/);
   const reads = items.get('reads what it concluded')!;
   assert.match(reads, /data-sample="reads"/);
   assert.match(reads, /stroke-dasharray:1 5/);
   assert.doesNotMatch(reads, / Z"/, 'no arrow: it waits on nothing');
-  const cards = items.get('waits until it lands')!;
+  const cards = items.get('waits until it succeeds')!;
   assert.match(cards, /data-sample="cards"/);
   assert.equal((cards.match(/<rect /g) ?? []).length, 2, 'a card at each end');
   assert.match(cards, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
@@ -2489,7 +2489,7 @@ test("outside dontAsk the settings' allow rules are listed, and the read-only co
 const HOLDING = {
   at: '2026-09-23T07:00:00.000Z',
   runs: [{ run: 'p-1', missing: false, cancelledAt: null, failed: false, released: false }],
-  word: 'held until p-1 lands',
+  word: 'held until p-1 succeeds',
   advice:
     'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has landed; to go on before then: wf hold r-1 --off',
   waitingOnYou: false,

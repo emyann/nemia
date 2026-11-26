@@ -114,7 +114,7 @@ export const askOffLine = (id: string, ask: AskName) =>
  * @param steps The run's steps, or undefined for a record that froze no workflow and whose folder does not read.
  * @param run The run's record, every task a pass filed and never wrote down adopted onto it.
  * @param phaseOf The engine's phase of a task by its id.
- * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it lands.
+ * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it succeeds.
  * @param closeoutOf How a step signed off, by its name, or undefined where it has not.
  * @param askedCloseout Whether the engine's record of a task by its id says a closeout was asked of it (`CloseoutAsked`).
  * @param verdictOf The verdict of a step's check, by the step's name, or undefined where it has none.
@@ -198,7 +198,7 @@ type Forgetting = {
 /**
  * The run read once for its reasons: its tasks in flight (`live`), its ending whose merge is not landed (`unlanded`), what a pass would
  * file were it not waiting on runs (`ready`, `waits`), the steps at their gates, what is due, the asks no pass files, the runs that wait on
- * it (`stranded`) or are held until it lands (`holders`), and how a hold on it is said (`lifts`).
+ * it (`stranded`) or are held until it succeeds (`holders`), and how a hold on it is said (`lifts`).
  */
 type Facts = Forgetting & {
   live: string[];
@@ -429,12 +429,12 @@ function strandedHeld(c: Facts) {
   return `${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`;
 }
 
-/** The runs held until this one lands. */
+/** The runs held until this one succeeds. */
 function holdersHeld(c: Facts) {
   const { holders } = c;
   if (!holders.length) return undefined;
   const one = holders.length === 1;
-  return `${andList(holders)} ${one ? 'is' : 'are'} held until it lands: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`;
+  return `${andList(holders)} ${one ? 'is' : 'are'} held until it succeeds: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`;
 }
 
 /** Why the run is held, each reason in the order a person is told it. */
@@ -471,10 +471,10 @@ function strandedFix(c: Facts) {
   const { stranded, id } = c;
   if (!stranded.length) return undefined;
   const one = stranded.length === 1;
-  return `Let ${one ? 'it' : 'them'} start first, on the pass after nemia decide says ${id} has landed, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `nemia cancel ${s}`).join(', ')}`;
+  return `Let ${one ? 'it' : 'them'} start first, on the pass after ${id} has succeeded, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `nemia cancel ${s}`).join(', ')}`;
 }
 
-/** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never lands. */
+/** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never succeeds. */
 function holdersFix(c: Facts) {
   const { holders, run, id } = c;
   if (!holders.length) return undefined;
@@ -482,7 +482,7 @@ function holdersFix(c: Facts) {
   const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `nemia hold ${h} --off`).join(', ')}`;
   return run.cancelledAt
     ? `Lift ${lift}`
-    : `Let ${one ? 'it' : 'them'} go on first, on the pass after nemia decide says ${id} has landed, or lift ${lift}`;
+    : `Let ${one ? 'it' : 'them'} go on first, on the pass after ${id} has succeeded, or lift ${lift}`;
 }
 
 /** What to do about each reason, in the order a person is told it. */

@@ -141,7 +141,7 @@ const folderTeam = () => {
   return dir;
 };
 
-test('a hold on a pruned run and on a folder run is refused, and --until a folder run, a run started --no-worktree, one on another base branch, or one whose result branch is gone is held: git is not read', async (t) => {
+test('a hold on a pruned run is refused, and a hold on or until a folder run, a run started --no-worktree, one on another base branch, or one whose result branch is gone is held: git is not read', async (t) => {
   const b = board();
   const repo = aRepo();
   const run = await aRunning(b, repo);
@@ -152,7 +152,11 @@ test('a hold on a pruned run and on a folder run is refused, and --until a folde
   await refused(t, b.e, 'Conflict', [`${pruned.id} was pruned at`, 'nothing to hold'], 'hold', pruned.id, '--until', target.id);
 
   const folder = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() }));
-  await refused(t, b.e, 'Conflict', [`${folder.id}'s team works in folders`, 'place: folder'], 'hold', folder.id, '--until', target.id);
+  assert.equal(
+    (await typed(t, b.e, 'hold', folder.id, '--until', target.id)).error,
+    undefined,
+    'a folder run is held until a run, as any other',
+  );
   const inPlace = await runPlaced(startRun({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false }));
   git(repo, 'checkout', '-q', '-b', 'release');
   const onRelease = await runPlaced(startRun({ brief: 'onto release', repo, workflowDir: oneStep() }));
@@ -166,5 +170,5 @@ test('a hold on a pruned run and on a folder run is refused, and --until a folde
     assert.ok(recordText(ROOT, runMarkKey(waiter.id, 'hold')) !== undefined, `a hold written on ${waiter.id}`);
   }
 
-  for (const r of [pruned, folder, run]) assert.ok(recordText(ROOT, runMarkKey(r.id, 'hold')) === undefined, `no hold written on ${r.id}`);
+  for (const r of [pruned, run]) assert.ok(recordText(ROOT, runMarkKey(r.id, 'hold')) === undefined, `no hold written on ${r.id}`);
 });

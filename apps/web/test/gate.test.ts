@@ -136,7 +136,7 @@ describe("gateOfSummary, readLink: the card's gate, what it approves and sends b
     const holding = {
       at: '2026-09-23T07:00:00.000Z',
       runs: [],
-      word: 'held until a-1 lands',
+      word: 'held until a-1 succeeds',
       advice: 'wf hold r --off',
       waitingOnYou: false,
     };

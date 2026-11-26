@@ -65,7 +65,7 @@ const roundAskFor = (round: number) => ({ step: 'review', round, at: '2026-09-13
 /** The command that takes an ask back, as `nemia rm` names it. */
 const at = (a: AskName) => askOffLine('r-1', a);
 const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
-/** A run held until r-1 lands. */
+/** A run held until r-1 succeeds. */
 const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });
 /** A run waiting on r-1 that has not started. */
 const child = (id: string, rest: Partial<RepositoryRun> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
@@ -244,7 +244,7 @@ describe('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each ot
       forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
       'c-1 and c-2 wait on it',
       'waiting on r-1 (no such run)',
-      'nemia decide says r-1 has landed',
+      'r-1 has succeeded',
       'nemia cancel c-1, nemia cancel c-2',
     );
     names(forgetRefusal(STEPS, parent, DONE, [child('c-1', { after: ['p-0', 'r-1'] })], signedDone, asked), 'c-1 waits on it');
@@ -303,7 +303,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       'implement is running',
       'try 2 of implement is asked for',
       'c-1 waits on it',
-      'h-1 is held until it lands',
+      'h-1 is held until it succeeds',
       'nemia cancel r-1',
       '(nemia ls r-1)',
       'nemia retry r-1 implement --off',
@@ -345,9 +345,9 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
     inOrder(
       forgetRefusal(fan, { ...gatedRun, ...until('p-9') }, signed, [], signedDone, asked),
       'plan and design wait at their gates',
-      'held until p-9 lands',
+      'held until p-9 succeeds',
       'a and b are ready to be filed',
-      'held until p-9 lands',
+      'held until p-9 succeeds',
       'nemia rm r-1',
     );
   });
@@ -402,12 +402,12 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
     const holders = [heldBy('h-2'), heldBy('h-1')];
     inOrder(
       forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, holders, signedDone, asked),
-      'h-1 and h-2 are held until it lands',
-      'nemia decide says r-1 has landed',
+      'h-1 and h-2 are held until it succeeds',
+      'r-1 has succeeded',
       'nemia hold h-1 --off, nemia hold h-2 --off',
     );
     const cancelled = forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), DONE, holders, signedDone, asked);
-    inOrder(cancelled, 'h-1 and h-2 are held until it lands', 'nemia hold h-1 --off, nemia hold h-2 --off');
+    inOrder(cancelled, 'h-1 and h-2 are held until it succeeds', 'nemia hold h-1 --off, nemia hold h-2 --off');
     lacks(cancelled, 'nemia decide');
   });
   const closeoutOf = () => ({ ...signedDone(), output: { message: 'Add a flag' } }) satisfies Closeout;
@@ -420,7 +420,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       "ship's merge is staged in the repository's checkout (/repo)",
       'try 5 of implement is asked for',
       'c-1 waits on it',
-      'h-1 is held until it lands',
+      'h-1 is held until it succeeds',
       'nemia retry r-1 implement --off',
       'The next tick lands it',
       "what became of ship's merge",

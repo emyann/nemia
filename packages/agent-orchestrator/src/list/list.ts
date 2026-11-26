@@ -86,7 +86,8 @@ export type Listing = {
   waitingOnYou: string[];
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `nemia ls` says
-   * `held until <run> lands` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
+   * `held until <run> succeeds` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off;
+   * empty
    * on a hold that names no run, which a person alone lifts (`held until a person lifts it`).
    */
   holding?: Wait[];

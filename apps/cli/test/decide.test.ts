@@ -63,7 +63,7 @@ const DECISIONS: Record<string, unknown> = {
   },
   'r-2': {
     waiting: {
-      runs: [{ run: 'r-1', missing: false, cancelledAt: null, gone: [] }],
+      runs: [{ run: 'r-1', missing: false, cancelledAt: null, failed: false }],
       word: 'waiting on r-1',
       advice: 'nothing to decide yet',
       waitingOnYou: false,

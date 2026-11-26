@@ -165,7 +165,7 @@ describe('openBlocks, blockOf, factoriesShown: the machine split into a block a 
     );
   });
   test("REFUSED: a factory's bar off its light answer counts every run, those waiting and those in flight by the api's counts", () => {
-    const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', waitingOnYou: false };
+    const holding = { at: 'x', runs: [], word: 'held until r-0 succeeds', advice: 'wait', waitingOnYou: false };
     const working = run('working', 'nemia', { status: 'running', moving: true });
     const held = run('held', 'nemia', { status: 'running', holding });
     const gate = run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] });

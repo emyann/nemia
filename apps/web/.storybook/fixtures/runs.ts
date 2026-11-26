@@ -465,7 +465,7 @@ const HELD = staged({
     holding: {
       at: before(30),
       runs: [{ run: AT_WORK.metadata.name, missing: false, cancelledAt: null, failed: false, released: false }],
-      word: `held until ${AT_WORK.metadata.name} lands (why: merge conflicts with 1sw7’s schema change; by ann)`,
+      word: `held until ${AT_WORK.metadata.name} succeeds (why: merge conflicts with 1sw7’s schema change; by ann)`,
       advice: '',
       waitingOnYou: false,
       why: 'merge conflicts with 1sw7’s schema change',

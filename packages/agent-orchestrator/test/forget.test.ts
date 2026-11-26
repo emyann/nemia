@@ -493,7 +493,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       await pass(asked.id);
       board().settle(`${asked.id}-implement`, 'succeeded');
       await stage.runWith(e(), retryRun(asked.id, 'implement', { mode: 'continue' }));
-      const parent = await aParent(repo, { work: 'parent.txt' });
+      const parent = await aParent(repo, { work: 'parent.txt', signed: false });
       const child = await stage.runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }));
       const over = await aParent(repo, { work: 'over.txt' });
       Object.assign(ids, { running: running.id, ready: readyRun.id, asked: asked.id, parent: parent.run.id, child: child.id });

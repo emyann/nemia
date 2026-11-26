@@ -373,7 +373,7 @@ describe("the meanings of a state's colour: one thing each, the look's meanings 
         RunWait,
         {
           label: 'Held',
-          wait: { runs: runs.slice(0, 1), word: 'held until a-1 lands', advice: 'lift it with hold --off', waitingOnYou: false },
+          wait: { runs: runs.slice(0, 1), word: 'held until a-1 succeeds', advice: 'lift it with hold --off', waitingOnYou: false },
         },
         createElement(LiftHold, { id: 'r-1', onClose: () => {} }),
       ),

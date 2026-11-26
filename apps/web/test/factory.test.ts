@@ -889,7 +889,7 @@ const holdingOn = (onYou: boolean) =>
   ({
     at: '2026-09-13T00:30:00.000Z',
     runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, failed: false, released: false }],
-    word: 'held until p lands',
+    word: 'held until p succeeds',
     advice: onYou
       ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
       : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
@@ -1010,7 +1010,7 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
     );
     assert.deepEqual(onYouOf({ ...before, waitingOnYou: [] }), []);
   });
-  test('a run held until runs that may still land is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
+  test('a run held until runs that may still succeed is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
     const gated = { status: 'running' as const, moving: false, waitingOnYou: [] as string[], waiting: null };
     const lifts = run(['awaiting approval', 'waiting'], { ...gated, holdUntil: ['p'], holding: holdingOn(false) });
     assert.deepEqual(

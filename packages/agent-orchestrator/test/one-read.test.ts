@@ -415,18 +415,16 @@ describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and t
       'decide reads the branch unread, as nemia ls does',
     );
   });
-  test('F3: a run after a parent merged by hand since the last pass: every reader waits on the parent', async () => {
+  test('F3: a run after a parent merged by hand: every reader waits on the parent, which has not succeeded', async () => {
     const repo = aRepo();
     const parent = await worked(folder({ implement: [], review: ['after: implement'] }), repo);
-    stage.board().settle(`${parent.id}-review`, 'succeeded', SIGNED);
-    await tick(parent.id);
     const child = await stage.runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ implement: [] }), after: [parent.id] }));
     await tick(child.id);
     await aPass();
     mergedByHand(repo, parent.branch);
     const said = await readers(child.id, { pass: false });
     agree(said);
-    assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge before a pass does');
+    assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge: a parent still at work is waited on, merged or not');
   });
   test('F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder', async () => {
     const repo = aRepo();

@@ -302,7 +302,7 @@ function unheldIn(text: string) {
 function releasedIn(text: string) {
   const json = jsonOr(text);
   const at = fieldOf(json, 'at');
-  return { at: isText(at) ? at : '', ...actorIn(fieldOf(json, 'actor')) } satisfies Released as Released;
+  return { at: isText(at) ? at : '', ...actorIn(fieldOf(json, 'actor')) } satisfies Released;
 }
 
 /** The longest time an assignee is read with, in milliseconds: 23 hours, as `--for` takes. */

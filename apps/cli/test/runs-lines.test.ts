@@ -223,7 +223,7 @@ test('cancel, hold, route, refresh and wait print what they did off the answer',
     'r-1  already succeeded — nothing to stop',
   ]);
   assert.match(holdLines({ id: 'r-1', lifted: false, hold: { until: [], why: 'legal' } } as never)[0] ?? '', /nemia hold r-1 --off/);
-  assert.match(holdLines({ id: 'r-1', lifted: false, hold: { until: ['a', 'b'] } } as never)[0] ?? '', /held until a and b land/);
+  assert.match(holdLines({ id: 'r-1', lifted: false, hold: { until: ['a', 'b'] } } as never)[0] ?? '', /held until a and b succeed/);
   assert.deepEqual(routeLines({ step: 'review', try: 2, route: 'fix', file: 'f' } as never, 'r-1'), [
     'r-1  routed: try 2 of review takes fix — the next tick files what its when: names',
     '   f',

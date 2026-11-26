@@ -291,8 +291,8 @@ test('REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   assert.equal(
     runsWritten(),
-    before,
-    'nor by the CLI: dropped, any of these would start a run that waits on nothing, or on the wrong repository, and the tick would file it',
+    before + 1,
+    'nor by the CLI, past the one run accepted from elsewhere: dropped, any of these would start a run that waits on nothing, or on the wrong repository, and the tick would file it',
   );
 
   const second = await aParent(repo, b, { work: 'second.txt' });

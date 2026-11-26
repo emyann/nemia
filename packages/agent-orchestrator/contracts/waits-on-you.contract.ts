@@ -75,6 +75,19 @@ const kindOfSpec = spec<(run: StateFacts) => RunState>({
       description: 'A run is listed finished only when it asks nothing of a person and nothing of it moves',
       condition: ({ input: [run], output }) => output !== 'finished' || (!asks(run) && !run.moving),
     },
+    whatNeitherAsksMovesNorRunsIsFinished: {
+      description: 'A run that asks nothing of a person, of which nothing moves, and that is not running is listed finished',
+      condition: ({ input: [run], output }) => asks(run) || run.moving || run.status === 'running' || output === 'finished',
+    },
+    aRunningRunCalledOffIsInFlightUntilItsWaitNeedsAPerson: {
+      description:
+        'A running run called off, nothing of which moves, is listed in flight while neither a run it waits on nor its hold needs a person, and finished once one does: a called-off run asks nothing, so such a wait never lands',
+      condition: ({ input: [run], output }) =>
+        run.status !== 'running' ||
+        !run.cancelledAt ||
+        run.moving ||
+        output === (run.waiting?.waitingOnYou === true || run.holding?.waitingOnYou === true ? 'finished' : 'inFlight'),
+    },
     aRunningRunThatAsksNothingIsInFlight: {
       description: 'A running run nobody called off that asks nothing of a person is listed in flight',
       condition: ({ input: [run], output }) => run.status !== 'running' || Boolean(run.cancelledAt) || asks(run) || output === 'inFlight',

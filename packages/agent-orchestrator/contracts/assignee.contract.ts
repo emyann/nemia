@@ -79,7 +79,7 @@ export type AssigneeStanding =
   | { kind: 'ended' };
 
 /** The instant an ask unanswered takes the run back to the person: its time, counted from the later of the ask and the assignment. */
-const dueOf = (c: AssigneeClock, asksSince: number) => Math.max(c.at, asksSince) + c.forMs;
+const dueOf = (c: AssigneeClock, asksSince: number) => (c.at > asksSince ? c.at : asksSince) + c.forMs;
 
 const assigneeStandingSpec = spec<(c: AssigneeClock) => AssigneeStanding>({
   requires: ({ input: [c] }) =>

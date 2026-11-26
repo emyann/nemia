@@ -414,7 +414,8 @@ const runFields = {
   /**
    * A person's labels on the run (`nemia label run`, and what `nemia start` copied once, at creation): free `key=value` pairs, never a
    * closed key (`factory`, `workflow`), which the run's whole map adds itself (`metadataLabels`). Composed onto every read of the store
-   * from a record of its own, `/registry/runmarks/<id>/labels` (`composedRun` in record.store.ts), never written into the record, and removed by `nemia rm`
+   * from a record of its own, `/registry/runmarks/<id>/labels` (`composedRun` in record.store.ts), never written into the record, and
+   * removed by `nemia rm`
    * with the run. Absent on a run nobody labelled.
    */
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -422,7 +423,8 @@ const runFields = {
    * What was said to each step before it was filed (`nemia say` to a step with no task and no try behind it), by step, in the order said:
    * when, and the words as said (`text`, an agent's in the frame that names it, as the engine journals words said to a session). Kept for
    * the step's first try, whose brief carries them (`saidBeforeSection`), and for no try after. Composed onto every read of the store from
-   * records of their own, `/registry/runmarks/<id>/said/<n>` (`composedRun` in record.store.ts), never written into the record, and removed by `nemia rm`
+   * records of their own, `/registry/runmarks/<id>/said/<n>` (`composedRun` in record.store.ts), never written into the record, and
+   * removed by `nemia rm`
    * with the run. Absent on a run nobody said anything to before a step ran.
    */
   saidBefore: Schema.optional(Schema.Record(Schema.String, Schema.Array(SaidBefore))),
@@ -473,14 +475,16 @@ const runFields = {
   acceptances: Schema.optional(Schema.Array(Acceptance)),
   /**
    * When `nemia prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
-   * `/registry/runmarks/<id>/pruned`, as `cancelledAt` is (`composedRun` in record.store.ts), and never written into the record. A pruned run is read as it
+   * `/registry/runmarks/<id>/pruned`, as `cancelledAt` is (`composedRun` in record.store.ts), and never written into the record. A pruned
+   * run is read as it
    * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
    * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
    */
   pruned: Schema.optional(Pruned),
   /**
    * That a person holds the run until other runs land (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
-   * its own, `/registry/runmarks/<id>/hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
+   * its own, `/registry/runmarks/<id>/hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing
+   * new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
    * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
    * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
@@ -488,7 +492,8 @@ const runFields = {
   hold: Schema.optional(Hold),
   /**
    * Who lifted the run's last hold lifted by hand, and the moment that hold was put (`since`) — composed on read from a file of its own,
-   * `/registry/runmarks/<id>/unheld`, written by the lift in the transaction that takes the hold away, and never written into the record. The feed's lift of
+   * `/registry/runmarks/<id>/unheld`, written by the lift in the transaction that takes the hold away, and never written into the record.
+   * The feed's lift of
    * that hold carries it (`holdOnce`). Absent where no caller the api resolved has lifted one.
    */
   unheld: Schema.optional(Unheld),

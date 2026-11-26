@@ -5,7 +5,7 @@ import { factoriesAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, dropStoredFactory, storeFactory, storedFactory } from '../world.ts';
 
 /** The factory the page gives two volumes besides the repository it works on, and one the page files with none. */
 const FACTORY = FACTORIES.hiring.name;
@@ -74,9 +74,9 @@ async function expectListed(page: Page, ...given: string[]) {
  * The switches of FACTORY's read-only volume `ro`: CLAUDE.md off and skills on, as a volume that sets neither; its CLAUDE.md switch
  * pressed, the api answers the volume with it on, the factory's file holds it on the same path, its mark unmoved, and the page drawn
  * again reads it on.
- * @param factoryFile The factory's file.
+ * @param factoryName The factory's file.
  */
-async function expectSwitched(page: Page, ro: string, factoryFile: string) {
+async function expectSwitched(page: Page, ro: string, factoryName: string) {
   await settingsOf(page, FACTORY);
   const row = page.locator(`[data-factory-volumes="${FACTORY}"] [data-factory-volume="${ro}"]`);
   const input = (key: string) => row.locator(`[data-volume-switch="${key}"] input`);
@@ -89,7 +89,7 @@ async function expectSwitched(page: Page, ro: string, factoryFile: string) {
   if (answered?.claudeMd !== true)
     throw new Refused(`the api answers ${ro} with CLAUDE.md on once its switch is pressed — it answers ${JSON.stringify(answered)}`);
   const filed = (
-    JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { volumes: Array<{ path: string; readOnly: boolean; claudeMd?: boolean }> }
+    JSON.parse(storedFactory(factoryName)) as { volumes: Array<{ path: string; readOnly: boolean; claudeMd?: boolean }> }
   ).volumes.find((v) => v.path === ro);
   if (filed?.claudeMd !== true || filed.readOnly !== true)
     throw new Refused(`the factory's file holds ${ro} read-only with claudeMd true — it holds ${JSON.stringify(filed)}`);
@@ -139,24 +139,24 @@ export default {
   name: 'factory-volumes',
   route: '/',
   expect: async (page) => {
-    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryName = FACTORY;
+    const factoryText = storedFactory(factoryName);
     fs.mkdirSync(OUT, { recursive: true });
     const ro = fs.mkdtempSync(path.join(OUT, 'factory-volumes-ro-'));
     const formed = fs.mkdtempSync(path.join(OUT, 'factory-volumes-form-'));
-    const noneFile = path.join(store!, 'factories', `${NONE}.json`);
+    const noneName = NONE;
     try {
       const factory = JSON.parse(factoryText) as { volumes: unknown[] };
       const volumes = [...factory.volumes, { path: ro, readOnly: true }];
-      fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, volumes }, null, 2)}\n`);
-      fs.writeFileSync(noneFile, `${JSON.stringify({ volumes: [], instruction: { store: true } }, null, 2)}\n`);
+      storeFactory(factoryName, `${JSON.stringify({ ...factory, volumes }, null, 2)}\n`);
+      storeFactory(noneName, `${JSON.stringify({ volumes: [], instruction: { store: true } }, null, 2)}\n`);
       await expectListed(page, ro);
-      await expectSwitched(page, ro, factoryFile);
+      await expectSwitched(page, ro, factoryName);
       await expectAddedThenRemoved(page, formed);
       await expectNone(page);
     } finally {
-      fs.writeFileSync(factoryFile, factoryText);
-      fs.rmSync(noneFile, { force: true });
+      storeFactory(factoryName, factoryText);
+      dropStoredFactory(noneName);
       fs.rmSync(formed, { recursive: true, force: true });
       fs.rmSync(ro, { recursive: true, force: true });
     }

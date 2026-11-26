@@ -37,7 +37,7 @@ import {
 import { agentDraftOf, skillDraftOf } from '../src/workflow.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { keysUnder, recordText, runKey } from '../testing.ts';
+import { factoriesNow, keysUnder, recordText, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-writers-cli-');
 process.env.NEMIA_DAEMON_START = 'off';
@@ -299,7 +299,7 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       const folder = path.join(DRAFTS, 'workflows', 'hired');
       fs.mkdirSync(folder, { recursive: true });
       fs.writeFileSync(path.join(folder, 'only.md'), '---\nplace: git\nskills: [tidy]\n---\n');
-      const { places, fills } = factoryDraftOf(ROOT, 'shop', 'hired');
+      const { places, fills } = factoriesNow(ROOT, factoryDraftOf(ROOT, 'shop', 'hired'));
       const draft = await handled(Effect.provideService(draftSteps(folder, places, fills), StoreRoot, ROOT));
       await handled(WORKFLOWS_WRITE.handler({ from: 'factory', name: 'hired', factory: 'shop', draft }));
       const written = fs.readFileSync(path.join(tree, 'workflows', 'hired', 'only.md'), 'utf8');

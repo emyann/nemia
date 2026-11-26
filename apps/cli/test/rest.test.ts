@@ -6,7 +6,7 @@
  *
  * Each refusal asserts its exit code and the command or the name it names, never its sentence.
  */
-import { plantRecord, recordText, runKey, subscriptionKey } from 'agent-orchestrator/testing';
+import { plantRecord, readFactoryLevel, recordText, runKey, subscriptionKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -128,7 +128,7 @@ test('`nemia level` reads where she is; a level, a factory raised for a stretch 
   await typed(['factory', 'add', 'mill']);
   const raised = await typed(['level', 'semi-auto', '--factory', 'mill', '--for', '2h']);
   assert.match(raised.out, /^ {2}mill: semi-auto until \S+, then manual \(the store's\)$/m);
-  assert.match(fs.readFileSync(path.join(store.root, 'factories', 'mill', 'level.json'), 'utf8'), /semi-auto/);
+  assert.match(JSON.stringify(readFactoryLevel(store.root, 'mill')), /semi-auto/);
   const ended = await typed(['level', '--factory', 'mill', '--end']);
   assert.match(ended.out, /^ {2}mill: manual \(the store's\)$/m);
   assert.match((await typed(['level', 'auto', '--factory', 'nowhere'], 2)).err, /nowhere/);

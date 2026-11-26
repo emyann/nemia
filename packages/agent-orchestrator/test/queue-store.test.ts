@@ -27,6 +27,7 @@ import {
   runKey,
   runRecord,
 } from '../testing.ts';
+import { clearFactories } from '../testing.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -63,7 +64,7 @@ import {
   addToInbox as addToInboxVerb,
   readInbox as readInboxVerb,
 } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { listedRow, stepRow, told } from './typed.ts';
 import { shownStatus, type RunsListed } from '../src/list/list.ts';
 import { CardDoor, type CardDoorShape } from '../src/cards/cards.store.ts';
@@ -269,7 +270,7 @@ const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
  * team's `dev` names its agents in its steps, so a start of it in `solo` hires no one.
  */
 const aSoloFactory = (attached: readonly string[]) => {
-  fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+  clearFactories(ROOT);
   const repo = aRepo();
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
   addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });

@@ -5,7 +5,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, dropStoredFactory, store } from '../world.ts';
 
 const { good, yours } = WORKFLOWS;
 
@@ -36,7 +36,7 @@ const stepFile = (body: string) => `---\nharness: claude\nmodel: sonnet\nplace: 
 
 /** Writes TREED's file and its tree, and TWIN's file; returns what takes them back. */
 function written() {
-  const file = path.join(store!, 'factories', `${TREED}.json`);
+  const file = TREED;
   const folder = path.join(store!, 'factories', TREED);
   const workflows = path.join(folder, 'tree', 'workflows');
   const put = (to: string, text: string) => {
@@ -60,11 +60,11 @@ function written() {
     `---\nname: ${TREE_SKILL.name}\ndescription: ${TREE_SKILL.description}\n---\n# Outline\n`,
   );
   put(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'elsewhere')]), template: TEMPLATE }, null, 2)}\n`);
-  const twin = path.join(store!, 'factories', `${TWIN.name}.json`);
+  const twin = TWIN.name;
   put(twin, `${JSON.stringify({ volumes: worked(TWIN.repos.map((repo) => path.join(store!, repo))) }, null, 2)}\n`);
   return (() => {
-    fs.rmSync(twin, { force: true });
-    fs.rmSync(file, { force: true });
+    dropStoredFactory(twin);
+    dropStoredFactory(file);
     fs.rmSync(folder, { recursive: true, force: true });
   }) satisfies () => void;
 }

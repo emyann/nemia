@@ -1,27 +1,24 @@
 /**
- * The factories on disk: `<home>/factories/<name>.json`, one file per factory, holding `{ "volumes": [...], "workflows": [...],
- * "hires": {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back
- * (`rewriteFactoryAt`),
- * given workflows (`attachWorkflowAt`), hired into and fired from (`hireAgentAt`, `fireAgentAt`), told where its instruction is kept
- * (`setInstructionAt`), and removed (`removeFactoryAt`); and, once, a file an earlier release wrote moved into one list of volumes
- * (`volumesMovedAt`). Each takes the store's root, `home`, first: the Factory door's files layer
- * (`factories.store.ts`) is over them. A person's verbs are their one writer; the judgement is `factory.ts`'s words and `wiring.ts`'s
- * decision.
+ * The factories' judgement over what the store holds of them: a factory is a record of the keyspace, `/registry/factories/<name>`, whose
+ * value is the text of the file it was — `{ "volumes": [...], "workflows": [...], "hires": {...} }`, every key a later `nemia` writes
+ * kept — and this file reads and judges those texts as a snapshot of them (`FactoryHeld`): read (`readFactoriesAt`, `readFactoryAt`),
+ * what a filing (`createdFactory`) or a write back (`rewriteFactoryAt`) would write, a removal's refusals (`removedFactory`), and, once, a
+ * record an earlier release wrote moved into one list of volumes (`volumesMovedAt`). It writes no record: the Factory door's records
+ * layer (`records.store.ts`) holds the snapshot and writes what these answer, in one transaction where several belong together; a
+ * templated factory's tree is files, and a write back of its wiring writes the tree. A person's verbs are their one writer; the judgement
+ * is `factory.ts`'s words and `wiring.ts`'s decision.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
 import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { Option, Result, Schema } from 'effect';
 import {
   ambiguousFactoryRefusal,
   takenFactoryRefusal,
-  unhiredFireRefusal,
   templateTriggeredDetachRefusal,
   unrenderedTreeRefusal,
-  unscheduledRefusal,
   scheduleRepoRefusal,
   scheduleRepoRefusalWords,
   wiredRepo,
@@ -30,16 +27,13 @@ import {
   factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
-  instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
   REVISIONS_POLICIES,
   workflowNameRefusal,
   type Factory,
   type FactoryListing,
-  type FactoryTemplate,
   type FactoryWrite,
-  type InstructionAt,
   type Volume,
   volumeEntry,
 } from './factory.ts';
@@ -48,20 +42,33 @@ import { volumesFromRepos, type FileVolume } from './from-repos/from-repos.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
-import { CardTriggerSchema, readStatus, readTreeWiring, treeDir, treeTriggersOn, writeTreeWiring } from './applied/applied.store.ts';
+import { CardTriggerSchema, readTreeWiring, statusOf, treeDir, treeTriggersOn, writeTreeWiring } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
-import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { generationWritten } from './door/generation.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { factoryKey } from './door/factory-keys.ts';
 
 /**
- * Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there.
+ * Where the factories' own folders are in the store `home`: `<home>/factories`, beside `runs/` and `inbox/`: a factory's tree, its
+ * applied base, its rules and its instruction, where it has them. The default factory has no folder there.
  * @param home The store's root.
  */
 export const factoriesDirAt = (home: string) => path.join(home, 'factories');
 
-/** The file the factory `name` is kept in, in the store `home`, whether or not it is there. */
-const fileAt = (home: string, name: string) => path.join(factoriesDirAt(home), `${name}.json`);
+/** A factory's record as the store holds it: its text, and the revision of the record, which a write back expects. */
+export type FactoryText = { readonly text: string; readonly revision: number };
+
+/**
+ * What the store holds of its factories, at one read: each factory's record by name, and the controller's status of each templated one
+ * by name, as the text it was written in. The snapshot every judgement of this file reads, so none reads the keyspace itself.
+ */
+export type FactoryHeld = {
+  /** The store's root, which a templated factory's tree is under. */
+  readonly home: string;
+  /** Each factory's record, by name. */
+  readonly texts: ReadonlyMap<string, FactoryText>;
+  /** The controller's status of each templated factory, by name, as its text. */
+  readonly statuses: ReadonlyMap<string, string>;
+};
 
 /** A schedule as a factory's file holds it (`Schedule`), a key a later `nemia` writes beside its own kept. */
 const ScheduleSchema = Schema.StructWithRest(
@@ -136,8 +143,8 @@ const FactoryFileSchema = Schema.StructWithRest(
 /** A factory's file as it reads, every key it holds kept, so a verb that writes it back drops none. */
 type FactoryFile = typeof FactoryFileSchema.Type;
 
-/** A factory's file where it is: what it holds, or why it does not read as a factory (`error`). */
-type FileRead = { file: string } & ({ content: FactoryFile } | { error: string });
+/** A factory's record where it is: what it holds, or why it does not read as a factory (`error`); `absent` where there is none. */
+type FileRead = { file: string } & ({ content: FactoryFile } | { error: string } | { absent: true });
 
 /** The keys of a factory's file an earlier release wrote, before one list of volumes: `volumesMovedAt` moves them at the daemon's start. */
 const FORMER_KEYS = ['repos', 'origins'] as const;
@@ -147,21 +154,16 @@ const isFormer = (raw: unknown): raw is Record<string, unknown> =>
   typeof raw === 'object' && raw !== null && !Array.isArray(raw) && FORMER_KEYS.some((k) => k in raw);
 
 /**
- * The file of the factory `name`, read — or why it does not read as one: a name that is no slug, and `default.json`, since the default
- * factory is no file, are each to be removed by hand; and a file an earlier release wrote, which the daemon moves at its start.
+ * The record of the factory `name`, read — or why it does not read as one: not JSON, or a record an earlier release wrote, which the
+ * daemon moves at its start; `absent` where the store holds none.
  */
-function factoryFile(home: string, name: string) {
-  const file = fileAt(home, name);
-  const badName = factoryNameRefusal(name);
-  if (badName) return { file, error: `${badName} Remove the file by hand.` } satisfies FileRead as FileRead;
-  if (name === DEFAULT_NAMESPACE)
-    return {
-      file,
-      error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.',
-    } satisfies FileRead as FileRead;
+function factoryFile(held: FactoryHeld, name: string) {
+  const file = factoryKey(name);
+  const there = held.texts.get(name);
+  if (there === undefined) return { file, absent: true } satisfies FileRead as FileRead;
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    raw = JSON.parse(there.text);
   } catch (err) {
     return {
       file,
@@ -231,16 +233,15 @@ function factoryOf(home: string, name: string, content: FactoryFile) {
 }
 
 /**
- * One entry of the folder as `nemia factory ls` lists it: the factory its file says, with what the controller last observed of it where it
- * is made from a template (`readStatus`), or why the file does not read as one.
+ * One entry of the list as `nemia factory ls` lists it: the factory its record says, with what the controller last observed of it where
+ * it is made from a template (`statusOf`), or why the record does not read as one.
  */
-function factoryAt(home: string, file: string) {
-  const name = file.slice(0, -'.json'.length);
-  const read = factoryFile(home, name);
-  const factory = 'error' in read ? read : factoryOf(home, name, read.content);
+function factoryAt(held: FactoryHeld, name: string) {
+  const read = factoryFile(held, name);
+  const factory = 'content' in read ? factoryOf(held.home, name, read.content) : { error: 'error' in read ? read.error : '' };
   if ('error' in factory) return { name, file: read.file, error: factory.error } satisfies FactoryListing;
   if (factory.template === undefined) return { ...factory, file: read.file } satisfies FactoryListing;
-  const status = readStatus(home, name);
+  const status = statusOf(held.statuses.get(name));
   return {
     ...factory,
     file: read.file,
@@ -249,22 +250,12 @@ function factoryAt(home: string, file: string) {
 }
 
 /**
- * `nemia factory ls`: every factory in the store, its `.json` files by name — a hidden file, such as one `addFactory` is writing, left out
- * — each read as a factory or listed with why, so one bad file hides no other. None when there is no folder yet.
- * @param home The store's root.
+ * `nemia factory ls`: every factory in the store, by name — each read as a factory or listed with why, so one bad record hides no other.
+ * None when the store holds none.
+ * @param held What the store holds of its factories.
  */
-export function readFactoriesAt(home: string) {
-  let names: string[];
-  try {
-    names = fs.readdirSync(factoriesDirAt(home));
-  } catch {
-    return [] satisfies FactoryListing[] as FactoryListing[];
-  }
-  return names
-    .filter((n) => n.endsWith('.json') && !n.startsWith('.'))
-    .sort()
-    .map((file) => factoryAt(home, file)) satisfies FactoryListing[] as FactoryListing[];
-}
+export const readFactoriesAt = (held: FactoryHeld) =>
+  [...held.texts.keys()].sort().map((name) => factoryAt(held, name)) satisfies FactoryListing[] as FactoryListing[];
 
 /**
  * The clones of `volumes`: each folder kept as a clone, to the URL it is cloned from (`origin`), as `cloned` makes them.
@@ -311,53 +302,27 @@ export function refuseName(name: string, verb: FactoryWrite) {
 }
 
 /** Whether `volumes` hold no writable one: a factory that works on no repository. */
-const workedOnNone = (volumes: readonly Volume[]) => volumes.every((v) => v.readOnly);
+export const workedOnNone = (volumes: readonly Volume[]) => volumes.every((v) => v.readOnly);
 
 /**
- * `nemia factory add`, and `nemia factory apply` with the `template` it is made from: a factory filed in the store `home` as
- * `<name>.json` (`createFactoryAt`). Refused before anything is written: the name (`refuseName`) and the volumes (`volumesGiven`); and,
- * the file already there, `Conflict`, the file left as it was. A hand-made factory that works on no repository keeps its instruction in
- * the store, so a volume given it later does not move where it is read.
- * @param home The store's root.
- * @param opts The factory's name, each `--volume` as typed, none or several, the folder a relative one is resolved from (where `nemia`
- * runs where none is given), and the template it is made from, where it is one.
- */
-export function addFactoryAt(home: string, opts: { name: string; volumes: readonly string[]; cwd?: string; template?: FactoryTemplate }) {
-  refuseName(opts.name, 'add');
-  const volumes = volumesGiven(home, opts.name, opts.volumes, opts.cwd ?? process.cwd());
-  const template = opts.template;
-  const made = template === undefined ? {} : { template, tree: treeDir(home, opts.name) };
-  const stored = template === undefined && workedOnNone(volumes) ? { instruction: { store: true as const } } : {};
-  const factory: Factory = { name: opts.name, volumes, workflows: [], hires: {}, schedules: {}, ...made, ...stored };
-  return { factory, file: createFactoryAt(home, factory) };
-}
-
-/**
- * The factory `factory` filed in the store `home`, its file written whole to a hidden file first and linked onto its name, which fails
- * when the name is taken: no reader sees half a file, and two creates of one name file one. Its file holds what the factory says, a
- * workflow, hire or schedule key only where it names one. Refused: a name taken (`Conflict`, the file left as it was), and a templated
- * factory given workflows, hires or a revisions policy, which its tree holds and is not rendered yet (`Conflict`). The name and the
- * factory's invariants are its caller's to check.
- * @param home The store's root.
+ * The record a filing of `factory` writes into the store `held` holds: its text, a workflow, hire or schedule key only where it names
+ * one, filed at generation 1. Refused: a templated factory given workflows, hires or a revisions policy, which its tree holds and is not
+ * rendered yet (`Conflict`). A name taken is the keyspace's to refuse, at the create. The name and the factory's invariants are its
+ * caller's to check.
+ * @param home The store's root, under which a templated factory's tree is.
  * @param factory The factory to file.
  */
-export function createFactoryAt(home: string, factory: Factory) {
+export function createdFactory(home: string, factory: Factory) {
   if (factory.template !== undefined && (factory.workflows.length || Object.keys(factory.hires).length || factory.revisions !== undefined))
     throw new Conflict({ message: unrenderedTreeRefusal(factory.name, treeDir(home, factory.name), 'Nothing was filed.') });
-  fs.mkdirSync(factoriesDirAt(home), { recursive: true });
-  const file = fileAt(home, factory.name);
-  const hidden = path.join(factoriesDirAt(home), `.${factory.name}.json.${process.pid}.${randomBytes(4).toString('hex')}`);
-  try {
-    fs.writeFileSync(hidden, `${JSON.stringify(fileContentOf(undefined, { ...factory, generation: 1 }), null, 2)}\n`);
-    fs.linkSync(hidden, file);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    throw new Conflict({ message: takenFactoryRefusal(factory.name, file) });
-  } finally {
-    fs.rmSync(hidden, { force: true });
-  }
-  return file;
+  return `${JSON.stringify(fileContentOf(undefined, { ...factory, generation: 1 }), null, 2)}\n`;
 }
+
+/**
+ * The refusal of a filing under a name the store holds one at already.
+ * @param name The factory's name.
+ */
+export const factoryTaken = (name: string) => new Conflict({ message: takenFactoryRefusal(name, factoryKey(name)) });
 
 /**
  * What the file of `factory` holds, written over `content`, what it held, every key the model does not name kept where it was: its
@@ -400,52 +365,41 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory) {
 }
 
 /** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
-const noFactory = (home: string, name: string, notDone: string) =>
+const noFactory = (held: FactoryHeld, name: string, notDone: string) =>
   new Missing({
     message: `${noFactoryLine(
       name,
-      readFactoriesAt(home).map((f) => f.name),
+      readFactoriesAt(held).map((f) => f.name),
     )} ${notDone}`,
   });
 
 /**
- * `nemia factory rm`: a factory's file removed, one that does not read included, since removing it is its fix. Refused: the name
- * (`refuseName`), and a name with no factory (`Missing`), naming those there are.
- * @param home The store's root.
+ * `nemia factory rm`: the record of the factory `name` to remove, one that does not read included, since removing it is its fix. Refused:
+ * the name (`refuseName`), and a name with no factory (`Missing`), naming those there are. Answers the record's key.
+ * @param held What the store holds of its factories.
  * @param name The factory's name.
  */
-export function removeFactoryAt(home: string, name: string) {
+export function removedFactory(held: FactoryHeld, name: string) {
   refuseName(name, 'rm');
-  const file = fileAt(home, name);
-  try {
-    fs.rmSync(file);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw noFactory(home, name, 'Nothing was removed.');
-    throw Object.assign(
-      new Error(
-        `nemia factory rm: ${file} could not be removed — ${(err as Error).message}. Nothing was removed: remove the file by hand, or fix what stops it and remove it again.`,
-      ),
-      { exitCode: 1 },
-    );
-  }
-  return { file };
+  if (!held.texts.has(name)) throw noFactory(held, name, 'Nothing was removed.');
+  return factoryKey(name);
 }
 
 /**
- * The factory `name`, as a run started in it reads it. Refused: a name that is no slug (`Invalid`), a name with no file (`Missing`, naming
- * the factories there are, then `notDone`, what the caller did not do), and a file that does not read as a factory (`Invalid`, quoting
- * why). The default factory is no file, and is never asked for here.
- * @param home The store's root.
+ * The factory `name`, as a run started in it reads it. Refused: a name that is no slug (`Invalid`), a name with no record (`Missing`,
+ * naming the factories there are, then `notDone`, what the caller did not do), and a record that does not read as a factory (`Invalid`,
+ * quoting why). The default factory is no record, and is never asked for here.
+ * @param held What the store holds of its factories.
  * @param name The factory's name.
  * @param notDone What the caller did not do, said at the end of a refusal; `Nothing was started.` by default.
  */
-export function readFactoryAt(home: string, name: string, notDone = 'Nothing was started.') {
+export function readFactoryAt(held: FactoryHeld, name: string, notDone = 'Nothing was started.') {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
-  const read = factoryFile(home, name);
-  if (!fs.existsSync(read.file)) throw noFactory(home, name, notDone);
+  const read = factoryFile(held, name);
+  if ('absent' in read) throw noFactory(held, name, notDone);
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
-  const factory = factoryOf(home, name, read.content);
+  const factory = factoryOf(held.home, name, read.content);
   if ('error' in factory) throw new Invalid({ message: `the factory ${name}: ${factory.error}` });
   return factory;
 }
@@ -470,9 +424,8 @@ export function treeChecked<F extends { tree?: string }>(name: string, factory: 
   return { ...factory, tree };
 }
 
-/** The store's factories that read, and the names of those whose file does not. */
-function readable(home: string) {
-  const listing = readFactoriesAt(home);
+/** The factories of `listing` that read, and the names of those whose record does not. */
+function readable(listing: readonly FactoryListing[]) {
   return {
     factories: listing.flatMap((f) => ('error' in f ? [] : [f])),
     unread: listing.flatMap((f) => ('error' in f ? [f.name] : [])),
@@ -480,30 +433,33 @@ function readable(home: string) {
 }
 
 /**
- * The names of the store's factories that read, as a refusal offers them.
- * @param home The store's root.
+ * The names of the factories of `listing` that read, as a refusal offers them.
+ * @param listing The store's factories, each as it reads or with why it does not.
  */
-export const factoryNamesAt = (home: string) => readable(home).factories.map((f) => f.name) satisfies string[];
+export const factoryNamesOf = (listing: readonly FactoryListing[]) => readable(listing).factories.map((f) => f.name) satisfies string[];
 
 /**
- * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory `named`,
- * read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
- * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStarts` (`StoreConfig`'s
- * `defaultFactoryStarts`). `fix` is the start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
+ * The refusal of a start that names the default factory, whatever the environment: `Invalid`, naming the factories there are.
+ * @param listing The store's factories, each as it reads or with why it does not.
+ * @param fix The start's words for naming a factory, `<name>` in them.
+ */
+export const defaultNamedRefusal = (listing: readonly FactoryListing[], fix: string) =>
+  new Invalid({ message: defaultStartRefusal(fix, factoryNamesOf(listing)) });
+
+/**
+ * The factory a start of a workflow that names none is made in, found from the folder `at`: the one factory of the store a repository of
+ * which holds the folder (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and
+ * `defaultStarts` (`StoreConfig`'s `defaultFactoryStarts`). `fix` is the start's words for naming one, `<name>` in them.
  *
- * Refused, `Invalid`, before anything is written: the default factory named, whatever the environment (`defaultStartRefusal`); two or more
- * factories holding the folder (`ambiguousFactoryRefusal`); and none holding it (`noFactoryRefusal`). A factory whose file does not read is
- * not looked at, and the refusal of none names it.
- * @param home The store's root.
- * @param named The factory's name the start gives, or undefined where it names none.
+ * Refused, `Invalid`, before anything is written: two or more factories holding the folder (`ambiguousFactoryRefusal`); and none holding
+ * it (`noFactoryRefusal`). A factory whose record does not read is not looked at, and the refusal of none names it.
+ * @param listing The store's factories, each as it reads or with why it does not.
  * @param at The folder the start is made from.
  * @param fix The start's words for naming a factory, `<name>` in them.
  * @param defaultStarts Whether a start that finds no factory goes to the default one.
  */
-export function startFactoryAt(home: string, named: string | undefined, at: string, fix: string, defaultStarts: boolean) {
-  if (named === DEFAULT_NAMESPACE) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
-  if (named !== undefined) return { factory: readFactoryAt(home, named) };
-  const { factories, unread } = readable(home);
+export function foundFactory(listing: readonly FactoryListing[], at: string, fix: string, defaultStarts: boolean) {
+  const { factories, unread } = readable(listing);
   const holding = factoriesHolding(factories, at);
   const [only] = holding;
   if (holding.length === 1 && only !== undefined) return only;
@@ -535,16 +491,9 @@ const DONE = {
   upgrade: 'upgraded',
 } as const;
 
-/** A verb that writes a factory back. */
-type Rewrite = keyof typeof DONE;
-
 /** The wiring a factory's tree holds, as its workflows, hires and revisions policy, for telling whether a rewrite changes it. */
 const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>) =>
   JSON.stringify([[...wiring.workflows].sort(), wiring.hires, wiring.revisions ?? null, wiring.workflowRepos ?? null]);
-
-/** The file a factory's wiring is kept in: its tree's `factory.json` where it is made from a template, else its own file. */
-const wiringFileAt = (home: string, factory: Factory) =>
-  factory.template === undefined ? fileAt(home, factory.name) : path.join(treeDir(home, factory.name), 'factory.json');
 
 /**
  * The wiring of the templated factory `factory` written into its tree's `factory.json` — its workflows, hires, revisions policy and
@@ -572,40 +521,32 @@ function treeRewired(home: string, factory: Factory, notDone: string) {
 }
 
 /**
- * The factory `factory` written back into the store `home`, the file it was read from: its file, every key the model does not name
- * kept (`fileContentOf`), and, made from a template, its workflows, hires and revisions policy into its tree's wiring (`factory.json`),
- * every other key of that kept; its generation one more where the write changes its spec, the tree's wiring included, or `counted` says
- * a change of it was made beside the file, its level (`generationWritten`). A file or a wiring that says what it said already is not
- * written again. Returns the file of what changed: the tree's wiring where that did, else the factory's file. Refused: a factory with no
- * file (`Missing`, then `notDone`), a file or a tree's wiring that does not read (`Invalid`), and a tree's wiring to change before the
- * tree is rendered (`Conflict`). The name and the factory's invariants are its caller's to check.
- * @param home The store's root.
+ * What a write back of the factory `factory` into the store `held` writes: its record's text, every key the model does not name kept
+ * (`fileContentOf`), and, made from a template, its workflows, hires and revisions policy into its tree's wiring (`factory.json`), every
+ * other key of that kept — written here, since a tree is files; its generation one more where the write changes its spec, the tree's
+ * wiring included, or `counted` says a change of it was made beside the record, its level (`generationWritten`). A record or a wiring
+ * that says what it said already is not written again: `text` is then undefined. Answers the key of what changed — the tree's wiring
+ * where that did, else the factory's record — and the text to write. Refused: a factory with no record (`Missing`, then `notDone`), a
+ * record or a tree's wiring that does not read (`Invalid`), and a tree's wiring to change before the tree is rendered (`Conflict`). The
+ * name and the factory's invariants are its caller's to check.
+ * @param held What the store holds of its factories.
  * @param factory The factory to write back.
  * @param notDone What the caller did not do, said at the end of a refusal; `Nothing was written.` by default.
- * @param counted Whether a change of the factory's spec was made beside its file (its level); false by default.
+ * @param counted Whether a change of the factory's spec was made beside its record (its level); false by default.
  */
-export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Nothing was written.', counted = false) {
+export function rewriteFactoryAt(held: FactoryHeld, factory: Factory, notDone = 'Nothing was written.', counted = false) {
   const { name } = factory;
-  const read = factoryFile(home, name);
-  if (!fs.existsSync(read.file)) throw noFactory(home, name, notDone);
+  const read = factoryFile(held, name);
+  if ('absent' in read) throw noFactory(held, name, notDone);
   if ('error' in read)
     throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error} It was left as it is, and nothing was changed.` });
   const content = read.content;
-  const written = generationWritten(factoryOf(home, name, content), factory, counted);
+  const written = generationWritten(factoryOf(held.home, name, content), factory, counted);
   let changed = read.file;
-  if ((content.template ?? factory.template) !== undefined) changed = treeRewired(home, factory, notDone) ?? changed;
+  if ((content.template ?? factory.template) !== undefined) changed = treeRewired(held.home, factory, notDone) ?? changed;
   const after = fileContentOf(content, written);
-  if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, `${JSON.stringify(after, null, 2)}\n`);
-  return changed;
-}
-
-/**
- * The factory `name` of the store `home`, as `verb` changes it. Refused: the name (`refuseName`), and the factory (`readFactoryAt`,
- * `notDone` naming the verb).
- */
-function toChange(home: string, name: string, verb: Rewrite) {
-  refuseName(name, verb);
-  return readFactoryAt(home, name, `Nothing was ${DONE[verb]}.`);
+  const text = JSON.stringify(after) === JSON.stringify(content) ? undefined : `${JSON.stringify(after, null, 2)}\n`;
+  return { file: changed, text };
 }
 
 /**
@@ -650,90 +591,6 @@ export function wiringChecked(factory: Factory, change: WiringChange, onDisk: (f
 }
 
 /**
- * The factory `name` of the store `home`, changed by `change` and written back: what it was, what it is, and the file written. Refused
- * before anything is written: the names (`wiringNamesRefused`), the factory (`readFactoryAt`), and what `wiringChecked` refuses.
- */
-function wiredAt(home: string, name: string, change: WiringChange, onDisk?: (factory: Factory) => Error | undefined) {
-  wiringNamesRefused(name, change);
-  const notDone = `Nothing was ${DONE[change.verb]}.`;
-  const was = readFactoryAt(home, name, notDone);
-  const now = wiringChecked(was, change, onDisk);
-  if (now === was) return { was, now, file: wiringFileAt(home, was) };
-  return { was, now, file: rewriteFactoryAt(home, now, notDone) };
-}
-
-/**
- * `nemia factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
- * step, replacing an earlier hire, which is returned (`replaced`). Every other key of the file is kept. Refused before anything is written:
- * a step or an agent that is not one (`hireRefusal`, `Invalid`), the factory (`toChange`), a step of a workflow the factory has not
- * attached (`wiringRefusal`, `Invalid`), and a step whose own file names its agent in a repository of the factory's or in the store
- * `home`'s `workflows/` (`ownAgentRefusal`, `Conflict`). Whether the workflow, its step and the agent exist is judged when a run starts in
- * the factory: a step with no file there takes a hire.
- * @param home The store's root.
- * @param opts The factory's name, the agent, the step as `<workflow>/<step>`, and the store whose `workflows/` is looked in for the step's
- * own file, `home` where absent.
- */
-export function hireAgentAt(home: string, opts: { factory: string; agent: string; step: string; home?: string }) {
-  const { was, file } = wiredAt(home, opts.factory, { verb: 'hire', step: opts.step, agent: opts.agent }, (factory) =>
-    ownAgentRefusal(opts.home ?? home, factory, opts.step),
-  );
-  const replaced = was.hires[opts.step];
-  return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };
-}
-
-/**
- * `nemia factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the
- * agent it hired. Refused: the factory (`toChange`), and a step it hires no one into (`Missing`, naming its hires).
- * @param home The store's root.
- * @param opts The factory's name and the step as `<workflow>/<step>`.
- */
-export function fireAgentAt(home: string, opts: { factory: string; step: string }) {
-  const { was, file } = wiredAt(home, opts.factory, { verb: 'fire', step: opts.step });
-  const fired = was.hires[opts.step];
-  if (fired === undefined) throw new Missing({ message: unhiredFireRefusal(opts.factory, opts.step, was.hires) });
-  return { file, fired };
-}
-
-/**
- * `nemia factory attach`: the workflow whose folder is named `workflow` attached to the factory `factory`, which then offers it; the file's
- * workflows kept sorted, each named once, and every other key kept. One already attached is not written again (`already`). Only the name
- * is stored: whether the workflow exists is judged when a run starts in the factory; `repo`, the folder name of the repository its runs
- * work on, where one is named. Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory
- * (`toChange`), and a `repo` none or several of its repositories are named (`Invalid`).
- * @param home The store's root.
- * @param opts The factory's name, the workflow's folder name, and the folder name of the repository its runs work on, where one is named.
- */
-export function attachWorkflowAt(home: string, opts: { factory: string; workflow: string; repo?: string }) {
-  const change = { verb: 'attach', workflow: opts.workflow, ...(opts.repo === undefined ? {} : { repo: opts.repo }) } as const;
-  const { was, now, file } = wiredAt(home, opts.factory, change);
-  return (now === was ? { file, already: true } : { file }) satisfies { file: string; already?: true };
-}
-
-/**
- * `nemia factory instruction`: where the instruction of the factory `factory` is kept, written into its file — a path in its first folder,
- * kept as `path.normalize` spells it, or the store — or, `at` undefined, the key removed, so the factory reads `NEMIA.md` in its first
- * folder again. Every other key of the file is kept. Refused before anything is written: a path that is not one (`instructionPathRefusal`,
- * `Invalid`), the factory (`toChange`), and one made from a template, whose instruction is its tree's (`Invalid`).
- * @param home The store's root.
- * @param opts The factory's name, and where its instruction is kept: a path in its first folder, the store, or undefined to remove the key.
- */
-export function setInstructionAt(home: string, opts: { factory: string; at: InstructionAt | undefined }) {
-  const at = opts.at;
-  if (at !== undefined && 'path' in at) {
-    const bad = instructionPathRefusal(at.path);
-    if (bad) throw new Invalid({ message: `${bad} Nothing was changed.` });
-  }
-  const factory = toChange(home, opts.factory, 'instruction');
-  if (factory.template !== undefined)
-    throw new Invalid({
-      message: `${opts.factory} is made from a template, and its instruction is its tree's NEMIA.md, at ${path.join(treeDir(home, opts.factory), 'NEMIA.md')}: write it with nemia factory instruct ${opts.factory} --file <path>. Nothing was changed.`,
-    });
-  const { instruction: _was, ...rest } = factory;
-  const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
-  return { file: rewriteFactoryAt(home, kept === undefined ? rest : { ...rest, instruction: kept }, 'Nothing was changed.') };
-}
-
-/**
  * Why the schedule `opts` cannot be written into `factory`, or undefined, beyond what `wiringRefusal` judges, each ending in what was not
  * done: a cron or zone `Cron` does not read, or a cron that never fires, quoting it (`firesOf`); an empty brief; and what
  * `scheduleRepoRefusal` refuses of its repository — a `repo` set or changed, which is retired, or a workflow the factory's wiring places
@@ -754,26 +611,6 @@ function scheduleRefusal(factory: Factory, opts: { workflow: string; cron: strin
   });
   if (refused === null) return undefined;
   return scheduleRepoRefusalWords(factory, opts.workflow, refused, 'refused' in wired ? wired.refused : undefined);
-}
-
-/**
- * `nemia factory schedule`: the schedule of the workflow `workflow` written into the factory `factory`'s file, stamped with when it was
- * written (`since`), so it starts nothing until its next fire; one already there is replaced (`replaced`), and every other key kept.
- * Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory (`toChange`), a workflow it does not
- * offer (`wiringRefusal`, `Invalid`), and what `scheduleRefusal` refuses (`Invalid`).
- * @param home The store's root.
- * @param opts The factory's name, the workflow's folder name, the cron, the brief, the retired repository and the time zone, where given.
- */
-export function setScheduleAt(
-  home: string,
-  opts: { factory: string; workflow: string; cron: string; brief: string; repo?: string; tz?: string },
-) {
-  const schedule = scheduleOf(opts);
-  const { was, file } = wiredAt(home, opts.factory, { verb: 'schedule', workflow: opts.workflow, schedule }, (factory) =>
-    scheduleRefused(factory, opts),
-  );
-  const replaced = was.schedules[opts.workflow];
-  return { file, schedule, ...(replaced ? { replaced } : {}) };
 }
 
 /**
@@ -799,20 +636,6 @@ export function scheduleRefused(factory: Factory, opts: { workflow: string; cron
   return bad === undefined ? undefined : new Invalid({ message: bad });
 }
 
-/**
- * `nemia factory unschedule`: the schedule of the workflow `workflow` taken from the factory `factory`'s file, every other key kept.
- * Refused before anything is written: the name (`Invalid`), the factory (`toChange`), and a workflow it does not schedule (`Missing`,
- * naming those it does).
- * @param home The store's root.
- * @param opts The factory's name and the workflow's folder name.
- */
-export function clearScheduleAt(home: string, opts: { factory: string; workflow: string }) {
-  const { was, file } = wiredAt(home, opts.factory, { verb: 'unschedule', workflow: opts.workflow });
-  const cleared = was.schedules[opts.workflow];
-  if (cleared === undefined) throw new Missing({ message: unscheduledRefusal(opts.factory, opts.workflow, Object.keys(was.schedules)) });
-  return { file, cleared };
-}
-
 /** What the move of a store's factory files did: each file it moved, and each it left as it was, with why. */
 export type VolumesMoved = { readonly moved: readonly string[]; readonly left: readonly { file: string; why: string }[] };
 
@@ -827,33 +650,22 @@ const FormerKeysSchema = Schema.Struct({
 const once = (xs: readonly string[]) => new Set(xs).size === xs.length;
 
 /**
- * The factory files of the store `home` an earlier release wrote, each moved once into one list of volumes (`volumesFromRepos`): its
- * repositories become writable volumes, first and in their order, each with the URL it was cloned from, its extra folders read-only after
- * them, `repos` and `origins` taken out and every other key kept, its generation as it was, since what the factory reaches is unchanged.
- * Each file written whole (`writeWhole`), so a move stopped half way leaves each file in one shape or the other, and a file already in
- * one list is not written: run at every start of the daemon, it finishes what a start before it began. A file whose keys do not read, or
- * that names a repository twice or a volume at a repository's path (`volumesFromRepos`' `requires`), is left as it is, with why; it then
- * reads as a file in the earlier shape, naming `nemia up`. A hidden file, one being written, is left out.
- * @param home The store's root.
+ * The factory records of the store `held` an earlier release wrote, each to be moved once into one list of volumes (`volumesFromRepos`):
+ * its repositories become writable volumes, first and in their order, each with the URL it was cloned from, its extra folders read-only
+ * after them, `repos` and `origins` taken out and every other key kept, its generation as it was, since what the factory reaches is
+ * unchanged. A record already in one list is not answered: run at every start of the daemon, it finishes what a start before it began.
+ * A record whose keys do not read, or that names a repository twice or a volume at a repository's path (`volumesFromRepos`'
+ * `requires`), is left as it is, with why; it then reads as a record in the earlier shape, naming `nemia up`. Answers each record to
+ * write, by name, and the keys of those it moves and of those it leaves.
+ * @param held What the store holds of its factories.
  */
-export function volumesMovedAt(home: string) {
-  let names: string[];
-  try {
-    names = fs.readdirSync(factoriesDirAt(home));
-  } catch {
-    return { moved: [], left: [] };
-  }
+export function volumesMovedAt(held: FactoryHeld) {
   const moved: string[] = [];
   const left: { file: string; why: string }[] = [];
-  for (const name of names.filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort()) {
-    const file = path.join(factoriesDirAt(home), name);
-    let text: string;
-    try {
-      text = fs.readFileSync(file, 'utf8');
-    } catch {
-      continue;
-    }
-    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  const writes: { name: string; text: string }[] = [];
+  for (const name of [...held.texts.keys()].sort()) {
+    const file = factoryKey(name);
+    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(held.texts.get(name)?.text ?? '');
     if (Option.isNone(json)) continue;
     const raw = json.value;
     if (!isFormer(raw)) continue;
@@ -878,8 +690,8 @@ export function volumesMovedAt(home: string) {
       ...former.find((was) => was.path === v.path),
       ...v,
     }));
-    writeWhole(file, `${JSON.stringify({ ...kept, volumes }, null, 2)}\n`);
+    writes.push({ name, text: `${JSON.stringify({ ...kept, volumes }, null, 2)}\n` });
     moved.push(file);
   }
-  return { moved, left };
+  return { moved, left, writes };
 }

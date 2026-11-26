@@ -38,7 +38,7 @@ import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../../testing.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');

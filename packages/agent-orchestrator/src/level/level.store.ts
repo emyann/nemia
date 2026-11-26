@@ -1,17 +1,15 @@
 /**
- * A factory's level on disk, `$WF_ROOT/factories/<name>/level.json`: the person's file, written by `nemia level --factory` alone, in the
- * store's folder for the factory, which `nemia factory rm` removes whole. Read and written whole, through a hidden file renamed over it.
+ * A factory's level as a record, `/registry/levels/<name>` (`levelKey`), whose value is the text of what
+ * `$WF_ROOT/factories/<name>/level.json` was: the person's, written by `nemia level --factory` alone, which `nemia factory rm` removes with
+ * the factory. Read as a record's text (`levelOf`) and written whole (`levelText`); the Factory door's records layer holds the record.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports.
  */
-import fs from 'node:fs';
-import path from 'node:path';
 import { Option, Result, Schema } from 'effect';
-import { factoryNameRefusal } from '../factory/factory.ts';
+import { levelKey } from '../factory/door/factory-keys.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { LEVELS, type FactoryLevelFile } from './level.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** A factory's level file as `nemia level --factory` writes it; a key it does not name is read past. */
 const FactoryLevelSchema = Schema.StructWithRest(
@@ -24,61 +22,33 @@ const FactoryLevelSchema = Schema.StructWithRest(
 );
 
 /**
- * The file the factory `name`'s level is kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's.
- * @param home The store's root.
+ * The level a factory's record `text` holds, or undefined where there is none. Refused (`Invalid`), naming the record, its first wrong
+ * field and the command that writes it again, where it does not read as one.
+ * @param text What the factory's level record holds, or undefined where there is none.
  * @param name The factory's name.
  */
-export function factoryLevelFile(home: string, name: string) {
-  const bad = factoryNameRefusal(name);
-  if (bad) throw new Invalid({ message: bad });
-  return path.join(home, 'factories', name, 'level.json');
-}
-
-/**
- * The factory `name`'s level file, or undefined where none was written. Refused (`Invalid`), naming the file, its first wrong field and the
- * command that writes it again, where it does not read as one.
- * @param home The store's root.
- * @param name The factory's name.
- */
-export const readFactoryLevel = (home: string, name: string) =>
-  levelIn(factoryLevelFile(home, name), name) satisfies FactoryLevelFile | undefined;
-
-/** The level `file` of the factory `name` holds, or undefined where it is not there; refused where it does not read. */
-function levelIn(file: string, name: string) {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw err;
-  }
+export function levelOf(text: string | undefined, name: string) {
+  if (text === undefined) return undefined;
+  const where = levelKey(name);
   const fix = `set its level again with nemia level manual --factory ${name}`;
   const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
-  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  if (Option.isNone(json)) throw new Invalid({ message: `${where} is not JSON: ${fix}.` });
   const raw = json.value;
   const read = Schema.decodeUnknownResult(FactoryLevelSchema)(raw);
   if (Result.isFailure(read)) {
     const { path: at, words } = firstRefusal(FactoryLevelSchema, raw);
-    throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
+    throw new Invalid({ message: `${where}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   const { level, since, raise } = read.success;
-  return { ...(level === undefined ? {} : { level }), since, ...(raise === undefined ? {} : { raise: { ...raise } }) };
+  return { ...(level === undefined ? {} : { level }), since, ...(raise === undefined ? {} : { raise: { ...raise } }) } satisfies
+    | FactoryLevelFile
+    | undefined;
 }
 
 /**
- * Writes the factory `name`'s level file whole; a file with neither a level nor a raise is removed, and the factory follows the store.
- * @param home The store's root.
- * @param name The factory's name.
- * @param level The file to write: the factory's own default and its raise, either absent.
+ * The text of a level record, or undefined where the level says neither a level nor a raise, which has no record: the factory then
+ * follows the store.
+ * @param level The level to write: the factory's own default and its raise, either absent.
  */
-export const writeFactoryLevel = (home: string, name: string, level: FactoryLevelFile) => levelWritten(factoryLevelFile(home, name), level);
-
-/** `level` written whole onto `file`, or the file removed where it says neither a level nor a raise. */
-function levelWritten(file: string, level: FactoryLevelFile) {
-  if (level.level === undefined && level.raise === undefined) {
-    fs.rmSync(file, { force: true });
-    return;
-  }
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeWhole(file, `${JSON.stringify(level)}\n`);
-}
+export const levelText = (level: FactoryLevelFile) =>
+  level.level === undefined && level.raise === undefined ? undefined : `${JSON.stringify(level)}\n`;

@@ -191,7 +191,7 @@ export type Served = {
    * the request's `?repo=` names, resolved and refused as `placeFor` resolves and refuses them (factory/place.ts). What a handler of a
    * namespaced kind is placed by (`answeredIn`, objects/refused.ts), never a route of its own.
    */
-  placedIn: (namespace: string) => Place;
+  placedIn: (namespace: string) => Promise<Place>;
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -268,7 +268,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
           placedIn,
         };
         const before = yield* readsOf(services.e);
-        return yield* Effect.promise(async () => handle({ ...services, ...placeFor(placeQueryOf(c), home) })).pipe(
+        return yield* Effect.promise(async () => handle({ ...services, ...(await placeFor(placeQueryOf(c), home)) })).pipe(
           Effect.ensuring(
             Effect.flatMap(readsOf(services.e), (after) =>
               before === undefined || after === undefined

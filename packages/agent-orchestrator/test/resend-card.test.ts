@@ -24,7 +24,7 @@ import type { Env } from '../src/config/config.store.ts';
 import { told } from './typed.ts';
 import { Effect } from 'effect';
 import { RunDoor } from '../src/runs/runs.store.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 
 const ROOT = scratch('wf-resend-card-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });

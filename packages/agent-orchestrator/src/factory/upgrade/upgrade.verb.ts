@@ -21,6 +21,7 @@ import { ResolutionProposer } from './proposer.verb.ts';
 import { textIn } from '../../folder/folder.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
+import { FactoryName } from '../factory.model.ts';
 import { templatePlace } from '../../template/door/templates.store.ts';
 import { nameOfSource, sourceGiven } from '../../template/door/templates.ts';
 import { Effect } from 'effect';
@@ -42,7 +43,6 @@ import {
   digestOf,
   entriesIn,
   readResolutions,
-  readStatus,
   choicesFor,
   proposalsFor,
   resolutionsFile,
@@ -131,9 +131,9 @@ const VERSION = /^\d+\.\d+\.\d+$/;
 
 /**
  * The templated factory `factory`, read through the door, rendered once: its base, the version it holds where its status names it, and
- * the status. Refused: one made from no template, one not rendered.
+ * the status, read beforehand (`status`). Refused: one made from no template, one not rendered.
  */
-function rendered(home: string, factory: Factory, verb: string, notDone: string) {
+function rendered(home: string, factory: Factory, status: Status | undefined, verb: string, notDone: string) {
   const name = factory.name;
   if (factory.template === undefined)
     throw new Invalid({
@@ -144,7 +144,6 @@ function rendered(home: string, factory: Factory, verb: string, notDone: string)
     throw new Conflict({
       message: `${verb}: ${name} is not rendered yet, so there is no base to merge with: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`,
     });
-  const status = readStatus(home, name);
   return { factory: factory as Templated, from: status?.version ?? undefined, base, status };
 }
 
@@ -204,7 +203,8 @@ const judgedTo = Effect.fn('judgedTo')(function* (
 const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: string, notDone: string, downgrades = true) {
   const home = yield* StoreRoot;
   const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
-  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, verb, notDone));
+  const last = yield* (yield* FactoryDoor).status.read(FactoryName.read(filed.name));
+  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, last, verb, notDone));
   const to = textOf(args, 'to');
   if (to === undefined || !VERSION.test(to))
     return yield* Effect.fail(
@@ -269,7 +269,7 @@ function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades:
  */
 function nextOf(home: string, asked: Asked, args: Args) {
   const { factory, from, to, source, render } = asked;
-  const digest = planDigest(home, factory.name, render, source, asked.switched?.from);
+  const digest = planDigest(factory, render, source, asked.switched?.from);
   const words = [
     factory.name,
     '--to',
@@ -314,7 +314,7 @@ function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone:
       message: `${verb}: this upgrade ${asked.switched === undefined ? `rewrites ${asked.factory.name}'s parameters` : `switches ${asked.factory.name} from ${asked.switched.from} onto ${asked.switched.to}, another template, with no common base`}, so it files only a plan a person previewed: ${preview} prints it and the line to type, which carries --plan <digest>. ${notDone}`,
     });
   }
-  if (plan !== planDigest(home, asked.factory.name, asked.render, asked.source, asked.switched?.from))
+  if (plan !== planDigest(asked.factory, asked.render, asked.source, asked.switched?.from))
     throw new Conflict({
       message: `${verb}: --plan ${plan} is not the plan of ${asked.factory.name}'s upgrade now — the factory's file, the template, its version, the parameters or the render changed since it was previewed: preview it again, ${preview}. ${notDone}`,
     });
@@ -426,7 +426,8 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
-  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, verb, notDone));
+  const last = yield* (yield* FactoryDoor).status.read(FactoryName.read(filed.name));
+  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, last, verb, notDone));
   const to = factory.template.version;
   if (from === undefined)
     return yield* Effect.fail(

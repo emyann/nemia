@@ -29,7 +29,7 @@ import { Invalid, TABLE, parseArgv, renamedIn, runWith, type Command, type Env, 
 import { placedIn, type Engine } from '../src/cli/flags.ts';
 import { main } from '../src/cli/main.ts';
 import type { Listing, RunsListed } from '../src/list/list.ts';
-import { readFactoriesAt } from '../src/factory/factory.store.ts';
+import { readFactoriesAt } from '../testing.ts';
 import { workedOn } from '../src/factory/factory.ts';
 import { START, StartInput, startedFacts, type Started } from '../src/start/commands.verb.ts';
 import type { RunStartedFacts } from 'objects';

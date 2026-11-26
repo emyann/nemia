@@ -18,6 +18,7 @@
  */
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
+import { knownIn } from '../folder/known.store.ts';
 import { checked, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
@@ -65,8 +66,13 @@ export type AgentLayer = {
     readonly list: (holder: string) => readonly string[];
     readonly read: (name: string, at: AgentAt) => Agent;
     readonly there: (name: string, at: AgentAt) => DefinitionThere;
-    readonly write: (name: string, draft: AgentDraft, version: string | undefined, at: AgentWriteAt) => AgentWritten;
-    readonly remove: (name: string, version: string | undefined, at: AgentAt) => AgentRemoved;
+    readonly write: (
+      name: string,
+      draft: AgentDraft,
+      version: string | undefined,
+      at: AgentWriteAt,
+    ) => AgentWritten | Effect.Effect<AgentWritten, Refusal>;
+    readonly remove: (name: string, version: string | undefined, at: AgentAt) => AgentRemoved | Effect.Effect<AgentRemoved, Refusal>;
   };
   readonly custom: {
     readonly read: (name: string, repo?: string) => string | undefined;
@@ -200,13 +206,17 @@ export function agentFiles(home: string) {
         return version === null ? { kind: 'none' } : { kind: 'held', version };
       },
       write: (name, draft, version, at) =>
-        writeAgent(home, at.dir, draft, {
-          version: version ?? null,
-          ...(version !== undefined || draft.name !== name ? { from: name } : {}),
-          ...(at.schema !== undefined && { schema: at.schema }),
-          ...placed(at),
-        }),
-      remove: (name, version, at) => removeAgent(home, at.dir, name, { version: version ?? null, ...placed(at) }),
+        Effect.map(knownIn(home), (known) =>
+          writeAgent(home, at.dir, draft, {
+            version: version ?? null,
+            ...(version !== undefined || draft.name !== name ? { from: name } : {}),
+            ...(at.schema !== undefined && { schema: at.schema }),
+            ...placed(at),
+            known,
+          }),
+        ),
+      remove: (name, version, at) =>
+        Effect.map(knownIn(home), (known) => removeAgent(home, at.dir, name, { version: version ?? null, ...placed(at), known })),
     },
     custom: {
       read: (name, repo) => (repo === undefined ? readCustomInstructions(home, name) : customInstructionsFor(home, name, repo)),

@@ -15,7 +15,7 @@ import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
 import { startedFacts } from './commands.verb.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../../testing.ts';
 
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };

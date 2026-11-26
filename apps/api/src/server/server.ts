@@ -61,7 +61,7 @@ import {
   eventKept,
   latestRelease,
   leaseRelease,
-  listedAtOnce,
+  listedAt,
   PASSES,
   PAUSE,
   PAUSE_NOW,
@@ -143,7 +143,7 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('capabilities', () =>
       answered(async (s) => {
         const { e, placeService, config, env, home, mcp, inRequest, trace } = s;
-        const read = pageRead(s, listedAtOnce(home));
+        const read = pageRead(s, await inRequest(listedAt(home)));
         if ('unread' in read) return unreadAnswer(read.unread);
         return capabilitiesWithSteps(read.repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest });
       }),

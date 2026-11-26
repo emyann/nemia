@@ -28,7 +28,7 @@ import {
 import { needsHolding, needsOfRun, needStateOf } from './needs.ts';
 import { workflowNeeds, workflowNeedsRead, workflowReadme } from '../folder/folder.store.ts';
 import { toolsDir } from '../config/root.store.ts';
-import { createFactoryAt } from '../factory/factory.store.ts';
+import { createFactoryAt } from '../../testing.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { trustPlaces } from '../trust/trust.verb.ts';

@@ -5,7 +5,7 @@ import { photograph, pickLevel, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storeFactory, storedFactory } from '../world.ts';
 
 /**
  * Press `control`, or pick the level `word` in the Select it opens, wait for the api's answer to the level's write, and refuse any but a
@@ -37,8 +37,8 @@ export default {
     const dir = path.join(store!, 'nemia');
     const factory = FACTORIES.bare;
     const own = path.join(store!, 'factories', factory);
-    const file = path.join(store!, 'factories', `${factory}.json`);
-    const fileText = fs.readFileSync(file, 'utf8');
+    const file = factory;
+    const fileText = storedFactory(file);
     try {
       const parsed = (before === null ? {} : JSON.parse(before)) as { projects?: Record<string, unknown> };
       const trusted = { ...parsed, projects: { ...parsed.projects, [path.resolve(dir)]: { hasTrustDialogAccepted: true } } };
@@ -88,7 +88,7 @@ export default {
       else fs.writeFileSync(config, before);
       fs.rmSync(dir, { recursive: true, force: true });
       fs.rmSync(own, { recursive: true, force: true });
-      fs.writeFileSync(file, fileText);
+      storeFactory(file, fileText);
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

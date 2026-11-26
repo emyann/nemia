@@ -148,11 +148,11 @@ of its kind, never from an older file that looks alike:
   `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it stands,
   its claim written with its record and removed with it (`runs.forget`). An ask's refusal names its key, not a path.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/door/factories.store.ts`), whose default is rooted**:
-  it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
+  it reads the records at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
   with `StoreRoot` given where its program is composed (`storeConfigLayer`). A test that only needs a factory to exist gives its program one
   `factoryDoorMemory()` (`src/factory/door/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); no file
-  of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`, with no baseline); a synchronous caller
-  names its root (`doorAtOnce`). A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
+  of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`, with no baseline); a caller with no door
+  given opens one at its root (`doorAt`). A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
 - **A card is read and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`), rooted as the Factory door is**: the
   inbox's verbs are programs that yield it, so a test runs one with its root given (`Effect.provideService(program, StoreRoot, root)`;

@@ -40,6 +40,7 @@ import { agentVersion } from './read.store.ts';
 import { copySkillFiles, preloads, readSkillRules, skillsFor, skillVersion } from '../skills/read.store.ts';
 import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolderAt } from '../folder/write.store.ts';
+import { NO_KNOWN, type Known } from '../folder/known.store.ts';
 import { isDirectory, runsDir } from '../record/record.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
@@ -210,11 +211,11 @@ const SIDECARS = [
  * lists — the store's (`<store>/workflows/agents`) or a repository's the store knows (`<repo>/workflows/agents`, for a factory's repo or
  * the `repo` the caller names). Anywhere else only with `{ anywhere: true }`.
  */
-function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: string) {
+function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: string, known = NO_KNOWN) {
   if (path.basename(dir) !== AGENTS_FOLDER) {
     return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
   }
-  if (anywhere || isWorkflowsHolderAt(home, path.dirname(dir), repo)) return undefined;
+  if (anywhere || isWorkflowsHolderAt(home, path.dirname(dir), known, repo)) return undefined;
   return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), AGENTS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${AGENTS_FOLDER}, for a factory's repo), the two places the board lists agents from. Write it to one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${dir} all the same.`;
 }
 
@@ -277,6 +278,16 @@ function keptOffer(draft: AgentDraft, version: string | null, at: string) {
   return kept === undefined ? draft : { ...draft, overridable: kept };
 }
 
+/** What a write of an agent is given besides the agent: the version it was read at, where it is allowed, and what the store knows. */
+type WriteOptions = {
+  version: string | null;
+  from?: string;
+  schema?: AgentSidecar | null;
+  anywhere?: boolean;
+  repo?: string;
+  known?: Known;
+};
+
 /**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
  * is a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps
@@ -306,19 +317,12 @@ export function writeAgent(
   home: string,
   dir: string,
   draft: AgentDraft,
-  {
-    version,
-    from,
-    schema,
-    anywhere = false,
-    repo,
-    ...rest
-  }: { version: string | null; from?: string; schema?: AgentSidecar | null; anywhere?: boolean; repo?: string },
+  { version, from, schema, anywhere = false, repo, known, ...rest }: WriteOptions,
 ) {
   const at = path.resolve(dir);
   if (Object.hasOwn(rest, 'card'))
     refuse('`card` is not written with an agent: its card is generated from its skills. Send the agent without it.');
-  refuse(agentPlaceRefusal(home, at, anywhere, repo));
+  refuse(agentPlaceRefusal(home, at, anywhere, repo, known));
   const name = draft?.name;
   refuse(agentNameRefusal(name));
   const old = from ?? name;
@@ -443,10 +447,10 @@ export function removeAgent(
   home: string,
   dir: string,
   name: string,
-  { version, anywhere = false, repo }: { version: string | null; anywhere?: boolean; repo?: string },
+  { version, anywhere = false, repo, known }: { version: string | null; anywhere?: boolean; repo?: string; known?: Known },
 ) {
   const at = path.resolve(dir);
-  refuse(agentPlaceRefusal(home, at, anywhere, repo));
+  refuse(agentPlaceRefusal(home, at, anywhere, repo, known));
   refuse(agentNameRefusal(name));
   const file = path.join(at, `${name}.md`);
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink())

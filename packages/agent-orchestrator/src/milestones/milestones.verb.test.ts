@@ -14,7 +14,7 @@ import { aRun } from '../../test/run-walks.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { testPlace } from '../../place/memory/index.ts';
-import { createFactoryAt } from '../factory/factory.store.ts';
+import { createFactoryAt } from '../../testing.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory } from '../needs/needs.verb.ts';

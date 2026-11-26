@@ -44,7 +44,7 @@ import {
   watchFeed,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { recordFeed } from '../src/feed/feed.store.ts';
 import { isRunLine } from '../src/feed/feed.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';

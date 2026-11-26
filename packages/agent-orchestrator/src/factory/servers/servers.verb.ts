@@ -19,7 +19,7 @@ import { doorAt, FactoryDoor } from '../door/factories.store.ts';
 import { tableEntry, type Served } from '../../command/entry.verb.ts';
 import { noFactoryLine } from '../factory.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
-import { factoryServersFile } from './servers.store.ts';
+import { serversKey } from '../door/factory-keys.ts';
 import {
   FACTORY_SERVER_ADD_WORDS,
   FACTORY_SERVER_RM_WORDS,
@@ -208,7 +208,6 @@ export const FACTORY_SERVER_ADD: Served<Added, ServerAddInput> = {
   input: ServerAddInput,
   handler: ({ factory, server: name, type, ...write }) =>
     Effect.gen(function* () {
-      const store = yield* StoreRoot;
       const bad = serverNameRefusal(name);
       if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was recorded.` }));
       yield* factoryThere(factory, 'recorded');
@@ -221,7 +220,7 @@ export const FACTORY_SERVER_ADD: Served<Added, ServerAddInput> = {
       const record = yield* door.servers.read(FactoryName.read(factory));
       const kept = yield* tried(() => headersKept(server, record[name]));
       yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: kept });
-      return { file: factoryServersFile(store, factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
+      return { file: serversKey(factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
     }),
 };
 
@@ -234,7 +233,6 @@ export const FACTORY_SERVER_RM: Served<{ file: string; removed: string }, Server
   input: ServerRmInput,
   handler: ({ factory, server: name }) =>
     Effect.gen(function* () {
-      const store = yield* StoreRoot;
       yield* factoryThere(factory, 'removed');
       const door = yield* FactoryDoor;
       const record = yield* door.servers.read(FactoryName.read(factory));
@@ -248,7 +246,7 @@ export const FACTORY_SERVER_RM: Served<{ file: string; removed: string }, Server
       }
       const { [name]: _gone, ...left } = record;
       yield* door.servers.write(FactoryName.read(factory), left);
-      return { file: factoryServersFile(store, factory), removed: name };
+      return { file: serversKey(factory), removed: name };
     }),
 };
 

@@ -17,7 +17,7 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { writeWorkflow } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 
 const ROOT = scratch('wf-write-');
 

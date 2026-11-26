@@ -106,7 +106,8 @@ const relabelled = (labels: Labels, relabel: readonly string[]) => {
 
 /**
  * The text of the card a node files, by its `card:`. `routed` (the default): queued, on the node's workflow, handed the caller as context
- * (`from:`), its repository and factory kept, the run's labels (`labels`, `/registry/runmarks/<id>/labels`) as its own `labels:`, so a card routed out
+ * (`from:`), its repository and factory kept, the run's labels (`labels`, `/registry/runmarks/<id>/labels`) as its own `labels:`, so a
+ * card routed out
  * of a labelled run is selected by the same labels, and `title` its first line. `given`: the same, but the run's own card as it was given
  * (`given`), its body and its labels, else the run's brief, then why it was routed and the producer's reason. `backlog`: the run's card
  * filed back to the inbox naming no workflow and unqueued, its labels after the edits the node's `relabel:` lists. `given` and `backlog`
@@ -186,7 +187,9 @@ const givenCard = Effect.fnUntraced(function* (door: CardDoorShape, run: Run) {
   }
 });
 
-/** The run's labels as the store holds them now (`/registry/runmarks/<id>/labels`), else those on the run as the pass read it, else none. */
+/**
+ * The run's labels as the store holds them now (`/registry/runmarks/<id>/labels`), else those on the run as the pass read it, else none.
+ */
 const storedLabels = Effect.fnUntraced(function* (run: Run) {
   const stored = yield* Effect.result((yield* RunDoor).runs.find(RunId.read(run.id), () => {}));
   return (stored._tag === 'Success' ? stored.success?.labels : undefined) ?? run.labels ?? {};

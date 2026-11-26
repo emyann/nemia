@@ -19,7 +19,7 @@ import { scratch } from 'test-kit/scratch';
 import { eachTest } from './placed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import { serversBefore } from '../src/factory/servers/servers.verb.ts';
-import { writeFactoryServers } from '../src/factory/servers/servers.store.ts';
+import { writeFactoryServers } from '../testing.ts';
 
 const ROOT = scratch('wf-servers-before-');
 

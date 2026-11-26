@@ -47,7 +47,7 @@ import { TEAM } from './team.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../testing.ts';
 
 import { pauseFile, readPause } from '../src/pause/pause.store.ts';
 import { nowRead } from '../src/pause/pause.verb.ts';

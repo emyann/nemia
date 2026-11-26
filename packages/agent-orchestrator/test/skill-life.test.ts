@@ -22,7 +22,7 @@ import { staged, story } from './story.ts';
 import { Effect } from 'effect';
 import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
 import { isRefusal, runWith as runEngine } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from '../src/skills/skills.verb.ts';

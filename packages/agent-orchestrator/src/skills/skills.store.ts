@@ -16,6 +16,7 @@ import { skillEntryOf, skillFilesRefusal, renderSkill, withPreload, type AgentSk
 import { skillFiles, skillLinkRefusal, skillVersion } from './read.store.ts';
 import type { VersionRefused } from '../folder/folder.ts';
 import { isWorkflowsHolderAt } from '../folder/write.store.ts';
+import { NO_KNOWN, type Known } from '../folder/known.store.ts';
 import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
@@ -232,11 +233,17 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
  * @param to The folder of skills copied into.
  * @param name The skill's name.
  */
-export function copySkill(home: string, from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}) {
+export function copySkill(
+  home: string,
+  from: string,
+  to: string,
+  name: string,
+  { anywhere = false, known = NO_KNOWN }: { anywhere?: boolean; known?: Known } = {},
+) {
   const refuse = refuseSkill;
   const at = path.resolve(to);
   const linkWhy = 'a copy follows a link, and would bring in whatever it points at, outside the skill.';
-  judgeSkillPlace(home, at, name, anywhere, 'Copy it', linkWhy);
+  judgeSkillPlace(home, at, name, anywhere, known, 'Copy it', linkWhy);
   const source = path.join(path.resolve(from), name);
   if (fs.lstatSync(source, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(source, linkWhy));
   const skillFile = path.join(source, 'SKILL.md');
@@ -291,12 +298,12 @@ const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof C
  * board lists — the store's, or that of a repository a factory names — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and
  * neither `at` nor the folder it is in is a link, which a write would follow out of the store.
  */
-function judgeSkillPlace(home: string, at: string, name: string, anywhere: boolean, verb: string, linkWhy: string) {
+function judgeSkillPlace(home: string, at: string, name: string, anywhere: boolean, known: Known, verb: string, linkWhy: string) {
   if (path.basename(at) !== SKILLS_FOLDER)
     refuseSkill(
       `${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`,
     );
-  if (!anywhere && !isWorkflowsHolderAt(home, path.dirname(at))) {
+  if (!anywhere && !isWorkflowsHolderAt(home, path.dirname(at), known)) {
     refuseSkill(
       `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${at} all the same.`,
     );
@@ -361,7 +368,7 @@ export function writeSkill(
   home: string,
   to: string,
   change: SkillChange,
-  { version, anywhere = false }: { version: string | null; anywhere?: boolean },
+  { version, anywhere = false, known = NO_KNOWN }: { version: string | null; anywhere?: boolean; known?: Known },
 ) {
   const at = path.resolve(to);
   const name = change?.name;
@@ -370,6 +377,7 @@ export function writeSkill(
     at,
     name,
     anywhere,
+    known,
     'Write it',
     'a write follows a link, and would write whatever it points at, outside the store.',
   );

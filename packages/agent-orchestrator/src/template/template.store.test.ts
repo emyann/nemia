@@ -24,7 +24,7 @@ import { checkedTree, packageSkillNames, problemLine } from './template.store.ts
 import { TemplateDoor } from './door/templates.store.ts';
 import { TemplateSource } from './door/templates.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../../testing.ts';
 import { writeRules } from '../factory/rules/rules.store.ts';
 import { followed } from '../../test/factory-planted.ts';
 import { main } from '../cli/main.ts';

@@ -286,10 +286,12 @@ const libraryHeld = (s: Served) => heldIn(s).filter((h) => h.origin === 'user' |
 
 /** The library's objects of the workflows `served`, in no namespace, each with the factories that attach it. */
 const libraryObjectsOf = async (s: Served, served: Parameters<typeof workflowObjectsOf>[1]) =>
-  (await workflowObjectsOf(s, served)).map((one) => ({
-    ...one,
-    status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Workflow', name: one.metadata.name }) },
-  })) satisfies Workflow[];
+  Promise.all(
+    (await workflowObjectsOf(s, served)).map(async (one) => ({
+      ...one,
+      status: { ...one.status, factories: await s.inRequest(libraryUsers(s.home, { kind: 'Workflow', name: one.metadata.name })) },
+    })),
+  ) satisfies Promise<Workflow[]>;
 
 /** The library's workflow `name` (from `asked`, where one is), read now. */
 async function libraryAt(s: Served, name: string, asked?: Origin) {
@@ -410,7 +412,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
           throw new Invalid({
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
-        writeGoes('library', 'remove', thereOf(libraryHeld(s), name), libraryUsers(s.home, { kind: 'Workflow', name }));
+        writeGoes('library', 'remove', thereOf(libraryHeld(s), name), await s.inRequest(libraryUsers(s.home, { kind: 'Workflow', name })));
         const before = await libraryAt(s, name, 'user');
         const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
         return { ...before, status: { ...before.status, removed } };

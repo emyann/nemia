@@ -245,7 +245,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   const pause = readPause(home);
   const paused = pause ? { paused: yield* pausedOf(e, pause, store, reads) } : {};
   const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
-  const schedules = runId ? [] : schedulesListed(home, all);
+  const schedules = runId ? [] : yield* schedulesListed(home, all);
   return {
     runs: listed,
     daemon: daemonStanding(home),

@@ -6,7 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
-import { cardKey, dropRecord, plantCard, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { factoryText, cardKey, dropRecord, plantCard, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -16,7 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from '../../test/story.ts';
 import { teamCopy } from '../../test/team.ts';
 import { templated as programsAt } from '../../test/templated.ts';
-import { readFactoryAt } from '../factory/factory.store.ts';
+import { readFactoryAt } from '../../testing.ts';
 import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
 import { advanceRun, startRun } from '../runner.ts';
 import { told, type StartedAnswer } from '../../test/typed.ts';
@@ -75,7 +75,7 @@ const previewed = async (name: string, dir: string) =>
   };
 
 /** The file of the factory `name`, as JSON. */
-const fileOf = (name: string) => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')) as Record<string, unknown>;
+const fileOf = (name: string) => JSON.parse(factoryText(ROOT, name) ?? '{}') as Record<string, unknown>;
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, and the team exported from it as a template. */
 function repoAndTemplate() {

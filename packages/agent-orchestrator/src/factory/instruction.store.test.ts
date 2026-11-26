@@ -8,6 +8,8 @@
  * `test/factory-rules.test.ts`; their removal with the factory, in `test/factory-start.test.ts`. Its store is at `ROOT`, given as
  * `ENV`.
  */
+import { clearFactories } from '../../testing.ts';
+import { factoriesNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +21,7 @@ import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { names } from '../../test/assessed.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith as runEngine } from '../runner.ts';
-import { readFactoriesAt, setInstructionAt } from './factory.store.ts';
+import { readFactoriesAt, setInstructionAt } from '../../testing.ts';
 import { readInstructionAt, writeInstructionText } from './instruction.store.ts';
 import { clearRules, readRules, writeRules } from './rules/rules.store.ts';
 import { typed } from '../../test/typed.ts';
@@ -55,7 +57,7 @@ const storeFolder = (name: string) => path.join(FACTORIES, name);
 
 /** A fresh store with the factory `pipao` filed on a new folder, its record holding `extra` beside its repository: the folder. */
 function filed(extra: Record<string, unknown> = {}) {
-  fs.rmSync(FACTORIES, { recursive: true, force: true });
+  clearFactories(ROOT);
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.mkdirSync(FACTORIES, { recursive: true });
   fs.writeFileSync(recordOf('pipao'), JSON.stringify({ volumes: [{ path: repo, readOnly: false }], ...extra }));
@@ -167,7 +169,7 @@ describe('a rules or instruction file that cannot be told is read with why, and 
     filed({ instruction: { store: true } });
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, path.join(storeFolder('pipao'), 'NEMIA.md'));
-    names(factoryInstruction(ROOT, 'pipao').error, 'link');
+    names(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).error, 'link');
     writeInstructionText(ROOT, 'pipao', 'mine');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n');
     assert.ok(!fs.lstatSync(path.join(storeFolder('pipao'), 'NEMIA.md')).isSymbolicLink());
@@ -177,7 +179,7 @@ describe('a rules or instruction file that cannot be told is read with why, and 
     const secret = path.join(ROOT, 'secret.md');
     fs.writeFileSync(secret, 'secret\n');
     fs.symlinkSync(secret, path.join(repo, 'NEMIA.md'));
-    const escaped = factoryInstruction(ROOT, 'pipao');
+    const escaped = factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao'));
     assert.equal(escaped.words, null);
     names(escaped.error, secret);
     fs.writeFileSync(path.join(repo, 'real.md'), 'inside\n');
@@ -191,7 +193,7 @@ describe('a rules or instruction file that cannot be told is read with why, and 
   test('instruction: a path written by hand that climbs out of the folder is not read', () => {
     const repo = filed({ instruction: { path: '../secret.md' } });
     fs.writeFileSync(path.join(path.dirname(repo), 'secret.md'), 'secret\n');
-    const answer = factoryInstruction(ROOT, 'pipao');
+    const answer = factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao'));
     assert.equal(answer.words, null);
     names(answer.error, 'inside');
   });

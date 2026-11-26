@@ -21,11 +21,13 @@ import {
   cardNames,
   cardText,
   plantCard,
+  dropFactory,
   dropRecord,
   emptyCards,
   emptyRuns,
   hireAgent,
   keysUnder,
+  plantFactory,
   plantRecord,
   removeFactory,
   runKey,
@@ -958,13 +960,14 @@ const acmeFactory = () => {
   const tree = path.join(root, 'factories', 'acme', 'tree');
   const folders = path.join(tree, 'workflows');
   fs.cpSync(TEAM, folders, { recursive: true });
-  write(
-    path.join(root, 'factories', 'acme.json'),
+  plantFactory(
+    root,
+    'acme',
     JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
   const gone = () => {
-    fs.rmSync(path.join(root, 'factories', 'acme.json'), { force: true });
+    dropFactory(root, 'acme');
     fs.rmSync(path.join(root, 'factories', 'acme'), { recursive: true, force: true });
   };
   return { dev: path.join(folders, 'dev'), repo, gone };

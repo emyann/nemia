@@ -27,7 +27,7 @@ type Running = import('agent-orchestrator').Running;
 const factoryOn = (name: string, repos: string[]) =>
   ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows: [], hires: {} }) as unknown as Factory;
 
-/** A listing of the store's factory `name` on `repos`, as `listedAtOnce` gives it. */
+/** A listing of the store's factory `name` on `repos`, as the door's `listed` gives it. */
 const listedOn = (name: string, repos: string[]) =>
   ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })) }) as unknown as FactoryListing;
 

@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { AGENTS, checkoutIn, FACTORIES, FOLDER, QUEUED_IN, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredCard, OUT, store, storeCard } from '../world.ts';
+import { OUT, dropStoredCard, store, storeCard, storeFactory, storedFactory } from '../world.ts';
 
 /** The card this page files in the factory, to tag and filter. */
 const CARD = 'tag-the-cards-by-factory-e2e0';
@@ -71,10 +70,10 @@ export default {
     );
 
     const { good, yours } = WORKFLOWS;
-    const brokenFile = path.join(store!, 'factories', `${FACTORIES.broken}.json`);
-    const brokenText = fs.readFileSync(brokenFile, 'utf8');
+    const brokenName = FACTORIES.broken;
+    const brokenText = storedFactory(brokenName);
     const offered = checkoutIn(store!, [good.name, yours.name]);
-    fs.writeFileSync(brokenFile, JSON.stringify({ workflows: [good.name, yours.name] }, null, 2));
+    storeFactory(brokenName, JSON.stringify({ workflows: [good.name, yours.name] }, null, 2));
     try {
       await open(page, '/workflows');
       const mine = page.locator(`section[aria-label="Workflow ${yours.name}"]`);
@@ -102,7 +101,7 @@ export default {
       await expectCount(cards, every, 'which shows every workflow again');
     } finally {
       offered();
-      fs.writeFileSync(brokenFile, brokenText);
+      storeFactory(brokenName, brokenText);
     }
 
     const scribe = page.locator(`section[data-agent="${AGENTS.seeded.name}"][data-from="user"]`);

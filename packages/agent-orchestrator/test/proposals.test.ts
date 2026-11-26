@@ -26,7 +26,7 @@ import { proposalsPass } from '../src/apply/pass.verb.ts';
 import { currentOf } from '../src/propose/current.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { delegationPut, delegationRemove } from '../src/delegation/delegation.verb.ts';
-import { writeFactoryLevel } from '../src/level/level.store.ts';
+import { writeFactoryLevel } from '../testing.ts';
 import { confirmedFile, writeProposed } from '../src/auto/auto.store.ts';
 import { POLICY_CONFIRM, policyListOf } from '../src/auto/auto.verb.ts';
 import { ruleWords } from '../src/auto/auto.ts';

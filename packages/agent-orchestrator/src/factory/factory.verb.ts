@@ -57,7 +57,7 @@ import { FACTORY_SETTINGS } from '../harness-settings/harness-settings.verb.ts';
 import { FACTORY_COST_LINES } from './cost-line/cost-line.verb.ts';
 
 /**
- * A factory's own MCP servers, kept beside it as `factories/<name>/servers.json`, not in its file: one entry per server, with the
+ * A factory's own MCP servers, kept beside it as the record `/registry/servers/<name>`, not in its own: one entry per server, with the
  * server's wire facts and the facts of the OAuth client it signs in through, and never a secret. An agent's `mcp:` line resolves a
  * name against that record before the checkout's `.mcp.json`, and the record's servers are handed to a step's session inline, byte
  * for byte as `mcpServerOf` spells them, so the sign-in the harness filed is found. `nemia factory servers` lists them with the state
@@ -83,7 +83,7 @@ const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
   const home = yield* StoreRoot;
   const factories = [...(yield* (yield* FactoryDoor).factories.listed())];
   const verify = yield* setting('verifyRest');
-  const schedules = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => tried(() => schedulesListed(home, runs)));
+  const schedules = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => schedulesListed(home, runs));
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories), dir: factoriesDirAt(yield* StoreRoot) } satisfies Listed;
 });
 

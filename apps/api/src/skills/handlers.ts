@@ -206,7 +206,7 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
         ...one,
         status: {
           ...one.status,
-          factories: libraryUsers(s.home, { kind: 'Skill', name }),
+          factories: await s.inRequest(libraryUsers(s.home, { kind: 'Skill', name })),
           ...(copiedAt !== undefined && builtinNow !== undefined && { builtinChanged: builtinNow !== copiedAt }),
         },
       };
@@ -366,7 +366,7 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
     .handle('deleteLibrary', ({ params: { name }, query }) =>
       answeredWriteIn(LIBRARY, async (s) => {
         const held = await libraryHeld(s);
-        writeGoes('library', 'remove', thereOf(held, name), libraryUsers(s.home, { kind: 'Skill', name }));
+        writeGoes('library', 'remove', thereOf(held, name), await s.inRequest(libraryUsers(s.home, { kind: 'Skill', name })));
         const gone = await libraryAt(s, name, 'user');
         await s.inRequest(Effect.flatMap(SkillDoor, (door) => door.skills.remove(name, librarySkills(s.home), query.resourceVersion)));
         return gone;

@@ -16,7 +16,8 @@
  * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door
  * (`AgentDoor`), each at the store root `up` is given.
  */
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
+import type { FactoryListing } from '../factory/factory.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -120,8 +121,8 @@ const nemiaBrief = (operating: boolean) =>
  * Each factory's folders, read-only: what she reads of the work and never writes, as the runtime takes a mount (`mountOf`), with no
  * volume's switch. A factory that does not read is left out.
  */
-const factoryFolders = (home: string) => {
-  const volumes = listedAtOnce(home).flatMap((f) => ('volumes' in f ? f.volumes : []));
+const factoryFolders = (listing: readonly FactoryListing[]) => {
+  const volumes = listing.flatMap((f) => ('volumes' in f ? f.volumes : []));
   return factoryMounts({ volumes }, undefined).map(mountOf);
 };
 
@@ -138,10 +139,19 @@ const factoryFolders = (home: string) => {
  * @param custom The person's custom words for her, or undefined where there are none.
  * @param token Her session token, minted as she is filed.
  * @param home The store's root folder.
+ * @param listing The store's factories, as the Factory door lists them, whose folders she reads.
  * @param resumeFrom The session of her last task to continue, or undefined to start cold.
  * @param operating Whether a factory is above `manual`, so her brief says the feed is said to her.
  */
-export function nemiaSpec(id: string, custom: string | undefined, token: string, home: string, resumeFrom?: string, operating = true) {
+export function nemiaSpec(
+  id: string,
+  custom: string | undefined,
+  token: string,
+  home: string,
+  listing: readonly FactoryListing[],
+  resumeFrom?: string,
+  operating = true,
+) {
   const step = readNemia();
   const prompt = composePrompt(home, step.body, custom);
   const memory = `Edit(/${memoryDir(home)}/**)`;
@@ -166,7 +176,7 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string,
         command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR, '--auto', 'nemia'],
         tools: ['Bash'],
       },
-      mounts: factoryFolders(home),
+      mounts: factoryFolders(listing),
       env: { [SESSION_TOKEN]: token },
       ...ownOf(
         { harness: step.harness, remote: true },
@@ -228,7 +238,7 @@ const fileHer = (e: Engine, beat: Beat) =>
     writeSession(home, { tasks: listed });
     const resumeFrom = yield* lastSession(e, listed, id);
     const custom = yield* herCustom();
-    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id), home, resumeFrom, beat.above)));
+    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id), home, yield* listedAt(home), resumeFrom, beat.above)));
   });
 
 /** The keeper's record of her session with `marks` laid over it, written whole. */

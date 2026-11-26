@@ -40,6 +40,7 @@ import {
   workflowsIn,
 } from '../folder/folder.store.ts';
 import { versionDigest, versionGathered, versionNamed, type VersionGathered } from '../folder/version.store.ts';
+import { knownIn, NO_KNOWN, type Known } from '../folder/known.store.ts';
 import { placesAroundAt, removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from '../folder/write.store.ts';
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
@@ -74,11 +75,17 @@ export type WorkflowSaved = WorkflowWritten & { readonly version: string };
 export type WorkflowLayer = {
   readonly workflows: {
     readonly list: (holder: string) => readonly string[];
-    readonly around: (dir: string, places?: Places) => Places;
+    readonly around: (dir: string, places?: Places) => Places | Effect.Effect<Places, Refusal>;
     readonly read: (dir: string, found: Found, fills?: Fills) => Step[];
     readonly named: (dir: string) => { readonly agents: readonly string[]; readonly added: readonly string[] };
     readonly there: (dir: string, gathered: VersionGathered) => WorkflowThere;
-    readonly write: (dir: string, draft: WorkflowDraft, found: Found, places?: Places, fills?: Fills) => WorkflowWritten;
+    readonly write: (
+      dir: string,
+      draft: WorkflowDraft,
+      found: Found,
+      places?: Places,
+      fills?: Fills,
+    ) => WorkflowWritten | Effect.Effect<WorkflowWritten, Refusal>;
     readonly remove: (dir: string, users: readonly string[]) => WorkflowRemoved;
     readonly hints: (dir: string) => readonly string[];
   };
@@ -267,7 +274,8 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs) {
  * @param home The store's root folder.
  */
 export function workflowFiles(home: string) {
-  const around = (dir: string, places?: Places) => places ?? placesAroundAt(home, dir);
+  const around = (dir: string, places?: Places) =>
+    places === undefined ? Effect.map(knownIn(home), (known) => placesAroundAt(home, dir, known)) : places;
   return {
     workflows: {
       list: (holder) => workflowsIn(holder),
@@ -280,13 +288,16 @@ export function workflowFiles(home: string) {
         return stat.isDirectory() ? { kind: 'folder', version: versionDigest(versionNamed(dir).files, gathered) } : { kind: 'file' };
       },
       write: (dir, draft, found, places, fills) =>
-        writeWorkflowAt(home, dir, draft.steps, draft.readme, {
-          found,
-          ...(fills !== undefined && { fills }),
-          ...(places !== undefined && { places }),
-          ...(draft.files !== undefined && { files: draft.files }),
-          ...(draft.whole !== undefined && { whole: draft.whole }),
-        }),
+        Effect.map(knownIn(home), (known) =>
+          writeWorkflowAt(home, dir, draft.steps, draft.readme, {
+            found,
+            known,
+            ...(fills !== undefined && { fills }),
+            ...(places !== undefined && { places }),
+            ...(draft.files !== undefined && { files: draft.files }),
+            ...(draft.whole !== undefined && { whole: draft.whole }),
+          }),
+        ),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),
     },
@@ -345,12 +356,13 @@ const writeWorkflowOnDisk = (
   dir: string,
   steps: readonly StepDraft[],
   readme?: string,
-  { anywhere, places }: { anywhere?: boolean; places?: Places } = {},
+  { anywhere, places, known = NO_KNOWN }: { anywhere?: boolean; places?: Places; known?: Known } = {},
 ) =>
   writeWorkflowAt(home, dir, steps, readme, {
     ...(anywhere !== undefined && { anywhere }),
     ...(places !== undefined && { places }),
-    found: foundOnDisk(home, path.resolve(dir), places ?? placesAroundAt(home, dir)),
+    known,
+    found: foundOnDisk(home, path.resolve(dir), places ?? placesAroundAt(home, dir, known)),
   }) satisfies WorkflowWritten;
 
 /** `writeWorkflowOnDisk`, under the name the package exports: the store's root first. */

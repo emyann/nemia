@@ -29,7 +29,7 @@ import { staged, story } from './story.ts';
 import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../testing.ts';
 import { told } from './typed.ts';
 import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';

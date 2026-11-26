@@ -4,7 +4,9 @@
  */
 import type { Run } from '../../record/record.ts';
 import type { RecordMemo } from '../../rest/index.ts';
-import { listedAtOnce } from '../door/factories.store.ts';
+import { Effect } from 'effect';
+import { listedAt } from '../door/factories.store.ts';
+import type { FactoryListing } from '../factory.ts';
 import type { Factory, Schedule } from '../factory.ts';
 import { firesOf, readScheduleTry } from './schedule.store.ts';
 import { scheduleDue, settledFire, type ScheduleTry } from './schedule.ts';
@@ -45,13 +47,14 @@ const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string
     .sort((a, b) => b.due - a.due)[0]?.run;
 
 /**
- * Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`.
+ * Every schedule of every factory of `listing` that reads, factories by name, then workflows by name, each read at `now`.
+ * @param listing The store's factories, as the Factory door lists them.
  * @param home The store's root.
  * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
  * @param now The time the fires are read around, in milliseconds since the epoch.
  */
-export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: number) {
-  return listedAtOnce(home)
+export function schedulesRead(listing: readonly FactoryListing[], home: string, runs: readonly ScheduleRun[], now: number) {
+  return listing
     .filter((f): f is Factory & { file: string } => !('error' in f))
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((factory) =>
@@ -102,8 +105,13 @@ function refusedOf(r: Read) {
  * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
  * @param now The time the fires are read around, in milliseconds since the epoch; absent, the clock's.
  */
-export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()) {
-  return schedulesRead(home, runs, now).map((r) => ({
+export const schedulesListed = Effect.fn('schedulesListed')(function* (
+  home: string,
+  runs: readonly ScheduleRun[],
+  now: number = Date.now(),
+) {
+  const listing = yield* listedAt(home);
+  return schedulesRead(listing, home, runs, now).map((r) => ({
     factory: r.factory.name,
     workflow: r.workflow,
     cron: r.schedule.cron,
@@ -114,4 +122,4 @@ export function schedulesListed(home: string, runs: readonly ScheduleRun[], now:
     last: lastOf(r),
     refused: refusedOf(r),
   }));
-}
+});

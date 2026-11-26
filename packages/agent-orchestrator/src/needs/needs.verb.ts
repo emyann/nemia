@@ -14,7 +14,7 @@ import { Context, Effect, Layer, type Duration } from 'effect';
 import { DEFAULT_HARNESS, DEFAULT_SIGN_IN, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import type { Need, NeedState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsDir } from '../config/root.store.ts';
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
 import type { FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
 import { carriedDirOf, carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
@@ -329,7 +329,7 @@ export const noRepositoryMessage = (need: Need) =>
  */
 export const needsOnce = Effect.fn('needsOnce')(function* (memo: NeedsMemo, options: { shell?: string } = {}) {
   const home = memo.home;
-  const listed = yield* Effect.sync(() => listedAtOnce(home));
+  const listed = yield* listedAt(home);
   const trusted = yield* trustedOf(listed);
   const workflows = factoryWorkflows(trusted);
   const targets = new Map<string, CheckAt>();

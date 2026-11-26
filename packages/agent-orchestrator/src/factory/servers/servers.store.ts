@@ -1,19 +1,19 @@
 /**
- * A factory's MCP servers on disk, `$WF_ROOT/factories/<name>/servers.json`: a per-factory folder file, as `level.json` is, which
- * `nemia factory rm` removes whole with the folder. Read and written whole, through a hidden file renamed over it.
+ * A factory's MCP servers as a record, `/registry/servers/<name>` (`serversKey`), whose value is the text of what
+ * `$WF_ROOT/factories/<name>/servers.json` was: read as a record's text (`serversOf`) and written whole, every other key of it kept
+ * (`serversTextOf`); the Factory door's records layer holds the record. The person's library of servers, `mcpservers.json`, is still a
+ * file, read and written here (`readServersAt`, `writeServersAt`).
  *
- * The default factory's *folder* file is legal, so a server may be added to it, while `factories/default.json` stays refused: the
- * default factory is no file, and the special case for it is the controller's (`servers.verb.ts`), never this store's.
+ * The default factory's servers are a record too, so a server may be added to it, while the default factory has no record of its own:
+ * the special case for it is the controller's (`servers.verb.ts`), never this store's.
  *
- * Beneath the controllers, beside `record.store.ts`, the one store file it imports — for `firstRefusal` alone: the store's root is
- * no module's to read, so every function here takes it as a required `home: string` and a caller that forgets it does not compile
- * (`test/root-given.test.ts`, and the package's own contributor guide).
+ * Beneath the controllers, beside `record.store.ts`, the one store file it imports — for `firstRefusal` alone.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Option, Result, Schema } from 'effect';
 import { MCP_TRANSPORTS } from 'objects';
-import { factoryNameRefusal } from '../factory.ts';
+import { serversKey } from '../door/factory-keys.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
@@ -43,32 +43,28 @@ const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Sche
 ]);
 
 /**
- * The file the factory `name`'s servers are kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's.
- * @param home The store's root.
- * @param name The factory's name.
+ * The servers a text holds, `text` being what a record or a file kept, or `undefined` where there is none. Refused (`Invalid`), naming
+ * `where` it was read from, its first wrong field and `fix`, where it does not read as a record.
+ * @param text What the record or file holds, or undefined where there is none.
+ * @param where The record's key or the file's path, named in a refusal.
+ * @param fix The command that writes it again, as a refusal names it.
  */
-export function factoryServersFile(home: string, name: string) {
-  const bad = factoryNameRefusal(name);
-  if (bad) throw new Invalid({ message: bad });
-  return path.join(home, 'factories', name, 'servers.json');
+export function serversIn(text: string | undefined, where: string, fix: string) {
+  if (text === undefined) return undefined;
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${where} is not JSON: ${fix}.` });
+  const raw = json.value;
+  const read = Schema.decodeUnknownResult(FactoryServersSchema)(raw);
+  if (Result.isFailure(read)) {
+    const { path: at, words } = firstRefusal(FactoryServersSchema, raw);
+    throw new Invalid({ message: `${where}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
+  }
+  return read.success;
 }
 
 /**
- * The factory `name`'s servers, or `undefined` where none was written. Refused (`Invalid`), naming the file, its first wrong field and
- * the command that writes it again, where it does not read as a record.
- * @param home The store's root.
- * @param name The factory's name.
- */
-export function readFactoryServers(home: string, name: string) {
-  return readServersAt(
-    factoryServersFile(home, name),
-    `add the server again with nemia factory server add ${name} <server> --url <address>`,
-  );
-}
-
-/**
- * The servers recorded in `file`, a factory's or the library's, or `undefined` where none was written. Refused (`Invalid`), naming the
- * file, its first wrong field and `fix`, where it does not read as a record.
+ * The servers recorded in `file`, the library's, or `undefined` where none was written. Refused (`Invalid`), naming the file, its first
+ * wrong field and `fix`, where it does not read as a record.
  * @param file The servers file.
  * @param fix The command that writes it again, as a refusal names it.
  */
@@ -80,59 +76,57 @@ export function readServersAt(file: string, fix: string) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
-  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  const raw = json.value;
-  const read = Schema.decodeUnknownResult(FactoryServersSchema)(raw);
-  if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(FactoryServersSchema, raw);
-    throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
+  return serversIn(text, file, fix);
+}
+
+/**
+ * The factory `name`'s servers as its record `text` holds them: the record is `undefined` where none was written, and no server then.
+ * Refused (`Invalid`) as `serversIn` refuses, naming the record and the command that writes it again.
+ * @param text What the factory's servers record holds, or undefined where there is none.
+ * @param name The factory's name.
+ */
+export const serversOf = (text: string | undefined, name: string) =>
+  (serversIn(text, serversKey(name), `add the server again with nemia factory server add ${name} <server> --url <address>`)?.servers ??
+    {}) satisfies FactoryServers;
+
+/**
+ * The text of a servers record that keeps every other key `was` held — a key a newer tick wrote, which this one does not name: the text
+ * is decoded by a `StructWithRest` so that a downgrade takes nothing away, and a write that spelled `{ servers }` alone would throw those
+ * keys away on the next `server add`. Text that does not read is written over: the verbs read the record before they write it and
+ * refuse a broken one themselves, loudly and with the record named.
+ * @param was What the record held, or undefined where there was none.
+ * @param servers Every server, by name.
+ */
+export function serversTextOf(was: string | undefined, servers: FactoryServers) {
+  let kept: Record<string, unknown> = {};
+  try {
+    const { servers: _gone, ...rest } = serversIn(was, '', '') ?? {};
+    kept = rest;
+  } catch {
+    kept = {};
   }
-  return read.success;
+  return `${JSON.stringify({ ...kept, servers })}\n`;
 }
 
 /**
- * The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes.
- * @param home The store's root.
- * @param name The factory's name.
- */
-export const factoryServers = (home: string, name: string) => readFactoryServers(home, name)?.servers ?? {};
-
-/**
- * Writes the factory `name`'s servers whole, keeping every other key the file held — a key a newer tick wrote, which this one does not
- * name: the file is decoded by a `StructWithRest` so that a downgrade takes nothing away, and a write that spelled `{ servers }` alone
- * would throw those keys away on the next `server add`. A file that does not read is written over: the verbs read the record before
- * they write it and refuse a broken one themselves, loudly and with the file named.
- *
- * A record with no server is removed, with whatever else it held: the record is the servers, and a stamp of a record that no longer
- * exists is no fact. So a re-read finds none rather than an empty map.
- * @param home The store's root.
- * @param name The factory's name.
- * @param servers The factory's servers by name, all of them; none removes the record.
- */
-export function writeFactoryServers(home: string, name: string, servers: FactoryServers) {
-  writeServersAt(factoryServersFile(home, name), servers);
-}
-
-/**
- * Writes the servers file `file`, a factory's or the library's, whole, as `writeFactoryServers` says.
+ * Writes the servers file `file`, the library's, whole, keeping every other key the file held (`serversTextOf`); a file with no server
+ * is removed, with whatever else it held: the file is the servers, and a stamp of a file that no longer exists is no fact.
  * @param file The servers file.
- * @param servers Every server, by name; none removes the record.
+ * @param servers Every server, by name; none removes the file.
  */
 export function writeServersAt(file: string, servers: FactoryServers) {
   if (!Object.keys(servers).length) {
     fs.rmSync(file, { force: true });
     return;
   }
-  let kept: Record<string, unknown> = {};
+  let was: string | undefined;
   try {
-    const { servers: _gone, ...rest } = readServersAt(file, '') ?? {};
-    kept = rest;
+    was = fs.readFileSync(file, 'utf8');
   } catch {
-    kept = {};
+    was = undefined;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeWhole(file, `${JSON.stringify({ ...kept, servers })}\n`);
+  writeWhole(file, serversTextOf(was, servers));
 }
 
 /**

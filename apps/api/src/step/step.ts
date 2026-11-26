@@ -15,7 +15,7 @@ import {
   fillsOf,
   hireRefusalOf,
   keptRuns,
-  listedAtOnce,
+  listedAt,
   Missing,
   SkillDoor,
   WORKFLOWS_STEP,
@@ -261,7 +261,7 @@ export async function stepPage(s: Served, { name, from, dir }: { name: string; f
     factory: factory?.name ?? null,
     layers,
     hired,
-    hiredIn: factory ? [] : hiredInOf(listedAtOnce(home), name, found.name, from, repo),
+    hiredIn: factory ? [] : hiredInOf(await s.inRequest(listedAt(home)), name, found.name, from, repo),
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
     recentRuns: recentRunsOf(

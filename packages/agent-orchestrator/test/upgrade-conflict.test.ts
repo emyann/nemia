@@ -27,18 +27,10 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
-import { readFactoryAt } from '../src/factory/factory.store.ts';
-import {
-  appliedDir,
-  digestOf,
-  entriesIn,
-  readStatus,
-  replaceBase,
-  resolutionsFile,
-  statusFile,
-  swapTree,
-  treeDir,
-} from '../src/factory/applied/applied.store.ts';
+import { readFactoryAt } from '../testing.ts';
+import { appliedDir, digestOf, entriesIn, replaceBase, resolutionsFile, swapTree, treeDir } from '../src/factory/applied/applied.store.ts';
+import { plantKey, readStatus, recordText } from '../testing.ts';
+import { appliedKey } from '../src/factory/door/factory-keys.ts';
 import { approveProgram, declineProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { mintToken } from '../src/token/token.store.ts';
@@ -393,7 +385,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     'once its proposal applied the controller merges, the workflow taken from the tree: the tree takes every choice, the base the template',
     async () => {
       const oldBase = entriesIn(appliedDir(ROOT, 'crew'));
-      const oldStatus = fs.readFileSync(statusFile(ROOT, 'crew'));
+      const oldStatus = recordText(ROOT, appliedKey('crew')) ?? '';
       const at = '2026-11-01T09:00:00.000Z';
       const merged = await reconciledAt(factory('crew'), at);
       assert.equal(merged.version, '0.2.0');
@@ -407,10 +399,10 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       mergedScript = textIn(tree(), SCRIPT);
       baseScript = textIn(appliedDir(ROOT, 'crew'), SCRIPT);
       replaceBase(ROOT, 'crew', oldBase);
-      fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
+      plantKey(ROOT, appliedKey('crew'), oldStatus);
       assert.deepEqual(await reconciledAt(factory('crew'), at), merged, 'stopped after the tree was swapped, the next pass ends it');
       assert.deepEqual(bytesUnder(tree()), mergedTree, 'composing the same tree');
-      fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
+      plantKey(ROOT, appliedKey('crew'), oldStatus);
       const after = await reconciled(factory('crew'));
       assert.deepEqual([after.version, after.conditions[0].status], ['0.2.0', 'True'], 'stopped after the base: the version is the render');
       assert.deepEqual(bytesUnder(tree()), mergedTree);
@@ -434,7 +426,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.match(textIn(tree(), REVIEW), /^budget: 7$/m);
     const staged = fs
       .readdirSync(path.join(FACTORIES, 'crew'))
-      .filter((f) => !['applied', 'proposals', 'resolutions.json', 'status.json', 'tree'].includes(f));
+      .filter((f) => !['applied', 'proposals', 'resolutions.json', 'tree'].includes(f));
     assert.deepEqual(staged, [], 'no folder is left staged beside it');
     const board = stage.board();
     assert.deepEqual([board.filings, board.stopped], [[], []], 'no command of the story filed on the engine');

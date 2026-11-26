@@ -54,10 +54,10 @@ on — the workflows it offers and the agents it hires into their steps:
                  refuses the add: the line says why, and what repairs it.
   nemia factory apply files a factory made from a template that passes its check (nemia template lint), its
                  parameters given with --set, typed as nemia.yaml declares them, a default filling one not
-                 given. Its file names the template; the daemon renders the template into
+                 given. Its record names the template; the daemon renders the template into
                  factories/<name>/applied/, read-only, and seeds factories/<name>/tree/ from it once — the
                  workflows, agents, skills, wiring (factory.json) and NEMIA.md the factory runs from, yours to
-                 change after — and writes factories/<name>/status.json: the version, the digest and the
+                 change after — and writes the factory's status, a record (/registry/applied/<name>): the version, the digest and the
                  conditions Applied and ConflictsPending. Its attach, detach, hire, fire and instruct write the
                  tree, and nemia workflows, agents and skills write into it with --factory <name>. Its places
                  are trusted as nemia factory add trusts them, unless --no-trust.
@@ -68,7 +68,7 @@ on — the workflows it offers and the agents it hires into their steps:
                  tree, the render — each file whole first, factory.json by key, a step's frontmatter by key and
                  its body by line; what merges cleanly, and each conflict with its sides. It writes nothing.
   nemia factory upgrade writes --to, and --template and --set where given, into the factory's file, and nothing else:
-                 the daemon merges on its next pass once each conflict has a choice (ConflictsPending in status.json); a
+                 the daemon merges on its next pass once each conflict has a choice (ConflictsPending in its status); a
                  run in flight keeps its frozen folders. With --to the version applied, a --set changes parameters alone.
                  Refused: a template at another version than --to, the version applied with nothing to change or its
                  template changed under it, a lower one without --downgrade, a --set without diff's --plan for it.
@@ -110,9 +110,9 @@ on — the workflows it offers and the agents it hires into their steps:
                  agent is not told them.
   nemia factory instruction says where the factory's instruction is kept, and prints it: what Nemia, who operates
                  the factory, is to know of it, read by her and told to no step. NEMIA.md in its first
-                 folder — its first writable volume — unless its file names another path there
+                 folder — its first writable volume — unless its record names another path there
                  (--path <path>, relative, never climbing out), or the store (--store), in
-                 factories/<name>/NEMIA.md beside its file. --clear goes back to NEMIA.md.
+                 factories/<name>/NEMIA.md beside its folder. --clear goes back to NEMIA.md.
   nemia factory instruct writes the instruction the store keeps (--file <path>, - for stdin), or removes it
                  (--clear): only while the factory keeps its instruction in the store. A file in a
                  folder is edited there.

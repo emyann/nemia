@@ -22,7 +22,7 @@ import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentSkillsFound, isRefusal, runWith as runEngine, StoreRoot } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 import { removeAgent, writeAgent } from '../src/agents/agents.store.ts';
 import { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } from '../src/agents/library.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';

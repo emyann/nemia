@@ -5,11 +5,12 @@
  * A request is placed by its factory alone. One that names none, or names `default`, is answered in the default factory, which reads no
  * repository — yours and the builtins alone — unless its `?repo=` is one a filed factory works on. The api's own repository is never a
  * request's: it is the folder the daemon's pass ticks in (`repoOf`, main.ts) and nothing else. A factory is read from the store's root
- * (`filedAtOnce`), never written: `nemia factory` is the one writer of its file.
+ * (`factoryOrNone`), never written: `nemia factory` is the one writer of its record.
  */
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
-import { filedAtOnce, Invalid, listedAtOnce, outsideRefusal, volumeAddLine, workedOn, type Factory } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { factoryOrNone, Invalid, listedAt, outsideRefusal, StoreRoot, volumeAddLine, workedOn, type Factory } from 'agent-orchestrator';
 
 /**
  * What a request is answered in: its repository, none where it has none; its factory, none for the default factory; and whether the
@@ -28,10 +29,10 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
 
 /**
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: those of each factory in the
- * store at `home` whose file reads, in the order the Factory door lists them (`listedAtOnce`).
+ * store at `home` whose file reads, in the order the Factory door lists them (`listedAt`).
  */
-function knownRepos(home: string) {
-  return [...new Set(listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : workedOn(listing))))];
+async function knownRepos(home: string) {
+  return [...new Set((await Effect.runPromise(listedAt(home))).flatMap((listing) => ('error' in listing ? [] : workedOn(listing))))];
 }
 
 /**
@@ -69,7 +70,8 @@ const outsideRepo = (factory: Factory, repo: string) => {
  * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else none. A `?repo=` is a repository a
  *   factory in the store works on (`knownRepos`), or a folder under one, read as the repository that holds it (`holdingOf`); any other is
  *   refused, `Invalid`.
- * - A factory named: read from the store at `home`, as a start reads it (`filedAtOnce`: `Invalid` for a name that is no slug or a file that
+ * - A factory named: read from the store at `home`, as a start reads it (`factoryOrNone`: `Invalid` for a name that is no slug or a file
+ * that
  *   does not read, `Missing` for none of that name). Its repository is `?repo=`, else its only one, else none; a `?repo=` that is not among
  *   its repositories (`outsideRefusal`) is refused, `Invalid`.
  *
@@ -78,17 +80,20 @@ const outsideRepo = (factory: Factory, repo: string) => {
  * @param query The request's query, read for its factory and repository.
  * @param home The store's root folder, whose factories are read.
  */
-export function placeFor(query: PlaceQuery, home: string) {
-  return { ...placeOf(query, home), repoNamed: query.repo !== undefined };
+export async function placeFor(query: PlaceQuery, home: string) {
+  return { ...(await placeOf(query, home)), repoNamed: query.repo !== undefined };
 }
 
 /** `placeFor`'s place, but whether it named `?repo=`. */
-function placeOf(query: PlaceQuery, home: string) {
+async function placeOf(query: PlaceQuery, home: string) {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
-  const factory = query.factory === undefined || query.factory === DEFAULT_NAMESPACE ? undefined : filedAtOnce(home, query.factory);
+  const factory =
+    query.factory === undefined || query.factory === DEFAULT_NAMESPACE
+      ? undefined
+      : await Effect.runPromise(Effect.provideService(factoryOrNone(query.factory), StoreRoot, home));
   if (factory === undefined) {
     if (named === undefined) return { repo: undefined, factory: undefined, named: query.factory !== undefined };
-    const known = knownRepos(home);
+    const known = await knownRepos(home);
     const holding = holdingOf(named, known);
     if (holding === undefined) throw unknownRepo(named, known);
     return { repo: holding, factory: undefined, named: true };

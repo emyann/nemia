@@ -13,6 +13,9 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
+import type { Effect } from 'effect';
+import { clearFactories } from '../testing.ts';
+import { factoriesNow } from '../testing.ts';
 import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -26,7 +29,7 @@ import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { FACTORY_INSTRUCT, FACTORY_RULES, factoryInstruction, factoryRules, runWith as runEngine, startRun } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, readFactoryAt, setInstructionAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, readFactoryAt, setInstructionAt } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { factoryTyped } from './factory-typed.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
@@ -57,7 +60,7 @@ function aRepo() {
 
 /** The factory `pipao`, filed afresh on a repository of its own, offering the tests' team's workflow `dev`: its steps name their agents. */
 function fresh() {
-  fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+  clearFactories(ROOT);
   const repo = aRepo();
   addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'dev' });
@@ -90,7 +93,7 @@ const runsWritten = () =>
 const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
 
 /** What `nemia factory instruction` and `instruct` answer: the instruction read after, and whether a clear took words off. */
-type Instruction = ReturnType<typeof factoryInstruction> & { removed?: boolean };
+type Instruction = Effect.Success<ReturnType<typeof factoryInstruction>> & { removed?: boolean };
 
 /** What `nemia <argv>` answers, run onto its entry's handler as the api calls it. */
 const answeredBy = async (...argv: string[]) => (await stage.main(argv)) as Instruction;
@@ -202,7 +205,7 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.equal(clearRules(ROOT, { name: 'pipao' }), true);
   });
   s.test('the instruction, kept in the folder by default: NEMIA.md in its first folder, no words while no file is there', async () => {
-    assert.deepEqual(factoryInstruction(ROOT, 'pipao'), {
+    assert.deepEqual(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')), {
       name: 'pipao',
       path: null,
       store: false,
@@ -212,7 +215,7 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
       stored: false,
     });
     fs.writeFileSync(path.join(here.repo, 'NEMIA.md'), 'Ship small.\n');
-    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Ship small.\n');
+    assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).words, 'Ship small.\n');
     const read = await answeredBy('factory', 'instruction', 'pipao');
     assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
   });
@@ -234,20 +237,20 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.equal(fs.readFileSync(kept, 'utf8'), 'Ship small.\n');
     const again = await stage.runWith(stage.board().e, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'Be brief.\n' }));
     assert.deepEqual([again.file, again.removed], [kept, undefined]);
-    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
+    assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).words, 'Be brief.\n');
   });
   s.test('moved out of the store, the stored words are kept unread; back, they are read', () => {
     setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
-    const moved = factoryInstruction(ROOT, 'pipao');
+    const moved = factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao'));
     assert.deepEqual([moved.store, moved.words, moved.stored], [false, 'Ship small.\n', true], "the folder's file is read");
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
-    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
+    assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).words, 'Be brief.\n');
   });
   s.test('`nemia factory instruct --clear` removes the words; a clear of where it is kept removes the key, never null', async () => {
     const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
     const cleared = await answeredBy('factory', 'instruct', 'pipao', '--clear');
     assert.deepEqual([cleared.file, cleared.removed], [kept, true]);
-    assert.equal(factoryInstruction(ROOT, 'pipao').stored, false);
+    assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).stored, false);
     setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
     assert.ok(!('instruction' in JSON.parse(fs.readFileSync(record, 'utf8'))), 'the key removed, never null');
   });

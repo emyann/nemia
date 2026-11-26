@@ -4,7 +4,7 @@
  * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules(home, name)` reads the files
  * at the root it is handed, for the package's callers not yet on it.
  */
-import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
+import { doorAt, FactoryDoor } from '../door/factories.store.ts';
 import type { Served } from '../../command/entry.verb.ts';
 import { Effect, Schema } from 'effect';
 import { FACTORY_RULES_WORDS, FactoryRulesWrite } from 'objects';
@@ -17,15 +17,17 @@ import { FactoryName } from '../factory.model.ts';
 export type FactoryRules = { name: string; file: string; words: string | null; error: string | null; removed?: boolean };
 
 /**
- * The rules of the factory `name` in the store `home`, read afresh where they are kept, through the Factory door at once. Refused as the
+ * The rules of the factory `name` in the store `home`, read afresh where they are kept, through the Factory door. Refused as the
  * door refuses the read: the default factory, which keeps none (`Conflict`), a name that is no slug or whose file does not read
  * (`Invalid`), a name with no file (`Missing`).
  * @param home The store's root.
  * @param name The factory's name, read as a slug.
  */
-export function factoryRules(home: string, name: string) {
-  return { name, ...doorAtOnce(home, (door) => door.rules.read(FactoryName.read(name))) };
-}
+export const factoryRules = (home: string, name: string) =>
+  Effect.map(
+    doorAt(home, (door) => door.rules.read(FactoryName.read(name))),
+    (read) => ({ name, ...read }),
+  );
 
 /**
  * What `nemia factory rules` takes: the factory, and the words to write (`objects`' `FactoryRulesWrite`, read by the command line's runner

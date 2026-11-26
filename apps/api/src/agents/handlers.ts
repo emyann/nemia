@@ -33,7 +33,7 @@ import {
   definitionRevision,
   factoriesFilling,
   inFactory,
-  listedAtOnce,
+  listedAt,
   stepsFilled,
   untriedOf,
   type AgentReading,
@@ -88,9 +88,9 @@ const treeAgents = (s: Served) =>
   });
 
 /** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
-const fillsIn = (s: Served) => ({
+const fillsIn = async (s: Served) => ({
   filled: stepsFilled(repoLayer(s), s.home, s.factory),
-  byFile: factoriesFilling(listedAtOnce(s.home), s.home),
+  byFile: factoriesFilling(await s.inRequest(listedAt(s.home)), s.home),
 });
 
 /**
@@ -99,9 +99,10 @@ const fillsIn = (s: Served) => ({
  * factory has no tree. The one reader of a tree's agents.
  * @param s The request's services, its caller and the place it is answered in.
  * @param origin The origin each agent is held at.
- * @param fills What fills each agent's lines, read from the request's services by default.
+ * @param given What fills each agent's lines, read from the request's services where none is given.
  */
-export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)) {
+export async function treeAgentsHeld(s: Served, origin: Origin, given?: Awaited<ReturnType<typeof fillsIn>>) {
+  const fills = given ?? (await fillsIn(s));
   const tree = await s.inRequest(treeAgents(s));
   const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoLayer(s), s.home, s.factory?.tree)));
   return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item })) satisfies Held<LibraryAgent>[];
@@ -114,7 +115,7 @@ export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(
 async function heldIn(s: Served) {
   const repo = repoLayer(s);
   const { agents } = await s.inRequest(AGENTS.handler({ repo }));
-  const fills = fillsIn(s);
+  const fills = await fillsIn(s);
   const own = await treeAgentsHeld(s, 'factory', fills);
   const trees = new Set(own.map(({ item }) => item.file));
   const listings = await s.inRequest(
@@ -220,10 +221,12 @@ const libraryHeld = async (s: Served) => (await heldIn(s)).filter((h) => h.origi
 
 /** The library's objects of the agents `served`, in no namespace, each with the factories that add it. */
 const libraryObjectsOf = async (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>) =>
-  (await agentObjectsOf(s, served)).map((one) => ({
-    ...one,
-    status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Agent', name: one.metadata.name }) },
-  })) satisfies Agent[];
+  Promise.all(
+    (await agentObjectsOf(s, served)).map(async (one) => ({
+      ...one,
+      status: { ...one.status, factories: await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name: one.metadata.name })) },
+    })),
+  ) satisfies Promise<Agent[]>;
 
 /** The library's agent `name` (from `asked`, where one is), read now. */
 async function libraryAt(s: Served, name: string, asked?: Origin) {
@@ -427,7 +430,12 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
       answeredWriteIn(LIBRARY, async (s) => {
         const route = `DELETE /api/agents/${name}`;
         const version = versioned(route, query.resourceVersion);
-        writeGoes('library', 'remove', thereOf(await libraryHeld(s), name), libraryUsers(s.home, { kind: 'Agent', name }));
+        writeGoes(
+          'library',
+          'remove',
+          thereOf(await libraryHeld(s), name),
+          await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name })),
+        );
         const before = await libraryAt(s, name, 'user');
         const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
         return { ...before, status: { ...before.status, removed } };

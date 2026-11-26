@@ -303,7 +303,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const pause = yield* tried(() => readPause(home));
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const conflicts = yield* conflictsNow().pipe(Effect.orElseSucceed(() => undefined));
-  const missing = yield* tried(() => addsMissingNow(home)).pipe(Effect.orElseSucceed(() => undefined));
+  const missing = yield* addsMissingNow(home).pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());

@@ -13,7 +13,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { engineOf, runWith } from '../../runtime-client.ts';
 import { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './sign-in.verb.ts';
-import { writeFactoryServers } from './servers.store.ts';
+import { writeFactoryServers } from '../../../testing.ts';
 import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
 import { DEFAULT_NAMESPACE } from '../factory.ts';
 import { libraryAddsFile, writeLibraryAdds } from '../../library/library.store.ts';

@@ -6,7 +6,7 @@ import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { DIAMOND, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredRun, OUT, store, storeRecord } from '../world.ts';
+import { OUT, dropStoredFactory, dropStoredRun, store, storeFactory, storeRecord, storedFactory } from '../world.ts';
 
 /** The agent the page writes into the checkout's `workflows/agents/` for FACTORIES' `hiring` to hire into `dev`'s `review`. */
 const REVIEWER = 'reviewer-e2e';
@@ -67,13 +67,13 @@ const PLAIN = 'plain';
  * `wf start` freezes one; returns what takes them back.
  */
 function written(checkout: string) {
-  const factoryFile = path.join(store!, 'factories', `${FACTORIES.hiring.name}.json`);
-  const factoryText = fs.readFileSync(factoryFile, 'utf8');
+  const factoryName = FACTORIES.hiring.name;
+  const factoryText = storedFactory(factoryName);
   const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
   const base = execFileSync('git', ['rev-parse', 'main'], { cwd: checkout, encoding: 'utf8' }).trim();
   fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
-  fs.writeFileSync(
-    factoryFile,
+  storeFactory(
+    factoryName,
     JSON.stringify({ ...(JSON.parse(factoryText) as object), hires: { [`${WORKFLOWS.good.name}/review`]: REVIEWER } }, null, 2),
   );
   const run = {
@@ -95,13 +95,13 @@ function written(checkout: string) {
     steps: { implement: { taskId: null }, review: { taskId: null } },
   };
   storeRecord(RECENT.id, JSON.stringify(run, null, 2));
-  const plain = path.join(store!, 'factories', `${PLAIN}.json`);
-  fs.writeFileSync(plain, JSON.stringify({ volumes: worked([checkout]), workflows: [WORKFLOWS.good.name] }, null, 2));
+  const plain = PLAIN;
+  storeFactory(plain, JSON.stringify({ volumes: worked([checkout]), workflows: [WORKFLOWS.good.name] }, null, 2));
   return (() => {
-    fs.rmSync(plain, { force: true });
+    dropStoredFactory(plain);
     dropStoredRun(RECENT.id);
     fs.rmSync(reviewerFile, { force: true });
-    fs.writeFileSync(factoryFile, factoryText);
+    storeFactory(factoryName, factoryText);
   }) satisfies () => void;
 }
 

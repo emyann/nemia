@@ -6,7 +6,7 @@ import { factoriesAnswered, openFold, partOf, photograph, themeOf } from '../boa
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FAKE, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storeFactory, storedFactory } from '../world.ts';
 
 /** The factory the page gives an untrusted place: one that names only a folder in the seed. */
 const FACTORY = FACTORIES.bare;
@@ -34,15 +34,15 @@ export default {
   name: 'factory-untrusted',
   route: SETTINGS,
   expect: async (page) => {
-    const file = path.join(store!, 'factories', `${FACTORY}.json`);
+    const file = FACTORY;
     const config = path.join(store!, 'claude', '.claude.json');
     const place = path.join(store!, 'hkb-v2');
-    const [filed, trusts] = [fs.readFileSync(file, 'utf8'), fs.readFileSync(config, 'utf8')];
+    const [filed, trusts] = [storedFactory(file), fs.readFileSync(config, 'utf8')];
     const caution = page.locator(`article[data-factory-settings="${FACTORY}"] [data-untrusted="${FACTORY}"]`);
     const inBar = page.locator(`[data-factory-bar="${FACTORY}"] [data-untrusted="${FACTORY}"]`);
     const denied = page.locator(`#step-${FAKE.refused} [data-fact="denied"]`);
     try {
-      fs.writeFileSync(file, JSON.stringify({ volumes: worked([place]) }, null, 2));
+      storeFactory(file, JSON.stringify({ volumes: worked([place]) }, null, 2));
       await visit(page, ALONE);
       const answered = await factoriesAnswered(page);
       const factory = answered.find((one) => one.name === FACTORY);
@@ -80,7 +80,7 @@ export default {
       await expectVisible(denied.locator('[data-denied]'), `${FAKE.refused}'s denied row still names its calls`);
       await expectCount(page.locator('[data-denied-cause]'), 0, 'and names no cause');
     } finally {
-      fs.writeFileSync(file, filed);
+      storeFactory(file, filed);
       fs.writeFileSync(config, trusts);
     }
   },

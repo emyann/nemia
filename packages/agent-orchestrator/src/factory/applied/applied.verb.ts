@@ -20,6 +20,7 @@ import { volumesTrusted, writableRooted } from '../volume/volume.verb.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { originSetsAt } from './declared.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
+import { FactoryName } from '../factory.model.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate, Volume } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
 import { TemplateSource } from '../../template/door/templates.model.ts';
@@ -31,12 +32,10 @@ import {
   digestOf,
   entriesIn,
   readResolutions,
-  readStatus,
   replaceBase,
   stageFolder,
   swapTree,
   treeDir,
-  writeStatus,
   choicesFor,
   proposalsFor,
   type Condition,
@@ -447,7 +446,7 @@ function upgradePass(
       conditions: waiting(factory, last.version, composed.pending, switched, read),
       upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictKept(c, read)) },
     };
-    return statusWritten(home, factory, stamped(status, last, at, factory));
+    return stamped(status, last, at, factory);
   }
   if (!swapTree(home, name, composed.entries, digestOf(ours))) return last;
   replaceBase(home, name, now.entries);
@@ -458,7 +457,7 @@ function upgradePass(
     params: template.params,
     conditions: upgraded(factory, now.version),
   };
-  return statusWritten(home, factory, stamped(status, last, at, factory));
+  return stamped(status, last, at, factory);
 }
 
 /**
@@ -474,12 +473,6 @@ function stamped(status: Status, last: Status | undefined, at: string, factory: 
   });
   return { ...status, conditions, observedGeneration: generationOf(factory) };
 }
-
-/** `status` written as the status of `factory`, where it changed; the status. */
-const statusWritten = (home: string, factory: Pick<Factory, 'name'>, status: Status) => {
-  writeStatus(home, factory.name, status);
-  return status;
-};
 
 /** The `Applied` condition of a pass that merges nothing: the render's problem, else a version no status names, else `appliedOf`'s. */
 function observedOf(
@@ -509,10 +502,14 @@ const cameByUpgrade = (last: Status | undefined, version: string) =>
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
   const home = yield* StoreRoot;
   const { now, named } = yield* templateNow(factory);
-  const recorded = yield* recordedOf(factory, now, readStatus(home, factory.name));
+  const door = yield* FactoryDoor;
+  const name = FactoryName.read(factory.name);
+  const last = yield* door.status.read(name);
+  const recorded = yield* recordedOf(factory, now, last);
   const phases = yield* phasesNamed(factory.name, readResolutions(home, factory.name)?.proposals ?? {});
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
-  const status = reconciledWith(home, factory, now, named, at, recorded, phases);
+  const status = reconciledWith(home, factory, now, named, at, recorded, phases, last);
+  if (status !== last) yield* door.status.write(name, status);
   if (factory.tree !== undefined) addTemplateBuiltins(home, factory.name, factory.tree);
   return status;
 });
@@ -532,7 +529,7 @@ export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: str
   const { now } = yield* templateNow(factory);
   const base = entriesIn(appliedDir(home, name));
   if ('type' in now || !base.length) return undefined;
-  const last = readStatus(home, name);
+  const last = yield* (yield* FactoryDoor).status.read(FactoryName.read(name));
   const recorded = yield* recordedOf(factory, now, last);
   if (typeof last?.version !== 'string' || !upgradeDue(factory, now, digestOf(base), last, recorded)) return undefined;
   const phases = yield* phasesNamed(name, readResolutions(home, name)?.proposals ?? {});
@@ -616,8 +613,8 @@ function reconciledWith(
   at: string,
   recorded: string | undefined,
   phases: ProposalPhases,
+  last: Status | undefined,
 ) {
-  const last = readStatus(home, factory.name);
   if (!('type' in now)) stageFolder(appliedDir(home, factory.name), now.entries, true);
   const base = entriesIn(appliedDir(home, factory.name));
   if (base.length && !fs.existsSync(treeDir(home, factory.name))) stageFolder(treeDir(home, factory.name), base, false);
@@ -654,7 +651,7 @@ function observed(
         ? upgraded(factory, now.version)
         : [observedOf(factory, now, digest, version, last), NO_CONFLICTS],
   };
-  return statusWritten(home, factory, stamped(status, last, at, factory));
+  return stamped(status, last, at, factory);
 }
 
 /** One pass: every factory of the store made from a template, reconciled (`reconcileFactory`). The factories reconciled, by name. */

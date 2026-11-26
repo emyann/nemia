@@ -13,7 +13,7 @@ import { Effect, Option, Stream } from 'effect';
 import type { Fix, FixStart, Need, NeedFix } from 'objects';
 import { asked, EngineService, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import { pathLedByTools, StoreRoot, toolsDir } from '../config/root.store.ts';
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
 import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
@@ -80,9 +80,11 @@ type FixFound = {
 /** The fixes of a need, each with where it was declared: a workflow's that `fills` a place need first, then the place's own. */
 type Declared = { readonly fix: NeedFix; readonly origin: Origin };
 
-/** The factory `name` of the store `home`, read; refused (`Missing`) where there is none, or its file does not read. */
-function factoryNamed(home: string, name: string) {
-  const all = listedAtOnce(home);
+/**
+ * The factory `name` of `all`, the store's factories as the Factory door lists them; refused (`Missing`) where there is none, or its
+ * record does not read.
+ */
+function factoryNamed(all: readonly FactoryListing[], name: string) {
   const found = all.find((f) => f.name === name);
   if (found === undefined)
     throw new Missing({
@@ -105,8 +107,12 @@ type Declaring = Pick<FixFound, 'listing' | 'folders' | 'repository'> & {
  * The need `start` names of the factory and workflow it names, as its files are now: the workflow's own, or a place need it fills, its
  * fixes before the place's. Refused (`Missing`) for a factory or a workflow that is not there.
  */
-function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string; workflow: string }) {
-  const listing = factoryNamed(home, start.factory);
+function workflowDeclaring(
+  all: readonly FactoryListing[],
+  placeNeeds: readonly Need[],
+  start: FixStart & { factory: string; workflow: string },
+) {
+  const listing = factoryNamed(all, start.factory);
   const workflow = factoryWorkflows([listing]).find((w) => w.workflow === start.workflow);
   if (workflow === undefined)
     throw new Missing({
@@ -146,13 +152,13 @@ export function ownRepository(need: Need, workflow: FactoryWorkflow) {
  * (`factoryRepository`). Refused (`Missing`) for a factory that is not there, and (`Invalid`) for a need of no repository, which a
  * workflow names with the factory.
  */
-function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string }) {
+function repositoryDeclaring(all: readonly FactoryListing[], placeNeeds: readonly Need[], start: FixStart & { factory: string }) {
   const need = placeNeeds.find((p) => p.name === start.need && isRepositoryNeed(p));
   if (need === undefined)
     throw new Invalid({
       message: `${start.need} is no need of a factory's repository: name a workflow's need with --factory ${start.factory} --workflow <workflow>, or a place's or a harness's with neither (nemia doctor lists each with the command that fixes it).`,
     });
-  const listing = factoryNamed(home, start.factory);
+  const listing = factoryNamed(all, start.factory);
   const repository = factoryRepository(listing);
   return {
     need,
@@ -167,11 +173,17 @@ function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: F
  * factory named alone (`repositoryDeclaring`), else a machine need of the builtin places (`placeNeeds`), of a harness (`harnessNeeds`)
  * or of the store itself (`toolsNeed`, the tools folder's `nemia`).
  */
-function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart) {
+function declaringOf(
+  home: string,
+  all: readonly FactoryListing[],
+  placeNeeds: readonly Need[],
+  harnessNeeds: readonly Need[],
+  start: FixStart,
+) {
   const { factory, workflow } = start;
   if (factory !== undefined && workflow !== undefined)
-    return workflowDeclaring(home, placeNeeds, { ...start, factory, workflow }) satisfies Declaring as Declaring;
-  if (factory !== undefined) return repositoryDeclaring(home, placeNeeds, { ...start, factory }) satisfies Declaring as Declaring;
+    return workflowDeclaring(all, placeNeeds, { ...start, factory, workflow }) satisfies Declaring as Declaring;
+  if (factory !== undefined) return repositoryDeclaring(all, placeNeeds, { ...start, factory }) satisfies Declaring as Declaring;
   const placed = placeNeeds.find((p) => p.name === start.need && !isRepositoryNeed(p));
   const harnessed = placed === undefined ? harnessNeeds.find((h) => h.name === start.need) : undefined;
   if (harnessed !== undefined)
@@ -191,14 +203,20 @@ function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: re
  * the workflow named of the factory named (`workflowDeclaring`). Refused (`Missing`) for a factory, a workflow or a need that is not
  * there, and (`Invalid`) for a workflow named without its factory, and an index no fix of the need has.
  */
-function fixFound(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart) {
+function fixFound(
+  home: string,
+  all: readonly FactoryListing[],
+  placeNeeds: readonly Need[],
+  harnessNeeds: readonly Need[],
+  start: FixStart,
+) {
   const index = start.index ?? 0;
   const { factory, workflow } = start;
   if (factory === undefined && workflow !== undefined)
     throw new Invalid({
       message: `nemia doctor fix ${start.need}: a workflow's need is named by its factory and its workflow together: give both, --factory <factory> --workflow <workflow>, or neither for a place's or a harness's need.`,
     });
-  const { need, declared, listing, folders, repository } = declaringOf(home, placeNeeds, harnessNeeds, start);
+  const { need, declared, listing, folders, repository } = declaringOf(home, all, placeNeeds, harnessNeeds, start);
   if (need === undefined)
     throw new Missing({
       message: `no need ${start.need} is declared ${workflow === undefined ? 'by a builtin place nor a harness' : `by ${factory}'s workflow ${workflow} nor its place`}: nemia doctor lists every need with the command that fixes it.`,
@@ -252,7 +270,8 @@ export const startFix = Effect.fn('startFix')(function* (start: FixStart) {
   const e = yield* EngineService;
   const placeNeeds = place.declared.needs ?? [];
   const harnessNeeds = (yield* NeedsMemory)?.harnessNeeds ?? declaredHarnessNeeds();
-  const found = yield* tried(() => fixFound(home, placeNeeds, harnessNeeds, start));
+  const all = yield* listedAt(home);
+  const found = yield* tried(() => fixFound(home, all, placeNeeds, harnessNeeds, start));
   yield* refusedStart(e, home, { placeNeeds, harnessNeeds }, found);
   const answers = yield* tried(() => answersOf(found, start));
   const id = `fix-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;

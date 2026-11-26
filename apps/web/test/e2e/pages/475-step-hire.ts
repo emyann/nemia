@@ -5,7 +5,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, dropStoredFactory, store, storeFactory } from '../world.ts';
 
 /** The factory the page writes, on the checkout, offering WORKFLOWS' workflow of yours and the repository's `dev`, and hiring no one. */
 const FACTORY = 'hirer-e2e';
@@ -22,15 +22,15 @@ const goto = async (page: Page, to: string) => {
 
 /** Writes FACTORY's file; returns what takes it back, with MADE's file if the page made it. */
 function written() {
-  const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
+  const factoryName = FACTORY;
   const madeFile = path.join(store!, 'workflows', 'agents', `${MADE.name}.md`);
-  fs.writeFileSync(
-    factoryFile,
+  storeFactory(
+    factoryName,
     JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name, WORKFLOWS.good.name] }, null, 2),
   );
   return (() => {
     fs.rmSync(madeFile, { force: true });
-    fs.rmSync(factoryFile, { force: true });
+    dropStoredFactory(factoryName);
   }) satisfies () => void;
 }
 

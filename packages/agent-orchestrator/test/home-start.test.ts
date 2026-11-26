@@ -20,7 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { advanceRun, forgetRun, retryRun, runWith } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { treeDir, writeTreeWiring } from '../src/factory/applied/applied.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';

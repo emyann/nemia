@@ -13,7 +13,6 @@ import { keptRuns } from '../../runs/runs.store.ts';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import { scheduleRun, schedulesListed, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
-import { tried } from '../../runtime-client.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
@@ -56,7 +55,7 @@ export const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, nam
   const { listing } = yield* factoryFiled(home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');
-  const listed = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => tried(() => schedulesListed(home, runs)));
+  const listed = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => schedulesListed(home, runs));
   return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
 });
 

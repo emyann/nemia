@@ -56,8 +56,8 @@ import { customInstructionsFile } from '../src/agents/read.store.ts';
 import { AgentDoor } from '../src/agents/agent-door.store.ts';
 import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
 import { AgentName } from '../src/agents/agents.model.ts';
-import { addFactoryAt, factoryNamesAt, rewriteFactoryAt } from '../src/factory/factory.store.ts';
-import { factoryLevelFile } from '../src/level/level.store.ts';
+import { addFactoryAt, dropRecord, factoryNamesAt, readFactoriesAt, recordText, rewriteFactoryAt } from '../testing.ts';
+import { levelKey } from '../src/factory/door/factory-keys.ts';
 import { DEFAULT_HARNESS } from '../src/harness/harness.ts';
 import { nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
@@ -444,11 +444,11 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
     assert.deepEqual(await beat(), ['file']);
     assert.deepEqual(await beat(), ['subscribe']);
     assert.deepEqual(await beat(), []);
-    const written = [levelFile(ROOT), factoryLevelFile(ROOT, 'pipao')].map((f) => fs.readFileSync(f, 'utf8'));
+    const written = [fs.readFileSync(levelFile(ROOT), 'utf8'), recordText(ROOT, levelKey('pipao'))];
     vi.setSystemTime(Date.parse('2026-10-06T10:00:00.000Z'));
     assert.deepEqual(await beat(), ['drop'], 'none above manual once the raise has passed: her subscription dropped');
     assert.deepEqual(
-      [levelFile(ROOT), factoryLevelFile(ROOT, 'pipao')].map((f) => fs.readFileSync(f, 'utf8')),
+      [fs.readFileSync(levelFile(ROOT), 'utf8'), recordText(ROOT, levelKey('pipao'))],
       written,
       'level-triggered: the raise reads as gone, with no write',
     );
@@ -462,7 +462,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
     const ended = await level({ factory: 'pipao', end: true });
     assert.equal(ended.task, raised.task, 'her task is the same');
     assert.deepEqual(ended.factories.find((row) => row.factory === 'pipao')?.raise, null);
-    assert.equal(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), false, 'a factory with no level of its own follows the store');
+    assert.equal(recordText(ROOT, levelKey('pipao')) !== undefined, false, 'a factory with no level of its own follows the store');
     assert.deepEqual(await beat(), ['drop']);
     vi.advanceTimersByTime(1);
     await level({ factory: 'pipao', level: 'semi-auto' });
@@ -476,7 +476,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
     "a factory's raise or default above manual while her folder is not trusted is written, and the keeper trusts it and files her at once",
     async () => {
       fs.rmSync(levelFile(ROOT), { force: true });
-      fs.rmSync(factoryLevelFile(ROOT, 'pipao'), { force: true });
+      dropRecord(ROOT, levelKey('pipao'));
       const b = stage.board();
       const asks: Record<string, string>[] = [
         { factory: 'pipao', level: 'semi-auto', for: '1h' },
@@ -487,7 +487,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
         vi.advanceTimersByTime(1);
         const set = await level(ask);
         assert.equal(set.factories.find((row) => row.factory === 'pipao')?.level, 'semi-auto', JSON.stringify(ask));
-        assert.ok(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), `${JSON.stringify(ask)} writes the factory's file`);
+        assert.ok(recordText(ROOT, levelKey('pipao')) !== undefined, `${JSON.stringify(ask)} writes the factory's level record`);
         assert.ok(readLevel(ROOT)?.asked !== undefined, `${JSON.stringify(ask)} says when the person set it`);
         assert.equal(set.untrusted, null, `${JSON.stringify(ask)}: nothing refused`);
         const filings = b.filings.length;
@@ -496,7 +496,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
         const factory = String(ask.factory);
         await level(ask.for === undefined ? { factory, level: 'manual' } : { factory, end: true });
         await letGo();
-        fs.rmSync(factoryLevelFile(ROOT, factory), { force: true });
+        dropRecord(ROOT, levelKey(factory));
       }
     },
   );
@@ -689,7 +689,7 @@ describe("Kept, she is told what changed: the person's custom words once, never 
 describe('`nemia level` refuses a level that is none, a factory write that names no factory or the default one, a raise of nothing and an end of none', () => {
   beforeAll(() => {
     withPipao();
-    fs.rmSync(factoryLevelFile(ROOT, 'pipao'), { force: true });
+    dropRecord(ROOT, levelKey('pipao'));
   });
   const check = (args: Record<string, string | boolean>) => LEVEL.check?.(args) ?? null;
   for (const [args, facts] of [
@@ -722,7 +722,7 @@ describe('`nemia level` refuses a level that is none, a factory write that names
     names(nothing, 'pipao is at manual by default', 'raises nothing', 'nemia level manual --factory pipao');
   });
   test('nothing is written of a write refused', () => {
-    assert.equal(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), false, 'nothing written');
+    assert.equal(recordText(ROOT, levelKey('pipao')) !== undefined, false, 'nothing written');
   });
 });
 
@@ -738,7 +738,7 @@ describe('She answers her chat at any level: a message files her, she rests once
     withPipao();
     [factory = ''] = factoryNamesAt(ROOT);
     fs.rmSync(nemiaDir(ROOT), { recursive: true, force: true });
-    fs.rmSync(factoryLevelFile(ROOT, factory), { force: true });
+    dropRecord(ROOT, levelKey(factory));
     return t.end;
   });
   const s = story(test);
@@ -847,7 +847,7 @@ describe("Her task's mounts are those the runtime takes, whatever switches a fac
     const repo = fs.mkdtempSync(path.join(home, 'repo-'));
     const { factory } = addFactoryAt(home, { name: 'acme', volumes: [`${repo}:rw`] });
     rewriteFactoryAt(home, { ...factory, volumes: factory.volumes.map((v) => ({ ...v, claudeMd: true, skills: false })) });
-    const spec = nemiaSpec('nemia-mounts', undefined, 'token', home);
+    const spec = nemiaSpec('nemia-mounts', undefined, 'token', home, readFactoriesAt(home));
     assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }]);
     assert.equal(argsRefusalOf(spec), undefined);
   });

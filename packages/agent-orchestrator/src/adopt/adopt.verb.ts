@@ -118,7 +118,7 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
       }),
     );
   const read = yield* adoptionAt(home, factory, render, notDone);
-  const digest = yield* tried(() => planDigest(home, factory.name, render, source));
+  const digest = yield* tried(() => planDigest(factory, render, source));
   const summaries = yield* runsSummarized(yield* EngineService, {
     home,
     memo: informerMemo(),
@@ -150,7 +150,7 @@ const adoptedNow = Effect.fn('adoptedNow')(function* (args: Args) {
         message: `${verb} takes over only a plan a person previewed: ${preview} prints it and its digest, then ${verb} … --plan <digest>. ${notDone}`,
       }),
     );
-  const digest = yield* tried(() => planDigest(home, factory.name, render, source));
+  const digest = yield* tried(() => planDigest(factory, render, source));
   if (plan !== digest)
     return yield* Effect.fail(
       new Conflict({

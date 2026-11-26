@@ -11,7 +11,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { workflowsOf } from './reads.verb.ts';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt, removeFactoryAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt, removeFactoryAt } from '../../testing.ts';
 import type { Run } from '../record/record.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 

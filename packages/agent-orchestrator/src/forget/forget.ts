@@ -37,8 +37,9 @@ export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 /**
  * Why `nemia rm` — or `nemia prune`, `nemia hold`, or a `read` of a run's record by `command`, the `verb` — will not take this as a run's
  * id — or null. Pure, and asked before
- * anything is read. A run's id names records of the keyspace and files under `WF_ROOT` — `/registry/runs/<id>`, its marks under `/registry/runmarks/<id>/`, `runs/<id>/`,
- * `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes,
+ * anything is read. A run's id names records of the keyspace — `/registry/runs/<id>`, its marks under `/registry/runmarks/<id>/` — and
+ * directories under `WF_ROOT` — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and
+ * dashes,
  * starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which
  * is another run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory
  * that is not the run's. One that is an id with a file's suffix on it is told the id.

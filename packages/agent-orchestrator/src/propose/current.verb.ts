@@ -29,12 +29,12 @@ import { textIn } from '../folder/folder.ts';
 import { stepFilesOf } from '../folder/write.store.ts';
 import { WorkflowError } from '../step/step.ts';
 import type { WorkflowStep } from 'objects';
-import { FactoryDoor, filedAtOnce, treeChecked } from '../factory/door/factories.store.ts';
+import { FactoryDoor, factoryOrNone, templatedOf } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
-import type { StoreRoot } from '../config/root.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
@@ -59,18 +59,21 @@ const NONE: Current = { version: null };
  * @param factory The factory's name.
  * @param what Which folder of the tree: its workflows, its agents or its skills.
  */
-export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills') => {
-  const filed = filedAtOnce(home, factory);
+export const treeDir = Effect.fn('treeDir')(function* (home: string, factory: string, what: 'workflows' | 'agents' | 'skills') {
+  const filed = yield* factoryOrNone(factory).pipe(Effect.provideService(StoreRoot, home));
   if (filed?.tree === undefined)
-    throw new Invalid({
-      message:
-        `nemia propose: the factory ${factory} is made from no template, so it has no tree a proposal writes: its ${what} are its ` +
-        "repositories', changed there, and your library's, which the person writes (`nemia workflows write yours <name> --folder <draft>`, " +
-        '`nemia agents write yours`, `nemia skills write yours`). Nothing was proposed.',
-    });
-  const workflows = path.join(treeChecked(factory, filed, 'nemia propose').tree, 'workflows');
+    return yield* Effect.fail(
+      new Invalid({
+        message:
+          `nemia propose: the factory ${factory} is made from no template, so it has no tree a proposal writes: its ${what} are its ` +
+          "repositories', changed there, and your library's, which the person writes (`nemia workflows write yours <name> --folder <draft>`, " +
+          '`nemia agents write yours`, `nemia skills write yours`). Nothing was proposed.',
+      }),
+    );
+  const { tree } = yield* templatedOf(factory, 'nemia propose').pipe(Effect.provideService(StoreRoot, home));
+  const workflows = path.join(tree, 'workflows');
   return what === 'workflows' ? workflows : path.join(workflows, what === 'agents' ? AGENTS_FOLDER : SKILLS_FOLDER);
-};
+});
 
 /** A failure of a read that says nothing is there (`Missing`) as nothing at the name; any other refusal as it was. */
 const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Current) =>
@@ -110,8 +113,9 @@ export function workflowSpecAt(dir: string) {
  */
 export const workflowStepsWritten = (place: ProposalPlace, factory: string, name: string, steps: readonly WorkflowStep[]) =>
   Effect.gen(function* () {
-    const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
-    const { places, fills } = yield* tried(() => factoryWriteOf(place.home, factory, name));
+    const holder = yield* treeDir(place.home, factory, 'workflows');
+    const dir = yield* tried(() => workflowDirAt(path.join(holder, name)));
+    const { places, fills } = yield* factoryWriteOf(place.home, factory, name);
     const agents = yield* (yield* AgentDoor).agents.found({ dir, places });
     const files = renderedOrNone(() => stepFilesOf(steps.map(stepDraftOf), agents, fills));
     return files === undefined ? undefined : workflowSpecOf(files.map(([step, text]) => ({ name: `${step}.md`, text }))).steps;
@@ -133,8 +137,9 @@ const renderedOrNone = <A>(render: () => A) => {
  */
 const workflowNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
-    const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
-    const { places } = yield* tried(() => factoryWriteOf(place.home, factory, name));
+    const holder = yield* treeDir(place.home, factory, 'workflows');
+    const dir = yield* tried(() => workflowDirAt(path.join(holder, name)));
+    const { places } = yield* factoryWriteOf(place.home, factory, name);
     const there = yield* (yield* WorkflowDoor).workflows.there(dir, places);
     return there.kind === 'folder' ? { version: there.version, spec: yield* tried(() => workflowSpecAt(dir)) } : NONE;
   });
@@ -142,7 +147,7 @@ const workflowNow = (place: ProposalPlace, factory: string, name: string) =>
 /** The Agent `name` of the factory's tree, now: its spec with the result schema its `output:` names, read beside it, where it reads. */
 const agentNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
-    const dir = yield* tried(() => treeDir(place.home, factory, 'agents'));
+    const dir = yield* treeDir(place.home, factory, 'agents');
     const door = (yield* AgentDoor).agents;
     const there = yield* door.there(AgentName.read(name), { dir });
     if (there.kind !== 'held') return NONE;
@@ -156,7 +161,7 @@ const agentNow = (place: ProposalPlace, factory: string, name: string) =>
 /** The Skill `name` of the factory's tree, now: its SKILL.md and its folder's other text files. */
 const skillNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
-    const at = yield* tried(() => treeDir(place.home, factory, 'skills'));
+    const at = yield* treeDir(place.home, factory, 'skills');
     const door = (yield* SkillDoor).skills;
     const there = yield* door.there(SkillName.read(name), at);
     if (there.kind !== 'held') return NONE;
@@ -219,12 +224,12 @@ export const currentOf = (place: ProposalPlace, factory: string, kind: Proposabl
     case 'McpServer':
       return orNone(mcpServerObject(place.home, factory, name), servedNow);
     case 'LibraryAdd':
-      return Effect.sync(() => {
+      return Effect.gen(function* () {
         const ref = refOf(name);
-        const { adds, recorded } = factoryAdds(place.home, factory);
+        const { adds, recorded } = yield* factoryAdds(place.home, factory);
         return ref === undefined || !adds.some((a) => sameAdd(a, ref))
           ? NONE
-          : servedNow(libraryAddObject(place.home, factory, ref, recorded));
+          : servedNow(yield* libraryAddObject(place.home, factory, ref, recorded));
       });
     case 'Factory':
       return name === factory

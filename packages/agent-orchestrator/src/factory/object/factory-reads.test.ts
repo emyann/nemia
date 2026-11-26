@@ -15,7 +15,7 @@ import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { addFactory, attachWorkflow, plantRecord, runKey, setSchedule } from '../../../testing.ts';
-import { addFactoryAt } from '../factory.store.ts';
+import { addFactoryAt } from '../../../testing.ts';
 import { treeDir } from '../applied/applied.store.ts';
 import { metered } from '../../meter/tally.store.ts';
 import { recordMemo } from '../../rest/index.ts';

@@ -21,9 +21,11 @@ import type { Served } from '../../command/entry.verb.ts';
 import type { Args } from '../../command/command.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
 import { FACTORY_RULES, factoryRules, runWith as runEngine } from '../../runner.ts';
-import { readFactoryAt } from '../factory.store.ts';
+import { readFactoryAt } from '../../../testing.ts';
 import { factoryTyped } from '../../../test/factory-typed.ts';
-import { appliedDir, digestOf, entriesIn, resolutionsFile, statusFile, swapTree, treeDir } from '../applied/applied.store.ts';
+import { appliedDir, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
+import { dropRecord, recordRevision } from '../../../testing.ts';
+import { appliedKey } from '../door/factory-keys.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
 import { withBuiltins } from '../../../test/templated.ts';
@@ -217,10 +219,10 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
     assert.match(textIn(appliedDir(ROOT, 'clean'), REVIEW), /^budget: 7\nloop: implement\nrounds: 5$/m, 'the base is the render');
     assert.equal(status.digest, digestOf(entriesIn(appliedDir(ROOT, 'clean'))));
     assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
-    const written = fs.statSync(statusFile(ROOT, 'clean')).mtimeMs;
+    const written = recordRevision(ROOT, appliedKey('clean'));
     const tree = bytesUnder(treeDir(ROOT, 'clean'));
     assert.deepEqual(await reconciled(templated('clean')), status);
-    assert.equal(fs.statSync(statusFile(ROOT, 'clean')).mtimeMs, written, 'a second pass writes no status');
+    assert.equal(recordRevision(ROOT, appliedKey('clean')), written, 'a second pass writes no status');
     assert.deepEqual(bytesUnder(treeDir(ROOT, 'clean')), tree, 'nor a tree');
     await assert.rejects(
       main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine()),
@@ -571,7 +573,7 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   fs.cpSync(dir, old, { recursive: true });
   released(dir, '0.2.0', 5);
   await main(['factory', 'upgrade', 'lost', '--to', '0.2.0'], noEngine());
-  fs.rmSync(statusFile(ROOT, 'lost'));
+  dropRecord(ROOT, appliedKey('lost'));
   const tree = bytesUnder(treeDir(ROOT, 'lost'));
   const base = bytesUnder(appliedDir(ROOT, 'lost'));
   const unknown = await reconciled(templated('lost'));
@@ -613,7 +615,7 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
   );
   failing.mockRestore();
   assert.deepEqual(bytesUnder(treeDir(ROOT, 'stuck')), tree, "the person's tree is put back whole");
-  assert.deepEqual(fs.readdirSync(path.join(FACTORIES, 'stuck')).sort(), ['applied', 'status.json', 'tree']);
+  assert.deepEqual(fs.readdirSync(path.join(FACTORIES, 'stuck')).sort(), ['applied', 'tree']);
 
   // oxlint-disable-next-line landmines-testing/no-test-doubles -- the tree seeded between two renames: a race no seam gives
   vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {

@@ -169,6 +169,41 @@ function wiringRenamed(text: string, renamed: Readonly<Record<string, string>>) 
   return `${JSON.stringify({ ...wiring, workflowRepos: named }, null, 2)}\n`;
 }
 
+/** Where a factory's level and servers travel in an archive: the files they were kept in, at these paths from its folder. */
+const RECORD_FILES = { level: 'level.json', servers: 'servers.json' } as const;
+
+/**
+ * The files of a factory's folder with its level and servers, which are records of the store and no files of the folder, packed beside
+ * them at the paths they were files at, so an archive reads as it always did. Sorted by path.
+ * @param files The files of the factory's folder.
+ * @param records The text of the factory's level record and of its servers record, each absent where it has none.
+ */
+export const withRecords = (files: readonly TreeFile[], records: { readonly level?: string; readonly servers?: string }) =>
+  [
+    ...files,
+    ...(['level', 'servers'] as const).flatMap((kind) => {
+      const text = records[kind];
+      return text === undefined ? [] : [{ path: RECORD_FILES[kind], mode: 0o644, bytes: new TextEncoder().encode(text) }];
+    }),
+  ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+/**
+ * The files an archive carried but for the level and the servers, which the target files as records of its store: the rest to place, and
+ * the text of each of the two where the archive held it.
+ * @param files The files of the folder sent.
+ */
+export const withoutRecords = (files: readonly TreeFile[]) => {
+  const text = (at: string) => {
+    const found = files.find((file) => file.path === at);
+    return found === undefined ? undefined : new TextDecoder().decode(found.bytes);
+  };
+  return {
+    files: files.filter((file) => file.path !== RECORD_FILES.level && file.path !== RECORD_FILES.servers),
+    level: text(RECORD_FILES.level),
+    servers: text(RECORD_FILES.servers),
+  };
+};
+
 /**
  * The files of a factory's folder as the target places them: its tree's wiring with its workflows' repositories renamed where a
  * repository's folder name changed (`renamed`), and the instruction's words the export carried, where it did, as the file the store keeps

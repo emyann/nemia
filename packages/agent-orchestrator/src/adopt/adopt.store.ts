@@ -12,7 +12,6 @@ import { Invalid } from '../refusal/refusal.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { parseInboxCard } from '../inbox/index.ts';
-import { factoriesDirAt } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { readRules, rulesAtHome } from '../factory/rules/rules.store.ts';
 import { appliedDir, digestOf, entriesIn, stageFolder, treeDir, treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';
@@ -77,22 +76,20 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
 });
 
 /**
- * The digest of a takeover's plan: the factory's file as it is now, the template's source, its version and parameters, and its render.
+ * The digest of a takeover's plan: the factory's record as it is now, the template's source, its version and parameters, and its render.
  * Any of them changed between the preview and the takeover changes it. The cards and runs, which change by the minute, are judged again
  * at the takeover instead. An upgrade's plan gives `from`, the name of the template its base holds, where it is a switch onto another,
  * hashed after the rest only then: a takeover's digest, and a same-template upgrade's, are the bytes they were.
- * @param home The store's root, whose factories folder holds the factory's file.
- * @param name The factory's name, whose file is hashed as it is now.
+ * @param factory The factory as the Factory door reads it now, its record hashed as it is.
  * @param render The template rendered with the factory's parameters: its version, its parameters and its files.
  * @param source The template's source as the person named it: a folder, an archive or a builtin's name.
  * @param from The name of the template the base holds, given only on an upgrade that switches onto another; undefined otherwise.
  */
-export function planDigest(home: string, name: string, render: RenderedAt, source: string, from?: string) {
-  const file = path.join(factoriesDirAt(home), `${name}.json`);
+export function planDigest(factory: Factory, render: RenderedAt, source: string, from?: string) {
   const hash = createHash('sha256');
   hash.update(JSON.stringify([source, render.version, render.params, digestOf(render.entries)]));
   hash.update('\0');
-  hash.update(fs.readFileSync(file));
+  hash.update(JSON.stringify(factory));
   if (from !== undefined) hash.update(`\0switch from ${from}`);
   return `sha256:${hash.digest('hex')}`;
 }

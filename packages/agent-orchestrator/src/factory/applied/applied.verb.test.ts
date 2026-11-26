@@ -19,7 +19,7 @@ import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { steeredClock } from '../../../test/steered.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
-import { attachWorkflowAt, fireAgentAt, hireAgentAt, readFactoriesAt, readFactoryAt } from '../factory.store.ts';
+import { attachWorkflowAt, fireAgentAt, hireAgentAt, readFactoriesAt, readFactoryAt } from '../../../testing.ts';
 import { main as cli } from '../../cli/main.ts';
 import { told } from '../../../test/typed.ts';
 import { handled } from '../../../test/typed.ts';
@@ -27,7 +27,9 @@ import { names } from '../../../test/assessed.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 import { FACTORY_INSTRUCT } from '../instruction.verb.ts';
 import { reconcile } from './applied.verb.ts';
-import { appliedDir, readStatus, statusFile, treeDir } from './applied.store.ts';
+import { appliedDir, treeDir } from './applied.store.ts';
+import { factoriesNow, factoryText, keysUnder, plantKey, readStatus, recordText } from '../../../testing.ts';
+import { appliedKey } from '../door/factory-keys.ts';
 import { detached, followed } from '../../../test/factory-planted.ts';
 import { Effect, Fiber } from 'effect';
 import { StoreRoot } from '../../config/root.store.ts';
@@ -110,8 +112,14 @@ function edit(dir: string, file: string, change: (spec: Record<string, any>) => 
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
-/** Every file under the factories folder, by its path in it, so a refusal is seen to have written nothing. */
-const filed = () => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
+/** Every file under the factories folder and every factory record with its text, so a refusal is seen to have written nothing. */
+const filed = () =>
+  [
+    ...(fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]) : []),
+    ...['factories', 'levels', 'servers', 'applied'].flatMap((kind) =>
+      keysUnder(ROOT, `/registry/${kind}/`).map((key) => `${key}=${recordText(ROOT, key)}`),
+    ),
+  ].sort();
 
 /** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
 const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
@@ -308,12 +316,12 @@ describe("the controller stamps each condition with when its status last moved, 
     ]);
   });
   test('a pass that observes the same status keeps the time each condition moved, and writes nothing', async () => {
-    const before = fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8');
+    const before = recordText(ROOT, appliedKey('stamped'));
     assert.deepEqual(times(await reconciledAt(templated('stamped'), at[1])), [
       ['Applied', 'True', at[0]],
       ['ConflictsPending', 'False', at[0]],
     ]);
-    assert.equal(fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8'), before);
+    assert.equal(recordText(ROOT, appliedKey('stamped')), before);
   });
   test("a condition whose status flips is stamped with the pass's time, the other keeps its own", async () => {
     edit(dir, 'workflows/dev/workflow.yaml', async (spec) => {
@@ -325,9 +333,9 @@ describe("the controller stamps each condition with when its status last moved, 
     ]);
   });
   test('a status written before the field is stamped with the time of the pass that reads it', async () => {
-    const status = JSON.parse(fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8'));
+    const status = JSON.parse(recordText(ROOT, appliedKey('stamped')) ?? '{}');
     for (const c of status.conditions) delete c.lastTransitionTime;
-    fs.writeFileSync(statusFile(ROOT, 'stamped'), JSON.stringify(status));
+    plantKey(ROOT, appliedKey('stamped'), JSON.stringify(status));
     assert.deepEqual(times(await reconciledAt(templated('stamped'), at[3])), [
       ['Applied', 'False', at[3]],
       ['ConflictsPending', 'False', at[3]],
@@ -346,9 +354,9 @@ describe("the controller stamps each condition with when its status last moved, 
 
 /** The status of `name` rewritten as the controller wrote it before it named templates: with no `template`, changed by `change`. */
 function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}) {
-  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, name), 'utf8'));
+  const { template: _named, ...status } = JSON.parse(recordText(ROOT, appliedKey(name)) ?? '{}');
   change(status);
-  fs.writeFileSync(statusFile(ROOT, name), JSON.stringify(status));
+  plantKey(ROOT, appliedKey(name), JSON.stringify(status));
 }
 
 describe('the controller names the template a base holds, even where the base is no longer the render, so a switch from it can be told', () => {
@@ -425,7 +433,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     );
     await assert.rejects(async () => followed(ROOT, 'wired', 'follow'), refusedNaming('Conflict', 'nemia up'));
     await reconciled(templated('wired'));
-    const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
+    const own = factoryText(ROOT, 'wired') ?? '';
     const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8'));
     assert.deepEqual(readFactoryAt(ROOT, 'wired').workflows, ['dev', 'triage']);
     assert.deepEqual(readFactoryAt(ROOT, 'wired').hires, {
@@ -457,14 +465,14 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
       "the policy is the tree wiring's, read back",
     );
     assert.deepEqual(
-      JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8')),
+      JSON.parse(factoryText(ROOT, 'wired') ?? ''),
       { ...JSON.parse(own), generation: 7 },
       "the factory's own file is written only for its generation, one more for each change of the tree's wiring: fire, hire, attach, detach, a workflow's repository, revisions",
     );
     const tree = fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8');
     const notes = scratch('wf-applied-volume-');
     await main(['factory', 'volume', 'add', 'wired', `${notes}:ro`], noEngine());
-    const file = JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'));
+    const file = JSON.parse(factoryText(ROOT, 'wired') ?? '');
     const volume = { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() };
     assert.deepEqual(file.volumes.at(-1), volume, "a volume is the factory's own, in its file, under the name its folder gives it");
     assert.equal(fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8'), tree, 'and never in its tree');
@@ -487,7 +495,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     );
     await main(['factory', 'rm', 'told'], noEngine());
     assert.deepEqual(
-      filed().filter((f) => f.startsWith('told')),
+      filed().filter((f) => f.startsWith('told') || f.includes('/told')),
       [],
     );
   });
@@ -522,7 +530,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     for (const write of writes(besideDraft, 'written', 'user')) await assert.rejects(handled(write), refusedWith('Invalid', /--factory/));
     assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
     await reconciled(templated('written'));
-    const { places, fills } = factoryDraftOf(ROOT, 'written', 'lean');
+    const { places, fills } = factoriesNow(ROOT, factoryDraftOf(ROOT, 'written', 'lean'));
     for (const write of writes(await handled(draftSteps(bare, places, fills)), 'written')) await handled(write);
     const tree = path.join(treeDir(ROOT, 'written'), 'workflows');
     assert.ok(fs.existsSync(path.join(tree, 'lean', 'review.md')), "the workflow is written into the tree's, its agents read in the tree");
@@ -634,8 +642,8 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
   });
   test('REFUSED by the controller: a recorded name no builtin template has any longer is TemplateInvalid, its base and tree kept', async () => {
     const digest = readStatus(ROOT, 'named')?.digest;
-    const { template: _named, ...unnamed } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'named'), 'utf8'));
-    fs.writeFileSync(statusFile(ROOT, 'named'), JSON.stringify(unnamed));
+    const { template: _named, ...unnamed } = JSON.parse(recordText(ROOT, appliedKey('named')) ?? '{}');
+    plantKey(ROOT, appliedKey('named'), JSON.stringify(unnamed));
     const gone = await programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
     assert.equal(gone.template, 'team', 'a builtin is named by the name it is recorded by, even where none has it any longer');
     const { message, lastTransitionTime: _goneAt, ...applied } = gone.conditions[0];

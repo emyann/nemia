@@ -5,7 +5,7 @@
  * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
  * given as `ENV`.
  */
-import { cardKey, dropRecord, runsNow } from '../../testing.ts';
+import { dropFactory, cardKey, dropRecord, runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -342,6 +342,6 @@ test('REFUSED: a factory offering the name with nothing else to give under it, a
   fs.mkdirSync(path.join(repo, 'workflows', 'offered'), { recursive: true });
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
-  fs.rmSync(path.join(ROOT, 'factories', 'shop.json'));
-  fs.rmSync(path.join(ROOT, 'factories', 'elsewhere.json'));
+  dropFactory(ROOT, 'shop');
+  dropFactory(ROOT, 'elsewhere');
 });

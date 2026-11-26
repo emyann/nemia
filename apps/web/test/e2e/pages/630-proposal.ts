@@ -7,7 +7,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, dropStoredFactory, store, storeFactory } from '../world.ts';
 
 /** The factory the page writes, on the checkout, offering WORKFLOWS' workflow of yours. */
 const FACTORY = 'proposing-e2e';
@@ -421,9 +421,9 @@ export default {
   name: 'proposal',
   route: '/runs',
   expect: async (page) => {
-    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
-    fs.writeFileSync(
-      factoryFile,
+    const factoryName = FACTORY;
+    storeFactory(
+      factoryName,
       JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name] }, null, 2),
     );
     let back: () => void = () => undefined;
@@ -444,7 +444,7 @@ export default {
       await goto(page, '/runs');
       if (made !== undefined) keyspaceWritten(made, made, () => undefined);
       fs.rmSync(path.join(store!, 'factories', FACTORY), { recursive: true, force: true });
-      fs.rmSync(factoryFile, { force: true });
+      dropStoredFactory(factoryName);
     }
   },
 } satisfies PageSpec;

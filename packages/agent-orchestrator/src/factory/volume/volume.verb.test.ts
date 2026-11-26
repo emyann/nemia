@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { handled } from '../../../test/typed.ts';
-import { addFactoryAt, readFactoryAt } from '../factory.store.ts';
+import { addFactoryAt, readFactoryAt } from '../../../testing.ts';
 import type { Env } from '../../config/config.store.ts';
 import { FACTORY_VOLUME_SET } from './volume.verb.ts';
 

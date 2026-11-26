@@ -10,11 +10,10 @@ import { Effect } from 'effect';
 import { HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import { MILESTONES, type Milestones } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
 import { factoryVolumesNamed, volumeRefusal } from '../factory/volume/index.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import { tried } from '../runtime-client.ts';
 import { harnessOfNeed, signInNeedOf } from '../needs/index.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory, needsOnce } from '../needs/needs.verb.ts';
 import { untrustedPlaces } from '../trust/untrusted.verb.ts';
@@ -40,7 +39,7 @@ const harnessReady = Effect.fnUntraced(function* (home: string) {
  */
 export const milestonesNow = Effect.fn('milestonesNow')(function* () {
   const home = yield* StoreRoot;
-  const factories = yield* tried(() => listedAtOnce(home));
+  const factories = yield* listedAt(home);
   const filed = factories.flatMap((f) => ('error' in f ? [] : [f]));
   const writable = filed.flatMap((f) =>
     factoryVolumesNamed(f)

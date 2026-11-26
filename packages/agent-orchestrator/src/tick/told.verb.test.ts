@@ -6,7 +6,6 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { recordedServers } from './told.verb.ts';
-import { writeFactoryServers } from '../factory/servers/servers.store.ts';
 import { writeLibraryAdds, writeLibraryServers } from '../library/library.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 
@@ -20,8 +19,7 @@ test("a run's servers: the factory's own beside the library's it added, its own 
     { kind: 'McpServer', name: 'notes' },
     { kind: 'McpServer', name: 'search' },
   ]);
-  writeFactoryServers(home, DEFAULT_NAMESPACE, { search: { type: 'http', url: 'https://search.own.example/mcp' } });
-  const servers = recordedServers(undefined, home);
+  const servers = recordedServers(undefined, home, { search: { type: 'http', url: 'https://search.own.example/mcp' } });
   assert.deepEqual(Object.keys(servers).sort(), ['notes', 'search']);
   assert.equal(servers.notes?.url, 'https://notes.library.example/mcp', 'an added library server is handed to the run');
   assert.equal(servers.search?.url, 'https://search.own.example/mcp', "the factory's own wins the name");

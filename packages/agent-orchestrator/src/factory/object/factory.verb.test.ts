@@ -16,6 +16,7 @@ import { factoryCommands, factoryObjectsOf, followOf, type FactoryListed } from 
 import { volumeBase } from '../volume/volume.ts';
 import { doorFrom, done } from '../../../test/door-walks.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
+import { factoriesNow } from '../../../testing.ts';
 import { factoryDoorMemory } from '../door/memory.store.ts';
 import type { Factory } from '../factory.ts';
 import { freezeHomeFiles } from '../../frozen/frozen.store.ts';
@@ -62,7 +63,7 @@ const listed: FactoryListed = {
   untrusted: [{ factory: 'acme', place: repo, harness: 'Claude Code', folder: repo, withheld: 'its hooks', never: null }],
 };
 
-const objects = factoryObjectsOf(listed, home);
+const objects = factoriesNow(home, factoryObjectsOf(listed, home));
 const byName = (name: string) => objects.find((o) => o.metadata.name === name);
 
 test('the default factory is listed first, on no repository, offering every workflow and hiring no one', () => {
@@ -100,7 +101,7 @@ test('a stray file is listed with why it does not read, and hides no other', () 
 
 test('every object decodes as the objects say a Factory is, and its resourceVersion stands when its status alone moves', () => {
   for (const o of objects) assert.ok(Schema.is(FactorySchema)(o), o.metadata.name);
-  const without = factoryObjectsOf({ ...listed, untrusted: [] }, home).find((o) => o.metadata.name === 'acme');
+  const without = factoriesNow(home, factoryObjectsOf({ ...listed, untrusted: [] }, home)).find((o) => o.metadata.name === 'acme');
   assert.notDeepEqual(without?.status, byName('acme')?.status, 'the status moved');
   assert.equal(
     without?.metadata.resourceVersion,
@@ -108,14 +109,15 @@ test('every object decodes as the objects say a Factory is, and its resourceVers
     'as metadata.generation, a status write moves no version',
   );
   assert.equal(
-    factoryObjectsOf(listed, home).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
+    factoriesNow(home, factoryObjectsOf(listed, home)).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
     byName('acme')?.metadata.resourceVersion,
     'the same read is the same version',
   );
 });
 
 test("a Factory's resourceVersion moves with its rules and its instruction, read beside its spec and status", () => {
-  const versionOf = (name: string) => factoryObjectsOf(listed, home).find((o) => o.metadata.name === name)?.metadata.resourceVersion;
+  const versionOf = (name: string) =>
+    factoriesNow(home, factoryObjectsOf(listed, home)).find((o) => o.metadata.name === name)?.metadata.resourceVersion;
   const rules = path.join(home, 'factories', 'acme', 'RULES.md');
   const instruction = path.join(repo, 'NEMIA.md');
   const plain = versionOf('acme');
@@ -176,7 +178,7 @@ test("a cloned volume's origin is on its spec, and a volume given no URL has non
   };
   const { name: _n, file: _f, ...millFiled } = mill;
   fs.writeFileSync(mill.file, JSON.stringify(millFiled));
-  const served = factoryObjectsOf({ factories: [mill], untrusted: [] }, home).find((o) => o.metadata.name === 'mill');
+  const served = factoriesNow(home, factoryObjectsOf({ factories: [mill], untrusted: [] }, home)).find((o) => o.metadata.name === 'mill');
   assert.equal(served?.spec.volumes.at(0)?.origin, 'https://h/o/r.git');
   assert.ok(served && Schema.is(FactorySchema)(served));
   assert.equal(

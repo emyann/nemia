@@ -24,7 +24,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { digestOf, kindsDrift, revisionNow, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
 import { advanceRun, approveRun, driftNow, startRun, retryRun, runWith as runEngine } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 

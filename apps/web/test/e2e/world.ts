@@ -185,6 +185,64 @@ export function dropStoredRecord(id: string) {
   inApi('t.dropRecord(root, t.runKey(input));', id);
 }
 
+/**
+ * The text of the record of the factory `name` in the seeded store, as the store holds it: what a page keeps to put back. Throws where
+ * there is none.
+ * @param name The factory's name.
+ */
+export function storedFactory(name: string) {
+  const text = inApi("return t.factoryText(root, input) ?? '';", name);
+  if (!text) throw new Error(`the seeded store holds no factory ${name}: seed it first`);
+  return text;
+}
+
+/**
+ * The record of the factory `name` in the seeded store written as `text`, over the one there or none: what a page plants or changes.
+ * @param name The factory's name.
+ * @param text The record's text.
+ */
+export function storeFactory(name: string, text: string) {
+  inApi('t.plantFactory(root, input.name, input.text);', { name, text });
+}
+
+/**
+ * The MCP servers recorded for the factory `name` in the seeded store, by server name: none where none is recorded.
+ * @param name The factory's name.
+ */
+export function storedServers(name: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.readFactoryServers(root, input) ?? {});', name)) as Record<
+    string,
+    { url?: string; headers?: Record<string, string> }
+  >;
+}
+
+/**
+ * The MCP servers of the factory `name` in the seeded store written as `servers`: what a page plants for a card to read.
+ * @param name The factory's name.
+ * @param servers The servers, by server name.
+ */
+export function storeServers(name: string, servers: object) {
+  inApi('t.writeFactoryServers(root, input.name, input.servers);', { name, servers });
+}
+
+/**
+ * What the controller observed of the factory `name` in the seeded store, written as `status`: what a page plants for a card to read.
+ * @param name The factory's name.
+ * @param status The status, as `statusOf` of the page's applied state gives it.
+ */
+export function storeStatus(name: string, status: object) {
+  inApi('t.writeStatus(root, input.name, input.status);', { name, status });
+}
+
+/**
+ * The factory `name` taken out of the seeded store, its level, servers and status with it, there or not: what a page does to take back
+ * a factory it made.
+ * @param name The factory's name.
+ */
+export function dropStoredFactory(name: string) {
+  inApi('t.dropFactory(root, input);', name);
+}
+
 /** Every kind's files the seed wrote as a store before the keyspace taken up into its records, as each door's first read would. */
 export function storeTakenUp() {
   inApi('t.kindsTakenUp(root);');

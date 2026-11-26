@@ -99,8 +99,8 @@ place's to answer** (its `root` verb). The orchestrator asks both when a place j
 `src/trust/trust.verb.ts`), and says no harness's word of it: every sentence that names the harness, its file or its key is the
 runtime's, carried whole (`HARNESS_WORDS` in `packages/agent-orchestrator/test/words.test.ts`).
 
-**A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a file beside the factory,
-`factories/<name>/servers.json`, read and written by `packages/agent-orchestrator/src/factory/servers/` — its store taking the store's root as
+**A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a record of the keyspace,
+`/registry/servers/<name>`, read and written by `packages/agent-orchestrator/src/factory/servers/` — its store taking the store's root as
 a required `home: string`, as every store function does since the root became a service (`StoreRoot`). What a session is handed is the
 runtime's: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of a server object's bytes, in one fixed key order,
 feeding both the session's `Options.mcpServers` and the state read, because the harness files a sign-in under those bytes and two
@@ -172,7 +172,7 @@ below it and asks one it cannot read (`Scope`), naming no agent. The static rule
 command's class (`nemiaFence`).
 
 **Levels** are the person's and the orchestrator's (`src/level/`): each factory's default, `manual`, `semi-auto` or `auto`, in its own
-file (`factories/<name>/level.json`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for
+record (`/registry/levels/<name>`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for
 the default factory, and a raise for a stretch that ends by itself, read as it passes with no write (`levelOf`).
 
 **The policies** are the person's and the orchestrator's (`src/auto/`, a folder named as the store's `auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
@@ -525,8 +525,12 @@ verb's. Its default departs from the Run door's on one point, which the pattern 
 and `Invalid`, naming the fix, where none was given — a new door may read no root of its own module's (rule 4's `root-given`), and a
 required service would change every controller's type at once. The Run door keeps its module-root default until its files store takes
 a root. No file of `src` but the door's imports the stores it is over or calls one, with no baseline (`src/factory/door/factories.store.test.ts`);
-a synchronous caller names its root and reads through the door at once (`readFactoryAtOnce`, `filedAtOnce`, `listedAtOnce`,
-`startFactoryAtOnce`, `doorAtOnce`).
+a caller that has no door given opens one at its root (`doorAt`) and runs the Effect it asks (`factoryOrNone`, `listedAt`, `startFactory`).
+
+The factories' own records are the keyspace's too: a factory (`/registry/factories/<name>`), its level, its servers and what the controller last
+observed of it (`/registry/applied/<name>`), written by the Factory door's layer in one transaction where several move together, a level beside the
+generation it counts; the files of before — `factories/<name>.json` and `level.json`, `servers.json`, `status.json` in the factory's folder — are imported
+once by the kind's import (`FACTORY_FILES`) and moved under `<root>/imported/`. A factory's folder, its rules and its instruction stay files.
 
 **The Card door.** A card of the inbox, and the tick's tries of a queued one, are read and written through `CardDoor`
 (`packages/agent-orchestrator/src/cards/cards.store.ts`), rooted as the Factory door is: two layers built the one way (`cardDoorOver`),

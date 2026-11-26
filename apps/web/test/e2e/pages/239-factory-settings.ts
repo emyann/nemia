@@ -6,7 +6,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { budgetWord } from '../../../src/lib/money.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storeFactory, storedFactory } from '../world.ts';
 
 /** The factory whose settings the page reads and writes: its first folder is the e2e's checkout. */
 const FACTORY = FACTORIES.hiring.name;
@@ -95,13 +95,13 @@ async function keepRules(page: Page, kept: string) {
 }
 
 /** The cost lines the factory's file keeps, as it reads now. */
-const costLinesIn = (factoryFile: string) => (JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { costLines?: unknown }).costLines;
+const costLinesIn = (factoryName: string) => (JSON.parse(storedFactory(factoryName)) as { costLines?: unknown }).costLines;
 
 /**
  * The factory's cost lines: a row per workflow it offers, none set yet and nothing to clear; a line typed and saved is the factory's
  * file's `costLines`, shown on the row and read again on a reload; cleared, the file keeps none and the row says so.
  */
-async function setCostLine(page: Page, factoryFile: string) {
+async function setCostLine(page: Page, factoryName: string) {
   const { workflow, usd } = LINED;
   const section = page.locator('[data-cost-lines]');
   const row = section.locator(`[data-cost-line="${workflow}"]`);
@@ -110,7 +110,7 @@ async function setCostLine(page: Page, factoryFile: string) {
   await expectCount(row.getByRole('button', { name: 'Clear', exact: true }), 0, 'with no line set, there is nothing to clear');
   await row.getByRole('textbox', { name: `The cost line of ${workflow}, in dollars` }).fill(String(usd));
   await wrote(page, row, 'Save', 'PUT', 'costLine');
-  const kept = costLinesIn(factoryFile);
+  const kept = costLinesIn(factoryName);
   if (JSON.stringify(kept) !== JSON.stringify({ [workflow]: usd }))
     throw new Refused(
       `saved, the factory's file keeps the line, ${JSON.stringify({ [workflow]: usd })} — it keeps ${JSON.stringify(kept)}`,
@@ -124,7 +124,7 @@ async function setCostLine(page: Page, factoryFile: string) {
   await settled(page);
   await photograph(section, path.join(OUT, `factory-settings-cost-lines-${await themeOf(page)}.png`));
   await wrote(page, row, 'Clear', 'DELETE', 'costLine');
-  const left = costLinesIn(factoryFile);
+  const left = costLinesIn(factoryName);
   if (left !== undefined && JSON.stringify(left) !== '{}')
     throw new Refused(`cleared, the factory's file keeps no line — it keeps ${JSON.stringify(left)}`);
   await expectVisible(row.locator('[data-cost-line-said="none"]'), 'cleared, the row says there is no line');
@@ -160,12 +160,12 @@ async function followSettings(page: Page, section: Locator, checkout: string) {
 }
 
 /** Pointed at a file of the folder, the instruction reads it, and the factory's file names it; Back to NEMIA.md undoes it. */
-async function pointAtFile(page: Page, section: Locator, checkout: string, factoryFile: string) {
+async function pointAtFile(page: Page, section: Locator, checkout: string, factoryName: string) {
   await section.getByRole('textbox', { name: /Or read it from a file/ }).fill(README);
   await wrote(page, section, 'Read this file', 'PUT');
   await expectKept(section, 'folder', path.join(checkout, README), 'pointed at a file, the instruction is read from it');
   await expectVisible(section.locator('[data-instruction-words]', { hasText: 'A second paragraph' }), "and the file's words are shown");
-  const record = JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { instruction?: unknown };
+  const record = JSON.parse(storedFactory(factoryName)) as { instruction?: unknown };
   if (JSON.stringify(record.instruction) !== JSON.stringify({ path: README }))
     throw new Refused(`the factory's file names the path — it says ${JSON.stringify(record.instruction)}`);
   await settled(page);
@@ -234,25 +234,25 @@ export default {
   route: `/factories/${FACTORY}`,
   expect: async (page) => {
     const checkout = path.join(store!, 'checkout');
-    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
+    const factoryName = FACTORY;
     const folder = path.join(store!, 'factories', FACTORY);
     const stored = path.join(folder, 'NEMIA.md');
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryText = storedFactory(factoryName);
     if (!fs.existsSync(path.join(checkout, README))) throw new Refused(`the checkout holds ${README} for the page to point at`);
     if (fs.existsSync(path.join(checkout, 'NEMIA.md'))) throw new Refused('the checkout holds no NEMIA.md: the page reads it as none yet');
     const section = page.locator('section[data-factory-instruction]');
     try {
       await followSettings(page, section, checkout);
       await keepRules(page, path.join(folder, 'RULES.md'));
-      await pointAtFile(page, section, checkout, factoryFile);
+      await pointAtFile(page, section, checkout, factoryName);
       await keepInStore(page, section, stored);
       await wrote(page, section, 'Back to NEMIA.md', 'DELETE');
       await expectKept(section, 'folder', path.join(checkout, 'NEMIA.md'), 'Back to NEMIA.md reads NEMIA.md again');
-      if (JSON.stringify(asRead(fs.readFileSync(factoryFile, 'utf8'))) !== JSON.stringify(asRead(factoryText)))
-        throw new Refused(`back to NEMIA.md, the factory's file is as it was — it holds ${fs.readFileSync(factoryFile, 'utf8')}`);
-      await setCostLine(page, factoryFile);
+      if (JSON.stringify(asRead(storedFactory(factoryName))) !== JSON.stringify(asRead(factoryText)))
+        throw new Refused(`back to NEMIA.md, the factory's file is as it was — it holds ${storedFactory(factoryName)}`);
+      await setCostLine(page, factoryName);
     } finally {
-      fs.writeFileSync(factoryFile, factoryText);
+      storeFactory(factoryName, factoryText);
       fs.rmSync(folder, { recursive: true, force: true });
     }
   },

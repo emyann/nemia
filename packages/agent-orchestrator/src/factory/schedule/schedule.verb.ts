@@ -11,7 +11,7 @@ import { tableEntry, type Served } from '../../command/entry.verb.ts';
 import type { Run } from '../../record/record.ts';
 import { isDue, schedulesRead, type Read } from './listed.store.ts';
 import { workflowFolder } from '../../folder/folder.store.ts';
-import { scheduleOf, scheduleRefused } from '../door/factories.store.ts';
+import { FactoryDoor, scheduleOf, scheduleRefused } from '../door/factories.store.ts';
 import { wire } from '../wiring/wire.verb.ts';
 import { unscheduledRefusal } from '../factory.ts';
 import { Missing } from '../../refusal/refusal.ts';
@@ -34,16 +34,16 @@ const oneLine = (err: unknown) =>
  * tree's before the repository's `workflows/` when it is made from a template. Refused, `Invalid`, naming the attach, where the wiring
  * places the workflow on none of its repositories, and `Missing` where the factory is no longer filed.
  */
-const started = (home: string, r: Read, due: string) =>
-  Effect.suspend(() => {
-    const repo = wiredRepoFor(home, r.factory.name, r.workflow);
+const started = (r: Read, due: string) =>
+  Effect.gen(function* () {
+    const repo = yield* wiredRepoFor(r.factory.name, r.workflow);
     if (repo === undefined)
-      return Effect.fail(
+      return yield* Effect.fail(
         new Missing({
           message: `The factory ${r.factory.name} is no longer filed, so its schedule of ${r.workflow} starts nothing: see the factories with nemia factory ls. Nothing was started.`,
         }),
       );
-    return startRun({
+    return yield* startRun({
       brief: r.schedule.brief,
       repo,
       repoNamed: false,
@@ -62,10 +62,10 @@ const started = (home: string, r: Read, due: string) =>
  */
 export const startDue = Effect.fn('startDue')(function* (runs: readonly Run[], now: number = Date.now()) {
   const home = yield* StoreRoot;
-  const due = schedulesRead(home, runs, now).find(isDue);
+  const due = schedulesRead(yield* (yield* FactoryDoor).factories.listed(), home, runs, now).find(isDue);
   if (!due) return undefined;
   const at = { factory: due.factory.name, workflow: due.workflow, due: new Date(due.fires.latest).toISOString() };
-  const exit = yield* Effect.exit(started(home, due, at.due));
+  const exit = yield* Effect.exit(started(due, at.due));
   const keep = (tried: ScheduleTry) => {
     try {
       putScheduleTry(home, at.factory, at.workflow, tried);

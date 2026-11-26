@@ -9,8 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddList } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { DEFAULT_NAMESPACE, type Factory, workedOn } from '../factory/factory.ts';
-import { doorAtOnce } from '../factory/door/factories.store.ts';
+import { DEFAULT_NAMESPACE, type Factory, type FactoryListing, workedOn } from '../factory/factory.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
 import { stepSkillsNamed, stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
@@ -35,10 +35,10 @@ export const recordedAt = (home: string, name: string) =>
 /** A factory's adds, and whether they are its record's (`recorded`) or derived from what its workflows resolve today. */
 export type FactoryAdds = { readonly recorded: boolean; readonly adds: readonly LibraryRef[] };
 
-/** The factory `name` as its file reads, or undefined for `default`, which has no file, and for one whose file does not read. */
-const factoryNamed = (home: string, name: string) => {
-  const listing = doorAtOnce(home, (door) => door.factories.listed()).find((f) => f.name === name);
-  return listing === undefined || 'error' in listing ? undefined : listing;
+/** The factory `name` as its record reads in `listing`, or undefined for `default`, which has no record, and for one that does not read. */
+const factoryNamed = (listing: readonly FactoryListing[], name: string) => {
+  const found = listing.find((f) => f.name === name);
+  return found === undefined || 'error' in found ? undefined : found;
 };
 
 /** Whether `file` is directly in the folder `dir`, by resolved path. */
@@ -67,16 +67,20 @@ const givenSkills = (file: string) => {
 };
 
 /** The repositories the factory `name` is read on, or one undefined for the store's workflows alone; none for a factory with no file. */
-function filledPlaces(home: string, name: string) {
-  const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
+function filledPlaces(listing: readonly FactoryListing[], name: string) {
+  const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(listing, name);
   if (name !== DEFAULT_NAMESPACE && factory === undefined) return undefined;
   const repos = factory === undefined || workedOn(factory).length === 0 ? [undefined] : workedOn(factory);
   return { factory, repos };
 }
 
 /** Each of `read` over the places of the factory `name`, a place that cannot be listed skipped. */
-function overPlaces<T>(home: string, name: string, read: (repo: string | undefined, factory: Factory | undefined) => T[]) {
-  const places = filledPlaces(home, name);
+function overPlaces<T>(
+  listing: readonly FactoryListing[],
+  name: string,
+  read: (repo: string | undefined, factory: Factory | undefined) => T[],
+) {
+  const places = filledPlaces(listing, name);
   if (places === undefined) return [];
   return places.repos.flatMap((repo) => {
     try {
@@ -88,18 +92,19 @@ function overPlaces<T>(home: string, name: string, read: (repo: string | undefin
 }
 
 /** The files of the agents the steps of the factory `name` are credited to (`stepsFilled`), on each of its repositories. */
-const filledFiles = (home: string, name: string) =>
-  new Set(overPlaces(home, name, (repo, factory) => stepsFilled(repo, home, factory).map((filled) => path.resolve(filled.file))));
+const filledFiles = (listing: readonly FactoryListing[], home: string, name: string) =>
+  new Set(overPlaces(listing, name, (repo, factory) => stepsFilled(repo, home, factory).map((filled) => path.resolve(filled.file))));
 
 /**
  * The library items the factory `name` resolves today, from the steps it fills: each library agent a step is credited to (`stepsFilled`,
  * the file a start would run), each skill an agent that fills a step gives, and each a step names on its own `skills:` line, that the
  * library holds.
+ * @param listing The store's factories, as the Factory door lists them.
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function derivedAdds(home: string, name: string) {
-  const files = filledFiles(home, name);
+function derivedAddsIn(listing: readonly FactoryListing[], home: string, name: string) {
+  const files = filledFiles(listing, home, name);
   const agentsDir = path.join(libraryDir(home), AGENTS_FOLDER);
   const adds: LibraryRef[] = [];
   const add = (ref: LibraryRef) => {
@@ -109,23 +114,39 @@ export function derivedAdds(home: string, name: string) {
     if (inFolder(file, agentsDir)) add({ kind: 'Agent', name: path.basename(file, '.md') });
     for (const skill of givenSkills(file)) if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
   }
-  for (const skill of overPlaces(home, name, (repo, factory) => stepSkillsNamed(repo, home, factory)))
+  for (const skill of overPlaces(listing, name, (repo, factory) => stepSkillsNamed(repo, home, factory)))
     if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
   return adds;
 }
 
 /**
- * The factory `name`'s adds: its record's where it has one, else those derived from its workflows (`libraryAddsOf`).
+ * The library items the factory `name` resolves today (`derivedAddsIn`), the factories read through the Factory door.
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function factoryAdds(home: string, name: string) {
+export const derivedAdds = (home: string, name: string) => Effect.map(listedAt(home), (listing) => derivedAddsIn(listing, home, name));
+
+/**
+ * The factory `name`'s adds as `listing` reads: its record's where it has one, else those derived from its workflows (`libraryAddsOf`).
+ * @param listing The store's factories, as the Factory door lists them.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ */
+function addsIn(listing: readonly FactoryListing[], home: string, name: string) {
   const recorded = readLibraryAdds(home, name);
   return {
     recorded: recorded !== undefined,
-    adds: libraryAddsOf(recorded, recorded === undefined ? derivedAdds(home, name) : []),
+    adds: libraryAddsOf(recorded, recorded === undefined ? derivedAddsIn(listing, home, name) : []),
   };
 }
+
+/**
+ * The factory `name`'s adds: its record's where it has one, else those derived from its workflows (`libraryAddsOf`), the factories read
+ * through the Factory door.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ */
+export const factoryAdds = (home: string, name: string) => Effect.map(listedAt(home), (listing) => addsIn(listing, home, name));
 
 /**
  * Where the library holds the item `ref`: the person's (`user`), a builtin, or undefined where it holds none.
@@ -150,8 +171,8 @@ export function libraryOrigin(home: string, ref: LibraryRef) {
  * @param name The factory's name.
  * @param ref The item.
  */
-function ownOrigins(home: string, name: string, ref: LibraryRef) {
-  const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
+function ownOrigins(listing: readonly FactoryListing[], name: string, ref: LibraryRef) {
+  const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(listing, name);
   if (factory === undefined || ref.kind === 'McpServer') return [] satisfies DefinitionOrigin[] as DefinitionOrigin[];
   const at = (root: string) =>
     ref.kind === 'Agent'
@@ -168,15 +189,16 @@ const missingFix = (factory: string, ref: LibraryRef) =>
   `${ref.kind} ${ref.name} is no longer in the library: make it again there, or take the add off with nemia library rm ${ref.kind} ${ref.name} --factory ${factory}.`;
 
 /**
- * The add `ref` of the factory `name` as an object, with what it is there.
+ * The add `ref` of the factory `name` as an object, with what it is there, the factories as `listing` reads them.
+ * @param listing The store's factories, as the Factory door lists them.
  * @param home The store's root.
  * @param name The factory's name.
  * @param ref The add.
  * @param recorded Whether the factory's adds are its record's.
  */
-export function libraryAddObject(home: string, name: string, ref: LibraryRef, recorded: boolean) {
+function addObjectIn(listing: readonly FactoryListing[], home: string, name: string, ref: LibraryRef, recorded: boolean) {
   const held = libraryOrigin(home, ref);
-  const own = ownOrigins(home, name, ref);
+  const own = ownOrigins(listing, name, ref);
   const state = libraryAddState([...own, ...(held === undefined ? [] : [held])]);
   const shadowedBy = state === 'shadowed' ? own[0] : undefined;
   return {
@@ -202,6 +224,16 @@ export function libraryAddObject(home: string, name: string, ref: LibraryRef, re
 }
 
 /**
+ * The add `ref` of the factory `name` as an object, with what it is there, the factories read through the Factory door.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param ref The add.
+ * @param recorded Whether the factory's adds are its record's.
+ */
+export const libraryAddObject = (home: string, name: string, ref: LibraryRef, recorded: boolean) =>
+  Effect.map(listedAt(home), (listing) => addObjectIn(listing, home, name, ref, recorded));
+
+/**
  * The add named `addname`, `<kind>.<name>`, read as a reference; undefined where it names no kind of the library.
  * @param addname The add's object name.
  */
@@ -222,15 +254,21 @@ export function refOf(addname: string) {
  * @param does Whether the item is added or its add taken off.
  * @param ref The item.
  */
-export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remove', ref: LibraryRef) {
-  const { adds } = factoryAdds(home, name);
+export const writeLibraryAdd = Effect.fn('writeLibraryAdd')(function* (
+  home: string,
+  name: string,
+  does: 'add' | 'remove',
+  ref: LibraryRef,
+) {
+  const listing = yield* listedAt(home);
+  const { adds } = addsIn(listing, home, name);
   const added = adds.some((a) => sameAdd(a, ref));
   const refused = libraryAddRefusal(does, libraryOrigin(home, ref) !== undefined, added);
-  if (refused !== null) throw new Missing({ message: refused.message });
+  if (refused !== null) return yield* Effect.fail(new Missing({ message: refused.message }));
   const now = does === 'add' ? (added ? adds : [...adds, ref]) : adds.filter((a) => !sameAdd(a, ref));
-  writeLibraryAdds(home, name, now);
-  return libraryAddObject(home, name, ref, true) satisfies LibraryAdd;
-}
+  yield* tried(() => writeLibraryAdds(home, name, now));
+  return addObjectIn(listing, home, name, ref, true) satisfies LibraryAdd;
+});
 
 /**
  * The factories that use the library item `ref`: each whose adds hold it (its record, else derived from the steps it fills), `default`
@@ -238,24 +276,25 @@ export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remov
  * @param home The store's root.
  * @param ref The item, or a workflow by its name.
  */
-export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }) {
-  const factories = doorAtOnce(home, (door) => door.factories.listed()).filter((f): f is Factory & { file: string } => !('error' in f));
-  if (ref.kind === 'Workflow')
-    return factories
-      .filter((f) => f.workflows.includes(ref.name))
-      .map((f) => f.name)
+export const libraryUsers = (home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }) =>
+  Effect.map(listedAt(home), (listing) => {
+    const factories = listing.filter((f): f is Factory & { file: string } => !('error' in f));
+    if (ref.kind === 'Workflow')
+      return factories
+        .filter((f) => f.workflows.includes(ref.name))
+        .map((f) => f.name)
+        .sort();
+    const libraryRef = ref;
+    return [DEFAULT_NAMESPACE, ...factories.map((f) => f.name)]
+      .filter((name) => {
+        try {
+          return addsIn(listing, home, name).adds.some((a) => sameAdd(a, libraryRef));
+        } catch {
+          return false;
+        }
+      })
       .sort();
-  const libraryRef = ref;
-  return [DEFAULT_NAMESPACE, ...factories.map((f) => f.name)]
-    .filter((name) => {
-      try {
-        return factoryAdds(home, name).adds.some((a) => sameAdd(a, libraryRef));
-      } catch {
-        return false;
-      }
-    })
-    .sort();
-}
+  });
 
 /**
  * Each factory's library adds as the tick's pass reads them, for the feed (`addsLines`): for `default` and every factory that records its
@@ -263,20 +302,21 @@ export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'W
  * words the fix, since it gates every name. A factory with no record is left out: its adds are what it runs.
  * @param home The store's root.
  */
-export function addsMissingNow(home: string) {
-  const listed = doorAtOnce(home, (door) => door.factories.listed()).flatMap((f) => ('error' in f ? [] : [f.name]));
-  return [...new Set([DEFAULT_NAMESPACE, ...listed])].flatMap((factory) => {
-    let adds: readonly LibraryRef[] | undefined;
-    try {
-      adds = readLibraryAdds(home, factory);
-    } catch (e) {
-      return [{ factory, missing: true, message: e instanceof Error ? e.message : String(e) }];
-    }
-    if (adds === undefined) return [];
-    const fixes = adds.flatMap((ref) => libraryAddObject(home, factory, ref, true).status.message ?? []);
-    return [{ factory, missing: fixes.length > 0, ...(fixes.length > 0 && { message: fixes.join(' ') }) }];
+export const addsMissingNow = (home: string) =>
+  Effect.map(listedAt(home), (listing) => {
+    const listed = listing.flatMap((f) => ('error' in f ? [] : [f.name]));
+    return [...new Set([DEFAULT_NAMESPACE, ...listed])].flatMap((factory) => {
+      let adds: readonly LibraryRef[] | undefined;
+      try {
+        adds = readLibraryAdds(home, factory);
+      } catch (e) {
+        return [{ factory, missing: true, message: e instanceof Error ? e.message : String(e) }];
+      }
+      if (adds === undefined) return [];
+      const fixes = adds.flatMap((ref) => addObjectIn(listing, home, factory, ref, true).status.message ?? []);
+      return [{ factory, missing: fixes.length > 0, ...(fixes.length > 0 && { message: fixes.join(' ') }) }];
+    });
   });
-}
 
 /**
  * The library's MCP servers the factory `name` has added, by name: the person's record of each, else Nemia's builtin of that name. None
@@ -343,7 +383,7 @@ export const libraryAddWritten = (factory: string, does: 'add' | 'remove', addna
       return yield* Effect.fail(
         new Missing({ message: `${addname} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
       );
-    return yield* tried(() => writeLibraryAdd(home, factory, does, ref));
+    return yield* writeLibraryAdd(home, factory, does, ref);
   }) satisfies Effect.Effect<LibraryAdd, Refusal, StoreRoot>;
 
 /**
@@ -353,10 +393,11 @@ export const libraryAddWritten = (factory: string, does: 'add' | 'remove', addna
  * @param query The list's query: its selector, limit and token.
  */
 export const libraryAddList = Effect.fn('libraryAddList')(function* (home: string, name: string, query: ObjectQuery) {
-  const { recorded, adds } = factoryAdds(home, name);
+  const listing = yield* listedAt(home);
+  const { recorded, adds } = addsIn(listing, home, name);
   const listed: LibraryAddList = yield* objectsListed(
     'LibraryAdd',
-    adds.map((ref) => libraryAddObject(home, name, ref, recorded)),
+    adds.map((ref) => addObjectIn(listing, home, name, ref, recorded)),
     query,
     'library add',
   );
@@ -369,12 +410,15 @@ export const libraryAddList = Effect.fn('libraryAddList')(function* (home: strin
  * @param name The factory's name, `default` among them.
  * @param addname The add's object name, `<kind>.<name>`.
  */
-export function libraryAddNamed(home: string, name: string, addname: string) {
+export const libraryAddNamed = Effect.fn('libraryAddNamed')(function* (home: string, name: string, addname: string) {
   const ref = refOf(addname);
-  const { recorded, adds } = factoryAdds(home, name);
+  const listing = yield* listedAt(home);
+  const { recorded, adds } = addsIn(listing, home, name);
   if (ref === undefined || !adds.some((a) => sameAdd(a, ref)))
-    throw new Missing({
-      message: `${name} has no add ${addname}: list them with GET /api/namespaces/${name}/libraryadds, or add it with nemia library add.`,
-    });
-  return libraryAddObject(home, name, ref, recorded) satisfies LibraryAdd;
-}
+    return yield* Effect.fail(
+      new Missing({
+        message: `${name} has no add ${addname}: list them with GET /api/namespaces/${name}/libraryadds, or add it with nemia library add.`,
+      }),
+    );
+  return addObjectIn(listing, home, name, ref, recorded) satisfies LibraryAdd;
+});

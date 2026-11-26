@@ -120,6 +120,7 @@ function planted(src: Side, template = templateFolder()) {
     ]),
   );
   done(src.factories.level.write(NAME, { level: 'auto', since: SINCE }));
+  done(src.factories.servers.write(NAME, { docs: { type: 'sse', url: 'https://docs.example/mcp' } }));
   done(src.cards.cards.add(CardName.read('add-a-flag-c3d4'), aCard('Add a flag', { workflow: 'build', factory: 'shop', queued: SINCE })));
   done(src.cards.cards.add(CardName.read('started-e5f6'), aCard('Started already', { workflow: 'build', factory: 'shop' })));
   done(src.cards.cards.add(CardName.read('elsewhere-a1b2'), aCard('Not this one', { workflow: 'build', factory: 'other' })));
@@ -174,7 +175,7 @@ describe('the export reads the source whole and writes nothing of it', () => {
     assert.deepEqual(exp.stays, ['proposals', 'delegations']);
     assert.deepEqual(
       unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files.map((f) => f.path),
-      ['applied/factory.json', 'level.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
+      ['applied/factory.json', 'level.json', 'servers.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
     );
   });
   test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
@@ -230,11 +231,17 @@ describe('the import files the factory on the target, clones its repositories, a
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
     assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
   });
-  test('its tree’s edits and its level, and none of what stays', () => {
+  test('its tree’s edits, its level and its servers as records of the target, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));
     const implement = files.find((f) => f.path === 'tree/workflows/press/implement.md');
     assert.equal(new TextDecoder().decode(implement?.bytes), '---\n---\nBuild it, edited.\n');
     assert.deepEqual(done(dst.factories.level.read(NAME)), { level: 'auto', since: SINCE });
+    assert.deepEqual(done(dst.factories.servers.read(NAME)), { docs: { type: 'sse', url: 'https://docs.example/mcp' } });
+    assert.deepEqual(
+      files.filter((f) => f.path === 'level.json' || f.path === 'servers.json'),
+      [],
+      'neither is a file of the folder it was packed with',
+    );
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
   });
   test('its places are all untrusted, for the person to trust', () => {

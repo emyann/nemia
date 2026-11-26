@@ -3567,10 +3567,10 @@ $ wf factory detach pipao build
 $ wf factory rm pipao
 ```
 
-- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
-  all included; its name is the file's. `wf factory
-  add` writes it whole to a hidden file and links it onto its name, so a reader never sees half of one and two adds of one
-  name file one. A key beside `volumes` is kept when the file is read; a file
+- **A factory is the record `/registry/factories/<name>`** (the file `$WF_ROOT/factories/<name>.json` of before is imported once), `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
+  all included; its name is the record's. `wf factory
+  add` creates it whole, so a reader never sees half of one and two adds of one
+  name file one. A key beside `volumes` is kept when the record is read; a file
   an earlier release wrote, with `repos` and `origins`, is moved into volumes once, when the daemon starts.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
   `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
@@ -4968,7 +4968,7 @@ for the same reason, and so does the `wf` command.
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`, and `inputs/cards/` for `--card`) and `artifacts/<step>/`, each mounted read-only on the steps of a run handed this one (`--from`); a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
-| `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
+| `factories/` | a factory each, the record `/registry/factories/<name>` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, `stoppedAt` once it stopped, and what its engine holds and serves (`holder`, never a secret) (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |

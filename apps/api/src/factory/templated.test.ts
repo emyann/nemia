@@ -18,7 +18,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { addFactory, BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
+import { BuiltinTemplates, addFactory, factoryText, testPlace } from 'agent-orchestrator/testing';
 import { reconcileOnce, sentTemplatesDir, StoreRoot, templateGiven } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
@@ -90,8 +90,7 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
 
 /** The factory's file as it is on disk, or null where there is none: what a refusal must leave as it was. */
 const fileOf = (name: string) => {
-  const file = path.join(root, 'factories', `${name}.json`);
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  return factoryText(root, name) ?? null;
 };
 
 /** That `res` was refused with `status`, and the factory `name`'s file is as it was before. */

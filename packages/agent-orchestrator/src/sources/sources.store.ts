@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Missing } from '../refusal/refusal.ts';
-import { knownReposAt } from '../folder/write.store.ts';
+import { knownIn } from '../folder/known.store.ts';
 import { Effect, Result } from 'effect';
 import { repositoryRoots, sourceSkills } from '../agents/read.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
@@ -65,7 +65,7 @@ export const agentSources = Effect.fn('agentSources')(function* ({
       new Missing({ message: `${named} is not a folder: name the folder that holds the agent files, <folder>/<name>.md.` }),
     );
   const sources: AgentSource[] = [];
-  for (const repo of [...knownReposAt(home)].sort())
+  for (const repo of [...(yield* knownIn(home)).repos].sort())
     for (const root of repositoryRoots(repo)) sources.push(...(yield* sourcesIn('repository', repo, path.join(root, AGENTS_FOLDER), home)));
   sources.push(...(yield* sourcesIn('library', null, yoursOf('agents', home), home)));
   for (const folder of kept)

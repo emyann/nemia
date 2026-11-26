@@ -89,6 +89,8 @@ erDiagram
     object pruned "optional"
     object hold "optional"
     object unheld "optional"
+    object assignee "optional"
+    object unassigned "optional"
     object pause "optional"
     list pinned "optional"
     string createdAt
@@ -136,6 +138,8 @@ erDiagram
     object pruned "optional"
     object hold "optional"
     object unheld "optional"
+    object assignee "optional"
+    object unassigned "optional"
     object pause "optional"
     list pinned "optional"
     string createdAt

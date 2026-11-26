@@ -69,7 +69,7 @@ export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => ru
  * Not once it is cancelled: a cancelled run waits on nobody, whatever its steps last said.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
-export const asksOfAPerson = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
+const asksOfAPerson = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**

@@ -276,10 +276,10 @@ describe('reasonOf names a reason for every word the package writes, only of a k
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
     assert.equal(
       entries.length,
-      58,
-      "the table the owner named has 58 entries: a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stalled wait two more (CardWaitStalled, CardWaitFreed)",
+      61,
+      "the table the owner named has 61 entries: a run's assignee adds three (AssigneePut, AssigneeGivenBack, AssigneeLapsed), a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stalled wait two more (CardWaitStalled, CardWaitFreed)",
     );
-    assert.equal(REASON_CODES.length, 47, 'of 47 distinct codes');
+    assert.equal(REASON_CODES.length, 50, 'of 50 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

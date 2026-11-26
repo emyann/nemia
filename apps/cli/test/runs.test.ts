@@ -245,7 +245,7 @@ test('nemia assign puts a run in hand, a second refused while it stands, and --o
   assert.deepEqual([JSON.parse(fs.readFileSync(file, 'utf8')).name, JSON.parse(fs.readFileSync(file, 'utf8')).forMs], ['ann', 7_200_000]);
   assert.match(put.out, new RegExp(`nemia assign ${id} --off`));
   const again = await store.nemia(['assign', id]);
-  assert.equal(again.code, 2, again.out);
+  assert.equal(again.code, 1, `a Conflict exits 1: ${again.out}${again.err}`);
   const back = await store.nemia(['assign', id, '--off']);
   assert.equal(back.code, 0, back.err);
   assert.equal(fs.existsSync(file), false);

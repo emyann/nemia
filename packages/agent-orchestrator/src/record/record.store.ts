@@ -476,7 +476,8 @@ function readUnassigned(home: string, id: string) {
  * @param id The run's id.
  * @param said How long an ask may wait on them, who they are, why, and the caller who put it.
  */
-export const writeAssignee = (home: string, id: string, { forMs, name, why, actor }: Omit<Assignee, 'at'>) => {
+export const writeAssignee = (home: string, id: string, said: Omit<Assignee, 'at'>) => {
+  const { forMs, name, why, actor } = said;
   fs.mkdirSync(runsDir(home), { recursive: true });
   const assignee: Assignee = {
     at: new Date().toISOString(),

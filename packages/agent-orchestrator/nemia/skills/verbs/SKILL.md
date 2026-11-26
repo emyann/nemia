@@ -547,7 +547,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                question, a retry, a budget, a hold only a person ends — is theirs to
                                answer, and leaves waiting on you, the bell and the counts, until they
                                give it back (--off), the run is over, or an ask waits on them past
-                               their time, when it is yours again. Nothing is refused because of it:
+                               their time, when it waits on you again. Nothing is refused because of it:
                                anyone may still answer. nemia ls says assigned to <name>. Refused of a
                                run cancelled, pruned or over, and of one someone already has in hand.
                                --to: who has it (default: your OS user); --why: the reason;

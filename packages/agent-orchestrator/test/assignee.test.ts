@@ -75,6 +75,9 @@ const summaryOf = async (b: Board, id: string) => {
   assert.ok(one, `${id} is listed`);
   return one;
 };
+/** `b`'s engine for a whole pass: its own tick quiet, and no tally of the pass, which the stand-in keeps neither of. */
+const quiet = (b: Board) => Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 /** Refused by kind and exit 2. */
 const refusedAs = (tag: string) => (err: Error & { exitCode?: number; _tag?: string }) => {
   assert.equal(err._tag, tag, err.message);
@@ -157,10 +160,10 @@ test('the tick ends an assignee whose ask waited past its time, on its first pas
   const b = stage.board();
   const run = await atItsGate(b, aRepo(), 'left at its gate');
   await assignTyped(run.id, '--for', '1s');
-  vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 7_200_000 });
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(String(readFile(run.id, 'assignee').at)) + 7_200_000 });
   try {
     assert.equal((await summaryOf(b, run.id)).assignee, null, 'a read serves none once its time ran out, before any pass');
-    await stage.runWith(b.e, tickRun());
+    await stage.runWith(quiet(b), tickRun());
   } finally {
     vi.useRealTimers();
   }
@@ -173,7 +176,7 @@ test('the tick ends an assignee whose run is over, and its receipt says it ended
   const run = await atItsGate(b, aRepo(), 'assigned then called off');
   await assignTyped(run.id);
   await stage.runWith(b.e, cancelRun(run.id));
-  await stage.runWith(b.e, tickRun());
+  await stage.runWith(quiet(b), tickRun());
   assert.equal(fs.existsSync(fileOf(run.id, 'assignee')), false);
   assert.equal(readFile(run.id, 'unassigned').how, 'ended');
 });

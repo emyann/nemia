@@ -3,7 +3,7 @@ title: Proposals
 description: How an agent changes a factory's definitions - the agent proposes, you approve (or, at auto, an agent you delegated to does), and Nemia applies the change when it is due.
 ---
 
-A proposal is a change to a factory's definitions, made in one step. It carries the same objects `nemia apply -f` takes, each read at
+A proposal is a change to a factory's definitions, made all at once. It carries the same objects `nemia apply -f` takes, each read at
 the version it changes, and writes them all together once the change is approved. It is how an agent changes what a factory is made
 of. An agent never writes a definition itself: the commands that would (`nemia factory hire`, `nemia agents write`, and the others
 that write a factory's definitions) are out of its reach, so it proposes instead.
@@ -86,8 +86,8 @@ The tick acts on every approved proposal on each pass, so a proposal waiting on 
 ## Undo
 
 Whatever was applied stays. To reverse it, propose the objects as they were before. Nemia keeps them on the proposal
-(`status.before`), and the client builds that proposal for you: each object restored at its current version, and each object the
-proposal created deleted. The undo is a proposal like any other, and waits for approval.
+(`status.before`), and the client builds that proposal for you: each object's earlier contents, proposed against its current
+version, and each object the proposal created, deleted. The undo is a proposal like any other, and waits for approval.
 
 ```bash
 nemia propose --undo ada-k3x9q -n pipao

@@ -100,8 +100,8 @@ The inbox, the Card's `status.waitingOn`, and the board list a waiting card with
 and that card's state. This is read on every pass, and nothing is written on the card. A wait that only a person can release is
 **stalled**. That happens when a name is unknown to the store, when `after:` lines form a cycle, or when a card's run ended without
 landing or its start was refused. The inbox line says so and gives the fix, and the feed says so once when the stall begins and once
-when it clears. To fix it, send the card on, change this card's `after:`, or start this card by hand. Starting a waiting card by hand
-always works, and Nemia tells you which cards had not landed yet.
+when it clears. To fix it, send the card on, change this card's `after:`, or start this card by hand. You can still start a waiting card
+by hand: the wait doesn't block it, and the start lists the cards that have not landed yet.
 
 ## Who writes what
 

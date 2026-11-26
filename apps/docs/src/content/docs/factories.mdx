@@ -46,7 +46,7 @@ nemia factory volume rm pipao /home/me/notes
   must be a git repository, or inside one.
 - **A read-only volume** is a folder that every local step of a run in the factory can read, alongside its repositories. It never
   makes the factory work on that folder: it doesn't change which factory a start, card, or schedule lands in. Rejected: a path that
-  isn't a directory, one of the factory's repositories, and a folder at or inside Nemia's store (except a clone Nemia made).
+  isn't a directory, one of the factory's repositories, and a folder at or inside Nemia's store (except this volume's own clone, when you add it by URL).
 - **A factory can have no volume.** It is created, but every start in it is rejected, with a pointer to
   `nemia factory volume add <factory> <path|url>:rw`, until it has a repository to work on.
 - A run copies the volumes when it starts, so a later change only affects runs started after it. If a step's harness can't mount a
@@ -67,7 +67,7 @@ nemia factory volume rm pipao /home/me/notes
 When you give a factory a writable volume (`nemia factory add`, `nemia factory apply`, `nemia factory volume add`), Nemia trusts it
 for the harness its steps run on, right then. For Claude Code, that is the folder's entry in Claude Code's own configuration file, at
 the repository's root. Without that trust, the harness ignores the allow rules in the folder's own project settings, and a step is
-refused commands the repository meant to allow. The command prints the location, what the trust grants, and how to revoke it.
+denied commands the repository meant to allow. The command prints the location, what the trust grants, and how to revoke it.
 `--no-trust` adds the volume without it. If a location isn't trusted (because it was added earlier, opted out, or revoked),
 `nemia factory` and the factory's page say so, with the command that trusts it: `nemia factory trust <name>`. When a run's calls are
 denied in such a location, the message points to it as the likely cause.
@@ -128,7 +128,8 @@ Each attached workflow works on one of the factory's repositories, named by the 
 `nemia factory attach pipao build --repo pipao`. A factory with one repository doesn't need the name: its workflows work on that one.
 A factory with several repositories rejects starting a workflow that has none named, and gives the attach command that names one
 (`workflowRepo`). Attaching an already attached workflow again with `--repo` changes its repository. The name is kept in the
-factory's own file, or in its tree's wiring if it was applied from a template, so an upgrade keeps it.
+factory's own file, or, if it was applied from a template, in the file of its tree that records its attached workflows
+and hires, so an upgrade keeps it.
 
 A card names its factory and its workflow, never a repository. Its run (and a brief's) works on the repository the factory names for
 that workflow, whatever folder you start it from. A brief's `--repo` only selects the factory, and the start tells you when the run
@@ -200,8 +201,8 @@ container picks up a newer image:
 Either way, a run that hasn't started any step yet picks up the current files when it starts its first one.
 
 - `nemia factory revisions <name> follow` (or `pinned`) sets it, and `nemia factory ls` shows it under the factory.
-- A factory created from a template sets it in its manifest, as `spec.revisions`, which the render writes into its tree's wiring.
-  `nemia factory revisions` writes the wiring afterwards.
+- A factory created from a template sets it in its manifest, as `spec.revisions`, which the render writes into the file of its tree
+  that records its attached workflows and hires. `nemia factory revisions` writes that file afterwards.
 - The daemon reads it on every pass, so a run in progress picks up a change at its next step start.
 
 ## Change a template's parameter

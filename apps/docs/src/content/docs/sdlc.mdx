@@ -42,7 +42,7 @@ fence blocks edits to your store's factories, workflows, and inbox.
   it, with no gate at the landing.
 - **quick** takes a card that fully specifies its change to your base branch: an implementation, then a review whose approval lands
   it, with no gate.
-- **janitor** runs on demand. It reads the factory's stats and files what it proposes as cards in your inbox, without starting any.
+- **janitor** runs on demand. It reads the factory's stats and adds what it proposes as cards to your inbox, without starting any.
 
 In build and quick:
 
@@ -200,8 +200,8 @@ Once the daemon has rendered the factory, its tree is yours to change. Four comm
   form of `gh` except a tool's help. Allowing `gh` in your settings would reach every read-only agent, so leave it out.
 - **Commit before a landing.** In both modes, the landing runs in your checkout, on your base branch. It refuses a checkout with
   uncommitted changes before merging anything, and leaves those changes as they are. On GitHub, its script rejects changes to tracked
-  files. In your checkout, the land step checks first, as the git place's _Stage a landing_ explains, and signs off blocked with
-  nothing staged. Commit the changes or set them aside, then retry the step. A run starts from your checkout's last commit, so
+  files. In your checkout, the land step checks first, as the git place's _Stage a landing_ explains, and stops,
+  marked blocked, without staging anything. Commit the changes or set them aside, then retry the step. A run starts from your checkout's last commit, so
   uncommitted work isn't included.
 
 ## Sources

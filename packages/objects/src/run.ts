@@ -481,6 +481,31 @@ export const RunHolding = Schema.Struct({
 });
 export type RunHolding = typeof RunHolding.Type;
 
+/** Who has a run in hand (`RunAssignee`, judged.verb.ts), in the package's words. */
+export const RunAssignee = Schema.Struct({
+  at: Schema.String.annotate({ description: 'When the run was assigned (nemia assign), an ISO 8601 time.' }),
+  forMs: describedNumber('How long, in milliseconds, an ask may go unanswered before the run is the person’s move again (--for).'),
+  comesBackAt: NullString.annotate({
+    description:
+      'When the run comes back to the person if what it asks now is not answered, an ISO 8601 time; null while it asks nothing, so nothing is timed.',
+  }),
+  word: Schema.String.annotate({
+    description: 'What nemia ls prints under the run for its assignee: who has it, and when it comes back.',
+  }),
+  name: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Who has the run in hand, by the name given (--to, or the OS user); absent where none was.' }),
+  ),
+  why: Schema.optionalKey(
+    Schema.String.annotate({ description: 'What was said of why (nemia assign --why), at most 200 characters; absent where nothing.' }),
+  ),
+  actor: Schema.optionalKey(Actor),
+}).annotate({
+  identifier: 'RunAssignee',
+  description:
+    'Who has the run in hand (nemia assign): what it asks of a person is theirs to answer until they give it back, the run is over, or an ask waits past their time.',
+});
+export type RunAssignee = typeof RunAssignee.Type;
+
 /** What a person has to decide (`RunToDecide`, judged.verb.ts): an approval at a gate, or the result branches. */
 const RunToDecide = Schema.Union([
   Schema.Struct({
@@ -606,6 +631,10 @@ export const RunStatus = Schema.Struct({
   holding: Schema.NullOr(RunHolding).annotate({
     description:
       'The hold a person put on the run (nemia hold): the runs it waits for and whether it needs a person; null where nobody holds it.',
+  }),
+  assignee: Schema.NullOr(RunAssignee).annotate({
+    description:
+      'Who has the run in hand (nemia assign), and when it comes back to the person; null where nobody does, or their time ran out.',
   }),
   toDecide: Schema.NullOr(RunToDecide).annotate({
     description: 'What a person has to decide of the run now, as nemia decide says it; null where nothing.',

@@ -12,6 +12,7 @@
  */
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
+import { describedNumber } from './meta.ts';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { Paused } from './server-api.ts';
@@ -550,6 +551,43 @@ export const RunHeld = Schema.Struct({
   identifier: 'RunHeld',
 });
 export type RunHeld = typeof RunHeld.Type;
+
+/** A run put in someone's hand, as `nemia assign <run>` puts it: who has it, why, and how long an ask may wait on them. */
+export const RunAssign = Schema.Struct({
+  to: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Who has the run in hand, one line; left out, the OS user of the client that asks.' }),
+  ),
+  why: Schema.optionalKey(Schema.String.annotate({ description: 'The words for why they have it, one line.' })),
+  for: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'How long an ask may wait on them before the run is the person’s move again, as 90s, 10m or 2h (1s to 23h); left out, 1h.',
+    }),
+  ),
+}).annotate({ identifier: 'RunAssign' });
+export type RunAssign = typeof RunAssign.Type;
+
+/** Who has a run in hand, as written: when, for how long an ask may wait on them, who and why. */
+export const RunAssigneeWritten = Schema.Struct({
+  at: Schema.String.annotate({ description: 'When the run was assigned.' }),
+  forMs: describedNumber('How long, in milliseconds, an ask may wait on them before the run comes back.'),
+  name: Schema.optionalKey(Schema.String.annotate({ description: 'Who has it; absent where no name was given or known.' })),
+  why: Schema.optionalKey(Schema.String.annotate({ description: 'The words for why; absent where none were given.' })),
+  actor: Schema.optionalKey(Actor),
+}).annotate({
+  identifier: 'RunAssigneeWritten',
+  description: 'Who has a run in hand, as written: when, how long an ask may wait on them, who and why.',
+});
+export type RunAssigneeWritten = typeof RunAssigneeWritten.Type;
+
+/** What an assignee put or given back answers: the run, whether it was given back, and the assignee. */
+export const RunAssigned = Schema.Struct({
+  id: Schema.String.annotate({ description: "The run's id." }),
+  ended: Schema.Boolean.annotate({ description: 'Whether the run was given back, rather than assigned.' }),
+  assignee: RunAssigneeWritten,
+}).annotate({
+  identifier: 'RunAssigned',
+});
+export type RunAssigned = typeof RunAssigned.Type;
 
 /** A task of a run's that a cancel asked to stop: its step's name and the engine's task. */
 const CancelStopped = Schema.Struct({

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { WaitOn } from 'objects';
 import type { NowStands } from '../contracts/now-chip.contract.ts';
 import { nowStandsOf, waitersOf } from '../src/lib/nowChip.ts';
-import type { StepState } from '../src/lib/status.ts';
+import { type StepState, waitsOnPerson } from '../src/lib/status.ts';
 import { summary } from './run.fixture.ts';
 
 /** Where each state stands on a run nobody holds, waiting on no thing. */
@@ -60,6 +60,12 @@ describe('nowStandsOf: where a step stands, by its state, what it waits on and t
     assert.equal(nowStandsOf('waiting-for-slot', 'limit', true), 'held');
     assert.equal(nowStandsOf('working', null, true), 'atWork');
     assert.equal(nowStandsOf('failed', null, true), 'failed');
+  });
+  test('on a run someone has in hand, a step that waits on a person stands as assigned, and every other as it would; a hold comes first', () => {
+    for (const [state, stands] of Object.entries(STANDS) as Array<[StepState, NowStands]>) {
+      assert.equal(nowStandsOf(state, null, false, true), waitsOnPerson(state, false) ? 'assigned' : stands, state);
+      assert.equal(nowStandsOf(state, null, true, true), nowStandsOf(state, null, true), `${state}, held`);
+    }
   });
 });
 

@@ -1042,6 +1042,25 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
       'the start form says where it stands in the same words',
     );
   });
+  test('a run in someone’s hand waits on nobody else: in flight while it asks, and on you again once given back', () => {
+    const assignee = { at: cancelledAt, forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    const asks = run(['succeeded · BLOCKED', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] });
+    const inHand = { ...asks, assignee };
+    assert.deepEqual([inFlight(inHand), waitsOnYou(inHand), standingOf(inHand)], [true, false, 'in flight']);
+    assert.deepEqual([inFlight(asks), waitsOnYou(asks)], [false, true], 'given back, it waits on you');
+    const held = run(['awaiting approval', 'waiting'], {
+      status: 'running',
+      moving: false,
+      waitingOnYou: [],
+      waiting: null,
+      holdUntil: ['p'],
+      holding: holdingOn(true),
+      assignee,
+    });
+    assert.deepEqual([inFlight(held), waitsOnYou(held)], [true, false], 'a hold only a person lifts, in hand');
+    const done = run(['verified ✓'], { status: 'succeeded', assignee });
+    assert.deepEqual([inFlight(done), waitsOnYou(done)], [false, false], 'an assignee keeps no finished run in flight');
+  });
 });
 
 describe('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finished runs included', () => {

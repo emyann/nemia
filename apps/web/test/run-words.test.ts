@@ -290,6 +290,13 @@ describe('ENDED, whenWords, presentWait: how a run ended, and when, in plain wor
 });
 
 describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its steps', () => {
+  test('a run at its gate in someone’s hand says its ask, then who has it, and is drawn as theirs, not yours', () => {
+    const gate = summary([['land', 'awaiting approval']], { waitingOnYou: ['land'] });
+    const assignee = { at: '2026-11-01T00:00:00.000Z', forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    const inHand = nowOf({ ...gate, assignee });
+    assert.deepEqual(inHand?.words, [...(nowOf(gate)?.words ?? []), NOW_WORDS.inHand('ann')], 'the ask as it was, and who has it');
+    assert.notEqual(inHand?.tone, nowOf(gate)?.tone, 'drawn apart from a step that waits on you');
+  });
   test('the rail says each step and its word, in the run’s order', () => {
     const mixed = summary([
       ['design', 'verified ✓'],

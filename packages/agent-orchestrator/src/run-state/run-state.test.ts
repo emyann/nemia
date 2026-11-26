@@ -23,6 +23,7 @@ const listed = (more: Partial<Listed> = {}) => ({
   holding: null,
   atWork: { endedAt: at(10, 30) },
   toDecide: null,
+  assignee: null,
   ...more,
 });
 
@@ -41,6 +42,15 @@ test('a run is waiting where the bell counts it, though it still moves; in fligh
   assert.equal(kindOf(listed({ status: 'running', moving: true, holding: { waitingOnYou: false } })), 'inFlight', 'a hold that may lift');
   assert.equal(kindOf(listed()), 'finished');
   assert.equal(kindOf(listed({ status: 'failed' })), 'finished');
+});
+
+test('a run in someone’s hand waits on nobody else: in flight while it asks, waiting again once given back, and finished where it asks nothing', () => {
+  const hand = { assignee: { at: at(10, 40) } };
+  assert.equal(kindOf(listed({ ...hand, status: 'failed', waitingOnYou: ['plan'] })), 'inFlight', 'a step at its gate, in hand');
+  assert.equal(kindOf(listed({ ...hand, status: 'running', holding: { waitingOnYou: true } })), 'inFlight', 'a hold, in hand');
+  assert.equal(kindOf(listed({ ...hand, status: 'running', waiting: { waitingOnYou: true } })), 'inFlight', 'a wait, in hand');
+  assert.equal(kindOf(listed({ status: 'failed', waitingOnYou: ['plan'] })), 'waiting', 'given back, it waits on you again');
+  assert.equal(kindOf(listed(hand)), 'finished', 'an assignee keeps no finished run in flight');
 });
 
 test('REFUSED as waiting: a cancelled run whose step waited, and a finished run whose result nobody decided', () => {

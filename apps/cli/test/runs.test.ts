@@ -237,6 +237,20 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
   assert.ok(kept.out.includes('mind the cache'), kept.out);
 });
 
+test('nemia assign puts a run in hand, a second refused while it stands, and --off gives it back', async () => {
+  const id = await started('Assign me.');
+  const file = path.join(store.root, 'runs', `${id}.assignee`);
+  const put = await store.nemia(['assign', id, '--to', 'ann', '--why', 'reading it', '--for', '2h']);
+  assert.equal(put.code, 0, put.err);
+  assert.deepEqual([JSON.parse(fs.readFileSync(file, 'utf8')).name, JSON.parse(fs.readFileSync(file, 'utf8')).forMs], ['ann', 7_200_000]);
+  assert.match(put.out, new RegExp(`nemia assign ${id} --off`));
+  const again = await store.nemia(['assign', id]);
+  assert.equal(again.code, 2, again.out);
+  const back = await store.nemia(['assign', id, '--off']);
+  assert.equal(back.code, 0, back.err);
+  assert.equal(fs.existsSync(file), false);
+});
+
 test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and of a run with no record, what was left under its id', async () => {
   const id = await started('Cancel me.');
   const cancelled = await store.nemia(['cancel', id]);

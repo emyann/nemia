@@ -293,7 +293,11 @@ spend that needs a person's word is `yours`.
   where nothing failed does not show it.
 - **Rest** is the label's grey, with black ink, for what is at rest: a
   count, a clock, a finished run. A step that is done, a check that runs
-  and a wait on another run are a filled `outline`, a cool grey.
+  and a wait on another run are filled in sage, rest's own cool grey,
+  its tint and not a fifth meaning, written beside the theme as the four
+  are (`--meaning-sage`): `#9aa3ad`, ink `#0c0d0e` dark; `#6b6e72`, ink
+  `#ffffff` light. It is no `outline`, which is a line and too light
+  under white ink.
 
 ### The names the board writes
 

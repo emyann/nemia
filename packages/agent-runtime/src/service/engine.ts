@@ -100,7 +100,7 @@ import { fallbackOf, verbHarnessIn } from './verb-harness.ts';
 import { wordsOf } from './written-verb.ts';
 import { takersOf, type HarnessDeclared, type VerbHarness } from '../harness/declaration.ts';
 import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
-import { McpSignInRefused, mcpSignInVerbsOf, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
+import { McpSignInRefused, mcpSignInVerbsOf, type McpSignedOut, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, type Attached } from '../harness/claude/index.ts';
 import { liftHolderDrain, liftSessionDrain, putSessionDrain } from '../core/engine/drain.ts';
@@ -429,33 +429,39 @@ export type EngineShape = {
    */
   readonly mcpState: (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;
   /**
-   * A sign-in to `name`, a remote server with an OAuth client and a callback port, started on Claude Code
-   * (`service/mcp-sign-in.ts`): where `clientSecret` is handed, it is stored in Claude Code's own store first, by a `claude mcp add
-   * --scope local` child run under this engine's root with the secret in its environment alone; then a session is held with the
-   * server inline and asked to authenticate it, and the address the person opens is answered at once, with when the sign-in stops
-   * waiting. The session is held in this engine's memory until the server reads `connected` or `SIGN_IN_MS` passes. No task is
-   * touched and nothing is journalled.
+   * A sign-in to `name`, a remote server with an OAuth client, started (`service/mcp-sign-in.ts`). The road is chosen from what its
+   * provider advertises (`routeOf`): by a code (`route: 'device'`), answered at once with the code to type, the provider's page to
+   * type it at and when it stops being good, the engine polling the provider for the token, holding it in its own store and handing it
+   * to every session as the server's `Authorization` header, refreshed with no person present; or by the browser (`route: 'browser'`),
+   * Claude Code's own sign-in, answered with the address the person opens and when the sign-in stops waiting, which needs a callback
+   * port. The sign-in is held in this engine's memory until the server reads `connected`, the person cancels it (`mcpSignOut`) or its
+   * time passes. No task is touched and nothing is journalled.
    *
-   * Refused — `McpSignInRefused` — for a server with no OAuth client or callback port, an engine with no Claude Code harness, a CLI that
-   * did not store the secret, and (`held: true`) a callback port another sign-in still waits on.
+   * Refused — `McpSignInRefused` — for a server with no OAuth client (or, by the browser, no callback port), an engine with no Claude
+   * Code harness, a provider that could not be asked or gave no code, and (`held: true`) a sign-in to the server that still waits, or a
+   * callback port another browser sign-in still waits on.
    */
-  readonly mcpSignIn: (name: string, server: RemoteMcpServer, clientSecret?: string) => Effect.Effect<McpSignInStarted, McpSignInRefused>;
-  /** The state of `name`'s last sign-in asked of this engine, from memory, spawning nothing: `none` where none was asked. */
+  readonly mcpSignIn: (name: string, server: RemoteMcpServer) => Effect.Effect<McpSignInStarted, McpSignInRefused>;
+  /**
+   * The state of `name`'s last sign-in asked of this engine, from memory, spawning nothing: `none` where none was asked, or where this
+   * engine restarted since. While one waits it carries what the sign-in answered (`started`), so a page opened later draws it again.
+   */
   readonly mcpSignInState: (name: string) => Effect.Effect<McpSignInState>;
   /**
-   * The address a person's browser was sent back to once they approved `name`'s sign-in, pasted where the browser runs on another
-   * machine than this engine, handed to the waiting sign-in's session (`mcpSubmitOAuthCallbackUrl`); the sign-in then settles as it
-   * would have had the browser reached the callback port, and its state is answered as it stands. The address is put in no refusal and
-   * no log. Refused — `McpSignInRefused`, its `callback` saying why — where no sign-in to `name` waits (`none-waiting`), and where the
-   * address is not that sign-in's redirect with a code and a state (`callbackRefusal`), nothing handed on.
+   * The address a person's browser was sent back to once they approved `name`'s sign-in by the browser, pasted where the browser runs
+   * on another machine than this engine, handed to the waiting sign-in's session (`mcpSubmitOAuthCallbackUrl`); the sign-in then
+   * settles as it would have had the browser reached the callback port, and its state is answered as it stands. The address is put in
+   * no refusal and no log. Refused — `McpSignInRefused`, its `callback` saying why — where no sign-in to `name` waits (`none-waiting`),
+   * and where the address is not that sign-in's redirect with a code and a state (`callbackRefusal`), nothing handed on.
    */
   readonly mcpSignInCallback: (name: string, url: string) => Effect.Effect<McpSignInState, McpSignInRefused>;
   /**
-   * `name`'s sign-in cleared from Claude Code's store — its token and its stored secret, by `claude mcp remove --scope local` in the
-   * folder its sign-in added it in — so a session handed the same bytes reads `needs-auth`. Refused as `mcpSignIn` is, and (`held:
-   * true`) while a sign-in to it waits.
+   * `name`'s sign-in ended: a waiting one, by a code or by the browser, is cancelled (`ended: 'cancelled'`) and its state reads `none`;
+   * otherwise the token this engine holds is removed, or Claude Code's sign-in cleared from its store (`claude mcp remove --scope
+   * local`, in the folder its sign-in added it in), so a session handed the same bytes reads `needs-auth` (`ended: 'signed-out'`).
+   * Refused as `mcpSignIn` is.
    */
-  readonly mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ readonly signedOut: true }, McpSignInRefused>;
+  readonly mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<McpSignedOut, McpSignInRefused>;
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts

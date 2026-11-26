@@ -90,7 +90,7 @@ export const declaredVerbsOf = (
       mcpStateRefusal(servers) === undefined && !mcp
         ? Effect.fail(new McpStateRefused({ message: noMcpHarness(declared) }))
         : kept.mcpState(servers),
-    mcpSignIn: (name, server, secret) => signIn(() => kept.mcpSignIn(name, server, secret), mcpStateRefusal({ [name]: server })),
+    mcpSignIn: (name, server) => signIn(() => kept.mcpSignIn(name, server), mcpStateRefusal({ [name]: server })),
     mcpSignInState: kept.mcpSignInState,
     mcpSignInCallback: kept.mcpSignInCallback,
     mcpSignOut: (name, server) => signIn(() => kept.mcpSignOut(name, server), mcpStateRefusal({ [name]: server })),

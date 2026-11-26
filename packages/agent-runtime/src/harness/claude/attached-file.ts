@@ -355,8 +355,11 @@ export const everyRun = (root: string) => {
   >;
 };
 
-/** The spawn as a run file keeps it: everything but the brief, which a resume does not say again. */
-export const keptRequest = ({ brief: _, ...kept }: SpawnRequest) => kept;
+/**
+ * The spawn as a run file keeps it: everything but the brief, which a resume does not say again, and the held tokens, which a run
+ * file (written without an owner-only mode) must not hold: a resume spawns again through `tokened`, which hands the then-held ones.
+ */
+export const keptRequest = ({ brief: _, mcpTokens: __, ...kept }: SpawnRequest) => kept;
 
 /** This process, as a run file names its holder: its pid, when it started, and the code it runs (`IMAGE`). */
 export const thisHolder = () => {

@@ -66,6 +66,7 @@ export type {
   EngineShape,
   ForgetReport,
   KeptReport,
+  McpSignedOut,
   McpSignInStarted,
   McpSignInState,
 } from './service/index.ts';

@@ -39,7 +39,7 @@ import { declaredVerbsOf, TEST_HARNESS, testHarnesses, testHarnessesOf, unkeptVe
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import type { TaskSpec } from './options.ts';
-import type { McpSignInState } from './mcp-sign-in.ts';
+import type { McpSignInStarted, McpSignInState } from './mcp-sign-in.ts';
 import { keptVerbOf, type TestKeeps } from './test-kept.ts';
 import { mcpHeld, type TestMcpState } from './test-mcp-state.ts';
 import { signInHeld } from './test-sign-in.ts';
@@ -347,8 +347,8 @@ export type TestEngine = {
   readonly plantMcpState: (name: string, state: TestMcpState) => void;
   /** Makes every `mcpState` read a look that failed, with `why`; `undefined` lets them read again. */
   readonly failMcpState: (why: string | undefined) => void;
-  /** Each `mcpSignIn` asked and not refused, in order: the server's name, and whether a client secret was handed — never its value. */
-  readonly signIns: Array<{ readonly name: string; readonly secret: boolean }>;
+  /** Each `mcpSignIn` asked and not refused, in order: the server's name, and the road it took (a callback port: the browser). */
+  readonly signIns: Array<{ readonly name: string; readonly route: McpSignInStarted['route'] }>;
   /** Each `mcpSignOut` asked and not refused, by the server's name, in order. */
   readonly signOuts: string[];
   /** Each `mcpSignInCallback` handed on, in order: the server's name and the address pasted, which a test of the stand-in reads. */

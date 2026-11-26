@@ -45,12 +45,12 @@ describe('the record of what each harness lists: one file the daemon writes, eve
     assert.equal(recordedModels(home).other?.at, '2026-11-26T11:00:00.000Z');
   });
 
-  test('a file that is not JSON, and an entry that is malformed, record nothing', () => {
+  test('a file that is not JSON, and one that does not read as a record, record nothing', () => {
     const home = scratch('wf-models-');
     fs.writeFileSync(modelsFile(home), 'not json');
     assert.deepEqual(recordedModels(home), {});
-    fs.writeFileSync(modelsFile(home), JSON.stringify({ claude: { at: 'now', models: [{ id: 1 }] }, ok: { at: 'now', models: [] } }));
-    assert.deepEqual(Object.keys(recordedModels(home)), ['ok']);
+    fs.writeFileSync(modelsFile(home), JSON.stringify({ claude: { at: 'now', models: [{ id: 1 }] } }));
+    assert.deepEqual(recordedModels(home), {});
   });
 });
 

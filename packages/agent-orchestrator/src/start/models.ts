@@ -42,8 +42,9 @@ export const modelsText = (models: RunModels) =>
  * Why a run of `steps` cannot run on `models`, said by `said` (`--model implement=fable`, or a card's line) — or undefined where it can:
  * a step the workflow does not have; `inherit`, a subagent's word no step's session can take; a step on a remote agent, which runs as its
  * operator configured it; and a model the step's harness does not list by that id, where its list is recorded (`stepModelJudged`): an
- * alias, naming the id, an unlisted word, naming the ids, or a model that drops the step's mode or effort, as `nemia retry --model` is refused. What the harness refuses of the config the step is then filed with is the
- * start's next question (`configRefused`), asked of the steps with the models set (`withModels`).
+ * alias, naming the id, an unlisted word, naming the ids, or a model that drops the step's mode or effort, as `nemia retry --model` is
+ * refused. What the harness refuses of the config the step is then filed with is the start's next question (`configRefused`), asked
+ * of the steps with the models set (`withModels`).
  * @param steps The workflow's steps.
  * @param models The model of each step named, by the step's name.
  * @param said What named a step's model, as a refusal opens on.

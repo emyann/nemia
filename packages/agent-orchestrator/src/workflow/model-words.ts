@@ -58,7 +58,10 @@ export function modelWords(model: string, judged: ModelJudged, listed: readonly 
     case 'unlisted':
       return `\`${model}\` is no model its harness lists. The ids it lists: ${ids}.`;
     case 'mode-dropped':
-      return `\`${model}\` drops \`${judged.mode}\`: the session would run in \`default\`, and a job denies every call \`default\` would ask about. Name a mode it keeps (\`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules), or a model that keeps \`${judged.mode}\`: ${listed.filter((m) => m.keepsAuto !== false).map((m) => m.id).join(', ')}.`;
+      return `\`${model}\` drops \`${judged.mode}\`: the session would run in \`default\`, and a job denies every call \`default\` would ask about. Name a mode it keeps (\`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules), or a model that keeps \`${judged.mode}\`: ${listed
+        .filter((m) => m.keepsAuto !== false)
+        .map((m) => m.id)
+        .join(', ')}.`;
     case 'effort-unlisted':
       return `\`${model}\` does not take the step's effort. The levels it takes: ${judged.efforts.join(', ')}.`;
   }
@@ -69,7 +72,10 @@ export function modelWords(model: string, judged: ModelJudged, listed: readonly 
  * @param step The step as resolved, with its agent's model where it names none.
  * @param lists What each harness lists, as recorded; undefined where none is recorded.
  */
-export function stepModelRefusal(step: Pick<StepSpec, 'name' | 'model' | 'harness' | 'permissionMode' | 'sandbox' | 'effort'>, lists: ModelLists | undefined) {
+export function stepModelRefusal(
+  step: Pick<StepSpec, 'name' | 'model' | 'harness' | 'permissionMode' | 'sandbox' | 'effort'>,
+  lists: ModelLists | undefined,
+) {
   if (step.model === undefined || step.model === 'inherit') return undefined;
   const words = modelWords(step.model, stepModelJudged(step.model, step, lists), listedFor(step.harness, lists));
   return words === undefined ? undefined : `${step.name}: \`model: ${step.model}\`: ${words}`;

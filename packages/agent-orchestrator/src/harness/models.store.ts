@@ -6,6 +6,7 @@
  * named for it is not judged. A store file at the bottom of the tree: it imports no other store file.
  */
 import fs from 'node:fs';
+import { Option, Schema } from 'effect';
 import path from 'node:path';
 import type { ListedModel } from 'agent-runtime/vocabulary';
 
@@ -24,48 +25,44 @@ export type ModelRecord = Readonly<Record<string, RecordedModels>>;
  */
 export const modelsFile = (home: string) => path.join(home, MODELS_FILE);
 
-/** Whether `value` is a model as the file holds it: an id, its aliases, a name and what the harness said of auto mode and efforts. */
-const isListed = (value: unknown): value is ListedModel => {
-  if (typeof value !== 'object' || value === null) return false;
-  const m = value as Record<string, unknown>;
-  return (
-    typeof m.id === 'string' &&
-    typeof m.name === 'string' &&
-    Array.isArray(m.aliases) &&
-    m.aliases.every((a) => typeof a === 'string') &&
-    (m.keepsAuto === undefined || m.keepsAuto === null || typeof m.keepsAuto === 'boolean') &&
-    (m.efforts === undefined || m.efforts === null || (Array.isArray(m.efforts) && m.efforts.every((e) => typeof e === 'string')))
-  );
-};
+/** The file as it reads: each harness's entry, a key `JSON.stringify` leaves out being a fact the harness did not say. */
+const RecordFile = Schema.Record(
+  Schema.String,
+  Schema.Struct({
+    at: Schema.String,
+    models: Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        aliases: Schema.Array(Schema.String),
+        name: Schema.String,
+        keepsAuto: Schema.optionalKey(Schema.Boolean),
+        efforts: Schema.optionalKey(Schema.Array(Schema.String)),
+      }),
+    ),
+  }),
+);
+
+const recordIn = Schema.decodeUnknownOption(Schema.fromJsonString(RecordFile));
 
 /**
- * The record of the store at `home`: each harness's entry that reads as one. A store with no file, a file that is not JSON, and an entry
- * that is malformed record nothing for it: a load never fails on the record, and the daemon's next ask writes it again.
+ * The record of the store at `home`. A store with no file, a file that is not JSON, and one that does not read as a record hold nothing:
+ * a load never fails on the record, and the daemon's next ask writes it again.
  * @param home The store's home folder.
  */
 export function recordedModels(home: string) {
-  let json: unknown;
+  let text: string;
   try {
-    json = JSON.parse(fs.readFileSync(modelsFile(home), 'utf8'));
+    text = fs.readFileSync(modelsFile(home), 'utf8');
   } catch {
     return {} satisfies ModelRecord as ModelRecord;
   }
-  if (typeof json !== 'object' || json === null || Array.isArray(json)) return {} satisfies ModelRecord as ModelRecord;
+  const read = recordIn(text);
+  if (Option.isNone(read)) return {} satisfies ModelRecord as ModelRecord;
   return Object.fromEntries(
-    Object.entries(json).flatMap(([harness, entry]) => {
-      if (typeof entry !== 'object' || entry === null) return [];
-      const { at, models } = entry as Record<string, unknown>;
-      if (typeof at !== 'string' || !Array.isArray(models) || !models.every(isListed)) return [];
-      return [
-        [
-          harness,
-          {
-            at,
-            models: models.map((m) => ({ ...m, keepsAuto: m.keepsAuto ?? undefined, efforts: m.efforts ?? undefined })),
-          },
-        ],
-      ];
-    }),
+    Object.entries(read.value).map(([harness, { at, models }]) => [
+      harness,
+      { at, models: models.map((m) => ({ ...m, keepsAuto: m.keepsAuto, efforts: m.efforts })) },
+    ]),
   ) satisfies ModelRecord;
 }
 

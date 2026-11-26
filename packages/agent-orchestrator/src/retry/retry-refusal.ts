@@ -80,7 +80,9 @@ type Judged = Asked &
 /**
  * Why `nemia retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
- * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` its harness does not list by that id, or on which a step in `auto` would run in `default` (`stepModelJudged`, as the load refuses it on the step's own `model:`); a cancelled run, which files
+ * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` its harness does not list
+ * by that id, or on which a step in `auto` would run in `default` (`stepModelJudged`, as the load refuses it on the step's own `model:`);
+ * a cancelled run, which files
  * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `nemia pause --now` wrote that is void
  * (`pauseAskVoid`) too, said as set aside by the next pass, which alone moves it; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted;
@@ -172,7 +174,8 @@ export function retryRefusal(
 
 /**
  * The step asked for — or why the ask is refused before its standing is read: words or a budget that cannot ride on it, a step the run
- * does not have, a flag a remote step cannot take, a model its harness does not list or that drops the step's mode, and a run cancelled, pruned or held.
+ * does not have, a flag a remote step cannot take, a model its harness does not list or that drops the step's mode, and a run
+ * cancelled, pruned or held.
  */
 function askedStep(asked: Asked) {
   const { steps, run, name, how, command } = asked;
@@ -185,7 +188,9 @@ function askedStep(asked: Asked) {
     (how.budget === undefined ? undefined : remoteRetryRefusal(step, 'budget', how.budget, command));
   if (remote) return remote;
   const words =
-    how.model === undefined ? undefined : modelWords(how.model, stepModelJudged(how.model, step, asked.lists), listedFor(step.harness, asked.lists));
+    how.model === undefined
+      ? undefined
+      : modelWords(how.model, stepModelJudged(how.model, step, asked.lists), listedFor(step.harness, asked.lists));
   if (words) return `\`--model ${how.model}\`: ${name}: ${words} The step's mode is frozen with the run.`;
   if (run.cancelledAt) {
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with nemia start.`;

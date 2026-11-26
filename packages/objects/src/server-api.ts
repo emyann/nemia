@@ -576,7 +576,7 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   ),
   HttpApiEndpoint.get('models', '/api/models', { success: HarnessModels, error: readErrors }).annotate(
     OpenApi.Description,
-    "Reads the models each harness lists for a session, by canonical id, as the daemon last recorded them: an agent, a step, a card and a retry name a model by one of these ids. Answers HarnessModels.",
+    'Reads the models each harness lists for a session, by canonical id, as the daemon last recorded them: an agent, a step, a card and a retry name a model by one of these ids. Answers HarnessModels.',
   ),
   HttpApiEndpoint.get('stats', '/api/stats', { query: StatsQuery, success: Stats, error: readErrors }).annotate(
     OpenApi.Description,

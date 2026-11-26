@@ -61,8 +61,8 @@ export type QuotaAsk = (harness: string) => Effect.Effect<HarnessQuota, unknown>
  * (`repo`); the kind of daemon it is (`holder`); the calling process's own series a collector reads by their increase, born at zero
  * with the daemon's (`series`, `DAEMON_SERIES`); what to do once the lease is taken and before the first pass, in the lease's scope
  * (`onTaken` — where the api serves, and `nemia up` says what it holds); how a harness's quota is asked (`quota`, `QuotaAsk`), the
- * engine's own unless given; how a harness's models are asked (`models`, `ModelsAsk`), the engine's own unless given; and how this host is asked whether it holds a memory limit (`scope`, the runtime's `scopeRefusal` unless
- * given).
+ * engine's own unless given; how a harness's models are asked (`models`, `ModelsAsk`), the engine's own unless
+ * given; and how this host is asked whether it holds a memory limit (`scope`, the runtime's `scopeRefusal` unless given).
  */
 export type UpOptions = {
   every: number;
@@ -113,11 +113,22 @@ export const askedModels = Effect.fn('askedModels')(function* (
       Effect.catchDefect(() => Effect.succeed(undefined)),
     );
     if (listed === undefined) continue;
-    yield* Effect.try({ try: () => recordModels(home, name, listed, at), catch: (err) => err }).pipe(
-      Effect.catch(() => Effect.void),
-    );
+    yield* Effect.try({ try: () => recordModels(home, name, listed, at), catch: (err) => err }).pipe(Effect.catch(() => Effect.void));
   }
 });
+
+/**
+ * `askedModels` of every harness at once and every `MODELS_EVERY_MS` after, for as long as its scope lasts.
+ * @param e The engine to ask.
+ * @param home The store's home folder, whose `models.json` the daemon alone writes.
+ * @param ask How a harness is asked; the engine's own unless given.
+ */
+const modelsAskedEvery = (e: Engine, home: string, ask?: ModelsAsk) =>
+  Effect.forever(
+    Effect.suspend(() => askedModels(e, home, new Date().toISOString(), modelsHarnesses(), ask)).pipe(
+      Effect.andThen(Effect.sleep(MODELS_EVERY_MS)),
+    ),
+  );
 
 /**
  * The quota's gauges, set at each good reading by harness and window (`five_hour`, `seven_day`, …, as the harness names them): the
@@ -422,13 +433,7 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, m
         ),
       ),
     );
-    yield* Effect.forkScoped(
-      Effect.forever(
-        Effect.suspend(() => askedModels(e, home, new Date().toISOString(), modelsHarnesses(), models)).pipe(
-          Effect.andThen(Effect.sleep(MODELS_EVERY_MS)),
-        ),
-      ),
-    );
+    yield* Effect.forkScoped(modelsAskedEvery(e, home, models));
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());

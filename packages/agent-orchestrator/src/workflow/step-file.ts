@@ -20,7 +20,7 @@ import {
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
 import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten } from '../check/index.ts';
-import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
+import { fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
   checkOf,

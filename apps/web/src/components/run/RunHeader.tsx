@@ -20,7 +20,7 @@ import { Labels } from '../field/Labels';
 import { RunMenu } from './RunMenu';
 import { Label, Title } from '@/components/ui/ds';
 
-/** The hue of where a run stands (`standingOf`): waiting on you, in flight, finished, or called off. */
+/** The hue of where a run stands (`standingOf`): waiting on you, in flight, finished, or cancelled. */
 const standingHue = (standing: string) =>
   standing === 'waiting on you' ? 'yours' : standing === 'in flight' ? 'alive' : standing === ENDED.cancelled.word ? 'grey' : 'sage';
 

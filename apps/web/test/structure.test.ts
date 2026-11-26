@@ -17,10 +17,10 @@
  * that says `<what> could not be read: ` takes `troubleOf(error).words`, never the bare `message` (`HAND_TROUBLE`,
  * `HAND_TROUBLES`, empty). A story and the kit's files are let through both: their words are a stand-in's and another repository's.
  *
- * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: no other file spells a word of it
- * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
- * (`hoverRuntimeBreaks`). A person's words for an offer are written once, in its `OFFERS`: no other file spells a sentence of it
- * (`offerWordBreaks`).
+ * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: each state the board names is one word
+ * (`stateWordBreaks`), no file spells a state's phrase from before it was one word (`retiredStateBreaks`), no file says a retired
+ * phrasing (`retiredBreaks`), and no hover says a runtime word (`hoverRuntimeBreaks`). A person's words for an offer are written once,
+ * in its `OFFERS`: no other file spells a sentence of it (`offerWordBreaks`).
  *
  * No file of the board compares the runtime's `needs-human`: a question a session asks is read off its codes (`needsHumanBreaks`).
  *
@@ -39,7 +39,7 @@ import path from 'node:path';
 import { specifiersIn, withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 import { KINDS } from 'objects';
-import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
+import { CARD_WORDS, ENDED, HELD_TO_COME, OFFERS, PAUSED, PERSON, PROPOSAL_WORDS } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
@@ -677,36 +677,59 @@ function saidIn(file: string, text: string) {
 /** The files of `src` whose words are the board's: every one but the kit's. */
 const boardTexts = (texts: ReadonlyMap<string, string>) => [...texts].filter(([file]) => !KIT.test(file)) satisfies Array<[string, string]>;
 
-/**
- * Each whole text outside `WORDS` that is a person's word for a state, of more than one word (`waits on you`, `called off`), as the
- * rail writes it: a state's words are written in `PERSON` alone, and read from there. A label that opens with a capital (`At work`, a
- * gauge's name) and a part of a sentence pass.
- */
-const personWordBreaks = (texts: ReadonlyMap<string, string>, rails: readonly string[]) => {
-  const multi = new Set(rails.filter((rail) => rail.includes(' ')));
-  return boardTexts(texts)
-    .filter(([file]) => file !== WORDS)
-    .flatMap(([file, text]) =>
-      saidIn(file, text)
-        .filter((said) => said.whole && multi.has(said.text.trim()))
-        .map((said) => `${file} spells '${said.text.trim()}', a state's word for a person: read it from PERSON in ${WORDS}`),
-    ) satisfies string[];
+/** The phrases the board drew as a state before each became one word, by the word that took its place. */
+const RETIRED_STATES: Readonly<Record<string, string>> = {
+  'at work': 'working',
+  'asks you': 'asking',
+  'being checked': 'checking',
+  'waits on you': 'waiting',
+  'to try again': 'retry',
+  'failed its check': 'failed',
+  'to come': 'pending',
+  'called off': 'cancelled',
+  'waits on the pause': 'paused',
+  'waiting its turn': 'pending',
 };
+
+/**
+ * Each whole text of `src` that is a state's retired phrase (`waits on you`, `called off`), as a chip or a rail would draw it: a state is
+ * one word, read from `WORDS`. A label that opens with a capital (`At work`, a gauge's name) and a part of a sentence pass.
+ */
+const retiredStateBreaks = (texts: ReadonlyMap<string, string>) =>
+  boardTexts(texts).flatMap(([file, text]) =>
+    saidIn(file, text)
+      .filter((said) => said.whole && Object.hasOwn(RETIRED_STATES, said.text.trim()))
+      .map(
+        (said) =>
+          `${file} spells '${said.text.trim()}', a state's retired phrase: say '${RETIRED_STATES[said.text.trim()]}', read from ${WORDS}`,
+      ),
+  ) satisfies string[];
+
+/** Each state word the board names, by where it is written: a step's rail, a run's end, a card's state, a proposal's phase. */
+const STATE_WORDS: ReadonlyArray<[where: string, word: string]> = [
+  ...Object.entries(PERSON).map(([state, words]) => [`PERSON.${state}.rail`, words.rail] satisfies [string, string]),
+  ['PAUSED.rail', PAUSED.rail],
+  ['HELD_TO_COME.rail', HELD_TO_COME.rail],
+  ...Object.entries(ENDED).map(([outcome, ended]) => [`ENDED.${outcome}.word`, ended.word] satisfies [string, string]),
+  ...Object.entries(CARD_WORDS).map(([state, card]) => [`CARD_WORDS.${state}.word`, card.word] satisfies [string, string]),
+  ...Object.entries(PROPOSAL_WORDS).map(([phase, proposal]) => [`PROPOSAL_WORDS.${phase}.word`, proposal.word] satisfies [string, string]),
+];
+
+/** Each state word of more than one word: a state the board names is one word, and its sentence is its meaning, on hover. */
+const stateWordBreaks = (words: ReadonlyArray<[where: string, word: string]>) =>
+  words
+    .filter(([, word]) => !/^\S+$/.test(word))
+    .map(([where, word]) => `${WORDS}'s ${where} is '${word}': name the state in one word, and say the sentence in its meaning`);
 
 /** The phrasings a person no longer reads, word-bounded: `waits for your approval` is not `waits for you`, nor `not signed off` the tag. */
 const RETIRED = /\b(?:waits for you\b|check refused\b|not signed\b(?! off))/i;
 
-/**
- * Each text of `src` that says a retired phrasing, or `cancelled` to a person (in JSX text, or in a sentence): the board says
- * `called off`. A bare `'cancelled'` is the code's word, and passes.
- */
+/** Each text of `src` that says a retired phrasing. */
 const retiredBreaks = (texts: ReadonlyMap<string, string>) =>
   boardTexts(texts).flatMap(([file, text]) =>
     saidIn(file, text)
-      .filter((said) => RETIRED.test(said.text) || (/\bcancelled\b/i.test(said.text) && (said.jsx || /\S\s+\S/.test(said.text.trim()))))
-      .map(
-        (said) => `${file} says '${said.text.trim()}': write the person's word of ${WORDS} (waits on you, failed its check, called off)`,
-      ),
+      .filter((said) => RETIRED.test(said.text))
+      .map((said) => `${file} says '${said.text.trim()}': write the person's words of ${WORDS} (waits on you, failed its check)`),
   ) satisfies string[];
 
 /** The runtime's words, which a person hovering over the board never reads. */
@@ -720,14 +743,12 @@ const hoverRuntimeBreaks = (texts: ReadonlyMap<string, string>) =>
       .map((said) => `${file} says '${said.text.trim()}' on hover: say it in a person's words, with no runtime word`),
   ) satisfies string[];
 
-/** The rail words, from the one table and the pause's word beside it. */
-const RAILS = [...Object.values(PERSON), PAUSED].map((words) => words.rail);
-
-test(`a state's words for a person are written in ${WORDS} alone, as a total Record<StepState, PersonWords>`, () => {
+test(`a state's words for a person are written in ${WORDS} alone, each one word, as a total Record<StepState, PersonWords>`, () => {
   const texts = sourceTexts();
   assert.match(texts.get(WORDS)!, /export const PERSON: Record<StepState, PersonWords> =/);
-  assert.ok(RAILS.filter((rail) => rail.includes(' ')).length >= 5, 'the scan has multi-word rails to look for');
-  assert.deepEqual(personWordBreaks(texts, RAILS), []);
+  assert.ok(STATE_WORDS.length >= 30, `the scan has the state words to read: ${STATE_WORDS.length}`);
+  assert.deepEqual(stateWordBreaks(STATE_WORDS), []);
+  assert.deepEqual(retiredStateBreaks(texts), []);
   assert.deepEqual(retiredBreaks(texts), []);
   assert.deepEqual(hoverRuntimeBreaks(texts), []);
 });
@@ -778,32 +799,38 @@ test("REFUSED: an offer's sentence spelled outside the table", () => {
   assert.equal(offerWordBreaks(planted, SENTENCES).length, 1);
 });
 
-test('REFUSED: a state word spelled outside the table, a retired phrasing, and a runtime word on hover', () => {
+test('REFUSED: a state of more than one word, a retired state phrase or phrasing, and a runtime word on hover', () => {
   const planted = (file: string, text: string) => new Map([[file, text]]) satisfies Map<string, string>;
-  const spelled = personWordBreaks(
-    planted('src/components/X.tsx', "export const x = <span>{'waits on you'}</span>;\nconst g = 'At work';\nconst t = `${g} at work`;\n"),
-    RAILS,
+  assert.deepEqual(
+    stateWordBreaks([
+      ['PERSON.working.rail', 'working'],
+      ['CARD_WORDS.pending.word', 'waiting its turn'],
+    ]).map((line) => line.split(' ')[1]),
+    ['CARD_WORDS.pending.word'],
+    'a state of more than one word refused, a word of its own passes',
   );
-  assert.equal(spelled.length, 1, 'the rail word refused; a capitalised label and a part of a sentence pass');
+  const spelled = retiredStateBreaks(
+    planted('src/components/X.tsx', "export const x = <span>{'waits on you'}</span>;\nconst g = 'At work';\nconst t = `${g} at work`;\n"),
+  );
+  assert.equal(spelled.length, 1, 'the retired phrase refused; a capitalised label and a part of a sentence pass');
   assert.match(spelled[0], /^src\/components\/X\.tsx spells 'waits on you'/);
   const passing = retiredBreaks(
     planted(
       'src/components/X.tsx',
-      "export const x = <p title={`${s} waits for your approval`}>It is not signed off.</p>;\nconst s = 'cancelled';\n",
+      "export const x = <p title={`${s} waits for your approval`}>It is not signed off. It was cancelled.</p>;\nconst s = 'cancelled';\n",
     ),
   );
-  assert.equal(passing.length, 0, 'a word-bounded approval, a fact of signing off and a bare code word pass');
+  assert.equal(passing.length, 0, 'a word-bounded approval, a fact of signing off and the state word cancelled pass');
   const each: Array<[file: string, jsx: string]> = [
     ['src/components/A.tsx', 'It waits for you.'],
     ['src/components/B.tsx', 'The check refused it.'],
     ['src/components/C.tsx', 'It is not signed.'],
-    ['src/components/D.tsx', 'The run was cancelled.'],
   ];
   const retired = retiredBreaks(new Map(each.map(([file, jsx]) => [file, `export const x = <p>${jsx}</p>;\n`])));
   assert.deepEqual(
     retired.map((line) => line.split(' ')[0]),
     each.map(([file]) => file),
-    'each retired phrasing, and cancelled said to a person, is refused on its own',
+    'each retired phrasing is refused on its own',
   );
   const hover = hoverRuntimeBreaks(
     planted(

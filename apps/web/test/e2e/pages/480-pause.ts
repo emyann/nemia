@@ -51,7 +51,7 @@ const HELD_WORDS = {
 type Step = RunObject.RunStepStatus;
 
 /** The person's word the chip draws for that reason (`lib/words.ts`). */
-const PAUSE_WORD = 'waits on the pause';
+const PAUSE_WORD = 'paused';
 
 /** Whether `url` is the read of FAKE's run, never one of its steps'. */
 const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;

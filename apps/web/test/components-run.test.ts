@@ -703,7 +703,7 @@ test('the result of a run called off, or ended, before its final steps gave says
   assert.match(off, /<p [^>]*data-result-ended="calledOff"/);
   assert.doesNotMatch(off, /data-result-stands/, 'not to come');
   assert.ok(
-    textsOf(off).some((t) => t.includes('called off')),
+    textsOf(off).some((t) => t.includes('cancelled')),
     'in the words a person reads',
   );
   const ended = await routedWith(createElement(RunResult, { run: detailOf({ ...toCome, status: 'succeeded' }) }));

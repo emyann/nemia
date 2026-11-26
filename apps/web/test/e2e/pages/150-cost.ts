@@ -103,7 +103,7 @@ export default {
       [askingStep.step, askingStep.status],
     ] as const) {
       await expectVisible(
-        node(name).locator('[data-state="over-budget"]', { hasText: 'waits on you' }),
+        node(name).locator('[data-state="over-budget"]', { hasText: 'waiting' }),
         `${name}'s chip on the graph, ${status}, says waits on you, as a wait on a person`,
       );
       await expectVisible(node(name).getByText('human gate'), `${name}, past a budget, is drawn as a human gate`);
@@ -287,10 +287,7 @@ export default {
       inspector.locator('[data-spent="over"]', { hasText: over.of }),
       `the inspector's Detail says what ${over.step}'s tries cost of its cap (${over.of}), red past it`,
     );
-    await expectVisible(
-      inspector.locator('[data-step-tag]', { hasText: /^waits on you$/i }),
-      `and its word, waits on you, for ${over.status}`,
-    );
+    await expectVisible(inspector.locator('[data-step-tag]', { hasText: /^waiting$/i }), `and its word, waits on you, for ${over.status}`);
     await expectVisible(
       inspector.locator('[data-peak="cap"]', { hasText: COSTLY.read.tokens.peak }),
       `the inspector marks ${over.step}'s peak at its context: 200k cap (${COSTLY.read.tokens.peak})`,

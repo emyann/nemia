@@ -279,7 +279,7 @@ async function glowHasRoom(page: Page, what: string) {
 /** At a gate: a waiting card's bar that waits on you opens its card in the frame that glows, the glow drawn whole. */
 async function aGateGlows(page: Page) {
   await page.mouse.move(0, 0);
-  const bar = page.locator('section[data-section="waiting"] [data-step-bar][data-step-preview="card"][aria-label$="waits on you"]').first();
+  const bar = page.locator('section[data-section="waiting"] [data-step-bar][data-step-preview="card"][aria-label$="waiting"]').first();
   await bar.hover();
   await expectVisible(previewOf(page), 'a bar at its gate opens its step card');
   await expectCount(page.locator('[data-slot="preview-card"] [data-cut-frame="yours"]'), 1, 'in the frame that glows');

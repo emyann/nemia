@@ -3,7 +3,7 @@
  * endpoint in the run's namespace (`namespaceOfRun`) and prints what the api answers.
  */
 import os from 'node:os';
-import { ASSIGN_WORDS, type Args, type RunAssigned } from 'objects';
+import { actorWords, ASSIGN_WORDS, type Args, type RunAssigned } from 'objects';
 import { asked } from '../../objects.ts';
 import { namespaceOfRun, said, switchArg, textArg } from '../requests.ts';
 import { runOf } from './act.ts';
@@ -23,7 +23,7 @@ const forWords = (ms: number) =>
 
 /** What `nemia assign` prints of an assignee put or given back. */
 export const assignLines = ({ id, ended, assignee }: RunAssigned) => {
-  const who = assignee.name ?? 'someone';
+  const who = assignee.name ?? (assignee.actor ? actorWords(assignee.actor) : 'someone');
   return [
     ended
       ? `${id}  given back — what it asks waits on you again`

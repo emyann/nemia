@@ -34,6 +34,7 @@ import {
   RUN_PANEL,
   titleOf,
   toDecideOf,
+  toDecideOfYou,
   toggleOpen,
   unfoldingNow,
   waitedMs,
@@ -1041,6 +1042,15 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
       ['in flight', 'waiting on you'],
       'the start form says where it stands in the same words',
     );
+  });
+  test('what is to decide about a run is the person’s move unless someone has the run in hand: the card’s band, the minimap and the count follow', () => {
+    const toDecide = approve('ends', 'ship');
+    const ends = run(['unverified · done', 'awaiting approval'], { id: 'ends', status: 'failed', waitingOnYou: ['ship'], toDecide });
+    const assignee = { at: cancelledAt, forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    assert.deepEqual([toDecideOfYou(ends), toDecideOfYou({ ...ends, assignee })], [true, false]);
+    const inHand = { ...ends, assignee };
+    assert.equal(toDecideOf(inHand)?.kind, 'approve', 'what is to decide is still served, and still there to read');
+    assert.equal(toDecideOfYou(run(['verified ✓'], { status: 'succeeded' })), false, 'a run with nothing to decide has none to be yours');
   });
   test('a run in someone’s hand waits on nobody else: in flight while it asks, and on you again once given back', () => {
     const assignee = { at: cancelledAt, forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };

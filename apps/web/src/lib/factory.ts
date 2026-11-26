@@ -63,6 +63,15 @@ type Held = {
 export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => run.toDecide ?? null;
 
 /**
+ * Whether what is to decide about the run is the person's move: there is something (`toDecideOf`) and nobody has the run in hand
+ * (`assignee`), as `waitsOnYou` says of what the run asks. The yellow of a card, its count and its chip follow this, never
+ * `toDecideOf` alone.
+ * @param run The run, by the api's `toDecide` and its `assignee`.
+ */
+export const toDecideOfYou = (run: { toDecide?: Frozen<RunToDecide> | null; assignee?: unknown }) =>
+  toDecideOf(run) !== null && !run.assignee;
+
+/**
  * Whether anything of the run is asked of a person, whoever has it in hand: a step does (`waitingOnYou`) — at its gate anywhere in
  * the run, or signed off blocked — or a run it waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for,
  * either way — or a hold on it only a person lifts (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there).

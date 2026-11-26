@@ -10,7 +10,7 @@ import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
+import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, toDecideOfYou, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
@@ -165,7 +165,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
         {decide?.kind === 'result' && !cancelled && <DecideLine run={run} said={decide.said} branches={decide.branches} />}
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
         {open && trouble && <p className="m-0 text-body-small text-failure">{trouble}</p>}
-        <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
+        <Chips run={run} decide={toDecideOfYou(run)} cancelled={cancelled} reads={reads} />
       </Run>
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
@@ -237,14 +237,14 @@ type Look = { ringed?: 'focus' | 'yours'; marks: { 'data-ghost-run'?: true; 'dat
 
 /**
  * How a run's card is drawn: banded in the focus colour, and marked, while the frame's bar shows it (`inspected`); else banded yellow
- * while a person has its result to decide (`toDecideOf`), the one finished card that waits for a person. A ghost, a run that waits on
+ * while a person has its result to decide (`toDecideOfYou`), the one finished card that waits for a person. A ghost, a run that waits on
  * runs and nothing else (`waitsOnRuns`), is marked: its part's tone draws it outlined, waiting.
  */
 function lookOf(run: RunView, inspected: boolean) {
   const ghost = waitsOnRuns(run);
   const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
   if (inspected) return { ringed: 'focus', marks } satisfies Look;
-  if (toDecideOf(run)) return { ringed: 'yours', marks: {} } satisfies Look;
+  if (toDecideOfYou(run)) return { ringed: 'yours', marks: {} } satisfies Look;
   return { marks } satisfies Look;
 }
 
@@ -269,7 +269,7 @@ function TouchedLine({ run }: { run: RunView }) {
 
 /**
  * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context,
- * each on hover (`reads`); to decide (`decide`), not while someone has the run in hand; waiting on you; who has it in hand, the assignee's
+ * each on hover (`reads`); to decide (`decide`, `toDecideOfYou`); waiting on you; who has it in hand, the assignee's
  * words on hover; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
@@ -281,7 +281,7 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
         </Tag>
       )}
-      {decide && !run.assignee && <Tag className="bg-yours text-on-yours">to decide</Tag>}
+      {decide && <Tag className="bg-yours text-on-yours">to decide</Tag>}
       {waitsOnYou(run) && <Tag className="bg-yours-container text-on-yours-container">waiting on you</Tag>}
       {run.assignee && !cancelled && (
         <Tag variant="outlined" data-assignee-chip title={run.assignee.word} className="text-on-surface-variant">

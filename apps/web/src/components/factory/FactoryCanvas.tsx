@@ -51,7 +51,7 @@ import {
   placeRuns,
   readsLines,
   titleOf,
-  toDecideOf,
+  toDecideOfYou,
   toggleOpen,
   unfoldingNow,
   waitsOnYou,
@@ -191,15 +191,7 @@ const HANDFUL = 5;
  * could not judge is in flight, as the tick counts it.
  */
 const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
-  !judged(run)
-    ? paint.alive
-    : toDecideOf(run) && !run.assignee
-      ? paint.yours
-      : waitsOnYou(run)
-        ? paint.yours
-        : finished
-          ? paint.sage
-          : paint.alive;
+  !judged(run) ? paint.alive : toDecideOfYou(run) ? paint.yours : waitsOnYou(run) ? paint.yours : finished ? paint.sage : paint.alive;
 
 /**
  * The runs of `factory` that are not finished, given as its light answer `open` (`openRunsQuery`), a card each, on a floor a person can
@@ -262,7 +254,7 @@ function FloorCounts({ open, undecided }: { open: OpenRuns; undecided: readonly 
   const flying = runs.filter((run) => !judged(run) || inFlight(run)).length;
   const finished = open.counts.finished + runs.length - flying;
   const waiting = runs.filter((run) => judged(run) && waitsOnYou(run)).length;
-  const toDecide = [...runs, ...undecided].filter((run) => judged(run) && toDecideOf(run) !== null).length;
+  const toDecide = [...runs, ...undecided].filter((run) => judged(run) && toDecideOfYou(run)).length;
   return (
     <p className="text-body-medium text-on-surface-variant">
       <span className="font-medium text-on-surface">{flying}</span> in flight

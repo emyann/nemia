@@ -33,6 +33,7 @@ const FILES = [
   'components/look/Run.tsx',
   'components/look/RunMarks.tsx',
   'components/look/RunMeta.tsx',
+  'components/look/RunHold.tsx',
   'components/look/RunFigures.tsx',
   'components/look/RunPanel.tsx',
   'components/look/Pager.tsx',

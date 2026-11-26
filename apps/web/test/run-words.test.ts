@@ -405,13 +405,10 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
       });
     const calledOff = never({ cancelledAt: '2026-11-02T00:00:00.000Z' });
     assert.equal(nowOf(calledOff)?.tone, 'yours', 'a hold that waits on you is yellow');
-    assert.deepEqual(
-      nowOf(calledOff)?.words,
-      [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.calledOff, NOW_WORDS.lands],
-      'it names the run and why it never lands, never the reader as the holder',
-    );
-    assert.deepEqual(nowOf(never({ missing: true }))?.words.at(3), NOW_WORDS.missing, 'a run not in the store');
-    assert.deepEqual(nowOf(never({ gone: ['wf/r-9/run'] }))?.words.at(3), NOW_WORDS.gone, 'a run whose branches are gone');
+    const neverLands = [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.calledOff, NOW_WORDS.lands];
+    assert.deepEqual(nowOf(calledOff)?.words, neverLands);
+    assert.deepEqual(nowOf(never({ missing: true }))?.words.at(3), NOW_WORDS.missing);
+    assert.deepEqual(nowOf(never({ gone: ['wf/r-9/run'] }))?.words.at(3), NOW_WORDS.gone);
   });
   test('a row that waits on you says its wait, in the yellow tone, and a failure its word, in red', () => {
     assert.deepEqual(nowOf(ROWS.check.row)?.words, [waitTag(ROWS.check.row)]);

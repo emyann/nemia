@@ -236,27 +236,27 @@ const HELD_ROWS = [
 export const HeldRows: Story = {
   render: () => (
     <div style={BOARD}>
-      <InTable run={HELD_ROWS[0]!} runs={HELD_ROWS} />
+      <InTable run={HELD_ROWS[0]} runs={HELD_ROWS} />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const row = (one: WaitingRun) => canvasElement.querySelector<HTMLElement>(`tr[data-run="${one.id}"]`)!;
     const [waits, said, long, none, yours] = HELD_ROWS.map(row);
-    await expect(waits!.querySelector('[data-hold]'), 'a run that only waits on a run has no hold line').toBeNull();
+    await expect(waits.querySelector('[data-hold]'), 'a run that only waits on a run has no hold line').toBeNull();
     for (const held of [said, long, none, yours])
-      await expect(held!.querySelectorAll('[data-hold]').length, 'a held row has one hold line').toBe(1);
-    await expect(said!.querySelector('[data-hold-why]')).toHaveTextContent('merge conflicts with 1sw7’s schema change');
-    await expect(said!.querySelector('[data-hold-by]')).toHaveTextContent('by ann');
-    await expect(said!.querySelector('[data-hold-by] [data-actor="person"]')).not.toBeNull();
-    await expect(long!.querySelector('[data-hold-why]'), 'the whole why on hover').toHaveAttribute('title', LONG_WHY);
-    await expect(long!.querySelector('[data-hold-by] [data-actor="agent"]')).not.toBeNull();
-    await expect(none!.querySelector('[data-hold-why]')).toHaveTextContent(NOW_WORDS.noWhy);
-    await expect(none!.querySelector('[data-hold-by]'), 'a hold that says nobody names nobody').toBeNull();
-    await expect(yours!.querySelector('[data-now]')).toHaveAttribute('data-now', 'yours');
-    const words = yours!.querySelector('[data-now-words]');
+      await expect(held.querySelectorAll('[data-hold]').length, 'a held row has one hold line').toBe(1);
+    await expect(said.querySelector('[data-hold-why]')).toHaveTextContent('merge conflicts with 1sw7’s schema change');
+    await expect(said.querySelector('[data-hold-by]')).toHaveTextContent('by ann');
+    await expect(said.querySelector('[data-hold-by] [data-actor="person"]')).not.toBeNull();
+    await expect(long.querySelector('[data-hold-why]'), 'the whole why on hover').toHaveAttribute('title', LONG_WHY);
+    await expect(long.querySelector('[data-hold-by] [data-actor="agent"]')).not.toBeNull();
+    await expect(none.querySelector('[data-hold-why]')).toHaveTextContent(NOW_WORDS.noWhy);
+    await expect(none.querySelector('[data-hold-by]'), 'a hold that says nobody names nobody').toBeNull();
+    await expect(yours.querySelector('[data-now]')).toHaveAttribute('data-now', 'yours');
+    const words = yours.querySelector('[data-now-words]');
     await expect(words).toHaveTextContent(NOW_WORDS.calledOff);
     await expect(words).not.toHaveTextContent(/held by you/i);
-    await expect(said!.querySelector('[data-now]')).not.toHaveAttribute('data-now', 'yours');
+    await expect(said.querySelector('[data-now]')).not.toHaveAttribute('data-now', 'yours');
   },
 };
 

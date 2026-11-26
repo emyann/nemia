@@ -135,15 +135,14 @@ and forgetting to wire it in:
   which the mutant runner passed before it was removed. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
   ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
   floor is the first release the suite passes on, not a round number.
-- **`npm run lint` and `npm run typecheck`**, whole, on the floor. So are the e2e shards, their bound and the build: every job but the
+- **`npm run lint` and `npm run typecheck`**, whole, on the floor. So are the e2e shards and the build: every job but the
   legs runs this repository's code on the one version it claims to run on, and `pinDrift` refuses a pin that is not the floor wherever
   it is, so a job a later card adds is held the day it is written.
 - **The whole e2e in four shards**, each leg running `npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}`: the
   runner deals the pages itself from the pages that exist (`shardOf`, `apps/web/test/e2e/pages.ts`), so the shard count is written once,
-  in the matrix, and a new e2e page is still its file and its line in `apps/web/test/e2e/pages/NAMES` and nothing else. Each shard
-  uploads its page times, and an `e2e-bound` job sums every shard's against `PAGES_BOUND_MS` — the bound that is the whole run's and
-  additive, which a shard silences inside a run exactly as `--pages` does — through `node apps/web/test/e2e/pages-bound.ts`, whose
-  refusal names the slowest pages, or the shard that wrote nothing. Playwright's browsers are cached, keyed on the lockfile; only a
+  in the matrix, and a new e2e page is still its file and its line in `apps/web/test/e2e/pages/NAMES` and nothing else. Each shard says
+  its slowest pages in its own log, and nothing in CI refuses what the pages cost: a bound on their sum, a job of its own, failed green work
+  on a runner's noise and was removed on 2026-11-25. Playwright's browsers are cached, keyed on the lockfile; only a
   failing page's pictures are uploaded. npm itself is never cached: the lockfile's own install is part of what is tested.
 - **A build job** that runs `npm run build` and `npm run theme:generate` and then refuses a stale generated file by name, over
   `apps/web/src/routeTree.gen.ts` and `apps/web/theme/`. Both generators were run twice on the committed tree before the job was
@@ -192,10 +191,9 @@ the fraction or holds it after its globs, a suite run not given `WF_TEST_SHARD: 
 leg name that does not name its shard, a `cancel-in-progress` that would cancel a run of `main`, a
 job outside the gate's `needs`, a gate without `always()`, a gate step not given the results through its environment or interpolating an
 expression into its shell, an action that is not GitHub's own by major tag, and the trigger that would run a fork's code against a
-writable token. Card 2 added three clauses of its own: an `e2e` matrix that is not 1..n in order or a run of the e2e that does not take
+writable token. Card 2 added two clauses of its own: an `e2e` matrix that is not 1..n in order or a run of the e2e that does not take
 its shard off the leg (`--shard ${{ matrix.shard }}`) and its count off the matrix (`--of ${{ strategy.job-total }}`), with more shards
-than `pages/NAMES` has pages; an `e2e-bound` job missing, not needing the shards, or not running `pages-bound.ts`, which is the one
-place `PAGES_BOUND_MS` is applied and the reason no copy of the number is in the YAML; and a `build` job that does not run a generator,
+than `pages/NAMES` has pages; and a `build` job that does not run a generator,
 or whose staleness step forgets one of the generated paths — those paths being read from one list, which is itself refused when it names
 a path this repository does not have. Card 3 added its own: no scan job, a download whose URL is not pinned by `${VERSION}` or whose
 bytes are not checked against a sha256, a scan missing `--log-opts`, `--redact`, `--exit-code 2` or its `--config`, a shallow checkout,

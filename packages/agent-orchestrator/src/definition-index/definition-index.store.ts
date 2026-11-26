@@ -111,7 +111,7 @@ const definitionsIn = (scope: string, folder: string) => {
 /** The record's text: the JSON of its keys in order. */
 const textOf = (found: DefinitionFound) => JSON.stringify({ digest: found.digest, path: found.path });
 
-/** What Nemia ships — its skills and its builtin templates — read once by the process: it changes with a release, which restarts the daemon. */
+/** What Nemia ships (its skills, its builtin templates), read once by the process: it changes with a release, which restarts the daemon. */
 const BUILTIN = new Map<string, readonly DefinitionFound[]>();
 
 /** The definitions Nemia ships, found once per folder of builtin templates. */
@@ -188,6 +188,23 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
       }),
     )
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
+});
+
+/** Whether the daemon's sweep runs in this process: where it does, a read leaves the index to it. */
+const SWEEPING = { running: false };
+
+/** The daemon's sweep of this process has begun: a read of a definition no longer reads the index again (`definitionsRefreshed`). */
+export const sweepBegun = () => {
+  SWEEPING.running = true;
+};
+
+/**
+ * The index read again where a read or a write of a definition needs it exact: after a write of one always, and before a read where no
+ * sweep of the daemon runs in this process (the api served alone), so a revision a reader holds is the one a write compares.
+ * @param afterWrite Whether a write of a definition was just answered.
+ */
+export const definitionsRefreshed = Effect.fn('definitionsRefreshed')(function* (afterWrite: boolean) {
+  if (afterWrite || !SWEEPING.running) yield* indexSweep();
 });
 
 /**

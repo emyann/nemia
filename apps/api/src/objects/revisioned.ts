@@ -5,7 +5,7 @@
  * A GET writes nothing here, and nothing is kept between two requests.
  */
 import type { Context as RequestContext } from 'hono';
-import { isWatchedKind, keyspaceHead, kindRevisions } from 'agent-orchestrator';
+import { definitionsRefreshed, isWatchedKind, keyspaceHead, kindRevisions } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 import type { Listed } from '../watch/watch.ts';
 
@@ -14,6 +14,9 @@ const watchedListOf = (kind: string | undefined) => {
   const base = kind?.replace(/List$/, '');
   return kind?.endsWith('List') === true && base !== undefined && isWatchedKind(base) ? base : undefined;
 };
+
+/** The kinds whose revisions are made of the definition index's records, which a read of one reads again where no daemon sweeps it. */
+const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire']);
 
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
@@ -46,9 +49,13 @@ export const revisioned =
     const path = new URL(request.url).pathname;
     const kinds = kindsAt(request.method, path);
     if (!kinds.some((kind) => stampedOf({ kind }) !== undefined)) return list(c, request);
-    const before = request.method === 'GET' && kinds.some((kind) => watchedListOf(kind) !== undefined);
+    const indexed = kinds.some((kind) => INDEXED.has(kind.replace(/List$/, '')));
+    const reads = request.method === 'GET';
+    if (indexed && reads) await c.var.runtime.runPromise(definitionsRefreshed(false));
+    const before = reads && kinds.some((kind) => watchedListOf(kind) !== undefined);
     const head = before ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
     const response = await list(c, request);
+    if (indexed && !reads) await c.var.runtime.runPromise(definitionsRefreshed(true));
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
     const body: unknown = await response.clone().json();
     const stamped = stampedOf(body);

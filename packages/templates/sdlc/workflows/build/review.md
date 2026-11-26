@@ -25,8 +25,7 @@ GitHub's `${{ parameters.ciCheck }}` context judged the repository's suite on th
 commit is the one it judged. Your brief hands you its exit and the end of its output, that verdict in it; a check that did not pass is
 a finding, and so is a round whose suite nothing ran.
 
-**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view <n> --json state,mergeable,headRefOid,title,body,url`
-(its plain form, with no fields named, fails on GitHub's deprecation of Projects classic) and `gh pr checks <n>`, `<n>` the number that address ends on. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
+**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `mcp__github__pull_request_read` with `get` (its state, mergeability, head, title and body), `get_status` and `get_check_runs`, `<n>` being the number that address ends on, with the repository's `owner` and `repo`. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
 the commit you are reviewing. You open, edit, merge and close none: those are refused you, and a person's.
 
 Run the repository's checks yourself where a finding needs a run to stand on, each bare and one command per call, as its settings

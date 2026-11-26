@@ -37,8 +37,7 @@ Run the repository's typecheck and lint yourself, each bare and one command per 
 where a finding needs a run to stand on; run nothing that writes the workspace or watches it, and never the whole suite: CI ran it on
 the commit implement pushed, and its verdict is in the check you are handed.
 
-**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view <n> --json state,mergeable,headRefOid,title,body,url`
-(its plain form, with no fields named, fails on GitHub's deprecation of Projects classic) and `gh pr checks <n>`, `<n>` the number that address ends on. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
+**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `mcp__github__pull_request_read` with `get` (its state, mergeability, head, title and body), `get_status` and `get_check_runs`, `<n>` being the number that address ends on, with the repository's `owner` and `repo`. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
 the commit you are reviewing. You open, edit, merge and close none: those are refused you, and Otto's.
 
 ### false — in this checkout

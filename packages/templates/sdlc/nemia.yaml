@@ -4,13 +4,13 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, with no gate unless the run is started with one at land."
 spec:
-  version: 5.9.0
+  version: 6.0.0
   rules:
     path: RULES.md
   parameters:
     github:
       type: boolean
-      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request, its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true. It follows the factory's first writable volume: true where that volume is cloned from github.com, false where it is a folder of the machine or another host's clone; a later volume leaves it as it is. Where neither the pull request's head nor the base branch declares a CI workflow in .github/workflows, the implement step's check runs localCheck in place of the wait, and the landing merges with no context."
+      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request through the factory's github MCP server, which the factory adds and signs in (the github-server need), and the review step reads it through the same server; its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true. It follows the factory's first writable volume: true where that volume is cloned from github.com, false where it is a folder of the machine or another host's clone; a later volume leaves it as it is. Where neither the pull request's head nor the base branch declares a CI workflow in .github/workflows, the implement step's check runs localCheck in place of the wait, and the landing merges with no context."
       default: false
       whenOrigin: github.com
     localCheck:
@@ -21,10 +21,6 @@ spec:
       type: string
       description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the land step's base-ci check then waits on it at the merge commit on the base branch. Read only where github is true."
       default: ci
-    ciServer:
-      type: string
-      description: "The MCP server, by its name in the factory's servers, through which build's and quick's implement step reads a red CI's runs and the logs of its failed jobs, where the lines its check hands it do not say why: github, Nemia's builtin GitHub server, whose Actions reads the implement agent's fence leaves open and whose writes it refuses. The step names it on its mcp: line, and each workflow needs the factory to have added it (the ci-server need, which nemia doctor reads): add it on the factory's settings page and sign it in there. Empty (the default) gives the step no server and needs none."
-      default: ""
     landingWaitsOnCi:
       type: boolean
       description: "Whether the land step's base-ci check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red; it runs once the checkout is given back to the next run's ending. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."

@@ -6,7 +6,7 @@ metadata:
 spec:
   needs:
     - name: gh
-      message: "gh, the GitHub CLI, on the PATH, which pushes the run's branch, opens its pull request and lands it: needed only where github is true"
+      message: "gh, the GitHub CLI, on the PATH, which pushes the run's branch, labels its pull request, waits on its checks and lands it: needed only where github is true"
       check: "if [ \"${{ parameters.github }}\" = true ]; then command -v gh >/dev/null; fi"
       fixes:
         - message: "install the latest gh release for this machine into Nemia's tools folder, its sum checked against the release's checksums, with no sudo"
@@ -25,9 +25,9 @@ spec:
       fixes:
         - message: "set git's name and email from the GitHub account gh is signed in to: its name (its login where it has none) and its noreply address, <id>+<login>@users.noreply.github.com; where gh is not signed in, take the next fix, which asks for a name and an email"
           command: "node \"$WF_CARRIED_FILES/needs.ts\" identity"
-    - name: ci-server
-      message: "the MCP server ciServer names, added to the factory, through which implement reads a red CI's runs and job logs: needed only where ciServer names one. Add it on the factory's settings page, where Nemia's builtin github is offered, or by nemia factory server add, then sign it in there"
-      check: "if [ -n \"${{ parameters.ciServer }}\" ]; then nemia get \"mcpservers/${{ parameters.ciServer }}\" -n \"$WF_FACTORY\" -o name >/dev/null; fi"
+    - name: github-server
+      message: "the factory's github MCP server, added to the factory and signed in, through which Grace opens her pull request and Agora reads it and its checks: needed only where github is true. Add it on the factory's settings page, where Nemia's builtin github is offered, or by nemia factory server add, then sign it in there"
+      check: "if [ \"${{ parameters.github }}\" = true ]; then nemia get mcpservers/github -n \"$WF_FACTORY\" -o name >/dev/null; fi"
     - name: browser
       message: "the Chromium build the steps' browser tools launch, which they look at the web app with"
       scope: repository
@@ -58,7 +58,7 @@ spec:
         path: workflows/quick/implement.schema.json
       overrides:
         mcp:
-          - "${{ parameters.ciServer }}"
+          - "${{ case(parameters.github, 'github', '') }}"
         claude:
           context: 400k
     - name: land
@@ -88,3 +88,6 @@ spec:
         - findings
         - findings.kind=placement
         - findings.missed
+      overrides:
+        mcp:
+          - "${{ case(parameters.github, 'github', '') }}"

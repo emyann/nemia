@@ -8,7 +8,7 @@
  *   assignment before nemia.
  * - The four read a tool's own help and version (`help.allow.yaml`): gh's by `gh help <core command>`, never `gh <x> --help`, which can
  *   run an alias or an extension, and claude's by exact lines. These are not gh's reads below: the writers keep every gh refused.
- * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands.
+ * - None of the four allows a `gh` beyond a tool's help: Agora reads the pull request through the GitHub server, never `gh`.
  * - An agent that allows the browser's tools denies those that write a file (`browser.deny.yaml`), and every agent that may reach the
  *   browser, the writers among them, denies the one that runs a script in the page (`run-code.deny.yaml`).
  * - Every agent is refused an edit and a write of the store's factories, workflows and inbox, under the store the factory names
@@ -51,12 +51,6 @@ const linesOf = (file: string) => yaml.load(fs.readFileSync(path.join(SDLC, 'fen
 
 /** A tool's help and version, which the read-only four take beside the read set; not counted as a read of gh's. */
 const HELP = linesOf('help.allow.yaml');
-
-/** The pull request's reads, which Agora alone allows itself. */
-const GH_READS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
-
-/** The reviewer, the one read-only agent whose steps read the pull request. */
-const READS_THE_PULL_REQUEST = 'agora';
 
 /**
  * The store's folders no agent edits or writes, under `root`: its factories, its workflows and its inbox. An `Edit` rule alone, since
@@ -120,9 +114,7 @@ function shortOf(fences: Record<string, Fence>, root: string) {
         ...lacks(agent, linesOf('read-only.allow.yaml'), allowed, 'allows no'),
         ...lacks(agent, HELP, allowed, 'allows no'),
         ...lacks(agent, linesOf('read-only.deny.yaml'), denied, 'denies no'),
-        ...(agent === READS_THE_PULL_REQUEST
-          ? lacks(agent, GH_READS, allowed, 'allows no')
-          : allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)).map((rule) => `${agent}: allows gh, ${rule}`)),
+        ...allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)).map((rule) => `${agent}: allows gh, ${rule}`),
       ];
     }),
     ...Object.keys(fences)
@@ -149,7 +141,7 @@ const cut =
     rules.reduce((left, rule) => left.replace(new RegExp(`^ *- ${rule.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n`, 'm'), ''), text);
 
 /**
- * sdlc as it ships, on either way it lands, and a copy with lines cut from four fence files and from two agents' own lists, rendered on
+ * sdlc as it ships, on either way it lands, and a copy with lines cut from four fence files and from an agent's own list, rendered on
  * one store with the store `STORE`.
  */
 const TREES = await rendered([
@@ -164,7 +156,6 @@ const TREES = await rendered([
       'fences/writers.deny.yaml': cut('Bash(git push:*)'),
       'fences/browser.deny.yaml': cut('mcp__playwright__browser_snapshot(filename:*)'),
       'agents/otto/agent.yaml': cut('Edit(${{ parameters.storeRoot }}/inbox/**)'),
-      'agents/agora/agent.yaml': cut('Bash(gh pr checks:*)'),
     }),
     sets: [`storeRoot=${STORE}`],
   },
@@ -181,7 +172,6 @@ test('REFUSED: a line cut from a fence file is named on every agent that takes t
   assert.deepEqual(
     shortOf(fencesOf('cut'), STORE).sort(),
     [
-      'agora: allows no Bash(gh pr checks:*)',
       ...READ_ONLY.flatMap((agent) => [
         `${agent}: allows no Bash(git merge-base:*)`,
         `${agent}: allows no Bash(gh help pr:*)`,
@@ -234,13 +224,14 @@ test("sdlc's six agents carry their fences: the read set and its denies, the bro
   );
 });
 
-test("Agora allows gh's two reads and gh's help, and nothing else of gh, on either way sdlc lands", () => {
+test("no read-only agent, Agora included, allows a gh beyond a tool's help, on either way sdlc lands", () => {
   for (const way of ['shipped', 'github'])
-    assert.deepEqual(
-      fencesOf(way).agora.allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)),
-      GH_READS,
-      way,
-    );
+    for (const agent of READ_ONLY)
+      assert.deepEqual(
+        fencesOf(way)[agent].allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)),
+        [],
+        `${way}: ${agent}`,
+      );
 });
 
 /** Reads a read-only agent makes, in the spellings a session types: each runs by its own allow. */
@@ -305,8 +296,8 @@ const NEVER_WRITERS: Call[] = [
 ];
 
 /**
- * The reads of GitHub's Actions toolset, through which implement reads a red CI's runs, jobs and job logs where its factory names the
- * server (`ciServer`); the toolset's one write, its run trigger (run, re-run, cancel, delete logs), is in `NEVER_WRITERS`.
+ * The reads of GitHub's Actions toolset, through which implement reads a red CI's runs, jobs and job logs where its factory is on GitHub
+ * (`github`); the toolset's one write, its run trigger (run, re-run, cancel, delete logs), is in `NEVER_WRITERS`.
  */
 const ACTIONS_READS: Call[] = ['actions_list', 'actions_get', 'get_job_logs'].map((tool) => ({ tool: `mcp__github__${tool}` }));
 
@@ -330,6 +321,17 @@ test("the writers' rendered fences refuse a push, a forced delete, gh, a kill, a
     assert.deepEqual(runsUnder({ allow: [], deny: denied }, NEVER_WRITERS, { dontAsk: false }), [], agent);
     assert.deepEqual(runsUnder({ allow: [], deny: denied }, [bash('git commit -m x')], { dontAsk: false }), ['Bash(git commit -m x)']);
   }
+});
+
+test("Grace's rendered fence runs the server's pull request writes of her own, and refuses its merge, its pushes and its run trigger", () => {
+  const { denied } = fencesOf('shipped').grace;
+  const opens: Call[] = ['create_pull_request', 'update_pull_request'].map((tool) => ({ tool: `mcp__github__${tool}` }));
+  assert.deepEqual(
+    runsUnder({ allow: [], deny: denied }, opens, { dontAsk: false }),
+    opens.map((call) => call.tool),
+  );
+  const refused: Call[] = ['merge_pull_request', 'push_files', 'actions_run_trigger'].map((tool) => ({ tool: `mcp__github__${tool}` }));
+  assert.deepEqual(runsUnder({ allow: [], deny: denied }, refused, { dontAsk: false }), []);
 });
 
 test("Grace's rendered fence, which every implement step runs under, runs the Actions toolset's reads and refuses its write", () => {

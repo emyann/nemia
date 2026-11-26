@@ -173,6 +173,7 @@ const REFUSALS: readonly Refused[] = [
   ['hold, --by twice', 'hold', ['r-x', '--until', 'a', '--by', 'a', '--by', 'b'], ['nemia hold takes --by once']],
   ['hold, --until twice with --why', 'hold', ['r-x', '--until', 'a', '--until', 'b', '--why', 'w'], null],
   ['hold, --off twice', 'hold', ['r-x', '--off', '--off'], null],
+  ['release, a flag it does not take', 'release', ['r-x', '--off'], ['nemia release takes one run']],
   ['assign, the run left out', 'assign', [], ['nemia assign takes the run first', '--off']],
   ['assign, --off with --to', 'assign', ['r-x', '--off', '--to', 'ann'], ['nemia assign --off', 'takes no --to, --why or --for']],
   ['assign, --off with --for', 'assign', ['r-x', '--off', '--for', '1h'], ['takes no --to, --why or --for']],

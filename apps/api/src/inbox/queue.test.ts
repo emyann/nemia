@@ -30,8 +30,6 @@ import {
   runSlots,
   runWith as runEngine,
   slotWord,
-  standingReader,
-  standingSnapshot,
   settingsOf,
   storeConfigLayer,
   type StoreConfig,
@@ -473,8 +471,7 @@ const ceilings = async () => {
 
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
 const packageHeld = async () => {
-  const git = standingReader(await runWith(engine(ENV), standingSnapshot()));
-  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsNow(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
+  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsNow(root).runs.list(), settingsOf(ENV), { read: new Map() }));
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face{font-family:'Michroma';font-weight:400;src:url('assets/fonts/michroma-latin-400-normal.woff2') format('woff2')}
+      @font-face{font-family:'Barlow';font-weight:400;src:url('assets/fonts/barlow-latin-400-normal.woff2') format('woff2')}
+      @font-face{font-family:'Barlow';font-weight:500;src:url('assets/fonts/barlow-latin-500-normal.woff2') format('woff2')}
+      @font-face{font-family:'JetBrains Mono';font-weight:400;src:url('assets/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2')}
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a0a0b; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="65" data-width="1920" data-height="1080">
+    <div id="title" class="clip" data-composition-id="s-title-host" data-composition-src="compositions/01-title.html" data-start="0" data-duration="5" data-track-index="0"></div>
+    <div id="install" class="clip" data-composition-id="s-install-host" data-composition-src="compositions/02-install.html" data-start="5" data-duration="8" data-track-index="0"></div>
+    <div id="welcome" class="clip" data-composition-id="s-welcome-host" data-composition-src="compositions/03-welcome.html" data-start="13" data-duration="9" data-track-index="0"></div>
+    <div id="card" class="clip" data-composition-id="s-card-host" data-composition-src="compositions/04-card.html" data-start="22" data-duration="8" data-track-index="0"></div>
+    <div id="run" class="clip" data-composition-id="s-run-host" data-composition-src="compositions/05-run.html" data-start="30" data-duration="10" data-track-index="0"></div>
+    <div id="gate" class="clip" data-composition-id="s-gate-host" data-composition-src="compositions/06-gate.html" data-start="40" data-duration="10" data-track-index="0"></div>
+    <div id="lands" class="clip" data-composition-id="s-lands-host" data-composition-src="compositions/07-lands.html" data-start="50" data-duration="8" data-track-index="0"></div>
+    <div id="end" class="clip" data-composition-id="s-end-host" data-composition-src="compositions/08-end.html" data-start="58" data-duration="7" data-track-index="0"></div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

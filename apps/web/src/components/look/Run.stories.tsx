@@ -10,6 +10,8 @@ import { nowMark } from '@/lib/stepMark';
 import { NOW_WORDS } from '@/lib/words';
 import { READS, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 import { rowOpens } from '../../../.storybook/play';
+import { AS_OF as APPROVAL_AS_OF, RUN as APPROVAL } from '../run/approve.fixture';
+import { CutPress } from './CutButton';
 import { Run } from './Run';
 
 /** The instant the stories' answer was read at. */
@@ -190,6 +192,45 @@ export const EveryState: Story = {
       const drawn = one.querySelector('[data-mark]')?.getAttribute('data-mark');
       await expect(drawn, `${id} is drawn by the mark of its step now`).toBe(run ? nowMark(run) : 'rest');
     }
+  },
+};
+
+/** The heights of the action and of Open the run in `card`, at lg. */
+const footHeights = (card: Element) =>
+  ['[data-cut-button="press"]', '[data-cut-button="link"]'].map((part) =>
+    Math.round(card.querySelector(`${part} [data-cut-shape]`)!.getBoundingClientRect().height),
+  );
+
+/**
+ * A run at an approval's gate at lg, with the waiting card's Approve as its action and without: with it, the button says the wait, so
+ * the now line keeps its chip, agent and clock and drops the words, and Open the run stands at the button's height; without it, the
+ * line says the wait's words, and Open the run stands alone at its own smaller height.
+ */
+export const Action: Story = {
+  render: () => (
+    <div style={WRAP}>
+      <Headed name="lg · with its action" width={460}>
+        <div data-with-action>
+          <Run run={APPROVAL} size="lg" asOf={APPROVAL_AS_OF} action={<CutPress>Approve land</CutPress>} />
+        </div>
+      </Headed>
+      <Headed name="lg · no action" width={460}>
+        <div data-no-action>
+          <Run run={APPROVAL} size="lg" asOf={APPROVAL_AS_OF} />
+        </div>
+      </Headed>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const [acted, bare] = ['[data-with-action]', '[data-no-action]'].map((box) => canvasElement.querySelector(box)!);
+    await expect(acted.querySelector('[data-now-words]'), 'the button says the wait: the line says no words').toBeNull();
+    await expect(acted.querySelector('[data-now-word]'), 'the step chip stays').not.toBeNull();
+    await expect(acted.querySelector('[data-waited]'), 'the clock stays').not.toBeNull();
+    const [action, opens] = footHeights(acted);
+    await expect(opens, 'Open the run is as tall as the action beside it').toBe(action);
+    await expect(bare.querySelector('[data-now-words]'), 'with no button, the line says the wait').toHaveTextContent('approve land');
+    const alone = bare.querySelector('[data-cut-button="link"] [data-cut-shape]')!.getBoundingClientRect().height;
+    await expect(Math.round(alone) < action, 'Open the run alone keeps its smaller height').toBe(true);
   },
 };
 

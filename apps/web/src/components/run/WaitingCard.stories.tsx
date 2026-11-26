@@ -28,6 +28,17 @@ const footOf = (canvas: HTMLElement) => {
 };
 
 /**
+ * What the card drawn in `canvas` says on its now line and in its foot: whether its words are drawn, and Approve's height against Open
+ * the run's.
+ */
+const saidOnce = (canvas: HTMLElement) => {
+  const [approve, opens] = ['[data-approve]', '[data-cut-button]:not([data-approve])'].map((part) =>
+    Math.round(canvas.querySelector(`${part} [data-cut-shape]`)!.getBoundingClientRect().height),
+  );
+  return { words: canvas.querySelector('[data-now-words]') !== null, sameHeight: approve === opens };
+};
+
+/**
  * The card where the page is narrow: its graph, 188 pixels wide as on every surface, and its cost on one line, and its two buttons
  * under them, at the card's right.
  */
@@ -39,6 +50,10 @@ export const Narrow: StoryObj = {
     await expect(canvasElement.querySelector('[data-approve="land"]')?.textContent, 'Approve names its step').toBe('Approve land');
     await expect(canvasElement.querySelectorAll('[data-step]').length, 'its four steps, laid out by their edges').toBe(4);
     await expect(canvasElement.querySelector('[data-fold]'), 'none folded').toBeNull();
+    await expect(saidOnce(canvasElement), 'Approve says the wait alone, and both buttons are one height').toEqual({
+      words: false,
+      sameHeight: true,
+    });
   },
   render: () => (
     <div data-card-box style={NARROW}>
@@ -55,6 +70,10 @@ export const Wide: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
     await document.fonts.ready;
     await expect(footOf(canvasElement), 'the button beside the rail, at the right').toEqual({ beside: true, fromRight: 0 });
+    await expect(saidOnce(canvasElement), 'Approve says the wait alone, and both buttons are one height').toEqual({
+      words: false,
+      sameHeight: true,
+    });
     const article = canvasElement.querySelector('article[data-run]')!;
     const link = article.querySelector('h3 a')!;
     const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();

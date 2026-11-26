@@ -5,7 +5,7 @@ description: Nemia's terms, one section per part of the product, one line each, 
 
 import { Badge } from '@astrojs/starlight/components';
 
-Each part of the product has its section, in the map's order, and each of its terms one line and a link to the page that explains it.
+Each part of the product has its own section, in the same order as the map. Each term gets one line and a link to the page that explains it.
 
 ```glossary
 runtime
@@ -27,8 +27,8 @@ templates
 
 ## Planned <Badge text="planned" variant="caution" />
 
-These terms are designed and not built yet. No page explains them until they land.
+These terms are designed but not built yet. No page explains them until they ship.
 
-- **Factory template** <Badge text="planned" variant="caution" />: a package a factory is made from: its workflows, agents and skills in one folder, shared as an archive, applied and never run.
-- **Definition, instance and package** <Badge text="planned" variant="caution" />: the kinds the template workbench settled. A definition (a skill, an agent, a workflow) is inert; an instance (a factory, a run, a task, a subscription) has one controller, which alone writes its status; a package, the template, is applied to make a factory.
-- **The factory's controller** <Badge text="planned" variant="caution" />: the controller that would apply a template to a factory, keep its workflows, agents and hires as applied, and upgrade it by a three-way merge, reporting conflicts as status.
+- **Factory template** <Badge text="planned" variant="caution" />: a package you create a factory from. It holds workflows, agents, and skills in one folder, is shared as an archive, and is applied, never run.
+- **Definition, instance and package** <Badge text="planned" variant="caution" />: the three kinds of object the template design settled on. A definition (a skill, an agent, a workflow) does nothing on its own. An instance (a factory, a run, a task, a subscription) has one controller, and only that controller writes its status. A package (the template) is applied to create a factory.
+- **The factory's controller** <Badge text="planned" variant="caution" />: a controller that would apply a template to a factory and keep its workflows, agents, and hires as applied. It would upgrade the factory with a three-way merge and report conflicts in its status.

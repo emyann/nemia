@@ -23,6 +23,7 @@ export { Reading, ReadingLines } from './Reading';
 export { Run, type RunProps } from './Run';
 export { RunClock, RunCost } from './RunFigures';
 export { QuietLabels, RunMeta } from './RunMeta';
+export { HoldLine } from './RunHold';
 export { RunMark } from './RunMarks';
 export { type PanelRead } from './RunPanel';
 export { runRecipe } from './run.recipe.ts';

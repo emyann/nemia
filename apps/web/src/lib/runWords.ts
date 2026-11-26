@@ -190,6 +190,28 @@ function runWaitWords(row: NowRow, on: WaitOn | null, step: CodedStep) {
   return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
 }
 
+/** A run a hold names, as the api serves it. */
+type HeldRun = NonNullable<RunView['holding']>['runs'][number];
+
+/** Why a run a hold waits on never lands on its own, as the row says it after its id: none where it may yet land. */
+const neverWord = (run: HeldRun) => {
+  if (run.missing) return [NOW_WORDS.missing];
+  if (run.cancelledAt) return [NOW_WORDS.calledOff];
+  return run.gone.length ? [NOW_WORDS.gone] : [];
+};
+
+/**
+ * The words of a held run: `held · until <run> lands`, the run being the first not landed that never lands on its own, else the first not
+ * landed, with why it never lands after its id (`neverWord`); `held` alone where every run it names landed, or it names none. The same
+ * words whether the hold waits on a person or not: the hold is said, never its holder as the reader.
+ * @param holding The run's hold, null where nobody holds it.
+ */
+function heldWords(holding: RunView['holding']) {
+  const open = holding?.runs.filter((run) => !run.landed) ?? [];
+  const until = open.find((run) => neverWord(run).length > 0) ?? open[0];
+  return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until.run }, ...neverWord(until), NOW_WORDS.lands] : [PERSON.held.rail];
+}
+
 /**
  * The words of a step that waits on no person, by where it stands: being checked, a run or the checkout (`runWaitWords`), a run slot, a
  * hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work or still to come.
@@ -197,10 +219,7 @@ function runWaitWords(row: NowRow, on: WaitOn | null, step: CodedStep) {
 function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null, step: CodedStep) {
   const held = row.holding != null;
   if (stands === 'atWork') return state === 'checking' ? [PERSON.checking.rail] : [];
-  if (stands === 'held') {
-    const until = row.holding?.runs.find((run) => !run.landed)?.run;
-    return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until }, NOW_WORDS.lands] : [PERSON.held.rail];
-  }
+  if (stands === 'held') return heldWords(row.holding);
   if (stands === 'waitsOnARun') return runWaitWords(row, on, step);
   if (stands === 'waitsForASlot') return [NOW_WORDS.slot];
   if (stands === 'failed' || stands === 'atRest') return [stateWordsOf(state, on, held).rail];
@@ -208,10 +227,23 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
 }
 
 /**
+ * The words of a row that waits on a person: a hold's held words (`heldWords`), another wait's tag (`waitTag`), or the rail word of the
+ * step it draws where the row names no wait.
+ * @param row The run's row.
+ * @param wait What it waits on a person for (`waitOf`), null where its step alone waits on one.
+ * @param drawn The step drawn now: its state and what it waits on.
+ */
+function yoursWords(row: NowRow, wait: Wait | null, drawn: { state: StepState; on: WaitOn | null }) {
+  if (wait?.kind === 'hold') return heldWords(row.holding);
+  return [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, row.holding != null).rail];
+}
+
+/**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
  * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or
  * waits on a person, its round of its rounds, its budget and what it spent, and the few words of its wait: on a person, the wait's tag
- * (`waitTag`); on no person, `waitWords`. None for a run whose every step is done. It says no duration: the row's Clock column says
+ * (`yoursWords`), a hold's being the held words every held row says; on no person, `waitWords`. None for a run whose every step is
+ * done. It says no duration: the row's Clock column says
  * how long the run has been at work.
  * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
  */
@@ -234,9 +266,7 @@ export function nowOf(row: NowRow) {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words: yours
-      ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail]
-      : waitWords(row, stands, drawn.state, drawn.on, step),
+    words: yours ? yoursWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
   };
 }
 

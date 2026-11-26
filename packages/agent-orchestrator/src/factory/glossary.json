@@ -130,6 +130,11 @@
       "type": "WorkflowRepoOf"
     },
     {
+      "term": "Label values",
+      "meaning": "the values each label key a factory names takes on its cards and runs (`labelValues`): kept in its own file, or in its tree's wiring where it is made from a template, rendered from the manifest's `spec.labelValues`, `key=value` words apart by whitespace, often a parameter's value (`labelValuesOf`, in `packages/agent-orchestrator/src/label-spelling/label-spelling.ts`). A filing, an apply, a label and a start that give such a key another value are refused `Invalid` before anything is written, naming the values it takes (`labelValuesRefused`, proved by `packages/agent-orchestrator/contracts/label-values.contract.ts`); a key it names not is free, and a value already standing is never judged by a later write. Served on the factory's `spec.labelValues`.",
+      "type": "LabelValueRule"
+    },
+    {
       "term": "Harness settings",
       "meaning": "the settings of a harness a factory gives every session of its runs' steps on it, on top of the repository's own: for Claude Code, through the Agent SDK's settings option, never a file written into the repository. A factory sets `attribution`, `includeGitInstructions` and `language` alone, each changing what a session writes or says and none what it may reach or run; kept in the factory's own file, never in its template, and frozen on a run at its start.",
       "type": "HarnessSettings",

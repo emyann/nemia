@@ -449,6 +449,26 @@ describe('what a render refuses by name, with nothing of it to write', () => {
     assert.deepEqual(readable.refusals, []);
     assert.deepEqual(readable.wiring.triggers?.door?.selector, 'ready');
   });
+  test('the values each label key takes, rendered from a parameter into the wiring; a word no label is refused naming it; empty wires none', () => {
+    const { dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { ...spec.parameters, v: { type: 'string', default: '' } };
+      spec.labelValues = '${{ parameters.v }}';
+    });
+    const taken = rendered(dir, ['v=work=feature work=fix']).out;
+    assert.deepEqual(taken.refusals, []);
+    assert.deepEqual(taken.wiring.labelValues, { work: ['feature', 'fix'] });
+    assert.deepEqual(JSON.parse(taken.files.find((f) => f.path === 'factory.json')?.text ?? '{}').labelValues, {
+      work: ['feature', 'fix'],
+    });
+    const refused = rendered(dir, ['v=work=a:b']).out;
+    assert.equal(refused.refusals.length, 1, refused.refusals.join('\n'));
+    assert.ok(refused.refusals[0].includes('--set v='), refused.refusals[0]);
+    assert.equal(refused.wiring.labelValues, undefined);
+    const none = rendered(dir, ['v=']).out;
+    assert.deepEqual(none.refusals, []);
+    assert.equal('labelValues' in none.wiring, false);
+  });
   test("REFUSED by name: a step's output.path outside its workflow's folder", () => {
     const { dir } = exported();
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {

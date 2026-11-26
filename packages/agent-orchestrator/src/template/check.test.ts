@@ -319,6 +319,13 @@ describe('the check of a template folder: the whole folder passes, and each rule
     assertRefused(trigger('ready', 'dev', 'Job'), 'nemia.yaml', at, 'targets a Workflow');
     assertRefused(trigger('a in (b', 'dev'), 'nemia.yaml', at, 'selector');
   });
+  test("the label values written whole that are no key=value labels are refused; a parameter's are read once rendered", () => {
+    const values = (labelValues: string) => refusalsOf((d) => (d['nemia.yaml'].spec.labelValues = labelValues));
+    assert.deepEqual(values('work=feature work=fix'), []);
+    assert.deepEqual(values('${{ parameters.check }}'), []);
+    assertRefused(values('work=a:b'), 'nemia.yaml', ['spec', 'labelValues'], '"a:b"');
+    assertRefused(values('work'), 'nemia.yaml', ['spec', 'labelValues'], '"work"');
+  });
   test("a skill the folder lacks is refused, an agent's or a step's, and a place skill nemia ships is present", () => {
     assertRefused(
       refusalsOf((d) => d[AGENT].spec.skills.push('nope')),

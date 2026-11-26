@@ -96,7 +96,9 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * `workflowRepo`), when it names any; kept, as an attach writes it, in its own file, or in its tree's wiring (`factory.json`) where it is
  * made from a template, so an upgrade keeps it; never in the template, which knows no person's folders. `generation`: the count of
  * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
- * its file holds one; a file written before the counter reads as 1 (`generationOf`).
+ * its file holds one; a file written before the counter reads as 1 (`generationOf`). `labelValues`: the values each label key it names
+ * takes on its cards and runs, when it names any — its file's, or its tree's wiring's where it is made from a template, which renders
+ * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`).
  */
 export type Factory = {
   name: string;
@@ -112,6 +114,7 @@ export type Factory = {
   costLines?: Readonly<Record<string, number>>;
   workflowRepos?: Readonly<Record<string, string>>;
   triggers?: Readonly<Record<string, CardTrigger>>;
+  labelValues?: Readonly<Record<string, readonly string[]>>;
   generation?: number;
 };
 

@@ -74,6 +74,7 @@ const TreeWiringSchema = Schema.StructWithRest(
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
+    labelValues: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(Schema.String))),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

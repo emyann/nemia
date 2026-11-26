@@ -182,6 +182,9 @@ export const filedOf = (listing: FactoryListing, home: string) => {
     ...(listing.workflowRepos === undefined || Object.keys(listing.workflowRepos).length === 0
       ? {}
       : { workflowRepos: { ...listing.workflowRepos } }),
+    ...(listing.labelValues === undefined || Object.keys(listing.labelValues).length === 0
+      ? {}
+      : { labelValues: Object.fromEntries(Object.entries(listing.labelValues).map(([key, values]) => [key, [...values]])) }),
     ...(listing.revisions === undefined ? {} : { revisions: listing.revisions }),
     ...(listing.template === undefined
       ? {}

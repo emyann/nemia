@@ -46,7 +46,7 @@ export const USAGE: Readonly<Record<string, string>> = {
   'surface-container-high': 'A raised container: a dialog, a hovered row.',
   'surface-container-highest': 'The strongest container tone: a filled field, a table head.',
   'surface-tint': 'The tint laid over a surface to show elevation. It equals primary.',
-  outline: 'A border that carries meaning, and the filled grey of a step that is done, a check that runs, a wait on another run.',
+  outline: 'A border that carries meaning: a line, never text and never a fill.',
   'outline-variant': "A hairline: a card's edge, a divider. Never the only boundary of a control.",
   shadow: 'The colour of a shadow. The look draws none.',
   scrim: 'The veil behind a modal surface.',
@@ -59,20 +59,19 @@ export const USAGE: Readonly<Record<string, string>> = {
 };
 
 /**
- * The look's four meanings, each a word and what it says, their values written by the board beside the theme (`src/styles.css`,
- * `--meaning-*`). A cost is no meaning: it is drawn in ink.
+ * The look's four meanings and rest's tint, sage, each a word and what it says, their values written by the board beside the theme
+ * (`src/styles.css`, `--meaning-*`). A cost is no meaning: it is drawn in ink.
  */
 export const MEANING: readonly (readonly [string, string])[] = [
   ['yours', 'What waits on a person: a gate, a waiting tag, the one filled button.'],
   ['alive', 'A session at work: a running step, the live step on a rail.'],
   ['failure', "What failed, and nothing else: Material's error."],
   ['rest', "What is at rest: the label's grey of a count, a clock, a finished run."],
+  ['sage', "Rest's cool grey, filled: a step that is done, an applied proposal, a landed card."],
 ];
 
 /** The look's further names, each over a role, as Tailwind's classes name them. */
 export const ALIASES: readonly { name: string; value: string; usage: string }[] = [
-  { name: 'meaning-sage', value: '{md-sys-color-outline}', usage: 'A step that is done: the filled grey of the steps rail.' },
-  { name: 'meaning-on-sage', value: '{md-sys-color-surface-container-lowest}', usage: 'Ink on `meaning-sage`.' },
   { name: 'background', value: '{md-sys-color-background}', usage: "The page ground, as Tailwind's `bg-background`." },
 ];
 

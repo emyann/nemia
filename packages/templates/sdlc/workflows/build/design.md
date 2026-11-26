@@ -15,8 +15,8 @@ The checks you may run here are the ones the repository's settings allow you, ea
 the repository's instructions say. Run nothing that writes the workspace or watches it.
 
 The review is handed your declared fields, `sources` among them, and may fetch none of the pages you read: the passage you quote there
-is all it has of each. A claim of the spec whose passage is not in `sources` is one the review cannot check, and says so to the person
-who approves the landing.
+is all it has of each. A claim of the spec whose passage is not in `sources` is one the review cannot check: it stops the landing for
+a person's answer, since no gate follows the review unless the run was started with one at land.
 
 **A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
 propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`

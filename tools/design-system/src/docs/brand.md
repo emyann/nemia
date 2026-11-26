@@ -7,7 +7,7 @@ A colour says one thing, on every page. Name a colour by its role, never by a va
 - Use `meaning-yours` (acid yellow, with `meaning-on-yours` black on it) for what waits on a person: a gate, a waiting tag and the one filled button of a screen. Use it for nothing else.
 - Use `meaning-alive` (a pale violet in dark, a deeper violet in light) for a session at work: a running step, the live step on a rail. Violet says alive and nothing else: selection and focus are ink.
 - Use `meaning-failure` (`md-sys-color-error`) for what failed, and for nothing else. A board where nothing failed shows no red.
-- Use `meaning-rest` (the label's grey, black ink) for what is at rest: a count, a clock, a finished run. Use `meaning-sage` (`md-sys-color-outline`) filled for a step that is done.
+- Use `meaning-rest` (the label's grey, black ink) for what is at rest: a count, a clock, a finished run. Use `meaning-sage`, rest's own cool grey, filled for what is done: a step, an applied proposal, a landed card.
 - Draw data, a cost among it, in plain ink: data never takes a hue, only what it means for a person does.
 - Draw what a person selects or sets in ink: a selection on `md-sys-color-secondary-container` under its ink, the kit's focus ring in `md-sys-color-secondary`, which is ink here.
 - Pair every fill with its content colour: `md-sys-color-primary` carries `md-sys-color-on-primary`. Let text inherit `md-sys-color-on-surface`; use `md-sys-color-on-surface-variant` for supporting text.

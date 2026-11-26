@@ -239,7 +239,7 @@
   --meaning-on-failure-container: var(--md-sys-color-on-error-container);
   --meaning-rest: #2f3031;
   --meaning-on-rest: #f2f0f1;
-  --meaning-sage: var(--md-sys-color-outline);
+  --meaning-sage: #6b6e72;
   --meaning-on-sage: var(--md-sys-color-surface-container-lowest);
   --radius: 0.625rem;
 }
@@ -256,6 +256,7 @@
     --meaning-on-alive-container: #e9ddff;
     --meaning-rest: #a9aaa8;
     --meaning-on-rest: #0d0d0d;
+    --meaning-sage: #9aa3ad;
   }
 }
 

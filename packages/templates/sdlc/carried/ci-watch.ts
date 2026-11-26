@@ -180,7 +180,7 @@ function declaresAt(cwd: string, ref: string) {
     throw new Unread(`cannot tell whether ${ref.slice(0, 12)} declares a CI workflow: ${ran.err}`);
   }
   const files = parsed<{ name?: string }[]>(`the workflows of ${ref.slice(0, 12)}`, ran.out);
-  return Array.isArray(files) && declaresCi(files.map((f) => `.github/workflows/${f.name ?? ''}`));
+  return Array.isArray(files) && declaresCi(files.map((f) => ['.github/workflows', f.name ?? ''].join('/')));
 }
 
 /** The job GitHub names in `entry`'s workflow run, as `gh api repos/{owner}/{repo}/actions/runs/<id>/jobs` gives one. */

@@ -244,7 +244,7 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
         'revisions',
         Effect.gen(function* () {
           if (swept) yield* definitionsSwept();
-          return yield* definitionRevisionsNow();
+          return yield* definitionRevisionsNow(true);
         }),
       ),
   });

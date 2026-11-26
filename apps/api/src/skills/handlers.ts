@@ -21,7 +21,8 @@ import {
   definitionJudged,
   definitionRevisionNow,
   definitionRevisionsNow,
-  skillVersion,
+  SkillDoor,
+  type SkillDoorShape,
   skillRemoved,
   libraryUsers,
   recordBuiltinCopy,
@@ -207,7 +208,7 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
     objects.map(async (one) => {
       const name = one.metadata.name;
       const copiedAt = one.status.origin === 'user' ? copies[`Skill/${name}`] : undefined;
-      const builtinNow = copiedAt === undefined ? undefined : builtinVersion(name);
+      const builtinNow = copiedAt === undefined ? undefined : await builtinVersion(s, name);
       return {
         ...one,
         status: {
@@ -220,9 +221,15 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
   );
 }
 
-/** The version of Nemia's builtin skill `name` now, or undefined where Nemia builds in none. */
-const builtinVersion = (name: string) =>
-  skillFoldersIn(BUILTIN_SKILLS).includes(name) ? (skillVersion(path.join(BUILTIN_SKILLS, name)) ?? undefined) : undefined;
+/** The name the Skill door is asked for a skill by, a branded string the package makes of a folder's name. */
+type SkillNamed = Parameters<SkillDoorShape['skills']['there']>[0];
+
+/** The digest of Nemia's builtin skill `name` now, read through the Skill door, or undefined where Nemia builds in none. */
+const builtinVersion = async (s: Served, name: string) => {
+  if (!skillFoldersIn(BUILTIN_SKILLS).includes(name)) return undefined;
+  const there = await s.inRequest(Effect.flatMap(SkillDoor, (door) => door.skills.there(name as SkillNamed, BUILTIN_SKILLS)));
+  return there.kind === 'held' ? there.version : undefined;
+};
 
 /** The library's skill `name` (from `asked`, where one is), read now. */
 async function libraryAt(s: Served, name: string, asked?: Origin) {
@@ -233,7 +240,7 @@ async function libraryAt(s: Served, name: string, asked?: Origin) {
 
 /** The builtin skill `name` copied to the person's, its digest at the copy recorded so a later change of it is flagged. */
 async function copied(s: Served, name: string) {
-  const version = builtinVersion(name);
+  const version = await builtinVersion(s, name);
   await s.inRequest(SKILLS_WRITE.handler({ from: 'user', copy: name, builtin: BUILTIN_SKILLS }));
   if (version !== undefined) recordBuiltinCopy(s.home, `Skill/${name}`, version);
 }

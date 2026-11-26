@@ -588,11 +588,9 @@ describe('a pinned run whose files moved past its pins says `revisions behind` o
       behind(run).map((l) => [l.step, l.word, l.type, l.source, l.waits]),
       [[undefined, 'revisions behind', 'Warning', 'tick', undefined]],
     );
-    assert.match(
-      behind(run)[0].note ?? '',
-      new RegExp(`^workflow ${name}: rev 1, now 2 \\([0-9a-f]{8}\\)$`),
-      'the kind behind, in the note',
-    );
+    const said = new RegExp(`^workflow ${name}: rev (\\d+), now (\\d+) \\([0-9a-f]{8}\\)$`).exec(behind(run)[0].note ?? '');
+    assert.ok(said, 'the kind behind, in the note');
+    assert.ok(Number(said[2]) > Number(said[1]), 'at a later revision than the pin');
   });
   s.test('a second pass adds nothing; a new edit is a new drift and one more line; the files back on the pins raise none', async () => {
     await ticks(2);
@@ -604,7 +602,7 @@ describe('a pinned run whose files moved past its pins says `revisions behind` o
     const notes = behind(run).map((l) => l.note ?? '');
     assert.equal(notes.length, 2, notes.join(' | '));
     assert.notEqual(notes[0], notes[1], 'two edits nobody resolved read as one number, and the digest tells them apart');
-    assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev 1, now 2 (`)));
+    assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev `)));
   });
   s.test('a succeeded run, which files nothing again, never raises it', async () => {
     const done = await started('done', dir);

@@ -469,6 +469,7 @@ describe('a folder edited around a run: what it pins, what the index numbers, an
     b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal(b.tasks.get(`${run.id}-build-check`)!.spec.config?.env?.WF_CARRIED_FILES, again, 'the check is told the new copy');
+    fs.rmSync(carried, { recursive: true, force: true });
   });
   s.test('a run whose workflows hold no carried folder records none, and its check is told none', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "tools/contracts/prove.ts",
+        "tools/coverage/{record,compare}.ts",
+        "tools/release/{release,archive}.ts",
+        "tools/store-measure/{report,loop}.ts",
+        "tools/observe/profile/preload.ts",
+        "tools/observe/render/{render,reap,hold}.ts"
+      ]
+    },
+    "packages/agent-runtime": {
+      "entry": [
+        "bin/*.ts",
+        "test/fixtures/**/*.ts"
+      ]
+    },
+    "packages/agent-orchestrator": {
+      "entry": [
+        "bin/*.ts",
+        "test/fixtures/**/*.ts",
+        "test/exporting-child.ts"
+      ]
+    },
+    "packages/templates": {
+      "entry": [
+        "released.ts",
+        "*/carried/*.ts",
+        "*/workflows/**/*.ts"
+      ]
+    },
+    "apps/api": {
+      "entry": [
+        "src/main.ts",
+        "src/openapi/print.ts",
+        "bin/*.ts",
+        "test/fixtures/**/*.ts"
+      ]
+    },
+    "apps/docs": {
+      "entry": [
+        "src/content.config.mjs",
+        "built.ts",
+        "test/dev.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": [
+        "test/e2e/run.ts",
+        "test/e2e/serve.ts",
+        "test/e2e/worker.ts",
+        "test/e2e/pages/*.ts",
+        "test/e2e/stories/*.ts",
+        "test/e2e/broken-page.ts",
+        "test/e2e/contrast-report.ts",
+        "test/e2e/look-photos.ts"
+      ],
+      "ignoreDependencies": [
+        "@google/design.md"
+      ]
+    },
+    "tools/guards": {
+      "entry": [
+        "rules.ts",
+        "due.ts",
+        "test/fixtures/**/*.ts"
+      ]
+    },
+    "tools/design-system": {
+      "entry": [
+        "src/produce.ts"
+      ],
+      "ignoreDependencies": [
+        "lucide-react",
+        "tailwindcss"
+      ]
+    }
+  },
+  "ignore": [
+    "apps/web/.claude/**",
+    "apps/web/.storybook/public/**"
+  ],
+  "ignoreIssues": {
+    "**/contracts/*.contract.ts": [
+      "exports",
+      "types"
+    ],
+    "apps/web/src/components/ui/ds/**": [
+      "files",
+      "exports",
+      "types",
+      "duplicates"
+    ]
+  },
+  "ignoreBinaries": [
+    "codex",
+    "systemd-run",
+    "nemia"
+  ]
+}

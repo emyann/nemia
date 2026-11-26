@@ -11,10 +11,9 @@ this machine's daemon, reached through its api. It sits beside the board, above 
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract, each verb list spelled once (`src/verbs.ts`, `objects`) and read by the code and the contract (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
-- **It imports the objects by their entry, the api's types, and no other package of ours.** Its source and its bins import no
+- **It imports the objects by their entry, and no other package of ours.** Its source and its bins import no
   `agent-orchestrator`, no `agent-runtime`, no harness SDK and no path into `packages/`; `objects` by its entry alone, never
-  `objects/...`; from the api, only `import type` of its client door, `apps/api/src/client/client.ts`, so an answer's shape is the
-  api's or the objects' and the client holds no copy of it. A value the client needs is asked of the api over HTTP. Held by
+  `objects/...`; nothing of the api, not even a type, so an answer's shape is the objects' and the client holds no copy of it. A value the client needs is asked of the api over HTTP. Held by
   `apps/cli/test/structure.test.ts` and the cli's block of `.oxlintrc.json` (proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). A bin imports `../src/` and nothing else.
 - **Every read is asked through `src/objects.ts`**, `objects`' one typed client of its `Api` (`apiClient`) over the daemon's lease

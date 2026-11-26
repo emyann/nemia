@@ -7,9 +7,9 @@
  *   route — an import, a re-export, `import()`, `require()` or a resolve — but the one `local.ts` makes (`spawn`).
  * - **The objects by their entry alone** (`objects`): `objects`, the shapes of what the api serves, is the one workspace package the
  *   client imports, and never a path into it (`objects/src/...`).
- * - **No path out of `apps/cli`** (`leaves`, `packages`), but to the api's client door: none into `packages/`.
- * - **The api's types alone, from its door** (`api-value`, `api-door`): an import of the api, by a relative path or by its name `api`, is
- *   `import type` (or `export type`), and of `apps/api/src/client/client.ts` alone.
+ * - **No path out of `apps/cli`** (`leaves`, `packages`): none into `packages/`.
+ * - **Nothing of the api** (`api`): no import of the api, by a relative path or by its name `api`, not even `import type`: an answer's
+ *   shape is `objects`'.
  * - **The bins are the program's door alone** (`bin`): a file of `bin/` imports `../src/` and nothing else.
  * - **One store fact** (`store`): `daemon.json`, `.agent-workflows`, `.agent-engine`, `WF_ROOT` and `AE_ROOT` are spelled in the code of
  *   `src/where.ts` alone, which reads the lease's `url`.
@@ -34,9 +34,6 @@ import { withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 
 const CLI = path.join(import.meta.dirname, '..');
-
-/** The api's one door this client reads, by its path from the repository's root. */
-const DOOR = 'apps/api/src/client/client.ts';
 
 /** The one file that reads the store, the one that spawns, and the folder that follows the feed. */
 const WHERE = 'src/where.ts';
@@ -75,7 +72,7 @@ const STORE = /daemon\.json|\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_RO
 const FEED = /\/api\/feed\/stream|\bEventSource\b/;
 
 /** The rule a break is of, one word each, named in the header. */
-type Rule = 'workspace' | 'objects' | 'harness' | 'leaves' | 'packages' | 'api-value' | 'api-door' | 'bin' | 'store' | 'spawn' | 'feed';
+type Rule = 'workspace' | 'objects' | 'harness' | 'leaves' | 'packages' | 'api' | 'bin' | 'store' | 'spawn' | 'feed';
 
 /** A file of the client that breaks a rule, and what to do instead. */
 type Break = { file: string; rule: Rule; fix: string };
@@ -165,7 +162,7 @@ function targetOf(file: string, spec: string) {
 }
 
 /** What the import of `named` in `file` breaks, if any: a package below the api, a path out, the api other than by its door's types. */
-function importBreak(file: string, { spec, way, typeOnly }: Named) {
+function importBreak(file: string, { spec, way }: Named) {
   const target = targetOf(file, spec);
   if (ENTRIES.test(spec))
     return (
@@ -192,21 +189,14 @@ function importBreak(file: string, { spec, way, typeOnly }: Named) {
   if (target === undefined) return undefined satisfies Break | undefined;
   if (target.startsWith('packages/'))
     return { file, rule: 'packages', fix: `import no package's file: ask the api for what ${spec} gives` } satisfies Break | undefined;
-  if (target === 'apps/api' || target.startsWith('apps/api/')) {
-    if (!typeOnly)
-      return { file, rule: 'api-value', fix: `import type it from ${DOOR}, and ask the api over HTTP for the value` } satisfies
-        | Break
-        | undefined;
-    return (
-      target === DOOR ? undefined : { file, rule: 'api-door', fix: `import type the shape from ${DOOR}, the api's one door for it` }
-    ) satisfies Break | undefined;
-  }
+  if (target === 'apps/api' || target.startsWith('apps/api/'))
+    return { file, rule: 'api', fix: `ask the api over HTTP, and read its answer's shape from ${OBJECTS}` } satisfies Break | undefined;
   return (
     target.startsWith('apps/cli/') ? undefined : { file, rule: 'leaves', fix: `${spec} leaves apps/cli: reach the api over HTTP` }
   ) satisfies Break | undefined;
 }
 
-/** Each import of the client that reaches past the api, out of `apps/cli`, or into the api other than by its door's types. */
+/** Each import of the client that reaches past the api, out of `apps/cli`, or into the api. */
 const importBreaks = (texts: ReadonlyMap<string, string>) =>
   [...texts].flatMap(([file, text]) => namedIn(file, text).flatMap((named) => importBreak(file, named) ?? [])) satisfies Break[];
 
@@ -264,8 +254,8 @@ test('the scan reads the client, its bins among it, and sees each way a file nam
     `${LOCAL} resolves the CLI`,
   );
   const text = [
-    "import type { RunObject } from '../../api/src/client/client.ts';",
-    "import { type A, type B } from 'api/src/client/client.ts';",
+    "import type { RunObject } from '../../api/src/runs/runs.ts';",
+    "import { type A, type B } from 'api/src/guard.ts';",
     "import { c, type D } from './c.ts';",
     "export type { E } from '../../api/src/runs/runs.ts';",
     `export * from '${RUNTIME}';`,
@@ -279,8 +269,8 @@ test('the scan reads the client, its bins among it, and sees each way a file nam
   assert.deepEqual(
     namedIn('src/x.ts', text).map((n) => `${n.way} ${n.typeOnly ? 'type' : 'value'} ${n.spec}`),
     [
-      'static type ../../api/src/client/client.ts',
-      'static type api/src/client/client.ts',
+      'static type ../../api/src/runs/runs.ts',
+      'static type api/src/guard.ts',
       'static value ./c.ts',
       'static type ../../api/src/runs/runs.ts',
       'static value agent-runtime',
@@ -337,29 +327,19 @@ test('REFUSED: a relative path out of apps/cli, and one into packages/', () => {
   assert.deepEqual(ruled(importBreaks(plantedIn('src/reads/x.ts', "import { x } from '../../test/helpers.ts';"))), [], 'inside apps/cli');
 });
 
-test('REFUSED: a value imported from the api, and a type imported from any file of it but its client door', () => {
+test('REFUSED: anything imported from the api, a value or a type, by any route', () => {
   for (const [file, line] of [
-    ['src/x.ts', "import { appOf } from '../../api/src/client/client.ts';"],
-    ['src/reads/x.ts', "import { x } from '../../../api/src/client/client.ts';"],
-    ['src/x.ts', "import { x, type Y } from 'api/src/client/client.ts';"],
-    ['src/x.ts', "export * from '../../api/src/client/client.ts';"],
-    ['src/x.ts', "const c = await import('../../api/src/client/client.ts');"],
-  ])
-    assert.deepEqual(ruled(importBreaks(plantedIn(file, line))), [`${file} api-value`], line);
-  for (const [file, line] of [
+    ['src/x.ts', "import { appOf } from '../../api/src/app.ts';"],
+    ['src/reads/x.ts', "import { x } from '../../../api/src/guard.ts';"],
+    ['src/x.ts', "import { x, type Y } from 'api/src/guard.ts';"],
+    ['src/x.ts', "export * from '../../api/src/app.ts';"],
+    ['src/x.ts', "const c = await import('../../api/src/app.ts');"],
     ['src/x.ts', "import type { RunObject } from '../../api/src/runs/runs.ts';"],
     ['src/x.ts', "import type { App } from 'api/src/app.ts';"],
     ['src/x.ts', "import type { App } from 'api';"],
     ['src/watch/x.ts', "export type { Feed } from '../../../api/src/factory/feed.ts';"],
   ])
-    assert.deepEqual(ruled(importBreaks(plantedIn(file, line))), [`${file} api-door`], line);
-  for (const [file, line] of [
-    ['src/x.ts', "import type { RunObject } from '../../api/src/client/client.ts';"],
-    ['src/reads/x.ts', "import type { RunObject } from '../../../api/src/client/client.ts';"],
-    ['src/reads/x.ts', "import { type RunObject, type RunSummary } from 'api/src/client/client.ts';"],
-    ['src/watch/x.ts', "export type { FeedEvent } from '../../../api/src/client/client.ts';"],
-  ])
-    assert.deepEqual(ruled(importBreaks(plantedIn(file, line))), [], `${line} is let through`);
+    assert.deepEqual(ruled(importBreaks(plantedIn(file, line))), [`${file} api`], line);
 });
 
 test('REFUSED: a bin that imports anything but the source', () => {

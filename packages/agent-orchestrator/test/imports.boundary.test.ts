@@ -1,7 +1,7 @@
 /**
  * The layers' import rules, held by lint (`docs/architecture.md`, "The rules"): the board imports no workspace package, no harness
- * SDK and no path into `packages/`; the client (`apps/cli`) imports none either, and from the api only `import type` of its client
- * door, `apps/api/src/client/client.ts` (a plant named `type:<spec>` is written as a type-only re-export); the api imports the
+ * SDK and no path into `packages/`; the client (`apps/cli`) imports none either, and nothing of the api, not even a type (a plant named
+ * `type:<spec>` is written as a type-only re-export); the api imports the
  * orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect` alone, and never the runtime or a harness SDK; the
  * orchestrator imports no harness SDK; the runtime imports no layer above it. The objects (`packages/objects`) sit at the bottom beside
  * the runtime: the board, the client, the api and the orchestrator import them by their one entry, `objects`, and never a path into
@@ -59,24 +59,16 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'agent-runtime/vocabulary',
       ...SDKS,
       '../../../packages/agent-orchestrator/src/run.ts',
-      '../../api/src/client/client.ts',
-      '../../../api/src/client/client.ts',
-      'api/src/client/client.ts',
+      '../../api/src/guard.ts',
+      '../../../api/src/runs/runs.ts',
+      'api/src/app.ts',
       'api',
       'type:../../api/src/runs/runs.ts',
+      'type:../../../api/src/guard.ts',
       'type:api/src/app.ts',
       'objects/src/run.ts',
     ],
-    allowed: [
-      'objects',
-      'effect',
-      'node:fs',
-      './route.ts',
-      '../src/main.ts',
-      'type:../../api/src/client/client.ts',
-      'type:../../../api/src/client/client.ts',
-      'type:api/src/client/client.ts',
-    ],
+    allowed: ['objects', 'effect', 'node:fs', './route.ts', '../src/main.ts'],
   },
   {
     name: 'api',

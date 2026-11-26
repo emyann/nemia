@@ -1,2 +1,0 @@
-apps/web/src/components/ui/switch.tsx#on-primary
-apps/web/src/components/ui/switch.tsx#primary

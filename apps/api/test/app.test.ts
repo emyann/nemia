@@ -562,6 +562,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
         waiting: null,
         holdUntil: [],
         holding: null,
+        assignee: null,
         /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
         status: 'waiting',
         phase: 'waiting',

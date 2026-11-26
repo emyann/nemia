@@ -5,8 +5,13 @@
  */
 import type { Args, Flag, Positional, Spec } from './command.ts';
 
-/** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
-export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
+/** `--why`, `--by` or `--to`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
+export type Said = {
+  readonly flag: '--why' | '--by' | '--to';
+  readonly key: 'why' | 'by' | 'to';
+  readonly takes: string;
+  readonly cap: number;
+};
 
 /**
  * Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms.
@@ -29,11 +34,11 @@ export const takesFor = (refusals: Readonly<Record<string, string>>, flag: strin
 };
 
 /**
- * `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space.
+ * `--why`, `--by` or `--to`'s value as one line: every run of whitespace, a newline included, one space.
  * @param args The command line's arguments, by key.
- * @param key Which of the two flags' values to read.
+ * @param key Which of the three flags' values to read.
  */
-export const saidOf = (args: Args, key: 'why' | 'by') => {
+export const saidOf = (args: Args, key: 'why' | 'by' | 'to') => {
   const value = args[key];
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : undefined;
 };

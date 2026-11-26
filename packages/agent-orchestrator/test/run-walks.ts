@@ -930,4 +930,62 @@ const FORGETTING: Record<string, Walk[]> = {
 };
 
 /** The Run door's walks, by method: every method of `RunDoorShape` has one, or `walksOn`'s first test fails. */
-export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = { ...RUNS, ...ASK_WALKS, ...HOLDS, ...SAID, ...LABELS, ...FORGETTING };
+const ASSIGNEES: Record<string, Walk[]> = {
+  'assignees.put': [
+    {
+      name: 'an assignee is put once: a second put answers null and the first stands, read back with who put it',
+      walk: ({ door }) => {
+        made(door, 'w-assign');
+        const put = act(door.assignees.put(idOf('w-assign'), { forMs: 3_600_000, name: 'ann', why: 'reading it', actor: ON_LAPTOP })) as {
+          at: string;
+          name?: string;
+          forMs: number;
+        };
+        const again = act(door.assignees.put(idOf('w-assign'), { forMs: 60_000, name: 'bob' }));
+        const read = (act(door.runs.read(idOf('w-assign'))) as Run).assignee;
+        return [put.name, put.forMs, again, read?.at === put.at, read?.why, read?.actor];
+      },
+      says: ['ann', 3_600_000, null, true, 'reading it', ON_LAPTOP],
+    },
+  ],
+  'assignees.end': [
+    {
+      name: 'an assignee is ended only as it was put, leaving a receipt of how and by whom',
+      walk: ({ door }) => {
+        made(door, 'w-unassign');
+        const put = act(door.assignees.put(idOf('w-unassign'), { forMs: 3_600_000 })) as { at: string };
+        const other = act(door.assignees.end(idOf('w-unassign'), '2020-01-01T00:00:00.000Z', 'given-back'));
+        const ended = act(door.assignees.end(idOf('w-unassign'), put.at, 'given-back', ON_LAPTOP));
+        const read = act(door.runs.read(idOf('w-unassign'))) as Run;
+        const receipt = read.unassigned;
+        return [
+          other,
+          ended,
+          act(door.assignees.stands(idOf('w-unassign'))),
+          read.assignee,
+          receipt?.since === put.at,
+          receipt?.how,
+          receipt?.actor,
+        ];
+      },
+      says: [false, true, false, undefined, true, 'given-back', ON_LAPTOP],
+    },
+  ],
+  'assignees.stands': [
+    {
+      name: 'no assignee stands for a run nobody assigned',
+      walk: ({ door }) => act(door.assignees.stands(idOf('w-assignee-none'))),
+      says: false,
+    },
+  ],
+};
+
+export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = {
+  ...RUNS,
+  ...ASK_WALKS,
+  ...HOLDS,
+  ...ASSIGNEES,
+  ...SAID,
+  ...LABELS,
+  ...FORGETTING,
+};

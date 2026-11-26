@@ -13,6 +13,7 @@ import type { Judgement } from '../summary/judgement.verb.ts';
 import { type RunSummary, unjudgedFields } from '../summary/summary.verb.ts';
 import { clockOf, waitingSinceOf } from '../timeline/index.ts';
 import { clockUntilOf, finishedAtOf, kindOf, outcomeOf, wallMsOf } from '../run-state/run-state.ts';
+import { asksOfAPerson } from '../phase/phase.ts';
 
 /** The frame's parts of a run's status: all seven keys, null where a part is not of the run's state. */
 export type FrameParts = Required<Pick<RunStatus, 'state' | 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince' | 'finishedAt' | 'outcome'>>;
@@ -23,9 +24,10 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
 /**
  * The frame's parts of the run `summary` says, measured to `now` (epoch ms): its state (`kindOf`); its wall time until `now`, or until its
  * work stopped for a finished run (`wallMsOf`), and its clock read at that same instant (`clockUntilOf`), so the clock's five parts add up
- * to it; for a waiting run, what each of its steps cost in the summary's order, every try's session together, and when its present wait
- * on a person began (`waitingSinceOf`): the end of the waiting step's last try or the placing of a hold only a person lifts, the earliest
- * where several are open, null where the record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
+ * to it; for a waiting run, what each of its steps cost in the summary's order, every try's session together; for a run that asks
+ * anything of a person (`asksOfAPerson`), whoever has it in hand, when its present wait on a person began (`waitingSinceOf`): the end
+ * of the waiting step's last try or the placing of a hold only a person lifts, the earliest where several are open, null where the
+ * record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
  * ended (`outcomeOf`). Off `judgement`'s own run, views and steps.
  * @param summary The run's summary, as the whole list summarizes it.
  * @param judgement The run's judgement on this read: its record, its tasks' views and its steps.
@@ -44,7 +46,7 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, now: num
     stepCosts: waiting
       ? summary.steps.map(({ name }) => ({ step: name, cost: spentOf(stepSpend(run, name, (id) => taskSpend(views.get(id)))) }))
       : null,
-    waitingSince: waiting ? waitingSinceOf(run, views, steps, summary.waitingOnYou, held) : null,
+    waitingSince: asksOfAPerson(summary) ? waitingSinceOf(run, views, steps, summary.waitingOnYou, held) : null,
     finishedAt: finished ? finishedAtOf(summary) : null,
     outcome: finished ? outcomeOf(summary) : null,
   } satisfies FrameParts;
@@ -60,13 +62,10 @@ export const framed = (object: RunObject, parts: FrameParts) => ({ ...object, st
 /**
  * The state of a run left unjudged (a task of it does not read, or its unfrozen folder does not load), as the whole list summarizes it
  * off its record (`unjudgedFields`): `running` and moving, so in flight, but where nothing of it is judged.
- * @param run The run's record: its id, factory, creation and cancellation.
+ * @param run The run's record: its cancellation.
  */
-export const unjudgedStateOf = (run: Pick<Run, 'id' | 'factory' | 'createdAt' | 'cancelledAt'>) =>
+export const unjudgedStateOf = (run: Pick<Run, 'cancelledAt'>) =>
   kindOf({
-    id: run.id,
-    factory: run.factory ?? null,
-    createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     waitingOnYou: [],
     ...unjudgedFields(),

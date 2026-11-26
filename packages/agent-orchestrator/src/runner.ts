@@ -413,6 +413,7 @@ export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type Floo
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
+export { ASSIGN } from './assignee/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';
 export { PRUNE, RM } from './forget/commands.verb.ts';

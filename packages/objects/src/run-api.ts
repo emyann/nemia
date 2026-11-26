@@ -17,6 +17,8 @@ import {
   RunApproved,
   RunAsked,
   RunCancelled,
+  RunAssign,
+  RunAssigned,
   RunHeld,
   RunHold,
   RunPrune,
@@ -192,6 +194,20 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     success: RunHeld,
     error: runActionErrors,
   }).annotate(OpenApi.Description, "Lifts the run's hold now, recording who lifted it. Answers RunHeld, lifted."),
+  HttpApiEndpoint.post('assign', '/api/namespaces/:namespace/runs/:name/assignee', {
+    params: runParams,
+    payload: RunAssign,
+    success: RunAssigned,
+    error: runActionErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Puts the run in the hand the body names, or the caller’s: what it asks of a person is theirs to answer until given back, the run is over, or an ask waits past their time. Answers RunAssigned.',
+  ),
+  HttpApiEndpoint.delete('unassign', '/api/namespaces/:namespace/runs/:name/assignee', {
+    params: runParams,
+    success: RunAssigned,
+    error: runActionErrors,
+  }).annotate(OpenApi.Description, 'Gives the run back now, recording who gave it back. Answers RunAssigned, ended.'),
   HttpApiEndpoint.post('cancel', '/api/namespaces/:namespace/runs/:name/cancel', {
     params: runParams,
     success: RunCancelled,

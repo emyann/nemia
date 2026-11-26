@@ -112,6 +112,24 @@ test('a run whose step signed off blocked says BLOCKED in its status, and waits 
   assert.equal(cellOf(run, 'Steps'), 'build verified ✓ $0.40 wf/r-blocked/build; review succeeded · BLOCKED · Which database?');
 });
 
+test("a run in someone's hand says who has it in its status, and asks what it asks of them, with how to give it back", () => {
+  const word = 'ann has it in hand (reading the plan) — back to you at 2026-10-16T05:00:00.000Z if unanswered';
+  const run = runOf('r-hand', {
+    status: {
+      status: 'waiting',
+      waitingOnYou: ['review'],
+      waitingOnYouWords: ['review'],
+      assignee: { at: '2026-10-16T04:00:00.000Z', forMs: 3_600_000, comesBackAt: '2026-10-16T05:00:00.000Z', word, name: 'ann' },
+    },
+  });
+  assert.equal(cellOf(run, 'Status'), 'waiting, assigned to ann — review');
+  assert.equal(cellOf(run, 'Waits'), `asked of ann: review — nemia decide r-hand; ${word} — nemia assign r-hand --off gives it back`);
+  const byAgent = runOf('r-agent', {
+    status: { assignee: { at: 'then', forMs: 1000, comesBackAt: null, word: 'w', actor: { kind: 'agent', agent: 'operator' } } },
+  });
+  assert.equal(cellOf(byAgent, 'Status'), 'running, assigned to operator', 'with no name said, the caller who assigned it');
+});
+
 test('a run at a gate says what to decide with `nemia approve <run> <step>`, the approval named once', () => {
   const run = runOf('r-gate', {
     status: {

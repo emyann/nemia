@@ -24,6 +24,7 @@ import {
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
+import { markInHand, nowMark } from '../src/lib/stepMark.ts';
 import { givenAgent, summary, type Word } from './run.fixture.ts';
 
 /** A command, as the api's advice can carry one: no sentence repeats it. */
@@ -290,6 +291,31 @@ describe('ENDED, whenWords, presentWait: how a run ended, and when, in plain wor
 });
 
 describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its steps', () => {
+  test('a run at its gate in someone’s hand says its ask, then who has it, and is drawn as theirs, not yours', () => {
+    const gate = summary([['land', 'awaiting approval']], { waitingOnYou: ['land'] });
+    const assignee = { at: '2026-11-01T00:00:00.000Z', forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    const inHand = nowOf({ ...gate, assignee });
+    assert.deepEqual(inHand?.words, [...(nowOf(gate)?.words ?? []), NOW_WORDS.inHand('ann')], 'the ask as it was, and who has it');
+    assert.notEqual(inHand?.tone, nowOf(gate)?.tone, 'drawn apart from a step that waits on you');
+  });
+  test('a run both held until a person lifts it and in someone’s hand is theirs too: its chip is outlined, never yellow, and says who has it', () => {
+    const assignee = { at: '2026-11-01T00:00:00.000Z', forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    const held = summary([['design', 'waiting']], { moving: false, holding, waitingOnYou: [] });
+    assert.equal(nowOf(held)?.tone, 'yours', 'held by a person alone, it is yours');
+    const inHand = nowOf({ ...held, assignee });
+    assert.equal(inHand?.tone, 'waits', 'held and assigned, it is theirs');
+    assert.deepEqual(inHand?.words.at(-1), NOW_WORDS.inHand('ann'));
+  });
+  test('a run in someone’s hand draws the step that waits on a person outlined, not yellow, on its graph and in its mark: the chip and the graph agree', () => {
+    const gate = summary([['land', 'awaiting approval']], { waitingOnYou: ['land'] });
+    const assignee = { at: '2026-11-01T00:00:00.000Z', forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
+    assert.equal(nowMark(gate), 'yours');
+    assert.equal(nowMark({ ...gate, assignee }), 'waits');
+    assert.deepEqual(
+      [markInHand('yours', true), markInHand('yours', false), markInHand('alive', true), markInHand('done', true)],
+      ['waits', 'yours', 'alive', 'done'],
+    );
+  });
   test('the rail says each step and its word, in the run’s order', () => {
     const mixed = summary([
       ['design', 'verified ✓'],

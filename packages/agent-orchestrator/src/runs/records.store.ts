@@ -62,6 +62,7 @@ import {
   composedRun,
   heldText,
   holdStands,
+  assigneeStands,
   keepSaid,
   markCancelled,
   readAs,
@@ -70,6 +71,7 @@ import {
   recordIn,
   recordValue,
   removeHold,
+  removeAssignee,
   restStamps,
   runFile,
   runsDir,
@@ -77,6 +79,7 @@ import {
   UnreadableRecord,
   When,
   writeHold,
+  writeAssignee,
   type AskEntry,
 } from '../record/record.store.ts';
 import type { AskKey, AskWritten, PersonRequest, Run, RunStore } from '../record/record.ts';
@@ -575,7 +578,7 @@ function askMethods(open: Opened, held: Held) {
 
 /** The Run door's markers beside a run, files in the store's root `home`. */
 function markerMethods(home: string) {
-  const markers: Pick<Shape, 'holds' | 'said' | 'labels' | 'refresh' | 'forgetting'> &
+  const markers: Pick<Shape, 'holds' | 'assignees' | 'said' | 'labels' | 'refresh' | 'forgetting'> &
     Pick<Shape['runs'], 'calledOff' | 'cancel' | 'filesAt' | 'dropFiles' | 'prune' | 'pruned'> = {
     calledOff: (id) => fromThrow(() => calledOffByMarker(home, id) || pauseStands(home)),
     cancel: (id, actor) => fromThrow(() => markCancelled(home, id, actor)),
@@ -587,6 +590,11 @@ function markerMethods(home: string) {
       lift: (id, at, actor) => fromThrow(() => removeHold(home, id, at, actor)),
       put: (id, until, said) => fromThrow(() => writeHold(home, id, until, said)),
       stands: (id) => fromThrow(() => holdStands(home, id)),
+    },
+    assignees: {
+      put: (id, said) => fromThrow(() => writeAssignee(home, id, said)),
+      end: (id, at, how, actor) => fromThrow(() => removeAssignee(home, id, at, how, actor)),
+      stands: (id) => fromThrow(() => assigneeStands(home, id)),
     },
     said: { put: (id, step, text) => fromThrow(() => keepSaid(home, id, step, text)) },
     labels: { put: (id, labels) => fromThrow(() => writeLabels(home, id, labels)) },
@@ -615,11 +623,12 @@ function markerMethods(home: string) {
  * @param held The keyspace a read reads, or undefined where there is none.
  */
 export function runRecords(home: string, open: Opened, held: Held) {
-  const { holds, said, labels, refresh, forgetting, ...markers } = markerMethods(home);
+  const { holds, assignees, said, labels, refresh, forgetting, ...markers } = markerMethods(home);
   return {
     runs: { ...runReads(home, held), ...runWrites(home, open, held), ...markers },
     asks: askMethods(open, held),
     holds,
+    assignees,
     said,
     labels,
     refresh,

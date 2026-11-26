@@ -158,5 +158,6 @@ library
 list-filter
 factory-paths
 hold-listed
+assignee-listed
 welcome
 factory-cards-later

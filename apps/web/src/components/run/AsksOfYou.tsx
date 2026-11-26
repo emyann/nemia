@@ -18,6 +18,7 @@ import { TextLink } from '../look';
 import { Decide } from '../gate/Decide';
 import { Fold } from '../step/part/Fold';
 import { RunWait } from './RunWait';
+import { AssigneeLine } from '@/components/look';
 
 /**
  * The link of a line to the step `step`: on the run's page, the step's part (`#step-<name>`), showing its current try, the one that asks;
@@ -67,17 +68,18 @@ function AskLine({ run, ask, onStep }: { run: string; ask: RunAsk; onStep?: (ste
 
 /**
  * What the run `run` asks of a person, top of its page: a line per ask, linked to its step's part, or given `onStep` (the frame's bar) a
- * button that shows the step; then its wait on runs and its hold, each in the package's words (`RunWait`), Lift being the run's menu's;
+ * button that shows the step; then its wait on runs and its hold, each in the package's words (`RunWait`), Lift being the run's menu's,
+ * and who has it in hand (`AssigneeLine`), its asks still offered to whoever reads them;
  * and, on the page, what the command line's decide shows, folded: under the asks, or where nothing is asked, once the api says there is
  * something to decide — a finished run asks nothing and still has its branch to land or drop. Nothing at all for a run that asks nothing,
- * waits on nobody and has nothing to decide.
+ * waits on nobody, is in nobody's hand and has nothing to decide.
  */
 export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const asks = runAsksOf(run);
   const decidable = !onStep && decidableRun(run);
   const { data } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable && !asks.length });
   const decide = decidable && (asks.length > 0 || isDecidable(data));
-  if (!asks.length && !run.waiting && !run.holding && !decide) return null;
+  if (!asks.length && !run.waiting && !run.holding && !run.assignee && !decide) return null;
   return (
     <div data-asks={asks.length} className="space-y-2">
       {asks.length > 0 && (
@@ -101,6 +103,7 @@ export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: str
       )}
       {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
       {run.holding && <RunWait label="Held" wait={run.holding} actor={run.holding.actor} />}
+      {run.assignee && <AssigneeLine assignee={run.assignee} />}
     </div>
   );
 }

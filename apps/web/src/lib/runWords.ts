@@ -8,7 +8,7 @@ import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
 import { agentOf, type RunView } from './api/judged.ts';
 import type { NowStands } from '../../contracts/now-chip.contract.ts';
 import { chipTone, nowStandsOf, type ChipTone } from './nowChip.ts';
-import type { WaitOn } from 'objects';
+import { actorWords, type WaitOn } from 'objects';
 import { stepState, waitsOnPerson, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 import { durationWords } from './duration.ts';
@@ -174,6 +174,7 @@ export type Now = {
 
 /** A row as NOW reads it: its wait, and of each step its codes, its frozen spec, its current try, its budget and what it spent. */
 type NowRow = Omit<WaitingRow, 'steps'> & {
+  assignee?: RunView['assignee'];
   steps: ReadonlyArray<CodedStep & Partial<Pick<RunView['steps'][number], 'spec' | 'current' | 'budget' | 'spent'>>>;
 };
 
@@ -239,10 +240,28 @@ function yoursWords(row: NowRow, wait: Wait | null, drawn: { state: StepState; o
 }
 
 /**
+ * Who has a run in hand, as the board names them: the name they gave, else the caller who put it (`actorWords`), else someone. The board
+ * never says "you": it does not know who reads it.
+ * @param assignee Who has the run, as the api serves it.
+ */
+export const assigneeName = (assignee: NonNullable<RunView['assignee']>) =>
+  assignee.name ?? (assignee.actor ? actorWords(assignee.actor) : NOW_WORDS.someone);
+
+/**
+ * What a row says of a step that asks a person: its ask (`yoursWords`), then, where someone has the run in hand, who has it.
+ * @param row The run: its steps, what it waits on, its hold and its assignee.
+ * @param wait What it waits on a person for, if anything (`waitOf`).
+ * @param drawn The step the row draws, as the rail says it.
+ */
+const askedWords = (row: NowRow, wait: Parameters<typeof yoursWords>[1], drawn: Parameters<typeof yoursWords>[2]) =>
+  row.assignee ? [...yoursWords(row, wait, drawn), NOW_WORDS.inHand(assigneeName(row.assignee))] : yoursWords(row, wait, drawn);
+
+/**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
  * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or
  * waits on a person, its round of its rounds, its budget and what it spent, and the few words of its wait: on a person, the wait's tag
- * (`yoursWords`), a hold's being the held words every held row says; on no person, `waitWords`. None for a run whose every step is
+ * (`yoursWords`), a hold's being the held words every held row says, and who has it where someone has the run in hand (`assignee`), its
+ * chip then outlined, not yellow; on no person, `waitWords`. None for a run whose every step is
  * done. It says no duration: the row's Clock column says
  * how long the run has been at work.
  * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
@@ -257,8 +276,10 @@ export function nowOf(row: NowRow) {
   const drawn = states[at];
   const step = row.steps[at];
   if (!drawn || !step) return null;
-  const yours = wait !== null || waitsOnPerson(drawn.state, cancelled);
-  const stands = nowStandsOf(drawn.state, drawn.on, held);
+  const asked = wait !== null || waitsOnPerson(drawn.state, cancelled);
+  const inHand = row.assignee != null;
+  const yours = asked && !inHand;
+  const stands = nowStandsOf(drawn.state, drawn.on, held, inHand);
   const rounds = step.spec?.rounds ?? null;
   return {
     step: drawn.name,
@@ -266,7 +287,7 @@ export function nowOf(row: NowRow) {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words: yours ? yoursWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
+    words: asked ? askedWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
   };
 }
 

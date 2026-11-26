@@ -88,7 +88,7 @@ const shots = () =>
  * What a pass judged of a run a person has acted on, with the one-shots the pass read of it beside its words: a person's acts
  * (`actsOf`), the runtime's faults (`faultsOf`), and the two moments a hold is paired by.
  */
-const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted' | 'unheld'>) =>
+const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted' | 'unheld' | 'assignee' | 'unassigned'>) =>
   ({
     run: { word: 'running' },
     labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
@@ -320,6 +320,39 @@ describe("recordFeed writes a one-shot once per occurrence, counted off the feed
       ],
       'the lift of the hold the receipt names carries its caller; the second hold, lifted with no receipt of its own, names nobody',
     );
+  });
+  test('an assignee says its put once while it stands, and its end once by the receipt beside the run: given back, ran out, or ended', () => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+    const [first, second, third] = ['2026-10-16T03:45:00.000Z', '2026-10-16T05:00:00.000Z', '2026-10-16T06:00:00.000Z'];
+    const pass = (once: Partial<Pick<FeedWords, 'assignee' | 'unassigned'>>, times = 3) => {
+      for (let i = 0; i < times; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], ...once })]]), { at: AT, memo });
+    };
+    pass({ assignee: { at: first, actor: agent } });
+    assert.equal(said('AssigneeGivenBack').length + said('AssigneeLapsed').length, 0, 'while it stands, no end is due');
+    pass({ unassigned: { since: first, how: 'given-back', actor: agent } });
+    pass({ assignee: { at: second } });
+    pass({ unassigned: { since: second, how: 'lapsed' } });
+    pass({ assignee: { at: third } });
+    pass({ unassigned: { since: third, how: 'ended' } });
+    assert.deepEqual(
+      lines()
+        .filter((l) => l.reason?.startsWith('Assignee'))
+        .map((l) => [l.reason, l.word, l.note, l.source, l.actor]),
+      [
+        ['AssigneePut', 'assigned', `since ${first}`, 'person', agent],
+        ['AssigneeGivenBack', 'given back', `since ${first}`, 'person', agent],
+        ['AssigneePut', 'assigned', `since ${second}`, 'person', undefined],
+        ['AssigneeLapsed', 'assignee ran out', `since ${second}`, 'tick', undefined],
+        ['AssigneePut', 'assigned', `since ${third}`, 'person', undefined],
+        ['AssigneeGivenBack', 'given back', `since ${third}`, 'tick', undefined],
+      ],
+      'three assignees, each put and ended exactly once over three passes apiece, told apart by the moment each was put',
+    );
+    const restarted = freshFeedMemo();
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [] })]]), { at: AT, memo: restarted });
+    assert.equal(lines().filter((l) => l.reason?.startsWith('Assignee')).length, 6, 'and a daemon with no fold writes none a second time');
   });
   test("a hold the tick lifted itself is the tick's deed, not the person's — the pass that lifted it is the only thing that knows", () => {
     emptyStore();

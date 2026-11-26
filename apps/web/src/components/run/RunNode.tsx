@@ -10,11 +10,12 @@ import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
+import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, toDecideOfYou, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
-import { ENDED } from '@/lib/words';
+import { assigneeName } from '@/lib/runWords';
+import { ENDED, NOW_WORDS } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
@@ -62,8 +63,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - A result nobody decided, in a line that fits, whole on hover in the CLI `ls`'s words, a link to where it is decided on the run's page;
  *   the card is banded yellow, the one finished card on the floor that waits for a person rather than for a machine.
  * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record could not be read.
- * - Its chips: a try of an agent, tagged with its agent; how many runs it reads as context; to decide; waiting on you; held, with the
- *   hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); called off; pruned.
+ * - Its chips: a try of an agent, tagged with its agent; how many runs it reads as context; to decide; waiting on you; who has it in
+ *   hand (`data-assignee-chip`, the assignee's words on hover); held, with the hold lifted here, as the CLI's `hold --off` lifts it
+ *   (`CardLift`); called off; pruned.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that waits on
  *   it leaves.
  *
@@ -163,7 +165,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
         {decide?.kind === 'result' && !cancelled && <DecideLine run={run} said={decide.said} branches={decide.branches} />}
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
         {open && trouble && <p className="m-0 text-body-small text-failure">{trouble}</p>}
-        <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
+        <Chips run={run} decide={toDecideOfYou(run)} cancelled={cancelled} reads={reads} />
       </Run>
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
@@ -235,14 +237,14 @@ type Look = { ringed?: 'focus' | 'yours'; marks: { 'data-ghost-run'?: true; 'dat
 
 /**
  * How a run's card is drawn: banded in the focus colour, and marked, while the frame's bar shows it (`inspected`); else banded yellow
- * while a person has its result to decide (`toDecideOf`), the one finished card that waits for a person. A ghost, a run that waits on
+ * while a person has its result to decide (`toDecideOfYou`), the one finished card that waits for a person. A ghost, a run that waits on
  * runs and nothing else (`waitsOnRuns`), is marked: its part's tone draws it outlined, waiting.
  */
 function lookOf(run: RunView, inspected: boolean) {
   const ghost = waitsOnRuns(run);
   const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
   if (inspected) return { ringed: 'focus', marks } satisfies Look;
-  if (toDecideOf(run)) return { ringed: 'yours', marks: {} } satisfies Look;
+  if (toDecideOfYou(run)) return { ringed: 'yours', marks: {} } satisfies Look;
   return { marks } satisfies Look;
 }
 
@@ -267,7 +269,8 @@ function TouchedLine({ run }: { run: RunView }) {
 
 /**
  * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context,
- * each on hover (`reads`); to decide (`decide`); waiting on you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
+ * each on hover (`reads`); to decide (`decide`, `toDecideOfYou`); waiting on you; who has it in hand, the assignee's
+ * words on hover; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
   return (
@@ -280,6 +283,11 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
       )}
       {decide && <Tag className="bg-yours text-on-yours">to decide</Tag>}
       {waitsOnYou(run) && <Tag className="bg-yours-container text-on-yours-container">waiting on you</Tag>}
+      {run.assignee && !cancelled && (
+        <Tag variant="outlined" data-assignee-chip title={run.assignee.word} className="text-on-surface-variant">
+          {NOW_WORDS.hasIt(assigneeName(run.assignee))}
+        </Tag>
+      )}
       {run.holding && !cancelled && (
         <Tag title={run.holding.advice} className="bg-rest text-on-rest">
           held

@@ -100,6 +100,7 @@ const run = ({ name, brief, createdAt, steps, status }: Shape) => ({
     tokens: null,
     waiting: null,
     holding: null,
+    assignee: null,
     toDecide: null,
     graph: chainOf(steps.map((step) => step.name)),
     timeline: {

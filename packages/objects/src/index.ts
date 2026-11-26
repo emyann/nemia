@@ -38,8 +38,6 @@ export {
   RunAsked,
   RunCancelPlan,
   RunCancelled,
-  RunHeld,
-  RunHold,
   RunInput,
   RunPrune,
   RunPruned,
@@ -55,6 +53,7 @@ export {
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunHeld, RunHold } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -403,7 +402,7 @@ export {
   TRANSCRIPT_ROLES,
   type TranscriptRole,
 } from './words.ts';
-export { BaseHold, QueuedFor, RunHolding, RunWaiting } from './run.ts';
+export { BaseHold, QueuedFor, RunAssignee, RunHolding, RunWaiting } from './run.ts';
 export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,
@@ -673,6 +672,7 @@ export { MACHINE_VERBS, type MachineVerb, STREAM_COMMANDS, type StreamCommand } 
 export {
   ANSWER_HELP,
   APPROVE_WORDS,
+  ASSIGN_WORDS,
   BY_CAP,
   CANCEL_WORDS,
   HOLD_WORDS,

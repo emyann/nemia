@@ -1,17 +1,18 @@
 /**
  * The colour of the one chip a runs-page row draws for what its run does now (`chipTone`, src/lib/nowChip.ts): the chip names the step
  * the run is on, and its colour says the state. Yellow is only what waits on a person; violet a step at work; red a step that failed and
- * waits on nobody; a wait on a run, a run slot or a hold is outlined; and grey is only what is at rest. A held run's step is drawn as a
- * step not started, outlined, never grey (the person's rule of 1 Nov).
+ * waits on nobody; a wait on a run, a run slot or a hold is outlined, and so is an ask someone has in hand; and grey is only what is at
+ * rest. A held run's step is drawn as a step not started, outlined, never grey (the person's rule of 1 Nov).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * Where the step a row is on now stands, as the chip reads it (implement maps the board's `StepState`, the step's `on` and the run's hold
  * onto it in src/lib/nowChip.ts): at work (a session or its check), failed, waiting on another run or the checkout, waiting for a run
- * slot, held by a person, still to come, or at rest (the store's pause, called off, skipped, unknown).
+ * slot, held by a person, asking what someone has in hand (the run's assignee), still to come, or at rest (the store's pause, called
+ * off, skipped, unknown).
  */
-export type NowStands = 'atWork' | 'failed' | 'waitsOnARun' | 'waitsForASlot' | 'held' | 'toCome' | 'atRest';
+export type NowStands = 'atWork' | 'failed' | 'waitsOnARun' | 'waitsForASlot' | 'held' | 'assigned' | 'toCome' | 'atRest';
 
 /** The row's step now, by where it stands, and whether the row waits on a person (its step's state, or the run's own wait). */
 export type NowCase = { readonly stands: NowStands; readonly yours: boolean };
@@ -22,8 +23,9 @@ export type NowCase = { readonly stands: NowStands; readonly yours: boolean };
  */
 export type ChipTone = 'alive' | 'yours' | 'failure' | 'waits' | 'rest';
 
-/** Whether a step waits on something that is not a person: a run, a run slot, a hold, or its turn. */
-const waits = (stands: NowStands) => stands === 'waitsOnARun' || stands === 'waitsForASlot' || stands === 'held' || stands === 'toCome';
+/** Whether a step waits on something that is not the person looking: a run, a run slot, a hold, its assignee, or its turn. */
+const waits = (stands: NowStands) =>
+  stands === 'waitsOnARun' || stands === 'waitsForASlot' || stands === 'held' || stands === 'assigned' || stands === 'toCome';
 
 const chipToneSpec = spec<(now: NowCase) => ChipTone>({
   ensures: {
@@ -48,7 +50,7 @@ const chipToneSpec = spec<(now: NowCase) => ChipTone>({
       condition: ({ input: [now], output }) => output !== 'alive' || now.stands === 'atWork',
     },
     aWaitIsOutlined: {
-      description: 'A step waiting on a run, a run slot, a hold or its turn, and on no person, is outlined',
+      description: 'A step waiting on a run, a run slot, a hold, its assignee or its turn, and on no person, is outlined',
       condition: ({ input: [now], output }) => now.yours || !waits(now.stands) || output === 'waits',
     },
     heldIsNeverGrey: {

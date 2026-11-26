@@ -13,7 +13,19 @@ import { readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { Pruned, Run } from './record.ts';
 import type { Labels } from '../labels/labels.ts';
-import { cancelFile, holdFile, lstatOf, marksAt, pruneFile, runsDir, saidDir, sayOnce, unheldFile } from './record.store.ts';
+import {
+  assigneeFile,
+  cancelFile,
+  holdFile,
+  lstatOf,
+  marksAt,
+  pruneFile,
+  runsDir,
+  saidDir,
+  sayOnce,
+  unassignedFile,
+  unheldFile,
+} from './record.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { runMarkMove } from '../run-marks/run-marks.ts';
 
@@ -30,6 +42,8 @@ export function removeMarkerFiles(home: string, id: string) {
     pruneFile(home, id),
     holdFile(home, id),
     unheldFile(home, id),
+    assigneeFile(home, id),
+    unassignedFile(home, id),
     refreshFile(home, id),
     labelsFile(home, id),
     saidDir(home, id),

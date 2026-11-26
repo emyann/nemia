@@ -121,6 +121,7 @@ const object = () =>
       tokens: null,
       waiting: null,
       holding: null,
+      assignee: null,
       toDecide: null,
       graph: {
         roots: ['implement'],

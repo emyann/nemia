@@ -204,6 +204,7 @@ const fixture = {
     },
     waiting: null,
     holding: null,
+    assignee: null,
     toDecide: null,
     graph: {
       roots: ['build'],

@@ -127,7 +127,7 @@ export const NothingWaits: Story = {
     const waiting = within(page.querySelector<HTMLElement>('[data-section="waiting"]')!);
     await expect(waiting.getByText('Nothing waits on you.')).toBeVisible();
     await expect(waiting.getByRole('button', { name: 'Waiting in every factory ›' })).toHaveAttribute('aria-expanded', 'false');
-    await expect(tonesOf(page, 'in-flight')).toEqual({ lgll: 'alive', '649a': 'waits', '5zt1': 'waits' });
+    await waitFor(() => expect(tonesOf(page, 'in-flight')).toEqual({ lgll: 'alive', '649a': 'waits', '5zt1': 'waits' }));
     await expect(headsOf(page, 'Runs in flight')).toEqual(['RUN', 'NOW', 'CLOCK', 'COST']);
     await expect(headsOf(page, 'Finished runs')).toEqual(['RUN', 'FINISHED', 'CLOCK', 'COST', 'OUTCOME']);
     const lgll = page.querySelector<HTMLElement>(`[data-run="${TARGET_RUNS.lgll.metadata.name}"]`)!;

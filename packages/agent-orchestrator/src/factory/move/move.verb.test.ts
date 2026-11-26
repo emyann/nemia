@@ -20,7 +20,7 @@ import { aRun } from '../../../test/run-walks.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService } from '../../place/place.store.ts';
 import { FactoryDoor, type FactoryDoorShape } from '../door/factories.store.ts';
-import { factoryDoorMemory } from '../door/memory.store.ts';
+import { factoryDoorMemory, MEMORY_ROOT } from '../door/memory.store.ts';
 import { CardDoor, type CardDoorShape } from '../../cards/cards.store.ts';
 import { cardDoorMemory } from '../../cards/memory.store.ts';
 import { RunDoor, type RunDoorShape } from '../../runs/runs.store.ts';
@@ -229,7 +229,7 @@ describe('the import files the factory on the target, clones its repositories, a
   test('its template, version and parameters, the template kept under the target’s store', () => {
     assert.equal(record.template?.source.startsWith(path.join(dst.root, 'templates-sent')), true);
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
-    assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
+    assert.equal(record.tree, path.join(MEMORY_ROOT, 'factories', 'shop', 'tree'), 'the tree is where the door puts it, under its root');
   });
   test('its tree’s edits, its level and its servers, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));

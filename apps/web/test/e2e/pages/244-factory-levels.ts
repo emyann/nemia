@@ -5,7 +5,7 @@ import { photograph, pickLevel, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storeFactory, storedFactory } from '../world.ts';
+import { dropStoredKey, OUT, store, storeFactory, storedFactory } from '../world.ts';
 
 /**
  * Press `control`, or pick the level `word` in the Select it opens, wait for the api's answer to the level's write, and refuse any but a
@@ -88,6 +88,7 @@ export default {
       else fs.writeFileSync(config, before);
       fs.rmSync(dir, { recursive: true, force: true });
       fs.rmSync(own, { recursive: true, force: true });
+      dropStoredKey(`/registry/levels/${factory}`);
       storeFactory(file, fileText);
     }
     await page.reload({ waitUntil: 'load' });

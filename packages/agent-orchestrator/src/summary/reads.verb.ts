@@ -138,8 +138,10 @@ const factoryRead = Effect.fnUntraced(function* (run: Run, home: string) {
       ),
     ),
   );
-  const fills = yield* read.pipe(Effect.catch((err) => Effect.succeed({ unread: { name, gone: err instanceof Missing } })));
-  return fills as { fills?: Fills; unread?: { name: string; gone: boolean } };
+  const found: { fills?: Fills; unread?: { name: string; gone: boolean } } = yield* read.pipe(
+    Effect.catch((err) => Effect.succeed({ unread: { name, gone: err instanceof Missing } })),
+  );
+  return found;
 });
 
 /** `why` ended with a full stop, where it ends with no stop of its own. */

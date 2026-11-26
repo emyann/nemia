@@ -44,13 +44,19 @@ export type ProposalPlace = { readonly home: string };
 export type Current = { readonly version: string | null; readonly spec?: unknown; readonly specVersion?: number };
 
 /**
- * Whether a proposal read the object at a version a write still follows: the version served now, or an older one where only what its
- * status reads moved since.
+ * Whether a proposal read the object at a version a write still follows: the version served now, or one between the revision of its spec's
+ * records and the version served now, where only what its status reads moved since; a version past the one served is never one read.
  * @param now The object as it is now.
  * @param read The `resourceVersion` the proposal read it at, none where it names none.
  */
 export const readFresh = (now: Current, read: string | undefined) =>
-  now.version === read || (now.specVersion !== undefined && read !== undefined && /^\d+$/.test(read) && Number(read) >= now.specVersion);
+  now.version === read ||
+  (now.specVersion !== undefined &&
+    now.version !== null &&
+    read !== undefined &&
+    /^\d+$/.test(read) &&
+    Number(read) >= now.specVersion &&
+    Number(read) <= Number(now.version));
 
 /** Nothing at the name. */
 const NONE: Current = { version: null };

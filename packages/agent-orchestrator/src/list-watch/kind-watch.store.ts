@@ -52,7 +52,7 @@ export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: Watched
   const keyspace = yield* keyspaceAt(keyspaceFile(home)).pipe(Effect.orDie);
   const head = yield* keyspace.head;
   const held = new Map<string, ReadonlyMap<string, number>>();
-  for (const prefix of prefixesOf(kind)) held.set(prefix, yield* keyspace.revisions(prefix));
+  for (const prefix of prefixesOf(kind)) held.set(prefix, yield* keyspace.touched(prefix));
   return { of: revisionTable(kind, held), specOf: revisionTable(kind, held, true), head } as const;
 });
 

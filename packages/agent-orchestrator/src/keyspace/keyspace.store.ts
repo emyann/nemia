@@ -137,6 +137,7 @@ export type Keyspace = {
   readonly list: (prefix: string) => Effect.Effect<{ readonly records: readonly KeyRecord[]; readonly revision: number }>;
   readonly keys: (prefix: string) => Effect.Effect<readonly string[]>;
   readonly revisions: (prefix: string) => Effect.Effect<ReadonlyMap<string, number>>;
+  readonly touched: (prefix: string) => Effect.Effect<ReadonlyMap<string, number>>;
   readonly write: (key: string, write: KeyWriteOf) => Effect.Effect<KeyRecord, KeyRefused>;
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly within: <A, E>(body: (tx: KeyTxn) => Effect.Effect<A, E>) => Effect.Effect<A, E | KeyRefused>;
@@ -261,14 +262,19 @@ const keysUnder = (prefix: string) =>
     return rows.map((row) => row.name);
   });
 
-/** The live keys that begin with `prefix`, each with its latest revision, no value read. */
-const revisionsUnder = (prefix: string) =>
+/**
+ * The keys that begin with `prefix`, each with its latest revision, no value read: the live ones, or with `deleted` every key a row of
+ * which compaction has left, so a record removed is counted at the revision that removed it.
+ * @param prefix The prefix of the keys.
+ * @param deleted Whether a key whose latest row deletes it is counted.
+ */
+const revisionsUnder = (prefix: string, deleted = false) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<{ readonly name: string; readonly id: number }>`SELECT kv.name, kv.id FROM kine AS kv
       JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
       ON maxkv.id = kv.id
-      WHERE kv.deleted = 0`;
+      WHERE kv.deleted = 0 OR ${deleted ? 1 : 0} = 1`;
     return new Map(rows.map((row) => [row.name, row.id]));
   });
 
@@ -349,6 +355,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
     list: (prefix) => Effect.withTracerEnabled(Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))), false),
     keys: (prefix) => read(keysUnder(prefix)),
     revisions: (prefix) => read(revisionsUnder(prefix)),
+    touched: (prefix) => read(revisionsUnder(prefix, true)),
     write: (key, write) => refusing(committed(inTxn(writeOne(key, write)))),
     txn: (writes) => refusing(committed(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write))))),
     within: (body) =>

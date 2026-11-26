@@ -41,7 +41,10 @@ export type CardDoorShape = {
     readonly read: (name: CardName) => Effect.Effect<string | null, Refusal>;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
     readonly filedAt: (name: CardName) => Effect.Effect<string | null, Refusal>;
-    /** The revision the card `name` stands at: the highest of its record, its try and its claim; null where it is not there. */
+    /**
+     * The revision the card `name` stands at: the highest of its record, its try and its claim, one removed counted at the revision
+     * that removed it; null where it is not there.
+     */
     readonly revision: (name: CardName) => Effect.Effect<number | null, Refusal>;
     /** When the inbox's entry `file` (as `entries` lists it) was filed, as an ISO time; null when it is gone or names no card. */
     readonly entryAt: (entry: { readonly file: string }) => Effect.Effect<string | null, Refusal>;
@@ -315,8 +318,10 @@ export function cardRecords(
           const keyspace = yield* held;
           const own = keyspace === undefined ? undefined : yield* keyspace.get(cardKey(name));
           if (keyspace === undefined || own === undefined) return null;
-          const beside = yield* Effect.all([keyspace.get(cardTryKey(name)), keyspace.get(claimKey(name))]);
-          return Math.max(own.revision, ...beside.map((r) => r?.revision ?? 0));
+          const beside = yield* Effect.all(
+            [cardTryKey(name), claimKey(name)].map((key) => Effect.map(keyspace.touched(key), (m) => m.get(key) ?? 0)),
+          );
+          return Math.max(own.revision, ...beside);
         }),
       entryAt: ({ file }) => {
         const name = nameOfEntry(file);

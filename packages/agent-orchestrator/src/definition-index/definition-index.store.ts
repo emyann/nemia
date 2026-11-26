@@ -294,10 +294,13 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
 });
 
-/** Whether the daemon's sweep runs in this process: where it does, a read leaves the index to it. */
+/** Whether a sweep keeps the index for this process's reads, the daemon's or another process's: where one does, a read writes nothing. */
 const SWEEPING = { running: false };
 
-/** The daemon's sweep of this process has begun: a read of a definition no longer reads the index again (`definitionsRefreshed`). */
+/**
+ * A sweep keeps the index for this process's reads, the daemon's in it or another process's (the api served alone): a read of a definition
+ * no longer reads the index again (`definitionsRefreshed`), so a GET writes nothing. A program with no sweep, a test, reads it again.
+ */
 export const sweepBegun = () => {
   SWEEPING.running = true;
 };
@@ -325,6 +328,6 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
 ) {
   yield* indexSweep();
   const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot)).pipe(Effect.orDie);
-  const held = new Map([[DEFINITIONS_PREFIX, yield* keyspace.revisions(DEFINITIONS_PREFIX)]]);
+  const held = new Map([[DEFINITIONS_PREFIX, yield* keyspace.touched(DEFINITIONS_PREFIX)]]);
   return revisionTable(kind, held)(namespace, name);
 });

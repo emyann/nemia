@@ -33,6 +33,7 @@ import {
   loadClaudeToken,
   runMain,
   runningRelease,
+  sweepBegun,
   tokenWarningLine,
   trialRefusal,
   up,
@@ -118,6 +119,7 @@ const listening = Effect.acquireRelease(
 const tickedIn = repoOf(process.env, running) ?? process.cwd();
 
 const asked = args;
+sweepBegun();
 if (!asked.ticks) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(

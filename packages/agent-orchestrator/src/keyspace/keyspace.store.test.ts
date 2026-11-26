@@ -224,6 +224,14 @@ describe('the keyspace on disk', () => {
     assert.deepEqual(await Effect.runPromise(ks.since(head, '/registry/t/')), { changes: [], head });
   });
 
+  test('a key removed is counted at the revision that removed it by `touched`, and is no live key of `revisions`', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('1')));
+    const gone = await Effect.runPromise(ks.write('/registry/t/a', { verb: 'delete', expected: a.revision, value: '' }));
+    assert.deepEqual([...(await Effect.runPromise(ks.revisions('/registry/t/')))], []);
+    assert.deepEqual([...(await Effect.runPromise(ks.touched('/registry/t/')))], [['/registry/t/a', gone.revision]]);
+  });
+
   test('a compaction keeps what the last sweep of at least the window ago had not seen', async () => {
     const file = fileOf();
     const ks = await Effect.runPromise(keyspaceAt(file));

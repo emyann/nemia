@@ -4,20 +4,22 @@
  * the stream under HttpApi changes no client (watch-sse.test.ts holds the frames equal). The stream stays Hono's (decision 27).
  *
  * The list is read by the route itself, the URL with `watch` taken out, through every page (`readAll`, each of `WatchPage` objects, its
- * `continue` followed until none is), so a watch answers what the list answers, every object of it, its selectors and its
- * namespace's refusal with it: a first read that is no 2xx is answered as it is, before any stream. Then each object is sent ADDED, then a
- * BOOKMARK, Kubernetes' initial state. The list is read again on a feed line (`followFeed`, on the app's `Beats.feed`), at most one read
- * in flight and one per `WATCH_SETTLE`, and on a resync every `Beats.watch` (`WATCH_RESYNC`) for a change no line says (a card or a
- * definition edited on disk); what changed between two reads is the package's `watchChanges`, an object's version being the one its
- * route hands (`versionOf`: a run's leaves out its frame's time measured to the read, `runWatchVersion`), its JSON as served where none,
- * so a change of its status is a change though its `resourceVersion` stands. A DELETED carries the object of the last read that held it.
- * A BOOKMARK is sent every `BOOKMARK_EVERY`, its `resourceVersion` the feed's size at the last read.
+ * `continue` followed until none is), so a watch answers what the list answers, its selectors and its namespace's refusal with it: a
+ * first read that is no 2xx is answered as it is, before any stream.
  *
- * Level-triggered: a watch keeps nothing between connections. A read again that is no 2xx, or a feed truncated under the reader, ends the
- * stream, and the reader opens it again and is sent the state whole: no `Last-Event-ID` resume, since nothing keeps a list's old versions
- * but the feed's own: a watch of the Event lists asked a `resourceVersion` (`watchStartOf`) is sent no state and follows the feed from
- * that byte, so a reader that kept the last one it was sent resumes there.
- * The feed's reader is held in the stream's scope, which the request's abort interrupts, and let go with it.
+ * A kind the keyspace watches (`isWatchedKind`) follows revisions (`revisionWatch`): with no `resourceVersion` each object ADDED then a
+ * BOOKMARK at the head read before them; with one, the objects changed after it (`kindReplay`), refused 410 past the compaction window
+ * and 400 past the head. It reads the head on every beat and replays what was written since, so a change is lost to no beat. A DELETED
+ * carries the object's name, namespace and the revision that removed it, and is sent only on a list asked whole (no namespace, no
+ * selector). The runs list keeps the state-whole watch below and answers 400 to a `resourceVersion`: the list is read again on a feed line
+ * (`followFeed`, the app's `Beats.feed`) and on a resync every `Beats.watch` (`WATCH_RESYNC`), what changed between two reads being the
+ * package's `watchChanges` (`versionOf`: a run's leaves out its frame's time measured to the read, `runWatchVersion`). A BOOKMARK is sent
+ * every `BOOKMARK_EVERY`.
+ *
+ * Level-triggered: a watch keeps nothing between connections. A revision compacted away under a watch, a read again that is no 2xx or a
+ * feed truncated under the reader ends the stream, and the reader opens it again. A watch of the Event lists asked a `resourceVersion`
+ * (`watchStartOf`) is sent no state and follows the feed from that byte. The feed's reader is held in the stream's scope, which the
+ * request's abort interrupts, and let go with it.
  */
 import { type Context as RequestContext } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
@@ -253,18 +255,21 @@ const revisionOf = (o: WatchedObject) => Number(o.metadata.resourceVersion);
 /**
  * The frames of `changes`, each object they name sent once as it stands in `read`, in the order of the changes: an object changed after
  * `after` and still in the list as its change says (MODIFIED for each of a namespace's), DELETED the object that is gone. An object the
- * list no longer holds, or holds at a revision the watcher was sent, is sent nothing.
+ * list no longer holds, or holds at a revision the watcher was sent, is sent nothing. DELETED is sent only where the list is `whole`: asked
+ * with no namespace and no selector, so an object the list lacks is gone and not merely outside the watcher's filter.
  */
-const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly KindChange[], read: Read | undefined) => {
+const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly KindChange[], read: Read | undefined, whole: boolean) => {
   const sent = new Set<string>();
   return changes.flatMap((change) => {
-    if (change.change === 'DELETED') return change.name === null ? [] : [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+    if (change.change === 'DELETED') {
+      return change.name === null || !whole ? [] : [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+    }
     const found = [...(read?.objects.values() ?? [])].filter(
       (object) =>
         (change.name === null || object.metadata.name === change.name) &&
         (change.namespace === null || object.metadata.namespace === change.namespace),
     );
-    if (found.length === 0 && change.name !== null && change.standing && change.change === 'MODIFIED')
+    if (found.length === 0 && whole && change.name !== null && change.standing && change.change === 'MODIFIED')
       return [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
     return found.flatMap((object) => {
       if (revisionOf(object) <= after || sent.has(keyOf(object))) return [];
@@ -273,6 +278,10 @@ const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly Kin
     });
   });
 };
+
+/** Whether a list's URL asks every object of the kind: no namespace in its path and no query but the paging ones. */
+const wholeList = (url: URL) =>
+  !url.pathname.includes('/namespaces/') && [...url.searchParams.keys()].every((key) => key === 'limit' || key === 'continue');
 
 /** The answer that refuses a watch from a revision the keyspace cannot replay: 410 where compaction removed it, 400 past the head. */
 const startRefused = (c: RequestContext<ApiEnv>, refused: 'gone' | 'ahead', revision: number) =>
@@ -313,7 +322,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
     const read = replay.changes.length === 0 ? undefined : await readNow();
     if (read instanceof Response) return read;
     first = {
-      frames: framesOfChanges(kind, start.revision, replay.changes, read).map((f) => f.data),
+      frames: framesOfChanges(kind, start.revision, replay.changes, read, wholeList(url)).map((f) => f.data),
       at: replay.head,
     };
   } else {
@@ -340,7 +349,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
         if (!('changes' in replay)) return yield* new ListRefused({ status: replay.refused === 'gone' ? 410 : 400 });
         const read = replay.changes.length === 0 ? undefined : yield* Effect.promise(readNow);
         if (read instanceof Response) return yield* new ListRefused({ status: read.status });
-        const frames = framesOfChanges(kind, state.at, replay.changes, read);
+        const frames = framesOfChanges(kind, state.at, replay.changes, read, wholeList(url));
         state.at = replay.head;
         for (const frame of frames) yield* write(frame);
       });
@@ -443,7 +452,8 @@ async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, versionOf
  * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read. A `resourceVersion` asked is read by
  * `watchStartOf`: of a list that follows the feed, the watch starts at that byte and sends no state (a byte the feed cannot be read from,
  * inside a line or past its end, refused 410, Kubernetes' expired one; the list's own refusals answered from a first page of one); of
- * any other list, or a word that is no byte, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
+ * a kind the keyspace watches, a revision (`revisionWatch`: 410 past the compaction window, 400 past the head); of any other list
+ * (the runs'), or a word that is no number, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
  * opened (at once where none was), as the initial state's BOOKMARK ends what a reader was sent of what was there already: a reader
  * that resumes counts what it missed by it.
  * @param list The list's handler, which answers a request that is no watch and gives each read of one.

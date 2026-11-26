@@ -18,6 +18,7 @@ import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { DEFINITIONS_PREFIX } from '../list-watch/kind-watch.ts';
+import { kindRevisions } from '../list-watch/kind-watch.verb.ts';
 import { recordDue } from '../observed/observed.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { BUILTIN_SKILLS, entriesOf, skillVersion } from '../skills/read.store.ts';
@@ -177,16 +178,17 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
 });
 
 /**
- * The revision the index holds a definition at once its files are read again: what a write of the definition compares the revision its
- * writer read to. None where it holds no such definition.
- * @param scope The factory's name, `_library` or `_builtin`.
+ * The revision a library definition stands at once its files are read again: what a write of it compares the revision its writer read to,
+ * the revision the api serves (`kindRevisions`), the highest among the records that name it.
  * @param kind What the definition is.
+ * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
  */
-export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function* (scope: string, kind: DefinitionKind, name: string) {
-  const home = yield* StoreRoot;
+export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function* (
+  kind: 'Agent' | 'Skill' | 'Workflow',
+  namespace: string | undefined,
+  name: string,
+) {
   yield* indexSweep();
-  const keyspace = yield* keyspaceAt(keyspaceFile(home));
-  const record = yield* keyspace.get(definitionKey(scope, kind, name));
-  return record?.revision;
+  return (yield* kindRevisions(kind)).of(namespace, name);
 });

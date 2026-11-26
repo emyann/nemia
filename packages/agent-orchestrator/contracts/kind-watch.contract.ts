@@ -35,8 +35,7 @@ const gone = (own: OwnRow | null) => own !== null && own.deleted;
 const objectChangeSpec = spec<(after: number, own: OwnRow | null) => ObjectChange>({
   requires: ({ input: [after, own] }) =>
     whole(after) &&
-    (own === null ||
-      (whole(own.createRevision) && whole(own.revision) && own.createRevision <= own.revision && own.revision > after)),
+    (own === null || (whole(own.createRevision) && whole(own.revision) && own.createRevision <= own.revision && own.revision > after)),
   ensures: {
     deletedExactlyWhenAHeldObjectIsGone: {
       description: 'An object the watcher held whose own record is now a tombstone is sent DELETED, and no other is',

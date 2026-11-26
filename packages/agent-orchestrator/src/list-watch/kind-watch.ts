@@ -19,7 +19,10 @@ export const objectChange: ObjectChangeOf = (after, own) => {
   return own.deleted ? 'DELETED' : 'MODIFIED';
 };
 
-/** The object a record names: its namespace (none where it names the object in every namespace) and its name (none where it names every object of the namespace). */
+/**
+ * The object a record names: its namespace (none where it names the object in every namespace) and its name (none where it names
+ * every object of the namespace).
+ */
 export type Target = { readonly namespace: string | null; readonly name: string | null };
 
 /** A prefix of the keyspace a kind's objects read, whether its records are the objects' own, and the object a key under it names. */

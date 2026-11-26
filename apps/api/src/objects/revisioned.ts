@@ -5,7 +5,7 @@
  * A GET writes nothing here, and nothing is kept between two requests.
  */
 import type { Context as RequestContext } from 'hono';
-import { isWatchedKind, keyspaceHead, kindRevisions, type WatchedKind } from 'agent-orchestrator';
+import { isWatchedKind, keyspaceHead, kindRevisions } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 import type { Listed } from '../watch/watch.ts';
 
@@ -15,13 +15,10 @@ const watchedListOf = (kind: string | undefined) => {
   return kind?.endsWith('List') === true && base !== undefined && isWatchedKind(base) ? base : undefined;
 };
 
-/** What `body` is of a watched kind: an object or a list, as the keyspace watches it. */
-type Stamped = { readonly kind: WatchedKind; readonly list: boolean };
-
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
 
-const stampedOf = (body: unknown): Stamped | undefined => {
+const stampedOf = (body: unknown) => {
   if (typeof body !== 'object' || body === null || !('kind' in body) || typeof body.kind !== 'string') return undefined;
   const list = watchedListOf(body.kind);
   if (list !== undefined) return { kind: list, list: true };
@@ -44,7 +41,7 @@ const withRevision = (object: unknown, revision: (namespace: string | undefined,
  * @param kindsAt The kinds a request's endpoint answers, from its method and its path: none where it answers no object of the api's.
  */
 export const revisioned =
-  (list: Listed, kindsAt: (method: string, path: string) => readonly string[]): Listed =>
+  (list: Listed, kindsAt: (method: string, path: string) => readonly string[]) =>
   async (c: RequestContext<ApiEnv>, request = c.req.raw) => {
     const path = new URL(request.url).pathname;
     const kinds = kindsAt(request.method, path);
@@ -66,7 +63,10 @@ export const revisioned =
         ? {
             ...body,
             items: body.items.map((item: unknown) => withRevision(item, revision)),
-            metadata: { ...('metadata' in body && typeof body.metadata === 'object' ? body.metadata : {}), ...(head === undefined ? {} : { resourceVersion: String(head) }) },
+            metadata: {
+              ...('metadata' in body && typeof body.metadata === 'object' ? body.metadata : {}),
+              ...(head === undefined ? {} : { resourceVersion: String(head) }),
+            },
           }
         : withRevision(body, revision);
     const headers = new Headers(response.headers);

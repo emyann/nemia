@@ -20,7 +20,8 @@ const KEYSPACE_WINDOW = 5 * 60_000;
  * One compaction of the keyspace of the store `home`: the revision it compacted up to.
  * @param home The store's root folder.
  */
-const compactOnce = (home: string) => Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => keyspace.compact(KEYSPACE_WINDOW, Date.now()));
+const compactOnce = (home: string) =>
+  Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => keyspace.compact(KEYSPACE_WINDOW, Date.now()));
 
 /** The compaction of the keyspace of the store `StoreRoot` names, for as long as the daemon runs (`sweepLoop`). */
 export const compaction = () =>
@@ -28,8 +29,8 @@ export const compaction = () =>
     sweepLoop(() => compactOnce(home), KEYSPACE_COMPACT_EVERY, 'The keyspace could not be compacted this sweep'),
   );
 
-/** How often the daemon reads the definitions' files again for the index: a definition edited on disk has its revision this late at most. */
+/** How often the daemon reads the definitions' files again: a definition edited on disk has its revision this late at most. */
 const DEFINITIONS_EVERY = '2 seconds';
 
-/** The definition index's sweep of the store `StoreRoot` names, for as long as the daemon runs (`sweepLoop`): the revisions a watch of a definition starts from. */
+/** The definition index's sweep of the store `StoreRoot` names, for as long as the daemon runs (`sweepLoop`). */
 export const definitionSweep = () => sweepLoop(() => indexSweep(), DEFINITIONS_EVERY, 'The definition index could not be read this sweep');

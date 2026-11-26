@@ -38,7 +38,7 @@ import { API_VERSION, AnyObjectList, LIST_PAGE, TABLE_ACCEPT, type WatchedObject
 import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
-import type { WatchStartOf, WatchStartRefusal } from '../../contracts/watch-start.contract.ts';
+import type { WatchStartOf } from '../../contracts/watch-start.contract.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
 const WATCH_SETTLE: Duration.Input = '500 millis';
@@ -102,7 +102,8 @@ export const watchStartOf: WatchStartOf = (asked, follows, version) => {
  * leading zero, else none.
  * @param text The resourceVersion as asked, or undefined where none is.
  */
-const versionAsked = (text: string | undefined) => (text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : undefined);
+const versionAsked = (text: string | undefined) =>
+  text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : undefined;
 
 /** A read of the list: its objects by key, and the objects themselves. */
 type Read = { readonly kind: string; readonly versions: Versioned[]; readonly objects: Map<string, WatchedObject>; readonly at: number };
@@ -271,8 +272,18 @@ const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly Kin
 /** The answer that refuses a watch from a revision the keyspace cannot replay: 410 where compaction removed it, 400 past the head. */
 const startRefused = (c: RequestContext<ApiEnv>, refused: 'gone' | 'ahead', revision: number) =>
   refused === 'gone'
-    ? c.json({ error: `resourceVersion ${revision} is older than the history the store keeps: watch again without resourceVersion for the state whole, and resume from the metadata.resourceVersion of what it sends` }, 410)
-    : c.json({ error: `resourceVersion ${revision} is past the store's latest revision: send the resourceVersion of the last event, BOOKMARK or list a watch or a GET sent, as it is` }, 400);
+    ? c.json(
+        {
+          error: `resourceVersion ${revision} is older than the history the store keeps: watch again without resourceVersion for the state whole, and resume from the metadata.resourceVersion of what it sends`,
+        },
+        410,
+      )
+    : c.json(
+        {
+          error: `resourceVersion ${revision} is past the store's latest revision: send the resourceVersion of the last event, BOOKMARK or list a watch or a GET sent, as it is`,
+        },
+        400,
+      );
 
 /**
  * The watch of a list whose kind the keyspace watches: without `resourceVersion` the state whole, each object ADDED, then a BOOKMARK at
@@ -328,12 +339,90 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
         state.at = replay.head;
         for (const frame of frames) yield* write(frame);
       });
-      const changes = Stream.tick(beats.feed ?? WATCH_BEAT).pipe(Stream.mapEffect(() => again), Stream.map(() => null));
+      const changes = Stream.tick(beats.feed ?? WATCH_BEAT).pipe(
+        Stream.mapEffect(() => again),
+        Stream.map(() => null),
+      );
       const bookmarks = Stream.tick(BOOKMARK_EVERY).pipe(
         Stream.drop(1),
         Stream.map(() => bookmarkOf(kind, state.at)),
       );
       return yield* Stream.merge(changes, bookmarks, { haltStrategy: 'left' }).pipe(
+        Stream.runForEach((frame) => (frame === null ? Effect.void : write(frame))),
+      );
+    });
+    await c.var.runtime.runPromiseExit(watched, { signal: gone.signal });
+  });
+}
+
+/**
+ * The watch of a list that is read again: the state whole, or a list that follows the feed from the byte asked, then each change sent as
+ * the list's reads and the feed's lines say it.
+ */
+async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, versionOf: ChangeVersionOf, follow: Follow | undefined) {
+  const opened = await openedAt(c, list, versionOf, follow !== undefined);
+  if (opened instanceof Response) return opened;
+  const { start, initial, home, url, page, end } = opened;
+  return streamSSE(c, async (stream: SSEStreamingApi) => {
+    const gone = new AbortController();
+    stream.onAbort(() => gone.abort());
+    if (stream.aborted) gone.abort();
+    const write = (frame: { data: string }) => Effect.promise(() => stream.writeSSE(frame));
+    const state = { sent: initial, at: initial.at };
+    if (start.kind === 'state') {
+      for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
+      await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
+    }
+    const caughtUp = { due: start.kind === 'from' && initial.at < end };
+    if (start.kind === 'from' && !caughtUp.due) await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
+    const again = Effect.gen(function* () {
+      const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
+      if (now instanceof Response) return yield* new ListRefused({ status: now.status });
+      const frames = changedFrames(state.sent, now);
+      state.sent = now;
+      state.at = now.at;
+      for (const frame of frames) yield* write(frame);
+      yield* Effect.sleep(WATCH_SETTLE);
+    });
+    const watched = Effect.gen(function* () {
+      const beats = yield* Beats;
+      const lines = followFeed(initial.at, beats.feed === undefined ? {} : { beat: beats.feed }).pipe(
+        Stream.filter((f) => f.kind === 'line'),
+        Stream.map(() => 'line' as const),
+      );
+      const resync = Stream.tick(beats.watch ?? WATCH_RESYNC).pipe(
+        Stream.drop(1),
+        Stream.map(() => 'resync' as const),
+      );
+      const sentKeys = new Set(initial.objects.keys());
+      const reads =
+        follow === undefined
+          ? Stream.merge(lines, resync).pipe(
+              Stream.buffer({ capacity: 1, strategy: 'sliding' }),
+              Stream.mapEffect(() => again),
+              Stream.map(() => null),
+            )
+          : follow(c, initial.at, beats.feed).pipe(
+              Stream.mapEffect(({ object, at: after }) =>
+                Effect.gen(function* () {
+                  state.at = after;
+                  if (object !== undefined && !sentKeys.has(keyOf(object))) {
+                    sentKeys.add(keyOf(object));
+                    yield* write(frameOf({ type: 'ADDED', object }));
+                  }
+                  if (caughtUp.due && after >= end) {
+                    caughtUp.due = false;
+                    yield* write(bookmarkOf(initial.kind, after));
+                  }
+                  return null;
+                }),
+              ),
+            );
+      const bookmarks = Stream.tick(BOOKMARK_EVERY).pipe(
+        Stream.drop(1),
+        Stream.map(() => bookmarkOf(state.sent.kind, state.at)),
+      );
+      return yield* Stream.merge(reads, bookmarks, { haltStrategy: 'left' }).pipe(
         Stream.runForEach((frame) => (frame === null ? Effect.void : write(frame))),
       );
     });
@@ -357,7 +446,11 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
 export const watchable =
   (
     list: Listed,
-    { follow, versionOf = JSON.stringify, kind }: { readonly follow?: Follow; readonly versionOf?: ChangeVersionOf; readonly kind?: WatchedKind } = {},
+    {
+      follow,
+      versionOf = JSON.stringify,
+      kind,
+    }: { readonly follow?: Follow; readonly versionOf?: ChangeVersionOf; readonly kind?: WatchedKind } = {},
   ) =>
   async (c: RequestContext<ApiEnv>) => {
     const asked = c.req.query('watch');
@@ -365,72 +458,5 @@ export const watchable =
     const refused = refusalOf(c);
     if (refused !== null) return c.json({ error: refused.error }, refused.status);
     if (kind !== undefined) return revisionWatch(c, list, kind);
-    const opened = await openedAt(c, list, versionOf, follow !== undefined);
-    if (opened instanceof Response) return opened;
-    const { start, initial, home, url, page, end } = opened;
-    return streamSSE(c, async (stream: SSEStreamingApi) => {
-      const gone = new AbortController();
-      stream.onAbort(() => gone.abort());
-      if (stream.aborted) gone.abort();
-      const write = (frame: { data: string }) => Effect.promise(() => stream.writeSSE(frame));
-      const state = { sent: initial, at: initial.at };
-      if (start.kind === 'state') {
-        for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
-        await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
-      }
-      const caughtUp = { due: start.kind === 'from' && initial.at < end };
-      if (start.kind === 'from' && !caughtUp.due) await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
-      const again = Effect.gen(function* () {
-        const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
-        if (now instanceof Response) return yield* new ListRefused({ status: now.status });
-        const frames = changedFrames(state.sent, now);
-        state.sent = now;
-        state.at = now.at;
-        for (const frame of frames) yield* write(frame);
-        yield* Effect.sleep(WATCH_SETTLE);
-      });
-      const watched = Effect.gen(function* () {
-        const beats = yield* Beats;
-        const lines = followFeed(initial.at, beats.feed === undefined ? {} : { beat: beats.feed }).pipe(
-          Stream.filter((f) => f.kind === 'line'),
-          Stream.map(() => 'line' as const),
-        );
-        const resync = Stream.tick(beats.watch ?? WATCH_RESYNC).pipe(
-          Stream.drop(1),
-          Stream.map(() => 'resync' as const),
-        );
-        const sentKeys = new Set(initial.objects.keys());
-        const reads =
-          follow === undefined
-            ? Stream.merge(lines, resync).pipe(
-                Stream.buffer({ capacity: 1, strategy: 'sliding' }),
-                Stream.mapEffect(() => again),
-                Stream.map(() => null),
-              )
-            : follow(c, initial.at, beats.feed).pipe(
-                Stream.mapEffect(({ object, at: after }) =>
-                  Effect.gen(function* () {
-                    state.at = after;
-                    if (object !== undefined && !sentKeys.has(keyOf(object))) {
-                      sentKeys.add(keyOf(object));
-                      yield* write(frameOf({ type: 'ADDED', object }));
-                    }
-                    if (caughtUp.due && after >= end) {
-                      caughtUp.due = false;
-                      yield* write(bookmarkOf(initial.kind, after));
-                    }
-                    return null;
-                  }),
-                ),
-              );
-        const bookmarks = Stream.tick(BOOKMARK_EVERY).pipe(
-          Stream.drop(1),
-          Stream.map(() => bookmarkOf(state.sent.kind, state.at)),
-        );
-        return yield* Stream.merge(reads, bookmarks, { haltStrategy: 'left' }).pipe(
-          Stream.runForEach((frame) => (frame === null ? Effect.void : write(frame))),
-        );
-      });
-      await c.var.runtime.runPromiseExit(watched, { signal: gone.signal });
-    });
+    return readAgainWatch(c, list, versionOf, follow);
   };

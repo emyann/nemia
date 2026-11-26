@@ -31,8 +31,7 @@ export type WatchStart =
 const asks = (asked: string | undefined) => asked !== undefined && asked !== '';
 
 const watchStartSpec = spec<(asked: string | undefined, follows: boolean, version: number | undefined) => WatchStart>({
-  requires: ({ input: [asked, , version] }) =>
-    version === undefined || (Number.isSafeInteger(version) && version >= 0 && asks(asked)),
+  requires: ({ input: [asked, , version] }) => version === undefined || (Number.isSafeInteger(version) && version >= 0 && asks(asked)),
   ensures: {
     noneAskedSendsTheState: {
       description: 'A watch that asks no resourceVersion is sent the list whole, whatever the list',

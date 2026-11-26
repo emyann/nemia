@@ -389,7 +389,10 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
             const sql = yield* SqlClient.SqlClient;
             const head = yield* headNow;
             const compacted = yield* compactedNow;
-            const [seen] = yield* sql<{ head: number; at: number }>`SELECT head, at FROM kine_sweeps WHERE at <= ${now - windowMs} ORDER BY at DESC, head DESC LIMIT 1`;
+            const [seen] = yield* sql<{
+              head: number;
+              at: number;
+            }>`SELECT head, at FROM kine_sweeps WHERE at <= ${now - windowMs} ORDER BY at DESC, head DESC LIMIT 1`;
             const to = compactTo(head, compacted, seen?.head ?? 0);
             if (to > compacted) yield* compactRange(compacted, to);
             yield* sql`INSERT INTO kine_sweeps (head, at) VALUES (${head}, ${now})`;

@@ -30,6 +30,7 @@ import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.
 import { asideOf, entriesIn, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
 import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts';
 import { FILE_ID_PREFIX } from 'objects';
+import { claimKey } from '../runs/run-keys.ts';
 
 /** The Card door's shape: the inbox's cards and the tick's tries of a queued card's start, each method answering an Effect. */
 export type CardDoorShape = {
@@ -40,6 +41,8 @@ export type CardDoorShape = {
     readonly read: (name: CardName) => Effect.Effect<string | null, Refusal>;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
     readonly filedAt: (name: CardName) => Effect.Effect<string | null, Refusal>;
+    /** The revision the card `name` stands at: the highest of its record, its try and its claim; null where it is not there. */
+    readonly revision: (name: CardName) => Effect.Effect<number | null, Refusal>;
     /** When the inbox's entry `file` (as `entries` lists it) was filed, as an ISO time; null when it is gone or names no card. */
     readonly entryAt: (entry: { readonly file: string }) => Effect.Effect<string | null, Refusal>;
     /** The text of the inbox's entry `file` (as `entries` lists it); null when it is gone or names no card. */
@@ -307,6 +310,14 @@ export function cardRecords(
         }),
       read: (name) => Effect.map(recordOf(name), (r) => r?.text ?? null),
       filedAt: (name) => Effect.map(recordOf(name), (r) => r?.filedAt ?? null),
+      revision: (name) =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          const own = keyspace === undefined ? undefined : yield* keyspace.get(cardKey(name));
+          if (keyspace === undefined || own === undefined) return null;
+          const beside = yield* Effect.all([keyspace.get(cardTryKey(name)), keyspace.get(claimKey(name))]);
+          return Math.max(own.revision, ...beside.map((r) => r?.revision ?? 0));
+        }),
       entryAt: ({ file }) => {
         const name = nameOfEntry(file);
         return name === undefined ? Effect.succeed(null) : Effect.map(recordOf(name), (r) => r?.filedAt ?? null);

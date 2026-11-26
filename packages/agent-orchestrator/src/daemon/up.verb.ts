@@ -327,8 +327,9 @@ const limitRefusal = (config: Settings, scope: (parent?: string) => string | und
  * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`). On an eleventh, once the
  * first pass has answered and every `NEEDS_EVERY` after, it reads the store's readiness over that memory (`readied`), and hands each
  * pass the latest read, whose moves the pass writes to the feed: `not ready` while a piece a run waits on is missing, `ready` once none
- * is. On a twelfth it reads the definitions' files again every `DEFINITIONS_EVERY` for the index (`definitionSweep`), and compacts the keyspace every `KEYSPACE_COMPACT_EVERY` (`compaction`), keeping at least the last 5 minutes
- * of revisions a watch can start from. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a
+ * is. On a twelfth it reads the definitions' files again every `DEFINITIONS_EVERY` for the index (`definitionSweep`), and
+ * compacts the keyspace every `KEYSPACE_COMPACT_EVERY` (`compaction`), keeping at least the last 5 minutes of revisions a watch can
+ * start from. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a
  * histogram exported with the rest (`EVENT_LOOP_DELAY`), and a stall of a second or more logged once, naming the span that was running
  * as the loop came back.
  * @param e The engine every pass runs on, whose sessions the daemon holds.

@@ -32,7 +32,6 @@ import {
   unattachedRefusal,
   WORKFLOWS_REMOVE,
   workflowDraftOfFiles,
-  workflowStale,
   workflowNeeds,
   workflowSpecAt,
   workflowSpecOf,
@@ -45,7 +44,6 @@ import { WorkflowError } from 'agent-orchestrator/workflow';
 import {
   Api,
   API_VERSION,
-  Conflict,
   Invalid,
   Missing,
   type DefinitionFiles,
@@ -79,6 +77,7 @@ import {
   servedOf,
   thereOf,
   namespacedWriteRefused,
+  readAtRevision,
   writeGoes,
   writtenAt,
   type Origin,
@@ -356,8 +355,7 @@ async function libraryReplaced(s: Served, name: string, payload: WorkflowWrite) 
       error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
     });
   const at = writing(s, name, true);
-  const now = await s.inRequest(workflowVersion(at.dir, placesOf(at.repo, s.home)));
-  if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
+  await readAtRevision(s, 'Workflow', name, given, 'write');
   builderRefused(await write(at, steps, workflowSpecReadme(at.dir, payload.spec), schemas, files));
   return libraryAt(s, name, 'user');
 }
@@ -413,8 +411,11 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
         writeGoes('library', 'remove', thereOf(libraryHeld(s), name), await s.inRequest(libraryUsers(s.home, { kind: 'Workflow', name })));
+        await readAtRevision(s, 'Workflow', name, version, 'remove');
         const before = await libraryAt(s, name, 'user');
-        const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
+        const { removed } = await s.inRequest(
+          WORKFLOWS_REMOVE.handler({ from: 'user', name, version: before.metadata.resourceVersion, repo: query.repo }),
+        );
         return { ...before, status: { ...before.status, removed } };
       }),
     )

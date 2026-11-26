@@ -66,6 +66,7 @@ import {
   servedOf,
   thereOf,
   namespacedWriteRefused,
+  readAtRevision,
   writeGoes,
   writtenAt,
   type Held,
@@ -374,11 +375,28 @@ async function libraryCreated(s: Served, payload: AgentWrite) {
 async function libraryReplaced(s: Served, name: string, payload: AgentWrite) {
   const route = `PUT /api/agents/${name}`;
   writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
-  const version = versioned(route, payload.metadata.resourceVersion);
+  await readAtRevision(s, 'Agent', name, versioned(route, payload.metadata.resourceVersion), 'write');
+  const version = (await libraryAt(s, name, 'user')).metadata.resourceVersion;
   const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
   const given = agentDraftOf(draftBodyOf(payload.spec), to);
   await saved(s, { ...given, version, name });
   return libraryAt(s, to, 'user');
+}
+
+/** The library's agent `name` removed at the `resourceVersion` the query says it was read at, read back as it was. */
+async function libraryRemoved(
+  s: Served,
+  name: string,
+  query: { readonly resourceVersion?: string | undefined; readonly repo?: string | undefined },
+) {
+  const route = `DELETE /api/agents/${name}`;
+  const read = versioned(route, query.resourceVersion);
+  writeGoes('library', 'remove', thereOf(await libraryHeld(s), name), await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name })));
+  await readAtRevision(s, 'Agent', name, read, 'remove');
+  const before = await libraryAt(s, name, 'user');
+  const version = before.metadata.resourceVersion;
+  const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
+  return { ...before, status: { ...before.status, removed } };
 }
 
 export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
@@ -426,21 +444,7 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
     .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
     .handle('createLibrary', ({ payload }) => answeredWriteIn(LIBRARY, (s) => libraryCreated(s, payload)))
     .handle('replaceLibrary', ({ params: { name }, payload }) => answeredWriteIn(LIBRARY, (s) => libraryReplaced(s, name, payload)))
-    .handle('deleteLibrary', ({ params: { name }, query }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const route = `DELETE /api/agents/${name}`;
-        const version = versioned(route, query.resourceVersion);
-        writeGoes(
-          'library',
-          'remove',
-          thereOf(await libraryHeld(s), name),
-          await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name })),
-        );
-        const before = await libraryAt(s, name, 'user');
-        const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
-        return { ...before, status: { ...before.status, removed } };
-      }),
-    )
+    .handle('deleteLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryRemoved(s, name, query)))
     .handle('tryLibrary', ({ params: { name }, payload }) => answeredWriteIn(LIBRARY, (s) => triedIn(s, name, payload.brief)))
     .handle('copyLibrary', ({ payload }) => answered((s) => s.inRequest(AGENTS_COPY.handler(payload))))
     .handle('card', ({ params: { namespace, name }, query }) => answeredWriteIn(namespace, (s) => cardIn(s, namespace, name, query.origin)))

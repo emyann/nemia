@@ -14,7 +14,8 @@ import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYo
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
-import { ENDED } from '@/lib/words';
+import { assigneeName } from '@/lib/runWords';
+import { ENDED, NOW_WORDS } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
@@ -62,8 +63,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - A result nobody decided, in a line that fits, whole on hover in the CLI `ls`'s words, a link to where it is decided on the run's page;
  *   the card is banded yellow, the one finished card on the floor that waits for a person rather than for a machine.
  * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record could not be read.
- * - Its chips: a try of an agent, tagged with its agent; how many runs it reads as context; to decide; waiting on you; held, with the
- *   hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); called off; pruned.
+ * - Its chips: a try of an agent, tagged with its agent; how many runs it reads as context; to decide; waiting on you; who has it in
+ *   hand (`data-assignee-chip`, the assignee's words on hover); held, with the hold lifted here, as the CLI's `hold --off` lifts it
+ *   (`CardLift`); called off; pruned.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that waits on
  *   it leaves.
  *
@@ -267,7 +269,8 @@ function TouchedLine({ run }: { run: RunView }) {
 
 /**
  * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context,
- * each on hover (`reads`); to decide (`decide`); waiting on you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
+ * each on hover (`reads`); to decide (`decide`), not while someone has the run in hand; waiting on you; who has it in hand, the assignee's
+ * words on hover; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
   return (
@@ -278,8 +281,13 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
         </Tag>
       )}
-      {decide && <Tag className="bg-yours text-on-yours">to decide</Tag>}
+      {decide && !run.assignee && <Tag className="bg-yours text-on-yours">to decide</Tag>}
       {waitsOnYou(run) && <Tag className="bg-yours-container text-on-yours-container">waiting on you</Tag>}
+      {run.assignee && !cancelled && (
+        <Tag variant="outlined" data-assignee-chip title={run.assignee.word} className="text-on-surface-variant">
+          {NOW_WORDS.hasIt(assigneeName(run.assignee))}
+        </Tag>
+      )}
       {run.holding && !cancelled && (
         <Tag title={run.holding.advice} className="bg-rest text-on-rest">
           held

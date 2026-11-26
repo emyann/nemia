@@ -350,6 +350,16 @@ describe('each write keeps who acted, by the token its request presented, and th
     assert.deepEqual((await status(OTHER)).holding?.actor, session, "and served on the run's holding");
     assert.equal((await send('DELETE', `${run(OTHER)}/hold`)).status, 200);
   });
+  test("an assignee put with no `to` is named by no one but its caller: no name made up, the person's actor kept, and served on the run", async () => {
+    record('ra-by-assign', { implement: null });
+    const put = await answered(await send('POST', `${run('ra-by-assign')}/assignee`, {}));
+    assert.equal(put.status, 200, JSON.stringify(put.body));
+    const assignee = put.body.assignee as { name?: string; actor?: unknown };
+    assert.deepEqual([assignee.name, assignee.actor], [undefined, person], 'answered with the caller, and no name');
+    const served = (await status('ra-by-assign')).assignee;
+    assert.deepEqual([served?.name, served?.actor], [undefined, person], 'and served on the run');
+    assert.equal((await send('DELETE', `${run('ra-by-assign')}/assignee`)).status, 200);
+  });
   test('a card sent on calls off the run that waited on it, as who sent it, answered and served on the run', async () => {
     task('t-by-resent', 'succeeded', BLOCKED);
     record('ra-by-resent', { implement: 't-by-resent' }, { card: 'resend-me' });

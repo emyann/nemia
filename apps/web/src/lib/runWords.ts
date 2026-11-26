@@ -277,9 +277,9 @@ export function nowOf(row: NowRow) {
   const step = row.steps[at];
   if (!drawn || !step) return null;
   const asked = wait !== null || waitsOnPerson(drawn.state, cancelled);
-  const assigned = row.assignee != null && !held;
-  const yours = asked && !assigned;
-  const stands = nowStandsOf(drawn.state, drawn.on, held, assigned);
+  const inHand = row.assignee != null;
+  const yours = asked && !inHand;
+  const stands = nowStandsOf(drawn.state, drawn.on, held, inHand);
   const rounds = step.spec?.rounds ?? null;
   return {
     step: drawn.name,

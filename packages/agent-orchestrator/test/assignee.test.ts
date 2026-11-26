@@ -13,7 +13,6 @@ import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
@@ -88,7 +87,6 @@ const refusedAs = (tag: string) => (err: Error & { exitCode?: number; _tag?: str
 describe('a run at its gate assigned: in flight while it stands, given back to wait on you, and never refused an answer', () => {
   let b!: Board;
   let id = '';
-  const user = os.userInfo().username;
   beforeAll(async () => {
     const t = teardowns();
     b = stage.board();
@@ -99,16 +97,16 @@ describe('a run at its gate assigned: in flight while it stands, given back to w
   s.test('before it is assigned, the run at its gate waits on you', async () => {
     assert.equal(kindOf(await summaryOf(b, id)), 'waiting');
   });
-  s.test('`nemia assign <run>` puts it in the OS user’s hand for an hour, written beside the run', async () => {
+  s.test('`nemia assign <run>` puts it in a hand for an hour, named by no one but its caller, written beside the run', async () => {
     const put = await assignTyped(id);
-    assert.deepEqual([put.id, put.ended, put.assignee.name, put.assignee.forMs], [id, false, user, 3_600_000]);
-    assert.deepEqual(Object.keys(readFile(id, 'assignee')), ['at', 'forMs', 'name']);
+    assert.deepEqual([put.id, put.ended, put.assignee.name, put.assignee.forMs], [id, false, undefined, 3_600_000]);
+    assert.deepEqual(Object.keys(readFile(id, 'assignee')), ['at', 'forMs']);
   });
   s.test('it waits on nobody else: listed in flight, its assignee served with when it comes back, its ask still asked', async () => {
     const summary = await summaryOf(b, id);
     assert.equal(kindOf(summary), 'inFlight');
     assert.ok(summary.waitingOnYou.length > 0, 'what it asks is still asked');
-    assert.equal(summary.assignee?.name, user);
+    assert.equal(summary.assignee?.name, undefined, 'no name said, none made up: the caller is named by its actor');
     assert.ok(summary.assignee?.comesBackAt, 'an ask is timed');
   });
   s.test('a second assignee is refused while one stands, and the first stands as it was', async () => {

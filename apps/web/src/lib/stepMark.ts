@@ -47,6 +47,14 @@ export const stepMark: StepMarkOf = (state, waits) =>
   state === 'waiting' || state === 'waiting-for-slot' || state === 'held' ? (waits ? 'waits' : 'todo') : MARK[state];
 
 /**
+ * The mark a step is drawn by on a run: its own (`stepMark`), except that where someone has the run in hand (`assignee`) a step that
+ * waits on a person is not the person's move, and is drawn outlined as one that waits, as the run's chip is (`nowStandsOf`). No new hue.
+ * @param mark The step's own mark.
+ * @param inHand Whether someone has the run in hand.
+ */
+export const markInHand = (mark: StepMark, inHand: boolean) => (inHand && mark === 'yours' ? 'waits' : mark) satisfies StepMark;
+
+/**
  * Whether the step of `drawn` at `at` waits on something now, not only its turn: a run slot or a hold by its state, a thing it names
  * (`on`), or, on a held run, the first step not started, which the hold stops.
  * @param drawn The run's steps, each with its state and what it waits on.
@@ -70,5 +78,5 @@ export function nowMark(run: Parameters<typeof nowOf>[0]) {
   const held = run.holding != null;
   const drawn = railStates(run.steps, Boolean(run.cancelledAt), held);
   const at = drawn.findIndex((step) => step.name === now.step);
-  return stepMark(drawn[at].state, waitsNow(drawn, at, held));
+  return markInHand(stepMark(drawn[at].state, waitsNow(drawn, at, held)), run.assignee != null);
 }

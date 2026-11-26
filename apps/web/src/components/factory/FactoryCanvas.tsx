@@ -191,7 +191,15 @@ const HANDFUL = 5;
  * could not judge is in flight, as the tick counts it.
  */
 const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
-  !judged(run) ? paint.alive : toDecideOf(run) ? paint.yours : waitsOnYou(run) ? paint.yours : finished ? paint.sage : paint.alive;
+  !judged(run)
+    ? paint.alive
+    : toDecideOf(run) && !run.assignee
+      ? paint.yours
+      : waitsOnYou(run)
+        ? paint.yours
+        : finished
+          ? paint.sage
+          : paint.alive;
 
 /**
  * The runs of `factory` that are not finished, given as its light answer `open` (`openRunsQuery`), a card each, on a floor a person can

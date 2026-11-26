@@ -7,7 +7,7 @@ import type { Frozen } from '@/lib/frozen';
 import { paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
-import { stepMark, waitsNow, type StepMark } from '@/lib/stepMark';
+import { markInHand, stepMark, waitsNow, type StepMark } from '@/lib/stepMark';
 import { stateWordsOf } from '@/lib/words';
 import { Body, Focusable, Label, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
@@ -57,9 +57,10 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
 /** A step of the run as the graph reads it: its name, its codes, its note and whether its next round is due. */
 type GraphStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>;
 
-/** The run the graph draws: its steps, its graph, its gates, when it was called off and its hold. */
+/** The run the graph draws: its steps, its graph, its gates, when it was called off, its hold and who has it in hand. */
 type GraphRun = { steps: readonly GraphStep[]; graph: Frozen<RunGraph>; gates: readonly GraphGate[]; cancelledAt: string | null } & {
   holding?: RunView['holding'];
+  assignee?: RunView['assignee'];
 };
 
 /** A step as a wrap is handed it: its name, its state, and what it waits on. */
@@ -202,7 +203,9 @@ export function StepGraph({
     width,
     named ? Infinity : undefined,
   );
-  const at = new Map(drawn.map((step, i) => [step.name, { step, mark: stepMark(step.state, waitsNow(drawn, i, held)) }]));
+  const at = new Map(
+    drawn.map((step, i) => [step.name, { step, mark: markInHand(stepMark(step.state, waitsNow(drawn, i, held)), run.assignee != null) }]),
+  );
   const lanes = new Map<number, number>();
   for (const point of layout.points) lanes.set(point.x, (lanes.get(point.x) ?? 0) + 1);
   const rows = namedRows(layout.points);

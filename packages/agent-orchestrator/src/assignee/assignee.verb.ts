@@ -3,7 +3,6 @@
  * anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`): each verb is a program that fails with
  * its refusal (`Invalid`, `Missing`, `Conflict`) and dies of anything else the store or the engine throws.
  */
-import os from 'node:os';
 import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import type { Assignee, Run } from '../record/record.ts';
@@ -37,8 +36,8 @@ const missing = (id: string) =>
  * exclusively: two put at once are the first one's, and the second is refused. Dies of anything else the store or the engine throws.
  *
  * @param id The run's id.
- * @param said How long an ask may wait on them (`forMs`, an hour where not given), who they are (`name`: without one, the user this
- * process runs as, and none when the system has no name for it), the words for why, and the caller who puts it (`actor`) where known.
+ * @param said How long an ask may wait on them (`forMs`, an hour where not given), who they are (`name`: none where not given, and the
+ * caller's `actor` names them then), the words for why, and the caller who puts it (`actor`) where known.
  */
 export const assign = Effect.fn('assign')(function* (id: string, said: Partial<Omit<Assignee, 'at'>> = {}) {
   const bad = idRefusal(id, 'assign');
@@ -55,7 +54,7 @@ export const assign = Effect.fn('assign')(function* (id: string, said: Partial<O
   if (run.assignee) yield* door.assignees.end(RunId.read(id), run.assignee.at, 'lapsed');
   const put = yield* door.assignees.put(RunId.read(id), {
     forMs: said.forMs ?? DEFAULT_FOR_MS,
-    ...((said.name ?? osUser()) ? { name: said.name ?? osUser() } : {}),
+    ...(said.name ? { name: said.name } : {}),
     ...(said.why ? { why: said.why } : {}),
     ...(said.actor ? { actor: said.actor } : {}),
   });
@@ -65,15 +64,6 @@ export const assign = Effect.fn('assign')(function* (id: string, said: Partial<O
   }
   return { run: { ...run, assignee: put }, assignee: put } satisfies Assigning;
 });
-
-/** Who this process runs as, by the name the system gives the user — or undefined, for a user it has no entry for. */
-function osUser() {
-  try {
-    return os.userInfo().username || undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Give a run back — `nemia assign <run> --off`: what it asks is the person's move again at once. Fails, before anything is written: an id

@@ -69,6 +69,12 @@ export type SpawnRequest = {
    * (`telemetered`), absent otherwise, and then none is.
    */
   telemetry?: Telemetry;
+  /**
+   * The access token of each remote MCP server of the task signed in to by a code, by the server's name: set by an engine at each spawn
+   * (`tokened`, `mcp-token.ts`), and in memory alone, never on `config`, which is journalled. A harness that hands servers to its session
+   * lays each as the server's `Authorization` header (`withTokens`). Absent: no server has one.
+   */
+  mcpTokens?: Readonly<Record<string, string>>;
 };
 
 /**

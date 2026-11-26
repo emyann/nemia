@@ -12,14 +12,13 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { eachTest } from './placed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import { serversBefore } from '../src/factory/servers/servers.verb.ts';
-import { writeFactoryServers } from '../testing.ts';
+import { plantKey, writeFactoryServers } from '../testing.ts';
+import { serversKey } from '../src/factory/door/index.ts';
 
 const ROOT = scratch('wf-servers-before-');
 
@@ -91,11 +90,9 @@ test("the pass reads a factory's whole record in one ask, whatever the steps tha
 });
 
 test('a record that does not read refuses every step that names a server, naming the file and the command', async () => {
-  const file = path.join(ROOT, 'factories', factory(), 'servers.json');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, '{');
+  plantKey(ROOT, serversKey(factory()), '{');
   const read = await before();
-  assert.match(read.refusal!, new RegExp(`the servers ${factory()} records cannot be read: .*servers\\.json is not JSON`));
+  assert.match(read.refusal!, new RegExp(`the servers ${factory()} records cannot be read: ${serversKey(factory())} is not JSON`));
   assert.match(read.refusal!, new RegExp(`nemia factory server add ${factory()}`), 'the command that writes it again');
   assert.ok(read.refuses('claude', ['github']), 'a step that names a server is not filed');
   assert.equal(read.refuses('claude', undefined), null, 'a step that names none never reads the record');

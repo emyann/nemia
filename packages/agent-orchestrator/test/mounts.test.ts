@@ -37,7 +37,7 @@ import { loadAgents } from '../src/agents/read.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../testing.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt, plantFactory } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { inboxViewOf } from '../src/tick/told.verb.ts';
@@ -197,10 +197,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
   s.test(
     "implement's first filing writes its folder alone, reads the rest, and names each on its brief; the factory changed since changes none",
     async () => {
-      fs.writeFileSync(
-        path.join(ROOT, 'factories', 'trio.json'),
-        `${JSON.stringify({ volumes: [...repos, aRepo()].map((at) => ({ path: at, readOnly: false })) })}\n`,
-      );
+      plantFactory(ROOT, 'trio', JSON.stringify({ volumes: [...repos, aRepo()].map((at) => ({ path: at, readOnly: false })) }));
       await pass(id);
       const first = filedFor(id, 'implement');
       assert.deepEqual(first.config?.mounts, writes);

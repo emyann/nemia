@@ -24,7 +24,8 @@ import { checkedTree, packageSkillNames, problemLine } from './template.store.ts
 import { TemplateDoor } from './door/templates.store.ts';
 import { TemplateSource } from './door/templates.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../../testing.ts';
+import { addFactoryAt, attachWorkflowAt, factoryText, hireAgentAt, plantFactory } from '../../testing.ts';
+import { factoryKey } from '../factory/door/index.ts';
 import { writeRules } from '../factory/rules/rules.store.ts';
 import { followed } from '../../test/factory-planted.ts';
 import { main } from '../cli/main.ts';
@@ -300,7 +301,7 @@ describe('what export writes from a repository and a factory, read back as it wa
     assert.equal(fs.readFileSync(path.join(dir, 'NEMIA.md'), 'utf8'), 'Run the crew.\n');
     const said = new Map(from.map(({ part, from: at }) => [part, at]));
     assert.equal(said.get('NEMIA.md'), path.join(repo, 'NEMIA.md'));
-    assert.equal(said.get('nemia.yaml hires solo/work: implementer'), `${path.join(ROOT, 'factories', 'crew.json')}, its hire`);
+    assert.equal(said.get('nemia.yaml hires solo/work: implementer'), `${factoryKey('crew')}, its hire`);
     assert.equal(said.get('agents/reviewer/'), undefined, 'an agent only an unattached workflow names is left out');
   });
   test("with --factory, the draft holds the factory's rules as RULES.md, read from the store; none where it has none, and rules that do not read refuse it", () => {
@@ -373,10 +374,10 @@ describe('what export, pack, unpack and lint refuse, by kind and exit 2, each wr
   test('with --factory: a workflow it attaches that the repository lacks, a step hired and filled by its own agent:, and another repository', () => {
     const repo = factoryOnTeam('gaps');
     attachWorkflowAt(ROOT, { factory: 'gaps', workflow: 'ghost' });
-    const factoryFile = path.join(ROOT, 'factories', 'gaps.json');
-    const record = JSON.parse(fs.readFileSync(factoryFile, 'utf8'));
-    fs.writeFileSync(
-      factoryFile,
+    const record = JSON.parse(factoryText(ROOT, 'gaps') ?? '');
+    plantFactory(
+      ROOT,
+      'gaps',
       JSON.stringify({ ...record, workflows: [...record.workflows, 'dev'], hires: { ...record.hires, 'dev/review': 'shipper' } }),
     );
     const dir = target();

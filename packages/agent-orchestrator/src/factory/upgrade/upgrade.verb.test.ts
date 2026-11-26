@@ -21,11 +21,11 @@ import type { Served } from '../../command/entry.verb.ts';
 import type { Args } from '../../command/command.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
 import { FACTORY_RULES, factoryRules, runWith as runEngine } from '../../runner.ts';
-import { readFactoryAt } from '../../../testing.ts';
+import { factoryText, keysUnder, readFactoryAt, recordText } from '../../../testing.ts';
 import { factoryTyped } from '../../../test/factory-typed.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
 import { dropRecord, factoriesNow, recordRevision } from '../../../testing.ts';
-import { appliedKey } from '../door/index.ts';
+import { appliedKey, factoryKey } from '../door/index.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
 import { withBuiltins } from '../../../test/templated.ts';
@@ -113,6 +113,16 @@ const bytesUnder = (dir: string) =>
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'base64')]),
   );
 
+/** Every file under the factories folder and every factory record with its text, so a refusal is seen to have written nothing. */
+const held = () => ({
+  ...(fs.existsSync(FACTORIES) ? bytesUnder(FACTORIES) : {}),
+  ...Object.fromEntries(
+    ['factories', 'levels', 'servers', 'applied'].flatMap((kind) =>
+      keysUnder(ROOT, `/registry/${kind}/`).map((key) => [key, recordText(ROOT, key)]),
+    ),
+  ),
+});
+
 /** The text of `file` in the factory `name`'s `folder`, its tree or its base. */
 const textIn = (folder: string, file: string) => fs.readFileSync(path.join(folder, file), 'utf8');
 
@@ -147,7 +157,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());
   await main(['factory', 'apply', 'unrendered', '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7'], noEngine());
-  const before = bytesUnder(FACTORIES);
+  const before = held();
   const upgrade = (name: string, ...rest: string[]) => main(['factory', 'upgrade', name, ...rest], noEngine());
   await assert.rejects(upgrade('plain', '--to', '0.2.0'), refusedWith('Invalid', /plain is not made from a template/));
   await assert.rejects(upgrade('unrendered', '--to', '0.2.0'), refusedWith('Conflict', /unrendered is not rendered yet[^]*nemia up/));
@@ -173,7 +183,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
     spec.parameters.gated = { type: 'boolean', description: 'a gate before the ship' };
   });
   await assert.rejects(upgrade('kept', '--to', '0.2.0'), refusedWith('Invalid', /gated has no default/));
-  assert.deepEqual(bytesUnder(FACTORIES), before, 'every refusal writes nothing');
+  assert.deepEqual(held(), before, 'every refusal writes nothing');
 });
 
 describe('an upgrade with no conflict, up or down: filed alone, then merged by the controller', () => {
@@ -189,15 +199,15 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
   test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async () => {
     vi.spyOn(console, 'log');
     const { dir } = await applied('clean');
-    const file = path.join(FACTORIES, 'clean.json');
-    const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const file = factoryKey('clean');
+    const filedAs = JSON.parse(factoryText(ROOT, 'clean') ?? '');
     rewrite(treeDir(ROOT, 'clean'), REVIEW, 'budget: 7', 'budget: 9');
     released(dir, '0.2.0', 5);
     const folder = bytesUnder(path.join(FACTORIES, 'clean'));
     const filed = await main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine());
     assert.deepEqual(filed, { name: 'clean', from: '0.1.0', to: '0.2.0', file, dropped: [], conflicts: 0 });
     assert.deepEqual(
-      JSON.parse(fs.readFileSync(file, 'utf8')),
+      JSON.parse(factoryText(ROOT, 'clean') ?? ''),
       { ...filedAs, template: { ...filedAs.template, version: '0.2.0' }, generation: 2 },
       'the template wanted is a change of its spec, counted',
     );
@@ -268,9 +278,8 @@ test('an upgrade onto a template that declares other parameters: --set given, th
   edit(other, 'workflows/dev/workflow.yaml', (spec) => {
     spec.steps[1].budget = { param: 'cap' };
   });
-  const file = path.join(FACTORIES, 'onto.json');
-  const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const before = bytesUnder(FACTORIES);
+  const filedAs = JSON.parse(factoryText(ROOT, 'onto') ?? '');
+  const before = held();
   const onto = ['onto', '--to', '0.2.0', '--template', other];
   await assert.rejects(main(['factory', 'diff', ...onto], noEngine()), refusedWith('Invalid', /cap has no default/));
   const preview = await previewOf(...onto, '--set', 'cap=9');
@@ -301,11 +310,11 @@ test('an upgrade onto a template that declares other parameters: --set given, th
     'a parameter dropped with no --set given still holds the upgrade to its plan',
   );
   await assert.rejects(main(['factory', 'upgrade', ...bare], noEngine()), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
-  assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and every refusal write nothing');
+  assert.deepEqual(held(), before, 'the previews and every refusal write nothing');
   const folder = bytesUnder(path.join(FACTORIES, 'onto'));
   const filed = (await main(['factory', 'upgrade', ...onto, '--set', 'cap=9', '--plan', digest], noEngine())) as { dropped: string[] };
   assert.deepEqual(filed.dropped, ['budget']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+  assert.deepEqual(JSON.parse(factoryText(ROOT, 'onto') ?? ''), {
     ...filedAs,
     template: { source: other, version: '0.2.0', params: { cap: 9 } },
     generation: 2,
@@ -470,10 +479,9 @@ describe('a parameter set again at the version applied: previewed, filed with it
   test("it merges with no conflict, and the factory's file records the new value", async () => {
     vi.spyOn(console, 'log');
     await applied('reset');
-    const file = path.join(FACTORIES, 'reset.json');
-    const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const filedAs = JSON.parse(factoryText(ROOT, 'reset') ?? '');
     rewrite(treeDir(ROOT, 'reset'), REVIEW, 'rounds: 3', 'rounds: 4');
-    const before = bytesUnder(FACTORIES);
+    const before = held();
     const preview = await previewOf('reset', '--to', '0.1.0', '--set', 'budget=9');
     assert.deepEqual([preview.from, preview.to, preview.switched], ['0.1.0', '0.1.0', undefined]);
     const { plan, line } = planIn(preview);
@@ -484,10 +492,10 @@ describe('a parameter set again at the version applied: previewed, filed with it
     const upgrade = (...rest: string[]) => main(['factory', 'upgrade', 'reset', '--to', '0.1.0', '--set', 'budget=9', ...rest], noEngine());
     await assert.rejects(upgrade(), refusedWith('Invalid', /nemia factory diff reset --to 0\.1\.0 --set budget=9/));
     await assert.rejects(upgrade('--plan', stale), refusedWith('Conflict', /nemia factory diff reset --to 0\.1\.0/));
-    assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and the refusals write nothing');
+    assert.deepEqual(held(), before, 'the previews and the refusals write nothing');
     const folder = bytesUnder(path.join(FACTORIES, 'reset'));
     await upgrade('--plan', plan);
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'reset') ?? ''), {
       ...filedAs,
       template: { ...filedAs.template, params: { budget: 9 } },
       generation: 2,
@@ -516,13 +524,13 @@ describe('a parameter set again at the version applied: previewed, filed with it
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
-    const before = bytesUnder(FACTORIES);
+    const before = held();
     for (const verb of ['diff', 'upgrade'])
       await assert.rejects(
         main(['factory', verb, 'edited', '--to', '0.1.0', '--set', 'budget=9'], noEngine()),
         refusedWith('Conflict', /the template at 0\.1\.0 now renders other content/),
       );
-    assert.deepEqual(bytesUnder(FACTORIES), before);
+    assert.deepEqual(held(), before);
   });
   test('a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes', async () => {
     vi.spyOn(console, 'log');

@@ -49,7 +49,7 @@ import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt, attachWorkflowAt } from '../../testing.ts';
+import { addFactoryAt, attachWorkflowAt, dropFactory, factoryText, plantFactory } from '../../testing.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -909,8 +909,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
   emptyInbox();
   const repo = aRepoWith('dev');
   addFactoryAt(ROOT, { name: 'lv', volumes: [`${repo}:rw`] });
-  const file = path.join(ROOT, 'factories', 'lv.json');
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), labelValues: { work: ['feature', 'fix'] } }));
+  plantFactory(ROOT, 'lv', JSON.stringify({ ...JSON.parse(factoryText(ROOT, 'lv') ?? ''), labelValues: { work: ['feature', 'fix'] } }));
   const cards = () => (fs.existsSync(INBOX) ? fs.readdirSync(INBOX).length : 0);
 
   assert.throws(
@@ -933,8 +932,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
     { work: 'store' },
     'the default factory judges none',
   );
-  const unread = path.join(ROOT, 'factories', 'unread.json');
-  fs.writeFileSync(unread, '{ not json');
+  plantFactory(ROOT, 'unread', '{ not json');
   try {
     assert.deepEqual(
       addToInbox({ text: 'Unread factory', factory: 'unread', labels: ['work=store'] }).card.labels,
@@ -942,7 +940,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
       'a factory whose file does not read judges none: the start says what is wrong with it',
     );
   } finally {
-    fs.rmSync(unread);
+    dropFactory(ROOT, 'unread');
   }
 
   const parent = await runPlaced(startRun({ brief: 'parent', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));

@@ -28,7 +28,7 @@ import type { PlaceTrust } from '../../trust/trust.ts';
 import { FACTORY_INSTRUCT } from '../instruction.verb.ts';
 import { reconcile } from './applied.verb.ts';
 import { appliedDir, treeDir } from './applied.store.ts';
-import { factoriesNow, factoryText, keysUnder, plantKey, readStatus, recordText } from '../../../testing.ts';
+import { factoriesNow, factoryText, keysUnder, plantFactory, plantKey, readStatus, recordText } from '../../../testing.ts';
 import { appliedKey } from '../door/index.ts';
 import { detached, followed } from '../../../test/factory-planted.ts';
 import { Effect, Fiber } from 'effect';
@@ -45,6 +45,12 @@ import type { Env } from '../../config/config.store.ts';
 const ROOT = scratch('wf-applied-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const FACTORIES = path.join(ROOT, 'factories');
+
+/** The record the store holds of the factory `name`, read as it is written. */
+const recordOf = (name: string) => JSON.parse(factoryText(ROOT, name) ?? '{}');
+
+/** The factory `name`'s record written again as `content`. */
+const rewrite = (name: string, content: unknown) => plantFactory(ROOT, name, JSON.stringify(content));
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const stand = eachTest(testPlace);
 /**
@@ -245,11 +251,10 @@ describe('what the controller says of a template or parameters moved since the r
     const { dir, repo } = template();
     await apply('moved', dir, repo, '--set', 'budget=7');
     const first = await reconciled(templated('moved'));
-    const file = path.join(FACTORIES, 'moved.json');
     const params = (budget: number) => {
-      const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const content = recordOf('moved');
       content.template.params.budget = budget;
-      fs.writeFileSync(file, JSON.stringify(content));
+      rewrite('moved', content);
     };
     const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
     params(9);
@@ -297,13 +302,11 @@ describe('what the controller says of a template or parameters moved since the r
 describe("the controller stamps each condition with when its status last moved, and the factory's generation it read", () => {
   let repo!: string;
   let dir!: string;
-  let file!: string;
   beforeAll(async () => {
     const t = teardowns();
     vi.spyOn(console, 'log');
     ({ repo, dir } = template());
     await apply('stamped', dir, repo, '--set', 'budget=7');
-    file = path.join(FACTORIES, 'stamped.json');
     return t.end;
   });
   const times = (status: { conditions: readonly { type: string; status: string; lastTransitionTime?: string }[] }) =>
@@ -342,11 +345,11 @@ describe("the controller stamps each condition with when its status last moved, 
     ]);
   });
   test("observedGeneration is the factory's generation the pass read: 1 for a file without one, else its own", async () => {
-    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const content = recordOf('stamped');
     delete content.generation;
-    fs.writeFileSync(file, JSON.stringify(content));
+    rewrite('stamped', content);
     assert.equal((await reconciledAt(templated('stamped'), at[3])).observedGeneration, 1);
-    fs.writeFileSync(file, JSON.stringify({ ...content, generation: 5 }));
+    rewrite('stamped', { ...content, generation: 5 });
     assert.equal((await reconciledAt(templated('stamped'), at[3])).observedGeneration, 5);
     assert.equal(readStatus(ROOT, 'stamped')?.observedGeneration, 5, 'and it is written');
   });
@@ -399,10 +402,9 @@ describe('the controller names the template a base holds, even where the base is
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
-    const file = path.join(FACTORIES, 'params.json');
-    const content = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const content = recordOf('params');
     content.template.params.budget = 9;
-    fs.writeFileSync(file, JSON.stringify(content));
+    rewrite('params', content);
     unnamed('params');
     const status = await reconciled(templated('params'));
     assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
@@ -590,13 +592,13 @@ const applyNamed = (builtins: string, name: string, given: string, repo: string,
   );
 
 describe('a builtin template, named: applied, recorded by its name, read wherever Nemia keeps it, and upgraded when it moves', () => {
-  const s = { builtins: '', repo: '', file: path.join(FACTORIES, 'named.json') };
+  const s = { builtins: '', repo: '' };
   test('applied by its name: the factory records the name and the version, and a pass renders it', async () => {
     const { dir, repo } = template();
     Object.assign(s, { builtins: path.dirname(dir), repo });
     const done = await applyNamed(s.builtins, 'named', 'team', repo, 'budget=3');
     assert.deepEqual([done.template.source, done.template.version, done.place], ['team', '0.1.0', dir]);
-    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).template, {
+    assert.deepEqual(recordOf('named').template, {
       source: 'team',
       version: '0.1.0',
       params: done.template.params,
@@ -609,9 +611,9 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     const moved = scratch('wf-applied-moved-');
     fs.cpSync(s.builtins, moved, { recursive: true });
     fs.rmSync(s.builtins, { recursive: true });
-    const before = fs.readFileSync(s.file, 'utf8');
+    const before = factoryText(ROOT, 'named');
     assert.equal((await programsAt(ROOT, moved).reconciled(templated('named'))).conditions[0].reason, 'Rendered');
-    assert.equal(fs.readFileSync(s.file, 'utf8'), before);
+    assert.equal(factoryText(ROOT, 'named'), before);
     s.builtins = moved;
   });
   test('the builtin template moved to 0.2.0 is drift, and upgrade --to with no --template takes it by its name', async () => {
@@ -626,7 +628,7 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     assert.equal(drift.conditions[0].reason, 'VersionDrift');
     const volumes = [{ path: scratch('wf-applied-kept-'), readOnly: false }];
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
-    fs.writeFileSync(s.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(s.file, 'utf8')), volumes, harnessSettings }));
+    rewrite('named', { ...recordOf('named'), volumes, harnessSettings });
     await runEngine(
       noEngine(),
       withBuiltins(FACTORY_UPGRADE.handler({ factory: 'named', to: '0.2.0' }), s.builtins).pipe(
@@ -634,10 +636,10 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
         Effect.provide(configGiven(ROOT, ENV)),
       ),
     );
-    const { source, version } = JSON.parse(fs.readFileSync(s.file, 'utf8')).template;
+    const { source, version } = recordOf('named').template;
     assert.deepEqual([source, version], ['team', '0.2.0']);
-    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).volumes, volumes, 'an upgrade keeps the volumes');
-    assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).harnessSettings, harnessSettings, 'and the harness settings');
+    assert.deepEqual(recordOf('named').volumes, volumes, 'an upgrade keeps the volumes');
+    assert.deepEqual(recordOf('named').harnessSettings, harnessSettings, 'and the harness settings');
     assert.equal((await programsAt(ROOT, s.builtins).reconciled(templated('named'))).conditions[0].reason, 'Upgraded');
   });
   test('REFUSED by the controller: a recorded name no builtin template has any longer is TemplateInvalid, its base and tree kept', async () => {

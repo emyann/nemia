@@ -8,7 +8,7 @@
  * `test/factory-rules.test.ts`; their removal with the factory, in `test/factory-start.test.ts`. Its store is at `ROOT`, given as
  * `ENV`.
  */
-import { clearFactories } from '../../testing.ts';
+import { clearFactories, factoryText, plantFactory } from '../../testing.ts';
 import { factoriesNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -52,7 +52,7 @@ const refused =
     return true;
   };
 
-const recordOf = (name: string) => path.join(FACTORIES, `${name}.json`);
+const recordOf = (name: string) => factoryText(ROOT, name);
 const storeFolder = (name: string) => path.join(FACTORIES, name);
 
 /** A fresh store with the factory `pipao` filed on a new folder, its record holding `extra` beside its repository: the folder. */
@@ -60,7 +60,7 @@ function filed(extra: Record<string, unknown> = {}) {
   clearFactories(ROOT);
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.mkdirSync(FACTORIES, { recursive: true });
-  fs.writeFileSync(recordOf('pipao'), JSON.stringify({ volumes: [{ path: repo, readOnly: false }], ...extra }));
+  plantFactory(ROOT, 'pipao', JSON.stringify({ volumes: [{ path: repo, readOnly: false }], ...extra }));
   return repo;
 }
 
@@ -92,10 +92,10 @@ describe('REFUSED: `nemia factory instruction`, the record unchanged', () => {
   for (const [row, act, tag, facts] of rows)
     test(row, async () => {
       filed();
-      fs.writeFileSync(recordOf('torn'), '{ not json');
-      const before = [fs.readFileSync(recordOf('pipao')), fs.readFileSync(recordOf('torn'))];
+      plantFactory(ROOT, 'torn', '{ not json');
+      const before = [recordOf('pipao'), recordOf('torn')];
       await assert.rejects(async () => await act(), refused(tag, ...facts));
-      assert.deepEqual([fs.readFileSync(recordOf('pipao')), fs.readFileSync(recordOf('torn'))], before);
+      assert.deepEqual([recordOf('pipao'), recordOf('torn')], before);
     });
   test('a put that names no place, by the check', () =>
     assert.notEqual(FACTORY_INSTRUCTION.check!({ factory: 'pipao', clear: false }), null));
@@ -199,7 +199,7 @@ describe('a rules or instruction file that cannot be told is read with why, and 
   });
   test('instruction: a record whose instruction is no path nor the store is listed with why, never thrown', () => {
     filed({ instruction: 5 });
-    fs.writeFileSync(recordOf('half'), JSON.stringify({ volumes: [{ path: '/x', readOnly: false }], instruction: { store: false } }));
+    plantFactory(ROOT, 'half', JSON.stringify({ volumes: [{ path: '/x', readOnly: false }], instruction: { store: false } }));
     assert.deepEqual(
       readFactoriesAt(ROOT).map((l) => ('error' in l ? [l.name, l.error.includes('`instruction')] : [l.name, 'read'])),
       [

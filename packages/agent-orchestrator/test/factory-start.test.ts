@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { DEFAULT_NAMESPACE, factoryLines } from '../src/factory/factory.ts';
+import { factoryLines } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -212,8 +212,8 @@ function asShipped(t: { onTestFinished: (fn: () => void) => void }) {
 /** The factory `name`'s record, as JSON. */
 const fileOf = (name: string) => JSON.parse(factoryText(ROOT, name) ?? '{}') as Record<string, unknown>;
 
-/** The factories the store holds a record of, by name: the listing but the default factory, which is no record. */
-const factoryFiles = () => factoryNamesAt(ROOT).filter((name) => name !== DEFAULT_NAMESPACE);
+/** The factories the store holds a record of, by name. */
+const factoryFiles = () => factoryNamesAt(ROOT);
 
 /** The workspaces the place lists under the store's worktrees for `repo`, as a string to compare. */
 const worktrees = (repo: string) => {

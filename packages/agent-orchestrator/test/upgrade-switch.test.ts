@@ -22,7 +22,7 @@ import { approveProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
-import { readFactoryAt } from '../testing.ts';
+import { factoryText, readFactoryAt } from '../testing.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, treeDir } from '../src/factory/applied/applied.store.ts';
 import { plantKey, readStatus, recordText } from '../testing.ts';
 import { appliedKey } from '../src/factory/door/index.ts';
@@ -170,19 +170,18 @@ describe('a switch onto another template: previewed with no common base, held to
     },
   );
   s.test('nemia factory upgrade refuses a switch without its plan, and files it with it', async () => {
-    const file = path.join(FACTORIES, 'crew.json');
-    const filedAs = fs.readFileSync(file, 'utf8');
+    const filedAs = factoryText(ROOT, 'crew');
     await assert.rejects(
       stage.main(['factory', 'upgrade', 'crew', '--to', '1.0.0', '--template', dirs.other]),
       refusedWith('Invalid', /--plan/),
     );
-    assert.equal(fs.readFileSync(file, 'utf8'), filedAs, 'refused, nothing written');
+    assert.equal(factoryText(ROOT, 'crew'), filedAs, 'refused, nothing written');
     const filed = (await stage.main(['factory', 'upgrade', 'crew', '--to', '1.0.0', '--template', dirs.other, '--plan', plan])) as {
       from: string;
       to: string;
     };
     assert.deepEqual([filed.from, filed.to], ['0.1.0', '1.0.0']);
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).template.source, dirs.other);
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'crew') ?? '').template.source, dirs.other);
   });
   s.test('the controller waits with the status alone: the base still named team, each conflict with no base side', async () => {
     const before = bytesUnder(tree());

@@ -11,6 +11,7 @@ export { agentDoorMemory, MEMORY_AGENTS } from './src/agents/agent-memory.store.
 export { skillDoorMemory } from './src/skills/skill-memory.store.ts';
 export { BuiltinTemplates } from './src/template/door/templates.store.ts';
 
+import { DEFAULT_NAMESPACE } from 'objects';
 import { Cause, Effect, Exit } from 'effect';
 import { FactoryName, isDefaultFactory } from './src/factory/factory.model.ts';
 import {
@@ -84,14 +85,14 @@ const throughDoor = <A, E>(use: (door: FactoryDoorShape) => Effect.Effect<A, E>)
 export const factoriesDir = () => factoriesDirAt(wfRoot(process.env));
 
 /**
- * The names of the factories the store `home` lists, sorted.
+ * The names of the factories the store `home` holds a record of, in the door's order: the default factory, which is no record, is not one.
  * @param home The store's root folder.
  */
 export const factoryNamesAt = (home: string) =>
   factoriesNow(
     home,
     throughDoor((door) => door.factories.list()),
-  );
+  ).filter((name) => name !== DEFAULT_NAMESPACE);
 
 /**
  * Every factory the store `home` lists, each read or with why it does not read.

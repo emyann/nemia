@@ -997,6 +997,10 @@
             {
               "path": "packages/agent-orchestrator/src/rest/kept.ts",
               "why": "names `RunStore.runs.find`, the interface's method"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/runs/marks.store.ts",
+              "why": "`DoorOf<RunStore, RunId>`, the keyspace layer typed by the store's interface"
             }
           ]
         }

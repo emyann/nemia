@@ -26,7 +26,7 @@ import { proposalsPass } from '../src/apply/pass.verb.ts';
 import { currentOf } from '../src/propose/current.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { delegationPut, delegationRemove } from '../src/delegation/delegation.verb.ts';
-import { writeFactoryLevel } from '../testing.ts';
+import { plantFactory, writeFactoryLevel, writeStatus } from '../testing.ts';
 import { confirmedFile, writeProposed } from '../src/auto/auto.store.ts';
 import { POLICY_CONFIRM, policyListOf } from '../src/auto/auto.verb.ts';
 import { ruleWords } from '../src/auto/auto.ts';
@@ -64,8 +64,9 @@ function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'
   const repo = scratch(`wf-proposals-repo-${name}-`);
   const factories = path.join(ROOT, 'factories');
   fs.mkdirSync(factories, { recursive: true });
-  fs.writeFileSync(
-    path.join(factories, `${name}.json`),
+  plantFactory(
+    ROOT,
+    name,
     JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   const tree = path.join(factories, name, 'tree');
@@ -425,16 +426,13 @@ test("a status move alone leaves a Factory proposal fresh: its version is its ge
   factory('moving');
   const object = await factoryChanged('moving', { rules: 'Mine.' });
   const proposed = await run(proposeProgram(agentOf('implementer', 'moving'), 'moving', { objects: [object] }, PLACE));
-  fs.writeFileSync(
-    path.join(ROOT, 'factories', 'moving', 'status.json'),
-    JSON.stringify({
-      version: '0.1.0',
-      digest: null,
-      params: {},
-      conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'ok', lastTransitionTime: '2026-11-09T00:00:00.000Z' }],
-      observedGeneration: 1,
-    }),
-  );
+  writeStatus(ROOT, 'moving', {
+    version: '0.1.0',
+    digest: null,
+    params: {},
+    conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'ok', lastTransitionTime: '2026-11-09T00:00:00.000Z' }],
+    observedGeneration: 1,
+  });
   assert.equal((await run(approveProgram(PERSON, 'moving', proposed.metadata.name, PLACE))).status.phase, 'applied');
 });
 
@@ -665,8 +663,7 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
     'Invalid',
     'a resource no proposal changes',
   );
-  const plain = path.join(ROOT, 'factories', 'plain.json');
-  fs.writeFileSync(plain, JSON.stringify({ volumes: [{ path: scratch('wf-proposals-plain-'), readOnly: false }] }));
+  plantFactory(ROOT, 'plain', JSON.stringify({ volumes: [{ path: scratch('wf-proposals-plain-'), readOnly: false }] }));
   const untemplated = await refusalOf(
     proposeProgram(PERSON, 'plain', { objects: [{ ...object, metadata: { name: 'dev' }, verb: 'create' }] }, PLACE),
   );

@@ -25,12 +25,17 @@ intent, so restate the intent's goal and constraints in it.
    can fail for it. A test of the running whole, in a browser or end to end, is for what only the running whole shows: an
    interaction, a layout, two parts wired together. A rule restated at every level is three tests to change for one fact, and every
    round after pays for each.
-6. **Cut it by its seams, never by its cost.** Cut the work into parts by where each lives: a layer, a package or a door, the
+6. **Name what the change makes dead.** List what it replaces or leaves unused: an old path, an alias, a fallback, a flag, and the
+   tests and docs of a behaviour it takes away. Each one is removed as a part like any other, by path, with its step and the test that
+   shows it is gone. What another package, app or template still reaches is not dead: search the repository for each one before you
+   name it. A compatibility path is kept only where the spec gives the reason, beside it, since whether to keep one is the
+   repository's call and its rules say when.
+7. **Cut it by its seams, never by its cost.** Cut the work into parts by where each lives: a layer, a package or a door, the
    boundaries your placement already names. Each part is a distinct area, says what it needs of the others, and is ordered only where
    one needs another, so parts with no need of each other can be built at the same time. Propose a second intent only for a seam of
    logic, where a part cannot be built until another has landed and been used; never cut to stay under a budget. When the whole costs
    more than a run usually does, say so, and size each step's budget to it.
-7. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
+8. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 
 Read a file with Read, list a folder with Glob and search with Grep; never `grep` or a pipe in

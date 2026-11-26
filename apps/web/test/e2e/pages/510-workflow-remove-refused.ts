@@ -3,7 +3,7 @@ import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredCard, OUT, store, storeCard } from '../world.ts';
 
 /** The workflow of yours the page writes, which a queued card still needs. */
 const NEEDED = 'a-card-still-needs-it-e2e';
@@ -21,12 +21,11 @@ export default {
   route: '/workflows',
   expect: async (page) => {
     const dir = path.join(store!, 'workflows', NEEDED);
-    const card = path.join(store!, 'inbox', `${CARD}.md`);
     const refused = await page.context().newPage();
     try {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
-      fs.writeFileSync(card, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea queued on it.\n`);
+      storeCard(CARD, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea queued on it.\n`);
       const { problems } = watch(refused);
       await refused.goto(new URL(`/workflows/user/${NEEDED}`, page.url()).href, { waitUntil: 'load' });
       await idle(refused);
@@ -63,7 +62,7 @@ export default {
         );
     } finally {
       await refused.close();
-      fs.rmSync(card, { force: true });
+      dropStoredCard(CARD);
       fs.rmSync(dir, { recursive: true, force: true });
     }
     await page.reload({ waitUntil: 'load' });

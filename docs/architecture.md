@@ -269,9 +269,9 @@ line of the feed. `--json` prints each line whole with its cursor; `-l` keeps th
 person.
 
 **Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`,
-also `POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver`
-in `src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it (`<name>.state.json`,
-its one writer, stamped with the subscription it is for). A subscription's filter is a list of selectors in the same grammar `nemia
+also `POST /api/subscriptions/:name`) puts a record at `/registry/subscriptions/<name>` of the keyspace, the person's, and the daemon's deliverer (`deliver`
+in `src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it
+(`/registry/deliveries/<name>`, its one writer, stamped with the subscription it is for). A subscription's filter is a list of selectors in the same grammar `nemia
 watch -l` reads (`-l`, its `selectors`; the default `waits=person`), and the lines one of them takes in one read of the feed are said
 to the task at once, in one message through the runtime's `say`, the routine lines riding them as a digest; with no wake, the digest is
 said after `digestEvery` minutes. A record written before the selectors, which held a list of wake words, is converted to selectors on
@@ -325,14 +325,14 @@ shows none of it yet: a person approves by the CLI or the api.
 
 **The caller is the session token's to say** (`src/token/`). The orchestrator mints a random token for each try it files, and one for
 Nemia's keeper session, hands it to the session as `WF_SESSION_TOKEN`, and keeps only its sha-256 as the name of its record
-(`<WF_ROOT>/tokens/<digest>.json`: the agent, factory, run, step and attempt, and the engine's task). The client sends it as
+(the record `/registry/tokens/<digest>`: the agent, factory, run, step and attempt, and the engine's task). The client sends it as
 `Authorization: Bearer <token>` whenever the variable is set. Who calls is pure (`callerOf`, `src/token/token.ts`,
 `contracts/session-caller.contract.ts`), judged afresh on every request by `sessionCaller` (`src/token/caller.verb.ts`): **no request
 to the api is the person for presenting no token** — every route it answers, loopback included, needs one, and one presenting none is
 refused `token-required`; a token is its agent while its try is live — its run there, not called off, the step's current task the one
 it was minted for, and that task filed and not settled (Nemia's, while her keeper session is the live one) — and refused otherwise,
 `unknown-token` or `session-ended`, which the api answers 401. The person is a standing token they minted (`nemia token add`, kept as
-`<WF_ROOT>/person-tokens/<digest>.json`), under the name of the device it is for: the board's, paired or linked into its HttpOnly
+the record `/registry/persontokens/<digest>` of the keyspace), under the name of the device it is for: the board's, paired or linked into its HttpOnly
 cookie; an MCP host's; and the store's own, `local`, which the daemon keeps in `<WF_ROOT>/credential` (0600) at its start
 (`credentialKept`) and the person's `nemia` on that machine presents. A standing token the person mints for an agent (`--agent`, bound
 to a factory or store-wide, maybe narrowed to `read` or `act`) is that agent, held to its floor before any handler runs (`floorOf`,
@@ -527,13 +527,16 @@ a synchronous caller names its root and reads through the door at once (`readFac
 
 **The Card door.** A card of the inbox, and the tick's tries of a queued one, are read and written through `CardDoor`
 (`packages/agent-orchestrator/src/cards/cards.store.ts`), rooted as the Factory door is: two layers built the one way (`cardDoorOver`),
-the files (`cardFiles(home)`, `<root>/inbox/<name>.md` and `<root>/queue/<name>.json`, so a card keeps a person's bytes) and a memory
+records of the keyspace (`cardRecords`, `/registry/cards/<name>`, the card's text whole, so a card keeps a person's bytes, and
+`/registry/cardtries/<name>`, a card pointing to each File it names, which the File prune reads) and a memory
 stand-in (`cardDoorMemory`, `src/cards/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/card-walks.ts`). A card's
 name is checked as `CardName.OnCreate` checks it, its text read as a card by `parseInboxCard` — the reader the model's `Card` says holds
-its invariants — a name taken is `Conflict` (the files' `wx`, so `nemia inbox add` draws another), a card written back that is not there
+its invariants — a name taken is `Conflict` (a create refused `exists`, so `nemia inbox add` draws another), a card written back that is not there
 `Missing`, and a try is decoded through the model's `MissedStart`. The inbox's verbs (`src/inbox/inbox.store.ts`, `inbox.verb.ts`) are
-programs that yield it, and its handlers yield the `StoreRoot` their program is given; no file of `src` but the door's calls `cardFiles` by hand
-(`src/cards/cards.store.test.ts`). The run store holds no inbox.
+programs that yield it, and its handlers yield the `StoreRoot` their program is given; the files of a store from before the keyspace, `inbox/<name>.md` and
+`queue/<name>.json`, are imported once by the kind's import (`CARD_FILES`) and moved under `<root>/imported/`. A step that reads
+the inbox (`reads: [inbox]`) is handed a view of the cards rendered into `runs/<id>/inbox` when it is filed (`cardsViewed`). The run
+store holds no inbox.
 
 **The Workflow door.** A workflow — its folder of markdown, its steps and its README — is read and written through `WorkflowDoor`
 (`packages/agent-orchestrator/src/workflows/workflows.store.ts`), on the Factory door's pattern and rooted as it is. It is addressed
@@ -592,22 +595,22 @@ the testing entry (`agent-orchestrator/testing`, `packages/agent-orchestrator/te
 
 **The Subscription door.** A subscription, and its deliverer's file beside it, are read and written through `SubscriptionDoor`
 (`packages/agent-orchestrator/src/subscription/subscription.store.ts`), by `SubscriptionName`, rooted as the Factory door is: two layers
-built the one way (`subscriptionDoorOver`), the files (`subscriptionFiles(home)`, `<root>/subscriptions/<name>.json` and
-`<name>.state.json`, the former `wake` key still read) and a memory stand-in (`subscriptionDoorMemory`,
+built the one way (`subscriptionDoorOver`), records of the keyspace (`subscriptionRecords`, `/registry/subscriptions/<name>` and
+`/registry/deliveries/<name>`, the former `wake` key still read; the files of before, `subscriptions/<name>.json` and
+`<name>.state.json`, imported once by `SUBSCRIPTION_FILES` and moved under `<root>/imported/`) and a memory stand-in (`subscriptionDoorMemory`,
 `src/subscription/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/subscription-walks.ts`). A subscription is put
-once, checked by `SubscriptionName.OnCreate` and the model's `Subscription` — a name taken is `Conflict` (the files' `wx`), one dropped
+once, checked by `SubscriptionName.OnCreate` and the model's `Subscription` — a name taken is `Conflict` (a create refused `exists`), one dropped
 that is not there `Missing` — and a delivery written is decoded through the model's `Delivery`. Its list answers the unreadable ones
 apart (`left`), and the deliverer says each once: the store writes no stderr. A delivery's cursor may fall below where its subscription
 began, since a cut feed sets it to 0. What once called its module spellings is paid, and its store test refuses any use.
 
 **The Ledger door.** The revision ledger — the numbers each content of a workflow, an agent, a skill or a factory's rules was given —
 is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/revisions/revisions.store.ts`), by `RevisionOf`, a kind
-and a name, rooted as the Factory door is: the files (`ledgerFiles(home)`, `<root>/revisions/<kind>/<name>.json`, a lost race read
-again, `APPEND_TRIES` times) and a memory stand-in (`ledgerDoorMemory`, `src/revisions/memory.store.ts`, in `STAND_INS`), held to one
+and a name, rooted as the Factory door is: records of the keyspace (`ledgerRecords`, `/registry/revisions/<kind>/<name>`, an append
+read and written in one transaction; the files of before, `revisions/<kind>/<name>.json`, imported once by `LEDGER_FILES`) and a memory stand-in (`ledgerDoorMemory`, `src/revisions/memory.store.ts`, in `STAND_INS`), held to one
 table of walks (`test/ledger-walks.ts`). An append is checked by the model's `Revision` (`src/revisions/revisions.model.ts`) before it is
-numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a file that does not read is an empty ledger. The pass's
-pins (`src/revisions/pin.verb.ts`) are synchronous and still call `ledgerOf` and `appendRevision`, counted in
-`test/ledger-door.baseline.ts`.
+numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a record that does not read as a list of revisions reads as an
+empty ledger, an append to it refused `Invalid`, nothing numbered.
 
 **The Feed door.** The feed is read and appended to through `FeedDoor` (`packages/agent-orchestrator/src/feed/feed.store.ts`), one
 group of lines, append-only, rooted as the Factory door is: the files (`feedFiles(home)`, `<root>/feed.jsonl`, its end the file's size
@@ -642,6 +645,15 @@ each under `/registry/files/<namespace>/<id>`, its `digest` sha256 of its bytes,
 written before the record and removed after it, and named by objects' `FilePointer` (OCI's descriptor with the File's id). Its prune lets
 go of a File through the keyspace, so one a live record points to is kept, and removes bytes no record names once they are a day old. A
 store's File records of before it are imported once, each hashed, and moved aside under `<root>/imported/files/`.
+
+The other kinds of record followed it into the keyspace: delegations (`/registry/delegations/`), subscriptions and their deliveries,
+the revision ledger, session and standing tokens (`/registry/tokens/`, `/registry/persontokens/`, a standing token's name checked and
+taken in the transaction that writes it) and the inbox's cards and the tick's tries. Each kind's door is one real engine over the
+keyspace (`<kind>Records`), its memory stand-in the same code over a keyspace in memory (`STAND_INS`). A kind's files of before are
+imported by one decision (`src/keyspace/import.store.ts`, an `ImportKind` per kind: its folders, and for each file its key, where it is
+moved aside and how its text reads), each file the first time a process opens the keyspace after it, moved under `<root>/imported/` and
+never deleted; a file that does not read is left where it was. The keyspace is its owner's alone: `db/` is 0700 and `state.db` 0600. A
+run's markers and the factory's record stay files until a card of their own moves them.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the

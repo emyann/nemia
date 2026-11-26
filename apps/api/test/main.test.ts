@@ -12,7 +12,7 @@ import type { MetricRead } from '../src/gauges/ceilings.ts';
 import { argsOf, DEFAULT_PORT, portOf, SERVER_TIMEOUTS, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
-import { DEFAULT_EVERY_MS, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { DEFAULT_EVERY_MS, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 
 const API = path.join(import.meta.dirname, '..');
 
@@ -69,7 +69,7 @@ function asPerson(root: string) {
     token = Effect.runSync(
       Effect.gen(function* () {
         return yield* (yield* TokenDoor).persons.mint('main-test');
-      }).pipe(Effect.provide(tokenDoorFiles(root))),
+      }).pipe(Effect.provide(tokenDoorAt(root))),
     );
     minted.set(root, token);
   }

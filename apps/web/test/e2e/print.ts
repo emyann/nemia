@@ -20,16 +20,17 @@ export const unprinted = (rel: string) =>
 /**
  * What the api writes into its store as it serves the board, whatever a page does: the runner's sightings of a session's transcript
  * (`quiet/` under the engine's root), the feed its passes write of the runs they judged (`feed.jsonl` beside `runs/`), and the revisions
- * ledger a pass appends to for every kind a run of the seed resolves (`revisions/`, one file per kind and name).
+ * ledger a pass appends to for every kind a run of the seed resolves (`/registry/revisions/` of the keyspace, one record per kind and
+ * name, which `liveRecords` leaves out).
  */
-const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^revisions\//, /^db\/state\.db-(wal|shm)$/];
+const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^db\/state\.db-(wal|shm)$/];
 
 /** The orchestrator's keyspace, by its path in the store: printed by its live records, not its bytes. */
 const KEYSPACE = 'db/state.db';
 
 /**
- * The digest of the live records of the keyspace `file`: each key's last row that is no tombstone, by key, with its value; undefined
- * where it holds none, so a keyspace whose every write was taken back prints as no keyspace at all.
+ * The digest of the live records of the keyspace `file` but the revision ledger's: each key's last row that is no tombstone, by key, with
+ * its value; undefined where it holds none, so a keyspace whose every write was taken back prints as no keyspace at all.
  * @param file The keyspace's SQLite file.
  */
 export function liveRecords(file: string) {
@@ -37,7 +38,7 @@ export function liveRecords(file: string) {
   try {
     const rows = db
       .prepare(
-        "SELECT k.name, k.value FROM kine k JOIN (SELECT name, MAX(id) AS id FROM kine WHERE name != 'compact_rev_key' GROUP BY name) last ON last.id = k.id WHERE k.deleted = 0 ORDER BY k.name",
+        "SELECT k.name, k.value FROM kine k JOIN (SELECT name, MAX(id) AS id FROM kine WHERE name != 'compact_rev_key' AND name NOT LIKE '/registry/revisions/%' GROUP BY name) last ON last.id = k.id WHERE k.deleted = 0 ORDER BY k.name",
       )
       .all();
     if (!rows.length) return undefined;

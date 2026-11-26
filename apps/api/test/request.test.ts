@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer, Logger, Option, References, Tracer } from 'effect';
-import { addFactory, attachWorkflow, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED } from 'agent-runtime/testing';
@@ -199,8 +199,7 @@ function aFinishedRun(id: string) {
       steps: { implement: { taskId, branch: `wf/${id}/implement` } },
     }),
   );
-  fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'inbox', `card-${id}.md`), `Do ${id}.\n`);
+  plantCard(root, `card-${id}`, `Do ${id}.\n`);
 }
 /** Runs `r-<from>` to `r-<to - 1>` planted. */
 const planted = (from: number, to: number) => {

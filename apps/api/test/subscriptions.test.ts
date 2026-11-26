@@ -12,10 +12,9 @@ import { root } from './harness.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { DEFAULT_SELECTORS, engine } from 'agent-orchestrator';
+import { recordText, subscriptionKey } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 
@@ -47,7 +46,13 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
-const file = (name: string) => path.join(root, 'subscriptions', `${name}.json`);
+/** The subscription `name`'s record as the store holds it, but when it was made; undefined where none is. */
+const held = (name: string) => {
+  const text = recordText(root, subscriptionKey(name));
+  if (text === undefined) return undefined;
+  const { createdAt: _made, ...rest } = JSON.parse(text) as Record<string, unknown>;
+  return rest;
+};
 
 describe('A person subscribes a long-lived task: given by its words or the defaults, an empty selectors list as the default, each refusal writing nothing, and a floor stored with the level it takes', () => {
   const s = story(test);
@@ -58,7 +63,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
       assert.equal(put.status, 201);
       const subscription = { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from: 0 };
       assert.deepEqual(put.body, { name: 'watch', subscription });
-      assert.deepEqual(JSON.parse(fs.readFileSync(file('watch'), 'utf8')), subscription, "the store's file holds it");
+      assert.deepEqual(held('watch'), subscription, "the store's record holds it");
       const own = await asked('POST', 'own', { task: 'nemia', selectors: ['reason=CheckPassed', 'agent=ada'], digestEvery: 15 });
       assert.equal(own.status, 201);
       assert.deepEqual(own.body.subscription, { task: 'nemia', selectors: ['reason=CheckPassed', 'agent=ada'], digestEvery: 15, from: 0 });
@@ -66,7 +71,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
       assert.equal(taken.status, 409);
       assert.match(String(taken.body.error), /^a subscription is already named watch: nemia unsubscribe watch removes it first/);
       assert.deepEqual(await asked('DELETE', 'watch'), { status: 200, body: { name: 'watch' } });
-      assert.equal(fs.existsSync(file('watch')), false, 'the file removed');
+      assert.equal(held('watch') !== undefined, false, 'the record removed');
       const again = await asked('DELETE', 'watch');
       assert.equal(again.status, 404);
       assert.match(String(again.body.error), /^no subscription is named watch: nemia subscribe watch <task> puts one/);
@@ -77,7 +82,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
     const blank = await asked('POST', 'blank', { task: 'nemia', selectors: [] });
     assert.equal(blank.status, 201);
     assert.deepEqual((blank.body.subscription as { selectors: string[] }).selectors, [...DEFAULT_SELECTORS]);
-    assert.deepEqual(JSON.parse(fs.readFileSync(file('blank'), 'utf8')).selectors, [...DEFAULT_SELECTORS], "the store's file holds it");
+    assert.deepEqual(held('blank')?.selectors, [...DEFAULT_SELECTORS], "the store's record holds it");
     assert.equal((await asked('DELETE', 'blank')).status, 200);
   });
   s.test(
@@ -95,7 +100,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
       const nokey = await asked('POST', 'a', { task: 'nemia', selectors: ['message=boom'] });
       assert.equal(nokey.status, 422);
       assert.match(String(nokey.body.error), /\bmessage\b/, 'the refusal names the key no selector reads');
-      assert.equal(fs.existsSync(file('a')), false, 'nothing written');
+      assert.equal(held('a') !== undefined, false, 'nothing written');
     },
   );
   s.test('REFUSED: a body that is not a subscription, and a name that names no file, 400 before anything is written', async () => {
@@ -113,7 +118,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
     assert.equal(dotted.status, 400);
     assert.match(String(dotted.body.error), /is no subscription's name/);
     assert.equal((await asked('DELETE', '..up')).status, 400);
-    assert.equal(fs.existsSync(file('b')), false, 'nothing written');
+    assert.equal(held('b') !== undefined, false, 'nothing written');
   });
   s.test(
     "a subscription is stored with the floor its runs' factories must be at, and takes the level the package knows alone",
@@ -125,11 +130,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
         { atLeast: 'auto' },
         "the body carries the floor as the subscription's scope",
       );
-      assert.deepEqual(
-        (JSON.parse(fs.readFileSync(file('floored'), 'utf8')) as { scope?: unknown }).scope,
-        { atLeast: 'auto' },
-        "the store's file holds it too",
-      );
+      assert.deepEqual((held('floored') as { scope?: unknown }).scope, { atLeast: 'auto' }, "the store's file holds it too");
       assert.equal((await asked('DELETE', 'floored')).status, 200);
 
       const none = await asked('POST', 'open', { task: 'nemia' });
@@ -151,7 +152,7 @@ describe('A person subscribes a long-lived task: given by its words or the defau
       const numbered = await asked('POST', 'd', { task: 'nemia', atLeast: 7 });
       assert.equal(numbered.status, 400);
       assert.equal(numbered.body.field, 'payload.atLeast');
-      assert.equal(fs.existsSync(file('d')), false, 'nothing written');
+      assert.equal(held('d') !== undefined, false, 'nothing written');
     },
   );
 });

@@ -18,7 +18,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
-import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { LISTED_WITHOUT, TABLE_ACCEPT, filesHeld, type Delegation, type Proposal, type Table } from 'objects';
 import { AnswerBound } from '../layer.ts';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -108,7 +108,7 @@ const token = Effect.runSync(
       attempt: 1,
       task: TASK,
     });
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** The session's task filed on the stand-in and left working: its token is live. */

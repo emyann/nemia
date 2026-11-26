@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import type { FolderNames, RepositoryMade } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { appOf, liveOf } from '../app.ts';
@@ -68,7 +68,7 @@ test("REFUSED: a session's token is refused 403 person-only on all three routes,
   const token = Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
   Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
   engine().settle(task, 'working');

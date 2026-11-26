@@ -5,7 +5,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { AGENTS, checkoutIn, FACTORIES, FOLDER, QUEUED_IN, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredCard, OUT, store, storeCard } from '../world.ts';
 
 /** The card this page files in the factory, to tag and filter. */
 const CARD = 'tag-the-cards-by-factory-e2e0';
@@ -119,9 +119,8 @@ export default {
       hiring();
     }
 
-    const cardFile = path.join(store!, 'inbox', `${CARD}.md`);
     try {
-      fs.writeFileSync(cardFile, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\nTag the cards by factory\n`);
+      storeCard(CARD, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\nTag the cards by factory\n`);
       await open(page, '/inbox');
       const cards = page.locator('section[aria-label="Cards"] li[data-card]');
       const filed = await cards.count();
@@ -145,7 +144,7 @@ export default {
       if (Number(await page.locator('section[aria-label="Cards"] h2 [data-count]').textContent()) !== loose)
         throw new Refused(`the heading counts the cards the factory picked keeps, ${loose}`);
     } finally {
-      fs.rmSync(cardFile, { force: true });
+      dropStoredCard(CARD);
     }
   },
 } satisfies PageSpec;

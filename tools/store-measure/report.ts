@@ -60,6 +60,7 @@
  *   with the factories that use it, the library's reverse lookup over every factory.
  *   `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the app's informer, as
  *   `runListAfterPass` is.
+ *   `tokenList`: `GET /api/tokens`, the person's standing tokens, over apps as `runList` is: each call's own token read besides.
  *
  * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own,
  * and the length of that call's answer as JSON (`bytes`). The runs the reads pick, the cards and the factories are listed at the most a
@@ -585,6 +586,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     librarySkills: await overApps(fresh, (app) => get(app, '/api/skills?limit=500'), repeat),
     ceilings: await overApps(fresh, (app) => get(app, '/api/ceilings'), repeat),
     ceilingsAfterPass: await overApps(passed, (app) => get(app, '/api/ceilings'), repeat),
+    tokenList: await overApps(fresh, (app) => get(app, '/api/tokens'), repeat),
   };
   const chat = await chatMeasured(orch, place, fence, env, repeat);
   Object.assign(measures, chat.measures);

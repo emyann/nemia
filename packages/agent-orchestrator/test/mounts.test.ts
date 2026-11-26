@@ -39,6 +39,7 @@ import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runn
 import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../src/factory/factory.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
+import { inboxViewOf } from '../src/tick/told.verb.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { factsOf, typed as onHandler } from './typed.ts';
@@ -170,7 +171,6 @@ describe('mounts on every filing: a factory run whose implement writes one folde
     attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide', repo: path.basename(own) });
     given = path.join(ROOT, 'template-draft.md');
     fs.writeFileSync(given, 'the draft\n');
-    inbox = path.join(ROOT, 'inbox');
     return t.end;
   });
   const s = story(test);
@@ -186,6 +186,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
       id = out.id;
       const run = runRecord(ROOT, id);
       inputs = inputsDir(ROOT, run);
+      inbox = inboxViewOf(ROOT, run);
       assert.deepEqual(run.mounts, readOnly(web, docs), 'read back');
       assert.deepEqual(JSON.parse(recordText(ROOT, runKey(id)) ?? '').mounts, readOnly(web, docs), 'as written');
       assert.deepEqual(out.facts.mounts, [web, docs], 'the start says the folders it mounts, in order');

@@ -672,14 +672,12 @@ test('a kind that stops reading between passes stops that run alone: it keeps th
   const prompt = promptOf(run.id, 'build');
 
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
-  const ledger = path.join(ROOT, 'revisions', 'agent', `${t.agent}.json`);
-  fs.rmSync(ledger);
-  fs.mkdirSync(ledger);
+  plantRecord(ROOT, `/registry/revisions/agent/${encodeURIComponent(t.agent)}`, 'not a ledger');
   const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
 
   assert.match(
     pass.notes.join('\n'),
-    /keeps the revisions it had, since resolving them did not read: EISDIR[^\n]*revisions\/agent/,
+    /keeps the revisions it had, since resolving them did not read: the ledger at \/registry\/revisions\/agent\//,
     'the pass says the run took nothing of the world, and what did not read',
   );
   assert.equal(pass.status, 'running', 'and the pass judged the run all the same, rather than dying of what did not read');

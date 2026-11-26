@@ -18,7 +18,7 @@ import { Effect, Layer } from 'effect';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
-import { CLI_VERBS, Informer, informerMemo, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { CLI_VERBS, Informer, informerMemo, TABLE, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { Api, type ApiGetName, READS } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { ANSWER_BOUND, PORT_PAGE } from './bound.ts';
@@ -35,7 +35,7 @@ const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(Informer)(i
 const personToken = Effect.runSync(
   Effect.gen(function* () {
     return yield* (yield* TokenDoor).persons.mint('bound-laptop');
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** `n` characters of words, so no text compresses to nothing. */

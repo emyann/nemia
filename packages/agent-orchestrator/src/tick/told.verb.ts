@@ -24,7 +24,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { filedFolders, startOf } from '../filed/filed.ts';
+import { filedFolders, readsMounts, startOf } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { RetryBriefing } from '../brief/index.ts';
@@ -64,7 +64,7 @@ import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { addedServers } from '../library/library.verb.ts';
-import { inboxDir } from '../record/files.store.ts';
+import { cardsViewed } from '../cards/cards.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { NeedsMemory, runNeeds } from '../needs/needs.verb.ts';
 
@@ -213,7 +213,26 @@ export function placeTold(run: Run, steps: readonly StepSpec[], step: StepSpec, 
 }
 
 /**
- * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
+ * The view of the inbox's cards a step of `run` that reads the inbox is filed with (`inboxViewed`): a folder of the run's own.
+ * @param home The store's root folder.
+ * @param run The run, by its id.
+ */
+export const inboxViewOf = (home: string, run: Pick<Run, 'id'>) =>
+  path.join(path.dirname(path.dirname(artifactsDir(home, run, 'step'))), 'inbox');
+
+/**
+ * The inbox's cards written whole into the run's view of them (`inboxViewOf`, `cardsViewed`) where `step` is filed it as a mount — it
+ * reads the inbox (`reads: inbox`) on a harness filed folders — and nothing done otherwise: asked as each try of a step is filed, so the
+ * step reads the cards as they stand then.
+ * @param home The store's root folder.
+ * @param run The run, by its id.
+ * @param step The step filed: its harness and its `reads:`.
+ */
+export const inboxViewed = (home: string, run: Pick<Run, 'id'>, step: Pick<StepSpec, 'harness' | 'reads'>) =>
+  readsMounts(step, inboxViewOf(home, run)).length ? cardsViewed(inboxViewOf(home, run)) : Effect.void;
+
+/**
+ * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the run's view of the inbox, the run's inputs
  * folder (`inputsDir`) only when its record names an input or a card, so a run given none is filed and told as before, the folders of
  * each run it is handed (`handedRunsAt`), and the run's copy of its workflow folder (`workflowFilesDir`) and of its carried files
  * (`carriedFilesDir`), each only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what a filing
@@ -223,7 +242,7 @@ export function placeTold(run: Run, steps: readonly StepSpec[], step: StepSpec, 
  */
 export const filedFoldersAt = (home: string, run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>) => ({
   runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
-  inbox: inboxDir(home),
+  inbox: inboxViewOf(home, run),
   ...(run.inputs?.length || run.cards?.length ? { inputs: inputsDir(home, run) } : {}),
   ...(run.context?.length ? { runs: handedRunsAt(home, run.context) } : {}),
   ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),

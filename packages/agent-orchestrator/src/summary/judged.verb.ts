@@ -144,6 +144,10 @@ export type RunHolding = {
   word: string;
   advice: string;
   waitingOnYou: boolean;
+  /** What the person who put the hold said of why (`nemia hold --why`), where they said it. */
+  why?: string;
+  /** Who the person who put the hold said they are, where they said it. */
+  by?: string;
   /** Who put the hold (objects' `Actor`), where its file says. */
   actor?: Actor;
 };
@@ -215,8 +219,8 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]) {
 }
 
 /**
- * A person's hold on a run (`RunHolding`), in the package's words, and who put it (`actor`) where its file says; null for a run nobody
- * holds, and one called off.
+ * A person's hold on a run (`RunHolding`), in the package's words, what its person said of why and who they are (`why`, `by`), and who
+ * put it (`actor`), each where its file says; null for a run nobody holds, and one called off.
  * @param run The run held.
  * @param holds The holds the reading found on it; empty where nobody holds it.
  */
@@ -234,6 +238,8 @@ export function holdingOf(run: Run, holds: readonly Wait[]) {
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
     waitingOnYou: holdNeedsYou(holds),
+    ...(run.hold.why ? { why: run.hold.why } : {}),
+    ...(run.hold.by ? { by: run.hold.by } : {}),
     ...(run.hold.actor ? { actor: run.hold.actor } : {}),
   };
 }

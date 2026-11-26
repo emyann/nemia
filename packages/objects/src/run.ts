@@ -465,6 +465,15 @@ export const RunHolding = Schema.Struct({
   waitingOnYou: Schema.Boolean.annotate({
     description: 'Whether the hold waits on a person: exactly when a run it names never lands on its own.',
   }),
+  why: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'What the person who put the hold said of why (nemia hold --why), at most 200 characters; absent where they said nothing.',
+    }),
+  ),
+  by: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Who the person who put the hold said they are; absent where they said nothing.' }),
+  ),
   actor: Schema.optionalKey(Actor),
 }).annotate({
   identifier: 'RunHolding',

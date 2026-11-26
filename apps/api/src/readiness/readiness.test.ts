@@ -16,7 +16,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { PlaceService, runningRelease, startRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { PlaceService, runningRelease, startRun, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { Conflict, Invalid, MILESTONES, type Fix, type Milestones, type Need, type Readiness } from 'objects';
 import { Schema } from 'effect';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -115,7 +115,7 @@ test("a session's token starts no fix: 403, and nothing is filed", async () => {
   const token = Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
   Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
   engine().settle(task, 'working');
@@ -149,7 +149,7 @@ test("a check turn: a session's token starts none (403), a harness that runs non
   const token = Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
   Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
   engine().settle(task, 'working');

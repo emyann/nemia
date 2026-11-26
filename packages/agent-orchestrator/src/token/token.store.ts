@@ -1,29 +1,38 @@
 /**
- * The store of session tokens: a random token minted for each session the store files (`mintToken`), handed to the session in its
- * environment and kept here only as the record its sha-256 digest names, `<home>/tokens/<digest>.json` (`TokenFiled`), so the store
- * never holds a token a reader could present. Read again by the digest of the token a request presents (`readToken`). A record is never
- * taken back: whether its session is still the live one is judged afresh on each request against the run (`caller.verb.ts`), so a token
- * ends with its try and no list of revoked ones is kept.
+ * The store of session tokens: a random token minted for each session the store files (`tokens.mint`), handed to the session in its
+ * environment and kept here only as the record its sha-256 digest names, `/registry/tokens/<digest>` in the keyspace (`TokenFiled`), so
+ * the store never holds a token a reader could present. Read again by the digest of the token a request presents (`tokens.read`). A
+ * record is never taken back: whether its session is still the live one is judged afresh on each request against the run
+ * (`caller.verb.ts`), so a token ends with its try and no list of revoked ones is kept.
  *
- * And the standing tokens, the person's to mint: named, minted through the api (`mintPersonToken`, `POST /api/tokens`), answered once and
- * kept as the record its digest names, `<home>/person-tokens/<digest>.json` (`PersonTokenFiled`: its name, when it was minted, and who
+ * And the standing tokens, the person's to mint: named, minted through the api (`persons.mint`, `POST /api/tokens`), answered once and
+ * kept as the record its digest names, `/registry/persontokens/<digest>` (`PersonTokenFiled`: its name, when it was minted, and who
  * holds it — the person, or an agent bound to a factory or store-wide and maybe narrowed; a record that names no holder, minted before
- * holders were said, is the person's); listed by name (`personTokens`) and removed by name (`revokePersonToken`), after which it is refused
- * as unknown. The folder keeps its name, `person-tokens`, so no record minted before is orphaned.
+ * holders were said, is the person's); listed by name (`persons.list`) and removed by name (`persons.revoke`), after which it is refused
+ * as unknown. A name is checked free and taken in one transaction, so two mints of one name at once make one token and one `Conflict`.
  *
- * Rooted: every function takes the store's root as `home`, and the door (`TokenDoor`) reads the root the program is given (`StoreRoot`).
- * And the minting of a step's token as its try is filed (`stepToken`), which the tick's filings spread into the config they file; and
- * the store's credential, the person's own token for this machine, kept in `<home>/credential` (`credentialKept`).
+ * The keyspace's folder and file are its owner's alone (`src/keyspace/keyspace.store.ts`), as the token files were. A store's token files
+ * of before the keyspace (`<home>/tokens/<digest>.json`, `<home>/person-tokens/<digest>.json`) are imported once by the kind's import
+ * (`TOKEN_FILES`) and moved aside under `<home>/imported/`.
+ *
+ * Rooted: the door (`TokenDoor`) reads the root the program is given (`StoreRoot`). The minting of a step's token as its try is filed
+ * (`stepToken`), which the tick's filings spread into the config they file; and the store's credential, the person's own token for this
+ * machine, kept in the file `<home>/credential` (`credentialKept`). The synchronous spellings (`mintToken`, `readToken`,
+ * `mintPersonToken`, …) are the door at the root `home` they are handed, run at once, a test's; no file of `src` calls them
+ * (`src/token/token.store.test.ts`).
  */
 import { runNamespace } from '../run-list/index.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Layer, Option, Result, Schema } from 'effect';
-import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
+import { fromThrow, rootedDoor } from '../door/door.store.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
+import { asideOf, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
+import type { KeyRefused, Keyspace } from '../keyspace/keyspace.store.ts';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../workflow.ts';
-import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import type { TokenHolder, TokenRecord } from './token.ts';
 
 /**
@@ -42,61 +51,10 @@ const TokenFiledSchema = Schema.Struct({
 });
 
 /**
- * The folder the store keeps its token records in, under the store `home`.
- * @param home The store's root folder.
- */
-export const tokensDir = (home: string) => path.join(home, 'tokens');
-
-/**
  * The digest a token is kept and found by: its sha-256, in hex.
  * @param token The token itself, as a session or a request presents it.
  */
 export const tokenDigest = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
-
-/** The file of the token whose digest is `digest`, under the store `home`. */
-const tokenFile = (home: string, digest: string) => path.join(tokensDir(home), `${digest}.json`);
-
-/**
- * A new token, 32 random bytes in base64url, its record written under its digest in the folder `dir` through a hidden file renamed over
- * it, readable by its owner alone in a folder its owner alone opens. Answers the token itself, which is written nowhere. Not through
- * `writeWhole`: the hidden file is made readable by its owner alone as it is created, so the record is never open to another.
- */
-function minted(dir: string, record: object) {
-  const token = crypto.randomBytes(32).toString('base64url');
-  const file = path.join(dir, `${tokenDigest(token)}.json`);
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const hidden = path.join(dir, `.${tokenDigest(token)}.${process.pid}.tmp`);
-  fs.writeFileSync(hidden, `${JSON.stringify(record)}\n`, { mode: 0o600 });
-  fs.renameSync(hidden, file);
-  return token;
-}
-
-/**
- * Mints a session's token, its record written under its digest (`tokenFile`), readable by its owner alone (`minted`). Answers the token
- * itself, which is written nowhere: the caller hands it to the session.
- * @param home The store's root folder.
- * @param record What the token vouches for: the session's agent, factory, run, step, attempt and task.
- */
-export function mintToken(home: string, record: TokenFiled) {
-  return minted(tokensDir(home), record);
-}
-
-/**
- * The record the store keeps of `token`, or null where it minted none: no file under its digest, or one that does not read as a record,
- * which vouches for no session.
- * @param home The store's root folder.
- * @param token The token presented.
- */
-export function readToken(home: string, token: string) {
-  let text: string;
-  try {
-    text = fs.readFileSync(tokenFile(home, tokenDigest(token)), 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
-  }
-  return Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(TokenFiledSchema))(text));
-}
 
 /** The holder of an agent's token as its record keeps it. */
 const AgentHolderSchema = Schema.Struct({
@@ -132,12 +90,6 @@ export const holderOf = (record: PersonTokenFiled) => record.holder ?? PERSON_HO
  */
 export const standingOf = (record: PersonTokenFiled) => ({ name: record.name, holder: holderOf(record) });
 
-/**
- * The folder the store keeps a person's token records in, under the store `home`.
- * @param home The store's root folder.
- */
-export const personTokensDir = (home: string) => path.join(home, 'person-tokens');
-
 /** A name a person's token takes: a letter or a digit, then letters, digits, `.`, `_` or `-`, 63 at most. */
 const PERSON_TOKEN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
 
@@ -147,183 +99,316 @@ function personRecordOf(text: string) {
   return Result.isSuccess(read) ? read.success : null;
 }
 
-/** Every record of a person's token under the store `home`, with the file it is kept in; none where the folder is not there. */
-function personFiles(home: string) {
-  const dir = personTokensDir(home);
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((name) => name.endsWith('.json') && !name.startsWith('.'))
-    .flatMap((name) => {
-      const file = path.join(dir, name);
-      const record = personRecordOf(fs.readFileSync(file, 'utf8'));
-      return record === null ? [] : [{ file, record }];
-    });
-}
+/** The keyspace's prefix of every session token's record, and of every standing token's. */
+const TOKENS = '/registry/tokens/';
+const PERSONS = '/registry/persontokens/';
 
-/**
- * Mints a standing token under `name`, held by `holder` (the person where not said), its record (`PersonTokenFiled`) written under its
- * digest, readable by its owner alone (`minted`). Answers the token itself, once: the store keeps only its digest. Refused, writing
- * nothing: a name that is no name (`Invalid`), an agent's name that is none (`Invalid`), and a name a token is already kept under
- * (`Conflict`, naming the removal that frees it).
- * @param home The store's root folder.
- * @param name The name the token is kept and removed under.
- * @param now When it is minted, written as its `createdAt`.
- * @param holder Who holds it: the person, or an agent and what bounds it.
- */
-export function mintPersonToken(home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER) {
+/** A new token, 32 random bytes in base64url: written nowhere but where the caller hands it. */
+const freshToken = () => crypto.randomBytes(32).toString('base64url');
+
+/** The refusals of a standing token's name or its holder's, or none. */
+function personRefusal(name: string, holder: TokenHolder) {
   if (!PERSON_TOKEN_NAME.test(name))
-    throw new Invalid({
+    return new Invalid({
       message: `nemia token add takes a name of letters, digits, \`.\`, \`_\` or \`-\`, starting with a letter or a digit, 63 at most, and \`${name}\` is not one: name it for where it is used, as nemia token add laptop.`,
     });
   if (holder.kind === 'agent' && !PERSON_TOKEN_NAME.test(holder.agent))
-    throw new Invalid({
+    return new Invalid({
       message: `nemia token add --agent takes the agent's name, of letters, digits, \`.\`, \`_\` or \`-\`, and \`${holder.agent}\` is not one: nemia token add <name> --agent <agent>, as nemia token add ops --agent operator.`,
     });
-  if (personFiles(home).some((f) => f.record.name === name))
-    throw new Conflict({
-      message: `a token named ${name} is already kept: name this one otherwise, or nemia token rm ${name} first, which refuses the old one from then on.`,
-    });
-  const record: PersonTokenFiled =
-    holder.kind === 'person' ? { name, createdAt: now.toISOString() } : { name, createdAt: now.toISOString(), holder };
-  return minted(personTokensDir(home), record);
+  return undefined;
 }
 
-/**
- * Mints a person's token under `name`, or under the first of `name-2`, `name-3`… no token of the person's is kept under, for a token
- * whose name the person did not type: a pairing's, after its client, and a first-visit link's. Answers the token, once, and the name it
- * was minted under. Refused as `mintPersonToken` refuses: a name that is no name (`Invalid`); a name taken between the read and the write
- * is tried again under the next.
- * @param home The store's root folder.
- * @param name The name to mint under, or to count on from where it is taken.
- * @param now When it is minted, written as its `createdAt`.
- */
-export function mintPersonTokenFree(home: string, name: string, now: Date = new Date()) {
-  const taken = new Set(personFiles(home).map((f) => f.record.name));
-  for (let n = 1; ; n++) {
-    const free = n === 1 ? name : `${name}-${n}`;
-    if (taken.has(free)) continue;
-    try {
-      return { token: mintPersonToken(home, free, now), name: free };
-    } catch (err) {
-      if (!(err instanceof Conflict)) throw err;
-      taken.add(free);
-    }
-  }
-}
+/** The refusal of a standing token minted under a name taken. */
+const nameTaken = (name: string) =>
+  new Conflict({
+    message: `a token named ${name} is already kept: name this one otherwise, or nemia token rm ${name} first, which refuses the old one from then on.`,
+  });
 
-/**
- * The record of the person's token whose digest is `digest`, or null where the store keeps none: it was never minted, or was removed.
- * @param home The store's root folder.
- * @param digest The token's digest (`tokenDigest`).
- */
-export function personTokenOf(home: string, digest: string) {
-  let text: string;
-  try {
-    text = fs.readFileSync(path.join(personTokensDir(home), `${digest}.json`), 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
-  }
-  return personRecordOf(text);
-}
+/** A write raced by another, as a refusal. */
+const raced = (err: KeyRefused) =>
+  new Conflict({ message: `${err.key} was written by another while it was written here: run again.` }) satisfies Refusal as Refusal;
 
-/**
- * The person's tokens the store keeps, by name: each its name and when it was minted, never its digest.
- * @param home The store's root folder.
- */
-export function personTokens(home: string) {
-  return personFiles(home)
-    .map((f) => f.record)
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+/** The standing tokens' records `records` holds, each with its key, those that do not read left out. */
+const personsIn = (records: readonly { readonly key: string; readonly value: string }[]) =>
+  records.flatMap((r) => {
+    const record = personRecordOf(r.value);
+    return record === null ? [] : [{ key: r.key, record }];
+  });
 
-/**
- * Removes the person's token named `name`: a request presenting it is refused as unknown from then on. Answers its record. Refused
- * (`Missing`) where the store keeps no token under that name, naming the list.
- * @param home The store's root folder.
- * @param name The name the token is kept under.
- */
-export function revokePersonToken(home: string, name: string) {
-  const found = personFiles(home).find((f) => f.record.name === name);
-  if (found === undefined)
-    throw new Missing({ message: `no token named ${name} is kept: nemia token ls lists the names of those that are.` });
-  fs.rmSync(found.file);
-  return found.record;
-}
-
-/**
- * A layer of the token door: minting a session's token and reading the record of one presented; and the standing tokens minted by name
- * for a holder, read by digest, listed and removed by name.
- */
-export type TokensLayer = {
+/** The token door's shape: session tokens minted and read; standing tokens minted by name, read by digest, listed and removed by name. */
+export type TokenDoorShape = {
   readonly tokens: {
-    readonly mint: (record: TokenFiled) => string;
-    readonly read: (token: string) => TokenFiled | null;
+    readonly mint: (record: TokenFiled) => Effect.Effect<string, Refusal>;
+    readonly read: (token: string) => Effect.Effect<TokenFiled | null, Refusal>;
   };
   readonly persons: {
-    readonly mint: (name: string, holder?: TokenHolder) => string;
-    readonly read: (digest: string) => PersonTokenFiled | null;
-    readonly list: () => PersonTokenFiled[];
-    readonly revoke: (name: string) => PersonTokenFiled;
+    readonly mint: (name: string, holder?: TokenHolder, now?: Date) => Effect.Effect<string, Refusal>;
+    readonly mintFree: (name: string, now?: Date) => Effect.Effect<{ readonly token: string; readonly name: string }, Refusal>;
+    readonly read: (digest: string) => Effect.Effect<PersonTokenFiled | null, Refusal>;
+    readonly list: () => Effect.Effect<PersonTokenFiled[], Refusal>;
+    readonly revoke: (name: string) => Effect.Effect<PersonTokenFiled, Refusal>;
   };
 };
 
-/** The token door's shape: each method of `TokensLayer` answering an Effect. */
-export type TokenDoorShape = DoorOf<TokensLayer, string>;
+/** In the keyspace `open` opens, a standing token minted under the first name `names` gives that none is kept under, in one transaction. */
+const mintedUnder = (
+  open: Effect.Effect<Keyspace, Refusal>,
+  names: (taken: ReadonlySet<string>) => string | undefined,
+  holder: TokenHolder,
+  now: Date,
+) =>
+  Effect.gen(function* () {
+    const keyspace = yield* open;
+    return yield* keyspace
+      .within((tx) =>
+        Effect.gen(function* () {
+          const taken = new Set(personsIn(yield* tx.list(PERSONS)).map((p) => p.record.name));
+          const name = names(taken);
+          if (name === undefined) return { taken: true as const };
+          const record: PersonTokenFiled =
+            holder.kind === 'person' ? { name, createdAt: now.toISOString() } : { name, createdAt: now.toISOString(), holder };
+          const token = freshToken();
+          yield* tx.write(`${PERSONS}${tokenDigest(token)}`, { verb: 'create', expected: null, value: JSON.stringify(record) });
+          return { token, name };
+        }),
+      )
+      .pipe(Effect.mapError(raced));
+  });
 
-/** The token records of the store `home`. */
-const tokenFiles = (home: string) =>
+/** The session tokens of the keyspace `open` opens, as the door's `tokens`, a read asking `held`. */
+const sessionTokens = (open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal>) =>
   ({
-    tokens: { mint: (record) => mintToken(home, record), read: (token) => readToken(home, token) },
+    mint: (record) =>
+      Effect.gen(function* () {
+        const keyspace = yield* open;
+        const token = freshToken();
+        yield* keyspace
+          .write(`${TOKENS}${tokenDigest(token)}`, { verb: 'create', expected: null, value: JSON.stringify(record) })
+          .pipe(Effect.mapError(raced));
+        return token;
+      }),
+    read: (token) =>
+      Effect.gen(function* () {
+        const keyspace = yield* held;
+        const record = keyspace === undefined ? undefined : yield* keyspace.get(`${TOKENS}${tokenDigest(token)}`);
+        return record === undefined
+          ? null
+          : Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(TokenFiledSchema))(record.value));
+      }),
+  }) satisfies TokenDoorShape['tokens'];
+
+/**
+ * The tokens of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it answers
+ * no keyspace, so a store read is not a store made.
+ * @param open Opens the keyspace the tokens are held in, refused as opening it is.
+ * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
+ */
+export function tokenRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal> = open) {
+  return {
+    tokens: sessionTokens(open, held),
     persons: {
-      mint: (name, holder) => mintPersonToken(home, name, new Date(), holder),
-      read: (digest) => personTokenOf(home, digest),
-      list: () => personTokens(home),
-      revoke: (name) => revokePersonToken(home, name),
+      mint: (name, holder = PERSON_HOLDER, now = new Date()) =>
+        Effect.gen(function* () {
+          const bad = personRefusal(name, holder);
+          if (bad !== undefined) return yield* bad;
+          const minted = yield* mintedUnder(open, (taken) => (taken.has(name) ? undefined : name), holder, now);
+          if ('taken' in minted) return yield* nameTaken(name);
+          return minted.token;
+        }),
+      mintFree: (name, now = new Date()) =>
+        Effect.gen(function* () {
+          const bad = personRefusal(name, PERSON_HOLDER);
+          if (bad !== undefined) return yield* bad;
+          const minted = yield* mintedUnder(
+            open,
+            (taken) => {
+              for (let n = 1; ; n++) {
+                const free = n === 1 ? name : `${name}-${n}`;
+                if (!taken.has(free)) return free;
+              }
+            },
+            PERSON_HOLDER,
+            now,
+          );
+          if ('taken' in minted) return yield* nameTaken(name);
+          return minted;
+        }),
+      read: (digest) =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          const record = keyspace === undefined ? undefined : yield* keyspace.get(`${PERSONS}${digest}`);
+          return record === undefined ? null : personRecordOf(record.value);
+        }),
+      list: () =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          if (keyspace === undefined) return [];
+          return personsIn((yield* keyspace.list(PERSONS)).records)
+            .map((p) => p.record)
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }),
+      revoke: (name) =>
+        Effect.gen(function* () {
+          const missing = new Missing({ message: `no token named ${name} is kept: nemia token ls lists the names of those that are.` });
+          const keyspace = yield* held;
+          if (keyspace === undefined) return yield* missing;
+          const found = yield* keyspace
+            .within((tx) =>
+              Effect.gen(function* () {
+                const one = personsIn(yield* tx.list(PERSONS)).find((p) => p.record.name === name);
+                if (one !== undefined) yield* tx.write(one.key, { verb: 'delete', expected: null, value: '' });
+                return one;
+              }),
+            )
+            .pipe(Effect.mapError(raced));
+          if (found === undefined) return yield* missing;
+          return found.record;
+        }),
     },
-  }) satisfies TokensLayer;
+  } satisfies TokenDoorShape;
+}
+
+/**
+ * The token files of a store from before the keyspace, `tokens/<digest>.json` and `person-tokens/<digest>.json`: what the kind's import
+ * takes up, as they were, at `/registry/tokens/<digest>` and `/registry/persontokens/<digest>`. A file that does not read as its record
+ * stays where it is.
+ */
+export const TOKEN_FILES: ImportKind = {
+  name: 'tokens',
+  folders: (home) => [path.join(home, 'tokens'), path.join(home, 'person-tokens')],
+  files: (home) =>
+    (
+      [
+        ['tokens', TOKENS, (text: string) => Option.isSome(Schema.decodeUnknownOption(Schema.fromJsonString(TokenFiledSchema))(text))],
+        ['person-tokens', PERSONS, (text: string) => personRecordOf(text) !== null],
+      ] as const
+    ).flatMap(([folder, prefix, reads]) =>
+      namesIn(path.join(home, folder), '.json')
+        .filter((digest) => /^[0-9a-f]{64}$/.test(digest))
+        .map((digest) => {
+          const file = path.join(home, folder, `${digest}.json`);
+          return {
+            file,
+            key: `${prefix}${digest}`,
+            aside: asideOf(home, file),
+            read: (text: string) => (reads(text) ? { value: text.trim() } : { unreadable: 'it is no token’s record' }),
+          };
+        }),
+    ),
+};
+
+/** The token door over the keyspace at the store `root`. */
+const tokensAt = (root: string) => tokenRecords(kindKeyspace(root, TOKEN_FILES), kindKeyspaceHeld(root, TOKEN_FILES));
 
 /**
  * The token door, as the service a program yields: a reference whose default is rooted (`rootedDoor`), the records at the store's root
  * the program is given, refused `Invalid` where it was given none.
  */
 export const TokenDoor = Context.Reference<TokenDoorShape>('agent-orchestrator/TokenDoor', {
-  defaultValue: () => rootedDoor((root) => doorOf<TokensLayer, string>(tokenFiles(root)), 'token door'),
+  defaultValue: () => rootedDoor(tokensAt, 'token door'),
 });
 
 /**
  * The token door over the records of the store `root`, as a layer: for a program that names its root by the door.
  * @param root The store's root folder, whose token records the door reads and writes.
  */
-export const tokenDoorFiles = (root: string) => Layer.succeed(TokenDoor)(doorOf<TokensLayer, string>(tokenFiles(root)));
+export const tokenDoorAt = (root: string) => Layer.succeed(TokenDoor)(tokensAt(root));
+
+/** An act of the door at the root `home`, run at once: a refusal is thrown as it is. A test's, never a program's. */
+const atRoot = <A>(home: string, act: (door: TokenDoorShape) => Effect.Effect<A, Refusal>) => Effect.runSync(act(tokensAt(home)));
 
 /**
- * A step's session token, minted under the store `home` as its try `attempt` is filed as the engine's task `task`: its agent (the step's
- * name where it has none), the run's factory (the default one where it names none: null is Nemia's alone) and the run and step.
- * Answered as the field `filedConfig` takes.
+ * Mints a session's token at the root `home` (`tokens.mint`), at once. Answers the token itself.
  * @param home The store's root folder.
+ * @param record What the token vouches for: the session's agent, factory, run, step, attempt and task.
+ */
+export const mintToken = (home: string, record: TokenFiled) => atRoot(home, (door) => door.tokens.mint(record));
+
+/**
+ * The record the store keeps of `token` at the root `home` (`tokens.read`), at once, or null where it minted none.
+ * @param home The store's root folder.
+ * @param token The token presented.
+ */
+export const readToken = (home: string, token: string) => atRoot(home, (door) => door.tokens.read(token));
+
+/**
+ * Mints a standing token under `name` at the root `home` (`persons.mint`), at once; refused as the door refuses.
+ * @param home The store's root folder.
+ * @param name The name the token is kept and removed under.
+ * @param now When it is minted, written as its `createdAt`.
+ * @param holder Who holds it: the person, or an agent and what bounds it.
+ */
+export const mintPersonToken = (home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER) =>
+  atRoot(home, (door) => door.persons.mint(name, holder, now));
+
+/**
+ * Mints a person's token under `name`, or the first free `name-2`, `name-3`… at the root `home` (`persons.mintFree`), at once.
+ * @param home The store's root folder.
+ * @param name The name to mint under, or to count on from where it is taken.
+ * @param now When it is minted, written as its `createdAt`.
+ */
+export const mintPersonTokenFree = (home: string, name: string, now: Date = new Date()) =>
+  atRoot(home, (door) => door.persons.mintFree(name, now));
+
+/**
+ * The record of the person's token whose digest is `digest` at the root `home` (`persons.read`), at once, or null.
+ * @param home The store's root folder.
+ * @param digest The token's digest (`tokenDigest`).
+ */
+export const personTokenOf = (home: string, digest: string) => atRoot(home, (door) => door.persons.read(digest));
+
+/**
+ * The person's tokens the store keeps at the root `home`, by name (`persons.list`), at once.
+ * @param home The store's root folder.
+ */
+export const personTokens = (home: string) => atRoot(home, (door) => door.persons.list());
+
+/**
+ * Removes the person's token named `name` at the root `home` (`persons.revoke`), at once; `Missing` where none is kept under it.
+ * @param home The store's root folder.
+ * @param name The name the token is kept under.
+ */
+export const revokePersonToken = (home: string, name: string) => atRoot(home, (door) => door.persons.revoke(name));
+
+/**
+ * A step's session token, minted as its try `attempt` is filed as the engine's task `task`, through the token door: its agent (the step's
+ * name where it has none), the run's factory (the default one where it names none: null is Nemia's alone) and the run and step.
+ * Answered as the field `filedConfig` takes; none for a step on a remote harness, which reads no config of this machine's.
+ * @param run The run the try is of: its id and its factory.
+ * @param step The step the try is of: its name, its agent and its harness.
+ * @param task The id of the engine's task the try is filed as.
+ * @param attempt The try's number, written on the record.
+ */
+export const stepToken = Effect.fnUntraced(function* (
+  run: Pick<Run, 'id' | 'factory'>,
+  step: Pick<StepSpec, 'name' | 'agent' | 'harness'>,
+  task: string,
+  attempt: number,
+) {
+  if (isRemoteHarness(step.harness)) return {};
+  return { sessionToken: yield* sessionTokenFor(run, step, task, attempt) };
+});
+
+/**
+ * A session token minted through the token door for the try `attempt` of `step` of `run`, filed as the task `task`, whatever its harness:
+ * what a check or a command carries in its environment (`SESSION_TOKEN`).
  * @param run The run the try is of: its id and its factory.
  * @param step The step the try is of: its name and its agent.
  * @param task The id of the engine's task the try is filed as.
  * @param attempt The try's number, written on the record.
  */
-export const stepToken = (
-  home: string,
-  run: Pick<Run, 'id' | 'factory'>,
-  step: Pick<StepSpec, 'name' | 'agent'>,
-  task: string,
-  attempt: number,
-) => ({
-  sessionToken: mintToken(home, {
-    agent: step.agent?.name ?? step.name,
-    factory: runNamespace(run.factory),
-    run: run.id,
-    step: step.name,
-    attempt,
-    task,
-  }),
-});
+export const sessionTokenFor = (run: Pick<Run, 'id' | 'factory'>, step: Pick<StepSpec, 'name' | 'agent'>, task: string, attempt: number) =>
+  Effect.flatMap(TokenDoor, (door) =>
+    door.tokens.mint({
+      agent: step.agent?.name ?? step.name,
+      factory: runNamespace(run.factory),
+      run: run.id,
+      step: step.name,
+      attempt,
+      task,
+    }),
+  );
 
 /**
  * The store's credential: the person's own standing token for this machine, kept in `<home>/credential` (mode 0600) so the person's
@@ -365,16 +450,27 @@ function heldCredential(home: string) {
  * @param home The store's root folder.
  * @param now When a token it mints is minted.
  */
-export function credentialKept(home: string, now: Date = new Date()) {
-  const held = heldCredential(home);
-  const record = held === undefined ? null : personTokenOf(home, tokenDigest(held));
+export const credentialKept = Effect.fnUntraced(function* (home: string, now: Date = new Date()) {
+  const door = yield* TokenDoor;
+  const held = yield* fromThrow(() => heldCredential(home));
+  const record = held === undefined ? null : yield* door.persons.read(tokenDigest(held));
   if (record !== null && holderOf(record).kind === 'person')
     return { kind: 'kept' } satisfies { readonly kind: 'kept' } | { readonly kind: 'minted'; readonly name: string };
-  const { token, name } = mintPersonTokenFree(home, CREDENTIAL_NAME, now);
-  fs.mkdirSync(home, { recursive: true });
-  const hidden = path.join(home, `.${CREDENTIAL_FILE}.${process.pid}.tmp`);
-  fs.writeFileSync(hidden, `${token}\n`, { mode: 0o600 });
-  fs.chmodSync(hidden, 0o600);
-  fs.renameSync(hidden, credentialFile(home));
+  const { token, name } = yield* door.persons.mintFree(CREDENTIAL_NAME, now);
+  yield* fromThrow(() => {
+    fs.mkdirSync(home, { recursive: true });
+    const hidden = path.join(home, `.${CREDENTIAL_FILE}.${process.pid}.tmp`);
+    fs.writeFileSync(hidden, `${token}\n`, { mode: 0o600 });
+    fs.chmodSync(hidden, 0o600);
+    fs.renameSync(hidden, credentialFile(home));
+  });
   return { kind: 'minted', name } satisfies { readonly kind: 'kept' } | { readonly kind: 'minted'; readonly name: string };
-}
+});
+
+/**
+ * Puts the person's credential in place under the store `home` (`credentialKept`), at once: a test's, as a daemon's start puts it.
+ * @param home The store's root folder.
+ * @param now When a token it mints is minted.
+ */
+export const credentialKeptNow = (home: string, now: Date = new Date()) =>
+  Effect.runSync(Effect.provide(credentialKept(home, now), tokenDoorAt(home)));

@@ -24,7 +24,7 @@ import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
-import { list, PERSON, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { list, PERSON, sayRun, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
@@ -244,13 +244,13 @@ describe("who says words to a step: a session by its token as its agent, framed;
           attempt: 1,
           task: 't-implement',
         });
-      }).pipe(Effect.provide(tokenDoorFiles(root))),
+      }).pipe(Effect.provide(tokenDoorAt(root))),
     );
     asSession = { ...BOARD, authorization: `Bearer ${token}` };
     ops = Effect.runSync(
       Effect.gen(function* () {
         return yield* (yield* TokenDoor).persons.mint('say-ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
-      }).pipe(Effect.provide(tokenDoorFiles(root))),
+      }).pipe(Effect.provide(tokenDoorAt(root))),
     );
     asOperator = { ...BOARD, authorization: `Bearer ${ops}` };
     storeAtSemiAuto();

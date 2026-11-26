@@ -35,6 +35,14 @@ import { askKey, askKeyOf, asksPrefix, runKey } from './src/runs/run-keys.ts';
 import { recordValue } from './src/record/record.store.ts';
 import type { Run } from './src/record/record.ts';
 import { RunDoor, type RunDoorShape, type RunsLayer } from './src/runs/runs.store.ts';
+import { CARD_FILES, CardDoor, cardDoorAt, cardKey, cardTryKey } from './src/cards/cards.store.ts';
+import { DELEGATION_FILES } from './src/delegation/delegation.store.ts';
+import { kindKeyspaceHeld } from './src/keyspace/import.store.ts';
+import { LEDGER_FILES } from './src/revisions/revisions.store.ts';
+import { SUBSCRIPTION_FILES } from './src/subscription/subscription.store.ts';
+import { TOKEN_FILES } from './src/token/token.store.ts';
+export { credentialKeptNow } from './src/token/token.store.ts';
+import { CardName } from './src/inbox/inbox.model.ts';
 
 /**
  * A function of the factories' store taking the store's root first, as a test plants a factory by hand: at the root its process's
@@ -321,3 +329,53 @@ export const readAsks = (root: string, id: string) => runsNow(root).asks.read(id
  */
 export const readAnswers = (root: string, id: string) => runsNow(root).asks.answers(id);
 export { RECORD_CEILING } from './src/keyspace/keyspace.store.ts';
+export { deliveryKey, subscriptionKey } from './src/subscription/subscription.store.ts';
+export { cardKey, cardTryKey };
+
+/**
+ * The text of the card `name` the store `root` holds, as the Card door reads it (a card file dropped into its inbox taken up first), or
+ * null where it holds none: what a test reads a card filed or written back by.
+ * @param root The store's root folder.
+ * @param name The card's name.
+ */
+export const cardText = (root: string, name: string) =>
+  Effect.runSync(Effect.flatMap(CardDoor, (door) => door.cards.read(CardName.read(name))).pipe(Effect.provide(cardDoorAt(root))));
+
+/**
+ * The names of the cards the store `root` holds, sorted, as the Card door lists them (a card file dropped into its inbox taken up first).
+ * @param root The store's root folder.
+ */
+export const cardNames = (root: string) =>
+  Effect.runSync(Effect.flatMap(CardDoor, (door) => door.cards.entries()).pipe(Effect.provide(cardDoorAt(root)))).map((e) =>
+    e.file.slice(0, -'.md'.length),
+  );
+
+/**
+ * The card `name` planted in the store `root` with `text`, over what is there: a card filed, or written over by hand, as no verb would.
+ * @param root The store's root folder.
+ * @param name The card's name.
+ * @param text The card's text.
+ * @param filedAt When it was filed, as an ISO time.
+ */
+export const plantCard = (root: string, name: string, text: string, filedAt = new Date().toISOString()) =>
+  plantRecord(root, cardKey(name), JSON.stringify({ text, filedAt }));
+
+/**
+ * Every card and every try of one of the store `root` deleted: what a test that empties its store between stories runs beside removing
+ * `inbox/` and `queue/`, since the keyspace keeps them.
+ * @param root The store's root folder.
+ */
+export const emptyCards = (root: string) => {
+  for (const key of [...keysUnder(root, '/registry/cards/'), ...keysUnder(root, '/registry/cardtries/')]) dropRecord(root, key);
+};
+
+/**
+ * Every kind's files of before the keyspace the store `root` holds taken up into its records and moved aside — delegations,
+ * subscriptions, the revision ledger, tokens, cards and tries — as each door's first read takes them up: what a test that prints a store
+ * before its first read runs first, so the store it prints is the one its reads leave.
+ * @param root The store's root folder.
+ */
+export const kindsTakenUp = (root: string) => {
+  for (const kind of [DELEGATION_FILES, SUBSCRIPTION_FILES, LEDGER_FILES, TOKEN_FILES, CARD_FILES])
+    void Effect.runSync(kindKeyspaceHeld(root, kind));
+};

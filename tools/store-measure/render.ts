@@ -43,6 +43,7 @@ export const MEASURES = [
   'librarySkills',
   'ceilings',
   'ceilingsAfterPass',
+  'tokenList',
 ] as const;
 
 /** A read the report measures. */

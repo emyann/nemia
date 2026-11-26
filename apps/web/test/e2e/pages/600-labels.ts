@@ -8,7 +8,7 @@ import { dollars } from '../../../src/lib/money.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredCard, OUT, store, storeCard, storedCard } from '../world.ts';
 
 /** The card this page files with a label, and the label it and a seeded run carry. */
 const CARD = 'label-the-card-e2e0';
@@ -34,11 +34,11 @@ export default {
   name: 'labels',
   route: '/inbox',
   expect: async (page) => {
-    const cardFile = path.join(store!, 'inbox', `${CARD}.md`);
+    const cardFile = `nemia get card ${CARD}`;
     const labelsFile = path.join(store!, 'runs', `${LANDED.id}.labels`);
     const theme = await themeOf(page);
     try {
-      fs.writeFileSync(cardFile, `---\nlabels:\n  team: core\n---\nLabel the card\n\nA card the label filter keeps.\n`);
+      storeCard(CARD, `---\nlabels:\n  team: core\n---\nLabel the card\n\nA card the label filter keeps.\n`);
       await labelRun(page, LANDED.id, [LABEL]);
 
       await load(page, `/inbox?l=${encodeURIComponent(LABEL)}`);
@@ -67,11 +67,13 @@ export default {
       await expectVisible(edit.locator('[data-label="size=wide"]'), 'a label added on the card page is shown');
       await settled(page);
       await photograph(page, path.join(OUT, `labels-card-${theme}.png`), { fullPage: true });
-      if (!fs.readFileSync(cardFile, 'utf8').includes('size: wide'))
+      if (!(storedCard(CARD) ?? '').includes('size: wide'))
         throw new Refused(`the label added is written to the card's frontmatter — ${cardFile} holds no size: wide`);
       await edit.getByRole('button', { name: 'Remove size' }).click();
       await expectCount(edit.locator('[data-label="size=wide"]'), 0, 'and removed again');
-      if (fs.readFileSync(cardFile, 'utf8').includes('size:')) throw new Refused(`the label removed leaves the card's file — ${cardFile}`);
+      const removed = storedCard(CARD);
+      if (removed === null || removed.includes('size:'))
+        throw new Refused(`the label removed leaves the card's frontmatter, the card kept — ${cardFile} holds ${JSON.stringify(removed)}`);
 
       await load(page, `/runs/${LANDED.id}`);
       const runEdit = page.locator('[data-labels-edit]');
@@ -106,7 +108,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `labels-page-${theme}.png`), { fullPage: true });
     } finally {
-      fs.rmSync(cardFile, { force: true });
+      dropStoredCard(CARD);
       await labelRun(page, LANDED.id, ['team-']).catch(() => undefined);
       fs.rmSync(labelsFile, { force: true });
     }

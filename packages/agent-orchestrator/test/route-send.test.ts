@@ -8,7 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { rewriteRun, runRecord, runsNow } from '../testing.ts';
+import { cardNames, cardText, rewriteRun, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -22,7 +22,6 @@ import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import { resultSteps } from '../src/branches/branches.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
-import { inboxAt } from '../src/cards/cards.store.ts';
 import { parseInboxCard } from '../src/inbox/inbox.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -77,7 +76,7 @@ const started = async (inputs: readonly string[] = []) => {
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The inbox's cards, by file. */
-const cards = () => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inboxAt(ROOT)).filter((f) => f.endsWith('.md')) : []) satisfies string[];
+const cards = () => cardNames(ROOT).map((name) => `${name}.md`) satisfies string[];
 
 /**
  * A run whose plan has signed off on `surface`, which triage's table routes by, and on the routed card's `title`, null when none is
@@ -101,7 +100,7 @@ const planned = async (surface: string, given: { title?: string; labels?: Record
 /** The routed card of a run's `ship` node, read as the inbox reads a card. */
 const routedCard = (id: string) => {
   const file = `${id}-ship-routed.md`;
-  return parseInboxCard(file, fs.readFileSync(path.join(inboxAt(ROOT), file), 'utf8'));
+  return parseInboxCard(file, cardText(ROOT, file.slice(0, -'.md'.length)) ?? '');
 };
 
 /** What `nemia ls <id>` words each step. */
@@ -131,7 +130,7 @@ describe('a condition that routes to a workflow node files one queued card, and 
     const before = cards().length;
     await pass(id);
     assert.equal(cards().length, before + 1);
-    const text = fs.readFileSync(path.join(inboxAt(ROOT), `${card}.md`), 'utf8');
+    const text = cardText(ROOT, card) ?? '';
     assert.match(text, /^workflow: deliver$/m);
     assert.match(text, new RegExp(`^from: ${id}$`, 'm'));
     assert.match(text, /^queued: /m);

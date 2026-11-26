@@ -138,21 +138,14 @@ write(
 );
 
 /**
- * The delegations, each cloned from one the api wrote (`PUT …/delegations/:name`), its file the store's own format with its name in
- * place of the first's.
+ * The delegations, each planted as a file of before the keyspace, which the Delegation door imports as its record at the next read.
  */
-async function delegationsPlanted() {
+function delegationsPlanted() {
   const dir = path.join(root, 'factories', FACTORY, 'delegations');
-  const [first = '', ...rest] = DELEGATIONS;
-  const put = await app.request(`/api/namespaces/${FACTORY}/delegations/${first}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-    body: JSON.stringify({ rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['update'] }] }),
-  });
-  assert.equal(put.status, 200, `the first delegation is written: ${await put.text()}`);
-  const [file = ''] = fs.readdirSync(dir);
-  const text = fs.readFileSync(path.join(dir, file), 'utf8');
-  for (const name of rest) fs.writeFileSync(path.join(dir, file.replace(first, name)), text.replaceAll(first, name));
+  fs.mkdirSync(dir, { recursive: true });
+  const spec = { rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['update'] }] };
+  for (const name of DELEGATIONS)
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify({ since: '2026-11-05T10:00:00.000Z', spec }));
 }
 
 /** Each `page` read of `READS` with the URL it is read at and the names planted for it; none where it is not planted past a page. */
@@ -212,7 +205,7 @@ test('every page read of READS is read here', () => {
 });
 
 test('every list answers a page of its default, at most its most however much is asked, and its continue reaches every object once', async () => {
-  await delegationsPlanted();
+  delegationsPlanted();
   const wrong: string[] = [];
   for (const [read, { url, planted, before, after }] of Object.entries(PAGES)) {
     before?.();

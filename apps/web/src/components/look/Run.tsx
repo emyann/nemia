@@ -17,6 +17,7 @@ import { cutRing } from './cut';
 import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
 import { runRecipe, runType, type RunTone, type RunType } from './run.recipe.ts';
 import { RunClock, RunCost } from './RunFigures';
+import { HoldLine } from './RunHold';
 import { Chip, Fan, Pips, Ring, RunMark, Words } from './RunMarks';
 import { RunMeta } from './RunMeta';
 import { Facts, NamedGraph, PanelFoot, pickWrap, RunsWaiting, type PanelRead } from './RunPanel';
@@ -104,7 +105,8 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  * - **sm**, a line: and the step now as a small chip, the title on one line and the clock.
  * - **md**, a row of the runs table (`layout="row"`, the kit's `Row` with its Run, Now, Clock and Cost cells) or a card of the floor: and
  *   factory / workflow, the agent, the round as pips, the words of its wait (a run named a mark), the step graph (each node inside `wrap`),
- *   the step's budget ring, its cost and how many of `among` wait on it; a row its labels too.
+ *   the step's budget ring, its cost and how many of `among` wait on it; a row its labels too, and a held run's row its hold line
+ *   (`HoldLine`: why it is held and who holds it).
  * - **lg**, a card: and its labels and Open run; a card that waits on you glows.
  * - **xl**, a panel: and each step named under the graph, the facts, the runs it waits on and that wait on it, and the step's last line
  *   from `read`, the run read alone.
@@ -247,9 +249,9 @@ function RunLine({ run, asOf, still, className, look }: RunProps & { look: Look 
 }
 
 /**
- * The run as a row of the runs table: its Run cell (title over its meta line), its Now cell (marks over its graph), Clock and Cost. The
- * row opens the run's page, as its title does, on a press or Enter, through the board's router (the kit's interactive row, with its
- * hover, pressed and focus states); a control inside it does its own thing.
+ * The run as a row of the runs table: its Run cell (title over its meta line), its Now cell (marks, a held run's hold line, then its
+ * graph), Clock and Cost. The row opens the run's page, as its title does, on a press or Enter, through the board's router (the kit's
+ * interactive row, with its hover, pressed and focus states); a control inside it does its own thing.
  */
 function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look: Look }) {
   const waiters = waitersOf(among, run.id).length;
@@ -287,6 +289,7 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
               )}
             </span>
           </span>
+          {run.holding && <HoldLine holding={run.holding} />}
           <span {...saying('graph')} className={look.s.steps()}>
             <StepGraph run={run} wrap={wrap} />
           </span>

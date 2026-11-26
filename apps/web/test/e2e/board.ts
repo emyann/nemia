@@ -493,17 +493,22 @@ async function expectKeyRows(page: Page, file: Locator, keys: readonly KeyRow[])
   }
 }
 
-/** Source: the file as written, frontmatter included, in place of what the page renders of it — and back. */
-export async function expectSource(file: Locator, body: Locator, onDisk: string) {
+/**
+ * Source: the file as written, frontmatter included, in place of what the page renders of it — and back.
+ * @param file The page's file section.
+ * @param body The rendered body Source stands in for.
+ * @param held Where the text is held, named in a refusal.
+ * @param written The text as it is held: a file's bytes, or a card's text as the store keeps it.
+ */
+export async function expectSource(file: Locator, body: Locator, held: string, written: string) {
   const toggle = file.getByRole('button', { name: 'Source' });
   await toggle.click();
   const source = file.locator('pre[data-source]');
   await expectVisible(source, 'Source shows the file as written');
   const shown = await source.textContent();
-  const written = fs.readFileSync(onDisk, 'utf8');
   if (shown !== written)
     throw new Refused(
-      `Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${onDisk} holds ${JSON.stringify(written)}`,
+      `Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${held} holds ${JSON.stringify(written)}`,
     );
   if ((await toggle.getAttribute('aria-pressed')) !== 'true') throw new Refused('Source says it is pressed while the file is shown');
   await expectCount(file.locator('section[aria-label="Keys"]'), 0, 'in place of the rendered body and the keys');

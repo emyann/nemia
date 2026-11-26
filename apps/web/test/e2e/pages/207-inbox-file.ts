@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { cardsPath, photograph, heldIn, optionsIn, pickIn, snackbarSaying, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
+import { dropStoredCard, OUT, store, storedCard, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /** The idea filed with no factory, then started through the Factory list of its Start. */
 const UNASSIGNED = 'File an idea with no factory\n\nIt gets its factory when it is started.';
@@ -30,7 +29,7 @@ function sentOf(filed: Response) {
   return (namespace === 'default' ? body : { ...body, factory: namespace }) satisfies unknown;
 }
 
-/** Type `idea` into the box and press File: the request's body as it was sent, and the card's name and file once the api took it. */
+/** Type `idea` into the box and press File: the request's body as it was sent, and the card's name once the api took it. */
 async function fileFrom(page: Page, idea: string) {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
@@ -42,11 +41,7 @@ async function fileFrom(page: Page, idea: string) {
   const {
     metadata: { name },
   } = (await filed.json()) as { metadata: { name: string } };
-  return { sent: sentOf(filed), name, file: path.join(store!, 'inbox', `${name}.md`) } satisfies {
-    sent: unknown;
-    name: string;
-    file: string;
-  };
+  return { sent: sentOf(filed), name } satisfies { sent: unknown; name: string };
 }
 
 /** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key. */
@@ -56,10 +51,10 @@ function expectSent(sent: unknown, expected: Record<string, string>, assertion: 
     throw new Refused(`${assertion} — it sent ${JSON.stringify(sent)}, not ${JSON.stringify(expected)}`);
 }
 
-/** Refuses unless the card's file holds exactly `text`. */
-function expectFile(file: string, text: string, assertion: string) {
-  const held = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
-  if (held !== text) throw new Refused(`${assertion} — ${file} holds ${JSON.stringify(held)}`);
+/** Refuses unless the store holds the card `name` as exactly `text`. */
+function expectCard(name: string, text: string, assertion: string) {
+  const held = storedCard(name);
+  if (held !== text) throw new Refused(`${assertion} — nemia get card ${name} holds ${JSON.stringify(held)}`);
 }
 
 /**
@@ -97,7 +92,7 @@ async function startUnassigned(page: Page, name: string, theme: string) {
     await expectStartedIn(started, { factory, repo: checkout, card: name });
     const { id } = (await started.json()) as { id: string };
     await other.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
-    if (!fs.existsSync(path.join(store!, 'inbox', `${name}.md`))) throw new Refused(`the card stays in the inbox once its run is written`);
+    if (storedCard(name) === null) throw new Refused(`the card stays in the inbox once its run is written`);
     await idle(other);
     const seen = problems();
     if (seen.length)
@@ -201,9 +196,9 @@ export default {
         'and says what no factory means',
       );
       const bare = await fileFrom(page, UNASSIGNED);
-      written.push(bare.file);
+      written.push(bare.name);
       expectSent(bare.sent, { body: UNASSIGNED }, 'with no factory the box sends the idea alone');
-      expectFile(bare.file, `${UNASSIGNED}\n`, 'the card has no factory:, repo: or workflow: key');
+      expectCard(bare.name, `${UNASSIGNED}\n`, 'the card has no factory:, repo: or workflow: key');
       const line = cardIn(page, bare.name);
       await expectTexts(line.locator('[data-unassigned]'), ['no factory yet'], 'its line says it has no factory yet');
       await expectCount(line.locator('[data-factory-tag]'), 0, 'and wears no tag, the default one least of all');
@@ -223,14 +218,14 @@ export default {
       await settled(page);
       await photograph(box, path.join(OUT, `inbox-file-box-${theme}.png`));
       const tagged = await fileFrom(page, ASSIGNED);
-      written.push(tagged.file);
+      written.push(tagged.name);
       expectSent(
         tagged.sent,
         { body: ASSIGNED, factory, workflow: WORKFLOWS.good.name },
         'in a factory the box sends the factory and the workflow picked by its name, and never a repository nor an origin',
       );
-      expectFile(
-        tagged.file,
+      expectCard(
+        tagged.name,
         `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${ASSIGNED}\n`,
         'the card names its factory, and no repo:',
       );
@@ -242,7 +237,7 @@ export default {
 
       await pickIn(page, list, 'No factory: chosen at start');
       const hidden = await fileFrom(page, HIDDEN);
-      written.push(hidden.file);
+      written.push(hidden.name);
       expectSent(hidden.sent, { body: HIDDEN }, 'back on no factory, the idea alone: nothing picked under the factory is sent');
       await expectVisible(
         box.locator('[data-filed-hidden]', { hasText: `Filed as ${hidden.name}` }),
@@ -252,7 +247,7 @@ export default {
       await box.locator('[data-filed-hidden]').getByRole('link', { name: "Show every factory's" }).click();
       await page.waitForURL((url) => url.pathname === '/inbox' && !url.searchParams.has('factory'));
       await expectVisible(cardIn(page, hidden.name), 'and its link shows it');
-      fs.rmSync(hidden.file, { force: true });
+      dropStoredCard(hidden.name);
 
       await open(page, '/inbox');
       await expectCount(page.locator('section[aria-label="Cards"] [data-factory-tag="default"]'), 0, 'no card wears a default tag');
@@ -260,7 +255,7 @@ export default {
       await photograph(page, path.join(OUT, `inbox-file-lines-${theme}.png`), { fullPage: true });
       await startUnassigned(page, bare.name, theme);
     } finally {
-      for (const file of written) fs.rmSync(file, { force: true });
+      for (const name of written) dropStoredCard(name);
       unhire();
     }
     await open(page, '/inbox');

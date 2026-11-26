@@ -4,7 +4,7 @@
  * changed Run, which the api writes no way (`nemia explain`), an `apiVersion` other than `nemia/v1`, and a list's objects, which lack
  * their files (`nemia get <resource> <name> -o yaml`).
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardText, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -66,8 +66,7 @@ test('a Card with a new spec.from is configured: written whole through its updat
 });
 
 test('REFUSED: a Card whose spec.queued the file changes exits 2 naming `nemia inbox queue`, the card left as it was', async () => {
-  const file = path.join(store.root, 'inbox', 'cache-the-views.md');
-  const before = fs.readFileSync(file, 'utf8');
+  const before = cardText(store.root, 'cache-the-views');
   const read = await store.nemia(['get', 'card', 'cache-the-views', '-n', 'default', '-o', 'yaml']);
   assert.equal(read.code, 0, read.err);
   const queued = read.out.replace(/^spec:\n/m, 'spec:\n  queued: 2026-11-01T10:00:00.000Z\n');
@@ -75,7 +74,7 @@ test('REFUSED: a Card whose spec.queued the file changes exits 2 naming `nemia i
   const refused = await store.nemia(['apply', '-f', '-'], queued);
   assert.equal(refused.code, 2, refused.err);
   assert.match(refused.err, /nemia inbox queue/);
-  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(cardText(store.root, 'cache-the-views'), before);
 });
 
 test('REFUSED: a missing Card is refused exit 2 naming `nemia inbox add`, which files one', async () => {

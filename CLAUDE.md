@@ -229,6 +229,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   its last lines naming the files changed against the last build; never shipped, it publishes nothing, a person's session does
   (`tools/design-system/README.md`). A story that reads the api is tagged `network`, one open over the window at rest `overlay`. CI's
   `design-system` job builds it on every push that reaches it or the board.
+- `docs/film/` — the README's one-minute film: a Hyperframes project outside every workspace, rendered by `npm run render` there (`docs/film/README.md`).
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/contracts/` — what `npm run contracts` runs (`prove.ts`): every contract proved by tsverify, in the legs `legs.ts` names, which

@@ -19,7 +19,7 @@ function installOf(text: string) {
 /** The relative targets of the links and images of a text, with no fragment, for which `exists` says no. */
 function unresolved(text: string, exists: (file: string) => boolean) {
   const missing: string[] = [];
-  for (const m of text.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  for (const m of text.matchAll(/\]\(([^)\s]+)\)/g)) {
     const target = m[1];
     if (/^(https?:|mailto:|#)/.test(target)) continue;
     const file = target.split('#')[0];
@@ -52,10 +52,11 @@ test('REFUSED: a relative link or image to a file that is not there', () => {
     '[c](docs/architecture.md#who-owns-what)',
     '[d](https://example.org)',
     '[e](#install)',
+    '[![f](apps/web/test/approved/none.png)](no/such.mp4)',
   ].join('\n');
   assert.deepEqual(
     unresolved(text, (f) => f === 'docs/architecture.md'),
-    ['no/such.md', 'apps/web/test/approved/none.png'],
+    ['no/such.md', 'apps/web/test/approved/none.png', 'apps/web/test/approved/none.png', 'no/such.mp4'],
   );
 });
 
@@ -65,4 +66,10 @@ test('every relative link and image of README.md names a file that is there', ()
     unresolved(README, (f) => fs.existsSync(path.join(ROOT, f))),
     [],
   );
+});
+
+test('the film and its poster stay under the size the README’s link can carry', () => {
+  const size = (file: string) => fs.statSync(path.join(ROOT, 'docs', 'film', file)).size;
+  assert.ok(size('nemia.mp4') < 20 * 1024 * 1024);
+  assert.ok(size('poster.png') < 1024 * 1024);
 });

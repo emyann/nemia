@@ -7,7 +7,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../folder/folder.model.ts';
 import { agentNameRefusal, HARNESS_PROMPTS, skillNameRefusal } from './agents.ts';
-import { OVERRIDABLE } from '../workflow/index.ts';
+import { OVERRIDABLE, STEP_OVERRIDES } from '../workflow/index.ts';
 
 /** An agent's name: its file's in `agents/`, minus `.md` (`agentNameRefusal`). */
 export const AgentName = brandedId('AgentName', agentNameRefusal);
@@ -71,7 +71,7 @@ export const StepAgent = Schema.Struct({
   workflow: WorkflowName.OnRead,
   step: StepName.OnRead,
   agent: AgentName.OnRead,
-  overrides: Schema.optional(Schema.Array(Schema.Literals(OVERRIDABLE))),
+  overrides: Schema.optional(Schema.Array(Schema.Literals(STEP_OVERRIDES))),
 }).annotate({ identifier: 'StepAgent' });
 export type StepAgent = typeof StepAgent.Type;
 

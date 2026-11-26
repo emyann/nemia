@@ -56,8 +56,7 @@ const unofferedSpec = spec<(offered: readonly Overridable[] | undefined, overrid
     },
     theFirstLeftOutIsSaid: {
       description: "The refusal names the first override, in the step's order, that its agent's line leaves out",
-      condition: ({ input: [offered, overrides], output }) =>
-        output === undefined || output === overrides.find((w) => kept(offered, w)),
+      condition: ({ input: [offered, overrides], output }) => output === undefined || output === overrides.find((w) => kept(offered, w)),
     },
   },
 });

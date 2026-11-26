@@ -57,8 +57,17 @@
       }
     },
     {
+      "term": "Harness property",
+      "meaning": "a property of the harness an agent runs on — the model, the effort, the context window and the harness itself, each one of `HARNESS_PROPERTIES`: always a step's to override, whatever its agent says, and never a word of an agent's `overridable:` line, which is refused for one.",
+      "type": "HARNESS_PROPERTIES",
+      "see": {
+        "label": "What a step may override",
+        "href": "/agents/#what-a-step-may-override"
+      }
+    },
+    {
       "term": "Overridable",
-      "meaning": "what an agent lets a step override of it, on its own `overridable:` line, each word one of `OVERRIDABLE`: `fence` for every fence key at once, `skills` and `mcp`, which only add, and the role keys. A step that sets anything else is refused at load, naming the key and the agent; an agent with no line offers everything.",
+      "meaning": "what an agent lets a step override of it beyond the harness's properties, on its own `overridable:` line, each word one of `OVERRIDABLE`: `remote` and `output`, `fence` for every fence key at once, `skills` and `mcp`, which only add. A step that sets anything else is refused at load, naming the key and the agent; an agent with no line offers everything.",
       "type": "OVERRIDABLE",
       "see": {
         "label": "What a step may override",
@@ -92,7 +101,7 @@
     },
     {
       "term": "Step's agent",
-      "meaning": "the agent on a step (AgentOnStep): the agent a step is given, by its `agent:` line or by a factory's hire, and what the step overrides of it (`overridesOf`), which the agent's `overridable:` must offer.",
+      "meaning": "the agent on a step (AgentOnStep): the agent a step is given, by its `agent:` line or by a factory's hire, and what the step overrides of it (`overridesOf`, each one of `STEP_OVERRIDES`): the harness's properties always, the rest within the agent's `overridable:`.",
       "type": "StepAgent"
     },
     {

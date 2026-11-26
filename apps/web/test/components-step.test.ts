@@ -1783,7 +1783,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
   assert.doesNotMatch(html(null), /data-fact="reach"/, 'not bridged: no row');
 });
 
-test("a step's node says what it needs: a gate's question after `waits on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
+test("a step's node says what it needs: a gate's question after `waiting`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
   const footer = /<p data-slot="typography" class="[^"]*\btruncate\b[^"]*" data-gate-band="true" title="([^"]*)">([\s\S]*?)<\/p>/.exec(
@@ -1902,7 +1902,7 @@ test('a prose field is drawn as markdown; a number as it is', () => {
   );
 });
 
-test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waits on you` — and on a run called off, not', () => {
+test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
   assert.match(html, /border-yours/);

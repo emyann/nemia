@@ -40,7 +40,7 @@ export default {
     );
     await expectVisible(
       card.locator(
-        `[data-run-steps] [data-step="${gated}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${gated}, waits on you"]`,
+        `[data-run-steps] [data-step="${gated}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${gated}, waiting"]`,
       ),
       `and ${gated}'s node on its graph, awaiting approval, said so by its button`,
     );

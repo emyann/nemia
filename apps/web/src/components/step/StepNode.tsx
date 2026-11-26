@@ -528,7 +528,7 @@ function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; sa
 }
 
 /**
- * What a gate's band says after the rail's word (`waits on you`): what approving does in a line (`approve ship to run it`, `approve
+ * What a gate's band says after the rail's word (`waiting`): what approving does in a line (`approve ship to run it`, `approve
  * plan's hand-off`), whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
  */
 const nodeNeed = (need: Need, step: StepNodeData['step']) =>

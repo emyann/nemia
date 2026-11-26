@@ -49,11 +49,11 @@ async function load(page: Page, route: string) {
 export default {
   /**
    * The Inbox lists the cards still in play by default, and those whose run ended under Ended (`?cards=ended`), each segment counted. A
-   * card filed in the factory and started from the board reads under In play, its run's phase on a chip (`at work`, or `waiting its turn`
+   * card filed in the factory and started from the board reads under In play, its run's phase on a chip (`working`, or `pending`
    * with no daemon to take it); once its run is called off — its `.cancelled` marker written beside the record, as `wf cancel` writes it,
-   * the board having no Call off of its own — In play no longer lists it, Ended does, as `called off`, and each count has moved by one.
+   * the board having no Call off of its own — In play no longer lists it, Ended does, as `cancelled`, and each count has moved by one.
    * Before, the card's own page and its label's page show the same chip; after, a second card, started as a copy of GATED's run, which
-   * waits at its gate, reads `waits on you`. The runs, the claim, the cards and the factory's hires are taken back.
+   * waits at its gate, reads `waiting`. The runs, the claim, the cards and the factory's hires are taken back.
    */
   name: 'inbox-in-play',
   route: '/inbox',

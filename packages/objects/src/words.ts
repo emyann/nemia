@@ -409,6 +409,18 @@ export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'faile
 /** One of `SIGN_IN_STATES`. */
 export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
 
+/** The road a sign-in takes: a code the person types at the provider's page (`device`), or an address the person's browser opens (`browser`). */
+export const SIGN_IN_ROUTES = ['device', 'browser'] as const;
+
+/** One of `SIGN_IN_ROUTES`. */
+export type SignInRoute = (typeof SIGN_IN_ROUTES)[number];
+
+/** How a sign-out ended: a waiting sign-in was cancelled, or the sign-in a server held was removed. */
+export const SIGN_IN_ENDINGS = ['cancelled', 'signed-out'] as const;
+
+/** One of `SIGN_IN_ENDINGS`. */
+export type SignInEnding = (typeof SIGN_IN_ENDINGS)[number];
+
 /**
  * Where a definition — a Workflow, an Agent, a Skill — is read from, in the order a factory looks a name up: the factory's own tree
  * (`factory`, the folder a factory made from a template keeps in the store), the repository (`repo`), the person's library (`user`),

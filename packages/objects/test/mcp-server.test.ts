@@ -51,15 +51,30 @@ test("the header mask is no value a header is sent with, and the write takes the
   assert.equal(taken('mcpservers', 'put', { type: 'http' }), undefined);
 });
 
-test("the sign-in's answers are the Api's endpoints', and one endpoint's answer is not another's", () => {
-  const started = { authUrl: 'https://github.com/login/oauth/authorize?x=1', until: '2026-11-04T00:05:00.000Z' };
-  assert.deepEqual(answered('mcpservers', 'signIn', started), started);
+test("the sign-in's answers are the Api's endpoints', both roads decode, and one endpoint's answer is not another's", () => {
+  const byCode = {
+    route: 'device',
+    userCode: 'WDJB-MJHT',
+    verificationUri: 'https://github.com/login/device',
+    until: '2026-11-04T00:15:00.000Z',
+  };
+  const byBrowser = { route: 'browser', authUrl: 'https://github.com/login/oauth/authorize?x=1', until: '2026-11-04T00:05:00.000Z' };
+  assert.deepEqual(answered('mcpservers', 'signIn', byCode), byCode);
+  assert.deepEqual(answered('mcpservers', 'signIn', byBrowser), byBrowser);
   assert.deepEqual(answered('mcpservers', 'signInState', { state: 'none' }), { state: 'none' });
+  const waiting = { state: 'waiting', until: byCode.until, started: byCode };
+  assert.deepEqual(answered('mcpservers', 'signInState', waiting), waiting, 'a page opened later reads what the sign-in answered');
   const failed = { state: 'failed', until: '2026-11-04T00:05:00.000Z', why: 'denied' };
   assert.deepEqual(answered('mcpservers', 'signInState', failed), failed);
-  assert.deepEqual(answered('mcpservers', 'signOut', { signedOut: true }), { signedOut: true });
-  assert.equal(answered('mcpservers', 'signOut', started), undefined);
-  assert.equal(answered('mcpservers', 'signIn', { signedOut: true }), undefined);
+  assert.deepEqual(answered('mcpservers', 'signOut', { ended: 'cancelled' }), { ended: 'cancelled' });
+  assert.equal(answered('mcpservers', 'signOut', byCode), undefined);
+  assert.equal(answered('mcpservers', 'signIn', { ended: 'signed-out' }), undefined);
+});
+
+test('REFUSED: a sign-in by a code with no code, a road off its words, and an ending off its words', () => {
+  assert.equal(answered('mcpservers', 'signIn', { route: 'device', verificationUri: 'https://github.com/login/device', until: 'x' }), undefined);
+  assert.equal(answered('mcpservers', 'signIn', { route: 'telepathy', authUrl: 'https://x.example', until: 'x' }), undefined);
+  assert.equal(answered('mcpservers', 'signOut', { ended: 'vanished' }), undefined);
 });
 
 test('REFUSED: a transport, a state or a sign-in state off its words, a write with no url, and another kind', () => {

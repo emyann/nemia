@@ -9,7 +9,7 @@
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { FactoryWritten } from './written.ts';
-import { MCP_STATES, MCP_TRANSPORTS, SIGN_IN_STATES } from './words.ts';
+import { MCP_STATES, MCP_TRANSPORTS, SIGN_IN_ENDINGS, SIGN_IN_ROUTES, SIGN_IN_STATES } from './words.ts';
 
 /** The OAuth client a server signs in with: its id, and the port its callback listens on, where it names one. */
 export const McpServerOAuth = Schema.Struct({
@@ -88,18 +88,38 @@ export const McpServerWrite = Schema.Struct({
 });
 export type McpServerWrite = typeof McpServerWrite.Type;
 
-/** A sign-in started: the address the person opens to sign in, and when the sign-in stops waiting. */
-export const SignInStarted = Schema.Struct({
-  authUrl: Schema.String.annotate({ description: 'The address the person opens to sign in.' }),
-  until: Schema.String.annotate({ description: 'When the sign-in stops waiting, as an ISO 8601 time.' }),
-});
+const [DEVICE_ROUTE, BROWSER_ROUTE] = SIGN_IN_ROUTES;
+
+/**
+ * A sign-in started, by the road its provider offers: a code to type at the provider's page (`device`), or an address to open
+ * (`browser`), with when the sign-in stops waiting.
+ */
+export const SignInStarted = Schema.Union([
+  Schema.Struct({
+    route: Schema.Literal(DEVICE_ROUTE).annotate({ description: 'The road: a code the person types at the provider.' }),
+    userCode: Schema.String.annotate({ description: 'The code the person types at the provider.' }),
+    verificationUri: Schema.String.annotate({ description: 'The provider’s page the person types the code at.' }),
+    until: Schema.String.annotate({ description: 'When the code stops being good, as an ISO 8601 time.' }),
+  }),
+  Schema.Struct({
+    route: Schema.Literal(BROWSER_ROUTE).annotate({ description: 'The road: an address the person opens in their browser.' }),
+    authUrl: Schema.String.annotate({ description: 'The address the person opens to sign in.' }),
+    until: Schema.String.annotate({ description: 'When the sign-in stops waiting, as an ISO 8601 time.' }),
+  }),
+]);
 export type SignInStarted = typeof SignInStarted.Type;
 
-/** Where a server's sign-in stands: its word, when a waiting one stops waiting, and why a failed one failed. */
+/**
+ * Where a server's sign-in stands: its word, when a waiting one stops waiting, why a failed one failed, and, while one waits, what it
+ * answered when it started.
+ */
 export const SignInState = Schema.Struct({
   state: Schema.Literals(SIGN_IN_STATES).annotate({ description: "Where the server's sign-in stands." }),
   until: Schema.optionalKey(Schema.String.annotate({ description: 'When a waiting sign-in stops waiting, as an ISO 8601 time.' })),
   why: Schema.optionalKey(Schema.String.annotate({ description: 'Why a failed sign-in failed.' })),
+  started: Schema.optionalKey(
+    SignInStarted.annotate({ description: 'What a waiting sign-in answered when it started: the code or the address to draw again.' }),
+  ),
 });
 export type SignInState = typeof SignInState.Type;
 
@@ -114,8 +134,8 @@ export const SignInCallback = Schema.Struct({
 });
 export type SignInCallback = typeof SignInCallback.Type;
 
-/** A server signed out of: whether a sign-in was cleared. */
+/** A server's sign-in ended: how. */
 export const SignedOut = Schema.Struct({
-  signedOut: Schema.Boolean.annotate({ description: 'Whether a sign-in was cleared.' }),
+  ended: Schema.Literals(SIGN_IN_ENDINGS).annotate({ description: 'How the sign-in ended: a waiting one cancelled, or the one the server held removed.' }),
 });
 export type SignedOut = typeof SignedOut.Type;

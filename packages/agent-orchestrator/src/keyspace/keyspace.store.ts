@@ -78,6 +78,14 @@ export const KEYSPACE_MIGRATIONS = {
 )`;
     yield* sql`CREATE INDEX IF NOT EXISTS kine_pointers_target_index ON kine_pointers (target)`;
   }),
+  '0003_sweeps': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS kine_sweeps
+(
+	head INTEGER NOT NULL,
+	at INTEGER NOT NULL
+)`;
+  }),
 } satisfies Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>>;
 
 /** The highest migration the code knows: the id of the last of `KEYSPACE_MIGRATIONS`. */
@@ -133,7 +141,7 @@ export type Keyspace = {
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly within: <A, E>(body: (tx: KeyTxn) => Effect.Effect<A, E>) => Effect.Effect<A, E | KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
-  readonly compact: (retain: number) => Effect.Effect<number>;
+  readonly compact: (windowMs: number, now: number) => Effect.Effect<number>;
   readonly settings: Effect.Effect<{ readonly journal: string; readonly synchronous: number }>;
 };
 
@@ -374,14 +382,18 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
           }),
         ),
       ),
-    compact: (retain) =>
+    compact: (windowMs, now) =>
       Effect.orDie(
         inTxn(
           Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
             const head = yield* headNow;
             const compacted = yield* compactedNow;
-            const to = compactTo(head, compacted, retain);
+            const [seen] = yield* sql<{ head: number; at: number }>`SELECT head, at FROM kine_sweeps WHERE at <= ${now - windowMs} ORDER BY at DESC, head DESC LIMIT 1`;
+            const to = compactTo(head, compacted, seen?.head ?? 0);
             if (to > compacted) yield* compactRange(compacted, to);
+            yield* sql`INSERT INTO kine_sweeps (head, at) VALUES (${head}, ${now})`;
+            if (seen !== undefined) yield* sql`DELETE FROM kine_sweeps WHERE at < ${seen.at}`;
             return to;
           }),
         ),

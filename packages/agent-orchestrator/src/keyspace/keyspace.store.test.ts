@@ -218,12 +218,33 @@ describe('the keyspace on disk', () => {
       [head, true],
     ]);
     assert.deepEqual(await Effect.runPromise(ks.since(head + 1, '/registry/t/')), { refused: 'ahead' });
-    assert.equal(await Effect.runPromise(ks.compact(1)), head - 1);
+    await Effect.runPromise(ks.compact(WINDOW, T0));
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW + 1)), head);
     assert.deepEqual(await Effect.runPromise(ks.since(0, '/registry/t/')), { refused: 'gone' });
-    const kept = await Effect.runPromise(ks.since(head - 1, '/registry/t/'));
-    assert.deepEqual('changes' in kept ? kept.changes.map((c) => c.revision) : kept, [head]);
+    assert.deepEqual(await Effect.runPromise(ks.since(head, '/registry/t/')), { changes: [], head });
+  });
+
+  test('a compaction keeps what the last sweep of at least the window ago had not seen', async () => {
+    const file = fileOf();
+    const ks = await Effect.runPromise(keyspaceAt(file));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('1')));
+    await Effect.runPromise(ks.write('/registry/t/a', update('2', a.revision)));
+    const seen = await Effect.runPromise(ks.head);
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0)), 0);
+    await Effect.runPromise(ks.write('/registry/t/b', create('3')));
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW - 1)), 0);
+    const head = await Effect.runPromise(ks.head);
+    const later = await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW + 1));
+    assert.equal(later, seen);
+    const resumed = await Effect.runPromise(ks.since(seen, '/registry/t/'));
+    assert.deepEqual('changes' in resumed ? resumed.changes.map((c) => c.revision) : resumed, [head]);
+    const other = await Effect.runPromise(Effect.scoped(Effect.flatMap(Effect.scope, (scope) => keyspaceIn(file, scope))));
+    assert.equal(await Effect.runPromise(other.compact(WINDOW, T0 + WINDOW + 2)), seen);
   });
 });
+
+const WINDOW = 300_000;
+const T0 = 1_000_000;
 
 describe('a pointer never dangles', () => {
   const FILE = '/registry/files/acme/file_a';
@@ -302,7 +323,8 @@ describe('a pointer never dangles', () => {
     await Effect.runPromise(ks.write(FILE, create('f')));
     const card = await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
     await Effect.runPromise(ks.write(CARD, { verb: 'update', expected: card.revision, value: 'c2', points: [FILE] }));
-    await Effect.runPromise(ks.compact(0));
+    await Effect.runPromise(ks.compact(0, T0));
+    await Effect.runPromise(ks.compact(0, T0 + 1));
     assert.deepEqual(await answered(ks.write(FILE, remove)), { refused: 'referenced', pointer: CARD });
   });
 });

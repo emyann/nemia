@@ -52,9 +52,9 @@ export const watchStart: WatchStartOf = (from, compacted, head) => {
  * The revision a compaction removes superseded rows up to.
  * @param head The store's highest revision.
  * @param compacted The revision the store has compacted up to already.
- * @param retain How many of the last revisions it keeps.
+ * @param seen The head the latest sweep of at least the window ago saw, 0 where none did.
  */
-export const compactTo: CompactTo = (head, compacted, retain) => Math.max(compacted, head - retain);
+export const compactTo: CompactTo = (head, compacted, seen) => Math.max(compacted, Math.min(seen, head));
 
 /**
  * The migrations opening a file applies, or its refusal where a newer release wrote it.

@@ -3175,7 +3175,7 @@ the board's bell stays quiet. Its file says `until: []`, so a restart keeps it. 
 hold, and only this one: it names no branch to land on.
 
 The hold is a person's fact in a record of its own, `/registry/runmarks/<id>/hold`, `{ at, until, why?, by }`, beside
-the record, as `.cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
+the record, as `cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
 hold it read: one put again since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
 is held until says so and names the `wf hold … --off` that lets it go.
 
@@ -4964,8 +4964,8 @@ for the same reason, and so does the `wf` command.
 
 | path | |
 |---|---|
-| `db/state.db` | the store's keyspace: a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it the claim it holds on its card and a person's asks — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds; a person's markers stay files in `runs/`: `<id>.cancelled` and the rest |
-| `imported/` | a store's run files from before the keyspace (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`), moved aside once imported, never deleted |
+| `db/state.db` | the store's keyspace: a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it the claim it holds on its card and a person's asks — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds; a person's markers are records beside it, under `/registry/runmarks/<id>/` (`cancelled`, `pruned`, `hold`, `unheld`, `assignee`, `unassigned`, `labels`, `refresh`, `said/<n>`), and `nemia rm`'s at `/registry/forgetting/<id>`; the factories, their levels, servers and status are records under `/registry/` too |
+| `imported/` | a store's files from before the keyspace — a run's (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`), its markers (`runs/<id>.cancelled` and the rest, `runs/<id>.said/`, `forgetting/<id>.json`) and the factories' (`factories/<name>.json`, and `level.json`, `servers.json` and `status.json` in a factory's folder) — moved aside once imported, never deleted |
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`, and `inputs/cards/` for `--card`) and `artifacts/<step>/`, each mounted read-only on the steps of a run handed this one (`--from`); a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |

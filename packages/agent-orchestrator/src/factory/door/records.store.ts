@@ -276,7 +276,7 @@ export function factoryRecords(home: string, open: Open, held: Held = open) {
   const kept = (name: string) =>
     Effect.gen(function* () {
       const found: TreeFile[] = [];
-      for (const { file: leaf, key } of FOLDER_RECORDS) {
+      for (const { file: leaf, key } of MOVING_RECORDS) {
         const text = yield* recordOf(key(name));
         if (text !== undefined) found.push({ path: leaf, mode: 0o644, bytes: new TextEncoder().encode(text) });
       }
@@ -284,7 +284,7 @@ export function factoryRecords(home: string, open: Open, held: Held = open) {
     });
   const placed = (name: string, files: readonly TreeFile[]) =>
     Effect.gen(function* () {
-      const mine = FOLDER_RECORDS.flatMap((record) => {
+      const mine = MOVING_RECORDS.flatMap((record) => {
         const file = files.find((f) => f.path === record.file);
         return file === undefined ? [] : [{ key: record.key(name), text: new TextDecoder().decode(file.bytes) }];
       });
@@ -338,6 +338,9 @@ const FOLDER_RECORDS = [
   { file: 'status.json', key: appliedKey },
 ] as const;
 
+/** The records of a folder that travel with a move: its level and servers, and not its status, which the target's controller writes. */
+const MOVING_RECORDS = FOLDER_RECORDS.filter((record) => record.file !== 'status.json');
+
 /**
  * The factory files of a store from before the keyspace: `factories/<name>.json`, the factory, and, in a factory's folder
  * `factories/<name>/`, `level.json`, `servers.json` and `status.json`, each taken up as the text it holds — checked as what it is when
@@ -381,7 +384,8 @@ export const FACTORY_FILES: ImportKind = {
 export const recordsAt = (root: string) => factoryRecords(root, kindKeyspace(root, FACTORY_FILES), kindKeyspaceHeld(root, FACTORY_FILES));
 
 /**
- * Whether `at`, a path from a factory's folder, is a file that is a record of the keyspace and not a file of the store's folder.
+ * Whether `at`, a path from a factory's folder, is a file that is a record of the keyspace and not a file of the store's folder: an older
+ * archive's `status.json` too, which a move drops.
  * @param at The path from the factory's folder.
  */
 export const isRecordFile = (at: string) => FOLDER_RECORDS.some((record) => record.file === at);

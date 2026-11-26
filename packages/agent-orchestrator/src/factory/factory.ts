@@ -254,7 +254,10 @@ export function instructionPathRefusal(p: string) {
   return undefined;
 }
 
-/** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
+/**
+ * A factory as `nemia factory ls` lists it, with where it is kept (`file`, its record's key); or an entry that does not read as
+ * one, with why (`error`).
+ */
 export type FactoryListing = (Factory & { file: string; status?: TemplateStatus }) | { name: string; file: string; error: string };
 
 /** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */

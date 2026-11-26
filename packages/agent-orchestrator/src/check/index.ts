@@ -9,6 +9,7 @@ export {
   CHECK_RESULTS,
   CHECK_TAIL_LINES,
   checkArgv,
+  checkedWord,
   checkContract,
   checksContract,
   checkEnvOf,

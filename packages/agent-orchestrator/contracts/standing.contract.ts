@@ -47,9 +47,6 @@ const waits = (step: StepSpec) => step.waitsFor !== undefined;
  */
 const filed = (step: StepSpec, run: Run) => !!run.steps[step.name]?.taskId || (waits(step) && !!run.steps[step.name]?.check);
 
-/** The words a wait node stands in on its own work: unfiled, then on its checks, and nothing a session or a command ends as. */
-const WAIT_WORDS: ReadonlySet<StepStatus> = new Set<StepStatus>(['pending', 'checking', 'verified', 'failed (check)']);
-
 export const overItsCap = assume(overBudget, { pure: true });
 export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
@@ -239,7 +236,8 @@ const ownStatusSpec = spec<
     aWaitStandsOnlyOnItsConditions: {
       description:
         'A wait node runs no session and no command, so it is never running, unsigned, blocked, failed, stopped, denied, cut off at a budget nor out of rounds: it is pending, checking, verified, or refused at its check',
-      condition: ({ input: [step], output }) => !waits(step) || WAIT_WORDS.has(output),
+      condition: ({ input: [step], output }) =>
+        !waits(step) || output === 'pending' || output === 'checking' || output === 'verified' || output === 'failed (check)',
     },
     aWaitIsJudgedByItsChecks: {
       description: 'A wait node is never unverified: its conditions are checks, and only their verdict passes it',
@@ -250,9 +248,9 @@ const ownStatusSpec = spec<
       condition: ({ input: [step], output }) => output !== 'unverified' || !judgedByAnExit(step),
     },
     aCheckIsReadOnlyOfAStepWithOne: {
-      description: 'Verified, checking, or failed at its check only of a step that has a check, or of a command node',
+      description: 'Verified, checking, or failed at its check only of a step that has a check, of a command node, or of a wait node',
       condition: ({ input: [step], output }) =>
-        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step),
+        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step) || waits(step),
     },
     deniedOnlyUnderDenialsFail: {
       description: 'Denied only of a step whose denials fail it',

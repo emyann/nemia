@@ -2042,6 +2042,7 @@ stateDiagram-v2
   pending --> unsigned: its table answered no route
   pending --> skipped: its route not taken
   pending --> sent: its card filed
+  pending --> checking: filed with nothing to run: its checks laid
   skipped --> pending: a new route, before a follower is filed
   running --> unverified: signed, with no check
   running --> checking: signed, with a check
@@ -2073,7 +2074,7 @@ stateDiagram-v2
   unsigned --> running: tried again
   denied --> running: tried again
   failed_check --> running: tried again
-  failed_check --> checking: checked again
+  failed_check --> checking: checked again, or a wait node tried again
   failed_check --> pending: an ending sent back with its work
   failed --> running: tried again
   stopped --> running: tried again

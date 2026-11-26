@@ -698,5 +698,16 @@ export const onItsCheck = (step: StepSpec, record: StepRecord, phaseOf: (taskId:
     if ('commit' in record.landed) return 'verified';
     return check === 'failed' || check === 'stopped' || check === 'unknown' ? 'failed (check)' : 'failed';
   }
-  return check === 'succeeded' ? 'verified' : check === 'failed' || check === 'stopped' ? 'failed (check)' : 'checking';
+  return checkedWord(record.check, phaseOf);
+};
+
+/**
+ * Where a step stands on its checks alone: `verified` once they passed, `failed (check)` once one refused or did not finish, `checking`
+ * until then, or while none is laid. What a step that lands nowhere (`onItsCheck`) and a wait node (`ownStatus`) stand on. Pure.
+ * @param check The check on the step's record, or undefined where none is laid.
+ * @param phaseOf The phase of a task the engine holds, by its id.
+ */
+export const checkedWord = (check: StepRecord['check'], phaseOf: (taskId: string) => TaskPhase) => {
+  const phase = check ? checksPhase(check, phaseOf) : undefined;
+  return phase === 'succeeded' ? 'verified' : phase === 'failed' || phase === 'stopped' ? 'failed (check)' : 'checking';
 };

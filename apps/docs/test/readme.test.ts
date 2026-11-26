@@ -20,9 +20,9 @@ function installOf(text: string) {
 function unresolved(text: string, exists: (file: string) => boolean) {
   const missing: string[] = [];
   for (const m of text.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)) {
-    const target = m[1]!;
+    const target = m[1];
     if (/^(https?:|mailto:|#)/.test(target)) continue;
-    const file = target.split('#')[0]!;
+    const file = target.split('#')[0];
     if (!exists(file)) missing.push(file);
   }
   return missing;

@@ -63,7 +63,7 @@ export type DiskMemory = { said: Set<string> };
 export const freshDiskMemory = () => ({ said: new Set() }) satisfies DiskMemory;
 
 /** What one sweep answers: the reading, the runs it named, and what the walk cost, the names it read and the bursts it yielded. */
-export type Measured = { reading: DiskReading; largest: DiskRun[]; names: number; bursts: number };
+type Measured = { reading: DiskReading; largest: DiskRun[]; names: number; bursts: number };
 
 /** `value` into `disk.bytes` for the part, kind and factory `key` names (`entryKey`), a key of no kind its part's own (`kindAt`). */
 const bytesSaid = (key: string, value: number) => {

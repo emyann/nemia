@@ -17,7 +17,7 @@ import { textOf } from './lines.ts';
  * @param file The path of the file to read, or `-` for stdin.
  * @param command The command's name, said in a refusal.
  */
-export function wordsOf(file: string, command: string) {
+function wordsOf(file: string, command: string) {
   if (file !== '-') return fileText(file, command);
   try {
     return fs.readFileSync(0, 'utf8');
@@ -36,7 +36,7 @@ const KEPT = 'a run already started keeps the rules it was started with';
  * @param data The factory's rules as the api answers them: its file, its words, why they cannot be told, or whether they were removed.
  * @param wrote Whether the command wrote the rules.
  */
-export function rulesLines(data: FactoryRules, wrote: boolean) {
+function rulesLines(data: FactoryRules, wrote: boolean) {
   const { name } = data;
   if (data.removed !== undefined)
     return [data.removed ? `${name}: rules removed, ${data.file} — ${KEPT}` : `${name} has no rules to remove`];
@@ -74,7 +74,7 @@ const keptLine = (data: FactoryInstruction) =>
  * What `nemia factory instruction` prints of a read: where it is kept, then the words, or why there are none.
  * @param data The factory's instruction as the api answers it: where it is kept, its words, or why it does not read.
  */
-export function instructionLines(data: FactoryInstruction) {
+function instructionLines(data: FactoryInstruction) {
   const where = `${data.name}: ${keptLine(data)}`;
   if (data.error !== null) return [where, `it does not read: ${data.error}`];
   if (data.words === null)

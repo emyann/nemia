@@ -32,35 +32,14 @@ export { toolsOf } from 'objects';
 /** A tool of the MCP port, as `objects`' `toolsOf` names it: the endpoint it calls, its name, its entry and its link's default query. */
 export type LinkedTool = ReturnType<typeof toolsOf>[number];
 
-export {
-  CLI,
-  commandLine,
-  helpOf,
-  leftOut,
-  RENAMED,
-  RENAMED_FLAGS,
-  renamedIn,
-  saidFlags,
-  saidOf,
-  saidRefusal,
-  takesFor,
-  takesOf,
-  type Args,
-  type CommandClass,
-  type CommandWords,
-  type Flag,
-  type Positional,
-  type Renamed,
-  type Said,
-  type Spec,
-} from 'objects';
+export { CLI, commandLine, helpOf, leftOut, RENAMED, renamedIn, saidOf, type Args, type Flag, type Positional, type Spec } from 'objects';
 
 /**
  * Each value renamed, by the command that takes it, the key that carries it and its former spelling: a retry's mode `nudge` is
  * `continue` (`FORMER_MODES`), as its flag `--nudge` is `--continue`. A body the api is sent that says a former value is read as the
  * value it became (`renamedValues`).
  */
-export const RENAMED_VALUES: ReadonlyMap<string, ReadonlyMap<string, Readonly<Record<string, string>>>> = new Map([
+const RENAMED_VALUES: ReadonlyMap<string, ReadonlyMap<string, Readonly<Record<string, string>>>> = new Map([
   ['retry', new Map([['mode', FORMER_MODES]])],
 ]);
 

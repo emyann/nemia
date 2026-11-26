@@ -102,9 +102,6 @@ export const messageOf = (lines: readonly FeedLine[], digest: readonly FeedLine[
     ...(digest.length ? ['', 'Since your last news:', ...digestLines(digest)] : []),
   ].join('\n');
 
-/** What one read of the feed comes to: its message, where a line wakes, the wake lines it holds, and where the deliverer is next. */
-export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
-
 /**
  * What one read of the feed, ending at `cursor`, comes to for a subscriber at `at`, given the lines it carries of that read (`carried`), in
  * feed order. Where one wakes — `selects`, over the subscription's parsed selectors — every wake line is said in one message, with the

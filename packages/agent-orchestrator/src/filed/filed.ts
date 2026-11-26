@@ -19,8 +19,6 @@ import { handedFolders } from './handed-folders/handed-folders.ts';
 import { inWorkspace, memoryFilesOf, sessionStart } from './session-start/session-start.ts';
 import { expandedIn } from './session-start/spelled.ts';
 
-export { handedFolders } from './handed-folders/handed-folders.ts';
-
 export type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 
 /**
@@ -376,7 +374,7 @@ const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string) => path
  * @param step The step to file.
  * @param runArtifacts The run's artifacts folder, absolute, under which the step's files directory is.
  */
-export const ownMounts = (step: StepSpec, runArtifacts: string) => {
+const ownMounts = (step: StepSpec, runArtifacts: string) => {
   const own = stepFilesOf(step, runArtifacts);
   return local(step.harness) && writesOutsideByRule(modeOf(step)) && unruledIn(step.harness ?? DEFAULT_HARNESS, own) === undefined
     ? [{ path: own, readOnly: true }]
@@ -487,6 +485,7 @@ export const inputsMounts = (step: Pick<StepSpec, 'harness'>, steps: readonly Pi
  * its mode (`local`, spelled out so its proof reads no declaration).
  * @param step The step to file: its harness.
  * @param found Each run this one is handed and its folders, as the pass found them on disk.
+ * @public
  */
 export const handedRunMounts: HandedRunMounts = (step, found) =>
   !isRemoteHarness(step.harness) && (step.harness === undefined || !sandboxed(step.harness))

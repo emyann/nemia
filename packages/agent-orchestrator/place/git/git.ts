@@ -38,7 +38,7 @@ export type Ran = {
 export type Asking<A> = Generator<Command, A, Ran>;
 
 /** A refusal in the place's words. */
-export type Refusal = { readonly refused: string };
+type Refusal = { readonly refused: string };
 
 /** What a verb's body returns: its answer, or its refusal. */
 export type Reply<V extends PlaceVerb> = PlaceAnswers[V] | Refusal;

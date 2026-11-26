@@ -193,8 +193,7 @@ const msWord = (ms: number) => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.
  * Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`.
  * @param n The count of bytes.
  */
-export const bytesWord = (n: number) =>
-  n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(1)} kB` : `${(n / 1_000_000).toFixed(1)} MB`;
+const bytesWord = (n: number) => (n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(1)} kB` : `${(n / 1_000_000).toFixed(1)} MB`);
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -317,7 +316,7 @@ export const PASS_BOUNDS: readonly number[] = [10, 25, 50, 100, 250, 500, 1000, 
 export const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000];
 
 /** One bucket of passes: those over the bound before and at most `le` ms, `le` null for the last, which has no bound. */
-export type PassBucket = { le: number | null; count: number };
+type PassBucket = { le: number | null; count: number };
 
 /**
  * The passes counted into the buckets of `bounds`, each in the first whose bound it does not pass, and one past the last for the rest.
@@ -335,7 +334,7 @@ export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds:
 };
 
 /** One phase over the recent passes: its time a pass, on average, and its share of all their time. */
-export type PassPart = { phase: Phase; ms: number; share: number };
+type PassPart = { phase: Phase; ms: number; share: number };
 
 /**
  * Each phase over `recent` (`PassPart`), heaviest first, the phases' own order between equals; none for no pass.
@@ -354,7 +353,7 @@ export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]) 
  * The recent passes in a few numbers: how many, the median and the slowest time, and what the latest saw — the runs listed, the journal
  * reads, the tasks, the sessions queued and admitted. Null for no pass.
  */
-export type PassSummary = Omit<Seen, 'waitMs' | 'load'> & {
+type PassSummary = Omit<Seen, 'waitMs' | 'load'> & {
   passes: number;
   medianMs: number;
   slowestMs: number;

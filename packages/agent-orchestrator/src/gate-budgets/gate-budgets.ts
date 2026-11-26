@@ -14,9 +14,6 @@ import { aboveTheWorkflow, budgetRefusals, ceilingsOf, pastTheLine, proposedBudg
 import { basename } from 'node:path';
 import type { GateBudgetsFrom } from 'objects';
 
-/** Where a gate's budgets come from: its step's closeout, before the approval, or the approval itself. */
-export type { GateBudgetsFrom };
-
 /**
  * One budget at a gate: the step, the amount and its words, why the step proposed it (null where the person gave the amount), the step's
  * own `budget:` (null where it has none), and whether the amount is above it.
@@ -27,7 +24,7 @@ export type GateBudget = { step: string; usd: number; said: string; why: string 
  * The run's cost line where the most it may cost under a gate's caps passes it: the line in dollars, and a sentence naming the most, the
  * line, the factory and the workflow, which the board and `nemia decide` show as it is.
  */
-export type GateLine = { usd: number; said: string };
+type GateLine = { usd: number; said: string };
 
 /**
  * The budgets at a gate (`GateBudget`), where they come from, the run's line in a person's words, and its cost line where the caps pass it

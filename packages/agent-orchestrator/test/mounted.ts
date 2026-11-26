@@ -52,7 +52,7 @@ export const filedOf = (steps: readonly Step[], inputs?: string) =>
 export type Filed = ReturnType<typeof filedConfig>;
 
 /** Whether `file` is under the folder a rule `Tool(//<folder>/**)` of the tool `tool` names, for a rule of that shape. */
-export const ruleCovers = (rule: string, tool: string, file: string) => {
+const ruleCovers = (rule: string, tool: string, file: string) => {
   const folder = new RegExp(`^${tool}\\(/(/.*)/\\*\\*\\)$`).exec(rule)?.[1];
   return folder !== undefined && file.startsWith(`${folder}/`);
 };

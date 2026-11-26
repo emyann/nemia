@@ -112,7 +112,7 @@ const TakenBack = (description: string, by: string) =>
  * What the settings' allow rules give a step: those that stand, those a deny or an ask rule takes back, those of a tool it does not have,
  * the Bash rules that stand with their commands, and why what asks is denied without a prompt.
  */
-export const StepReachAllowed = Schema.Struct({
+const StepReachAllowed = Schema.Struct({
   rules: Texts('The allow rules that stand: none a deny or an ask rule takes back, none of a tool the step does not have.'),
   takenBack: TakenBack('The allow rules a deny takes back, each with the deny.', 'The deny that takes it back.'),
   asked: TakenBack(
@@ -147,7 +147,7 @@ export const StepReachAllowed = Schema.Struct({
   ),
   why: OrNull(Schema.String, 'Why the step runs no Bash command, whatever the settings allow; null where it has Bash.'),
 }).annotate({ description: "What the settings' allow rules give a step." });
-export type StepReachAllowed = typeof StepReachAllowed.Type;
+type StepReachAllowed = typeof StepReachAllowed.Type;
 
 /** A server's tool as it reaches a step: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it. */
 const ReachedTool = Schema.Struct({

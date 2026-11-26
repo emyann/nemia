@@ -32,7 +32,7 @@ export const TOKEN_VARIABLE = DEFAULT_SIGN_IN.variable;
 export const claudeTokenFile = (home: string) => path.join(home, TOKEN_NAME);
 
 /** Whether the store keeps a sign-in token (`set`) or not (`unset`). */
-export type ClaudeTokenState = 'set' | 'unset';
+type ClaudeTokenState = 'set' | 'unset';
 
 /** A day, in milliseconds. */
 const DAY_MS = 86_400_000;
@@ -41,10 +41,10 @@ const DAY_MS = 86_400_000;
 export const TOKEN_LIFE_DAYS = 365;
 
 /** How old a token is when it is warned of: about eleven months, a month before its year is out. */
-export const TOKEN_WARN_DAYS = 335;
+const TOKEN_WARN_DAYS = 335;
 
 /** Why a kept token is warned of: within a month of its year (`near-year`), or past it (`past-year`). */
-export type ClaudeTokenWarning = 'near-year' | 'past-year';
+type ClaudeTokenWarning = 'near-year' | 'past-year';
 
 /**
  * What `status` says: whether a token is kept, its file, and the file's mode, as `0600`; for a kept one, when it was set (the file's

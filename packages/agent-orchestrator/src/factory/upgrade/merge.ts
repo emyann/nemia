@@ -28,7 +28,7 @@ type FileMerge = {
 };
 
 /** Where a merged file's change came from: the template's side, the factory's, or both alike. */
-export type Merged = { at: string; from: 'template' | 'factory' | 'both' };
+type Merged = { at: string; from: 'template' | 'factory' | 'both' };
 
 /**
  * A tree's merge: whether it had a common base (`none` for a template switch), each file's, what merged cleanly and from which side, and
@@ -485,7 +485,7 @@ export const approveLine = (name: string, proposal: string) => `nemia proposals 
 export const declineLine = (name: string, proposal: string) => `nemia proposals decline ${proposal} -n ${name}`;
 
 /** The most lines of a side a status keeps of a conflict. */
-export const KEPT_LINES = 200;
+const KEPT_LINES = 200;
 
 /** A side cut to its first `max` lines, saying how many more it holds and where it is read whole. */
 function cutSide(text: string | null, max: number, where: string) {
@@ -589,6 +589,7 @@ export const baseTemplateOf: BaseTemplateOf = (seen) => {
  * A key merged with no base: taken where the sides agree or only the template sets it, else asked.
  * @param ours The key's value in the tree, or undefined where it sets none.
  * @param theirs The key's value in the template's render, or undefined where it sets none.
+ * @public
  */
 export const unrelatedKey: UnrelatedKey = (ours, theirs) => {
   if (ours === theirs) return { taken: theirs ?? '' };
@@ -600,6 +601,7 @@ export const unrelatedKey: UnrelatedKey = (ours, theirs) => {
  * A set of names merged with no base: the template's where it holds every name the tree's does, else asked.
  * @param ours The names the tree's set holds.
  * @param theirs The names the template's set holds.
+ * @public
  */
 export const unrelatedSet: UnrelatedSet = (ours, theirs) =>
   ours.every((name) => theirs.includes(name)) ? { taken: theirs } : { ask: true };

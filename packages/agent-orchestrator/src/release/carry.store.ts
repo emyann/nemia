@@ -55,7 +55,7 @@ const deactivated = (home: string, name: string) => isA(path.join(harnessesDir(h
  * @param home The store's folder.
  * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
-export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
+const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
   pinned.filter((h) => isA(path.join(harnessesDir(home), h.name), 'directory') && !deactivated(home, h.name)).map((h) => h.name);
 
 /**
@@ -83,7 +83,7 @@ export function bundledProgramIn(tree: string, program: string, platform: string
  * @param trees The release trees searched.
  * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
-export const bundledHarnesses = (trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
+const bundledHarnesses = (trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
   pinned.filter((h) => trees.some((tree) => bundledProgramIn(tree, h.needs.program) !== undefined)).map((h) => h.name);
 
 /**
@@ -199,9 +199,6 @@ function bundledVersionOf(program: string, platform: string, arch: string) {
   const version = packageOf(own)?.version;
   return typeof version === 'string' && /^[\w.+-]+$/.test(version) ? version : 'bundled';
 }
-
-/** A harness adopted from a release's tree: its name, the version it was bundled at, and the file it was copied from. */
-export type Adopted = { readonly name: string; readonly version: string; readonly from: string };
 
 /**
  * Adopts, into the tools folder of the store at `home`, each harness with needs whose program the folder's `bin/` lacks and one of `trees`

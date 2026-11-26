@@ -62,6 +62,7 @@ export type WorkerSeen = 'running' | 'gone' | 'unknown';
  * @param beatAgeMs How long ago its last beat was, in milliseconds; `NaN` where it cannot be read.
  * @param leaseMs How long a beat holds the lease, in milliseconds.
  * @param worker Whether the worker is seen running (`workerSeen`).
+ * @public
  */
 export const leaseWord: LeaseWord = (state, beatAgeMs, leaseMs, worker) =>
   state !== 'working' || beatAgeMs <= leaseMs || worker === 'running' ? state : 'failed';

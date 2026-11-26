@@ -56,8 +56,7 @@ import { readsBounded } from './answer-bound.ts';
  * run object and its sub-resources read a run's judgement through, and keep on a miss.
  * @param program The read, given the informer.
  */
-export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>) =>
-  Effect.provideService(program, Informer, informer);
+const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>) => Effect.provideService(program, Informer, informer);
 
 /** How a list of the runs judges each: off the app's informer, verified as the env says. */
 const howOf = (s: Served) => ({

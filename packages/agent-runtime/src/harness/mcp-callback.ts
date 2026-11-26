@@ -5,7 +5,7 @@
  */
 import type { CallbackRefusalOf } from '../../contracts/mcp-callback.contract.ts';
 
-export type { PastedCallback, Redirect, CallbackRefusal } from '../../contracts/mcp-callback.contract.ts';
+export type { CallbackRefusal } from '../../contracts/mcp-callback.contract.ts';
 
 /** Whether an OAuth parameter was given, and given something. */
 const given = (value: string | null) => value !== null && value !== '';

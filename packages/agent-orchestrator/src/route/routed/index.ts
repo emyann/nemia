@@ -4,4 +4,3 @@
  */
 export { answeredRoute, routedWords, routeSettled, runWords } from './routed-words.ts';
 export { routeLine, routedRows } from './routed-lines.ts';
-export type { RoutedInput, RoutedRow } from './routed-lines.ts';

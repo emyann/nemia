@@ -48,7 +48,7 @@ export type DelegationDoorShape = {
  * @param factory The factory's name.
  * @param agent The agent's name.
  */
-export function delegationNamed(factory: string, agent: string) {
+function delegationNamed(factory: string, agent: string) {
   const bad = factoryNameRefusal(factory) ?? agentNameRefusal(agent);
   if (bad !== undefined) throw new Invalid({ message: bad });
 }

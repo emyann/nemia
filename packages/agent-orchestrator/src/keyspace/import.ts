@@ -4,7 +4,7 @@
  */
 import type { ImportActOf } from '../../contracts/kind-import.contract.ts';
 
-export type { FileRead, ImportAct, ImportFile } from '../../contracts/kind-import.contract.ts';
+export type { FileRead } from '../../contracts/kind-import.contract.ts';
 
 /**
  * What the import does with `file`: stop the whole import where it is larger than a record holds, pass over one gone, leave one that does

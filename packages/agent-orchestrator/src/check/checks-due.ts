@@ -8,7 +8,7 @@ import type { CheckNode, CheckStanding, ChecksDue, ChecksDueOf } from '../../con
 import { checkTaskId, type Run, type TaskPhase } from '../record/record.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
 
-export type { CheckNode, CheckStanding, ChecksDue, ChecksVerdict } from '../../contracts/checks-due.contract.ts';
+export type { CheckNode, CheckStanding } from '../../contracts/checks-due.contract.ts';
 
 /**
  * The checks the pass files now and the step's verdict on its checks: once one refused or did not finish nothing more is filed, and the
@@ -51,7 +51,7 @@ export const standingOf = (phase: TaskPhase, exited: boolean) => {
  * @param plan The step's checks, each its name and its waits.
  * @param standing Where each check stands, by its name.
  */
-export const checkNodes = (plan: readonly { name: string; after: readonly string[] }[], standing: (name: string) => CheckStanding) =>
+const checkNodes = (plan: readonly { name: string; after: readonly string[] }[], standing: (name: string) => CheckStanding) =>
   plan.map((c) => ({ name: c.name, after: c.after, standing: standing(c.name) }) satisfies CheckNode);
 
 /** A check on a step's or a try's record: its first task, and each task by its check's name where it has several (`checkTasksOf`). */

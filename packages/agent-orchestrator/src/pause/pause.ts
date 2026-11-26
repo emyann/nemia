@@ -47,13 +47,13 @@ export const pauseLapsed: PauseLapsed = (holder: Identity | null) => holder === 
 export const DEFAULT_TIMEOUT_MS = 600_000;
 
 /** The shortest timeout a pause takes: one second. */
-export const MIN_TIMEOUT_MS = 1_000;
+const MIN_TIMEOUT_MS = 1_000;
 
 /** The longest timeout a pause takes: 23 hours, the runtime's bound on a held job (`JOB_HOLD_MS`), under its hook's own (`HOOK_HOLD_S`). */
-export const MAX_TIMEOUT_MS = 23 * 3_600_000;
+const MAX_TIMEOUT_MS = 23 * 3_600_000;
 
 /** How a timeout is typed, as every refusal of one says it. */
-export const TIMEOUT_FORM = 'digits and s, m or h, from 1s to 23h, as 90s, 10m or 2h';
+const TIMEOUT_FORM = 'digits and s, m or h, from 1s to 23h, as 90s, 10m or 2h';
 
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
 
@@ -80,19 +80,6 @@ export const timeoutRefusal = (text: string) => {
  * @param text The timeout as a person typed it.
  */
 export const timeoutOf = (text: string) => (timeoutRefusal(text) === undefined ? formOf(text) : undefined);
-
-/**
- * Why `nemia pause`'s `--timeout` is refused: a timeout out of its form, or one given with `--now`, which cuts at once; null when none.
- * @param timeout The `--timeout` given, or undefined where none is.
- * @param now Whether `--now` is given.
- * @param shape How the verb is typed, which the refusal ends on.
- */
-export const pauseTimeoutRefusal = (timeout: string | undefined, now: boolean, shape: string) => {
-  if (timeout === undefined) return null;
-  if (now) return `--timeout gives each call in flight a while to end, and --now cuts them at once: give one, ${shape}.`;
-  const wrong = timeoutRefusal(timeout);
-  return wrong === undefined ? null : `--timeout: ${wrong}: ${shape}, as nemia pause --timeout 10m.`;
-};
 
 /**
  * A timeout in words, by its largest whole unit: `10m`, `90s`, `2h`.
@@ -375,7 +362,7 @@ export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged
  * stopping, and that nemia resume tries it again only where a pause at once's ask names it (`resumed`); a session in a tool call names
  * the tool.
  */
-export const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing) =>
+const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing) =>
   stopping
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
     : `${run}'s ${step} is finishing: ${atWorkWords(kind, calling)}`;
@@ -393,21 +380,21 @@ const atWorkWords = (kind: Finishing['kind'], calling: string | undefined) => {
 export const callsOf = (paused: { finishing: readonly Finishing[] }) => paused.finishing.filter((f) => f.calling !== undefined);
 
 /** A session the pause has parked, in one line: its run and step, and the call it stopped after or the call cut. */
-export const parkedWords = ({ run, step, after, cut }: Parked) =>
+const parkedWords = ({ run, step, after, cut }: Parked) =>
   `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
 
 /**
  * A task a pause at once cuts, in words: its run, its step, and whether its session, whose call is cut and which goes on as the same try,
  * or its check, run again.
  */
-export const interruptWords = ({ run, step, kind }: Interrupt) =>
+const interruptWords = ({ run, step, kind }: Interrupt) =>
   `${run}'s ${step}: ${kind === 'session' ? 'its session, its call cut, going on as the same try' : 'its check, run again'}`;
 
 /** What a pause at once did, as `nemia pause --now --yes` answers it: the pause, whether it stood already, what it cut and left. */
 export type PausedNow = { pause: Pause; kept: boolean; interrupted: Interrupt[]; skipped: Interrupt[] };
 
 /** How `nemia pause --now` acts once it is shown what it stops. */
-export const NOW_LINE = 'nemia pause --now --yes';
+const NOW_LINE = 'nemia pause --now --yes';
 
 /**
  * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
@@ -428,28 +415,12 @@ export const nowLines = (interrupts: readonly Interrupt[], standing = false) => 
   ];
 };
 
-/**
- * What `nemia pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it cut, or that
- * none was at work; each check it left at work, since a try of it was asked for already; and the cost.
- */
-export const pausedNowLines = ({ pause, kept, interrupted, skipped }: PausedNow) => [
-  kept
-    ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is cut`
-    : `the store is paused at once ${sinceWords(pause)} — what runs is cut, and a landing finishes; ${RESUME_LINE} resumes it`,
-  interrupted.length
-    ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:`
-    : 'nothing outside a landing was at work: nothing was stopped',
-  ...interrupted.map((i) => `   ${interruptWords(i)}`),
-  ...skipped.map((i) => `   ${interruptWords(i)} — left at work: a try of it is asked for already`),
-  ...(interrupted.length ? [NOW_COST] : []),
-];
-
 /** A landing the pause holds, in one line: its run, and the checkout its merge is staged in until the resume. */
-export const stagedWords = ({ run, step, repo }: PauseStaged) =>
+const stagedWords = ({ run, step, repo }: PauseStaged) =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`;
 
 /** A check the pause holds, in one line: its run and step, signed off, and that its check waits on the resume. */
-export const heldWords = ({ run, step }: PauseHeld) => `${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`;
+const heldWords = ({ run, step }: PauseHeld) => `${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`;
 
 /** Each check the pause holds back, a line each, indented: each landing with its merge staged (`stagedWords`), then each other. */
 export const heldLines = ({ staged, held }: Pick<Paused, 'staged' | 'held'>) => [

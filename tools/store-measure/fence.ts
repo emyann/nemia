@@ -127,7 +127,7 @@ export function destinationRefusal(dest: string, sources: readonly string[]) {
 }
 
 /** The place's verbs that change a repository or a checkout: each refused by `readOnlyPlace`. */
-export const PLACE_WRITES = ['open', 'follow', 'make', 'handoff', 'land', 'remove', 'export', 'seal'] as const;
+const PLACE_WRITES = ['open', 'follow', 'make', 'handoff', 'land', 'remove', 'export', 'seal'] as const;
 
 const isWrite = (verb: string) => (PLACE_WRITES as readonly string[]).includes(verb);
 
@@ -227,10 +227,10 @@ export function gitVerdict(args: readonly string[]) {
 }
 
 /** What the fence is armed for: a read of the api, or a pass of the tick, which may spawn git's reads alone. */
-export type FenceMode = 'read' | 'pass';
+type FenceMode = 'read' | 'pass';
 
 /** A child process the fence saw: what ran, its verdict, and what the fence was armed for. */
-export type Spawned = { command: string; verdict: 'git read' | 'git write' | 'other'; on: FenceMode };
+type Spawned = { command: string; verdict: 'git read' | 'git write' | 'other'; on: FenceMode };
 
 /** What the fence refused: a child process, a write to the disk, or a signal, with what it was and what the fence was armed for. */
 export type Refusal = { kind: 'spawn' | 'write' | 'signal' | 'engine'; what: string; on: FenceMode };

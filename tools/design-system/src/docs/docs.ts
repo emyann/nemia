@@ -41,7 +41,7 @@ const proseOf = (comment: string) =>
  * @param text a source file's text.
  * @param pattern what the comment stands over.
  */
-export const commentBefore = (text: string, pattern: RegExp) => {
+const commentBefore = (text: string, pattern: RegExp) => {
   const at = text.search(pattern);
   if (at < 0) return [];
   const found = /\/\*\*(?:(?!\*\/)[\s\S])*\*\/\s*$/.exec(text.slice(0, at));
@@ -91,7 +91,7 @@ const supplyOf = (card: Told, types: string) => {
  * @param card the card, with its kept and left stories.
  * @param types index.d.ts's text.
  */
-export const boardReadme = (card: Told, types: string) => {
+const boardReadme = (card: Told, types: string) => {
   const overStories = commentBefore(fs.readFileSync(card.file, 'utf8'), /^(?:const|export const) meta\b/m);
   const source = sourceOf(card);
   const own = source
@@ -114,7 +114,7 @@ export const boardReadme = (card: Told, types: string) => {
  * A kit card's README, from its guideline.
  * @param card the kit card.
  */
-export const kitReadme = (card: KitCard) =>
+const kitReadme = (card: KitCard) =>
   `${card.guide[0]}\n\n## When to use it\n\n${card.guide[1]}\n\n## What you supply\n\n${card.guide[2]}\n`;
 
 /** What the brand book is filled with. */
@@ -130,7 +130,7 @@ export type Brand = {
  * The brand book, `brand.md` with its blanks filled.
  * @param brand what fills it.
  */
-export const brandBook = (brand: Brand) => {
+const brandBook = (brand: Brand) => {
   const drawn = brand.told.filter((card) => card.kept.length > 0);
   const kitGroups = new Map<string, string[]>();
   for (const card of brand.kit) kitGroups.set(card.group, [...(kitGroups.get(card.group) ?? []), card.name]);

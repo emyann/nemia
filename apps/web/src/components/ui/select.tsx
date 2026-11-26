@@ -3,31 +3,20 @@ import { cn } from '@/lib/utils';
 import {
   Button as ButtonPrimitive,
   composeRenderProps,
-  Header as HeaderPrimitive,
   ListBoxItem as ListBoxItemPrimitive,
   ListBox as ListBoxPrimitive,
-  ListBoxSection as ListBoxSectionPrimitive,
   Popover as PopoverPrimitive,
-  SearchField,
   Select as SelectPrimitive,
   SelectValue as SelectValuePrimitive,
-  Separator as SeparatorPrimitive,
   type ListBoxProps,
-  type SearchFieldProps,
-  type ListBoxSectionProps as SelectGroupProps,
   type SelectProps,
   type SelectValueProps,
 } from 'react-aria-components';
 
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
-import { ChevronDownIcon, SearchIcon, CheckIcon } from 'lucide-react';
+import { ChevronDownIcon, CheckIcon } from 'lucide-react';
 
 function Select<T extends object, M extends 'single' | 'multiple' = 'single'>({ className, ...props }: SelectProps<T, M>) {
   return <SelectPrimitive data-slot="select" className={cn('w-fit', className)} {...props} />;
-}
-
-function SelectGroup<T extends object>({ className, ...props }: SelectGroupProps<T>) {
-  return <ListBoxSectionPrimitive data-slot="select-group" className={cn('scroll-my-1 p-1', className)} {...props} />;
 }
 
 function SelectValue<T extends object>({ className, children, ...props }: SelectValueProps<T>) {
@@ -125,31 +114,6 @@ function SelectList<T extends object>({ className, ...props }: ListBoxProps<T>) 
   );
 }
 
-function SelectInput({ className, ...props }: SearchFieldProps) {
-  return (
-    <SearchField
-      {...props}
-      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the list's search field, which the person opened the list to type into
-      autoFocus
-      data-slot="select-input-wrapper"
-      className={cn('p-1 pb-0', className)}
-    >
-      <InputGroup>
-        <InputGroupInput data-slot="select-input" className="[&::-webkit-search-cancel-button]:hidden" />
-        <InputGroupAddon>
-          <SearchIcon className="size-4 shrink-0 opacity-50" />
-        </InputGroupAddon>
-      </InputGroup>
-    </SearchField>
-  );
-}
-
-function SelectLabel({ className, ...props }: React.ComponentProps<typeof HeaderPrimitive>) {
-  return (
-    <HeaderPrimitive data-slot="select-label" className={cn('px-1.5 py-1 text-body-small text-on-surface-variant', className)} {...props} />
-  );
-}
-
 function SelectItem({ className, children, ...props }: React.ComponentProps<typeof ListBoxItemPrimitive>) {
   return (
     <ListBoxItemPrimitive
@@ -173,40 +137,4 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
   );
 }
 
-function SelectSeparator({ className, ...props }: React.ComponentProps<typeof SeparatorPrimitive>) {
-  return (
-    <SeparatorPrimitive
-      data-slot="select-separator"
-      className={cn('pointer-events-none -mx-1 my-1 h-px bg-outline-variant', className)}
-      {...props}
-    />
-  );
-}
-
-function SelectEmpty({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="select-empty"
-      className={cn(
-        'hidden w-full justify-center py-2 text-center text-body-medium text-on-surface-variant group-data-empty/select-list:flex',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectInput,
-  SelectItem,
-  SelectLabel,
-  SelectList,
-  SelectPopover,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-  SelectEmpty,
-};
+export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue };

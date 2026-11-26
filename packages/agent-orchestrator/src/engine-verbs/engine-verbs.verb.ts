@@ -15,7 +15,7 @@ export type EngineVerb = keyof Engine;
  * after which a command reads every task afresh; `all`, it may change any, so a wrapper drops every read it kept; or the tasks its
  * arguments name.
  */
-export type Changes = 'none' | 'pass' | 'all' | ((args: unknown[]) => readonly unknown[]);
+type Changes = 'none' | 'pass' | 'all' | ((args: unknown[]) => readonly unknown[]);
 
 /** What a verb is: the phase it is counted in, where the meter counts it, and what it changes (`Changes`). */
 export type VerbKind = { readonly phase?: Phase; readonly changes: Changes };
@@ -27,7 +27,7 @@ const first = ([id]: unknown[]) => [id];
 const listed = ([ids]: unknown[]) => (Array.isArray(ids) ? ids : []) satisfies readonly unknown[] as readonly unknown[];
 
 /** Every verb of the engine: its phase (a journal read is `journals`, a verb that changes a task `act`) and what it changes. */
-export const ENGINE_VERBS = {
+const ENGINE_VERBS = {
   file: { phase: 'act', changes: ([spec]) => [(spec as { id?: unknown } | undefined)?.id] },
   tick: { phase: 'runtime', changes: 'pass' },
   admit: { phase: 'act', changes: listed },

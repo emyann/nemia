@@ -8,7 +8,7 @@ import { fileParts } from './workflow-spec.ts';
 import type { SkillOther } from '../skills/skills.ts';
 
 /** A skill's spec as a proposal carries it. */
-export type SkillSpecRead = {
+type SkillSpecRead = {
   title?: unknown;
   description?: unknown;
   tags?: unknown;

@@ -13,16 +13,8 @@ import { checkTasksOf } from '../record/record.ts';
 import { callerOf, type CallerOf, type TokenNeed } from './token.ts';
 import { TokenDoor, standingOf, tokenDigest, type TokenFiled } from './token.store.ts';
 
-export { callerOf, type CallerOf, type StandingRecord, type TokenHolder, type TokenNeed, type TokenRecord } from './token.ts';
-export {
-  TokenDoor,
-  holderOf,
-  tokenDoorAt,
-  tokenDigest,
-  type PersonTokenFiled,
-  type TokenDoorShape,
-  type TokenFiled,
-} from './token.store.ts';
+export { type CallerOf, type StandingRecord, type TokenHolder, type TokenNeed } from './token.ts';
+export { TokenDoor, tokenDoorAt, tokenDigest, type PersonTokenFiled, type TokenFiled } from './token.store.ts';
 export { SESSION_TOKEN } from '../filed/filed.ts';
 
 /** Whether the engine's task `task` was filed and has not settled: a session that still runs, or will run again. */
@@ -37,7 +29,7 @@ const unsettled = Effect.fnUntraced(function* (task: string) {
  * and that task has not settled; for a session that is no run's
  * (Nemia's), its task has not settled, the keeper filing her anew under another once she was stopped.
  */
-export const liveSession = Effect.fn('liveSession')(function* (record: TokenFiled) {
+const liveSession = Effect.fn('liveSession')(function* (record: TokenFiled) {
   if (record.run === null) return yield* unsettled(record.task);
   const run = yield* (yield* RunDoor).runs.find(RunId.read(record.run), () => {});
   if (run === undefined || run.cancelledAt !== undefined) return false;

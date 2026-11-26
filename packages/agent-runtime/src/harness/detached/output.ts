@@ -455,6 +455,7 @@ export const claudePartials = (output: string, before: number) => {
  * version of Claude Code or a mode other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
  * @param line What the `init` line says that a reader reads.
  * @param read What the earlier `init` and `status` lines say to a reader, or undefined before the first.
+ * @public
  */
 export const initKept: InitKept = (line, read) => {
   const { cwd, model, claude_code_version: version, ranIn: mode } = line;

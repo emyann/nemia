@@ -37,7 +37,7 @@ export const checkOutputCut: CheckOutputCut = (count, start, limit, last, bounds
 };
 
 /** A line of a check's output: its number in the stream, from 1, and its text with no line end. */
-export type CheckOutputLine = { readonly n: number; readonly text: string };
+type CheckOutputLine = { readonly n: number; readonly text: string };
 
 /**
  * The lines of `text` numbered from 1, a `\r` before each line end dropped and the end after a last line ending in one not counted as a

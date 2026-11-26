@@ -47,14 +47,14 @@ export const StandingSchema = Schema.Union([StandingNow, StandingFormer]) satisf
 export const STOP_GRACE_MS = 2000;
 
 /** How often a stopped group is asked whether it has ended. */
-export const STOP_POLL_MS = 20;
+const STOP_POLL_MS = 20;
 
 /**
  * Signal the process group `pgid` leads; false when it has no process left, or cannot be signalled.
  * @param pgid The id of the process group, its leader's pid.
  * @param signal The signal sent, or 0 to ask only whether the group has a process left.
  */
-export function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
+function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
   try {
     process.kill(-pgid, signal);
     return true;

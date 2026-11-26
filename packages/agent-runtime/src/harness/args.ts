@@ -173,13 +173,13 @@ export type HarnessArgs = {
 };
 
 /** The media types a picture is sent in: what the Messages API's image block takes. */
-export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
 
 /** One picture put before a session: its file, by its absolute path, and the media type it is in. */
 export type Picture = { path: string; mediaType: (typeof PICTURE_TYPES)[number] };
 
 /** The most pictures one task puts before its session: the Messages API's smallest count of images in one request. */
-export const PICTURES_MOST = 100;
+const PICTURES_MOST = 100;
 
 /**
  * What a Codex session is given of its own. `trustFrom`: a directory whose trust in the operator's Codex config extends to

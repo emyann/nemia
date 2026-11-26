@@ -22,8 +22,6 @@ import { agentNameRefusal, type AgentDraft } from 'agent-orchestrator/workflow';
 import type { Served } from '../layer.ts';
 import { givenSkills, type GivenSkill } from '../skills/skills.ts';
 
-export type { AgentUser } from 'agent-orchestrator';
-
 /**
  * One agent as the board lists it: the package's reading of it (`AgentReading`, as `nemia agents` reads it) but the file of a person's
  * custom instructions, which the board does not show, and two facts of the board's own:

@@ -73,31 +73,7 @@ import {
   WorkflowObject,
   WorkflowsGroup,
 } from './definition-api.ts';
-export {
-  CardsGroup,
-  FactoriesGroup,
-  McpServersGroup,
-  SchedulesGroup,
-  TriggersGroup,
-  HiresGroup,
-  LibraryAddsGroup,
-  VolumesGroup,
-  WorkflowsGroup,
-  AgentsGroup,
-  SkillsGroup,
-  BadRequest,
-  Conflict,
-  Failed,
-  Forbidden,
-  Invalid,
-  Missing,
-  Unauthorized,
-  Unjudged,
-  WriteFailed,
-  RunsGroup,
-  ProposalsGroup,
-  DelegationsGroup,
-};
+export { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing, Unauthorized, Unjudged, WriteFailed };
 
 export { KINDS, type Kind };
 
@@ -113,7 +89,7 @@ const EventListObject = EventList.annotate({ identifier: 'EventList' });
  * The templates Nemia builds in, which no namespace holds, listed and read; and each one's documents, its workflows, agents and skills,
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
  */
-export class TemplatesGroup extends HttpApiGroup.make('templates').add(
+class TemplatesGroup extends HttpApiGroup.make('templates').add(
   HttpApiEndpoint.get('listAll', '/api/templates', {
     query: listQuery,
     success: [TemplateListObject, Table],
@@ -177,7 +153,7 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
  * The feed's subscriptions, which no namespace holds, listed and read; and a long-lived task given one (`nemia subscribe`), and one taken
  * away (`nemia unsubscribe`).
  */
-export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
+class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
   HttpApiEndpoint.get('listAll', '/api/subscriptions', {
     query: listQuery,
     success: [SubscriptionListObject, Table],
@@ -214,7 +190,7 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
  * The feed's lines as events, in the order they were written: all of them, or a namespace's, those of the factory they name; and one by
  * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
  */
-export class EventsGroup extends HttpApiGroup.make('events').add(
+class EventsGroup extends HttpApiGroup.make('events').add(
   HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: [EventListObject, Table], error: objectErrors }).annotate(
     OpenApi.Description,
     "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList, or the same page as a Table where the request asks for one.",

@@ -21,7 +21,7 @@ export type GraphEdge =
 export type GraphNode = { name: string; kind: NodeKind; ends?: string[]; workflow?: string };
 
 /** `input`: `to` is handed `from`'s declared output (its `input:`). Drawn on the run object's graph alone until the board draws it. */
-export type InputEdge = { from: string; to: string; kind: Extract<EdgeKind, 'input'> };
+type InputEdge = { from: string; to: string; kind: Extract<EdgeKind, 'input'> };
 
 /**
  * A run's steps as a graph: where the run's card leads, and every edge between its steps. `nodes`, each step with its kind, only on a

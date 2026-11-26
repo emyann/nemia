@@ -90,7 +90,7 @@ export function levelRefusal(word: string) {
 
 import type { HerSubscription, HerTask, Keeping, NemiaAct, NemiaDue, QuietOf } from '../../contracts/nemia-keep.contract.ts';
 
-export type { HerSubscription, HerTask, IdleRead, Keeping, NemiaAct, Quiet } from '../../contracts/nemia-keep.contract.ts';
+export type { HerSubscription, HerTask, NemiaAct } from '../../contracts/nemia-keep.contract.ts';
 
 /**
  * Where she is: `resting`, no task of hers open and nobody wanting her, or her last task put to rest by the keeper; `due`, wanted — a
@@ -100,7 +100,7 @@ export type { HerSubscription, HerTask, IdleRead, Keeping, NemiaAct, Quiet } fro
  * `kept`, open and subscribed, operating; `talking`, open with every factory at `manual`, in conversation with the person; `leaving`, put
  * to rest by the keeper, the stop asked; `stopped`, her task ended with no rest of the keeper's, filed again only once the person speaks.
  */
-export type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 'talking' | 'leaving' | 'stopped';
+type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 'talking' | 'leaving' | 'stopped';
 
 /** How long the conversation is quiet, her session idle since the last word said to her, before she rests at `manual`. */
 export const NEMIA_REST_AFTER = '15 minutes';
@@ -233,10 +233,10 @@ export const toldCustom = (custom: string | undefined) =>
     : `The person's custom instruction for you changed. It now reads as below, and replaces the one you were started with:\n\n${custom}`;
 
 /** One edge of her machine: from a state, on what the keeper reads, to a state, by what it does. */
-export type NemiaEdge = { from: NemiaState; to: NemiaState; event: string; action: string };
+type NemiaEdge = { from: NemiaState; to: NemiaState; event: string; action: string };
 
 /** A verb a person writes from outside her machine: the states it is taken from, the state the next beat reads, its guard, and who. */
-export type NemiaVerb = { verb: string; from: NemiaState[]; to: NemiaState; guard: string; by: string };
+type NemiaVerb = { verb: string; from: NemiaState[]; to: NemiaState; guard: string; by: string };
 
 /** Her machine as plain data: its first state, its states, its final ones (none: she is kept until a person says), edges and verbs. */
 export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: NemiaState[]; edges: NemiaEdge[]; verbs: NemiaVerb[] };
@@ -276,7 +276,7 @@ const EDGES: NemiaEdge[] = [
  * above it, which ends her operating and leaves the conversation as it is; and `nemia agents custom nemia` setting or clearing her custom
  * words, which the next beat says to her. Nothing else raises a level: the level is the person's.
  */
-export const NEMIA_VERBS: NemiaVerb[] = [
+const NEMIA_VERBS: NemiaVerb[] = [
   { verb: 'chat (a message)', from: ['resting', 'stopped'], to: 'due', guard: 'always', by: 'person' },
   { verb: 'level (a factory above manual)', from: ['resting', 'stopped'], to: 'due', guard: 'always', by: 'person' },
   { verb: 'level (none above manual)', from: ['filed', 'kept'], to: 'talking', guard: 'always', by: 'person' },

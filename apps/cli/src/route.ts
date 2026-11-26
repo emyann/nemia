@@ -13,7 +13,6 @@ import { MACHINE_VERBS, MOVED_COMMANDS, type MovedCommand } from 'objects';
 import type { RouteOf } from '../contracts/route.contract.ts';
 import { CLIENT_VERBS, READ_VERBS } from './verbs.ts';
 
-export type { Route, Routed } from '../contracts/route.contract.ts';
 export { CLIENT_VERBS, type ClientVerb, READ_VERBS, type ReadVerb } from './verbs.ts';
 
 /**
@@ -24,9 +23,6 @@ export { CLIENT_VERBS, type ClientVerb, READ_VERBS, type ReadVerb } from './verb
  * contract and the code to read.
  */
 export { MACHINE_VERBS, MOVED_COMMANDS };
-
-/** One of `MACHINE_VERBS`. */
-export type MachineVerb = (typeof MACHINE_VERBS)[number];
 
 /** One of `MOVED_COMMANDS`. */
 export type MovedName = MovedCommand;

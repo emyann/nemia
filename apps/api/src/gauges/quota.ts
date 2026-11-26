@@ -57,7 +57,7 @@ export const QUOTA_MARK_PERCENT = 80;
  * `resetsAt` is ISO, null when none was given. `reset` is whether that time has passed since the reading: the window has begun again, and
  * its number is about the one before. `marked` is whether it is `QUOTA_MARK_PERCENT` used or more.
  */
-export type QuotaWindow = { key: string; label: string; usedPercentage: number; resetsAt: string | null; reset: boolean; marked: boolean };
+type QuotaWindow = { key: string; label: string; usedPercentage: number; resetsAt: string | null; reset: boolean; marked: boolean };
 
 /**
  * The quota as the board is given it:
@@ -116,7 +116,7 @@ const SEE = 'get_usage is experimental: see README.md, The quota on the board';
  * `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days.
  * @param ms How long, in milliseconds; a negative one is none.
  */
-export function ageWord(ms: number) {
+function ageWord(ms: number) {
   const sec = Math.ceil(Math.max(0, ms) / 1000);
   if (sec < 60) return `${sec} s`;
   const min = Math.floor(sec / 60);
@@ -152,7 +152,7 @@ function windowsOf(limits: readonly QuotaLimit[], now: number) {
  * What an outcome says to the board: its state, its sentence but for when it is asked again (null when `fresh`), its windows and plan,
  * and, for a token's answer, what its sessions heard (`heard`: the reading's time, null while there is none to show).
  */
-export type Read = Pick<Quota, 'state' | 'subscription' | 'windows'> & { said: string | null; heard?: { at: string } | null };
+type Read = Pick<Quota, 'state' | 'subscription' | 'windows'> & { said: string | null; heard?: { at: string } | null };
 
 /** An answer in a shape the board does not read, `what` saying what it found. */
 const unknownRead = (what: string) =>
@@ -188,7 +188,7 @@ const heardRead = (heard: HeardQuota | null, now: number) => {
  * @param asked The engine's answer, or why it gave none.
  * @param now The wall time, in milliseconds since the epoch, the windows' resets are judged at.
  */
-export function readOf(asked: Asked, now: number) {
+function readOf(asked: Asked, now: number) {
   const none = { subscription: null, windows: [] };
   switch (asked.kind) {
     case 'missing':

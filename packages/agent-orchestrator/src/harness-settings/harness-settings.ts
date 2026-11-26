@@ -29,10 +29,10 @@ export const SETTABLE = Object.keys(TAKES) as readonly FactorySetting[];
 type FactorySetting = keyof typeof TAKES;
 
 /** How a session marks the commits and pull requests it writes: `false` for not at all, or each mark, an empty one for none. */
-export type Attribution = boolean | { commit?: string; pr?: string; sessionUrl?: boolean };
+type Attribution = boolean | { commit?: string; pr?: string; sessionUrl?: boolean };
 
 /** The settings a factory names of its harness (`SETTABLE`). */
-export type FactorySettings = { attribution?: Attribution; includeGitInstructions?: boolean; language?: string };
+type FactorySettings = { attribution?: Attribution; includeGitInstructions?: boolean; language?: string };
 
 /** A factory's harness settings, by harness (`HarnessSettings`): the default harness's alone, once judged. */
 export type HarnessSettings = Readonly<Record<string, FactorySettings>>;

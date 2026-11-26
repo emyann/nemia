@@ -210,7 +210,7 @@ export function readingOf(
 }
 
 /** The kinds of the folder handed to the runtime that the runtime names by task: all of `engine` but what no task names. */
-export type EngineKind = Exclude<(typeof DISK_KINDS)['engine'][number], 'engine-other'>;
+type EngineKind = Exclude<(typeof DISK_KINDS)['engine'][number], 'engine-other'>;
 
 /**
  * What the runtime keeps of one task, as the sweep reads its answer: the bytes under the folder handed to the runtime by kind

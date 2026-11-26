@@ -526,7 +526,7 @@ const pathOf = (runId: string, step: string, tried: string | undefined) =>
  * @param asked How the page is cut: its limit or last, and the kinds kept.
  * @param bounds The most a page holds; TRANSCRIPT_PAGE by default.
  */
-export const transcriptAt = (runId: string, step: string, after: string | undefined, asked: TranscriptAsked, bounds = TRANSCRIPT_PAGE) =>
+const transcriptAt = (runId: string, step: string, after: string | undefined, asked: TranscriptAsked, bounds = TRANSCRIPT_PAGE) =>
   answered(async (s) => {
     const at = transcriptCursorRead(after);
     if (at instanceof Error) throw at;

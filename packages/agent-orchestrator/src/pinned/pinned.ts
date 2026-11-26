@@ -20,7 +20,7 @@ type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly StepSpec[] 
  * @param step The step, whose agent and its skills are read.
  * @param pins The run's pins, of every agent and skill it resolved.
  */
-export const stepPins = (step: StepSpec, pins: readonly Pin[]) => {
+const stepPins = (step: StepSpec, pins: readonly Pin[]) => {
   const agent = step.agent;
   if (!agent) return [];
   const names = new Set(agent.skills ?? []);
@@ -48,6 +48,7 @@ export const filedOn = (f: PinsRead, step: StepSpec | undefined) => {
  * @param filed What the step's record kept at the filing: the fields it was filed with, where kept, and whether its schema has moved.
  * @param now The fields the step's `output:` declares now.
  * @param gave The fields its closeout gave.
+ * @public
  */
 export const filedFields: FiledFields = (filed, now, gave) => {
   const declared = filed.declared;

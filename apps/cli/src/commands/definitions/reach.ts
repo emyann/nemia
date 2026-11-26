@@ -26,7 +26,7 @@ function rowLines(row: Row) {
  * The lines `nemia policy reach` prints.
  * @param r The reach the api answers: the agent, the factory or run read, each step at its gate, and the rules suggested.
  */
-export function reachLines(r: PolicyReach) {
+function reachLines(r: PolicyReach) {
   const reached = r.gates.filter((g) => g.reachedBy.length).length;
   const of = r.run === null ? `the factory ${r.factory}` : `the run ${r.run} (factory ${r.factory})`;
   const lines = [

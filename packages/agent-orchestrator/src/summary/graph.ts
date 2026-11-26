@@ -14,12 +14,9 @@ export {
   type GraphEdge,
   type GraphNode,
   type GraphStep,
-  type InputEdge,
   type ObjectGraph,
   type RunGraph,
 } from './input-graph/input-graph.ts';
-
-export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
 
 /**
  * A Workflow object's graph: the run's (`inputGraphOf`), with every node and its kind on every workflow, routed or not, so a client never

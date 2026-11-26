@@ -16,7 +16,7 @@ import { Refused } from '../refused.ts';
 import { asked } from '../objects.ts';
 
 /** `nemia decide`'s help. */
-export const DECIDE_HELP = `nemia decide <runId>
+const DECIDE_HELP = `nemia decide <runId>
 
 What the run produced, and the choice it leaves you, as the api reads it (GET /api/runs/<runId>/decision):
 what it waits on, or the branches it touched, the lesson, the check-affecting diffs in full, what each
@@ -152,7 +152,7 @@ export function decisionLines(runId: string, decision: RunDecision) {
  * The words of a command line as a shell would read them: split on spaces, a double-quoted stretch one word without its quotes.
  * @param line The command line as offered.
  */
-export const wordsOf = (line: string) => [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '');
+const wordsOf = (line: string) => [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '');
 
 /** The placeholders a command line holds, `<objection>` and its like, each once, in order. */
 const placeholdersOf = (line: string) => [...new Set([...line.matchAll(/<([^<>]+)>/g)].map((m) => m[1] ?? ''))];

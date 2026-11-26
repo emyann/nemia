@@ -153,7 +153,7 @@ export async function keepCheckoutInstalled(home: string, repo: string) {
  * @param repo The repository's checkout folder, said in the note.
  * @param kept What came of the checkout's install (`keepCheckoutInstalled`).
  */
-export function keptNotes(repo: string, kept: CheckoutKept) {
+function keptNotes(repo: string, kept: CheckoutKept) {
   const why = (because: string) =>
     because === 'node_modules' ? 'it had no node_modules' : `its package-lock.json asks for ${because}, which its node_modules lacks`;
   if (kept.kept === 'installed') return [`node_modules: ${repo} installed with npm install --no-save — ${why(kept.because)}`];
@@ -576,7 +576,7 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * @param repo The repository's checkout folder, said in the note.
  * @param followed What `follow` answered of the checkout.
  */
-export function followedNotes(repo: string, followed: Followed) {
+function followedNotes(repo: string, followed: Followed) {
   if (followed.state === 'fast-forwarded')
     return [
       `base: ${repo} fast-forwarded from ${followed.from.slice(0, 12)} to ${followed.to.slice(0, 12)}, where ${followed.upstream} is`,

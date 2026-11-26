@@ -14,7 +14,7 @@ import type * as Classes from '../src/lib/classes.ts';
 import { owesAStory } from './e2e/stories/touched.ts';
 
 /** The categories a story's title opens with: the look, the frame, the store's level, a factory's, a run's, and a page body. */
-export const CATEGORIES = ['Look/', 'Frame/', 'Store/', 'Factory/', 'Run/', 'Pages/'] as const;
+const CATEGORIES = ['Look/', 'Frame/', 'Store/', 'Factory/', 'Run/', 'Pages/'] as const;
 
 /**
  * Every file among `files` that owes a story (`owesAStory`) and has no `<Part>.stories.tsx` beside it.
@@ -26,7 +26,7 @@ export const storyless = (files: readonly string[]) => {
 };
 
 /** One story of a module: its export's name, whether it or its meta gives args, and whether its axe only warns. */
-export type StoryFact = { name: string; args: boolean; todo: boolean };
+type StoryFact = { name: string; args: boolean; todo: boolean };
 
 /** A story module as the rules read it: its meta's title, none where it has none, and each story it exports. */
 export type StoryModule = { title: string | null; stories: StoryFact[] };
@@ -118,7 +118,7 @@ const SRC = 'apps/web/src';
 const ofAnotherSystem = (file: string) => /^apps\/web\/src\/components\/(ui|ai-elements|look)\//.test(file);
 
 /** One name a file takes from a second component system: the module by its canonical spelling, and the name it exports. */
-export type Taken = { module: string; name: string };
+type Taken = { module: string; name: string };
 
 /**
  * The module `spec` names, spelled as the map keys it: `@/components/ui/<part>` for a file of shadcn's `ui/` (anything there but the
@@ -202,10 +202,10 @@ export const secondSystem = (file: string, source: string) => {
 };
 
 /** The elements a control drawn by hand is: each is the kit's to draw. */
-export const CONTROL_ELEMENTS = ['button', 'input', 'select', 'textarea'] as const;
+const CONTROL_ELEMENTS = ['button', 'input', 'select', 'textarea'] as const;
 
 /** The class strings of `lib/classes.ts` that draw a control by hand; `FLOOR_BOX`, a canvas's frame, is none. */
-export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY'];
+const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY'];
 
 /** The input kinds the kit draws with a part of their own, each keyed apart from the other inputs. */
 const INPUT_KINDS = ['checkbox', 'radio'];

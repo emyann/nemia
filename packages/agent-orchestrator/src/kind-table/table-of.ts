@@ -34,7 +34,7 @@ export const firstLine = (text: string | null | undefined) => {
  * A row's object, as Kubernetes gives one beside a table's row: the item's metadata alone.
  * @param metadata The item's metadata.
  */
-export const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
+const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
 
 /**
  * A page as a table: its place (`continue`), its columns, and a row per item, its cells by `cells`, its metadata beside them.

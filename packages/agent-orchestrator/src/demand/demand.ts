@@ -19,10 +19,10 @@ export const DEMAND_POLL_MS = 200;
 export const DAEMON_LOG = 'daemon.log';
 
 /** The variables of the login a service's system gives its daemon itself, passed on from the command's own environment where set. */
-export const LOGIN_KEYS = ['HOME', 'USER', 'LOGNAME', 'SHELL', 'XDG_RUNTIME_DIR', 'LANG'] as const;
+const LOGIN_KEYS = ['HOME', 'USER', 'LOGNAME', 'SHELL', 'XDG_RUNTIME_DIR', 'LANG'] as const;
 
 /** What a command that ticks does before it runs: nothing, where a daemon ticks or the start is off; start the service; or spawn. */
-export type DemandPlan = { kind: 'ticking' } | { kind: 'off' } | { kind: 'service' } | { kind: 'spawn' };
+type DemandPlan = { kind: 'ticking' } | { kind: 'off' } | { kind: 'service' } | { kind: 'spawn' };
 
 /**
  * The plan from where the lease stands, whether a login service of the store is installed (`serviced`, asked only where it decides) and

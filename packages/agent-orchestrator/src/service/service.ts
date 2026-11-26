@@ -13,7 +13,7 @@ import { pauseWords, type Pause } from '../pause/pause.ts';
 import type { UnitRunningOf } from '../../contracts/unit-running.contract.ts';
 import type { UnitState } from '../../contracts/unit-running.contract.ts';
 
-export type { UnitState, UnitRunning } from '../../contracts/unit-running.contract.ts';
+export type { UnitState } from '../../contracts/unit-running.contract.ts';
 
 /** What the machine is, as the store reads it: its platform, whether it is WSL, and whether systemd runs as its init. */
 export type Machine = { readonly platform: string; readonly wsl: boolean; readonly systemd: boolean };
@@ -25,7 +25,7 @@ export type ServiceSystem = 'systemd' | 'launchd';
 export const DEFAULT_NAME = 'nemia';
 
 /** How systemd is turned on in a WSL distro, said wherever the service is refused for want of it. */
-export const WSL_SYSTEMD_WORDS =
+const WSL_SYSTEMD_WORDS =
   'turn systemd on: add [boot] with systemd=true to /etc/wsl.conf (sudo), then run wsl --shutdown from Windows and open the distro again';
 
 /**
@@ -316,7 +316,7 @@ const unquoted = (word: string, exec: boolean) => {
 const words = (line: string) => [...line.matchAll(/"(?:[^"\\]|\\.)*"/g)].map((m) => m[0]);
 
 /** What a unit's or a plist's text says it runs: its node, its entry, its folder and its environment, read back as written. */
-export type UnitRead = { node?: string; entry?: string; cwd?: string; env: [string, string][] };
+type UnitRead = { node?: string; entry?: string; cwd?: string; env: [string, string][] };
 
 /**
  * A unit's text read back (`unitText`): its `ExecStart=`, `WorkingDirectory=` and each `Environment=`, as the values were given.
@@ -396,9 +396,6 @@ export type ServiceRead = {
   readonly unit: (UnitRead & { checkout?: string }) | null;
   readonly state: UnitState | null;
 };
-
-/** Who holds the lease beside the service: the service's own process, another daemon, or none ticking. */
-export type HolderOf = 'service' | 'other' | 'none';
 
 /**
  * Who of the service and another daemon ticks the store, by the lease and the unit's main process.

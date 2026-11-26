@@ -42,7 +42,7 @@ const widestOf = (reach: FenceReach) =>
  * mode that does and every wider one. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
  * @param mode The permission mode; undefined for the runtime's default.
  */
-export const editsUnasked = (mode: string | undefined) => {
+const editsUnasked = (mode: string | undefined) => {
   const modes = reachOf();
   return rankOf(modes, mode ?? modes.given) >= modes.writes;
 };
@@ -356,7 +356,7 @@ function ruleParts(rule: string) {
  * @param by The rule that may cover.
  * @param rule The rule that may be covered.
  */
-export function covers(by: string, rule: string) {
+function covers(by: string, rule: string) {
   if (by === rule) return true;
   const outer = ruleParts(by);
   const inner = ruleParts(rule);

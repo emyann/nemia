@@ -11,7 +11,7 @@ import { HEADER_MASK, type McpTransport } from 'objects';
 import type { HeaderWrittenOf } from '../../../contracts/header-mask.contract.ts';
 
 /** The header a factory refuses to record by name: a person types no secret, and a server signs in instead. */
-export const REFUSED_HEADER = 'authorization';
+const REFUSED_HEADER = 'authorization';
 
 /**
  * One server a factory records: its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
@@ -28,12 +28,6 @@ export type FactoryServer = {
 
 /** One builtin server of Nemia, as the board offers it for an add: its name, and the facts a factory would record of it. */
 export type BuiltinServer = FactoryServer & { readonly name: string };
-
-/**
- * A factory's server record, as read and written (`servers.store.ts` decodes and writes the file): its servers by name, and every
- * other key the file held — one a newer tick wrote, which this one does not name and must not take away.
- */
-export type FactoryServersFile = { readonly servers: FactoryServers; readonly [key: string]: unknown };
 
 /** The record's servers by name, the shape a harness takes them in. */
 export type FactoryServers = Readonly<Record<string, FactoryServer>>;

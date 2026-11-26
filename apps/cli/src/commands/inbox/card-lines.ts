@@ -15,6 +15,7 @@ import type { IdeaOf } from '../../../contracts/idea.contract.ts';
  * themselves. Pure, and proved by `contracts/idea.contract.ts`.
  * @param given The words as typed.
  * @param at What the machine has at the path the words would name.
+ * @public
  */
 export const ideaOf: IdeaOf = (given, at) => {
   if (at === 'file') return { kind: 'file' };

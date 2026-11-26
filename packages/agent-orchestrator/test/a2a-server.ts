@@ -22,7 +22,7 @@ import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 /** How the agent ends a Task it is sent: completed with a text or a data part, failed, or left waiting on an answer to a question. */
 export type Answer = { text: string } | { data: Record<string, unknown> } | { failed: string } | { asks: string };
 
-export type A2AServer = {
+type A2AServer = {
   /** The agent's base URL: its card at `/.well-known/agent-card.json` beneath it. */
   url: string;
   /** The text of every message the agent was sent, in order. */

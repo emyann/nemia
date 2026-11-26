@@ -113,32 +113,13 @@ const configurationRefused = (done: string) => [
 ];
 
 /**
- * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
- *
- *   workspace  a path from the workspace root — collected from the workspace into the step's files directory
- *              when the step hands off (`collectArtifacts` in artifacts.store.ts), and read from there
- *   files      an absolute path inside the step's files directory — on disk, where the run keeps it
- *   escapes    a path from the workspace root that climbs out of it, `../notes.md` — refused, and never read
- *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
- *              look at a file on this machine because a step named it. `..` is resolved first, so a path
- *              that climbs out of the directory is outside however it is spelled.
- *   configuration  a path from the workspace root, or one inside the files directory, that passes through a
- *              folder a harness reads as its own configuration (`configFolderIn`) — refused, and never
- *              collected: the steps after read the files directory as a mounted folder, and their harness
- *              would take the file as its own. Asked after `escapes` and `outside`.
- *   reserved   `closeout.json` at the workspace root or at the root of the files directory (`HANDED_CLOSEOUT`): the run's own name
- *              for the step's closeout it writes there — refused, and never collected.
- */
-export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside' | 'configuration' | 'reserved';
-
-/**
  * The file the tick writes in a step's files directory once it signs off (`handCloseout` in artifacts.store.ts): the step's closeout in
  * v1's shape, which the steps after it read there. Its name is the run's: a closeout that names it is refused (`reserved`).
  */
 export const HANDED_CLOSEOUT = 'closeout.json';
 
 /**
- * Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`.
+ * Where a declared artifact is looked for. Pure. The files directory itself is no file in it, and is `outside`.
  * @param file The path the closeout declared, from the workspace root or absolute.
  * @param dir The step's files directory.
  */
@@ -170,7 +151,7 @@ export type ArtifactFile = { path: string; bytes: number };
  *   missing        an absolute path in the step's files directory that is not a file there
  *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
  *   outside        an absolute path outside the step's files directory: refused, and not read
- *   configuration  a path through a folder a harness reads as its own configuration (`ArtifactPlace`): refused, and not handed over
+ *   configuration  a path through a folder a harness reads as its own configuration: refused, and not handed over
  *   reserved       the run's own name for the closeout it writes (`HANDED_CLOSEOUT`): refused, and not handed over
  */
 export type MissingArtifact = {
@@ -250,7 +231,7 @@ export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
  * @param why Why the run does not have the file.
  * @param dir The step's files directory.
  */
-export function lackWords(why: string, dir: string) {
+function lackWords(why: string, dir: string) {
   const words: Record<string, string> = {
     'not there': 'nothing is at that path in the workspace',
     missing: `it is not a file in \`${dir}\``,

@@ -30,7 +30,7 @@ import { gateRows, type GateReach, type GateSite, type Reach } from './reach.ts'
 export type WordedRule = PolicyRule & { words: string };
 
 /** A workflow attached to the factory that does not load, and why, in the refusal's words. */
-export type Unloaded = { workflow: string; message: string };
+type Unloaded = { workflow: string; message: string };
 
 /**
  * What an agent's rules reach: the agent; the factory read, and the run where one was named; the factory's level now; the reach of the

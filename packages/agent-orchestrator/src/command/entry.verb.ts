@@ -14,11 +14,8 @@ import type { InformerMemo } from '../rest/informer.verb.ts';
 import type { ScheduleRuns } from '../factory/schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
 import type { SeriesMemo } from '../series/series.ts';
-import type { Args, CommandSpec, Flag } from './command.ts';
-import type { Run } from '../record/record.ts';
-import type { Labels } from '../labels/labels.ts';
-import { labelSegments, runLabelMap } from '../labels/labels.ts';
-import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from '../watch/selector.ts';
+import type { Args, CommandSpec } from './command.ts';
+import { parseSelectors, selectorsRefusal, type Selectors } from '../watch/selector.ts';
 
 /**
  * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the
@@ -36,7 +33,7 @@ export type Kept = {
  * A memo of a projection of every run's record, one per read that polls (`keptRecords`): the factories' schedules and the pause's current
  * tasks. A read handed none reads every record, as the command line does.
  */
-export type KeptRecords = {
+type KeptRecords = {
   readonly factories?: ScheduleRuns;
   readonly pause?: PauseRuns;
 };
@@ -48,7 +45,7 @@ export type KeptRecords = {
  * type error at the api's call, never a request that fails. An entry read as the table's (`Command` with `Args`) may carry any `input`, so
  * a typed entry joins the table as it is.
  */
-export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<unknown> } : { readonly input: Schema.Decoder<I> };
+type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<unknown> } : { readonly input: Schema.Decoder<I> };
 
 /**
  * A command whole: its spec, `input`, the keys its handler takes where they are its own (`InputOf`), `handler`, which is the Effect of
@@ -114,7 +111,7 @@ export const checked = (wrong: string | null | undefined) => (wrong ? Effect.fai
  * another, and the api's `?selector=`, one or many — none where unset: a list's read takes the runs whose labels one of them takes.
  * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
-export const selectorTexts = (args: Args) => {
+const selectorTexts = (args: Args) => {
   const value = args['selector'];
   return (typeof value === 'string' ? [value] : Array.isArray(value) ? value : []) satisfies readonly string[] as readonly string[];
 };
@@ -123,7 +120,7 @@ export const selectorTexts = (args: Args) => {
  * Why the selectors under `selector` are refused, or null where each is one: an entry's `check`.
  * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
-export const selectorCheck = (args: Args) => selectorsRefusal(selectorTexts(args)) ?? null;
+const selectorCheck = (args: Args) => selectorsRefusal(selectorTexts(args)) ?? null;
 
 /**
  * The selectors under `selector`, parsed (`parseSelectors`); refused as `Invalid` (exit 2, 422 on the api) where one is no selector, in
@@ -136,50 +133,3 @@ export const selectorsIn = (args: Args) => {
     refusal === null ? Effect.succeed(parseSelectors(selectorTexts(args))) : Effect.fail(new Invalid({ message: refusal }))
   ) satisfies Effect.Effect<Selectors, Invalid>;
 };
-
-/**
- * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
- * another; each line with its whole map; and that label's value beside each line, given again for another (`labelsShown`).
- * @param command The command's name, which the flags' words name.
- */
-export const labelFlags = (command: string) =>
-  [
-    selectorFlag(command),
-    { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
-    {
-      flag: '-L',
-      kind: 'text',
-      key: 'labelColumns',
-      many: true,
-      takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
-    },
-  ] satisfies Flag[];
-
-/**
- * What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither.
- * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
- * @param map The line's labels, each key with its value.
- */
-export const labelsShown = (args: Args, map: Labels) => {
-  const columns = args['labelColumns'];
-  return labelSegments(map, { all: args['showLabels'] === true, columns: Array.isArray(columns) ? columns : [] });
-};
-
-/**
- * What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`).
- * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
- */
-export const runsShown = (args: Args) => (run: Run) => labelsShown(args, runLabelMap(run));
-
-/**
- * `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes.
- * @param command The command's name, which the flag's words name.
- */
-export const selectorFlag = (command: string) =>
-  ({
-    flag: '-l',
-    kind: 'text',
-    key: 'selector',
-    many: true,
-    takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
-  }) satisfies Flag;

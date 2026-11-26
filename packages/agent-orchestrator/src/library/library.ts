@@ -8,7 +8,7 @@
  */
 import type { LibraryAddRefusal, LibraryAddStateOf, LibraryAddsOf, LibraryRef, Origin } from '../../contracts/library-add.contract.ts';
 
-export type { LibraryAddRefused, LibraryAddState, LibraryAddWrite, LibraryKind, LibraryRef } from '../../contracts/library-add.contract.ts';
+export type { LibraryKind, LibraryRef } from '../../contracts/library-add.contract.ts';
 
 /**
  * A factory's adds: its record's, where it has one, else those its workflows resolve from the library today.

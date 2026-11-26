@@ -26,7 +26,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
  * file that writes one (`formerFenceLine`), and `nemia frontmatter rewrite` moves it (`fenceMoved`). Nothing writes one: `renderStep` and
  * `renderAgent` write the block (`fencedPairs`).
  */
-export const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
+const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
 
 /**
  * Whether `key` names a harness, whose block a file's frontmatter may hold.
@@ -305,7 +305,7 @@ const fenceKeyRefused = (file: string, harness: string, key: string, takes: read
  * @param block The harness block its frontmatter holds, or undefined for none.
  * @param harness The harness the file runs on.
  */
-export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string) {
+function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string) {
   if (block === undefined || block.harness === harness) return undefined;
   const takes = fenceKeysOf(harness);
   return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${takes ? ` (${takes.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;

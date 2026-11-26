@@ -199,9 +199,6 @@ export function unitsOf(dir: string) {
 /** How a spawned daemon ended: its exit code or the signal that ended it; an error that kept it from starting is a code of null. */
 export type SpawnEnded = { code: number | null; signal: string | null };
 
-/** A daemon spawned on demand: its pid, none where it could not start, and its end, which settles only once it has ended. */
-export type Spawned = { pid: number | undefined; ended: Promise<SpawnEnded> };
-
 /**
  * Starts `node entry` in `cwd` with `env` alone, in a session of its own (`detached`), so a closed terminal does not end it, its stdout and
  * stderr appended to `log`, and lets it go: this process ends without waiting for it.

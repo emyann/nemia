@@ -9,9 +9,6 @@ import { artifactPlace, filesPrunedWords, GIVEN, HANDED_CLOSEOUT, isRepositoryRu
 import type { ArtifactKind } from 'objects';
 import { isFilePath } from '../artifacts/artifacts.ts';
 
-/** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
-export type { ArtifactKind };
-
 /**
  * A file a closeout named. A file under the step's files directory (`artifactsDir`), at its top or in a folder beneath it, by a path
  * the artifacts route serves (`statUnder`), is that path as its `name`, where the api serves it, its kind and its size. Anything else is

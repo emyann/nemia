@@ -10,5 +10,5 @@ export { servedOf } from './listener.ts';
 export { BEARER } from './served.ts';
 export { holderTokenOf } from './holder-token.ts';
 export type { Served } from './listener.ts';
-export { holderAgentRefusal, holderRefusal, holderSeamOf } from './holder-follow.ts';
+export { holderRefusal, holderSeamOf } from './holder-follow.ts';
 export type { HolderAgent } from './holder-follow.ts';

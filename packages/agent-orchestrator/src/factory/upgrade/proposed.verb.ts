@@ -44,7 +44,7 @@ const proposedBy = (caller: ProposalCaller, place: ProposalPlace) =>
  * @param spec The spec proposed, or undefined to propose the owner's removal.
  * @param why What the proposal says of itself, shown with it.
  */
-export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
+const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
   Effect.gen(function* () {
     const place: ProposalPlace = { home: yield* StoreRoot };
     const caller = yield* sessionCaller(yield* setting('sessionToken'));

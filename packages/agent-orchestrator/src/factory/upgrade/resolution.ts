@@ -48,6 +48,7 @@ const hireOfKey = (key: string | null) => {
  * @param key The key after the address's `#`, or null where it has none.
  * @param text Whether every side of the conflict's file is text.
  * @param factory The factory's name, the Factory owner's.
+ * @public
  */
 export const resolvedBy: ResolvedBy = (segments, key, text, factory) => {
   if (!text) return null;
@@ -120,7 +121,7 @@ export const segmentsOf = (at: string) => at.replace(/(#.*|:\d+-\d+)$/, '').spli
  * The key a conflict's address names after its `#`, null where it names none.
  * @param at The conflict's address.
  */
-export const keyOf = (at: string) => {
+const keyOf = (at: string) => {
   const cut = at.indexOf('#');
   return cut < 0 ? null : at.slice(cut + 1);
 };
@@ -129,8 +130,7 @@ export const keyOf = (at: string) => {
  * Whether every side of a file that is there holds text (`textIn`).
  * @param sides Each side's file, undefined where that side has none.
  */
-export const allText = (...sides: readonly (TreeFile | undefined)[]) =>
-  sides.every((side) => side === undefined || textIn(side.bytes) !== null);
+const allText = (...sides: readonly (TreeFile | undefined)[]) => sides.every((side) => side === undefined || textIn(side.bytes) !== null);
 
 /**
  * The key of the owner of a whole file of the tree, at the path `at`, where one owns it whole; the wiring, which a Hire owns by a key,

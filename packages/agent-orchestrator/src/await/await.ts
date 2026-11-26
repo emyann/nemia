@@ -4,15 +4,12 @@
 import type { WaitBoundOf } from '../../contracts/wait-bound.contract.ts';
 import { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';
 
-export { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';
-
-export type { WaitBound } from '../../contracts/wait-bound.contract.ts';
-
 /**
  * How long a wait waits, from the bound it was given in milliseconds (`undefined`: none): four minutes where none was given, the one given
  * where it is above zero and at most four minutes and a half, else refused — never cut to the longest, since its caller asked for what it
  * would not get. Pure; proved by `contracts/wait-bound.contract.ts`.
  * @param asked The bound asked, in milliseconds; undefined where none was given.
+ * @public
  */
 export const waitBound: WaitBoundOf = (asked) => {
   if (asked === undefined) return { ms: WAIT_DEFAULT_MS };
@@ -22,7 +19,7 @@ export const waitBound: WaitBoundOf = (asked) => {
 };
 
 /** How `--for` is typed, as every refusal of one says it. */
-export const WAIT_FOR_FORM = 'digits and ms, s or m, above zero and at most 270s, as 30s or 4m';
+const WAIT_FOR_FORM = 'digits and ms, s or m, above zero and at most 270s, as 30s or 4m';
 
 /** The milliseconds of each unit `--for` is typed in. */
 const UNIT_MS: Readonly<Record<string, number>> = { ms: 1, s: 1_000, m: 60_000 };
@@ -32,7 +29,7 @@ const UNIT_MS: Readonly<Record<string, number>> = { ms: 1, s: 1_000, m: 60_000 }
  * undefined where it does not read as one. Pure.
  * @param text The duration as typed.
  */
-export function waitForOf(text: string) {
+function waitForOf(text: string) {
   const [, digits, unit] = /^(\d+)(ms|s|m)$/.exec(text.trim()) ?? [];
   const per = unit === undefined ? undefined : UNIT_MS[unit];
   return digits === undefined || per === undefined ? undefined : Number(digits) * per;

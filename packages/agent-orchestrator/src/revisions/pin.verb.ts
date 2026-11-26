@@ -329,7 +329,7 @@ export const resolvedNow = Effect.fn('resolvedNow')(function* (
  * names, in the order the run has them, and a step the folder no longer has kept as the run froze it — the verb takes new content, never a
  * new step set. Undefined where the folder does not load, so the run keeps what it froze and its pins.
  */
-export const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: string, given?: PassRevisions) {
+const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: string, given?: PassRevisions) {
   const read = yield* readOr(given);
   const steps = yield* refreshedSteps(run, read);
   return steps && ({ steps, pins: yield* pinsOf(run, steps, at, read) } satisfies Resolved);
@@ -398,7 +398,7 @@ export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: 
  * copied again with it (`freezeCarriedFiles`), and `run.carriedFiles` set to what is there now: none where the folder is gone. A folder
  * that is no directory on the disk — a workflow read through another door — keeps the copies the run had.
  */
-export const renderAgain = Effect.fn('renderAgain')(function* (run: Run, steps: readonly StepSpec[], given?: PassRevisions) {
+const renderAgain = Effect.fn('renderAgain')(function* (run: Run, steps: readonly StepSpec[], given?: PassRevisions) {
   const home = yield* StoreRoot;
   const found = yield* (yield* readOr(given)).skills(run);
   const copies = yield* Effect.try({

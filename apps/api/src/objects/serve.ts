@@ -172,14 +172,14 @@ async function inApiWords(c: RequestContext<ApiEnv>, response: Response) {
  * The kind of list a GET of `path` answers — its endpoint's success a `<Kind>List` — or none where it is no list's.
  * @param path The request's path.
  */
-export const listAt = (path: string) => endpointOf('GET', path)?.kinds.find((kind) => kind.endsWith('List'));
+const listAt = (path: string) => endpointOf('GET', path)?.kinds.find((kind) => kind.endsWith('List'));
 
 /**
  * The web handler of the `Api`, its layer built in the app runtime's memo map: every group's handlers, so a group left out does not
  * compile.
  * @param runtime The app's runtime, in whose memo map the layer is built.
  */
-export const objectsHandler = (runtime: ApiRuntime) =>
+const objectsHandler = (runtime: ApiRuntime) =>
   HttpRouter.toWebHandler(
     HttpApiBuilder.layer(Api).pipe(
       Layer.provide([

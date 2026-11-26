@@ -6,4 +6,4 @@
  * layer's lint block refuses `agent-runtime` to every file under `apps/api/src/`, a test among them.
  */
 export { bell, until, WAITED } from 'agent-runtime/testing';
-export type { Bell, Truthy, Waiter } from 'agent-runtime/testing';
+export type { Waiter } from 'agent-runtime/testing';

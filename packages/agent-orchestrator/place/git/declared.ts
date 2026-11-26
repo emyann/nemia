@@ -18,7 +18,7 @@
 import type { PlaceDeclared } from '../../src/place/place.ts';
 
 /** The mise release the `mise` need installs: its tag (https://github.com/jdx/mise/releases/tag/v2026.11.5). */
-export const MISE_PIN = 'v2026.11.5';
+const MISE_PIN = 'v2026.11.5';
 
 /** The git place's declaration. */
 export const declared: PlaceDeclared = {

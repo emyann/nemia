@@ -28,7 +28,7 @@ export const mayPropose: MayPropose = (caller, factory) => actsIn(caller, factor
  * @param grant A grant of a delegation, or a rule: its resources, its names and its verbs.
  * @param change One change of a proposal: its resource, its name and its verb.
  */
-export const covers = (grant: Grant, change: Change) =>
+const covers = (grant: Grant, change: Change) =>
   grant.resources.includes(change.resource) &&
   (grant.resourceNames.length === 0 || grant.resourceNames.includes(change.name)) &&
   grant.verbs.includes(change.verb);

@@ -15,7 +15,7 @@ const { name: COMMAND } = INBOX_RESEND_WORDS;
  * why not.
  * @param sent What the api answers of the card sent on.
  */
-export const resentLines = (sent: CardResent) => {
+const resentLines = (sent: CardResent) => {
   const { card, from } = sent;
   const name = card.metadata.name;
   const goes =

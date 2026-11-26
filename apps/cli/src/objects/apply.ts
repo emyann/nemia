@@ -27,6 +27,7 @@ import { isObject } from 'effect/Predicate';
  * @param found What the object's read found: whether it is served and, where it is, whether the file says what is served.
  * @param writes What the object's kind takes over the api: a create, an update, and whether its update makes one missing.
  * @param whole Whether the file holds the object whole, its files' content in its spec: false for one copied from a list.
+ * @public
  */
 export const applyOf: ApplyOf = (found, writes, whole) => {
   if (!whole) return 'partial';
@@ -35,7 +36,7 @@ export const applyOf: ApplyOf = (found, writes, whole) => {
   return writes.update ? 'update' : 'no-update';
 };
 
-export const APPLY_HELP = `nemia apply -f <file|-> [-n <namespace>]
+const APPLY_HELP = `nemia apply -f <file|-> [-n <namespace>]
 
 Write the objects a file holds, each as the api serves its kind: made where it is missing, written where the file changes it, left
 alone where it does not. The file is YAML or JSON: one object, a stream of documents, or a List (nemia get -o yaml prints one).
@@ -50,7 +51,7 @@ Each prints <plural>/<name> created, configured or unchanged.
  * that leaves out a key the api serves as null (a workflow's `readme`) says what it says.
  * @param value The value to write as JSON.
  */
-export const canonical = (value: unknown) =>
+const canonical = (value: unknown) =>
   JSON.stringify(value, (_key, v: unknown) =>
     typeof v === 'object' && v !== null && !Array.isArray(v)
       ? Object.fromEntries(

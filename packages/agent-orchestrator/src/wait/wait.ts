@@ -101,6 +101,7 @@ export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
  * person lifts it, and a folder run may take one.
  * @param p What of the run stops a hold: whether it is cancelled, pruned, finished or held, whether it is a folder run, and the runs
  * asked to wait on.
+ * @public
  */
 export const holdStop: HoldStopOf = (p) => {
   const move = runMarkMove(runMarkOf(p), 'hold');

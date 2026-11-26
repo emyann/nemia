@@ -19,6 +19,7 @@ const ofALoop = (of: AskTakenOf) => of === 'round' || of === 'base' || of === 'l
  * What refuses a take-back, in the order it is said, or null where the ask is taken back: a step the run does not have; a loop's ask of a
  * step that closes no loop; nothing at the ask's key; an acceptance whose waiting steps have a task. A stray at the key is always set
  * aside.
+ * @public
  */
 export const askTakeBackStop: AskTakeBackStopOf = ({ of, known, looping, held, handedOn }) =>
   !known ? 'unknown' : ofALoop(of) && !looping ? 'loopless' : held === 'none' ? 'unasked' : held === 'ask' && handedOn ? 'handed-on' : null;

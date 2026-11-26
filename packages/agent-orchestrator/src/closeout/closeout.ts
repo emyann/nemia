@@ -41,7 +41,7 @@ import {
 export const CLOSEOUT_SCHEMA = ENVELOPE_SCHEMA;
 
 /** A closeout schema as the engine is handed it. */
-export type CloseoutSchema = { type: string; properties: Record<string, object>; required: string[]; additionalProperties: boolean };
+type CloseoutSchema = { type: string; properties: Record<string, object>; required: string[]; additionalProperties: boolean };
 
 /**
  * The schema a step is filed with: `CLOSEOUT_SCHEMA`, and the fields its `output:` declares, merged.

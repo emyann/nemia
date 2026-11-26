@@ -13,9 +13,9 @@ import type { Adoption } from '../../contracts/adopt.contract.ts';
 import type { AdoptedCard } from './adopt-refusals.ts';
 import { templatedAdoptRefusal, strandedCardRefusal, strandedScheduleRefusal, leftoverRefusal } from './adopt-refusals.ts';
 
-export { templatedAdoptRefusal, strandedCardRefusal, strandedScheduleRefusal, leftoverRefusal } from './adopt-refusals.ts';
+export { templatedAdoptRefusal } from './adopt-refusals.ts';
 
-export type { Wiring, Adoption, AdoptRefused } from '../../contracts/adopt.contract.ts';
+export type { Adoption } from '../../contracts/adopt.contract.ts';
 export type { AdoptedCard } from './adopt-refusals.ts';
 
 /** The cards filed and not started whose workflow `offered` leaves out. */
@@ -81,7 +81,7 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
 });
 
 /** A hire a takeover changes: a step hired into by the template only (`added`), by the factory only (`dropped`), or by both, apart. */
-export type HireChange = {
+type HireChange = {
   readonly step: string;
   readonly kind: 'added' | 'dropped' | 'changed';
   readonly was?: string;

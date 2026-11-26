@@ -41,8 +41,6 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
 export { StoreConfig, StoreRoot } from 'agent-orchestrator';
 import { StoreConfig, StoreRoot } from 'agent-orchestrator';
 
-type Reader = Engine['Service'];
-
 /**
  * One verb of the engine, `read`, run to a Promise: what it succeeds with; its refusal as an `Error` whose `exitCode` is 2 and whose
  * message is led by `verb` (`output: …`), as a caller of the command line reads it (`asked`); and any other failure — a `JournalError`, a
@@ -52,23 +50,6 @@ type Reader = Engine['Service'];
  * @param read The verb's Effect, as the request's engine gives it.
  */
 export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) => Effect.runPromise(asked(verb, read));
-
-/**
- * The engine's view of every task in its store, over one observation, by task id.
- *
- * `list` observes the harnesses once and folds every task's journal against that; `view` observes
- * afresh on each call. A task the engine has no record of is simply absent, which reads exactly as
- * `view`'s empty state does: no brief, so `unknown`. One whose journal does not read is in `unreadable` instead, and in no view
- * (`judgedUnlessUnreadable`).
- * @param e The engine's reader of tasks.
- */
-export async function everyView(e: Reader) {
-  const listed = await engineRead('list', e.list());
-  return {
-    views: new Map(listed.views.map((view) => [view.id, view])),
-    unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])),
-  };
-}
 
 /**
  * Found among the ids the store at `home` lists (`runs.find`), not read by path, so no id can name a file outside it.

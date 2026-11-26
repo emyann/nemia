@@ -33,7 +33,7 @@ const CLIENT_NAME = new RegExp(`^[A-Za-z0-9][A-Za-z0-9._-]{0,${CLIENT_NAME_MAX -
  * The digest a code or a secret is kept and found by: its sha-256, in hex.
  * @param text The code or the secret.
  */
-export const ticketDigest = (text: string) => crypto.createHash('sha256').update(text).digest('hex');
+const ticketDigest = (text: string) => crypto.createHash('sha256').update(text).digest('hex');
 
 /** How long a ticket's files are kept past its time, for the list: a day. */
 const KEPT_MS = 24 * 60 * 60_000;

@@ -10,6 +10,7 @@ import { isObject } from 'effect/Predicate';
  * Whether the frame of a run in `state` (its status's `state`, undefined where the status carries no frame) has its `wallMs` and `clock`
  * measured to the instant its list was read at: a run still going, as `clockUntilOf` reads it to `now`. A finished run's stand still.
  * @param state The run's state, as its status says it, or undefined where the status carries no frame.
+ * @public
  */
 export const measuredToNow: MeasuredToNow = (state) => state === 'waiting' || state === 'inFlight';
 

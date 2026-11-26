@@ -14,7 +14,7 @@ import { isObject } from 'effect/Predicate';
 export type TallyFact = { tally: string; value: number | null };
 
 /** What the measured tries of a step give a tally: their values' sum, null with none measured, and how many were measured. */
-export type TallyCell = { sum: number | null; tries: number };
+type TallyCell = { sum: number | null; tries: number };
 
 /** A tally of a step, totalled over a range (`total`) and on each of its days (`days`). */
 export type TallyRow = { step: string; tally: string; total: TallyCell; days: Array<TallyCell & { day: string }> };

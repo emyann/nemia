@@ -115,7 +115,7 @@ export function recordCeilings(home: string, c: { sessions: number; runs: number
  * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  * @param home The store's directory (`WF_ROOT`).
  */
-export const statsFile = (home: string) => path.join(home, 'tick-stats.json');
+const statsFile = (home: string) => path.join(home, 'tick-stats.json');
 
 const PhaseCostSchema = Schema.StructWithRest(Schema.Struct({ ms: Count, calls: Count, bytes: Count, reads: Count, spawned: Count }), Rest);
 const HarnessCostSchema = Schema.StructWithRest(
@@ -327,7 +327,7 @@ const bootId = () => {
 };
 
 /** The monotonic clock now, in whole milliseconds, under the boot's id; undefined where the boot id cannot be read. */
-export const monoNow = () => {
+const monoNow = () => {
   const id = bootId();
   return id === null ? undefined : { boot: id, ms: Number(process.hrtime.bigint() / 1_000_000n) };
 };

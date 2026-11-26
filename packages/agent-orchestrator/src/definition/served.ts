@@ -18,8 +18,8 @@
 import type { DefinitionOrigin, DefinitionServedOf, DefinitionFound, HeldOriginsOf } from '../../contracts/definition-served.contract.ts';
 import type { DefinitionWriteRefusal } from '../../contracts/definition-write.contract.ts';
 
-export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
-export type { DefinitionWrite, WriteAt, WriteRefused, WriteThere, WriteWay } from '../../contracts/definition-write.contract.ts';
+export type { DefinitionFound, DefinitionListed, DefinitionOrigin } from '../../contracts/definition-served.contract.ts';
+export type { DefinitionWrite, WriteAt, WriteRefused } from '../../contracts/definition-write.contract.ts';
 
 /**
  * Of the origins that hold one name, the one served — the first, or, with an origin asked, that origin where it holds the name — and the
@@ -44,6 +44,7 @@ export const LOOKUP = ['factory', 'repo', 'user', 'builtin'] as const satisfies 
  * The origins that hold `name` among `found`, in the lookup order.
  * @param found Every definition found, by name and origin.
  * @param name The definition's name.
+ * @public
  */
 export const heldOrigins: HeldOriginsOf = (found, name) => LOOKUP.filter((o) => found.some((f) => f.name === name && f.origin === o));
 

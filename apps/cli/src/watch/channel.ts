@@ -27,10 +27,10 @@ import { servedAt } from '../where.ts';
 import { kept, RECONNECT_EVERY, savedIn, SIGNALS } from './watch.ts';
 
 /** The most lines of a backlog a resumed channel sends; past it, one notice says how many it skipped and where to read them. */
-export const RESUME_MOST = 50;
+const RESUME_MOST = 50;
 
 /** The variable that sets another cap than `RESUME_MOST`, a whole number: a test's, or a session that wants a longer backlog. */
-export const RESUME_MOST_VARIABLE = 'NEMIA_CHANNEL_RESUME_MOST';
+const RESUME_MOST_VARIABLE = 'NEMIA_CHANNEL_RESUME_MOST';
 
 /** The notification a channel sends, as Claude Code's channels reference names it. */
 const CHANNEL_METHOD = 'notifications/claude/channel';
@@ -39,7 +39,7 @@ const CHANNEL_METHOD = 'notifications/claude/channel';
 const OPEN_WITHIN_MS = 10_000;
 
 /** What `nemia channel --help` prints, and a refusal of its words names. */
-export const CHANNEL_USAGE = `nemia channel [-l <selector>]... [-n <namespace>] [--cursor-file <path>]
+const CHANNEL_USAGE = `nemia channel [-l <selector>]... [-n <namespace>] [--cursor-file <path>]
 
 Push the feed's events into a Claude Code session as they happen: an MCP server over stdio, spawned by Claude Code from an .mcp.json
 entry and loaded with \`claude --dangerously-load-development-channels server:<name>\`, in an interactive session.
@@ -54,6 +54,7 @@ entry and loaded with \`claude --dangerously-load-development-channels server:<n
  * Each Event as the session reads it: its message the body of the tag, each field an attribute under its own name, a nested one joined to
  * its parent by `_`, a field the Event does not carry no attribute, and its labels left out.
  * @param event The Event as the api's watch sends it.
+ * @public
  */
 export const channelNotice: ChannelNoticeOf = (event) => {
   const meta: ChannelMeta = {
@@ -95,7 +96,7 @@ function took(asked: ChannelAsked, word: string, value: string | undefined) {
  * The words read, `help` for `--help`; refused, exit 2, for any word the channel does not take.
  * @param args The words typed after `channel`.
  */
-export function channelAsked(args: readonly string[]) {
+function channelAsked(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) return 'help';
   const asked: ChannelAsked = { selectors: [] };
   for (let i = 0; i < args.length; i += 2) took(asked, args[i] ?? '', args[i + 1]);
@@ -116,7 +117,7 @@ const resumeMost = (env: NodeJS.ProcessEnv = process.env) => {
  * @param selectors The label selectors typed with `-l`, none where every event is sent.
  * @param namespace The namespace `-n` names, undefined where every namespace's events are sent.
  */
-export function channelInstructions(selectors: readonly string[], namespace: string | undefined) {
+function channelInstructions(selectors: readonly string[], namespace: string | undefined) {
   const which = selectors.length === 0 ? 'every event' : `each event one of the selectors ${selectors.join(', ')} takes`;
   const where = namespace === undefined ? '' : ` of the namespace ${namespace}`;
   return [

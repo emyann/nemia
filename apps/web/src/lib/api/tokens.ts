@@ -7,7 +7,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { Token, TokenList } from 'objects';
 import { call, read, write } from './objects.ts';
 
-export type { Token, TokenList } from 'objects';
+export type { Token } from 'objects';
 
 /**
  * The store's standing tokens, by name: read on each visit of the Tokens page and never polled, since a token is minted or retired by a

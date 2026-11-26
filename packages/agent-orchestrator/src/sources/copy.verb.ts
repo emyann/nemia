@@ -43,7 +43,7 @@ export type AgentCopied = { name: string; copied: string[]; reused: string[]; re
  * otherwise, all named in one `Conflict` with its fix — `--as` for the agent, `--keep` for a skill or the schema. A write that fails
  * removes the skills, the schema and the agent this copy wrote.
  */
-export const copyAgent = Effect.fn('copyAgent')(function* ({
+const copyAgent = Effect.fn('copyAgent')(function* ({
   file,
   as,
   keep = [],

@@ -23,7 +23,7 @@ const textOf = (args: Args, key: string) => {
  * number from 1.
  * @param args The command's arguments, `last` among them as the text given.
  */
-export const lastOf = (args: Args) => {
+const lastOf = (args: Args) => {
   const last = textOf(args, 'last');
   if (last === undefined) return Infinity;
   const n = /^\d+$/.test(last) ? Number(last) : 0;

@@ -1,6 +1,6 @@
 /**
- * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the
- * skills by place (`skillPlace`), one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
+ * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`),
+ * one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
  * (`stepPage`) and the builder's form (`keyForm`). Each takes keys to put over its own. And each definition as the objects serve it, made
  * from the board's view of it (`workflowObject`, `agentObject`, `skillObject`): the object a read answers, whose view is the fixture.
  */
@@ -9,7 +9,7 @@ import { writtenStepOf } from '../src/lib/api/workflows.ts';
 import type { AgentListing, LibraryAgent } from '../src/lib/api/agents.ts';
 import type { AgentSkill, WorkflowStepSpec } from '../src/lib/api/library.ts';
 import type { KeyForm } from '../src/lib/api/builder.ts';
-import type { SkillDetail, SkillPlace, SkillRow } from '../src/lib/api/skills.ts';
+import type { SkillDetail, SkillRow } from '../src/lib/api/skills.ts';
 import type { WorkflowListing, WorkflowStepPage } from '../src/lib/api/workflows.ts';
 
 /** A card entry that says every key the A2A protocol has. */
@@ -41,7 +41,7 @@ export const skillRow = (extra: Partial<SkillRow> = {}) =>
   }) satisfies SkillRow;
 
 /** One agent of yours, with a card, a schema, a skill it gives and a node that names it. */
-export const agent = (extra: Partial<AgentListing> = {}) =>
+const agent = (extra: Partial<AgentListing> = {}) =>
   ({
     name: 'agora',
     from: 'user',
@@ -81,17 +81,8 @@ export const agent = (extra: Partial<AgentListing> = {}) =>
 export const listedAgent = (extra: Partial<AgentListing> = {}, factories = ['nemia']) =>
   ({ ...agent(extra), factories }) satisfies LibraryAgent & AgentListing;
 
-/** The skills of one place. */
-export const skillPlace = (extra: Partial<SkillPlace> = {}) =>
-  ({
-    from: 'builtin',
-    dir: '/work/workflows/skills',
-    skills: [skillRow()],
-    ...extra,
-  }) satisfies SkillPlace;
-
 /** One skill of yours on its page, its draft setting every key. */
-export const skillDetail = (extra: Partial<SkillDetail> = {}) =>
+const skillDetail = (extra: Partial<SkillDetail> = {}) =>
   ({
     skill: skillRow({ from: 'user', found: null }),
     version: 'v-2',

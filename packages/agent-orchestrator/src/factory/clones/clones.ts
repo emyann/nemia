@@ -8,10 +8,6 @@ import path from 'node:path';
 import type { CloneTargetOf } from '../../../contracts/clone-target.contract.ts';
 import { joinedFolder } from './clone-folder.ts';
 
-export { joinedFolder } from './clone-folder.ts';
-
-export type { CloneTarget } from '../../../contracts/clone-target.contract.ts';
-
 /** The forms of a URL a clone is made of, said in a refusal. */
 const FORMS = 'https://<host>/<path>, ssh://[<user>@]<host>/<path>, <user>@<host>:<path>, git://<host>/<path> or file:///<path>';
 

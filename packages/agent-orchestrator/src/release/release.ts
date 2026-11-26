@@ -16,13 +16,13 @@ export const CURRENT = 'current';
 export const RELEASE_FILE = 'release.json';
 
 /** The setting that lets a checkout's `nemia`, or its api, act on a store that runs an install. */
-export const ON_INSTALLED = 'NEMIA_ON_INSTALLED';
+const ON_INSTALLED = 'NEMIA_ON_INSTALLED';
 
 /** The script of a tag's root `package.json` that an upgrade runs as the release's checks, after `npm ci` and `npm run build`. */
 export const RELEASE_CHECK = 'release:check';
 
 /** How a release came to the store: built from a tag of its repository, or unpacked from a published archive. */
-export type ReleaseFrom = 'build' | 'archive';
+type ReleaseFrom = 'build' | 'archive';
 
 /** The platforms a release archive is published for: `process.platform` and `process.arch` of the machines Nemia installs on. */
 export const RELEASE_PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'] as const;
@@ -48,7 +48,7 @@ export type ReleaseFile = {
  * How a release came to the store, an absent `from` read as a build.
  * @param file A release's `release.json`, of which `from` is read.
  */
-export const releaseFrom = (file: Pick<ReleaseFile, 'from'>) => file.from ?? 'build';
+const releaseFrom = (file: Pick<ReleaseFile, 'from'>) => file.from ?? 'build';
 
 /**
  * The release platform of a machine whose Node says `platform` and `arch`, or null where no archive is published for it.
@@ -106,7 +106,7 @@ export function trialRefusal(running: Running, current: Current | null, store: s
 }
 
 /** How an upgrade restarts the daemon: through the service holding the store, not at all where a hand-run daemon holds it, or none. */
-export type RestartPlan =
+type RestartPlan =
   | { readonly kind: 'service'; readonly pid: number }
   | { readonly kind: 'hand'; readonly pid: number }
   | { readonly kind: 'none' };

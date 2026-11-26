@@ -5,5 +5,5 @@
  * status (`refusedAs`, `statusOf`, refused.ts).
  */
 export { MOUNT } from './endpoints.ts';
-export { listAt, mount, noRoute, objectsHandler } from './serve.ts';
+export { mount, noRoute } from './serve.ts';
 export { bodyOf, refusedAs, statusOf } from './refused.ts';

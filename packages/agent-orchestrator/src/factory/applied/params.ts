@@ -7,7 +7,7 @@
 import { isMap, isParam, writeExpressions, type Parameter } from '../../template/index.ts';
 
 /** A parameter's value: a string, a number or a boolean, as its declaration types it. */
-export type ParamValue = string | number | boolean;
+type ParamValue = string | number | boolean;
 
 /** Every declared parameter, by name, with its value. */
 export type Params = Readonly<Record<string, ParamValue>>;

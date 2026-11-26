@@ -43,7 +43,7 @@ export type RetainMemory = { said: string | undefined };
 export const freshRetainMemory = () => ({ said: undefined });
 
 /** What one sweep did: the releases it removed, why it held, the leftovers of a crashed upgrade it removed, and its lines. */
-export type Retained = {
+type Retained = {
   readonly removed: readonly string[];
   readonly held: Retention['held'];
   readonly swept: Leftovers;
@@ -56,7 +56,7 @@ export type Retained = {
  * @param release The release the process records.
  * @param home The store's folder.
  */
-export function pinnedBy(release: ProcessRelease, home: string) {
+function pinnedBy(release: ProcessRelease, home: string) {
   if (release.kind !== 'install') return [] satisfies string[];
   if (release.tag !== undefined) return [release.tag] satisfies string[];
   let real: string;
@@ -81,7 +81,7 @@ const deleted = (dir: string) =>
  * read now: each entry whose process is gone is moved aside (`asideLeftover`), then deleted, and each old build log deleted, a single
  * unlink needing no move. Each is said at Info. A live build's folder is never touched; asks the engine nothing.
  */
-export const sweptLeftovers = Effect.fn('sweptLeftovers')(function* (home: string) {
+const sweptLeftovers = Effect.fn('sweptLeftovers')(function* (home: string) {
   const answer = leftovers(pidEntries(home, alive), buildLogs(home), Date.now());
   const entries: string[] = [];
   for (const name of answer.entries) {

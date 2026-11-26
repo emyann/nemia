@@ -13,7 +13,7 @@ export type CostLines = Readonly<Record<string, number>>;
  * Whether `usd` is an amount a line can be: dollars above zero, and finite, as a cap is.
  * @param usd The amount, in dollars.
  */
-export const isLineAmount = (usd: number) => Number.isFinite(usd) && usd > 0;
+const isLineAmount = (usd: number) => Number.isFinite(usd) && usd > 0;
 
 /**
  * Why `factory` cannot set a cost line of `usd` for `workflow`, or undefined: a workflow's name that is not one, a workflow it does not

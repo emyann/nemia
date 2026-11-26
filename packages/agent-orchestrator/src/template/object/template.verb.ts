@@ -27,7 +27,7 @@ import { TemplateSource } from '../door/templates.model.ts';
 import { BuiltinTemplates, builtinTemplatesIn, TemplateDoor } from '../door/templates.store.ts';
 
 /** A builtin template rendered on disk: its name, where it is read from, its digest, its render's folder, and the wiring it holds. */
-export type TemplateTreeRendered = {
+type TemplateTreeRendered = {
   name: string;
   source: string;
   digest: string;

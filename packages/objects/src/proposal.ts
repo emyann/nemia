@@ -118,7 +118,7 @@ export type Proposal = typeof Proposal.Type;
 const ListedObject = ProposedObject.mapFields(Struct.omit(['spec']));
 
 /** A proposal as a list serves it: its object without its objects' specs, which a read of the proposal answers. */
-export const ProposalListed = Schema.Struct({
+const ProposalListed = Schema.Struct({
   ...Proposal.fields,
   spec: ProposalSpec.mapFields((fields) => ({
     ...fields,
@@ -143,7 +143,7 @@ export const ProposalListed = Schema.Struct({
       "The machinery's account of the proposal, the objects before it applied without their specs: its phase, who proposed and approved it, its changes and whether it widens access, the revisions it made, and why it stands where it does.",
   }),
 }).annotate({ description: "A proposal as a list serves it, without its files' content (LISTED_WITHOUT)." });
-export type ProposalListed = typeof ProposalListed.Type;
+type ProposalListed = typeof ProposalListed.Type;
 
 /** A page of a factory's proposals, each without its objects' specs. */
 export const ProposalList = listOf('Proposal', ProposalListed);

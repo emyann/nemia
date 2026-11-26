@@ -27,7 +27,7 @@ import { Refused } from '../refused.ts';
 import { objectsOf, type Read, readOf, servedOf, textOf } from './apply.ts';
 import { isObject } from 'effect/Predicate';
 
-export const PROPOSE_HELP = `nemia propose -f <file|-> [-n <factory>] [--at approval|run-end] [--why <text>]
+const PROPOSE_HELP = `nemia propose -f <file|-> [-n <factory>] [--at approval|run-end] [--why <text>]
 nemia propose --objects '<json>' [-n <factory>] [--at approval|run-end] [--why <text>]
 nemia propose --undo <proposal> [-n <factory>] [--why <text>]
 
@@ -44,7 +44,7 @@ named applied, and the removal of each it made. Prints the proposal's name, its 
       --undo <proposal>        propose undoing a proposal that applied
 `;
 
-export const PROPOSALS_HELP = `nemia proposals approve <name> [-n <factory>]
+const PROPOSALS_HELP = `nemia proposals approve <name> [-n <factory>]
 nemia proposals decline <name> [-n <factory>]
 
 Approve or decline a waiting proposal. Prints the proposal's name, its phase, whether it widens access, and the line that approves it. List them
@@ -117,7 +117,7 @@ function parsed(args: readonly string[]) {
  * @param proposal The proposal as the api answers it.
  * @param namespace The factory it was asked in, named where the proposal's metadata names none.
  */
-export const proposalLines = (proposal: Proposal, namespace: string) => {
+const proposalLines = (proposal: Proposal, namespace: string) => {
   const factory = proposal.metadata.namespace ?? namespace;
   const { name } = proposal.metadata;
   const widens = proposal.status.widens ? ' (widens access)' : '';

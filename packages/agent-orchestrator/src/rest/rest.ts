@@ -65,6 +65,7 @@ export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
  * it, which no input the memo watches says; a cancelled run's pass reads none of them (`liftHold` returns at once, `waitedOn` names no
  * run), so its hold keeps it out of nothing. Pure.
  * @param run Whether the run is held, and whether it was cancelled.
+ * @public
  */
 export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
@@ -149,7 +150,7 @@ export const RUN_INPUTS = {
 } as const satisfies Record<string, Watch>;
 
 /** An input of a run's judgement, by its name in `RUN_INPUTS`. */
-export type RunInput = keyof typeof RUN_INPUTS;
+type RunInput = keyof typeof RUN_INPUTS;
 
 /** The inputs `RUN_INPUTS` says `watch` watches. */
 export type InputsWatchedBy<W extends Watch> = { [K in RunInput]: (typeof RUN_INPUTS)[K] extends W ? K : never }[RunInput];

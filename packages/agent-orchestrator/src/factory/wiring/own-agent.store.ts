@@ -30,7 +30,7 @@ function rootsOf(home: string, factory: Factory, workflow: string) {
  * @param workflow The workflow's name.
  * @param step The step's name in the workflow.
  */
-export function ownAgentOf(roots: readonly string[], workflow: string, step: string) {
+function ownAgentOf(roots: readonly string[], workflow: string, step: string) {
   for (const root of roots) {
     const file = path.join(path.resolve(root), 'workflows', workflow, `${step}.md`);
     let named: string | undefined;

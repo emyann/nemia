@@ -38,9 +38,9 @@ import {
 import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
 import { withName, hiresInto, triggersOn, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
-export { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
+export { hiresInto } from './dictionaries.ts';
 
-export type { WiringChange, WiringRefused } from '../../../contracts/wiring.contract.ts';
+export type { WiringChange } from '../../../contracts/wiring.contract.ts';
 
 /** The workflow a hire's step `<workflow>/<step>` names. */
 const workflowOfStep = (step: string) => step.slice(0, step.indexOf('/'));
@@ -82,6 +82,7 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
  * each verb asks of what the factory offers, schedules and holds. Its own contract, which `wiringRefusal` leans on for these four verbs.
  * @param factory The factory as it is: its name, workflows, hires, schedules, cost lines, repositories and own card triggers.
  * @param change The attach, detach, schedule or unschedule, and the workflow it names.
+ * @public
  */
 export const workflowChangeRefusal: WorkflowChangeRefusal = (factory, change) => {
   const badName = workflowNameRefusal(change.workflow);
@@ -102,6 +103,7 @@ export const workflowChangeRefusal: WorkflowChangeRefusal = (factory, change) =>
  * `wiringRefusal` leans on for these two verbs.
  * @param factory The factory as it is: its name, workflows, schedules and own card triggers.
  * @param change The trigger written, or the untrigger, and the name it carries.
+ * @public
  */
 export const triggerRefusal: TriggerRefusal = (factory, change) => {
   const badName = workflowNameRefusal(change.name);
@@ -121,6 +123,7 @@ export const triggerRefusal: TriggerRefusal = (factory, change) => {
  * contract, which `wiringRefusal` leans on for a hire.
  * @param factory The factory as it is: its name and workflows.
  * @param change The hire, its step `<workflow>/<step>` and its agent.
+ * @public
  */
 export const hireChangeRefusal: HireChangeRefusal = (factory, change) => {
   const bad = hireRefusal(change.step, change.agent);
@@ -134,6 +137,7 @@ export const hireChangeRefusal: HireChangeRefusal = (factory, change) => {
  * for a fire.
  * @param factory The factory as it is: its name and hires.
  * @param change The fire, and the step it names.
+ * @public
  */
 export const fireRefusal: FireRefusal = (factory, change) =>
   holds(factory.hires, change.step) ? null : missing(unhiredFireRefusal(factory.name, change.step, factory.hires));
@@ -166,6 +170,7 @@ function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string) 
  * detach takes the workflow's off, and any other change keeps them; none where none is left.
  * @param wired Each workflow's repository by its name, or undefined where none is wired.
  * @param change The change the person's verb asks: attach, detach, hire, fire, schedule or unschedule, and what it names.
+ * @public
  */
 export const reposRewired: ReposRewired = (wired, change) => {
   if (change.verb !== 'detach' && (change.verb !== 'attach' || change.repo === undefined)) return wired;
@@ -181,6 +186,7 @@ export const reposRewired: ReposRewired = (wired, change) => {
  * it back, and any other change keeping them; none where none is left.
  * @param triggers Each card trigger of the factory's own by its name, or undefined where it holds none.
  * @param change The change the person's verb asks, and what it names.
+ * @public
  */
 export const triggersRewired: TriggersRewired = (triggers, change) => {
   if (change.verb === 'trigger') return withEntry(triggers ?? {}, change.name, change.trigger);

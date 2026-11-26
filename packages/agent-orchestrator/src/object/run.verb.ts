@@ -353,7 +353,7 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
  * The run's object (`runObject`) built off its reading in hand (`RunReading`), its parts no stamp watches read now (`diskPartsOf`): the
  * object before them (`runObjectCore`) with them laid over (`withDiskParts`).
  */
-export const runObjectOf = Effect.fnUntraced(function* (
+const runObjectOf = Effect.fnUntraced(function* (
   run: Run,
   at: RunReading,
   reads: { readonly said: LastSaid } & Pick<RunReads, 'inRequest' | 'listed'>,
@@ -417,7 +417,10 @@ export type RunDiskParts = {
 /** Whether two types are one. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-/** The parts read on every request are exactly the inputs `RUN_INPUTS` says a request watches: one added there fails the typecheck here. */
+/**
+ * The parts read on every request are exactly the inputs `RUN_INPUTS` says a request watches: one added there fails the typecheck here.
+ * @public
+ */
 export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>> = true;
 
 /**

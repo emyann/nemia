@@ -18,32 +18,15 @@ export {
 } from './meter.ts';
 export type {
   AlsoKept,
-  CheckLabels,
   HarnessCost,
   Interval,
-  PassBucket,
   PassCost,
   PassCostRead,
   PassesRead,
-  PassPart,
-  PassSummary,
   Phase,
   PhaseCost,
   Reading,
   RecentPass,
 } from './meter.ts';
-export {
-  checkWait,
-  deniedCalls,
-  gateWaits,
-  onceFacts,
-  queueWait,
-  roundsGranted,
-  settledFacts,
-  settledOnce,
-  settledWaits,
-  runKeys,
-  stepKeys,
-  timelineFacts,
-} from './step.ts';
-export type { DeniedFact, StepFact, StepKeys, TimelineFact, Wait, WaitFact, Waited } from './step.ts';
+export { onceFacts, roundsGranted, settledOnce, runKeys, stepKeys, timelineFacts } from './step.ts';
+export type { StepFact } from './step.ts';

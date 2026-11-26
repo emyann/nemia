@@ -49,7 +49,7 @@ export const checkOutputFile = (dir: string, taskId: string, stream: Stream) => 
  * @param stream The stream.
  * @param text What the stream holds, as kept (`keptOutput`).
  */
-export const writeCheckOutput = (dir: string, taskId: string, stream: Stream, text: string) => {
+const writeCheckOutput = (dir: string, taskId: string, stream: Stream, text: string) => {
   const file = checkOutputFile(dir, taskId, stream);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);

@@ -24,7 +24,7 @@ import type { Decision } from '../decide/decide.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
-export type MergeAsked = { run: Run; ask: MergeAsk; file: string };
+type MergeAsked = { run: Run; ask: MergeAsk; file: string };
 
 /**
  * What a merge decides on of a run's steps (`MergeReads`), off their tasks as `nemia ls` reads them: the closeouts read with the run's

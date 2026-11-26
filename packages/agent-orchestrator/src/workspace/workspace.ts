@@ -36,12 +36,10 @@ import type { CheckoutInstallOf } from '../../contracts/checkout-install.contrac
 import type { WorktreeDepsOf } from '../../contracts/worktree-deps.contract.ts';
 import type { InputsGiven } from '../../contracts/inputs-given.contract.ts';
 
-export type { CheckoutInstall, CheckoutSeen } from '../../contracts/checkout-install.contract.ts';
-export type { WorktreeDeps, WorktreeSeen } from '../../contracts/worktree-deps.contract.ts';
-export type { GivenInputs, InputsRun } from '../../contracts/inputs-given.contract.ts';
+export type { GivenInputs } from '../../contracts/inputs-given.contract.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
-export type DepEntry = { name: string; link?: string };
+type DepEntry = { name: string; link?: string };
 
 /**
  * The main checkout's `node_modules`, listed: its top-level entries, the entries of each `@scope`
@@ -57,7 +55,7 @@ export type DepsListing = {
  * One thing to make in the worktree: a directory of its own, a link — its target written as given — or a `tree`, main's entry at `from`
  * made again at `path` with every file hardlinked and every link inside it copied as written, never followed.
  */
-export type DepsAction =
+type DepsAction =
   | { kind: 'dir'; path: string }
   | { kind: 'link'; path: string; target: string }
   | { kind: 'tree'; path: string; from: string };
@@ -419,7 +417,7 @@ export const inputsGiven: InputsGiven = (run, plan) => {
  * One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it
  * came from.
  */
-export type GivenFrom = { step: string; dir: string; source: string };
+type GivenFrom = { step: string; dir: string; source: string };
 
 /** What a folder step is given: the run's inputs, and a copy of each folder it waits on. Both by their path from the step's own folder. */
 export type Given = { inputs: string | null; from: readonly GivenFrom[] };

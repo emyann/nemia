@@ -46,10 +46,10 @@ import { runEnded } from '../run-ending/run-ending.ts';
 export const FIX_DEADLINE_SECONDS = 900;
 
 /** How much of the end of a fix's output its read carries (`fixOf`). */
-export const FIX_TAIL_BYTES = 16_384;
+const FIX_TAIL_BYTES = 16_384;
 
 /** How often a follow of a fix's output reads it again while the fix runs (`followFix`). */
-export const FIX_FOLLOW_MS = 500;
+const FIX_FOLLOW_MS = 500;
 
 /**
  * The variable an ask's answer reaches a fix's command in: `NEMIA_ANSWER_` and its name in capitals, any other character `_`.

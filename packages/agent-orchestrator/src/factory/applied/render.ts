@@ -54,7 +54,7 @@ export type Wiring = {
  * @param triggers The manifest's `triggers`, as its YAML reads, parameters substituted.
  * @param written The manifest's `triggers` as the template writes them, whose selectors name the parameters they read.
  */
-export function renderedTriggers(triggers: unknown, written: unknown) {
+function renderedTriggers(triggers: unknown, written: unknown) {
   const out: NonNullable<Wiring['triggers']> = {};
   const refused: string[] = [];
   for (const [name, t] of Object.entries(isMap(triggers) ? triggers : {})) {
@@ -87,7 +87,7 @@ function unreadTriggerRefusal(name: string, selector: string, unread: string, wr
  * @param labelValues The manifest's `labelValues`, parameters substituted.
  * @param written The manifest's `labelValues` as the template writes it, which names the parameters it reads.
  */
-export function renderedLabelValues(labelValues: unknown, written: unknown) {
+function renderedLabelValues(labelValues: unknown, written: unknown) {
   const parsed = labelValuesOf(typeof labelValues === 'string' ? labelValues : '');
   if ('refused' in parsed) {
     const raw = typeof written === 'string' ? written : '';
@@ -224,7 +224,7 @@ const STEP_WORDS = [
   'tally',
 ];
 
-/** A template's `route:` (`TemplateRoute`) as the parser's `RouteEval`, which the step's file writes as YAML flow; undefined for none. */
+/** A template's `route:` as the parser's `RouteEval`, which the step's file writes as YAML flow; undefined for none. */
 function routeEvalOf(route: unknown) {
   if (route === 'judge') return { kind: 'judge' } satisfies RouteEval | undefined;
   if (!isMap(route)) return undefined;

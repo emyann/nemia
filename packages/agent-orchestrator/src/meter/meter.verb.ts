@@ -167,10 +167,10 @@ export const recordPassMetrics = Effect.fn('recordPassMetrics')(function* (cost:
 const STEP_BOUNDS = [60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000, 3_600_000, 7_200_000];
 
 /** A wait in the queue or a check's run, in ms: a second to two hours, since a check or a free slot takes seconds. */
-export const WAIT_BOUNDS = [1_000, 5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 1_800_000, 3_600_000, 7_200_000];
+const WAIT_BOUNDS = [1_000, 5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 1_800_000, 3_600_000, 7_200_000];
 
 /** A person's wait at a gate, in ms: a minute to a day, since a person may answer the next morning. */
-export const GATE_BOUNDS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 14_400_000, 28_800_000, 43_200_000, 86_400_000];
+const GATE_BOUNDS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 14_400_000, 28_800_000, 43_200_000, 86_400_000];
 
 /**
  * The metrics of a step, each by the attributes of `stepAttributes` alone: what its settled sessions cost (`step.cost`, USD, where

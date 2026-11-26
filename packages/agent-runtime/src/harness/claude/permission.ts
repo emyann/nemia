@@ -11,14 +11,9 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAnswered, PermissionAskOf } from '../../../contracts/permission.contract.ts';
 import type { AskOption } from '../../core/index.ts';
-import type { PermissionFacts } from '../seam.ts';
 import { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_DENIED, commandOf } from './permission-words.ts';
 
-export type { PermissionOffer, PermissionAsk, PermissionHeld, PermissionAnswer } from '../../../contracts/permission.contract.ts';
-
-export { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_DENIED, commandOf } from './permission-words.ts';
-
-export type { PermissionFacts };
+export { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, commandOf } from './permission-words.ts';
 
 /** Whether `s` is a word with something in it. */
 const said = (s: string | undefined): s is string => s !== undefined && s !== '';

@@ -6,10 +6,8 @@ export {
   askedQuestions,
   closeoutRefusals,
   expandShapes,
-  questionRefusals,
   questionsOf,
-  recommendedOf,
   SHAPE_KEY,
 } from './question.ts';
-export type { Answer, Asked, Question, QuestionOption } from './question.ts';
-export { answerForm, answersOr, numberedAnswers, numberedQuestions, questionLines } from './numbered.ts';
+export type { Answer, Asked, Question } from './question.ts';
+export { answersOr, numberedAnswers, numberedQuestions, questionLines } from './numbered.ts';

@@ -16,6 +16,10 @@
       "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/cli/**", "$TURBO_ROOT$/apps/api/**"]
     },
+    "cli#test": {
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/**"]
+    },
     "agent-orchestrator#test": {
       "dependsOn": ["^transit"],
       "inputs": [

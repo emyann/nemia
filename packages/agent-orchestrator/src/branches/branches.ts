@@ -44,7 +44,7 @@ export function resultSteps(steps: readonly StepSpec[], run?: Run) {
  * @param steps The run's steps.
  * @param run The run, whose step records say which workflow node filed its card.
  */
-export function routedResult(steps: readonly StepSpec[], run: Run) {
+function routedResult(steps: readonly StepSpec[], run: Run) {
   const read = steps.flatMap((s) => {
     const condition = (s.workflow !== undefined || s.card !== undefined) && run.steps[s.name]?.sent ? conditionOf(s, steps) : undefined;
     const names = condition ? (condition.input ?? condition.after) : [];
@@ -197,7 +197,7 @@ export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/
  * without a slash after it. npm reads them the same, and a regexp built from `./packages/*` as written matches no path git prints.
  * @param written The glob as the `package.json` writes it.
  */
-export const workspaceGlob = (written: string) => written.replace(/^(?:\.\/+)+/, '').replace(/\/+$/, '');
+const workspaceGlob = (written: string) => written.replace(/^(?:\.\/+)+/, '').replace(/\/+$/, '');
 
 /**
  * The globs among a repository's `workspaces` that have `**`, as written. Not refused — the repository's `package.json` is not
@@ -228,7 +228,7 @@ export const ROOT_GROUP = '(root)';
  * A glob as a regexp of a whole path: `*` and `?` within one folder, `**` across folders, and a trailing `/` every path under it.
  * @param glob The glob.
  */
-export function globRegExp(glob: string) {
+function globRegExp(glob: string) {
   const g = glob.endsWith('/') ? `${glob}**` : glob;
   let re = '';
   for (let i = 0; i < g.length; i++) {
@@ -263,7 +263,7 @@ const linesOf = (c: Change) => (c.added === null || c.removed === null ? 'binary
  * @param file The file's path from the repository's root.
  * @param workspaces The repository's `workspaces` globs, as written.
  */
-export function packageOf(file: string, workspaces: readonly string[]) {
+function packageOf(file: string, workspaces: readonly string[]) {
   const dirs = file.split('/').slice(0, -1);
   const packages = workspaces.map((w) => globRegExp(workspaceGlob(w)));
   for (let n = 1; n <= dirs.length; n++) {

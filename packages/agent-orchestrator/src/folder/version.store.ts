@@ -74,10 +74,10 @@ export type VersionNamed = {
 };
 
 /** An agent a folder names, as its version counts it: where the load finds it and its version there, or missing. */
-export type VersionAgent = readonly [string, { at: string; version: string } | { missing: string }];
+type VersionAgent = readonly [string, { at: string; version: string } | { missing: string }];
 
 /** A skill a step adds, as its version counts it: its folder's version where found (null where no skill is there), or missing. */
-export type VersionSkill = readonly [string, string | null | { missing: string }];
+type VersionSkill = readonly [string, string | null | { missing: string }];
 
 /** What the doors answer of the agents and skills a folder names: each agent and each added skill, as the version counts them. */
 export type VersionGathered = { readonly agents: readonly VersionAgent[]; readonly added: readonly VersionSkill[] };

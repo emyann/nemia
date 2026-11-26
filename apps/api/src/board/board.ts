@@ -56,7 +56,7 @@ const boardDirOf = async (c: Parameters<Handler<ApiEnv>>[0]) => {
  * a backslash, a NUL, or an encoding that does not decode.
  * @param urlPath The request's path, as it came, still encoded.
  */
-export function segmentsOf(urlPath: string) {
+function segmentsOf(urlPath: string) {
   let decoded: string;
   try {
     decoded = decodeURIComponent(urlPath);

@@ -2,5 +2,5 @@
 export { fromNote, INPUTS_HEADING, inputRefusal, inputsLine, inputsNote, mountsLine, namedInText, PICTURES } from './inputs.ts';
 export type { InputFile } from './inputs.ts';
 export { contextRefusal } from './context.ts';
-export { modelsOf, modelsRefusal, modelsText, withModels } from './models.ts';
+export { modelsOf, modelsText, withModels } from './models.ts';
 export type { RunModels } from './models.ts';

@@ -26,7 +26,7 @@ export type { Level };
 export const atLeast = (level: Level, floor: Level) => LEVELS.indexOf(level) >= LEVELS.indexOf(floor);
 
 /** A raise of a factory's level for a stretch: the level it is raised to, until the moment `until` (ISO), and its default after. */
-export type Raise = { level: Level; until: string };
+type Raise = { level: Level; until: string };
 
 /**
  * A factory's level file as `nemia level --factory` writes it: its own default `level`, absent where it follows the store's; when it was
@@ -81,7 +81,7 @@ export const FACTORY_LEVEL_FORM = `nemia level [${LEVELS.join('|')}] [--factory 
  * @param level The level the raise asks for.
  * @param byDefault The factory's default level.
  */
-export const raiseRefusal = (factory: string, level: Level, byDefault: Level) =>
+const raiseRefusal = (factory: string, level: Level, byDefault: Level) =>
   atLeast(byDefault, level)
     ? `${factory} is at ${byDefault} by default, so a raise to ${level} raises nothing: raise it above its default, or set its default with nemia level ${level} --factory ${factory}.`
     : undefined;
@@ -170,15 +170,4 @@ export function levelsAfter(
     return { since: '', ...(r.own === null ? {} : { level: r.own }), ...(r.raise === null ? {} : { raise: r.raise }) };
   };
   return rows.map((r) => factoryLevelOf(r.factory, fileOf(r), store, at));
-}
-
-/**
- * A factory's level as `nemia level` says it: in force, until when and what after, and whose default it is. Pure.
- * @param row The factory's level.
- * @param byDefault The default factory's name, whose level is the store's.
- */
-export function factoryLevelWords(row: FactoryLevel, byDefault: string) {
-  const whose = row.factory === byDefault ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
-  if (row.raise !== null) return `${row.factory}: ${row.level} until ${row.raise.until}, then ${row.default} (${whose})`;
-  return `${row.factory}: ${row.level} (${whose})`;
 }

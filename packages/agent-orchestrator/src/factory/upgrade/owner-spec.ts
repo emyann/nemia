@@ -28,7 +28,7 @@ const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>) 
  * @param merge The merge of the trees: its clean entries and its conflicts.
  * @param choices The person's choice for each conflict, by where it is; a conflict with none is taken as the tree has it.
  */
-export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>) {
+function composedTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>) {
   const composed = compose(merge, filledFor(merge, choices));
   const entries = 'entries' in composed ? composed.entries : [];
   return new Map(
@@ -50,7 +50,7 @@ const under = (texts: Texts, prefix: string, direct: boolean) =>
  * @param factory The factory's name.
  * @param owner The owner of the conflicts chosen for: its kind and name.
  */
-export const keptLine = (factory: string, owner: ResolutionOwner) =>
+const keptLine = (factory: string, owner: ResolutionOwner) =>
   `Nothing was proposed; your choice is kept. Choose again for a conflict of the ${owner.kind} ${owner.name} to propose it again ` +
   `(nemia factory resolve ${factory} <conflict> --ours|--theirs|--file <path>).`;
 

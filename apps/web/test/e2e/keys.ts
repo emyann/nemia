@@ -25,11 +25,11 @@ export async function tabTo(page: Page, mark: string) {
 }
 
 /** Waits for two frames of the page: what a press started has been drawn. */
-export const drawn = (page: Page) =>
+const drawn = (page: Page) =>
   page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 
 /** Where the router of the story the page draws stands, as its search, and how many times it has moved. */
-export const standing = (page: Page) =>
+const standing = (page: Page) =>
   page.locator('[data-story-ground]').evaluate((ground) => {
     const at = ground.getAttribute('data-at') ?? '';
     return { search: at.includes('?') ? at.slice(at.indexOf('?')) : '', moves: Number(ground.getAttribute('data-moves')) };

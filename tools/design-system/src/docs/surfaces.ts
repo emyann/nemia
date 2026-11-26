@@ -47,7 +47,7 @@ const ON: readonly (readonly [readonly string[], readonly string[]])[] = [
  * A colour of tokens.json, `hsl(h s% l%)`, as its three channels from 0 to 255.
  * @param hsl the colour.
  */
-export const channels = (hsl: string) => {
+const channels = (hsl: string) => {
   const [hue = 0, saturation = 0, lightness = 0] = (/hsl\(([\d.]+) ([\d.]+)% ([\d.]+)%\)/.exec(hsl) ?? []).slice(1).map(Number);
   const [s, l] = [saturation / 100, lightness / 100];
   const a = s * Math.min(l, 1 - l);

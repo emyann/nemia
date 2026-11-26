@@ -12,7 +12,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 /** A compose service, as far as the render reads it. */
-export type Service = { image?: string; environment?: Record<string, string>; volumes?: string[] };
+type Service = { image?: string; environment?: Record<string, string>; volumes?: string[] };
 
 /** A compose file, as far as the render reads it. */
 export type Compose = { services?: Record<string, Service> };
@@ -21,8 +21,8 @@ export type Compose = { services?: Record<string, Service> };
 export type Ports = { grafana: string; otlp: string };
 
 /** The ports of the container the render publishes: Grafana's, and OTLP over HTTP. */
-export const GRAFANA_PORT = 3000;
-export const OTLP_PORT = 4318;
+const GRAFANA_PORT = 3000;
+const OTLP_PORT = 4318;
 
 /** The name of a render's container: `nemia-render-<pid>-<random>`, whole. */
 export const NAME = /^nemia-render-\d+-[a-z0-9]+$/;
@@ -50,14 +50,14 @@ function bindOf(line: string, observeDir: string): string | undefined {
 }
 
 /** The pinned image of `compose`'s one service; refuses a file that names none. */
-export function imageOf(compose: Compose): string {
+function imageOf(compose: Compose): string {
   const { image } = serviceOf(compose);
   if (!image) throw refusal('compose.yaml names no image for its service: pin one by digest');
   return image;
 }
 
 /** Where the image keeps its Prometheus's configuration. */
-export const PROMETHEUS_CONFIG = '/otel-lgtm/prometheus.yaml';
+const PROMETHEUS_CONFIG = '/otel-lgtm/prometheus.yaml';
 
 /**
  * How late a render's Prometheus takes a sample behind the newest it holds: eight days, so the seed's week of quota is kept. The image's
@@ -113,7 +113,7 @@ export function runArgv(compose: Compose, observeDir: string, name: string, own:
 }
 
 /** Run `docker` with `args`, bounded; its stdout, or an error saying what it answered. */
-export function docker(args: readonly string[], seconds = 120): string {
+function docker(args: readonly string[], seconds = 120): string {
   const ran = spawnSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: seconds * 1000 });
   if (ran.status !== 0)
     throw new Error(`docker ${args.join(' ')} failed (${ran.error?.message ?? (ran.stderr.trim() || `exit ${ran.status}`)})`);

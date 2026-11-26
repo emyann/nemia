@@ -37,7 +37,7 @@ export const digestOf = (bytes: Buffer) => `sha256:${crypto.createHash('sha256')
  * @param at When it is uploaded, in milliseconds.
  * @param bytes Its bytes.
  */
-export async function uploaded(door: FileDoorShape, namespace: string, at = NOW, bytes = BYTES) {
+async function uploaded(door: FileDoorShape, namespace: string, at = NOW, bytes = BYTES) {
   const begun = await settled(door.files.begin(namespace, at));
   if (begun === undefined) throw new Error(`no file is begun in ${namespace}`);
   begun.write(bytes.subarray(0, 2));

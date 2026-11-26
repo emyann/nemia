@@ -781,7 +781,7 @@ export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
  * @param l The card: its workflow and the factory it names, null for the default one.
  * @param factories The store's factories that read, by name.
  */
-export function factoryRepoOf(
+function factoryRepoOf(
   l: Pick<InboxListing, 'workflow' | 'factory'> & Partial<Pick<InboxListing, 'queued'>>,
   factories: ReadonlyMap<string, WiredFactory>,
 ) {
@@ -843,7 +843,7 @@ export type QueueStarted =
  * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in inbox.verb.ts is what both are given.
  * @param repo The card's own `repo:` value.
  */
-export const ignoredRepoLine = (repo: string) =>
+const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**

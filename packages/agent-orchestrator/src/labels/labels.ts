@@ -2,7 +2,7 @@
  * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling, a key an optional prefix and a name
  * (`team.example/stage`), put on inbox cards and runs and changed at any time. What a label may be spelled (`labelRefusal`), kubectl's
  * edits of a map (`parseLabelEdits`, `labelEdits`), and what a start copies once, at creation (`inheritedLabels`); and a run's labels
- * as a selection reads them (`runLabelMap`, `selectedRuns`, `labelSegments`). No Effect: every caller wraps a refusal in the package's
+ * as a selection reads them (`runLabelMap`, `selectedRuns`). No Effect: every caller wraps a refusal in the package's
  * `Invalid`.
  *
  * **One map, beside the closed keys.** A run's and a card's labels sit in one map with `factory` and `workflow`, which Nemia gives
@@ -15,22 +15,10 @@ import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import { selectsLabels, type Selectors } from '../watch/selector.ts';
 
-export {
-  CLOSED_LABEL_KEYS,
-  LABEL_CAP,
-  LABEL_NAME,
-  labelKeyRefusal,
-  labelRefusal,
-  labelsRefusal,
-  labelValueRefusal,
-  labelValuesOf,
-  labelValuesRefused,
-  parseLabelEdits,
-  RESERVED_LABEL_KEYS,
-} from '../label-spelling/label-spelling.ts';
+export { labelRefusal, labelsRefusal, labelValuesOf, parseLabelEdits } from '../label-spelling/label-spelling.ts';
 import type { Labels, LabelChange } from '../../contracts/labels.contract.ts';
 
-export type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
+export type { Labels, LabelChange } from '../../contracts/labels.contract.ts';
 
 /**
  * `current` after `edits`, as `kubectl label` applies them: each `key=value` sets its key, each `key-` removes it (no change where it
@@ -141,13 +129,3 @@ export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>
  */
 export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'labels'>>(runs: readonly R[], selectors: Selectors = []) =>
   selectors.length ? runs.filter((run) => selectsLabels(selectors, runLabelMap(run))) : runs;
-
-/**
- * What a printer appends to a line of `map`'s, as `nemia ls` its runs' head lines and `nemia inbox` its cards': with `--show-labels`,
- * `  labels: <the map>` (`labelsText`); then, for each `-L <key>` in the order given, `  <key>: <its value>`, `<none>` where the map has
- * none. Nothing with neither, so the line is as it was. Pure.
- * @param map The labels of the line's run or card.
- * @param shown Whether `--show-labels` was given (`all`), and the keys of each `-L`, in the order given.
- */
-export const labelSegments = (map: Labels, shown: { readonly all: boolean; readonly columns: readonly string[] }) =>
-  `${shown.all ? `  labels: ${labelsText(map)}` : ''}${shown.columns.map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;

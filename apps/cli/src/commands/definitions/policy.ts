@@ -15,7 +15,7 @@ type Listed = typeof PolicyList.Type;
  * The lines `nemia policy` prints of an agent's rules.
  * @param list The agent's rules as the api answers them: those in force, and its proposal where it made one.
  */
-export function listLines(list: Listed) {
+function listLines(list: Listed) {
   const inForce = list.rules.length
     ? list.rules.map((r) => `  ${r.id}${r.from === 'default' ? ' (default)' : ''}: ${r.words}`)
     : ['  none: every answer is asked'];

@@ -28,7 +28,7 @@ import { StoreRoot } from '../../config/root.store.ts';
 import { endLeftBehind, LEFT_GRACE } from './left-behind.verb.ts';
 
 /** The sweep's pace when it is given none. */
-export const FREE_EVERY: Duration.Input = '5 seconds';
+const FREE_EVERY: Duration.Input = '5 seconds';
 
 /** The most runs one sweep judges, and so frees: a store with many finished runs is freed over as many sweeps as that takes. */
 export const FREE_A_SWEEP = 4;
@@ -44,7 +44,7 @@ export type FreeMemory = { judged: Set<string>; said: Map<string, string>; turn:
 export const freshFreeMemory = () => ({ judged: new Set(), said: new Map(), turn: 0 }) satisfies FreeMemory;
 
 /** What one sweep did: each run it freed, as its prune answered, and each line it said of a run it left. */
-export type Freed = { readonly freed: readonly Pruning[]; readonly said: readonly string[] };
+type Freed = { readonly freed: readonly Pruning[]; readonly said: readonly string[] };
 
 /** One candidate judged: ready, with what its removal frees; or left, with what is to be said of it, if anything. */
 type Swept = { readonly id: string; readonly ready: Sized } | { readonly id: string; readonly words: string | null };

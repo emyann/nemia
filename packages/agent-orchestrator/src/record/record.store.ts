@@ -203,7 +203,7 @@ const jsonOr = (text: string) => Result.getOrUndefined(Schema.decodeUnknownResul
  * by code older than actors — or names one that does not read as an actor, which is left out rather than refusing what the file asks.
  * @param value What the file holds under its actor's key; undefined where it holds none.
  */
-export const actorIn = (value: unknown) => {
+const actorIn = (value: unknown) => {
   const read = Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
   return read === undefined ? {} : { actor: read };
 };
@@ -740,7 +740,7 @@ export function approvalIn(text: string, step: string, n: number) {
  * cannot be read as one.
  * @param asks The run's waiting asks.
  */
-export function acceptancesIn(asks: readonly AskEntry[]) {
+function acceptancesIn(asks: readonly AskEntry[]) {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
   for (const { name, text, where } of asks) {

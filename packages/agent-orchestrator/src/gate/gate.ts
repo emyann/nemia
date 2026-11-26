@@ -251,6 +251,7 @@ export function approveFormOf(steps: readonly StepSpec[], run: Pick<Run, 'gates'
 /**
  * What of a step refuses `nemia approve <run> <step> --off` (`takeBackJudged`, which words it), or null: a step the run does not have,
  * then one not approved, then one approved whose session or check has a task — what it approved has run. Pure.
+ * @public
  */
 export const takeBackStop: TakeBackStopOf = ({ known, approved, filed }) =>
   !known ? 'unknown' : !approved ? 'unapproved' : filed ? 'handed-on' : null;

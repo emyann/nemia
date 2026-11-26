@@ -13,8 +13,7 @@ import { said, switchArg } from './requests.ts';
  * @param answer The api's answer, decoded by its Schema.
  * @param json Whether `--json` was given.
  */
-export const answerLines = (answer: unknown, json: boolean) =>
-  (json ? JSON.stringify(answer, null, 2) : stringify(answer).trimEnd()).split('\n');
+const answerLines = (answer: unknown, json: boolean) => (json ? JSON.stringify(answer, null, 2) : stringify(answer).trimEnd()).split('\n');
 
 /**
  * Asks the read `verb` names through `call`, prints its answer by `answerLines`, as `args` asks, and answers exit 0.

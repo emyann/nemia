@@ -16,7 +16,7 @@ import type { PlaceRequests } from '../../../src/place/place.ts';
 const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0' };
 
 /** `text` with the password of each URL in it taken out: `scheme://user:secret@host` said as `scheme://user@host`. */
-export const withoutPassword = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/[^/@\s:]*):[^/@\s]*@/gi, '$1@');
+const withoutPassword = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/[^/@\s:]*):[^/@\s]*@/gi, '$1@');
 
 /** The host a URL names, scp-like `user@host:path` too; undefined where it names none. */
 function hostOf(url: string) {
@@ -33,7 +33,7 @@ function hostOf(url: string) {
  * What to set up on the machine Nemia's daemon runs on so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything
  * else.
  */
-export function setupFor(url: string) {
+function setupFor(url: string) {
   const host = hostOf(url) ?? 'its host';
   if (/^ssh:\/\//i.test(url) || /^[^/:@\s]+@[^/:\s]+:/.test(url))
     return `give the machine Nemia's daemon runs on an SSH key that ${host} accepts, and add ${host}'s host key to ~/.ssh/known_hosts (ssh -T <user>@${host} once checks both), then ask again`;

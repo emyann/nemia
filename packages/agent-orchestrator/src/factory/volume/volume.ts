@@ -125,9 +125,6 @@ export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined
   }));
 };
 
-/** A volume with its name: the one its file stores, or the one `volumesNamed` gives it on read. */
-export type NamedVolume = Volume & { readonly name: string };
-
 /**
  * The name a volume's folder gives it (`volumeNameAmong`'s `base`): the basename of its path as a slug, lowercase letters, digits and
  * dashes, each run of anything else one dash, none at either end; `volume` where nothing of it is left, the root's say.
@@ -189,7 +186,7 @@ export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>) {
  * @param volumes The factory's other volumes, each with the name its file stores, where it stores one.
  * @param at The added volume's path, resolved.
  */
-export function volumeNameAt(volumes: readonly Volume[], at: string) {
+function volumeNameAt(volumes: readonly Volume[], at: string) {
   const named = volumesNamed(volumes);
   const same = named.find((v) => v.path === at);
   if (same !== undefined) return same.name;
@@ -205,6 +202,7 @@ export function volumeNameAt(volumes: readonly Volume[], at: string) {
  * ends.
  * @param base The name the volume's folder gives it (`volumeBase`).
  * @param taken The names the factory's other volumes hold.
+ * @public
  */
 export const volumeNameAmong: VolumeNameAmong = (base, taken) => {
   if (!taken.includes(base)) return base;
@@ -240,3 +238,9 @@ export const volumeSwitched: VolumeSwitched = (volumes, name, switches) => {
     },
   };
 };
+
+/**
+ * A volume with its name: the one its file stores, or the one `volumesNamed` gives it on read.
+ * @public
+ */
+export type NamedVolume = Volume & { readonly name: string };

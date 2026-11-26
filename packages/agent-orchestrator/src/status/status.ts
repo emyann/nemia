@@ -17,7 +17,7 @@ import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 import { declarationOf } from '../harness/harness.ts';
 import type { Actor, GateAt } from 'objects';
-export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
+export { budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
@@ -90,7 +90,7 @@ export const approvedWork = (step: StepSpec, run: Run) =>
  * @param step The step.
  * @param run The run's record.
  */
-export const unfiledApproval = (step: StepSpec, run: Run) =>
+const unfiledApproval = (step: StepSpec, run: Run) =>
   !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId ? approvalOf(run, step.name) : undefined;
 
 /**

@@ -301,7 +301,7 @@ export function upgradeMerge(
  * @param choices The person's choices, by a conflict's address.
  * @param owners The key of the owner whose proposal resolves each conflict, by its address.
  */
-export const choicesUnowned = (choices: Readonly<Record<string, Choice>>, owners: ReadonlyMap<string, string>) =>
+const choicesUnowned = (choices: Readonly<Record<string, Choice>>, owners: ReadonlyMap<string, string>) =>
   Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at))) satisfies Readonly<Record<string, Choice>> as Readonly<
     Record<string, Choice>
   >;
@@ -672,7 +672,7 @@ export const reconcileOnce = Effect.fn('reconcileOnce')(function* () {
 });
 
 /** The controller's pace, which no caller shortens. */
-export const RECONCILE_EVERY: Duration.Input = '5 seconds';
+const RECONCILE_EVERY: Duration.Input = '5 seconds';
 
 /**
  * The controller, for as long as it runs: a pass each `RECONCILE_EVERY`; a pass that fails is a warning, and the next is tried a pass

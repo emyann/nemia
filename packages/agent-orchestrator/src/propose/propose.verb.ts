@@ -145,7 +145,7 @@ function specRefusal(object: ProposedObject, label: string) {
  * @param object The object proposed.
  * @param factory The factory the proposal is in.
  */
-export function objectRefusal(object: ProposedObject, factory: string) {
+function objectRefusal(object: ProposedObject, factory: string) {
   const label = labelOf(object);
   const verb = verbOf(object);
   if (object.metadata.namespace !== undefined && object.metadata.namespace !== factory)
@@ -176,7 +176,7 @@ const objectsChecked = (objects: readonly ProposedObject[], factory: string) => 
  * A proposal's name: its proposer and five lowercase letters or digits.
  * @param proposer Who proposes, as the name's first part.
  */
-export const proposalNameOf = (proposer: string) => {
+const proposalNameOf = (proposer: string) => {
   const letters = randomBytes(5)
     .reduce((word, byte) => word + (byte % 36).toString(36), '')
     .slice(0, 5);

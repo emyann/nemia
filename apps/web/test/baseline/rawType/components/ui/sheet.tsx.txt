@@ -1,2 +1,0 @@
-apps/web/src/components/ui/sheet.tsx#text-body-large
-apps/web/src/components/ui/sheet.tsx#text-body-medium

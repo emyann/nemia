@@ -64,7 +64,7 @@ const withFile = (file: { path: string; text: string }) => {
 };
 
 /** A picture's bytes as a carried text: a NUL among them, so it is no text (`textIn`), built from its code. */
-export const PICTURE = `${String.fromCharCode(0x89)}PNG${String.fromCharCode(0)}${String.fromCharCode(1)}`;
+const PICTURE = `${String.fromCharCode(0x89)}PNG${String.fromCharCode(0)}${String.fromCharCode(1)}`;
 
 /**
  * `dev` written carrying two scripts, `a.ts` and `b.ts`, and a picture, `logo.png`, then written again at its version carrying `a.ts`

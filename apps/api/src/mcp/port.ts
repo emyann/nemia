@@ -77,7 +77,7 @@ import { type PortTool, portTools } from './tools.ts';
 import { type FeedViews, feedViews } from './views.ts';
 
 /** How often a pending call is told as progress, where its caller gave a progress token: under any host's idle bound. */
-export const PROGRESS_EVERY_MS = 30_000;
+const PROGRESS_EVERY_MS = 30_000;
 
 /**
  * How long a host of the modern era may answer the port's `tools/list` from its cache (`ttlMs`): five minutes, the spec's own example, so a
@@ -129,7 +129,7 @@ const jsonOf = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOptio
  * @param from The request to the port that carried the call, whose address and Authorization are taken.
  * @param signal What aborts the request, where one is given.
  */
-export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, signal?: AbortSignal) {
+function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, signal?: AbortSignal) {
   const filled = tool.path.replace(/:([A-Za-z]+)/g, (_, key: string) => encodeURIComponent(asText(args[key])));
   const url = new URL(filled, from.url);
   for (const key of tool.queryKeys) {
@@ -153,7 +153,7 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
  * @param tool The tool called: its link's defaults and its endpoint's keys.
  * @param args The call's arguments, by key.
  */
-export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>) {
+function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>) {
   const absent = (key: string) => args[key] === undefined || args[key] === null;
   const sent: Record<string, unknown> = { ...args };
   for (const [key, value] of Object.entries(tool.defaults)) if (absent(key)) sent[key] = value;
@@ -289,7 +289,7 @@ export async function called(tool: PortTool, args: Readonly<Record<string, unkno
  * @param held The tasks the port holds in its memory.
  * @param signal What aborts the call.
  */
-export async function taskCalled(
+async function taskCalled(
   tool: PortTool,
   args: Readonly<Record<string, unknown>>,
   from: Request,
@@ -390,7 +390,7 @@ function servesFeed(mcp: McpServer, views: FeedViews, appOf: () => Fetching) {
  * @param feed The era the request speaks, the feed's views and the tasks the port holds, where the feed is offered as resources and
  *   tasks are served; none where they are not.
  */
-export function portServer(
+function portServer(
   tools: readonly PortTool[],
   appOf: () => Fetching,
   progressEveryMs: number,
@@ -540,7 +540,7 @@ function releasedWith(response: Response, releases: readonly (() => void)[], sig
  * @param handler The SDK's handler of the port.
  * @param views The feed's views, which hold each URI subscribed to.
  */
-export async function listened(request: Request, handler: McpHttpHandler, views: FeedViews) {
+async function listened(request: Request, handler: McpHttpHandler, views: FeedViews) {
   if (request.method !== 'POST') return handler.fetch(request);
   const body = await bodyOf(request.clone());
   const asked = subscribedIn(body);

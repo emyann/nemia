@@ -7,8 +7,6 @@
 import type { Milestone, MilestoneState } from 'objects';
 import type { MilestoneFacts, MilestonesOf } from '../../contracts/milestones.contract.ts';
 
-export type { MilestoneFacts, MilestoneStates } from '../../contracts/milestones.contract.ts';
-
 /**
  * Each milestone's state: done where the store holds it, next for the first not done, later for any other.
  * @param f What the store holds now, one fact a milestone.

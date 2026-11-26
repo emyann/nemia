@@ -201,6 +201,7 @@ const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict
  * the checks with `usesCheckout: false` are doing. Pure.
  * @param checks The ending's checks, each whether it uses the checkout and where it stands on the current try.
  * @param signedDone Whether the ending signed off done, its checks due or running (`own` is `checking`).
+ * @public
  */
 export const checksHoldCheckout: ChecksHoldCheckout = (checks, signedDone) =>
   checks.some((c) => c.usesCheckout && (c.standing === 'running' || (signedDone && c.standing !== 'passed')));
@@ -272,6 +273,7 @@ export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[])
  * (a sign-off ask, a check's `retries:`) on the word the workflow gave at the start; else nothing. Proved by
  * `contracts/checkout-claim.contract.ts`. Pure.
  * @param w What the claim is read off: the person's word, whether the ending is gated, filed and landed, and the run's creation.
+ * @public
  */
 export const claimedAt: ClaimedAt = (w) => w.asked ?? (w.filed ? (w.landed ? undefined : w.createdAt) : w.gated ? undefined : w.createdAt);
 

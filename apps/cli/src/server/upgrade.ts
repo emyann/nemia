@@ -24,9 +24,6 @@ import { clientRelease } from '../release.ts';
 import { blocksOf } from '../watch/watch.ts';
 import { upgradeEnd, upgradeTarget } from './upgraded.ts';
 
-/** The verb, as a person types it. */
-export const SERVER_VERB = 'server';
-
 /** What the verb is asked as, in its refusals and its asks. */
 const ASKED_AS = 'server upgrade';
 
@@ -43,13 +40,13 @@ const USAGE = [
  * How long a server going down for its upgrade has to answer again before the follow gives up: three minutes, many times a restart
  * (seconds), so a loaded server still gets there, while a person is told within a few minutes where to read it otherwise.
  */
-export const BACK_WITHIN_MS = 180_000;
+const BACK_WITHIN_MS = 180_000;
 
 /** How often the follow asks a server that went down whether it answers again. */
 const POLL_MS = 500;
 
 /** Where the follow writes: the output on `out`, what the verb says of it on `err`. */
-export type Speak = { readonly out: (text: string) => void; readonly err: (text: string) => void };
+type Speak = { readonly out: (text: string) => void; readonly err: (text: string) => void };
 
 const STDIO: Speak = { out: (text) => process.stdout.write(text), err: (text) => process.stderr.write(text) };
 

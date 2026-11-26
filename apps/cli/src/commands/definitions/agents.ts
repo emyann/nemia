@@ -47,7 +47,7 @@ function agentLines({ metadata: { name }, spec, status }: AgentListed) {
  * `nemia agents`' lines: each agent, and how to get one's card; or where an agent would be, for none.
  * @param agents The agents the api lists, in its order; none prints where an agent would be.
  */
-export const agentsLines = (agents: readonly AgentListed[]) =>
+const agentsLines = (agents: readonly AgentListed[]) =>
   (agents.length
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
     : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"]) satisfies string[];
@@ -89,7 +89,7 @@ const headingOf = ({ place, repo, dir }: AgentSource) =>
   place === 'repository' ? `${dir}  (the repository ${repo})` : place === 'library' ? `${dir}  (your library)` : dir;
 
 /** `nemia agents sources`' lines: the agents of each folder under its heading, then how to copy one; or that there is none. */
-export function sourcesLines({ sources }: AgentSources) {
+function sourcesLines({ sources }: AgentSources) {
   if (!sources.length)
     return ['no agent file found in the repositories the store knows, nor in your library: name a folder of them with --path <folder>.'];
   const lines: string[] = [];
@@ -119,7 +119,7 @@ export async function agentsSources(args: Args) {
 }
 
 /** The words of a copy: what it wrote, what it reused, and how the agent is given to a step. */
-export const copiedLines = ({ name, copied, reused }: AgentCopied) => [
+const copiedLines = ({ name, copied, reused }: AgentCopied) => [
   `${name} copied into your library${copied.length ? `: ${copied.join(', ')}` : ', which held it already'}`,
   ...(reused.length && copied.length ? [`reused as they were: ${reused.join(', ')}`] : []),
   `give it to a step: nemia factory hire <factory> ${name} --step <workflow>/<step>`,

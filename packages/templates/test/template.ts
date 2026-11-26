@@ -45,7 +45,7 @@ export async function handled<A extends object>(env: NodeJS.ProcessEnv, entry: S
 }
 
 /** The orchestrator's CLI, `nemia`, at the entry its package exports for a spawn (`agent-orchestrator/bin`). */
-export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
+const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
@@ -90,7 +90,7 @@ export function copyOf(from: string, edit: Record<string, (text: string) => stri
 export type Applied = { name: string; template: string; sets?: string[] };
 
 /** A factory as the controller left it: its tree's folder where it was seeded, the conditions of its status, and the store it is in. */
-export type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }>; store: string };
+type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }>; store: string };
 
 /**
  * Each of `factories` applied on one scratch store, each over a scratch repository of its own, then rendered by `nemia up`, stopped once

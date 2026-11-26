@@ -84,7 +84,7 @@ export const Skill = Schema.Struct({
 export type Skill = typeof Skill.Type;
 
 /** A page of a namespace's skills. */
-export const SkillListed = Schema.Struct({
+const SkillListed = Schema.Struct({
   ...Skill.fields,
   spec: SkillSpec.mapFields((fields) => ({
     ...Struct.omit(fields, ['body', 'files']),
@@ -98,7 +98,7 @@ export const SkillListed = Schema.Struct({
       "The skill as its SKILL.md says it, without its body or its files' text, which a read of the skill answers: its title, description, tags, examples, whether it is preloaded, and its folder's other files by path.",
   }),
 }).annotate({ description: "A skill as a list serves it, without its files' content (LISTED_WITHOUT)." });
-export type SkillListed = typeof SkillListed.Type;
+type SkillListed = typeof SkillListed.Type;
 
 /** A page of skills, each without its files' content. */
 export const SkillList = listOf('Skill', SkillListed);

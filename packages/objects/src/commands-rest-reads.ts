@@ -133,13 +133,3 @@ export const MEMORY_WORDS = {
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the nemia group's `memory` and `fact` of `objects`' Api, calling this handler" },
 } as const satisfies CommandWords;
-
-/** The reads' words, in the order the help lists them. */
-export const REST_READ_WORDS = [
-  CONCLUDED_WORDS,
-  LOGS_WORDS,
-  PASSES_WORDS,
-  SERIES_WORDS,
-  QUOTA_WORDS,
-  MEMORY_WORDS,
-] as const satisfies readonly CommandWords[];

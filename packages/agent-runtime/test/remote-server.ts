@@ -52,7 +52,7 @@ export type Binding = 'JSONRPC' | 'HTTP+JSON' | 'GRPC';
  * A state the script moves a task to, in A2A's words. `input-required` and `auth-required` interrupt a turn; the last four end the
  * task.
  */
-export type StateWord = 'working' | 'input-required' | 'auth-required' | 'completed' | 'failed' | 'rejected' | 'canceled';
+type StateWord = 'working' | 'input-required' | 'auth-required' | 'completed' | 'failed' | 'rejected' | 'canceled';
 
 /**
  * One thing the agent does: an artifact published (`data`, or `text`), then a move to `state` with `words` as its status

@@ -87,7 +87,7 @@ export const KEYSPACE_SCHEMA = Math.max(...Object.keys(KEYSPACE_MIGRATIONS).map(
 export type KeyRecord = { readonly key: string; readonly value: string; readonly revision: number; readonly createRevision: number };
 
 /** A change a watch replays: the record a row holds, and whether the row deletes its key. */
-export type KeyChange = KeyRecord & { readonly deleted: boolean };
+type KeyChange = KeyRecord & { readonly deleted: boolean };
 
 /**
  * A write of one key: its verb, the revision the writer read it at (null where it names none), the record's value, and the keys of the
@@ -113,7 +113,7 @@ export class KeyRefused extends Data.TaggedError('KeyRefused')<{
 }> {}
 
 /** A watch's answer: the changes after the revision it asked from, or why it cannot start there. */
-export type Since = { readonly changes: readonly KeyChange[]; readonly head: number } | { readonly refused: 'gone' | 'ahead' };
+type Since = { readonly changes: readonly KeyChange[]; readonly head: number } | { readonly refused: 'gone' | 'ahead' };
 
 /** The reads and writes of one transaction (`Keyspace.within`): the store's own, opening no transaction of their own. */
 export type KeyTxn = {

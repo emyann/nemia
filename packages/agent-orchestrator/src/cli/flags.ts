@@ -1,8 +1,7 @@
 /**
- * What the CLI's verbs and runners share: the help, a verb's shape, how a program is given its place, a usage refusal, a person's yes.
+ * What the CLI's verbs and runners share: the help, a verb's shape, how a program is given its place, a usage refusal.
  */
-import readline from 'node:readline/promises';
-import { Effect, Schema } from 'effect';
+import { Effect } from 'effect';
 import {
   CLI_VERBS,
   Invalid,
@@ -10,7 +9,6 @@ import {
   TABLE,
   helpOf,
   storeConfigLayer,
-  type Args,
   type Env,
   type engine,
   type StoreConfig,
@@ -45,7 +43,7 @@ export const placedIn = <A, E, R>(env: Env, place: Place, program: Effect.Effect
  * @param e The engine the handler runs over.
  * @param place The place the handler is given.
  * @param command The command, by its handler.
- * @param input The handler's input, decoded (`inputFor`).
+ * @param input The handler's input, decoded.
  */
 export function answered<D extends object, I>(env: Env, e: Engine, place: Place, command: Pick<Command<D, I>, 'handler'>, input: I) {
   return runWith(e, placedIn(env, place, command.handler(input)));
@@ -124,32 +122,3 @@ a run's task ids carry the run and the step, so its output already names the wor
 export const usage = (message: string): never => {
   throw new Invalid({ message });
 };
-
-/**
- * A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes.
- * @param question The question, as the terminal shows it.
- */
-export async function confirmed(question: string) {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return /^y(es)?$/i.test((await rl.question(question)).trim());
-  } finally {
-    rl.close();
-  }
-}
-
-/**
- * `args` as the handler of `command` takes them, decoded through its `input`: a key its handler takes that a runner left out or gave
- * another type refused, exit 2, before anything is read. What a runner hands a typed entry's handler.
- * @param command The command: its name and usage, which a refusal names, and its input's schema.
- * @param args The arguments a runner read off the command line.
- */
-export function inputFor<I>(
-  command: { name: string; usage: string; input: Schema.Decoder<I> },
-  args: Args | Readonly<Record<string, unknown>>,
-) {
-  const decoded = Schema.decodeUnknownExit(command.input)(args);
-  if (decoded._tag === 'Success') return decoded.value;
-  return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
-}

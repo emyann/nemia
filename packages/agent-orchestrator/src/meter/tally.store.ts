@@ -205,17 +205,7 @@ export const addRuntime = (
 };
 
 /**
- * `f`, counting done outside `within` — a runtime's report read, say — its time added to the overhead and charged to no kind: the time
- * before it is charged first, and the mark moved past it after. Outside a pass, `f` itself.
- * @param f The counting to run outside every phase.
- */
-export function aside<T>(f: () => T) {
-  const m = open();
-  return m ? counting(m, f) : f();
-}
-
-/**
- * `program`, counted as `aside` counts a function: its time added to the overhead and charged to no kind, the mark moved past it after.
+ * `program`, counted outside every phase: its time added to the overhead and charged to no kind, the mark moved past it after.
  * Outside a pass, `program` itself.
  * @param program The counting to run outside every phase.
  */

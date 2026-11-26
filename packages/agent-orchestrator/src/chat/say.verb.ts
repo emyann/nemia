@@ -50,7 +50,7 @@ import {
  * What one delivery did: the entries found said already and marked without saying again (`marked`), those it said, and those left for
  * the next, the task refusing to hear them now.
  */
-export type Delivered = { marked: string[]; said: string[]; left: string[] };
+type Delivered = { marked: string[]; said: string[]; left: string[] };
 
 /** The key a said is claimed by: its attempt and its time. */
 const keyOf = (s: { attempt: number; at: string } | { attempt: number; said: string }) => `${s.attempt} ${'at' in s ? s.at : s.said}`;
@@ -177,7 +177,7 @@ const markCuts = (dir: string, live: TaskView['asks']) => {
 };
 
 /** What one carry of the answers did: those returned through the call she holds open, those said as words, and those only marked. */
-export type AnswersCarried = Record<AnswerOwed, string[]>;
+type AnswersCarried = Record<AnswerOwed, string[]>;
 
 /**
  * Each answer of the person's in the chat kept in `dir` that no mark names yet, carried to the task `taskId` and marked: `return`,

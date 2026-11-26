@@ -17,7 +17,7 @@ import { programIn } from '../harness-bin.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
 /** How long an ask may take before it is given up on, and its query closed. */
-export const QUOTA_TIMEOUT_MS = 15_000;
+const QUOTA_TIMEOUT_MS = 15_000;
 
 /**
  * What a Claude Code session hands its children, as 2.1.278 does (read off a session's own environment): a process started from one would
@@ -88,7 +88,7 @@ export const usageOptions = (command?: string, env: NodeJS.ProcessEnv = process.
  * One ask of Claude Code's usage, as `claudeQuota` puts it: `usage` answers the question once, asked as the SDK's method is, and
  * `close` lets the query go, whatever came of it. A test stands in for it.
  */
-export type UsageAsk = {
+type UsageAsk = {
   readonly usage: (opts: { skipBehaviors: boolean }) => Promise<unknown>;
   readonly close: () => Promise<void>;
 };
@@ -150,7 +150,7 @@ const subscriptionOf = (usage: Record<string, unknown>) => (typeof usage.subscri
  * alone, and answers `get_usage` with `rate_limits_available: false` without asking the usage endpoint, since it lacks `user:profile`
  * (read off 2.1.322 and measured: `docs/harness.md`, *The quota of a token*) — the same answer as no subscription at all.
  */
-export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
+const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
 
 /**
  * What the SDK's usage answer says, asked in `env`: the plan's limits and its subscription, no plan, a token that cannot read the plan

@@ -51,7 +51,7 @@ export const cookieSent = (token: string | undefined, secure: boolean) =>
  * `POST /api/session`: the bearer the gate judged, set as the board's cookie; refused 400 where the request presents none.
  * @param request The request, whose Authorization header and scheme are read.
  */
-export const signIn = (request: HttpServerRequest.HttpServerRequest) =>
+const signIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const token = bearerOf(request.headers.authorization);
     if (typeof token !== 'string')
@@ -69,7 +69,7 @@ export const signIn = (request: HttpServerRequest.HttpServerRequest) =>
  * `DELETE /api/session`: the board's cookie cleared.
  * @param request The request, whose scheme is read.
  */
-export const signOut = (request: HttpServerRequest.HttpServerRequest) =>
+const signOut = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.as(cookieSent(undefined, overHttps(request)), { cookie: 'cleared' } as const);
 
 export const sessionHandlers = readsBounded(Api, 'session', (handlers) =>

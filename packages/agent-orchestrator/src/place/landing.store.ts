@@ -17,7 +17,7 @@ import type { StepSpec } from '../step/step.ts';
 import type { Place } from './place.store.ts';
 
 /** The checkout as the place's `status` answered it, or why it gave no answer: an unread or refused `status` is never a verdict. */
-export type CheckoutRead = MergeState | { readonly unread: string };
+type CheckoutRead = MergeState | { readonly unread: string };
 
 /**
  * One pass's reading of its places: the answers of `status` it has had (`reads`), by checkout and the run that asked, whose tips it was
@@ -113,13 +113,6 @@ export function mergeStaged(run: Run, steps: readonly StepSpec[], memo: StatusMe
   const read = checkoutStatus(run, steps, memo);
   return 'unread' in read || read.merging !== 'none';
 }
-
-/** What `landThrough` did: the commit made, the merge taken back, or the place's words on why it did neither. */
-export type LandedThrough =
-  | { readonly commit: string }
-  | { readonly aborted: true }
-  | { readonly refused: string }
-  | { readonly unread: string };
 
 /**
  * Commit the merge staged in `run`'s checkout with `message`, or abort it, through the place `memo` names (`land`); the pass's reads of

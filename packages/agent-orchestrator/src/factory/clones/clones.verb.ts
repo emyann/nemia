@@ -70,7 +70,7 @@ export const clonesOnce = Effect.fn('clonesOnce')(function* (memory: CloneMemory
 });
 
 /** The sweep's pace: a clone gone is made again within half a minute. */
-export const CLONE_EVERY: Duration.Input = '30 seconds';
+const CLONE_EVERY: Duration.Input = '30 seconds';
 
 /** The clones' keeper, for as long as the daemon runs: a sweep (`clonesOnce`) each `CLONE_EVERY` (`sweepLoop`). */
 export const clones = () => {

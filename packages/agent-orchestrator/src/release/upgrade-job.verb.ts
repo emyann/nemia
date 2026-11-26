@@ -27,13 +27,13 @@ import { lastUpgradeRecord, readUpgradeRecord, writeUpgradeRecord, type UpgradeR
 import { runningRelease } from './version.verb.ts';
 
 /** How long an upgrade may run: an archive's download and its carry, or a build's `npm ci`, build and checks, then the restart. */
-export const UPGRADE_DEADLINE_SECONDS = 3600;
+const UPGRADE_DEADLINE_SECONDS = 3600;
 
 /** How much of the end of an upgrade's output its read carries (`upgradeOf`). */
-export const UPGRADE_TAIL_BYTES = 16_384;
+const UPGRADE_TAIL_BYTES = 16_384;
 
 /** How often a follow of an upgrade's output reads it again while the upgrade runs (`followUpgrade`). */
-export const UPGRADE_FOLLOW_MS = 500;
+const UPGRADE_FOLLOW_MS = 500;
 
 /** The orchestrator's in-process CLI, which an archive carries as the repository tracks it (`tools/release/archive.ts`, `git archive`). */
 const NEMIA_BIN = path.join(import.meta.dirname, '..', '..', 'bin', 'nemia.ts');
@@ -49,7 +49,7 @@ export const RunningCode = Context.Reference<() => Running>('orchestrator/Runnin
  * stdout so a refusal is read in the one stream with the rest.
  * @param tag The tag the upgrade names.
  */
-export const upgradeCommand = (tag: string) => ['sh', '-c', 'exec 2>&1\nexec "$0" "$@"', process.execPath, NEMIA_BIN, 'upgrade', tag];
+const upgradeCommand = (tag: string) => ['sh', '-c', 'exec 2>&1\nexec "$0" "$@"', process.execPath, NEMIA_BIN, 'upgrade', tag];
 
 /**
  * Whether the engine holds the task of `view` filed: a task it never filed, or has forgotten, reads as an empty journal, with no filing,

@@ -31,8 +31,6 @@ import { cookieRenewed } from '../server/renewal.ts';
 import { httpsBy, KEPT_SECONDS } from '../server/keeping.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
-export { MCP_PATH } from './paths.ts';
-
 /**
  * A request whose token the api refuses, with the reason where it presented one, and whether the store is marked exposed (`exposed`),
  * so the board's token page says what to do on a store served on this machine alone: the api's 401 (`objects`' `Unauthorized`).
@@ -46,7 +44,7 @@ export class Unauthorized extends TaggedError('Unauthorized')<{
 }
 
 /** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
-export const API_PATHS = ['/api', '/openapi'] as const;
+const API_PATHS = ['/api', '/openapi'] as const;
 
 /**
  * Whether `path` is `root` or a path under it: joined with `+`, which the verifier reads, where it reads a template string as an unknown
@@ -112,7 +110,7 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
  * @param token The token the request presents, or undefined where it presents none.
  * @param need What the request's route needs of a token (needOf).
  */
-export async function callerBy(c: Parameters<MiddlewareHandler<ApiEnv>>[0], token: string | undefined, need: TokenNeed) {
+async function callerBy(c: Parameters<MiddlewareHandler<ApiEnv>>[0], token: string | undefined, need: TokenNeed) {
   if (token === undefined && need === 'none') return PERSON;
   const { e, placed } = await c.var.runtime.runPromise(
     Effect.gen(function* () {

@@ -38,7 +38,7 @@ const settledStanding = standingNow.pipe(
 );
 
 /** Reads where the store's daemon stands, once a starting api listens. */
-export const daemonRead = Effect.fn('daemonRead')(function* () {
+const daemonRead = Effect.fn('daemonRead')(function* () {
   const standing = yield* settledStanding;
   const file = 'file' in standing ? standing.file : undefined;
   return {

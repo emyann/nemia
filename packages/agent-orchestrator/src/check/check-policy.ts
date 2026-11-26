@@ -13,12 +13,7 @@
 import type { CheckFailureActionOf, CheckFailurePolicy, CheckFailureRule } from '../../contracts/check-failure-policy.contract.ts';
 import { refuse } from '../step/step.ts';
 
-export type {
-  CheckFailureAction,
-  CheckFailurePolicy,
-  CheckFailureRule,
-  ExitCodesRequirement,
-} from '../../contracts/check-failure-policy.contract.ts';
+export type { CheckFailurePolicy } from '../../contracts/check-failure-policy.contract.ts';
 
 /**
  * What the policy says of a check's verdict: the action of the first rule whose `onExitCodes` holds of its exit code, or `Count` where

@@ -39,7 +39,7 @@
  *   guard asks of every write (guard.ts). 409 where she is not answering — no session of hers is filed, her turn is over, or her harness
  *   cannot end a turn without ending its session.
  */
-import { Effect, Stream } from 'effect';
+import { Stream } from 'effect';
 import {
   chatAnswer as answerAsk,
   chatHistory,
@@ -59,19 +59,6 @@ import {
 import type { ChatAnswerWrite, ChatSend, ChatStreamEvent } from 'objects';
 import type { Served } from '../layer.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
-
-/** What `GET /api/nemia/chat` answers, as the package types it: read by the board's wire test until it reads `objects`' `ChatHistory`. */
-export type ChatHistoryAnswer = Effect.Success<ReturnType<typeof chatHistory>>;
-/** What `POST /api/nemia/chat/send` answers, as the package types it. */
-export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSay>>;
-/** What `POST /api/nemia/chat/stop` answers, as the package types it. */
-export type ChatStopAnswer = Effect.Success<ReturnType<typeof stopTurn>>;
-/** What `POST /api/nemia/chat/answer` takes, as the package types it. */
-export type ChatAnswerBody = Parameters<typeof answerAsk>[1];
-/** What `POST /api/nemia/chat/answer` answers, as the package types it. */
-export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof answerAsk>>;
-/** What `POST /api/nemia/chat/read` answers, as the package types it. */
-export type ChatReadAnswer = Effect.Success<ReturnType<typeof readThrough>>;
 
 /** One frame of her chat's stream. */
 type Frame = typeof ChatStreamEvent.Type;

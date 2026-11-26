@@ -38,29 +38,13 @@ export const RECENT_RUNS = 5;
  * in — the factory, null for the default, and the repository, null where the request names none: the factory's only one, or none in the
  * default factory.
  */
-export type WorkflowPageAddress = { from: WorkflowSource; workflow: string; factory: string | null; repo: string | null };
-
-/** A factory that hires an agent into a step: the factory's name and the agent's. */
-export type HiredIn = { factory: string; agent: string };
+type WorkflowPageAddress = { from: WorkflowSource; workflow: string; factory: string | null; repo: string | null };
 
 /**
  * A skill a step's layers give, named as its line writes it, and where it is found: `from`, yours, the repository's or builtin, null
  * where no place the board pages has it; and then `foundIn`, where the repository has it (`foundInOf`), null for one found nowhere.
  */
-export type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null };
-
-/** An agent a step may be hired: its name, and what it is for, null where its file says nothing. */
-export type HireableAgent = { name: string; description: string | null };
-
-/**
- * Whether an agent can be hired into a step, read before anyone presses Hire: `refused`, why not, in the package's words
- * (`hireRefusalOf`), null where one can; and `agents`, those it may be hired — the agents beside its workflow, the repository's for one of
- * the repository's and yours for one of yours, each that reads, by name; none where it is refused.
- */
-export type Hiring = { refused: string | null; agents: HireableAgent[] };
-
-/** One of a step's recent runs: its id, its brief, when it was made, its factory (null for the default), and whether the step was filed. */
-export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
+type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null };
 
 /** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
 const factoryNamed = (factory: string | null | undefined) => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
@@ -100,7 +84,7 @@ export type StepRun = Pick<Run, 'id' | 'brief' | 'createdAt' | 'workflowDir' | '
  * A run as a step's page reads it (`StepRun`): the fields `recentRunsOf` reads, and no part of a frozen step's body.
  * @param run The run, as its record reads.
  */
-export const stepRun = (run: Run) => ({
+const stepRun = (run: Run) => ({
   id: run.id,
   brief: run.brief,
   createdAt: run.createdAt,

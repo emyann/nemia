@@ -23,7 +23,7 @@ import { formerOf, isFormerReason } from '../former-reason/former-reason.ts';
 import { involvedOf, upgraded, type Codes, type FeedLine } from '../feed/index.ts';
 import { LABEL_KEYS, labelKeySpellingRefusal, RESERVED_KEYS } from '../label-spelling/label-spelling.ts';
 
-export { LABEL_KEYS, labelKeyShape, labelKeySpellingRefusal, RESERVED_KEYS } from '../label-spelling/label-spelling.ts';
+export { LABEL_KEYS, RESERVED_KEYS } from '../label-spelling/label-spelling.ts';
 
 /** Every key a selector may name: the labels and the reserved keys, in that order. */
 export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KEYS];

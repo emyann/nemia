@@ -18,7 +18,7 @@ import {
 } from 'agent-orchestrator';
 
 /** How a person starts the store's daemon where none ticks: the api's own process, which serves the board as it ticks. */
-export const START = 'npm start in apps/api';
+const START = 'npm start in apps/api';
 
 /**
  * Where the store stands (`kind`, the package's `DaemonStanding`): `ticking` alone is a daemon moving the runs. Every time is ISO, and null

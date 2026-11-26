@@ -159,7 +159,7 @@ const asSent = (schemas: readonly Schema.Top[], answer: unknown) => {
  * @param endpoint The GET endpoint, by its group and name.
  * @param handler The endpoint's handler.
  */
-export const readHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
+const readHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
   endpoint: ApiGetName,
   handler: (...args: Args) => Effect.Effect<A, E, R>,
 ) =>
@@ -202,7 +202,7 @@ const partsOf = (value: unknown) => (typeof value === 'object' && value !== null
  * @param name The endpoint's name in its group.
  * @param handler The endpoint's handler.
  */
-export const floorHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
+const floorHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
   group: string,
   name: string,
   handler: (...args: Args) => Effect.Effect<A, E, R>,

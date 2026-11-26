@@ -29,13 +29,14 @@ export type WorkflowDir = Id<'WorkflowDir'>;
  * One step of a workflow, its file `<name>.md` in the folder: its name, the steps it waits on, and the keys that shape the graph — the
  * step it loops back to, whether a person approves it, the command that checks it. Its other keys are its file's (`STEP_KEYS`).
  */
-export const WorkflowStep = Schema.Struct({
+const WorkflowStep = Schema.Struct({
   name: StepName.OnRead,
   after: Schema.Array(StepName.OnRead),
   loop: Schema.optional(Schema.NullOr(StepName.OnRead)),
   gate: Schema.optional(Schema.NullOr(Schema.Boolean)),
   check: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: 'WorkflowStep' });
+/** @public */
 export type WorkflowStep = typeof WorkflowStep.Type;
 
 /** The folder's own name: its path's last segment. */

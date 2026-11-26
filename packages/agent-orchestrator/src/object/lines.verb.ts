@@ -58,7 +58,7 @@ export type StepCommands = { approve: string; retry: string; say: string };
  * @param runId The run's id, said in each line.
  * @param step The step's name, said in each line.
  */
-export const stepCommands = (runId: string, step: string) => ({
+const stepCommands = (runId: string, step: string) => ({
   approve: commandLine(APPROVE, { runId, step }),
   retry: commandLine(RETRY, { runId, step }),
   say: commandLine(SAY, { runId, step }),

@@ -333,7 +333,7 @@ const READ_ROUTE = 'POST /api/agents/read';
  * read from the files sent beside it. Refused `Invalid`, naming the file, for a file that does not read and for a schema named and not
  * sent.
  */
-export function agentReadOf({ name, files }: DefinitionFiles) {
+function agentReadOf({ name, files }: DefinitionFiles) {
   const [file, ...beside] = files;
   if (file === undefined)
     throw new Invalid({ error: `${READ_ROUTE} reads an agent's file: send it first in \`files\`, then the schema its output: names.` });

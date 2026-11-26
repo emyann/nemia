@@ -34,7 +34,7 @@ import {
 import { everyPage, type ObjectsClient, type PageAsked } from '../objects.ts';
 
 /** What every kind's metadata carries: a Run served before it had one carries no `resourceVersion`. */
-export type ServedMeta = Pick<ObjectMeta, 'name' | 'namespace' | 'labels' | 'creationTimestamp'> & {
+type ServedMeta = Pick<ObjectMeta, 'name' | 'namespace' | 'labels' | 'creationTimestamp'> & {
   readonly resourceVersion?: string;
 };
 
@@ -48,13 +48,13 @@ export type Served = {
 };
 
 /** A page of a list of any kind. */
-export type Page = { readonly items: readonly Served[] };
+type Page = { readonly items: readonly Served[] };
 
 /** What a call asks of the client. */
 export type Call<A> = (client: ObjectsClient) => Effect.Effect<A, unknown>;
 
 /** An object of a file as a write reads it: its name, its namespace, its labels and the version it was read at, where it says them. */
-export type Applied = {
+type Applied = {
   readonly name: string;
   readonly namespace: string;
   readonly labels: Readonly<Record<string, string>> | undefined;
@@ -69,7 +69,7 @@ export type Prepared = {
 };
 
 /** What `nemia apply` can do with a kind: read a file's spec as its own, or say why it cannot. */
-export type Writes = {
+type Writes = {
   /** Whether it makes an object (`create`), writes one (`update`), and whether the write makes a missing one (`upsert`). */
   readonly create: boolean;
   readonly update: boolean;

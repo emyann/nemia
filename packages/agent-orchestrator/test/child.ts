@@ -15,7 +15,7 @@ const PRELUDE = "process.stdin.once('end', () => process.exit(1)); process.stdin
 export type Ended = { code: number | null; signal: NodeJS.Signals | null; error?: Error };
 
 /** A running node child, what it has said so far, how it ended once it has, and a wait on what it says. */
-export type NodeChild = {
+type NodeChild = {
   child: ChildProcessWithoutNullStreams;
   out: () => string;
   err: () => string;

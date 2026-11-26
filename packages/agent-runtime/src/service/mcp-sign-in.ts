@@ -32,7 +32,7 @@ import { declaredOf } from './verb-harness.ts';
  * Why a pasted callback completes no sign-in: no sign-in waits for the server (`none-waiting`), or the address is refused as
  * `callbackRefusal` says.
  */
-export const CALLBACK_REFUSALS = ['none-waiting', 'unreadable', 'elsewhere', 'denied', 'no-code', 'no-state'] as const satisfies readonly (
+const CALLBACK_REFUSALS = ['none-waiting', 'unreadable', 'elsewhere', 'denied', 'no-code', 'no-state'] as const satisfies readonly (
   | 'none-waiting'
   | CallbackRefusal
 )[];

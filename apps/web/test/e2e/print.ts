@@ -14,7 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
  * The files of a store no page answers for, by their path in it: a repository's own `.git` (git packs and logs what a page's take-back
  * puts back), the e2e's `claude` in `bin/`, and what the api keeps of its own reads.
  */
-export const unprinted = (rel: string) =>
+const unprinted = (rel: string) =>
   rel.split('/').includes('.git') || rel.startsWith('bin/') || UNPRINTED.some((pattern) => pattern.test(rel));
 
 /**
@@ -33,7 +33,7 @@ const KEYSPACE = 'db/state.db';
  * its value; undefined where it holds none, so a keyspace whose every write was taken back prints as no keyspace at all.
  * @param file The keyspace's SQLite file.
  */
-export function liveRecords(file: string) {
+function liveRecords(file: string) {
   const db = new DatabaseSync(file, { readOnly: true });
   try {
     const rows = db

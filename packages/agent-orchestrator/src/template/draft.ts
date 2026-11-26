@@ -18,7 +18,7 @@ import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS } from './layout.ts';
 import { checkFailurePolicyOf, checksOf, checksWritten } from '../check/index.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
-export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
+type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
 
 /** A workflow of the repository: its folder, what its README says, its steps, and the other files of its folder, by path in it. */
 export type WorkflowSource = {
@@ -30,19 +30,19 @@ export type WorkflowSource = {
 };
 
 /** An agent found where the loader finds it: its file, as read, and its output schema's text where it names one. */
-export type AgentSource = { name: string; file: string; agent: Agent; output: string | undefined };
+type AgentSource = { name: string; file: string; agent: Agent; output: string | undefined };
 
 /**
  * Where a skill named is: its folder, the folder of one named with its folder (`named`, which a template never carries), a builtin
  * place skill, one of Nemia's builtin skills (`builtin`), or why it is not found (a refusal in the loader's words, or none).
  */
-export type SkillFound = { dir: string } | { named: string } | 'place' | 'builtin' | { refused: string } | undefined;
+type SkillFound = { dir: string } | { named: string } | 'place' | 'builtin' | { refused: string } | undefined;
 
 /**
  * A factory's parts the draft holds: its name, its file, its hires, and its instruction's words and its rules', each with the file they
  * were read from.
  */
-export type FactorySource = {
+type FactorySource = {
   name: string;
   file: string;
   hires: Readonly<Record<string, string>>;
@@ -65,7 +65,7 @@ export type Source = {
  * A file of the draft: a document, a text, a file or folder copied from `copy` with its modes, or the skill folder `skill` carried as its
  * real files, a link it follows as what it points at.
  */
-export type DraftFile = { path: string } & ({ document: unknown } | { text: string } | { copy: string } | { skill: string });
+type DraftFile = { path: string } & ({ document: unknown } | { text: string } | { copy: string } | { skill: string });
 
 /** The draft: its files, where each part came from, and what refuses it, each by name; nothing is written while one stands. */
 export type Draft = { files: DraftFile[]; from: Array<{ part: string; from: string }>; refusals: string[] };

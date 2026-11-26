@@ -16,7 +16,7 @@ import { KIT_MAP } from '../kit/cards.ts';
 import { ofTheFrame, serve } from './serve.ts';
 
 /** The themes, the first the one a card is measured in. */
-export const THEMES = ['dark', 'light'] as const;
+const THEMES = ['dark', 'light'] as const;
 
 /** The tallest picture taken of a card. */
 const TALLEST = 3000;
@@ -45,7 +45,7 @@ const ADVICE: Readonly<Record<CellFault, (asked: number) => string>> = {
  * @param reports what its page left on `window.__cells`.
  * @param rooted true for a board card.
  */
-export const cellFaults = (card: string, reports: readonly CellReport[], rooted: boolean) =>
+const cellFaults = (card: string, reports: readonly CellReport[], rooted: boolean) =>
   reports.flatMap((report) => {
     if (report.fate === 'undeclared')
       return [`${card} ${report.name}: its parameters name MSW handlers and it carries no tag: tag it 'network' (or 'overlay')`];

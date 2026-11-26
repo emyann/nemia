@@ -6,18 +6,6 @@
  */
 import type { Agent } from '../agents/agents.ts';
 
-/** An agent's spec as a proposal carries it. */
-export type AgentSpecRead = {
-  role?: string;
-  description?: string;
-  keys: Agent['keys'];
-  skills?: string;
-  harnessPrompt?: string;
-  mcp?: string;
-  output?: { file: string; text: string };
-  instructions: string;
-};
-
 /**
  * The spec `agent` says, as it parses (`parseAgent`), with the result schema `schema` its `output:` names, where one is given.
  * @param agent The agent as it parses.

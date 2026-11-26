@@ -41,7 +41,5 @@ export type InboxCommand = (typeof INBOX_WORDS)[number]['name'];
 export type FactoryCommand = (typeof FACTORY_WORDS)[number]['name'];
 export type WriterCommand = (typeof WRITER_WORDS)[number]['name'];
 export type DefinitionCommand = (typeof DEFINITION_WORDS)[number]['name'];
-/** A command of the library's. */
-export type LibraryCommand = (typeof LIBRARY_WORDS_ALL)[number]['name'];
 export type ReadCommand = (typeof READ_WORDS)[number]['name'];
 export type RestCommand = (typeof REST_WORDS)[number]['name'];

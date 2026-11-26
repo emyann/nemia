@@ -21,7 +21,7 @@ export const LEFT_GRACE: Duration.Input = '2 seconds';
 const LEFT_LOOK: Duration.Input = '25 millis';
 
 /** What one sweep's ending did: the processes it ended, by run, and those that hold each finished run's worktree, by run. */
-export type LeftEnded = {
+type LeftEnded = {
   readonly ended: ReadonlyMap<string, readonly ProcessNow[]>;
   readonly holds: ReadonlyMap<string, readonly ProcessNow[]>;
 };

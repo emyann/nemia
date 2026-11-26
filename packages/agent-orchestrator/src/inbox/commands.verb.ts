@@ -192,7 +192,7 @@ export const INBOX_RESEND: Served<Resent, InboxResendInput> = {
  * (`objects`' `INBOX_FROM_WORDS`), which writes the card whole through the Card's `update`. Context is no wait: the run reads what each
  * concluded when its steps are filed, landed or in flight, and waits on none (`setFrom`).
  */
-export const INBOX_FROM: Served<InboxFrom & { name: string; from: string[] }> = {
+const INBOX_FROM: Served<InboxFrom & { name: string; from: string[] }> = {
   ...INBOX_FROM_WORDS,
   handler: (args) =>
     Effect.map(setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : [...runsNamed(args)]), (done) => ({

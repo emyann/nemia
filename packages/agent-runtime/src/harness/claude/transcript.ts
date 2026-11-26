@@ -484,31 +484,13 @@ const latestSpent = (text: string, since: number, file?: string) => {
   return undefined;
 };
 
-/**
- * What an attempt of a Claude Code session has spent so far, read from its transcript's text: the latest `budget_usd` attachment
- * written at or after `since` — `used` as `usd`, `total` as `capUsd`, its `timestamp` as `at`. Claude Code writes one before each
- * request of a session that has a dollar cap (`maxBudgetUsd`), counting the attempt's own spend against its own cap (`docs/harness.md`,
- * *What a session has spent*). Undefined for a session with no cap, which writes none, for an attempt that has not said one yet, and
- * where the latest was written before `since`: a resumed transcript holds its parent's lines, and their spend is not this attempt's.
- * Pure, read whole on every call and never added up across calls. A `budget_usd` line that does not decode throws an `Error` naming
- * the line, in `file` when it is given.
- * Exported only for the tests that import it.
- * @param text The transcript's text, or its end, one JSON line each.
- * @param since When the attempt began, in ms since the epoch.
- * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
- */
-export const transcriptSpent = (text: string, since: number, file?: string) => {
-  const said = latestSpent(text, since, file);
-  return said === 'before' ? undefined : said;
-};
-
 /** How much of a transcript's end `claudeTranscriptSpent` reads at most: a `budget_usd` line is written before every request. */
 const SPENT_SCAN_BYTES = 8 * 1024 * 1024;
 /** How much of a transcript's end it reads first, doubled while no `budget_usd` line is found. */
 const SPENT_FIRST_BYTES = 256 * 1024;
 
 /**
- * What an attempt of a Claude Code session has spent so far, read from the end of its transcript `file` (`transcriptSpent`): its last
+ * What an attempt of a Claude Code session has spent so far, read from the end of its transcript `file`: its last
  * 256 KiB first, then twice as much each time no `budget_usd` line is found, up to 8 MiB, the line torn at the cut left out. Undefined
  * where none is found there, or the file cannot be read.
  * @param file The transcript's path.

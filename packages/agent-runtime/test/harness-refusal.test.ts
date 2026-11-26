@@ -116,7 +116,7 @@ const ON_ALL: Record<keyof typeof ASKS, readonly [Check | '', Check | '', Check 
   "enabledSkills: 'default'": ['', '', 'commandOwn', 'remoteOwn', ''],
   pictures: ['', 'pictures', 'pictures', 'remoteOwn', ''],
   'a memory limit': ['', '', 'commandOwn', 'memoryLimit', ''],
-  "restartPolicy: 'Always'": ['', 'keepsOpen', '', 'keepsOpen', ''],
+  "restartPolicy: 'Always'": ['', 'keepsOpen', 'commandOwn', 'keepsOpen', ''],
   mayAsk: ['holdsCalls', 'holdsCalls', 'holdsCalls', 'holdsCalls', 'holdsCalls'],
   "mayAsk, restartPolicy: 'Always'": ['', 'keepsOpen', 'holdsCalls', 'keepsOpen', 'holdsCalls'],
   'codex and env on command': ['codexArgs', 'commandArgs', 'codexArgs', 'codexArgs', ''],

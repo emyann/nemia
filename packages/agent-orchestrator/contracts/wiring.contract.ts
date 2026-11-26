@@ -450,9 +450,9 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
    */
   requires: ({ input: [factory, change] }) => accepted(factory, change),
   /**
-   * A wiring change copies the factory's instruction, revisions, template, tree, harness settings, cost lines and label values as they
-   * were, by a spread, and the verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread,
-   * where the spread value may lack it"), so no law can say they are kept: left to the code, which names none of them, until the
+   * A wiring change copies the factory's instruction, revisions, template, tree, harness settings, cost lines, label values and programs
+   * as they were, by a spread, and the verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a
+   * spread, where the spread value may lack it"), so no law can say they are kept: left to the code, which names none of them, until the
    * verifier reads one. Its volumes, which a factory always has, none or several, are a law (`keepsVolumes`).
    * That a factory's harness settings survive a wiring change is held by the tests of its verbs (`test/factory-start.test.ts`, its
    * setting checkpoints). Its generation is carried the same way: the door counts it on the write that follows (`generationAfter`,
@@ -469,6 +469,7 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.workflowRepos',
     'output.triggers',
     'output.labelValues',
+    'output.programs',
   ],
   ensures: {
     detachWithdraws: {

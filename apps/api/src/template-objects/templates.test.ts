@@ -95,7 +95,7 @@ function template(folder: string, name: string, parameters?: string) {
   write(
     path.join(at, 'programs', 'proofing', 'program.yaml'),
     [
-      'apiVersion: nemia/v1',
+      'apiVersion: nemia.dev/v1alpha1',
       'kind: Program',
       'metadata:',
       '  name: proofing',

@@ -153,6 +153,7 @@ erDiagram
   }
   Step {
     TaskId taskId FK
+    object conditions "optional"
     object route "optional"
     object sent "optional"
     list pinned "optional"
@@ -229,6 +230,7 @@ erDiagram
     object workflowRepos "optional"
     object triggers "optional"
     object labelValues "optional"
+    object programs "optional"
     number generation "optional"
   }
   AppliedTemplate {

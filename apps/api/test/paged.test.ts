@@ -172,6 +172,7 @@ const PAGES: Readonly<
   'templates.workflows': { url: '/api/templates/sdlc/workflows' },
   'templates.agents': { url: '/api/templates/sdlc/agents' },
   'templates.skills': { url: '/api/templates/sdlc/skills' },
+  'templates.programs': { url: '/api/templates/sdlc/programs' },
   'subscriptions.listAll': { url: '/api/subscriptions', planted: SUBSCRIPTIONS },
   'events.listAll': { url: '/api/events', planted: EVENTS },
   'events.list': { url: '/api/namespaces/default/events', planted: EVENTS },

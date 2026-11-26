@@ -7,7 +7,6 @@
  */
 import type { ConditionStanding } from '../../contracts/condition-standing.contract.ts';
 import type { ConditionWriteRefusalOf } from '../../contracts/condition-write.contract.ts';
-import { WRITTEN_CONDITION_STATUSES } from 'objects';
 import type { ConditionWritten, Run, StepRecord } from '../record/record.ts';
 
 /**
@@ -41,6 +40,9 @@ export const conditionWriteRefusal: ConditionWriteRefusalOf = (writer, target, s
 
 export type WrittenFor = ConditionWritten;
 
+/** The statuses a condition is written with, as the record keeps them, spelt here so this pure file loads nothing of `objects`' value. */
+const STATUSES = ['True', 'False', 'Unknown'] as const satisfies readonly ConditionWritten['status'][];
+
 /**
  * The name of a condition's file in a run's asks folder: `condition-<step>~<n>~<name>`, which `~` no step's or condition's name holds.
  * @param step The step the condition is written for.
@@ -63,7 +65,7 @@ export function personConditions(names: readonly string[], read: (name: string) 
     const { step, name: condition, status, message, at, transitionedAt, by } = said;
     const [wrote, tried] = [said.try, typeof said.try === 'number' && Number.isInteger(said.try) && said.try >= 1];
     if (typeof step !== 'string' || typeof condition !== 'string' || typeof wrote !== 'number' || !tried) return [];
-    if (!WRITTEN_CONDITION_STATUSES.some((s) => s === status) || typeof message !== 'string' || typeof at !== 'string') return [];
+    if (!STATUSES.some((s) => s === status) || typeof message !== 'string' || typeof at !== 'string') return [];
     return [
       {
         step,

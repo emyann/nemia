@@ -297,6 +297,21 @@ const RUNS: Record<string, Walk[]> = {
       says: [true, 'second', 'second'],
     },
   ],
+  'asks.condition': [
+    {
+      name: "a condition written again reads as the second on the step's try, and keeps when its status last changed while the status stands",
+      walk: ({ door }) => {
+        const run = made(door, 'w-condition');
+        const first = { step: 'implement', name: 'ci', try: 1, status: 'True' as const, message: 'one', at, by: null };
+        act(door.asks.condition(idOf(run.id), first));
+        const again = act(door.asks.condition(idOf(run.id), { ...first, message: 'two', at: `${at}1` })) as { transitionedAt: string };
+        const read = act(door.runs.read(idOf(run.id))) as Run;
+        const kept = read.steps.implement?.conditions?.ci;
+        return [kept?.message, kept?.status, again.transitionedAt === at];
+      },
+      says: ['two', 'True', true],
+    },
+  ],
   'runs.stamps': [
     {
       name: "an ask moves its run's stamp, and another run's stands",

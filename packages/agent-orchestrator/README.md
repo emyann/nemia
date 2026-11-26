@@ -2326,7 +2326,7 @@ checks:
 A template declares the long-lived programs that write its conditions, a document kind of its own beside workflows, agents and skills:
 
 ```yaml
-apiVersion: nemia/v1
+apiVersion: nemia.dev/v1alpha1
 kind: Program
 metadata:
   name: ci-writer

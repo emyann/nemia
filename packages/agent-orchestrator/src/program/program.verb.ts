@@ -136,7 +136,10 @@ const programsOnce = Effect.fn('programsOnce')(function* () {
   return due;
 });
 
-/** The controller, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later. */
+/**
+ * The controller, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later.
+ * @param every How long it waits between two beats.
+ */
 export const programs = (every: Duration.Input = PROGRAMS_EVERY) =>
   Effect.forever(
     Effect.suspend(programsOnce).pipe(

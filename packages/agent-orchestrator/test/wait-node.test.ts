@@ -49,7 +49,7 @@ async function signedOff() {
   const e = engineOf(b.layer);
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, { 'a.ts': 'export const a = 1;\n' });
-  const run = await runPlaced(startRun({ brief: 'wait on ready', repo, workflowDir: folder() }));
+  const run = await runPlaced(startRun({ brief: 'wait for the signal', repo, workflowDir: folder() }));
   assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, run.id)))).filed, ['work']);
   b.settle(`${run.id}-work`, 'succeeded', { closeout: { outcome: 'done', summary: 'done', artifacts: [], needs: null } });
   return { id: run.id, b, e };

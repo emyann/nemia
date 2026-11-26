@@ -21,7 +21,6 @@
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
  * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Result, Schema } from 'effect';
 import {
@@ -334,14 +333,15 @@ const builderRefused = (saved: Awaited<ReturnType<typeof write>>) => {
 async function libraryCreated(s: Served, payload: WorkflowCreate) {
   const { name } = payload.metadata;
   const route = 'POST /api/workflows';
-  writeGoes('library', 'create', thereOf(libraryHeld(s), name));
+  const there = thereOf(libraryHeld(s), name);
+  writeGoes('library', 'create', there);
   const wrong = workflowNameRefusal(name);
   if (wrong !== undefined) throw new Invalid({ error: `${route}: ${wrong}` });
   if (payload.spec.steps.length === 0)
     throw new Invalid({ error: `${route}: a workflow is made with its first step. Send ${SHAPE}, with one step at least.` });
   const steps = draftsOf(payload.spec.steps, route);
   const at = writing(s, name, false);
-  if (fs.statSync(at.dir, { throwIfNoEntry: false })?.isDirectory() === true)
+  if (there === 'user')
     throw new Conflict({
       error: workflowTaken(at.dir, String(await s.inRequest(definitionRevisionNow('Workflow', undefined, name)))),
       users: [],

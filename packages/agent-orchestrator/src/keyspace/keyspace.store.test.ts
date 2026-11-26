@@ -238,8 +238,13 @@ describe('the keyspace on disk', () => {
     assert.equal(later, seen);
     const resumed = await Effect.runPromise(ks.since(seen, '/registry/t/'));
     assert.deepEqual('changes' in resumed ? resumed.changes.map((c) => c.revision) : resumed, [head]);
-    const other = await Effect.runPromise(Effect.scoped(Effect.flatMap(Effect.scope, (scope) => keyspaceIn(file, scope))));
-    assert.equal(await Effect.runPromise(other.compact(WINDOW, T0 + WINDOW + 2)), seen);
+    const other = Effect.scoped(
+      Effect.flatMap(
+        Effect.flatMap(Effect.scope, (scope) => keyspaceIn(file, scope)),
+        (reopened) => reopened.compact(WINDOW, T0 + WINDOW + 2),
+      ),
+    );
+    assert.equal(await Effect.runPromise(other), seen);
   });
 });
 

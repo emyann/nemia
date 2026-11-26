@@ -258,7 +258,10 @@ of its kind, never from an older file that looks alike:
   `src/definition-index/`, swept by the daemon every 2 s through `recordDue`): a new place definitions are read from goes into
   `definitionsFound`, and a write of one reads the index again first (`definitionRevisionNow`). The api, not the orchestrator's objects,
   stamps the revision (`apps/api/src/objects/revisioned.ts`); a verb's own digest is the content's, which a writer's precondition still
-  compares where its door does (`definitionVersionRefusal`).
+  compares where its door does (`definitionVersionRefusal`). A record's digest is the version the doors give it counted with the skills
+  of each repository a factory works on (`_repo.<factory>` for a repository's own definitions, a `factory` record for a Factory's rules
+  and instruction), so an edit of a repository's skill moves the revision of the agent that names it; the index reads the doors, never
+  the stores. A proposal's folder write is held to the content digest read at its apply (`digestNow`), its own version being a revision.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/forget/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

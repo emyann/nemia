@@ -274,7 +274,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(inside.entry?.description, 'Kept inside.');
     const page = await detail('repo', 'inside');
     assert.equal(page.skill.entry?.description, 'Kept inside.');
-    assert.match(page.version, /^[0-9a-f]{16}$/);
+    assert.match(page.version, /^[1-9][0-9]*$/);
 
     assert.equal(rowOf(places, 'user', 'apart'), undefined, 'listed where its folder is');
     const apart = rowOf(places, 'repo', 'apart')!;
@@ -470,7 +470,7 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
       preload: false,
       body: '# Mine\n\nWrite it down.',
     });
-    assert.match(mine.version, /^[0-9a-f]{16}$/);
+    assert.match(mine.version, /^[1-9][0-9]*$/);
     assert.deepEqual(mine.users, [
       { from: 'repo', name: 'theirs' },
       { from: 'user', name: 'clerk' },

@@ -16,7 +16,7 @@ const watchedListOf = (kind: string | undefined) => {
 };
 
 /** The kinds whose revisions are made of the definition index's records, which a read of one reads again where no daemon sweeps it. */
-const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire']);
+const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire', 'Factory']);
 
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;

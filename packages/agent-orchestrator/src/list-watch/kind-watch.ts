@@ -61,6 +61,9 @@ export type WatchedKind = (typeof WATCHED_KIND_NAMES)[number];
 /** The prefix of the definition index's records (`src/definition-index`). */
 export const DEFINITIONS_PREFIX = '/registry/definitions/';
 
+/** What an index scope begins with where it holds a repository's definitions, the factory's name after it: served in every namespace. */
+export const REPO_SCOPE = '_repo.';
+
 const byName = (rest: string) => ({ namespace: null, name: rest }) satisfies Target;
 const inNamespace = (rest: string) => {
   const at = rest.indexOf('/');
@@ -80,10 +83,18 @@ const definitionOf = (kind: string) => (rest: string) => {
   return { namespace: scope.startsWith('_') ? null : scope, name: decodeURIComponent(name.join('/')) } satisfies Target;
 };
 
+/** The index's record of what a factory's rules and instruction hold, which the Factory is made of: named by the factory's own name. */
+const wordsOfFactory = (rest: string) => {
+  const [scope, of] = rest.split('/');
+  return scope === undefined || of !== 'factory' || scope.startsWith('_') ? null : ({ namespace: null, name: scope } satisfies Target);
+};
+
 /** The definition index's records of workflows of a factory: what each of its Hires reads. */
 const workflowsOfFactory = (rest: string) => {
   const [scope, of] = rest.split('/');
-  return scope === undefined || of !== 'workflow' || scope.startsWith('_') ? null : ({ namespace: scope, name: null } satisfies Target);
+  if (scope === undefined || of !== 'workflow') return null;
+  if (scope.startsWith(REPO_SCOPE)) return { namespace: scope.slice(REPO_SCOPE.length), name: null } satisfies Target;
+  return scope.startsWith('_') ? null : ({ namespace: scope, name: null } satisfies Target);
 };
 
 /** The records each watched kind's objects are made of, by the prefixes of the keyspace. */
@@ -104,6 +115,7 @@ export const WATCHED_KINDS = {
     { prefix: '/registry/levels/', own: false, status: true, target: ofFactoryNamed },
     { prefix: '/registry/applied/', own: false, status: true, target: ofFactoryNamed },
     { prefix: '/registry/servers/', own: false, status: true, target: ofFactoryNamed },
+    { prefix: DEFINITIONS_PREFIX, own: false, target: wordsOfFactory },
   ],
   Hire: [
     { prefix: '/registry/factories/', own: false, target: ofFactory },

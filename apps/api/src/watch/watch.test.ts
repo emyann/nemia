@@ -343,7 +343,7 @@ const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
 test('aborting a watch lets its feed reader go', async (t) => {
   const before = followers();
-  const w = await watch(t, '/api/cards?watch=true');
+  const w = await watch(t, '/api/runs?watch=true');
   await w.initial();
   await waitFor(t, () => followers() > before, 'followers() > before');
   await w.stop();

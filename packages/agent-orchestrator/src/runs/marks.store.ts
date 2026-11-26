@@ -7,11 +7,10 @@
  * kind `RUN_MARK_FILES`, moved aside under `<root>/imported/`, never deleted. The Run door (`records.store.ts`) composes them onto each
  * run.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Option, Schema } from 'effect';
 import type { Actor } from 'objects';
-import { asideOf, entriesIn, type ImportKind } from '../keyspace/import.store.ts';
+import { asideOf, entriesIn, namesIn, type ImportKind } from '../keyspace/import.store.ts';
 import { KeyRefused, type KeyRecord, type Keyspace, type KeyTxn } from '../keyspace/keyspace.store.ts';
 import { pauseStands } from '../pause/pause.store.ts';
 import { Conflict, type Refusal } from '../refusal/refusal.ts';
@@ -36,16 +35,25 @@ import {
 /** The Run door's shape: each method of the run store answering an Effect, a run's id taken as `RunId`. */
 type Shape = DoorOf<RunStore, RunId>;
 
-/** A write that makes its key. */
+/**
+ * A write that makes its key.
+ * @param value The text the key holds.
+ */
 export const create = (value: string) => ({ verb: 'create', expected: null, value }) as const;
 
-/** A write that overwrites its key, naming no revision. */
+/**
+ * A write that overwrites its key, naming no revision.
+ * @param value The text the key holds.
+ */
 export const overwrite = (value: string) => ({ verb: 'update', expected: null, value }) as const;
 
 /** A write that deletes its key, naming no revision. */
 export const remove = { verb: 'delete', expected: null, value: '' } as const;
 
-/** A keyspace's refusal of a write the door did not foresee, as a refusal naming its key. */
+/**
+ * A keyspace's refusal of a write the door did not foresee, as a refusal naming its key.
+ * @param err The keyspace's refusal.
+ */
 export const raced = (err: { readonly key: string }) =>
   new Conflict({ message: `${err.key} changed while it was written: run the command again.` }) satisfies Refusal as Refusal;
 
@@ -55,7 +63,10 @@ export type Opened = Effect.Effect<Keyspace, Refusal>;
 /** The keyspace a read reads, or undefined where there is none. */
 export type Held = Effect.Effect<Keyspace | undefined, Refusal>;
 
-/** A keyspace's refusal inside a transaction, as the door's `raced` refusal. */
+/**
+ * A keyspace's refusal inside a transaction, as the door's `raced` refusal.
+ * @param effect The program run in the transaction.
+ */
 export const racedOn = <A, E, R>(effect: Effect.Effect<A, E | KeyRefused, R>) =>
   Effect.catchIf(
     effect,
@@ -63,7 +74,11 @@ export const racedOn = <A, E, R>(effect: Effect.Effect<A, E | KeyRefused, R>) =>
     (err) => Effect.fail(raced(err)),
   );
 
-/** A run's markers as `records`, those listed under its marks prefix, hold them. */
+/**
+ * A run's markers as `records`, those listed under its marks prefix, hold them.
+ * @param id The run's id.
+ * @param records The records listed under the run's marks prefix.
+ */
 export const marksFrom = (id: string, records: readonly KeyRecord[]) => {
   const prefix = runMarksPrefix(id);
   const text: Partial<Record<RunMarker, string>> = {};
@@ -76,7 +91,10 @@ export const marksFrom = (id: string, records: readonly KeyRecord[]) => {
   return { ...text, said: said.sort((a, b) => a.n - b.n).map((w) => w.text) } satisfies RunMarks;
 };
 
-/** Whether `id` names a key of its own under the prefix: one holding a `/` would name another's, or an ask's, so names no run. */
+/**
+ * Whether `id` names a key of its own under the prefix: one holding a `/` would name another's, or an ask's, so names no run.
+ * @param id The run's id.
+ */
 export const ownKey = (id: string) => id !== '' && !id.includes('/');
 
 /** The marks a run carries now, by which of its three records are there, in a transaction `tx`. */
@@ -318,13 +336,13 @@ export const RUN_MARK_FILES: ImportKind = {
   name: 'run-marks',
   folders: (home) => [runsDir(home), forgettingAt(home)],
   files: (home) => [
-    ...entriesIn(runsDir(home)).flatMap((entry) =>
-      MARKER_ENDINGS.flatMap(({ marker, end }) => {
-        const file = path.join(runsDir(home), entry);
-        if (entry.startsWith('.') || !entry.endsWith(end) || entry === end || !fs.statSync(file, { throwIfNoEntry: false })?.isFile())
-          return [];
-        return [{ file, key: runMarkKey(entry.slice(0, -end.length), marker), aside: asideOf(home, file), read: markerRead(marker) }];
-      }),
+    ...MARKER_ENDINGS.flatMap(({ marker, end }) =>
+      namesIn(runsDir(home), end)
+        .filter((id) => id !== '')
+        .map((id) => {
+          const file = path.join(runsDir(home), `${id}${end}`);
+          return { file, key: runMarkKey(id, marker), aside: asideOf(home, file), read: markerRead(marker) };
+        }),
     ),
     ...entriesIn(runsDir(home))
       .filter((entry) => entry.endsWith('.said') && entry !== '.said')

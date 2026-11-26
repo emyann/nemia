@@ -6,7 +6,7 @@
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports.
  */
 import { Option, Result, Schema } from 'effect';
-import { levelKey } from '../factory/door/factory-keys.ts';
+import { levelKey } from '../factory/door/index.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { LEVELS, type FactoryLevelFile } from './level.ts';

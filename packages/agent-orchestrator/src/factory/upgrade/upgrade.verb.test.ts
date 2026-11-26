@@ -25,7 +25,7 @@ import { readFactoryAt } from '../../../testing.ts';
 import { factoryTyped } from '../../../test/factory-typed.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
 import { dropRecord, factoriesNow, recordRevision } from '../../../testing.ts';
-import { appliedKey } from '../door/factory-keys.ts';
+import { appliedKey } from '../door/index.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
 import { withBuiltins } from '../../../test/templated.ts';

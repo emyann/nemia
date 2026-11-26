@@ -12,9 +12,9 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { factoryKey } from '../src/factory/door/factory-keys.ts';
+import { factoryKey } from '../src/factory/door/index.ts';
 import { clearFactories, dropFactory, factoryNamesAt, factoryText, plantFactory, runFolderNames } from '../testing.ts';
-import { cardText, factoriesNow, keysUnder, recordText, runKey, runRecord } from '../testing.ts';
+import { cardText, factoriesNow, keysUnder, plantKey, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -291,14 +291,14 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
     },
   );
   s.test('`nemia factory attach` adds a workflow by name, sorted and once, keeping every other key; detach takes it back', async () => {
-    plantFactory(ROOT, 'pipao', JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
+    plantKey(ROOT, file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
     await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'intake']);
     attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
     attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'notes' });
-    const before = factoryText(ROOT, 'pipao');
+    const before = recordText(ROOT, file);
     await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build']);
     assert.deepEqual(attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' }), { file, already: true });
-    assert.deepEqual(factoryText(ROOT, 'pipao'), before, 'an attach of one attached already writes nothing');
+    assert.deepEqual(recordText(ROOT, file), before, 'an attach of one attached already writes nothing');
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').workflows, ['build', 'intake', 'notes']);
     assert.deepEqual(factoryFiles(), ['pipao'], 'no hidden file left behind');
   });
@@ -481,10 +481,10 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', 'nemia factory attach');
       assert.equal(runRecord(ROOT, id).repo, a, 'the run works on the repository build is wired to');
       await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(b)]);
-      const wired = factoryText(ROOT, 'pipao');
+      const wired = recordText(ROOT, file);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', id, `nemia cancel ${id}`);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${a}:ro`]), 'Conflict', id, `nemia cancel ${id}`);
-      assert.equal(factoryText(ROOT, 'pipao'), wired, 'nothing written');
+      assert.equal(recordText(ROOT, file), wired, 'nothing written');
       await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(a)]);
     },
   );
@@ -496,7 +496,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
       await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } });
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
-      const before = factoryText(ROOT, 'pipao');
+      const before = recordText(ROOT, file);
       await refusedBy(
         () => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.permissions', '{"allow":["Bash(*)"]}']),
         'Invalid',
@@ -505,7 +505,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'codex.model', '"x"']), 'Invalid', 'codex');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.language', 'french']), 'Invalid', 'french');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'set', 'default', 'claude.attribution', 'false']), 'Conflict');
-      assert.equal(factoryText(ROOT, 'pipao'), before, 'nothing written');
+      assert.equal(recordText(ROOT, file), before, 'nothing written');
       await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
       await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } }, 'a wiring change keeps the settings');
@@ -561,7 +561,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
   );
   s.test('REFUSED: a start in a factory whose file a person gave a widening setting by hand, naming it, and no run written', async () => {
     const f = path.basename(file, '.json');
-    const before = factoryText(ROOT, 'pipao');
+    const before = recordText(ROOT, file);
     plantFactory(ROOT, f, JSON.stringify({ ...fileOf(f), harnessSettings: { claude: { hooks: {} } } }));
     const runs = runsWritten();
     await refusedBy(() => startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']), 'Invalid', 'hooks');

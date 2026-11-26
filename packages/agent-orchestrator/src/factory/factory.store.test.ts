@@ -33,7 +33,7 @@ import {
   setScheduleAt,
   volumesMovedAt,
 } from '../../testing.ts';
-import { factoryKey } from './door/factory-keys.ts';
+import { factoryKey } from './door/index.ts';
 import { detached } from '../../test/factory-planted.ts';
 import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';

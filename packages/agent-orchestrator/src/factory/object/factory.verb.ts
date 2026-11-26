@@ -32,7 +32,7 @@ import { declaredAt } from '../applied/declared.verb.ts';
 import type { Parameter } from '../../template/index.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
-import { generationOf } from '../door/generation.ts';
+import { generationOf } from '../door/index.ts';
 import type { FactoryListing } from '../factory.ts';
 import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';

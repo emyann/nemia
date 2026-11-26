@@ -1055,7 +1055,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/read.store.ts imports src/custom/custom.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/write.store.ts', 'src/workspace/worktree.store.ts')), [
-    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/folder/folder.store.ts, src/factory/door/factories.store.ts',
+    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/folder/folder.store.ts, src/folder/known.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/factory/factory.store.ts', 'src/folder/write.store.ts')), [
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/factory/schedule/schedule.store.ts, src/factory/applied/applied.store.ts, src/factory/wiring/own-agent.store.ts, src/whole-file/whole-file.store.ts',

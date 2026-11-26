@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Option, Result, Schema } from 'effect';
 import { MCP_TRANSPORTS } from 'objects';
-import { serversKey } from '../door/factory-keys.ts';
+import { serversKey } from '../door/index.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';

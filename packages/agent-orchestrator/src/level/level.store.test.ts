@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { plantKey, readFactoryLevel, recordText, writeFactoryLevel } from '../../testing.ts';
-import { levelKey } from '../factory/door/factory-keys.ts';
+import { levelKey } from '../factory/door/index.ts';
 import { levelOf } from './level.store.ts';
 
 const ROOT = scratch('wf-level-');

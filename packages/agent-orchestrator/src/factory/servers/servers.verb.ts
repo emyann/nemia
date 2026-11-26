@@ -19,7 +19,7 @@ import { doorAt, FactoryDoor } from '../door/factories.store.ts';
 import { tableEntry, type Served } from '../../command/entry.verb.ts';
 import { noFactoryLine } from '../factory.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
-import { serversKey } from '../door/factory-keys.ts';
+import { serversKey } from '../door/index.ts';
 import {
   FACTORY_SERVER_ADD_WORDS,
   FACTORY_SERVER_RM_WORDS,

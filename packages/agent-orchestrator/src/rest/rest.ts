@@ -5,7 +5,7 @@
  * `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
- * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its
+ * they were when a pass last judged it — its record and every file a person keeps beside it (the Run door's stamps), each of its
  * tasks' journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and reads and judges every
  * run afresh. While a run's stamp holds, the memo answers it from the run it read, and its record is not read again until the stamp moves.
  * Nothing is written for it, and no verb, `nemia ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.

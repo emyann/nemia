@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { factoryInstruction } from 'agent-orchestrator';
-import { addFactory, recordText, setInstruction } from 'agent-orchestrator/testing';
+import { addFactory, factoriesNow, recordText, setInstruction } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
@@ -108,7 +108,7 @@ describe('the instruction routes: what a read or a write refuses, changing nothi
     const ghost = await refused(() => app.request('/api/factories/ghost/instruction'), 404);
     assert.equal(
       ghost,
-      packageSays(() => factoryInstruction(root, 'ghost')),
+      packageSays(() => factoriesNow(root, factoryInstruction(root, 'ghost'))),
     );
     for (const fact of ['ghost', 'mill']) assert.ok(ghost.includes(fact), `${fact}: ${ghost}`);
     assert.match(await refused(() => send('PUT', '/api/factories/ghost/instruction', { store: true }), 404), /Nothing was changed\.$/);
@@ -117,7 +117,7 @@ describe('the instruction routes: what a read or a write refuses, changing nothi
     const fallback = await refused(() => app.request('/api/factories/default/instruction'), 409);
     assert.equal(
       fallback,
-      packageSays(() => factoryInstruction(root, 'default')),
+      packageSays(() => factoriesNow(root, factoryInstruction(root, 'default'))),
     );
     await refused(() => send('PUT', '/api/factories/default/instruction/words', { words: 'No.' }), 409);
   });

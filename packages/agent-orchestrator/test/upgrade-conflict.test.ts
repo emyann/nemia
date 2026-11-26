@@ -29,8 +29,8 @@ import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
 import { readFactoryAt } from '../testing.ts';
 import { appliedDir, digestOf, entriesIn, replaceBase, resolutionsFile, swapTree, treeDir } from '../src/factory/applied/applied.store.ts';
-import { plantKey, readStatus, recordText } from '../testing.ts';
-import { appliedKey } from '../src/factory/door/factory-keys.ts';
+import { factoryText, plantKey, readStatus, recordText } from '../testing.ts';
+import { appliedKey } from '../src/factory/door/index.ts';
 import { approveProgram, declineProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { mintToken } from '../src/token/token.store.ts';
@@ -237,12 +237,11 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.deepEqual(bytesUnder(FACTORIES), before, 'nothing is resolved');
   });
   s.test("nemia factory upgrade files the version wanted in the factory's file, and nothing else", async () => {
-    const file = path.join(FACTORIES, 'crew.json');
-    const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const filedAs = JSON.parse(factoryText(ROOT, 'crew') ?? '{}');
     const folder = bytesUnder(path.join(FACTORIES, 'crew'));
     const filed = (await stage.main(['factory', 'upgrade', 'crew', '--to', '0.2.0'])) as { conflicts: number };
     assert.equal(filed.conflicts, 3, 'three conflicts wait for a choice');
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'crew') ?? '{}'), {
       ...filedAs,
       template: { ...filedAs.template, version: '0.2.0' },
       generation: 2,

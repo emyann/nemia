@@ -27,7 +27,7 @@ import { checkedTree, packageSkillNames } from '../src/template/template.store.t
 import { dropRecord, factoryText, plantKey, readFactoriesAt, readFactoryAt, recordRevision, recordText } from '../testing.ts';
 import { appliedDir, treeDir } from '../src/factory/applied/applied.store.ts';
 import { readStatus } from '../testing.ts';
-import { appliedKey } from '../src/factory/door/factory-keys.ts';
+import { appliedKey } from '../src/factory/door/index.ts';
 import { reconcileOnce } from '../src/factory/applied/applied.verb.ts';
 import { startDue } from '../src/factory/schedule/schedule.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
@@ -212,7 +212,7 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
       trusts: ReadonlyArray<{ place: string; wrote?: boolean }>;
     };
     assert.deepEqual(
-      (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).filter((f) => f.startsWith('trip')),
+      (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]) : []).filter((f) => f.startsWith('trip')),
       [],
       'no file, a record',
     );

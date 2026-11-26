@@ -15,7 +15,8 @@
  */
 import type { Effect } from 'effect';
 import { clearFactories, runFolderNames } from '../testing.ts';
-import { factoriesNow, factoryText } from '../testing.ts';
+import { factoriesNow, recordText } from '../testing.ts';
+import { factoryKey } from '../src/factory/door/index.ts';
 import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -101,11 +102,13 @@ const keysOf = (steps: readonly StepSpec[]) =>
 describe("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", () => {
   let here!: { repo: string; dev: string; file: string };
   let FILE!: string;
+  let record!: string;
   let told!: import('../src/start/start.verb.ts').StartedRun;
   beforeAll(() => {
     const t = teardowns();
     here = fresh();
     FILE = here.file;
+    record = factoryKey('pipao');
     told = none;
     return t.end;
   });
@@ -214,11 +217,11 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
   });
   s.test('`nemia factory instruction` writes where it is kept, a path or the store, every other key of the file kept', () => {
-    const others = JSON.parse(factoryText(ROOT, 'pipao') ?? '');
+    const others = JSON.parse(recordText(ROOT, record) ?? '');
     setInstructionAt(ROOT, { factory: 'pipao', at: { path: 'docs/../docs/X.md' } });
-    assert.deepEqual(JSON.parse(factoryText(ROOT, 'pipao') ?? ''), { ...others, instruction: { path: 'docs/X.md' } });
+    assert.deepEqual(JSON.parse(recordText(ROOT, record) ?? ''), { ...others, instruction: { path: 'docs/X.md' } });
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
-    assert.deepEqual(JSON.parse(factoryText(ROOT, 'pipao') ?? ''), { ...others, instruction: { store: true } });
+    assert.deepEqual(JSON.parse(recordText(ROOT, record) ?? ''), { ...others, instruction: { store: true } });
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').instruction, { store: true });
   });
   s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and the words a file holds', async () => {
@@ -246,7 +249,7 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.deepEqual([cleared.file, cleared.removed], [kept, true]);
     assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).stored, false);
     setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
-    assert.ok(!('instruction' in JSON.parse(factoryText(ROOT, 'pipao') ?? '')), 'the key removed, never null');
+    assert.ok(!('instruction' in JSON.parse(recordText(ROOT, record) ?? '')), 'the key removed, never null');
   });
 });
 

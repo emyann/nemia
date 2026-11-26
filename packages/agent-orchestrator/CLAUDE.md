@@ -27,7 +27,7 @@ of its kind, never from an older file that looks alike:
   asks the function before each write; `src/pause/pause.store.test.ts` walks every mode and event against both, and refuses another
   writer.
 - **A state written as several marks that combine**: a person's marks on a run. `contracts/run-marks.contract.ts`,
-  `src/run-marks/run-marks.ts` (a word for every set of the marks, so no set of files is unreadable), `src/record/marks.store.test.ts`.
+  `src/run-marks/run-marks.ts` (a word for every set of the marks, so no set of files is unreadable), `src/runs/marks.store.test.ts`.
 - **A state worked out on every pass and never written**: whether a run has ended. `contracts/run-ending.contract.ts` and
   `src/run-ending/run-ending.ts`: one table over the closed type, which each reader asks in place of a list of its own. No move function
   and no writer: there is nothing to write.

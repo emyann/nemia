@@ -487,7 +487,7 @@ const runFields = {
    * new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
    * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
-   * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   * landed (the Run door's holds.lift); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold: Schema.optional(Hold),
   /**

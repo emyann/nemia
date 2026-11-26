@@ -18,7 +18,7 @@ import { DEFAULT_NAMESPACE } from '../factory.ts';
 import { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } from './servers.ts';
 import { builtinServers } from './servers.store.ts';
 import { factoryText, plantKey, readFactoryServers, recordText, writeFactoryServers } from '../../../testing.ts';
-import { serversKey } from '../door/factory-keys.ts';
+import { serversKey } from '../door/index.ts';
 import { Effect } from 'effect';
 import { HEADER_MASK } from 'objects';
 import { FACTORY_SERVER_ADD, listedOf } from './servers.verb.ts';

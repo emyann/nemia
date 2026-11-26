@@ -44,7 +44,7 @@ import {
 } from './applied.store.ts';
 import { overlaid, renderFactory, resolveParams, type Params } from './index.ts';
 import { transitionedAt } from './condition-time.ts';
-import { generationOf } from '../door/generation.ts';
+import { generationOf } from '../door/index.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 import {
   approveLine,

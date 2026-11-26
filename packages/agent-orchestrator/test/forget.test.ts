@@ -544,7 +544,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
           `${id}: a cancelled run files nothing, a child called off strands nothing`,
         );
       assert.ok(
-        askNames(ROOT, ids.asked).length === 0 && !under('runs', `${ids.asked}.cancelled`),
+        askNames(ROOT, ids.asked).length === 0 && markerText(ROOT, ids.asked, 'cancelled') === undefined,
         'its ask and its cancellation go with it',
       );
     },
@@ -593,7 +593,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       assert.ok(fs.existsSync(path.join(p.wt, 'uncommitted.txt')) && worktreesOf(at).includes(p.wt), 'the worktree and its work stay');
       assert.ok(hasBranch(at, p.branch), 'the branch stays');
       assert.ok(
-        recordText(ROOT, runKey(p.run.id)) !== undefined && under('runs', `${p.run.id}.cancelled`),
+        recordText(ROOT, runKey(p.run.id)) !== undefined && markerText(ROOT, p.run.id, 'cancelled') !== undefined,
         'the record and its cancellation stay',
       );
       assert.ok(!under('forgetting', `${p.run.id}.json`), 'no task written down to forget');
@@ -644,7 +644,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       }
       assert.ok(
         recordText(ROOT, runKey(id)) !== undefined &&
-          under('runs', `${id}.cancelled`) &&
+          markerText(ROOT, id, 'cancelled') !== undefined &&
           askText(ROOT, id, 'retry-implement-2') !== undefined,
       );
       assert.ok(runRecord(ROOT, id).cancelledAt);
@@ -826,7 +826,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
         const done = await tick();
         assert.equal(board().forgets.length, before + 1, 'a pass asks again');
         assert.deepEqual([done.forgetting?.length, done.forgetting?.[0].warn], [1, true]);
-        names(done.forgetting?.[0]?.text, `${p.run.id} (removed)`, 'forget: the store is read-only.', `rm ${marker}`);
+        names(done.forgetting?.[0]?.text, `${p.run.id} (removed)`, 'forget: the store is read-only.', `${marker} keeps their ids`);
         assert.ok(stands(marker), 'the marker stands');
       } finally {
         delete refusing.whole;
@@ -877,7 +877,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
         assert.deepEqual(files.forgetting.read(run.id), tasks, 'the marker keeps their ids');
         const done = await tick();
         assert.deepEqual([done.forgetting?.length, done.forgetting?.[0].warn], [1, true], JSON.stringify(done.forgetting));
-        names(done.forgetting?.[0]?.text, `${run.id} (removed)`, message, `rm ${marker}`);
+        names(done.forgetting?.[0]?.text, `${run.id} (removed)`, message, `${marker} keeps their ids`);
         assert.ok(stands(marker), 'the marker stands');
       } finally {
         delete refusing.task;

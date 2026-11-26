@@ -38,7 +38,7 @@ against 4ef706510985 of 2026-11-25T18:39:35.919Z: 309 runs now, 309 then; 3250 t
 | ceilingsAfterPass | 323.8 | 334.8 | ×0.97 | 329.2 | 345.3 | ×0.95 | 0 / 0 | 0 / 0 | 1.2 | 1.2 |
 | tokenList | 3.6 | 3.4 | ×1.04 | 3.4 | 3.1 | ×1.09 | 0 / 0 | 0 / 0 | 0.4 | 0.4 |
 
-On one frozen copy (/home/nemia/store-measure-s19, outside both stores, made once and read by both runs; --repeat 3), part 6 (f8a077295) as the baseline and part 7 now:
+On one frozen copy (~/store-measure-s19, outside both stores, made once and read by both runs; --repeat 3), part 6 (f8a077295) as the baseline and part 7 now:
 
 against f8a077295d66 of 2026-11-26T07:33:31.183Z: 309 runs now, 309 then; 3250 tasks now, 3250 then; 395 cards now, 395 then
 

@@ -29,6 +29,7 @@ import {
   cardNames,
   cardText,
   readFactoryLevel,
+  writeFactoryLevel,
   factoryText,
   plantCard,
   plantRecord,
@@ -267,7 +268,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     await answered(send(source, 'PUT', '/api/factories/mill/rules', { words: 'Keep drafts short.\n' }));
     sourceTree = path.join(source.home, 'factories', 'mill', 'tree');
     fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
-    write(path.join(source.home, 'factories', 'mill', 'level.json'), `${JSON.stringify({ level: 'auto', since: SINCE })}\n`);
+    writeFactoryLevel(source.home, 'mill', { level: 'auto', since: SINCE });
     [clone = ''] = applied.volumes.map((v) => v.path);
     plantCard(
       source.home,

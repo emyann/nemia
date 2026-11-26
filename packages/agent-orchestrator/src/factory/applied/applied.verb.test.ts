@@ -29,7 +29,7 @@ import { FACTORY_INSTRUCT } from '../instruction.verb.ts';
 import { reconcile } from './applied.verb.ts';
 import { appliedDir, treeDir } from './applied.store.ts';
 import { factoriesNow, factoryText, keysUnder, plantKey, readStatus, recordText } from '../../../testing.ts';
-import { appliedKey } from '../door/factory-keys.ts';
+import { appliedKey } from '../door/index.ts';
 import { detached, followed } from '../../../test/factory-planted.ts';
 import { Effect, Fiber } from 'effect';
 import { StoreRoot } from '../../config/root.store.ts';

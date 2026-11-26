@@ -8,7 +8,8 @@
  * taken off the queue, and its labels edited — is the Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's
  * own is left: `GET /api/inbox/:name` and `PUT` and `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
-import { factoryOrNone } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { factoryOrNone, Missing } from 'agent-orchestrator';
 import type { Served } from '../layer.ts';
 import type { CardFile } from 'objects';
 
@@ -26,7 +27,14 @@ import type { CardFile } from 'objects';
  * @param s The request's services, through which the factory it names is read.
  */
 export async function filingOf(body: CardFile, s: Pick<Served, 'inRequest'>) {
-  if (body.factory !== undefined) await s.inRequest(factoryOrNone(body.factory));
+  if (body.factory !== undefined)
+    await s.inRequest(
+      factoryOrNone(body.factory).pipe(
+        Effect.catchTag('Missing', (miss) =>
+          Effect.fail(new Missing({ message: miss.message.replace(/Nothing was read\.$/, 'Nothing was filed.') })),
+        ),
+      ),
+    );
   return {
     text: body.body,
     ...(body.workflow !== undefined ? { workflow: body.workflow } : {}),

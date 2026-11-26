@@ -41,7 +41,7 @@ import {
   factoryKey,
   levelKey,
   serversKey,
-} from './src/factory/door/factory-keys.ts';
+} from './src/factory/door/index.ts';
 import { FACTORY_FILES } from './src/factory/door/records.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -44,8 +44,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
 import { CardTriggerSchema, readTreeWiring, statusOf, treeDir, treeTriggersOn, writeTreeWiring } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
-import { generationWritten } from './door/generation.ts';
-import { factoryKey } from './door/factory-keys.ts';
+import { factoryKey, generationWritten } from './door/index.ts';
 
 /**
  * Where the factories' own folders are in the store `home`: `<home>/factories`, beside `runs/` and `inbox/`: a factory's tree, its
@@ -301,7 +300,10 @@ export function refuseName(name: string, verb: FactoryWrite) {
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal(verb) });
 }
 
-/** Whether `volumes` hold no writable one: a factory that works on no repository. */
+/**
+ * Whether `volumes` hold no writable one: a factory that works on no repository.
+ * @param volumes The factory's volumes.
+ */
 export const workedOnNone = (volumes: readonly Volume[]) => volumes.every((v) => v.readOnly);
 
 /**

@@ -208,13 +208,11 @@ describe('a due fire waits behind the run cap and behind the queue, then starts'
 describe('a schedule written after its latest fire waits for its next; refused by its factory, it is kept refused for that fire alone', () => {
   let repo!: string;
   let e!: import('agent-runtime').EngineShape;
-  let file!: string;
   beforeAll(() => {
     const t = teardowns();
     repo = aStore(t, '2026-10-05T14:00:00Z');
     weekly();
     e = runtime();
-    file = path.join(ROOT, 'factories', 'solo.json');
     return t.end;
   });
   const s = story(test);
@@ -228,7 +226,7 @@ describe('a schedule written after its latest fire waits for its next; refused b
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled?.due, '2026-10-12T13:00:00.000Z');
   });
   s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async () => {
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), workflows: [] }, null, 2));
+    plantFactory(ROOT, 'solo', JSON.stringify({ ...JSON.parse(factoryText(ROOT, 'solo') ?? '{}'), workflows: [] }, null, 2));
     vi.setSystemTime(Date.parse('2026-10-19T13:00:30Z'));
     const refused = await runWith(e, tickRun({ repo }));
     assert.ok(refused.scheduled && 'refused' in refused.scheduled, JSON.stringify(refused.scheduled));

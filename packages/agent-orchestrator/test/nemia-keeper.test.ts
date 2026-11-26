@@ -57,7 +57,7 @@ import { AgentDoor } from '../src/agents/agent-door.store.ts';
 import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
 import { AgentName } from '../src/agents/agents.model.ts';
 import { addFactoryAt, dropRecord, factoryNamesAt, readFactoriesAt, recordText, rewriteFactoryAt } from '../testing.ts';
-import { levelKey } from '../src/factory/door/factory-keys.ts';
+import { levelKey } from '../src/factory/door/index.ts';
 import { DEFAULT_HARNESS } from '../src/harness/harness.ts';
 import { nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';

@@ -25,7 +25,7 @@ import { templated as programsAt } from './templated.ts';
 import { readFactoryAt } from '../testing.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, treeDir } from '../src/factory/applied/applied.store.ts';
 import { plantKey, readStatus, recordText } from '../testing.ts';
-import { appliedKey } from '../src/factory/door/factory-keys.ts';
+import { appliedKey } from '../src/factory/door/index.ts';
 import { factoryTyped } from './factory-typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';

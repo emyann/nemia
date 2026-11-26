@@ -225,8 +225,8 @@ export const FACTORY_SERVER_ADD: Served<Added, ServerAddInput> = {
 };
 
 /**
- * `nemia factory server rm`: one server taken off a factory's record. The sign-in the harness filed for it is left: it is the
- * harness's own store, and nothing here writes it.
+ * `nemia factory server rm`: one server taken off a factory's record. The sign-in filed for it is left: it is held in the
+ * runtime's or the harness's own store, and nothing here writes it.
  */
 export const FACTORY_SERVER_RM: Served<{ file: string; removed: string }, ServerRmInput> = {
   ...FACTORY_SERVER_RM_WORDS,

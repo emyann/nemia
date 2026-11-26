@@ -1162,17 +1162,6 @@ test('each entry exports exactly its pinned names', async () => {
   }
 });
 
-test('no entry exports the shipped client secrets, nor anything that answers one', async () => {
-  for (const entry of Object.keys(PINNED)) {
-    const names = Object.keys(await import(entry));
-    assert.deepEqual(
-      names.filter((n) => /secret/i.test(n)),
-      [],
-      `${entry}: the shipped secret is handed to the engine inside the package, never to a caller`,
-    );
-  }
-});
-
 test("HARNESS_CHOICES, which the api offers on a step's form, is the runtime's own table from its vocabulary door, not a copy", async () => {
   const { HARNESS_CHOICES } = await import('agent-orchestrator');
   const vocabulary = await import('agent-runtime/vocabulary');

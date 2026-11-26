@@ -1,11 +1,11 @@
 /**
- * A factory's server signed in to and out of (`sign-in.verb.ts`), over the runtime's stand-in, which records whether a secret was
- * handed and never its value.
+ * A factory's server signed in to and out of (`sign-in.verb.ts`), over the runtime's stand-in, which records the road each sign-in took
+ * and is handed no secret by anyone.
  *
- * The rule the card rests on is the secret's: a server of the client Nemia ships is handed its secret, and the fixture that breaks it is
- * the same server under a foreign client id, which is handed none. And each refusal by its kind: a server the record does not hold is
- * `Missing`, a callback port another sign-in waits on is `Conflict`, as is a callback pasted where none waits, and a pasted address that
- * is not the sign-in's redirect is `Invalid`.
+ * The rules: the engine is asked with the server alone — no secret is handed, since Nemia ships none; a server with no callback port
+ * is answered a code, one with a port an address; and each refusal by its kind: a server the record does not hold is `Missing`, a
+ * callback port another sign-in waits on is `Conflict`, as is a callback pasted where none waits, and a pasted address that is not the
+ * sign-in's redirect is `Invalid`. A sign-out of a waiting sign-in cancels it.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -14,7 +14,6 @@ import { scratch } from 'test-kit/scratch';
 import { engineOf, runWith } from '../../runtime-client.ts';
 import { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './sign-in.verb.ts';
 import { writeFactoryServers } from '../../../testing.ts';
-import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
 import { DEFAULT_NAMESPACE } from '../factory.ts';
 import { libraryAddsFile, writeLibraryAdds } from '../../library/library.store.ts';
 import { writeFileSync } from 'node:fs';
@@ -36,30 +35,23 @@ const refusal = (p: Promise<unknown>) =>
     (e: { _tag?: string; message: string }) => e,
   );
 
-test("Nemia's own client is shipped with a secret, and a client Nemia does not ship has none", () => {
-  assert.equal(typeof SHIPPED_CLIENT_SECRETS[NEMIA], 'string');
-  assert.ok(shippedSecretOf(NEMIA)!.length > 0);
-  assert.equal(shippedSecretOf('Iv23liSomeoneElse'), undefined);
-  assert.equal(shippedSecretOf(undefined), undefined);
-  assert.equal(shippedSecretOf('toString'), undefined, "a name on Object's prototype is no client");
-});
-
-test('a sign-in to the shipped server hands the engine its secret; the same server under a foreign client hands none', async () => {
+test('a sign-in is asked of the engine with the server alone, and answers a code where the server names no callback port', async () => {
   const engine = testEngine();
   writeFactoryServers(ROOT, DEFAULT_NAMESPACE, {
-    github: GITHUB,
+    github: { ...GITHUB, oauth: { clientId: NEMIA } },
     other: { ...GITHUB, oauth: { clientId: 'Iv23liForeign', callbackPort: 8792 } },
   });
   const started = await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
-  assert.match(started.authUrl, /client_id=Iv23liQBfm9prqhvXkuY/);
-  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'other', ROOT));
+  assert.equal(started.route, 'device');
+  assert.equal(started.route === 'device' && started.userCode.length > 0, true);
+  const browser = await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'other', ROOT));
+  assert.equal(browser.route === 'browser' && /client_id=Iv23liForeign/.test(browser.authUrl), true);
   assert.deepEqual(engine.signIns, [
-    { name: 'github', secret: true },
-    { name: 'other', secret: false },
+    { name: 'github', route: 'device' },
+    { name: 'other', route: 'browser' },
   ]);
-  assert.equal(JSON.stringify(started).includes(SHIPPED_CLIENT_SECRETS[NEMIA]), false, 'no answer carries the secret');
   const state = await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_NAMESPACE, 'github', ROOT));
-  assert.equal(state.state, 'waiting');
+  assert.deepEqual([state.state, state.started], ['waiting', started], 'a page opened later reads what the sign-in answered');
 });
 
 test('REFUSED: a server the record does not hold is Missing, and a port another sign-in waits on is a Conflict', async () => {
@@ -80,15 +72,15 @@ test('REFUSED: a server the record does not hold is Missing, and a port another 
   assert.equal(noClient._tag, 'Invalid', 'a server with no OAuth client signs in to nothing');
 });
 
-test('a sign-out asks the engine to clear the server, and is refused while its sign-in waits', async () => {
+test('a sign-out cancels a waiting sign-in, and signs a settled one out', async () => {
   const engine = testEngine();
   writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { github: GITHUB });
   await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
-  const waiting = await refusal(runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)));
-  assert.equal(waiting._tag, 'Conflict');
+  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)), { ended: 'cancelled' });
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
   engine.settleSignIn('github', { state: 'connected' });
-  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)), { signedOut: true });
-  assert.deepEqual(engine.signOuts, ['github']);
+  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)), { ended: 'signed-out' });
+  assert.deepEqual(engine.signOuts, ['github', 'github']);
 });
 
 test('a pasted callback completes a waiting sign-in; refused by kind where none waits or the address is not its redirect', async () => {
@@ -112,17 +104,17 @@ test('a pasted callback completes a waiting sign-in; refused by kind where none 
   assert.deepEqual(await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_NAMESPACE, 'github', ROOT)), { state: 'connected' });
 });
 
-test("a server the factory added from the library is signed in to by its name, Nemia's builtin handed its secret", async () => {
+test('a server the factory added from the library is signed in to by its name', async () => {
   const home = scratch('wf-sign-in-added-');
   const engine = testEngine();
   writeLibraryAdds(home, DEFAULT_NAMESPACE, [{ kind: 'McpServer', name: 'github' }]);
   await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home));
-  assert.deepEqual(engine.signIns, [{ name: 'github', secret: true }]);
+  assert.deepEqual(engine.signIns, [{ name: 'github', route: 'device' }], 'the builtin names no callback port');
   writeLibraryAdds(home, DEFAULT_NAMESPACE, []);
   const gone = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
   assert.equal(gone._tag, 'Missing', 'the add taken off, nothing holds the server');
   writeFileSync(libraryAddsFile(home, DEFAULT_NAMESPACE), '{ not json');
   const broken = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
   assert.equal(broken._tag, 'Invalid', 'a broken record of the adds is said, never read as no adds');
-  assert.deepEqual(engine.signIns, [{ name: 'github', secret: true }], 'and nothing more is signed in');
+  assert.deepEqual(engine.signIns, [{ name: 'github', route: 'device' }], 'and nothing more is signed in');
 });

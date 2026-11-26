@@ -17,6 +17,7 @@ import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { CAPABILITIES } from '../harness/declaration.ts';
 import { CLAUDE_DECLARATION } from '../harness/claude/vocabulary.ts';
 import { REMOTE_DECLARATION } from '../a2a/vocabulary.ts';
+import { tokened } from '../harness/mcp-token.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import {
   holderRefusal,
@@ -384,7 +385,8 @@ export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: Runne
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]) => {
       const ops = runnerOf(name, h, given);
-      return [name, given.telemetry ? telemetered(ops, given.telemetry) : ops] satisfies [string, RunnerOps];
+      const telemetry = given.telemetry ? telemetered(ops, given.telemetry) : ops;
+      return [name, tokened(telemetry, given.root)] satisfies [string, RunnerOps];
     }),
   ) satisfies Record<string, RunnerOps>;
 

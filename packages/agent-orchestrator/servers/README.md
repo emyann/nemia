@@ -10,14 +10,15 @@ names every toolset a factory's agents need before anyone signs in — `pull_req
 read down to its job log — since a changed header is a new sign-in for every factory. Which of its tools each agent may call is fenced
 on the agent, in its own file.
 
-A file holds the server's wire facts and the facts of the OAuth client it signs in through, and never a secret:
+A file holds the server's wire facts and the facts of the OAuth client it signs in through, and never a secret (`callbackPort` too,
+where the server signs in by the browser):
 
 ```json
 {
   "type": "http",
   "url": "https://api.githubcopilot.com/mcp/",
   "headers": { "X-MCP-Toolsets": "actions,repos" },
-  "oauth": { "clientId": "Iv23li…", "callbackPort": 8791 }
+  "oauth": { "clientId": "Iv23li…" }
 }
 ```
 
@@ -27,7 +28,5 @@ The file's name is the server's name, by the same rule a `.mcp.json` keys one �
 
 `type`, `url` and `headers` are the server's identity to the harness, which files a sign-in under
 `name|sha256({type,url,headers})[:16]`: changing any of them asks for a new sign-in, and `oauth`, which sits outside that hash, does
-not. A client **secret** is no part of a file here: the board's read answers every key of a file, and the harness reads a secret from
-its own store alone. A builtin server's secret is built into Nemia, as `gh` publishes its own, in
-`src/factory/servers/clients.ts`, keyed by client id: a sign-in from the board to a server whose `oauth.clientId`
-is one of those hands the runtime that secret, which stores it in Claude Code's store, and a person never types one.
+not. A client **secret** is no part of a file here, and Nemia ships none: a server whose provider advertises the device grant signs in by a
+code from the board (the client id alone), and Nemia holds the token it gets.

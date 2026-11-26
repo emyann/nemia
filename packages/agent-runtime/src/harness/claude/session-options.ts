@@ -23,6 +23,7 @@ import { memorylessSettings } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import { everyMcpServer } from '../mcp.ts';
+import { withTokens } from '../mcp-token.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
 /** The options of `Options` this file sets: what `query()` is given, beside its prompt and the runner's own callbacks. */
@@ -196,7 +197,7 @@ const askedOf = (r: SpawnRequest) =>
 export const attachedOptions = (r: SpawnRequest) => {
   const c = r.config;
   const { extra, plugins, settings, systemPrompt } = extraOf(r.cwd, admittedFlags(c));
-  const servers = everyMcpServer(r.cwd, c);
+  const servers = withTokens(everyMcpServer(r.cwd, c), r.mcpTokens);
   const window = c?.contextTokens;
   const windowed = window !== undefined && typeof settings === 'object';
   return {

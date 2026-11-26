@@ -15,7 +15,7 @@ export { CompactRefused } from './compact.ts';
 export type { CompactReport } from './compact.ts';
 export { McpStateRefused } from './mcp-state.ts';
 export { McpSignInRefused, SIGN_IN_STATES } from './mcp-sign-in.ts';
-export type { McpSignInStarted, McpSignInState } from './mcp-sign-in.ts';
+export type { McpSignedOut, McpSignInStarted, McpSignInState } from './mcp-sign-in.ts';
 export { refusalWords } from './refusal.ts';
 export { testEngine } from './test-engine.ts';
 export type { Printed, TestEnd, TestEngine, TestFiling, TestKeeps, TestMcpState, TestTask } from './test-engine.ts';

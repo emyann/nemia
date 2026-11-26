@@ -20,7 +20,7 @@ import {
 } from 'objects';
 import { factories, library, hireName, hires, mcpServers, schedules, triggers } from './objects.ts';
 
-export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInState } from 'objects';
+export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
 
 /**
  * The template a factory is made from: where it is, the version wanted and the parameters given; the version its tree was last applied
@@ -439,16 +439,17 @@ export const recordServer = (name: string, server: string, body: McpServerWrite)
 export const removeServer = (name: string, server: string) => mcpServers.delete(name, server);
 
 /**
- * Start a sign-in to the factory `name`'s server `server`: resolves with the address the person opens. Rejects with a `WriteRefusal`:
- * no such server (404), another sign-in waiting on its callback port (409), a server with no OAuth client (422).
+ * Start a sign-in to the factory `name`'s server `server`: resolves with a code to type at the provider's page, or the address the person
+ * opens. Rejects with a `WriteRefusal`: no such server (404), a sign-in to it or another on its callback port waiting (409), a
+ * server with no OAuth client or whose provider could not be asked (422).
  * @param name The factory's name.
  * @param server The server's name.
  */
 export const signInServer = (name: string, server: string) => mcpServers.signIn(name, server);
 
 /**
- * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board polls it while a sign-in waits,
- * every 2 seconds, and stops once it settles.
+ * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board reads it on every load and polls it
+ * while a sign-in waits, every 2 seconds, and stops once it settles. A waiting one carries what it answered when it started.
  * @param name The factory's name.
  * @param server The server's name.
  */
@@ -472,7 +473,8 @@ export const signInStateQuery = (name: string, server: string) =>
 export const completeSignIn = (name: string, server: string, url: string) => mcpServers.signInCallback(name, server, url);
 
 /**
- * Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits.
+ * End the sign-in of the factory `name`'s `server`: a waiting one is cancelled, otherwise what was held is removed, so its state reads
+ * needs-auth on the next read.
  * @param name The factory's name.
  * @param server The server's name.
  */

@@ -203,7 +203,7 @@ export async function factoryServerRm(args: Args) {
   const answer = await asked('factory server rm', (c) => c.mcpservers.delete({ params: { namespace: factory, name: server } }));
   said([
     `${factory}  ${server} removed`,
-    `recorded: ${writtenOf(answer, 'factory server rm').file} — the sign-in the harness filed for it is left in the harness's own store`,
+    `recorded: ${writtenOf(answer, 'factory server rm').file} — the sign-in filed for it is left in the runtime's or the harness's own store`,
   ]);
   return 0;
 }

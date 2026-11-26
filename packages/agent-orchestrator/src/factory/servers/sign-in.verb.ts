@@ -1,16 +1,16 @@
 /**
- * A factory's server signed in to and out of, from the board: the server read off the factory's record, the builtin secret picked for
- * its client (`shippedSecretOf`), and the engine asked to hold the sign-in (`mcpSignIn`), read it (`mcpSignInState`), complete it with
- * the address a person's browser landed on (`mcpSignInCallback`) or clear it (`mcpSignOut`). The secret is handed to the engine and to
- * nothing else: no answer here carries it, and the pasted address is in no answer or refusal either.
+ * A factory's server signed in to and out of, from the board: the server read off the factory's record, and the engine asked to hold
+ * the sign-in (`mcpSignIn`), read it (`mcpSignInState`), complete a browser one with the address a person's browser landed on
+ * (`mcpSignInCallback`) or end it (`mcpSignOut`). The road is the engine's to choose, from what the server's provider advertises: a code
+ * the person types at the provider, or the browser. The engine holds the token and hands it to each session; no answer here carries
+ * it, the device code, or the pasted address, and no refusal does either.
  *
- * Not a command of the table, so no CLI verb: a sign-in waits on a browser, and a CLI one would have to hold its own process open for
+ * Not a command of the table, so no CLI verb: a sign-in waits on a person, and a CLI one would have to hold its own process open for
  * it (`docs/features.md`).
  */
 import { Effect } from 'effect';
 import { EngineService, mcpServerOf, tried } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
-import { shippedSecretOf } from './clients.ts';
 import { factoryThere } from './servers.verb.ts';
 import { doorAt } from '../door/factories.store.ts';
 import { FactoryName } from '../factory.model.ts';
@@ -48,15 +48,11 @@ const recorded = (factory: string, server: string, home: string, verb: string) =
 const kindOf = (e: { readonly message: string; readonly held: boolean; readonly callback?: string }) =>
   e.held || e.callback === 'none-waiting' ? new Conflict({ message: e.message }) : new Invalid({ message: e.message });
 
-/**
- * A sign-in to `server` of `factory` started: the address the person opens, and when it stops waiting. A server of a client built
- * into Nemia is handed that client's secret, which the engine stores in the harness's own store first; any other is handed none.
- */
+/** A sign-in to `server` of `factory` started: the code to type or the address to open, and when it stops waiting. */
 export const serverSignIn = Effect.fn('serverSignIn')(function* (factory: string, server: string, home: string) {
   const found = yield* recorded(factory, server, home, 'signed in to');
-  const secret = shippedSecretOf(found.oauth?.clientId);
   const e = yield* EngineService;
-  return yield* e.mcpSignIn(server, found, secret).pipe(Effect.mapError(kindOf));
+  return yield* e.mcpSignIn(server, found).pipe(Effect.mapError(kindOf));
 });
 
 /** The state of `server`'s last sign-in on this engine, from memory: `none`, `waiting`, `connected`, `expired` or `failed`. */
@@ -83,7 +79,7 @@ export const serverSignInCallback = Effect.fn('serverSignInCallback')(function* 
   return yield* e.mcpSignInCallback(server, url).pipe(Effect.mapError(kindOf));
 });
 
-/** `server`'s sign-in cleared, so a session handed it reads `needs-auth` until a person signs in again. */
+/** `server`'s waiting sign-in cancelled, or its sign-in removed: a session handed it then reads `needs-auth` until a person signs in. */
 export const serverSignOut = Effect.fn('serverSignOut')(function* (factory: string, server: string, home: string) {
   const found = yield* recorded(factory, server, home, 'signed out of');
   const e = yield* EngineService;

@@ -229,6 +229,26 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
+    name: 'a remote server with a token in `mcpTokens` is handed `Authorization: Bearer <token>` beside its own headers, one without is handed as before',
+    check: () => {
+      const bare = scratch('ae-session-options-token-');
+      const mcp = {
+        github: { type: 'http' as const, url: 'https://api.githubcopilot.com/mcp/', headers: { 'X-MCP-Readonly': 'false' } },
+        other: { type: 'http' as const, url: 'https://other.example/mcp' },
+      };
+      const given = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare, config: { mcp }, mcpTokens: { github: 'planted-token' } });
+      assert.deepEqual(given.mcpServers, {
+        github: { ...mcp.github, headers: { 'X-MCP-Readonly': 'false', Authorization: 'Bearer planted-token' } },
+        other: mcp.other,
+      });
+      assert.deepEqual(
+        attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare, config: { mcp } }).mcpServers,
+        mcp,
+        'no token, no header',
+      );
+    },
+  },
+  {
     name: 'a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it',
     check: () => {
       const bare = scratch('ae-session-options-bare-');

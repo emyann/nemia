@@ -753,13 +753,12 @@ const SIGNING = { ...SERVER, oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callback
 
 const MCP_SIGN_IN: readonly Walk[] = [
   {
-    name: 'a sign-in is refused a server with no OAuth client or no callback port, and one that is no remote server',
+    name: 'a sign-in is refused a server with no OAuth client, and one that is no remote server',
     walk: async ({ engine }) => [
       await asked(engine.mcpSignIn('github', SERVER)),
-      await asked(engine.mcpSignIn('github', { ...SERVER, oauth: { clientId: 'Iv23li' } })),
       await asked(engine.mcpSignIn('local', { command: 'npx' } as never)),
     ],
-    says: [{ refused: 'McpSignInRefused' }, { refused: 'McpSignInRefused' }, { refused: 'McpSignInRefused' }],
+    says: [{ refused: 'McpSignInRefused' }, { refused: 'McpSignInRefused' }],
   },
 ];
 
@@ -906,18 +905,19 @@ export const APART: readonly Apart[] = [
   },
   {
     name: 'a sign-in to a server with an OAuth client',
-    why: 'a sign-in stores a secret with the `claude` CLI and holds a Claude Code session, and the stand-in spawns neither: it answers an address built from the client id and waits until a test settles it (`settleSignIn`), where an engine with no Claude Code harness refuses the sign-in. A test of the real one gives `mcpSignInVerbsOf` its seams (`src/service/mcp-sign-in.test.ts`).',
+    why: 'a sign-in holds a Claude Code session or polls a provider for a code, and the stand-in does neither: it answers a code, or an address built from the client id where the server names a callback port, and waits until a test settles it (`settleSignIn`), where an engine with no Claude Code harness refuses the sign-in. A test of the real one gives `mcpSignInVerbsOf` its seams, and MSW the provider (`src/service/mcp-sign-in.test.ts`).',
     walk: ({ engine }) => asked(engine.mcpSignIn('github', SIGNING)),
     standIn: {
+      route: 'browser',
       authUrl: 'https://github.com/login/oauth/authorize?client_id=Iv23liQBfm9prqhvXkuY&state=stand-in',
       until: '<time>',
     },
   },
   {
     name: 'a sign-out of a server with an OAuth client',
-    why: 'a sign-out runs `claude mcp remove`, and the stand-in spawns nothing: it answers that it signed out, where an engine with no Claude Code harness refuses it.',
+    why: 'a sign-out removes a held token or runs `claude mcp remove`, and the stand-in does neither: it answers how it ended, where an engine with no Claude Code harness refuses it.',
     walk: ({ engine }) => asked(engine.mcpSignOut('github', SIGNING)),
-    standIn: { signedOut: true },
+    standIn: { ended: 'signed-out' },
   },
   {
     name: 'the feed after a filing',

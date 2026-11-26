@@ -104,8 +104,9 @@ export type Program = { readonly run: string; readonly writes: readonly string[]
  * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
  * its file holds one; a file written before the counter reads as 1 (`generationOf`). `labelValues`: the values each label key it names
  * takes on its cards and runs, when it names any — its file's, or its tree's wiring's where it is made from a template, which renders
- * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`). `programs`: the programs its template declares
- * (`programs/<name>/program.yaml`), by name, read from its tree's wiring, which the daemon keeps running for it (`programs()`).
+ * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`).
+ * `programs`: the programs its template declares (`programs/<name>/program.yaml`), by name, read from its tree's wiring, which the
+ * daemon keeps running for it (`programs()`).
  */
 export type Factory = {
   name: string;

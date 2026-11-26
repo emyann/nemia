@@ -13,7 +13,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Duration, Effect } from 'effect';
+import { Cause, Duration, Effect, Schema } from 'effect';
 import { listedAt } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
@@ -34,8 +34,7 @@ const recordFile = (home: string) => path.join(home, 'programs.json');
 /** The ids the controller filed, or none where it kept no record or one that does not read as a list of ids. */
 const filedIds = (home: string) => {
   try {
-    const read: unknown = JSON.parse(fs.readFileSync(recordFile(home), 'utf8'));
-    return Array.isArray(read) ? read.filter((id): id is string => typeof id === 'string') : [];
+    return Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.String)))(fs.readFileSync(recordFile(home), 'utf8'));
   } catch {
     return [];
   }
@@ -55,16 +54,13 @@ type Declared = { readonly id: string; readonly name: string; readonly factory: 
  * @param listing The store's factories, as the Factory door lists them.
  */
 export const declaredPrograms = (listing: readonly FactoryListing[]) =>
-  listing.flatMap((f): Declared[] => {
+  listing.flatMap((f) => {
     if ('error' in f || f.tree === undefined || f.programs === undefined) return [];
     const { tree, programs, name, generation } = f;
-    return Object.entries(programs).map(([program, one]) => ({
-      id: programTaskId(name, program, one, generation, tree),
-      name: program,
-      factory: name,
-      tree,
-      program: one,
-    }));
+    return Object.entries(programs).map(
+      ([program, one]) =>
+        ({ id: programTaskId(name, program, one, generation, tree), name: program, factory: name, tree, program: one }) satisfies Declared,
+    );
   });
 
 /**
@@ -125,7 +121,9 @@ export const programsOnce = Effect.fn('programsOnce')(function* () {
     declared.map((d) => d.id),
     held,
   );
-  recorded(home, [...new Set([...ids.filter((id) => declared.some((d) => d.id === id) || held.some((h) => h.id === id && !h.settled)), ...due.file])]);
+  recorded(home, [
+    ...new Set([...ids.filter((id) => declared.some((d) => d.id === id) || held.some((h) => h.id === id && !h.settled)), ...due.file]),
+  ]);
   for (const id of due.file) {
     const d = declared.find((one) => one.id === id);
     if (d !== undefined) yield* asked('file', e.file(programSpec(d, yield* programToken(d), home)));

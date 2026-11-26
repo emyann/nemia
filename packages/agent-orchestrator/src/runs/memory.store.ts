@@ -221,7 +221,9 @@ function runsOf(st: State) {
     stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
     exists: (id) => st.records.has(id),
     taken: (id) =>
-      [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said, st.routes, st.conditions].some((m) => m.has(id)),
+      [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said, st.routes, st.conditions].some((m) =>
+        m.has(id),
+      ),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id, actor) => {
       const at = st.cancelled.get(id);

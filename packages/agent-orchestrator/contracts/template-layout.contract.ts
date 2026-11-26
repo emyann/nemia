@@ -1,6 +1,7 @@
 /**
  * Whether a template's layout gives a file a place (agent-orchestrator, src/template/layout.ts, `inLayout`): `file` its path from the
- * template's root, `named` the files a `{ path }` of a document names. Beside the root files, `workflows/`, `agents/`, `skills/` and `programs/`, a
+ * template's root, `named` the files a `{ path }` of a document names. Beside the root files, `workflows/`, `agents/`, `skills/` and
+ * `programs/`, a
  * template holds one folder of carried files its workflows share, `carried/`, any file at any depth in it: the render copies it byte for
  * byte into the factory's tree and a run freezes it beside its workflow's folder; and the factory's home, `home/`, any file at any depth
  * in it, copied byte for byte into the tree's `home/`, where a run's sessions start. A file a `{ path }` names is in the layout wherever it

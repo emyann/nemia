@@ -40,7 +40,9 @@ function whatOf(step: string, name: string, entry: Record<string, unknown>) {
       `${step}: the check \`${name}\`'s \`condition:\` is a name of lower-case letters, digits and dashes, opening on a letter (${JSON.stringify(entry.condition)} is not): \`condition: ready\`.`,
     );
   if (entry.usesCheckout !== undefined)
-    refuse(`${step}: the check \`${name}\` waits on a condition and runs nothing, so \`usesCheckout:\` means nothing to it. Delete the line.`);
+    refuse(
+      `${step}: the check \`${name}\` waits on a condition and runs nothing, so \`usesCheckout:\` means nothing to it. Delete the line.`,
+    );
   return { condition: entry.condition };
 }
 
@@ -221,7 +223,9 @@ export function checksOf(step: string, check: string | undefined, text: string |
 export const checksWritten = (checks: readonly CheckSpec[]) =>
   checks.map((c) => {
     const entry: Record<string, FrontmatterValue> =
-      c.condition === undefined ? { name: c.name, run: c.run, after: [...c.after] } : { name: c.name, condition: c.condition, after: [...c.after] };
+      c.condition === undefined
+        ? { name: c.name, run: c.run, after: [...c.after] }
+        : { name: c.name, condition: c.condition, after: [...c.after] };
     if (c.usesCheckout === false) entry.usesCheckout = 'false';
     return entry;
   });

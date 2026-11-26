@@ -39,7 +39,8 @@ const conditionWriteRefusalSpec = spec<
     },
     undeclaredIsRefused: {
       description: 'Another writer is refused a condition the step does not wait on',
-      condition: ({ input: [writer, target, step], output }) => ownStep(writer, target) || declared(step, target) || output === 'undeclared',
+      condition: ({ input: [writer, target, step], output }) =>
+        ownStep(writer, target) || declared(step, target) || output === 'undeclared',
     },
     otherTryIsRefused: {
       description: 'Another writer is refused a declared condition written for a try the step is not on',
@@ -47,8 +48,7 @@ const conditionWriteRefusalSpec = spec<
         ownStep(writer, target) || !declared(step, target) || target.try === step.currentTry || output === 'other-try',
     },
     writtenExactlyWhenNothingRefuses: {
-      description:
-        "A write by anyone but the step's own session, of a condition the step waits on, for the try it is on, is taken",
+      description: "A write by anyone but the step's own session, of a condition the step waits on, for the try it is on, is taken",
       condition: ({ input: [writer, target, step], output }) =>
         (output === null) === (!ownStep(writer, target) && declared(step, target) && target.try === step.currentTry),
     },

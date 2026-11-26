@@ -15,7 +15,7 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
-export { CheckOutput, Spent, StepAttempts, StepCheck, StepCondition, StepConditionWriter, StepLog, StepUsed } from './run-step.ts';
+export { CheckOutput, Spent, StepAttempts, StepCheck, StepLog, StepUsed } from './run-step.ts';
 export {
   StepCloseout,
   type BodyPage,
@@ -36,7 +36,6 @@ export {
   RunApprove,
   RunApproved,
   RunAsked,
-  RunCancelPlan,
   RunCancelled,
   RunInput,
   RunPrune,
@@ -47,15 +46,13 @@ export {
   RunRetry,
   RunRoute,
   RunRouted,
-  RunConditionWrite,
-  RunConditionWritten,
   RunSaid,
   RunSay,
   RunStart,
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
-export { RunAssign, RunAssigned, RunHeld, RunHold } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -127,17 +124,11 @@ export {
   type ToldVia,
   TRY_CAUSES,
   WAIT_ON,
-  WRITTEN_CONDITION_STATUSES,
-  PROGRAM_PHASES,
-  CONDITION_WRITE_REFUSALS,
 } from './words.ts';
 export type {
   AnswerVia,
   CheckResult,
   ConditionStatus,
-  ConditionWriteRefusalWord,
-  ProgramPhase,
-  WrittenConditionStatus,
   DefinitionOrigin,
   EdgeKind,
   EventReason,
@@ -210,7 +201,6 @@ export {
   FactoryTemplate,
   FactoryTrusted,
   FactoryUntrusted,
-  FactoryProgram,
   FactoryUpgrade,
   FactoryVolume,
   HarnessSettings,
@@ -607,7 +597,7 @@ export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGro
 export { FolderNames, FoldersGroup, RepositoryMade, RepositoryMake, RepositoryNew } from './folders.ts';
 export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
 export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
-export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';
+export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES, WRITTEN_CONDITION_STATUSES } from './words.ts';
 export type { HarnessCheckName, HarnessCheckState, Milestone, MilestoneState, TurnFailure } from './words.ts';
 export {
   LinkClaimed,
@@ -701,7 +691,6 @@ export {
   WHY_CAP,
   answerFlag,
   approveRefusal,
-  conditionRefusal,
   holdRefusal,
   pauseRefusal,
   pauseTimeoutCheck,

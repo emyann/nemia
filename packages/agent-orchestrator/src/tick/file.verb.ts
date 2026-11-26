@@ -737,7 +737,8 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
  * A check that waits on a condition, once its condition is decided for the try the step is on (`conditionStanding`): filed as a task of
  * its own that prints the writer's message and exits 0 where it was written True, 1 where False, so every reader of a check's task (its
  * verdict, its output handed to the next try, `retries:`) reads it as it reads any check. Filed nothing while it is not written, written
- * Unknown, or written for another try: the step stays checking, and its row says what it waits on (`conditionWaitWords`, `src/condition/condition.ts`).
+ * Unknown, or written for another try: the step stays checking, and its row says what it waits on (`conditionWaitWords`,
+ * `src/condition/condition.ts`).
  */
 const fileConditionCheck = Effect.fnUntraced(function* (f: Filing, name: string, condition: string, taskId: string) {
   const { e, run } = f;

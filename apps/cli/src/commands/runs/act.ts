@@ -6,7 +6,6 @@
 import {
   type Args,
   CANCEL_WORDS,
-  CONDITION_WORDS,
   DEFAULT_NAMESPACE,
   type RunConditionWritten,
   type Event,
@@ -132,12 +131,12 @@ export const conditionLines = ({ condition: c }: RunConditionWritten, runId: str
 export async function condition(args: Args) {
   const name = runOf(args);
   const step = textArg(args, 'step') ?? '';
-  const run = await asked(CONDITION_WORDS.name, (c) => c.runs.show({ params: { name } }));
+  const run = await asked('condition', (c) => c.runs.show({ params: { name } }));
   const namespace = run.metadata.namespace ?? DEFAULT_NAMESPACE;
   const given = textArg(args, 'try');
   const tried = given === undefined ? (run.status.steps.find((s) => s.name === step)?.current?.try ?? 1) : Number(given);
   const status = textArg(args, 'status') === 'True' ? 'True' : textArg(args, 'status') === 'False' ? 'False' : 'Unknown';
-  const written = await asked(CONDITION_WORDS.name, (c) =>
+  const written = await asked('condition', (c) =>
     c.runs.condition({
       params: { namespace, name, step, condition: textArg(args, 'condition') ?? '' },
       payload: { status, try: tried, message: textArg(args, 'message') ?? '' },

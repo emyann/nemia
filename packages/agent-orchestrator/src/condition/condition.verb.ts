@@ -45,7 +45,16 @@ export type ConditionInput = typeof ConditionInput.Type;
 
 /** `nemia condition`: the condition as it is kept for the step's try, with when it was written and when its status last changed. */
 export const CONDITION: Served<
-  { step: string; name: string; try: number; status: 'True' | 'False' | 'Unknown'; message: string; at: string; transitionedAt: string; by: string | null },
+  {
+    step: string;
+    name: string;
+    try: number;
+    status: 'True' | 'False' | 'Unknown';
+    message: string;
+    at: string;
+    transitionedAt: string;
+    by: string | null;
+  },
   ConditionInput
 > = {
   ...CONDITION_WORDS,
@@ -54,11 +63,16 @@ export const CONDITION: Served<
     const door = yield* RunDoor;
     if (!(yield* door.runs.exists(RunId.read(runId))))
       return yield* Effect.fail(
-        new Missing({ message: `no such run: ${runId}. nemia condition takes a run by its id, as nemia ls lists it: nemia condition <runId> <step> <name>.` }),
+        new Missing({
+          message: `no such run: ${runId}. nemia condition takes a run by its id, as nemia ls lists it: nemia condition <runId> <step> <name>.`,
+        }),
       );
     const run = yield* door.runs.read(RunId.read(runId));
     const spec = (yield* stepsOf(run)).find((s) => s.name === step);
-    if (!spec) return yield* Effect.fail(new Missing({ message: `${runId} has no step ${step}. Name one of its steps: nemia condition ${runId} <step> ${condition}.` }));
+    if (!spec)
+      return yield* Effect.fail(
+        new Missing({ message: `${runId} has no step ${step}. Name one of its steps: nemia condition ${runId} <step> ${condition}.` }),
+      );
     const waitsOn = stepChecks(spec).flatMap((c) => (c.condition === undefined ? [] : [c.condition]));
     const currentTry = tryOf(run, step);
     const refused = conditionWriteRefusal(

@@ -7,7 +7,7 @@
  */
 import type { ConditionStanding } from '../../contracts/condition-standing.contract.ts';
 import type { ConditionWriteRefusalOf } from '../../contracts/condition-write.contract.ts';
-import { WRITTEN_CONDITION_STATUSES, type WrittenConditionStatus } from 'objects';
+import { WRITTEN_CONDITION_STATUSES } from 'objects';
 import type { ConditionWritten, Run, StepRecord } from '../record/record.ts';
 
 /**
@@ -68,7 +68,7 @@ export function personConditions(names: readonly string[], read: (name: string) 
         step,
         name: condition,
         try: wrote,
-        status: status as WrittenConditionStatus,
+        status: status as ConditionWritten['status'],
         message,
         at,
         transitionedAt: typeof transitionedAt === 'string' ? transitionedAt : at,
@@ -88,7 +88,8 @@ export const withConditions = <R extends Pick<Run, 'steps'>>(run: R, written: re
   const steps = { ...run.steps };
   for (const w of written) {
     const record = steps[w.step];
-    if (record && w.try === (record.tries?.length ?? 0) + 1) steps[w.step] = { ...record, conditions: { ...record.conditions, [w.name]: w } };
+    if (record && w.try === (record.tries?.length ?? 0) + 1)
+      steps[w.step] = { ...record, conditions: { ...record.conditions, [w.name]: w } };
   }
   return { ...run, steps };
 };

@@ -656,7 +656,8 @@ export type RunRouted = typeof RunRouted.Type;
  */
 export const RunConditionWrite = Schema.Struct({
   status: Schema.Literals(WRITTEN_CONDITION_STATUSES).annotate({
-    description: 'True: it holds, the step goes on. False: it does not, the step is refused as a failed check is. Unknown: not decided yet.',
+    description:
+      'True: it holds, the step goes on. False: it does not, the step is refused as a failed check is. Unknown: not decided yet.',
   }),
   try: Schema.Finite.annotate({ description: 'The try of the step the status speaks of, from 1; it must be the one the step is on.' }),
   message: Schema.String.annotate({ description: "The writer's words with the status: what it saw, and what to do where it is False." }),

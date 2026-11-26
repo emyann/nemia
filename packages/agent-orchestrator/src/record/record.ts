@@ -760,7 +760,8 @@ export type RunStore = {
     readonly route: (id: string, step: string, n: number, route: { route: string; at: string }) => string;
     /**
      * Write the condition `name` of the step `step` for its try `n` (`nemia condition set`, a program), whole over the one there: never
-     * spent, read on every pass, laid on the step's record while `n` is the try it is on. Answers it as kept, with when its status last changed.
+     * spent, read on every pass, laid on the step's record while `n` is the try it is on. Answers it as kept, with when its status last
+     * changed.
      */
     readonly condition: (id: string, written: Omit<ConditionWritten, 'transitionedAt'>) => ConditionWritten;
   };

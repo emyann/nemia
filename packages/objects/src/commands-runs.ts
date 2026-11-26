@@ -18,7 +18,7 @@ import {
   WHY_CAP,
 } from './commands-runs-act.ts';
 import { ASSIGN_WORDS, assignRefusal } from './commands-runs-assign.ts';
-import { CONDITION_WORDS, conditionRefusal } from './commands-runs-condition.ts';
+import { CONDITION_WORDS } from './commands-runs-condition.ts';
 import { ANSWER_HELP, answerFlag, APPROVE_WORDS, approveRefusal, RETRY_WORDS, retryRefusal, SAY_WORDS } from './commands-runs-answer.ts';
 import { PRUNE_WORDS, RM_WORDS, rmRefusal } from './commands-runs-forget.ts';
 import { PAUSE_TIMEOUT_WORDS, PAUSE_WORDS, pauseRefusal, pauseTimeoutCheck, RESUME_WORDS, timeoutRefusal } from './commands-runs-pause.ts';
@@ -47,7 +47,6 @@ export {
   answerFlag,
   approveRefusal,
   assignRefusal,
-  conditionRefusal,
   holdRefusal,
   pauseRefusal,
   pauseTimeoutCheck,

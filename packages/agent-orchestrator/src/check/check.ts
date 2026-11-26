@@ -335,7 +335,8 @@ export const checksContract = (checks: readonly CheckSpec[]) =>
     'have passed, checks that wait on nothing between them run side by side, and none starts after one refuses.',
     '',
     ...checks.map(
-      (c) => `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${c.condition === undefined ? codeSpan(c.run) : `then waits on the condition ${codeSpan(c.condition)}, which its writer writes and never this session`}`,
+      (c) =>
+        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${c.condition === undefined ? codeSpan(c.run) : `then waits on the condition ${codeSpan(c.condition)}, which its writer writes and never this session`}`,
     ),
     '',
     'Nothing that waits on this step starts until every one has passed. Do not weaken them to pass them: the commands come from the run, not',

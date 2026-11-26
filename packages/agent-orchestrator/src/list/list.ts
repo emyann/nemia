@@ -488,18 +488,7 @@ function listedSteps(
       return { name, message: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
-    if (judged) {
-      const waits =
-        status === 'checking'
-          ? conditionWaitWords(
-              run,
-              run.id,
-              name,
-              stepChecks(step).flatMap((c) => (c.condition === undefined ? [] : [c.condition])),
-            )
-          : '';
-      return { name, ...judged, ...(waits ? { note: [('note' in judged ? judged.note : ''), waits].filter(Boolean).join(' · ') } : {}), branch };
-    }
+    if (judged) return { name, ...judged, ...conditionNote(run, step, judged.message), branch };
 
     return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }
@@ -587,6 +576,20 @@ function saidReason(word: StepStatus | ListedPhase, c: Closeout | { error: strin
 
 /** What a check's verdict is as codes while it runs, and while the pause keeps it from being filed: running, with no exit yet. */
 const CHECK_RUNNING: CheckVerdict = { result: 'running', exit: null };
+
+/** The note of a row that says `checking` while its checks wait on conditions (`conditionWaitWords`), and none for any other row. */
+const conditionNote = (run: Run, step: StepSpec, word: string) => {
+  const note =
+    word === 'checking'
+      ? conditionWaitWords(
+          run,
+          run.id,
+          step.name,
+          stepChecks(step).flatMap((c) => (c.condition === undefined ? [] : [c.condition])),
+        )
+      : '';
+  return note ? { note } : {};
+};
 
 /**
  * The row of a step its run judged by its check or a person refused: `verified ✓`; `checking` while its check is filed, else `waiting on

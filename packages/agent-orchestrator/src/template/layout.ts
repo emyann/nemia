@@ -156,7 +156,12 @@ export const inLayout: InLayout = (file, named) => {
 };
 
 /** The file each folder of a kind must hold, and what the folder is. */
-const HOLDS = { workflows: ['workflow.yaml', 'a workflow'], agents: ['agent.yaml', 'an agent'], skills: ['SKILL.md', 'a skill'], programs: ['program.yaml', 'a program'] } as const;
+const HOLDS = {
+  workflows: ['workflow.yaml', 'a workflow'],
+  agents: ['agent.yaml', 'an agent'],
+  skills: ['SKILL.md', 'a skill'],
+  programs: ['program.yaml', 'a program'],
+} as const;
 
 /** What the folders of `files` lack or are misnamed: a folder of workflows/, agents/ or skills/ without its file, or not named a Name. */
 function folderRefusals(files: readonly string[]) {

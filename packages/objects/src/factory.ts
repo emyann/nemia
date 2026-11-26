@@ -224,7 +224,8 @@ export const FactoryStatus = Schema.Struct({
   untrusted: Schema.Array(FactoryUntrusted).annotate({ description: 'Its places a harness does not trust now.' }),
   programs: Schema.optionalKey(
     Schema.Array(FactoryProgram).annotate({
-      description: "The programs its template declares and where each stands, read from the runtime; absent where the template declares none or the runtime was not read.",
+      description:
+        'The programs its template declares and where each stands, read from the runtime; absent where the template declares none or the runtime was not read.',
     }),
   ),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why its record does not read; absent on a factory that reads.' })),

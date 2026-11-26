@@ -6,7 +6,7 @@
  * and `test/refusal.test.ts` pins how many modules they load. A reader of `exitCode === 2` needs no change, since each class carries it.
  */
 import { TaggedError } from 'effect/Data';
-import type { ConditionWriteRefusalWord, ProposalRefusal } from 'objects';
+import type { ProposalRefusal } from 'objects';
 
 /** What is asked of is not there: no run by that id. */
 export class Missing extends TaggedError('Missing')<{ readonly message: string }> {
@@ -34,7 +34,7 @@ export class Invalid extends TaggedError('Invalid')<{ readonly message: string }
  */
 export class Forbidden extends TaggedError('Forbidden')<{
   readonly message: string;
-  readonly reason: ProposalRefusal | Extract<ConditionWriteRefusalWord, 'own-step'>;
+  readonly reason: ProposalRefusal | 'own-step';
 }> {
   readonly exitCode = 2;
 }

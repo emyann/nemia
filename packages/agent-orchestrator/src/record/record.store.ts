@@ -774,7 +774,8 @@ function takenBackIn(text: string) {
 
 /**
  * A record as the keyspace holds it: compact JSON, without what a person owns beside it (the approvals, acceptances, pruning, hold and a
- * person's routes and the conditions written for its steps a read composed onto it, `unrouted`, `unconditioned`), nor the pause, labels and words said before a step was filed the Run door did. It
+ * person's routes and the conditions written for its steps a read composed onto it, `unrouted`, `unconditioned`), nor the pause, labels and
+ * words said before a step was filed the Run door did. It
  * takes the run as a pass or `nemia start` writes it.
  */
 export const recordValue = ({

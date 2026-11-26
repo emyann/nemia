@@ -34,6 +34,16 @@ export type StepCheck = {
    * did not finish, `running` while it runs, and `unknown` for a task the engine has no record of. Null until the run files it.
    */
   verdict: CheckVerdict | null;
+  /** The condition a check waits on, as it stands for the try the step is on: present on that check alone. */
+  condition?: {
+    name: string;
+    try: number;
+    status: 'True' | 'False' | 'Unknown' | null;
+    message: string | null;
+    writtenAt: string | null;
+    lastTransitionTime: string | null;
+    writer: null;
+  };
   refused: {
     exit: string;
     /** Null on an earlier try's check: the page reads the current try's stdout alone, and every try's stderr. */
@@ -173,7 +183,7 @@ export async function checksOf(e: Engine, run: Run, steps: readonly StepSpec[], 
   const checks = new Map<string, readonly StepCheck[]>();
   for (const step of steps) {
     if (!hasChecks(step)) continue;
-    const list = checksIn(step, run.steps[step.name]?.check, views, stderr);
+    const list = checksIn(step, run.steps[step.name]?.check, views, stderr, run.steps[step.name]);
     checks.set(step.name, list);
     for (const check of list) {
       const id = check.taskId;
@@ -199,11 +209,27 @@ export async function checksOf(e: Engine, run: Run, steps: readonly StepSpec[], 
  * @param check The check on the try's record, or undefined where none was filed.
  * @param views The engine's views of the run's tasks, by task id.
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
+ * @param current The step's record while the try is the one it is on, whose written conditions a check that waits on one carries
+ * (`StepCheck.condition`); left out for an earlier try, whose conditions the record no longer holds.
  */
-export const checksIn = (step: StepSpec, check: StepRecord['check'], views: Views, stderr: CheckStderr) =>
+export const checksIn = (step: StepSpec, check: StepRecord['check'], views: Views, stderr: CheckStderr, current?: StepRecord) =>
   stepChecks(step).map((c) => {
     const taskId = check ? Object.fromEntries(checkTasksOf(check))[c.name] : undefined;
-    return checkIn(checkLine(c), taskId, views, stderr, c.name);
+    const filed = checkIn(checkLine(c), taskId, views, stderr, c.name);
+    if (c.condition === undefined || current === undefined) return filed;
+    const written = current.conditions?.[c.condition];
+    return {
+      ...filed,
+      condition: {
+        name: c.condition,
+        try: (current.tries?.length ?? 0) + 1,
+        status: written?.status ?? null,
+        message: written?.message ?? null,
+        writtenAt: written?.at ?? null,
+        lastTransitionTime: written?.transitionedAt ?? null,
+        writer: null,
+      },
+    } satisfies StepCheck;
   });
 
 /**

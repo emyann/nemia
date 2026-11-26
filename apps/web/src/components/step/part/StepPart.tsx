@@ -5,13 +5,14 @@
  * it asks of you, what it got, what it said, what it gave, and its detail. So the node, the card, the ledger's row, the bar and the step's
  * page cannot disagree. Each step keeps its own try picker, the address keeping the choice (`?try=`), and every slot is of that try.
  */
+import type { ReactNode } from 'react';
 import type { AgentListing } from '@/lib/api/agents';
 import type { RunDetail, StepView } from '@/lib/runView';
 import { useUnchecked } from '@/lib/useUnchecked';
 import { slotsOf, stepPartOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
-import { CutFrame } from '../../look';
+import { CutFrame, type FrameHue } from '../../look';
 import { PartAsks } from './PartAsks';
 import { PartDetail } from './PartDetail';
 import { PartGave } from './PartGave';
@@ -53,7 +54,16 @@ function Slot({
 /**
  * The part of the step `step` of the run's view `view`, at `size`. `agents` gives its agent a role where they are read; `now` the
  * instant its times are said at, else the clock, read again every 30 seconds. `here` is the step's own page, where the head links to no
- * page; `id` the part's anchor, as the ledger names it (`step-<name>`).
+ * page; `id` the part's anchor, as the ledger names it (`step-<name>`). `frame`, for a caller that gives the frame (the approve modal,
+ * whose one frame holds its title too), draws the part's body in place of its own cut frame, told the hue the frame would wear.
+ * @param props.view The run's view the step is read from.
+ * @param props.step The step's name.
+ * @param props.size The size it is drawn at.
+ * @param props.agents The agents its head names a role from.
+ * @param props.now The instant its times are said at.
+ * @param props.here Whether it is drawn on the step's own page.
+ * @param props.id The part's anchor.
+ * @param props.frame The caller's frame around the body, given the body and its hue; the part's own cut frame by default.
  */
 export function StepPart({
   view,
@@ -63,6 +73,7 @@ export function StepPart({
   now,
   here = false,
   id,
+  frame,
 }: {
   view: RunDetail;
   step: string;
@@ -71,31 +82,36 @@ export function StepPart({
   now?: Date;
   here?: boolean;
   id?: string;
+  frame?: (body: ReactNode, hue: FrameHue) => ReactNode;
 }) {
   const ticking = useNow(30_000);
   const unchecked = useUnchecked();
   const part = stepPartOf(view, step, now ?? new Date(ticking), agents, unchecked);
   const own = view.steps.find((s) => s.name === step);
+  const body = (
+    <article
+      id={id}
+      data-step-part={size}
+      data-step-name={step}
+      aria-label={step}
+      className={cn('flex min-w-0 flex-col text-on-surface', INSIDE[size])}
+    >
+      {slotsOf(part, size).map(({ slot }) =>
+        slot === 'head' ? (
+          <div key={slot} className="flex flex-col gap-2">
+            <PartHead head={part.head} size={size} action={size === 'L' && !here} />
+            {size === 'L' && own && <TryPicker step={step} tries={own.tries} shown={own.shown} />}
+          </div>
+        ) : (
+          own && <Slot key={slot} slot={slot} part={part} run={view} step={own} size={size} />
+        ),
+      )}
+    </article>
+  );
+  if (frame) return frame(body, part.head.hue);
   return (
     <CutFrame hue={part.head.hue} size={size === 'S' ? 12 : 24} className={cn(WIDTH[size], size === 'L' && 'scroll-mt-4')}>
-      <article
-        id={id}
-        data-step-part={size}
-        data-step-name={step}
-        aria-label={step}
-        className={cn('flex min-w-0 flex-col text-on-surface', INSIDE[size])}
-      >
-        {slotsOf(part, size).map(({ slot }) =>
-          slot === 'head' ? (
-            <div key={slot} className="flex flex-col gap-2">
-              <PartHead head={part.head} size={size} action={size === 'L' && !here} />
-              {size === 'L' && own && <TryPicker step={step} tries={own.tries} shown={own.shown} />}
-            </div>
-          ) : (
-            own && <Slot key={slot} slot={slot} part={part} run={view} step={own} size={size} />
-          ),
-        )}
-      </article>
+      {body}
     </CutFrame>
   );
 }

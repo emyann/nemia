@@ -51,7 +51,7 @@
     },
     {
       "term": "resourceVersion",
-      "meaning": "an opaque word in an object's metadata that changes on every write to it: a reader compares it and never orders it, and a writer hands back the one it read to say which change it acted on (`ObjectMeta`, `packages/objects/src/meta.ts`)."
+      "meaning": "a word in an object's metadata, passed back unmodified, that changes on every write to it: of an object of a kind the keyspace watches it is the revision of its last change, a decimal, and a list's is the keyspace head it was read at, which a watch resumes from (`?watch=true&resourceVersion=`: 410 where compaction removed it, 400 past the head or for no version); of an Event, a byte of the feed. A writer hands back the one it read to say which change it acted on (`ObjectMeta`, `packages/objects/src/meta.ts`)."
     },
     {
       "term": "generation",

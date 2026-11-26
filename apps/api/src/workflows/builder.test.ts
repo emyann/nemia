@@ -19,7 +19,7 @@ import { addFactory, agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
 import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
-import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
+import { definitionRevisionNow, StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, settingsOf, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
@@ -48,6 +48,10 @@ const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>) =>
   Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root))) satisfies Promise<A>;
 const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+
+/** The revision the api serves the workflow `name` of the library at now (the index read again), as a write is held to it. */
+const revisionOf = async (name: string) =>
+  String(await Effect.runPromise(definitionRevisionNow('Workflow', undefined, name).pipe(Effect.provideService(StoreRoot, root))));
 
 type KeyForm = import('objects').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
@@ -132,10 +136,10 @@ const json = { 'content-type': 'application/json' };
  * A PUT of `body`: sent with the folder's version as it is on disk now, as a board that has just read it sends it — unless the body says
  * `version` itself, which the tests of a stale or a missing one do.
  */
-const put = (name: string, body: unknown, from = 'user', headers: Record<string, string> = json) => {
+const put = async (name: string, body: unknown, from = 'user', headers: Record<string, string> = json) => {
   const read =
     typeof body === 'object' && body !== null && !Array.isArray(body) && !('version' in body)
-      ? { version: versionOf(path.join(STORE, decodeURIComponent(name))), ...body }
+      ? { version: await revisionOf(decodeURIComponent(name)), ...body }
       : body;
   return sentTo('PUT', `/api/workflows/${name}?${ON_REPO}`, read, headers);
 };
@@ -452,18 +456,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         'README.md': '# fresh\n\nA plan.\n',
         'plan.md': '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n',
       });
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'fresh'),
-      );
+      const read = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'fresh');
+      assert.deepEqual(saved.workflow, read && { ...read, version: saved.workflow.version });
+      assert.equal(saved.workflow.version, await revisionOf('fresh'), 'at the revision the api serves it at');
       assert.equal(saved.workflow.from, 'user');
       assert.deepEqual(
         loadWorkflows(dir).map((s) => renderStep(s)),
@@ -501,19 +504,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
       assert.equal(res.status, 200, await res.clone().text());
       const saved = (await res.json()) as WorkflowSaved;
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'as-listed' && w.from === 'user'),
-        'answered as the listing reads it',
-      );
+      const listing = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'as-listed' && w.from === 'user');
+      assert.deepEqual(saved.workflow, listing && { ...listing, version: saved.workflow.version }, 'answered as the listing reads it');
+      assert.equal(saved.workflow.version, await revisionOf('as-listed'), 'at the revision the api serves it at');
     },
   );
   s.test(
@@ -561,19 +562,17 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
       ]);
       assert.equal(saved.workflow.description, 'Plan, build, review.');
       assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
-      assert.deepEqual(
-        saved.workflow,
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'drawn'),
-        'answered as the listing reads it',
-      );
+      const listing = (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'drawn');
+      assert.deepEqual(saved.workflow, listing && { ...listing, version: saved.workflow.version }, 'answered as the listing reads it');
+      assert.equal(saved.workflow.version, await revisionOf('drawn'), 'at the revision the api serves it at');
 
       const windowed = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, context: 150_000 } }, review] });
       assert.equal(windowed.status, 200, await windowed.clone().text());
@@ -650,7 +649,7 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         ],
       );
       assert.deepEqual(saved.workflow.schemas, ['build.schema.json', 'plan.schema.json']);
-      assert.equal(saved.workflow.version, versionOf(dir), 'at the version the folder is at now, for the next save');
+      assert.equal(saved.workflow.version, await revisionOf(path.basename(dir)), 'at the revision the folder is at now, for the next save');
 
       const steps = saved.workflow.steps;
       const stamps = () => snapshot(dir);
@@ -1222,10 +1221,7 @@ describe("the builder's routes: a body not in its shape, a source not yours, a f
     }
     const taken = await post({ name: 'taken', step });
     assert.equal(taken.status, 409);
-    assert.equal(
-      ((await taken.json()) as { error: string }).error,
-      workflowTaken(path.join(STORE, 'taken'), versionOf(path.join(STORE, 'taken'))),
-    );
+    assert.equal(((await taken.json()) as { error: string }).error, workflowTaken(path.join(STORE, 'taken'), await revisionOf('taken')));
     const file = await post({ name: 'NOTES.txt', step });
     assert.equal(file.status, 409);
     assert.equal(((await file.json()) as { error: string }).error, workflowTaken(path.join(STORE, 'NOTES.txt'), null));
@@ -1446,7 +1442,7 @@ describe('PUT /api/workflows/yours/:name: a save the package refuses, or of a fo
     const dir = planned('edited');
     write(path.join(dir, 'README.md'), '# edited\n');
     const [plan, build] = (await listedSteps('edited')) as [ListedStep, ListedStep];
-    const read = versionOf(dir);
+    const read = await revisionOf('edited');
     const draft = { version: read, steps: [plan, { ...build, spec: { ...build.spec, retries: 2 } }] };
     const handEdits: Array<[string, () => void, () => void]> = [
       [
@@ -1493,21 +1489,22 @@ describe('PUT /api/workflows/yours/:name: a save the package refuses, or of a fo
     for (const [what, edit, undo] of handEdits) {
       edit();
       const edited = snapshot(dir);
-      const now = versionOf(dir);
-      assert.notEqual(now, read, `${what}: the folder's version moves`);
+      const now = await revisionOf('edited');
+      assert.notEqual(now, read, `${what}: the folder's revision moves`);
       const res = await put('edited', draft);
       assert.equal(res.status, 409, `${what}: ${await res.clone().text()}`);
       const { error } = (await res.json()) as BuildRefused;
-      tells(error, `${dir} has changed since it was read at version ${read}`, [`(it is at version ${now})`, 'Nothing was written.']);
+      tells(error, 'the Workflow edited changed since it was read', [`(it is at revision ${now}, not ${read})`, 'read it again']);
       assert.deepEqual(snapshot(dir), edited, `${what}: the hand edit is kept, and nothing else written`);
       undo();
-      assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);
+      assert.notEqual(await revisionOf('edited'), read, `${what}: undone, the revision is still ahead: a revision never goes back`);
     }
 
+    const settled = await revisionOf('edited');
     write(path.join(dir, 'sub', 'x.md'), '---\nplace: git\n---\nNot a step.\n');
-    assert.equal(versionOf(dir), read, 'a folder inside it moves nothing');
+    assert.equal(await revisionOf('edited'), settled, 'a folder inside it moves nothing');
 
-    const taken = await put('edited', draft);
+    const taken = await put('edited', { ...draft, version: settled });
     assert.equal(taken.status, 200, `read at the version it is at, the save is taken: ${await taken.clone().text()}`);
     assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m);
     assert.ok(fs.existsSync(path.join(dir, 'sub', 'x.md')), 'the save leaves a folder inside, which it did not count, where it was');

@@ -106,7 +106,7 @@ test('five cards walked two at a time answer each once in name order, 3, 1 and 0
   for (const page of pages) for (const item of page.items) assert.equal('source' in item.status, false, "a list's items carry no file");
 });
 
-test('a card is an object: its factory its namespace, filed time, a digest of its text, its labels, spec and status', () => {
+test('a card is an object: its factory its namespace, filed time, its keyspace revision, its labels, spec and status', () => {
   const card = valueOf(
     over(
       five,
@@ -118,7 +118,7 @@ test('a card is an object: its factory its namespace, filed time, a digest of it
   assert.equal(card.metadata.namespace, 'alpha');
   assert.deepEqual(card.metadata.labels, { team: 'core' });
   assert.match(card.metadata.creationTimestamp, /^\d{4}-\d{2}-\d{2}T/);
-  assert.match(card.metadata.resourceVersion, /^[0-9a-f]{16}$/);
+  assert.match(card.metadata.resourceVersion, /^[0-9]+$/);
   assert.equal(card.spec.body?.trim(), 'Bravo');
   assert.equal(card.status.state, 'filed');
   assert.deepEqual(card.status.runs, []);

@@ -184,7 +184,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector (-l at a shell): The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - fieldSelector: A fieldSelector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.
 
 - On the port: Answers a line per item, as `inbox -o wide` prints them.
@@ -438,7 +438,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 
 - On the port: Answers a line per item, as `factory -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -460,7 +460,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 
 - On the port: Answers a line per item, as `factory ls -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -750,7 +750,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 
 - On the port: Answers a line per item, as `factory servers -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -1349,7 +1349,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector (-l at a shell): The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - fieldSelector: The runs in one state or outcome, as one term: status.state=<state> or status.state!=<state>, status.outcome=<outcome> or status.outcome!=<outcome>.
 
 - On the port: Answers a line per item, as `ls -o wide` prints them.
@@ -1701,7 +1701,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 - repo (--repo at a shell): The path on the api's machine of a repository a factory works on, or a folder under one, read as that repository; absent, the person's library and the builtins alone.
 
@@ -1988,7 +1988,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
 - On the port: Answers a line per item, as `skills -o wide` prints them.
@@ -2947,7 +2947,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
 - On the port: Answers a line per item, as `library -o wide` prints them.
@@ -2973,7 +2973,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
 - On the port: Answers a line per item, as `library -o wide` prints them.
@@ -2999,7 +2999,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 
 - On the port: Answers a line per item, as `library -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -3024,7 +3024,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
 - On the port: Answers a line per item, as `library -o wide` prints them.
@@ -3051,7 +3051,7 @@ Its arguments:
 - continue: The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector: The retired spelling of labelSelector, read the same.
-- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
 
 - On the port: Answers a line per item, as `library -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.

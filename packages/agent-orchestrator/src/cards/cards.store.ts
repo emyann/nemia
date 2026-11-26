@@ -25,11 +25,12 @@ import path from 'node:path';
 import { Context, Effect, Layer, Option, Schema } from 'effect';
 import { checked, fromThrow, rootedDoor } from '../door/door.store.ts';
 import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
-import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
+import { cardLabels, inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
 import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.ts';
 import { asideOf, entriesIn, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
 import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts';
-import { FILE_ID_PREFIX } from 'objects';
+import { DEFAULT_NAMESPACE, FILE_ID_PREFIX } from 'objects';
+import { claimKey } from '../runs/run-keys.ts';
 
 /** The Card door's shape: the inbox's cards and the tick's tries of a queued card's start, each method answering an Effect. */
 export type CardDoorShape = {
@@ -40,6 +41,11 @@ export type CardDoorShape = {
     readonly read: (name: CardName) => Effect.Effect<string | null, Refusal>;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
     readonly filedAt: (name: CardName) => Effect.Effect<string | null, Refusal>;
+    /**
+     * The revision the card `name` stands at: the highest of its record, its try and its claim, one removed counted at the revision
+     * that removed it; null where it is not there.
+     */
+    readonly revision: (name: CardName) => Effect.Effect<number | null, Refusal>;
     /** When the inbox's entry `file` (as `entries` lists it) was filed, as an ISO time; null when it is gone or names no card. */
     readonly entryAt: (entry: { readonly file: string }) => Effect.Effect<string | null, Refusal>;
     /** The text of the inbox's entry `file` (as `entries` lists it); null when it is gone or names no card. */
@@ -154,6 +160,26 @@ const CardRecord = Schema.Struct({ text: Schema.String, filedAt: Schema.String }
 
 /** A card's record as its value reads, or none where it does not. */
 const cardIn = Schema.decodeUnknownOption(Schema.fromJsonString(CardRecord));
+
+/**
+ * The namespace and the labels a selector reads of the card `name` as a card record's value held it, or null where the value is no card
+ * that reads: what a watch resumed from a revision asks of a card removed or relabelled since, to know whether the watcher held it.
+ * @param name The card's name.
+ * @param value The value of the card's record (`/registry/cards/<name>`) as of the revision asked.
+ */
+export const cardHeld = (name: string, value: string) => {
+  const record = cardIn(value);
+  if (Option.isNone(record)) return null;
+  try {
+    const card = parseInboxCard(`${name}.md`, record.value.text);
+    return {
+      namespace: card.factory ?? DEFAULT_NAMESPACE,
+      labels: cardLabels({ labels: card.labels ?? {}, workflow: card.workflow ?? null, factory: card.factory ?? null }),
+    };
+  } catch {
+    return null;
+  }
+};
 
 /** A try as the tick writes it; any key beside these is left unread. */
 const missedStartIn = Schema.decodeUnknownOption(Schema.fromJsonString(MissedStartModel));
@@ -307,6 +333,16 @@ export function cardRecords(
         }),
       read: (name) => Effect.map(recordOf(name), (r) => r?.text ?? null),
       filedAt: (name) => Effect.map(recordOf(name), (r) => r?.filedAt ?? null),
+      revision: (name) =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          const own = keyspace === undefined ? undefined : yield* keyspace.get(cardKey(name));
+          if (keyspace === undefined || own === undefined) return null;
+          const beside = yield* Effect.all(
+            [cardTryKey(name), claimKey(name)].map((key) => Effect.map(keyspace.touched(key), (m) => m.get(key) ?? 0)),
+          );
+          return Math.max(own.revision, ...beside);
+        }),
       entryAt: ({ file }) => {
         const name = nameOfEntry(file);
         return name === undefined ? Effect.succeed(null) : Effect.map(recordOf(name), (r) => r?.filedAt ?? null);

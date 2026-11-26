@@ -167,9 +167,9 @@ const labelQuery = (description: string) =>
  * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
  * its retired spelling, read the same. Each kept as the text it was sent as, so a wrong one is refused in the package's words, a 422.
  * And `watch`: `watch=true` asks for the list as a stream of watch events (`watchEventOf`), which the api answers before this
- * definition is reached, so a list's answer here is always a page. And `resourceVersion`, beside `watch=true`: a watch of a list of the
- * feed's lines (the Event lists) starts at that byte of the feed, the `resourceVersion` of the last event or BOOKMARK a reader was sent
- * or of a page's `metadata`, and is sent no state; a watch of any other list refuses one, since nothing keeps its old versions.
+ * definition is reached, so a list's answer here is always a page. And `resourceVersion`, beside `watch=true`: a watch of a list of a
+ * watched kind starts at that keyspace revision (410 where compaction removed it, 400 past the head or for no version); the Event lists
+ * start at a byte of the feed; the runs list takes none yet and refuses one.
  */
 export const listQuery = {
   limit: Schema.optionalKey(Schema.String.annotate({ description: 'The most items a page holds, a whole number from 1.' })),
@@ -186,7 +186,7 @@ export const listQuery = {
   resourceVersion: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.",
+        "With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.",
     }),
   ),
 };

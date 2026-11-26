@@ -1,7 +1,9 @@
 /**
  * The inbox's cards as objects (`Card`, `CardList`, from `objects`): the listing the inbox reads (`InboxListing`, its state judged by
  * `inboxJudged`) and each card's text, read through the Card door. A card's namespace is its factory, `default` for a card that names none;
- * its `creationTimestamp` when it was filed; its `resourceVersion` a digest of its text, which changes on every write of it; its labels a
+ * its `creationTimestamp` when it was filed; its `resourceVersion` the revision of the card's records (`CardDoor`'s `revision`), which
+ * moves on every write of it and on a
+ * try or a claim of its start; its labels a
  * person's, and a selector reads them with its `workflow:` and `factory:` (`cardLabels`). A list is selected first, sorted by name, then
  * cut into a page, the one list page (`pageListed`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is
  * no markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
@@ -23,7 +25,6 @@ import {
   parseInboxCard,
 } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
-import { cardVersion } from '../card-write/card-write.verb.ts';
 import { FileDoor } from '../start/files.store.ts';
 import { namedInText } from '../start/index.ts';
 
@@ -96,7 +97,7 @@ const specKeysOf = (l: InboxListing) => ({
 });
 
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
-const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, files?: Card['status']['files']) => {
+const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, files?: Card['status']['files'], revision = 0) => {
   const { body, error } = bodyOf(l, text);
   return {
     apiVersion: API_VERSION,
@@ -106,7 +107,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, 
       namespace: namespaceOf(l),
       ...(Object.keys(l.labels).length ? { labels: { ...l.labels } } : {}),
       creationTimestamp: filedAt,
-      resourceVersion: cardVersion(text),
+      resourceVersion: String(revision),
     },
     spec: { ...specKeysOf(l), ...(body !== undefined ? { body } : {}) },
     status: {
@@ -142,7 +143,7 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
   if (text === null || filedAt === null) return null;
-  return cardOf(l, text, filedAt, source, yield* filesOf(l, bodyOf(l, text).body ?? ''));
+  return cardOf(l, text, filedAt, source, yield* filesOf(l, bodyOf(l, text).body ?? ''), (yield* door.cards.revision(name)) ?? 0);
 });
 
 /**

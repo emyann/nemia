@@ -431,7 +431,7 @@ export const formerFenceLine = (file: string, key: string) =>
  * @param file The agent file, as the line names it.
  */
 export const overridableLine = (file: string) =>
-  `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added. Say what a step may override — \`overridable: [model, fence, skills]\` — and a step that writes anything else is refused at load.`;
+  `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added; the harness's properties (model, effort, context, harness) it always may. Say what a step may override of the rest — \`overridable: [output, fence, skills]\` — and a step that writes anything else is refused at load.`;
 
 /**
  * The block a top-level fence key moves into: the harness whose fence takes it (`harnessTaking`), and for the mode key one harness takes

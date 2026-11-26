@@ -9,7 +9,10 @@ export {
   directoryFence,
   FENCE_KEYS,
   offerRefusal,
+  HARNESS_PROPERTIES,
   OVERRIDABLE,
+  STEP_OVERRIDES,
+  unoffered,
   OVERRIDE_KEYS,
   overridesOf,
   ownDenies,
@@ -19,6 +22,7 @@ export {
   writesOutsideByRule,
   type Fenced,
   type Overridable,
+  type StepOverride,
 } from './fence.ts';
 export { headedLayers, LAYER_HEADINGS } from './layers.ts';
 export type { ComposedLayer } from './layers.ts';

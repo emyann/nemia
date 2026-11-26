@@ -298,6 +298,12 @@ describe('the check of a template folder: the whole folder passes, and each rule
       ['spec', 'overridable', 1],
       'wiring',
     );
+    assertRefused(
+      refusalsOf((d) => (d[AGENT].spec.overridable = ['model', 'fence'])),
+      AGENT,
+      ['spec', 'overridable', 0],
+      'model',
+    );
   });
   test('a hire naming no workflow, no step or no agent is refused', () => {
     const hire = (key: string, agent: string) => refusalsOf((d) => (d['nemia.yaml'].spec.hires[key] = agent));

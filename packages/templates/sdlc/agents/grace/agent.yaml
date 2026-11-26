@@ -9,7 +9,6 @@ spec:
     - implement-a-change
     - git
   overridable:
-    - context
     - output
     - fence
     - skills

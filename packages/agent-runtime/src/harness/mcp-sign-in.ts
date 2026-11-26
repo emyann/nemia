@@ -3,20 +3,17 @@
  *
  * Measured on Claude Code 2.1.308 and the Agent SDK 0.3.308 (`docs/harness.md`, *The MCP sign-in affordances*):
  *
- * - Claude Code reads an OAuth app's client secret from its own store alone, filed under `name|sha256({type,url,headers})[:16]`, and
- *   only `claude mcp add … --client-secret` writes it there, reading the value from `MCP_CLIENT_SECRET`. `--scope local` files it
- *   under the same key an inline session computes, and adds the server to the one folder the child ran in, so the owner's own
- *   sessions in their own checkouts do not gain it.
- * - `claude mcp remove --scope local <name>` deletes both the stored secret and the stored token under that key: a later session handed
- *   the same bytes finds no sign-in, which is what a sign-out is. It finds the key only through a server added under the name: a remove
- *   of one never added exits 1 and leaves the token, so a sign-out adds the server first, with no secret.
+ * - Claude Code files its sign-ins under `name|sha256({type,url,headers})[:16]`. `claude mcp add --scope local` adds a server to the one
+ *   folder the child ran in, so the owner's own sessions in their own checkouts do not gain it.
+ * - `claude mcp remove --scope local <name>` deletes the stored token under that key: a later session handed the same bytes finds no
+ *   sign-in, which is what a sign-out is. It finds the key only through a server added under the name: a remove of one never added
+ *   exits 1 and leaves the token, so a sign-out adds the server first.
  * - `query().mcpAuthenticate(name, redirectUri)` answers an authorize URL, and the Claude Code child itself listens on the callback
  *   port until the browser's redirect arrives or the session ends; `mcpServerStatus()` then reads `connected`.
  * - `query().mcpSubmitOAuthCallbackUrl(name, callbackUrl)` hands the child the address the browser was sent back to, for a browser
  *   that runs on another machine than the child, whose redirect never reaches that port (`sdk.mjs` 0.3.322, 0.3.323 and 0.3.325).
  *
- * The secret rides the child's environment alone: never its argv, never a task's config (which is journalled), and a refusal quoting
- * the child's output has it taken out first.
+ * This file is the browser road: a server whose provider offers a code signs in by `mcp-device.ts` instead, and Nemia holds its token.
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -64,7 +61,7 @@ export const claudeCli = (executable: string) =>
     })) satisfies McpCli;
 
 /**
- * The Claude Code every road runs — a session, held or a job, its sign-in check, its quota, a `claude mcp` child — so the key a secret
+ * The Claude Code every road runs — a session, held or a job, its sign-in check, its quota, a `claude mcp` child — so the key a sign-in
  * is filed under is the key a session computes, and the sign-in asked is the one the session meets. In order:
  * 1. `executable`, the one named: the engine's own (`EngineOptions.claudeExecutable`), or `AE_CLAUDE_EXECUTABLE` where the caller reads it;
  * 2. `<harnessBin>/claude` where it exists, read at every call (`programIn`): the one a person activated, after the engine started too;
@@ -90,20 +87,15 @@ const sdkBundledClaude = (from: string) => {
   }
 };
 
-/** `text` with every appearance of `secret` taken out, so no refusal quotes it. */
-const withoutSecret = (text: string, secret: string) => (secret ? text.split(secret).join('<secret>') : text);
-
 /**
  * The argv of `claude mcp add` for `server` under `name`, as `mcpServerOf` hands its bytes — the headers in its order, which is the
- * order the key is computed over — with `--client-secret` given no value: the CLI reads it from `MCP_CLIENT_SECRET`. The headers come
- * before the other options, never last: `--header` takes many values, and would read the name as one more header (measured). With
- * `secret` false, `--client-secret` is left out: the add a sign-out makes stores no secret.
+ * order the key is computed over. The headers come before the other options, never last: `--header` takes many values, and would read
+ * the name as one more header (measured). It stores nothing a sign-in needs: it adds the server so that a remove finds its key.
  * Exported only for the tests that import it.
  * @param name The name the server is added under.
  * @param server The remote server, its URL, headers and OAuth app.
- * @param secret Whether `--client-secret` is given; false for the add a sign-out makes.
  */
-export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true) => {
+export const mcpAddArgs = (name: string, server: RemoteMcpServer) => {
   const s = mcpServerOf(server);
   return [
     'mcp',
@@ -113,7 +105,7 @@ export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true)
     '--transport',
     s.type,
     ...Object.entries(s.headers ?? {}).flatMap(([k, v]) => ['--header', `${k}: ${v}`]),
-    ...(s.oauth === undefined ? [] : ['--client-id', s.oauth.clientId, ...(secret ? ['--client-secret'] : [])]),
+    ...(s.oauth === undefined ? [] : ['--client-id', s.oauth.clientId]),
     ...(s.oauth?.callbackPort === undefined ? [] : ['--callback-port', String(s.oauth.callbackPort)]),
     name,
     s.url,
@@ -121,29 +113,10 @@ export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true)
 };
 
 /**
- * The client secret of `server`'s OAuth app stored in Claude Code's own store, under the key a session handed the same bytes finds:
- * `claude mcp remove --scope local` first (an earlier add under the name is refused by the CLI, and its exit is no failure), then
- * `claude mcp add --scope local … --client-secret` with the secret in `MCP_CLIENT_SECRET` alone. Answers why it failed, with the
- * secret taken out of the CLI's words, or `undefined`.
- * @param cli Runs the CLI with an argv, in a folder, with an environment.
- * @param name The name the server is added under.
- * @param server The remote server, whose OAuth app the secret is of.
- * @param secret The OAuth app's client secret.
- * @param cwd The folder the CLI runs in, whose local scope the server is added to.
- */
-export const storeClientSecret = async (cli: McpCli, name: string, server: RemoteMcpServer, secret: string, cwd: string) => {
-  const env = withoutTelemetry(process.env);
-  await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env });
-  const added = await cli(mcpAddArgs(name, server), { cwd, env: { ...env, MCP_CLIENT_SECRET: secret } });
-  if (added.code === 0) return undefined;
-  return `\`claude mcp add\` did not store the client secret of \`${name}\` (exit ${added.code}): ${withoutSecret(added.out.trim(), secret)}`;
-};
-
-/**
- * `name`'s sign-in cleared from Claude Code's store, in the folder a sign-in adds it in: `claude mcp add --scope local` with no secret,
- * then `claude mcp remove --scope local <name>`, which deletes the token and any secret under its key (measured). The add comes first
- * because a remove finds the key only through a server added under the name, and a sign-in handed no secret added none; where one is
- * already added the CLI refuses the second add, which is no failure. Answers why the remove failed, or `undefined`.
+ * `name`'s sign-in cleared from Claude Code's store, in the folder a sign-in adds it in: `claude mcp add --scope local`, then
+ * `claude mcp remove --scope local <name>`, which deletes the token under its key (measured). The add comes first because a remove
+ * finds the key only through a server added under the name; where one is already added the CLI refuses the second add, which is no
+ * failure. Answers why the remove failed, or `undefined`.
  * @param cli Runs the CLI with an argv, in a folder, with an environment.
  * @param name The name the server was added under.
  * @param server The remote server, added again first so that the remove finds its key.
@@ -151,7 +124,7 @@ export const storeClientSecret = async (cli: McpCli, name: string, server: Remot
  */
 export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpServer, cwd: string) => {
   const env = withoutTelemetry(process.env);
-  await cli(mcpAddArgs(name, server, false), { cwd, env });
+  await cli(mcpAddArgs(name, server), { cwd, env });
   const removed = await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env });
   if (removed.code === 0) return undefined;
   return `\`claude mcp remove\` did not clear the sign-in of \`${name}\` (exit ${removed.code}): ${removed.out.trim()}. Read its words, then sign out again.`;

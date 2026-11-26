@@ -31,7 +31,9 @@ const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   }
   const list = watchedListOf(body.kind);
   if (list !== undefined) return API_STAMPED.has(list) ? { kind: list, list: true, table: false } : undefined;
-  return isWatchedKind(body.kind) && API_STAMPED.has(body.kind) ? { kind: body.kind, list: false, table: false } : undefined;
+  return isWatchedKind(body.kind) && API_STAMPED.has(body.kind) && body.kind !== 'Delegation'
+    ? { kind: body.kind, list: false, table: false }
+    : undefined;
 };
 
 /** `object` with the revision it stands at as its `metadata.resourceVersion`, where it is an object with metadata. */

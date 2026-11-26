@@ -127,8 +127,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   the definition has moved (`definitionJudged`): the api judges nothing, but a builder's schemas, written before its folder, are judged first
   (`write`, `workflows/builder.ts`). No GET writes the keyspace in any process, a `--no-tick` api included: a definition no sweep has
   numbered is served at the next revision, worked out with no write (`kindRevisions`, `definitionsNumbered`), and a writer sweeps once it
-  has written. Two edges of that number: a hand edit read before any sweep is served at the next revision, which a restore to exactly the
-  record's text returns to the record's own (no update is lost, the files being the same), and under a daemon, in the ~2 s before a sweep, a
+  has written. Three edges of that number: a definition read before any sweep is served at the next revision, which a hand edit before the next sweep leaves the same, so a save at that read passes and writes over the edit (the tests number the index first, `definitionsIndexed`); a restore to exactly the
+  record's text returns a definition to the record's own revision (no update is lost, the files being the same), and under a daemon, in the ~2 s before a sweep, a
   reader that saw a hand edit is not sent its undo. Each object's revision is the orchestrator's (`atRevisions`); the api stamps only what no verb of its stamps — a Card,
   Proposal and Delegation list, an Agent, a Skill and a Workflow, and a template's documents at the Template's revision
   (`src/objects/revisioned.ts`). A watch resumed from a revision sends DELETED for an

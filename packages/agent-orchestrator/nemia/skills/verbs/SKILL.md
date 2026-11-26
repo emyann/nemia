@@ -471,6 +471,17 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                nemia cancel <runId>, and start again.
                                each tool's words: tools.md#route
                                on the port: route
+  nemia condition <runId> <step> <name> --status True|False|Unknown [--message "<words>"] [--try <n>]
+                               write a condition a check of the step waits on (condition: <name> in its checks:): True lets
+                               the step go on, False refuses it as a failed check is (it counts against retries:, then waits
+                               on you), Unknown leaves it waiting. It speaks of one try of the step: --try, else the try the
+                               step is on now; a status for any other try is refused. The step's own session, and its checks,
+                               are refused: a step never vouches for its own work. A template's program writes it with the
+                               session token it is given.
+                               --message: the words that go with the status; a False one is handed to the next try as the
+                               check's output
+                               each tool's words: tools.md#condition
+                               on the port: condition
   nemia refresh <runId> [<step>] [--base [--off]]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the

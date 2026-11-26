@@ -12,6 +12,16 @@ import type { Env } from '../config/config.store.ts';
 import { personTokens } from '../token/token.store.ts';
 import { pairingAsked } from './pairing.store.ts';
 import { boardBase, linkClaimed, pairingClaimed } from './commands.verb.ts';
+import { Effect } from 'effect';
+import { tokenDoorAt } from '../token/token.store.ts';
+
+/** The pairing claimed at once, at the store `home` (`pairingClaimed`). */
+const claimedNow = (home: string, id: string, secret: string, nowMs: number) =>
+  Effect.runSync(Effect.provide(pairingClaimed(home, id, secret, nowMs), tokenDoorAt(home)));
+
+/** The link claimed at once, at the store `home` (`linkClaimed`). */
+const linkNow = (home: string, secret: string, nowMs: number) =>
+  Effect.runSync(Effect.provide(linkClaimed(home, secret, nowMs), tokenDoorAt(home)));
 
 const ROOT = scratch('wf-pairing-verbs-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -21,13 +31,13 @@ const answered = async (argv: readonly string[]) => JSON.stringify(await typed(a
 
 test('nemia pairings approve <code> approves the pairing the client shows, which it claims after; ls lists it by client', async () => {
   const asked = pairingAsked(ROOT, 'approved-laptop', Date.now());
-  assert.equal(pairingClaimed(ROOT, asked.id, asked.secret, Date.now()).phase, 'waiting');
+  assert.equal(claimedNow(ROOT, asked.id, asked.secret, Date.now()).phase, 'waiting');
   const listed = await answered(['pairings', 'ls']);
   assert.match(listed, /approved-laptop/);
   assert.match(listed, /waiting/);
   assert.ok(!listed.includes(asked.code) && !listed.includes(asked.secret), 'neither the code nor the secret is listed');
   await answered(['pairings', 'approve', asked.code]);
-  const claimed = pairingClaimed(ROOT, asked.id, asked.secret, Date.now());
+  const claimed = claimedNow(ROOT, asked.id, asked.secret, Date.now());
   assert.equal(claimed.phase, 'claimed');
   assert.equal(claimed.name, 'approved-laptop');
   await assert.rejects(typed(['pairings', 'approve', asked.code], undefined, undefined, undefined, ENV), (err: unknown) => {
@@ -48,7 +58,7 @@ test('nemia board link mints a link of the board under its address, or under --b
   const based = await answered(['board', 'link', '--base', 'http://box.tailnet:9000']);
   const other = new URL((JSON.parse(based) as { url: string }).url);
   assert.equal(other.origin, 'http://box.tailnet:9000');
-  const claimed = linkClaimed(ROOT, other.searchParams.get('link') ?? '', Date.now());
+  const claimed = linkNow(ROOT, other.searchParams.get('link') ?? '', Date.now());
   assert.ok(personTokens(ROOT).some((p) => p.name === claimed.name));
   assert.ok(![printed, based].some((answer) => answer.includes(claimed.token)), 'no answer holds a token');
 });

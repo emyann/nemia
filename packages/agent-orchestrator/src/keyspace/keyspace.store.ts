@@ -397,10 +397,22 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
   } satisfies Keyspace;
 }
 
-/** Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. */
+/**
+ * Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. Its folder and file are
+ * made its owner's alone (`db/` 0700, `state.db` 0600), as a token's record was, whether it makes them or an older release made them at
+ * the umask's modes.
+ */
 const opened = (file: string, scope: Scope.Scope) =>
   Effect.gen(function* () {
-    if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (file !== ':memory:') {
+      fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+      if (!fs.existsSync(file)) fs.closeSync(fs.openSync(file, 'a', 0o600));
+      for (const [at, mode] of [
+        [path.dirname(file), 0o700],
+        [file, 0o600],
+      ] as const)
+        if ((fs.statSync(at).mode & 0o777) !== mode) fs.chmodSync(at, mode);
+    }
     const client = yield* Layer.buildWithScope(SqliteClient.layer({ filename: file, busyTimeout: Duration.seconds(30) }), scope);
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -463,3 +475,19 @@ export const keyspaceAt = (file: string) =>
  * @param home The store's root folder.
  */
 export const keyspaceFile = (home: string) => path.join(home, 'db', 'state.db');
+
+/**
+ * A keyspace in memory of its own, opened when it is first asked and kept: what a door's memory stand-in holds its records in, so the
+ * stand-in is the door's own code over a keyspace no file holds.
+ */
+export function memoryKeyspace() {
+  let held: Keyspace | undefined;
+  return Effect.suspend(() =>
+    held === undefined
+      ? Effect.map(keyspaceAt(':memory:'), (keyspace) => {
+          held ??= keyspace;
+          return held;
+        })
+      : Effect.succeed(held),
+  ) satisfies Effect.Effect<Keyspace, Invalid>;
+}

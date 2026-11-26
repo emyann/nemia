@@ -61,7 +61,7 @@ import {
   UNMERGED,
 } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT } from '../world.ts';
 
 /**
  * COSTLY's card says what the run took, in its footer and whole: its time at work, what it cost and its tokens, the split on hover. A
@@ -164,7 +164,7 @@ export default {
     }
     await expectTexts(
       lane.locator(`a[data-ghost="${QUEUE.third.name}"] [data-ghost-tried="refused"]`),
-      [`not started, refused: ${unfactoredWhy(store!)}`],
+      [`not started, refused: ${unfactoredWhy()}`],
       "the card of no factory, queued before a queue asked for one, says the tick refused its start for that, in the package's words",
     );
     await expectCount(

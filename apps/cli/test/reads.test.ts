@@ -15,14 +15,13 @@
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
  * its end, or for the line it says, never for a length of time.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { credentialKeptNow, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { credentialKept } from 'agent-orchestrator';
 import { CHECK_OUTPUT_PAGE, type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
@@ -209,7 +208,6 @@ write(
   "---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the engine's views between passes.\n",
 );
 write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
-write(path.join(root, 'inbox', 'notes.txt'), 'not a card\n');
 write(path.join(root, 'inbox', 'hold-the-reads.md'), 'Hold the reads to the old path.\n');
 write(path.join(root, 'inbox', 'called-off.md'), '---\nlabels:\n  team: gone\n---\nCalled off.\n');
 write(
@@ -241,7 +239,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV) {
  * credential is put in the store first, as a daemon's start puts it (`credentialKept`), which `--no-tick` does not run.
  */
 async function startApi() {
-  credentialKept(root);
+  credentialKeptNow(root);
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...ENV, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
@@ -422,7 +420,6 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
   assert.equal(listed.code, 0, listed.err);
   assert.match(listed.out, /^NAME +TITLE +WORKFLOW +REPO +FACTORY +QUEUED +WAITS +STATE +RUNS$/m, "the server's columns");
   assert.match(listed.out, /^hold-the-reads .*waiting on you +r-parity$/m, "a started card's state beside its run");
-  assert.match(listed.out, /^notes\.txt /m, 'an entry that is no card is listed too, never hidden');
   assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');
   assert.match(
     listed.out,

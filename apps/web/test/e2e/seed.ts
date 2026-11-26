@@ -1685,11 +1685,11 @@ export const refusedWhy = (root: string, repo: string) =>
 
 /**
  * Why the tick's start of QUEUE.third was refused, in the package's words for a queued card that names no factory
- * (`unfactoredCardRefusal`, with no start's flag): its file in the store at `root`, and the factories that read, by name.
+ * (`unfactoredCardRefusal`, with no start's flag): the card named by the command that shows it, and the factories that read, by name.
  */
-export const unfactoredWhy = (root: string) => {
+export const unfactoredWhy = () => {
   const names = [FACTORIES.hiring.name, FACTORIES.bare, ...FACTORIES.others].sort().join(', ');
-  return `${path.join(root, 'inbox', `${QUEUE.third.name}.md`)}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — one of ${names}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
+  return `nemia get card ${QUEUE.third.name}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — one of ${names}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
 };
 
 /**
@@ -1755,7 +1755,7 @@ export function seedQueue(root: string, repo: string, now = Date.now()) {
   }
   const tries = [
     { card: refused, text: cards[1].text, why: refusedWhy(root, repo) },
-    { card: third, text: cards[2].text, why: unfactoredWhy(root) },
+    { card: third, text: cards[2].text, why: unfactoredWhy() },
   ];
   for (const { card, text, why } of tries) {
     const tried = { at: ago(card.triedMinutesAgo), text, repo, why, refused: true };

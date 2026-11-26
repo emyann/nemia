@@ -12,7 +12,7 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
+import { cardText, keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -43,6 +43,8 @@ import { writeInstructionText } from '../src/factory/instruction.store.ts';
 import { factsOf, told, type StartedAnswer } from './typed.ts';
 import { startFactoryAtOnce, wiredRepoFor, workflowFolder, type StartInput } from '../src/runner.ts';
 import { inboxNameAt } from '../src/inbox/inbox.store.ts';
+import { Effect } from 'effect';
+import { StoreRoot } from '../src/config/root.store.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-start-');
@@ -163,7 +165,7 @@ async function startTypedFrom(cwd: string, argv: string[]) {
   const was = process.cwd();
   process.chdir(cwd);
   try {
-    const card = inboxNameAt(ROOT, text('brief') ?? '');
+    const card = await Effect.runPromise(Effect.provideService(inboxNameAt(ROOT, text('brief') ?? ''), StoreRoot, ROOT));
     const here = fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true;
     if (card !== null)
       return factsOf(
@@ -863,7 +865,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       ['pipao', repo, true],
       'the start says its factory and the repository it is on',
     );
-    assert.ok(fs.existsSync(card), 'the card is kept');
+    assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
   });
   s.test("a card's factory: starts it there, its workflow: found in the factory's repository; --factory is over it", async () => {
     aCard('in-pipao', '---\nworkflow: build\nfactory: pipao\n---\nBuild it.\n');
@@ -912,7 +914,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         [run.brief, run.factory, run.workflowDir, run.context, run.from],
         ['Build it by name.', 'pipao', path.join(repo, 'workflows', 'build'), [before.id], { inbox: 'by-its-name' }],
       );
-      assert.ok(fs.existsSync(card), 'the card is kept');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
       const flags = ['--factory', 'pipao', '--workflows', build, '--no-worktree'];
       const text = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
       assert.deepEqual([text.brief, 'from' in text], ['no-such-card', false], 'a name no card has stays a text brief');
@@ -920,7 +922,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       fs.writeFileSync(path.join(elsewhere, 'shadowed'), 'From the file.\n');
       const file = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'shadowed', ...flags])));
       assert.equal(file.brief, 'From the file.', 'a file of that name where it is typed is the brief');
-      assert.ok(fs.existsSync(shadowed), 'the card of that name stays in the inbox');
+      assert.ok(cardText(ROOT, path.basename(shadowed, '.md')) !== null, 'the card of that name stays in the inbox');
     },
   );
   s.test(
@@ -936,7 +938,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         path.basename(first),
         path.basename(second),
       );
-      assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is left in the inbox');
       attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'build', repo: path.basename(second) });
       const wired = await runPlaced(startFromInbox({ name: 'in-duo', workflow: 'build', callerRepo: first, isolate: false }));
       assert.deepEqual([runRecord(ROOT, wired.run.id).repo, wired.run.factory], [second, 'duo']);
@@ -961,7 +963,10 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       'dev',
       'nemia factory attach devs build',
     );
-    assert.ok(fs.existsSync(nosuch) && fs.existsSync(unattached), 'both cards are left in the inbox');
+    assert.ok(
+      [nosuch, unattached].every((card) => cardText(ROOT, path.basename(card, '.md')) !== null),
+      'both cards are left in the inbox',
+    );
   });
   s.test('with WF_DEFAULT_FACTORY_STARTS=1, a card naming no factory records none, on the repository it is started in', async () => {
     const other = teamIn(aRepo());
@@ -979,7 +984,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         'Invalid',
         '`default`',
         '`factory: <name>`',
-        'by-name.md',
+        'nemia get card by-name',
         'pipao',
       );
       aCard('plain', 'Build it.\n');
@@ -1000,7 +1005,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         '--factory <name>',
         'pipao',
       );
-      assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is left in the inbox');
     },
   );
   s.test(
@@ -1011,12 +1016,12 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       await startRefused(
         () => startTypedFrom(repo, ['start', card, '--workflows', 'build', '--no-worktree']),
         'Invalid',
-        card,
+        'nemia get card loose',
         '`factory: <name>`',
         'pipao',
         '--factory <name>',
       );
-      assert.ok(fs.existsSync(card), 'the card stays in the inbox');
+      assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card stays in the inbox');
       const flagged = runRecord(
         ROOT,
         startedId(await startTypedFrom(repo, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree'])),
@@ -1057,7 +1062,7 @@ describe("a card and a brief work on the repository the factory's wiring names, 
       path.basename(a),
       path.basename(b),
     );
-    assert.ok(fs.existsSync(card), 'the card is kept');
+    assert.ok(cardText(ROOT, path.basename(card, '.md')) !== null, 'the card is kept');
   });
   s.test("after `nemia factory attach f dev --repo <b>`, a card's run works on b; an old card's repo: is said and not read", async () => {
     await typedFrom(ROOT, ['factory', 'attach', 'f', 'dev', '--repo', path.basename(b)]);

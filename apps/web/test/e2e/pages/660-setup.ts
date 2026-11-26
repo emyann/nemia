@@ -7,7 +7,7 @@ import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import { serveExposed } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredKey, OUT, store, storedKeys } from '../world.ts';
 
 /** The need the page plants in the checkout's `dev`: never in place, its one fix a device sign-in that prints a link and a code. */
 const NEED = 'e2e-device-sign-in';
@@ -35,17 +35,23 @@ const plantedReadme = (found: string) =>
 const CLIENT = 'e2e-laptop';
 
 /** The store's folders a link's claim and a pairing write: each file added is taken back, and a folder that was not there removed. */
-const WRITTEN = ['person-tokens', 'pairings', 'links'] as const;
+const WRITTEN = ['pairings', 'links'] as const;
+
+/** The keys of the standing tokens a link's claim and a pairing mint, under which each record added is taken back. */
+const MINTED = '/registry/persontokens/';
 
 /** What each of WRITTEN holds now, by folder. */
 const heldIn = () =>
-  new Map(
-    WRITTEN.map((dir) => [dir, new Set(fs.existsSync(path.join(store!, dir)) ? fs.readdirSync(path.join(store!, dir)) : [])]),
-  ) satisfies Map<string, Set<string>>;
+  new Map([
+    ...WRITTEN.map((dir) => [dir, new Set(fs.existsSync(path.join(store!, dir)) ? fs.readdirSync(path.join(store!, dir)) : [])] as const),
+    [MINTED, new Set(storedKeys(MINTED))] as const,
+  ]) satisfies Map<string, Set<string>>;
 
 /** Each file added under WRITTEN since `before` removed, and each folder that did not exist then. */
 function takeBack(before: Map<string, Set<string>>) {
+  for (const key of storedKeys(MINTED)) if (!before.get(MINTED)?.has(key)) dropStoredKey(key);
   for (const [dir, files] of before) {
+    if (dir === MINTED) continue;
     const full = path.join(store!, dir);
     if (!fs.existsSync(full)) continue;
     for (const file of fs.readdirSync(full)) if (!files.has(file)) fs.rmSync(path.join(full, file), { recursive: true, force: true });

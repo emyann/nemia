@@ -25,7 +25,7 @@
  * - `<folder>/given` is the run's to empty and write each time the step is filed: a link there is never followed, or the filing would
  *   remove and write wherever it points.
  */
-import { keysUnder, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { cardKey, cardNames, cardText, dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -403,11 +403,10 @@ test('REFUSED: a card filed with a repository, whatever its team — repo: is re
           err._tag === 'Invalid' && err.exitCode === 2 && err.message.includes(NOT_A_REPO),
         workflow,
       );
-    const inbox = path.join(ROOT, 'inbox');
-    assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], 'refused before the card is written');
+    assert.deepEqual(cardNames(ROOT), [], 'refused before the card is written');
     const filed = addToInbox({ text: 'a note on tides', workflow: 'note' }).card;
     assert.deepEqual([filed.workflow, filed.repo], ['note', undefined], 'a folder team by its name, with no repository, is filed');
-    fs.rmSync(path.join(inbox, `${filed.name}.md`));
+    dropRecord(ROOT, cardKey(filed.name));
   } finally {
     process.chdir(cwd);
   }
@@ -425,7 +424,7 @@ test('an old inbox card of a folder team: --repo at its start is refused, as on 
       started({ card: 'a-note-on-tides-old', at: NOT_A_REPO, repo: NOT_A_REPO, repoNamed: true }),
       (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes('--repo'),
     );
-    assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
+    assert.ok(cardText(ROOT, 'a-note-on-tides-old') !== null, 'refused before anything is written: the card is still in the inbox');
     const out = await started({ card: 'a-note-on-tides-old', at: NOT_A_REPO });
     const run = runRecord(ROOT, out.id);
     assert.deepEqual(
@@ -434,7 +433,7 @@ test('an old inbox card of a folder team: --repo at its start is refused, as on 
       'the repository is ignored: the record has none',
     );
     assert.equal(out.ignoredRepo, NOT_A_REPO, 'the start says so, rather than leaving a person to look for the work in it');
-    assert.ok(fs.existsSync(file), 'started, the card stays in the inbox');
+    assert.ok(cardText(ROOT, 'a-note-on-tides-old') !== null, 'started, the card stays in the inbox');
   } finally {
     process.chdir(cwd);
   }
@@ -621,10 +620,10 @@ test('an old card with a repository queued onto a folder team is queued: its ret
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `---\nworkflow: change\nrepo: ${NOT_A_REPO}\n---\na change to make\n`);
     assert.equal(queueInInbox('a-card-with-a-repo', { workflow: 'note' }).was, 'queued');
-    const queued = fs.readFileSync(file, 'utf8');
+    const queued = cardText(ROOT, 'a-card-with-a-repo') ?? '';
     assert.ok(queued.includes('workflow: note') && queued.includes(`repo: ${NOT_A_REPO}`), queued);
     assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
-    fs.rmSync(file);
+    dropRecord(ROOT, cardKey('a-card-with-a-repo'));
   } finally {
     process.chdir(cwd);
   }

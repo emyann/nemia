@@ -3810,7 +3810,8 @@ reads: inbox, costs   # what of the store this step reads and never writes, from
 ---
 ```
 
-- **`inbox`**, the cards waiting to be started. The run files the folder read-only for that step alone — its first filing, a try and a
+- **`inbox`**, the cards waiting to be started, records of the keyspace rendered as `<name>.md` into the run's `runs/<id>/inbox` each
+  time the step is filed (`cardsViewed`). The run files that folder read-only for that step alone — its first filing, a try and a
   round (`readsMounts`, in `filedConfig`) — and a new session's brief names it (`mountsLine`). A harness that reads the disk in its
   sandbox (Codex) is filed no mount. A store whose path no permission rule can name refuses `wf start` of such a step, quoting its
   `reads:` line, before anything is written.

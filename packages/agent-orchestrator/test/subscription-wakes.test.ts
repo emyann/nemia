@@ -40,7 +40,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { SUBSCRIPTION_DIGEST_CHECKS, deliver } from '../src/subscription/deliver.verb.ts';
-import { SubscriptionDoor, subscriptionDoorFiles, readDelivery as deliveryAtRoot } from '../src/subscription/subscription.store.ts';
+import { SubscriptionDoor, subscriptionDoorAt, readDelivery as deliveryAtRoot } from '../src/subscription/subscription.store.ts';
 import { subscriptionDoorMemory } from '../src/subscription/memory.store.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../src/subscription/subscription.verb.ts';
 import { SubscriptionName } from '../src/feed/feed.model.ts';
@@ -91,7 +91,7 @@ const inMemory = () => worldOf(Layer.mergeAll(subscriptionDoorMemory(), feedDoor
  * The store on the files at `ROOT`, the root the file's synchronous spellings are handed and every deliverer's `StoreRoot`: for what only
  * a file can hold.
  */
-const onFiles = () => worldOf(Layer.mergeAll(subscriptionDoorFiles(ROOT), feedDoorFiles(ROOT))) satisfies World;
+const onFiles = () => worldOf(Layer.mergeAll(subscriptionDoorAt(ROOT), feedDoorFiles(ROOT))) satisfies World;
 
 /** An act of a door, run at once: a refusal thrown as it is. */
 const done = <A>(act: Effect.Effect<A, unknown>) => Effect.runSync(act) satisfies A;

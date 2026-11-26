@@ -19,7 +19,7 @@ import { artifactsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { SESSION_TOKEN } from '../filed/filed.ts';
-import { stepToken } from '../token/token.store.ts';
+import { sessionTokenFor } from '../token/token.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { COMMAND_ANSWER_FILE, isCommandNode } from './command-node.ts';
 
@@ -77,7 +77,7 @@ export const fileCommand = Effect.fn('fileCommand')(function* (f: CommandFiling,
         ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
       }),
       WF_ANSWER: answer,
-      [SESSION_TOKEN]: stepToken(home, run, step, taskId, tryOf(run, step.name)).sessionToken,
+      [SESSION_TOKEN]: yield* sessionTokenFor(run, step, taskId, tryOf(run, step.name)),
     };
     yield* asked(
       'file',

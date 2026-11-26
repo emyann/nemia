@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { keysUnder, runRecord } from '../testing.ts';
+import { cardKey, dropRecord, keysUnder, plantCard, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,7 +17,6 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { advanceRun, runWith } from '../src/runner.ts';
 import { cardsDir } from '../src/record/record.store.ts';
-import { inboxAt } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { readsAt, writesAt, type Filed } from './mounted.ts';
@@ -64,11 +63,8 @@ const twoSteps = () => {
   return dir;
 };
 
-/** Files the card `name` in the store's inbox with `text`. */
-const fileCard = (name: string, text: string) => {
-  fs.mkdirSync(inboxAt(ROOT), { recursive: true });
-  fs.writeFileSync(path.join(inboxAt(ROOT), `${name}.md`), text);
-};
+/** Files the card `name` in the store's inbox with `text`, as its record. */
+const fileCard = (name: string, text: string) => plantCard(ROOT, name, text);
 
 /** What `nemia start` answered, with the facts the client words. */
 const startedBy = async (argv: string[]) => factsOf((await stage.main(argv)) as Started);
@@ -140,7 +136,7 @@ describe('nemia start --card hands the run inbox cards: copied at start, mounted
     handed('implement');
   });
   s.test('a card removed from the inbox still reads in the run, and the next step is handed it too', async () => {
-    fs.rmSync(path.join(inboxAt(ROOT), 'lists-lbpq.md'));
+    dropRecord(ROOT, cardKey('lists-lbpq'));
     assert.equal(fs.readFileSync(path.join(cardsDir(ROOT, runRecord(ROOT, id)), 'lists-lbpq.md'), 'utf8'), LQ);
     stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
     assert.deepEqual((await pass(id)).filed, ['review']);

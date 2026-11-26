@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { mintPersonToken, SEAT_TOKEN } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredKey, OUT, store, storedKeys } from '../world.ts';
 
 /** The person's token the page mints and retires. */
 const RETIRED = 'e2e-retire';
@@ -16,8 +15,8 @@ const AGENT = { name: 'e2e-ops', agent: 'operator' } as const;
 /** The row of the token `name` in the page's table. */
 const rowOf = (page: Page, name: string) => page.locator(`[data-tokens-page="loaded"] tr[data-token="${name}"]`);
 
-/** The token files under the store's `person-tokens/`, by name. */
-const tokenFiles = () => new Set(fs.readdirSync(path.join(store!, 'person-tokens'))) satisfies Set<string>;
+/** The standing tokens' records the store keeps, by key. */
+const tokenFiles = () => new Set(storedKeys('/registry/persontokens/')) satisfies Set<string>;
 
 /** Refuses unless the row of `name` says its holder, its factory and its narrowing as the board words them. */
 async function rowSays(page: Page, name: string, [holder, factory, narrowed]: readonly [string, string, string]) {
@@ -74,7 +73,7 @@ export default {
       await retires(page, RETIRED, before);
       await expectVisible(rowOf(page, SEAT_TOKEN), "the seat's own token is still listed, and this browser still reads with it");
     } finally {
-      for (const file of tokenFiles()) if (!before.has(file)) fs.rmSync(path.join(store!, 'person-tokens', file), { force: true });
+      for (const key of tokenFiles()) if (!before.has(key)) dropStoredKey(key);
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

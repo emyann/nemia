@@ -8,7 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its cards name no factory.
  */
-import { plantRecord, runKey, runRecord } from '../testing.ts';
+import { cardNames, plantCard, plantRecord, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,7 +17,6 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { advanceRun, runWith as runEngine, startFromInbox } from '../src/runner.ts';
-import { inboxAt } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { INBOX_RESEND } from '../src/inbox/commands.verb.ts';
 import { CANCEL } from '../src/cancel/commands.verb.ts';
@@ -54,21 +53,11 @@ const aRepo = () => {
 };
 
 /** Files the card `name` in the store's inbox, on `deliver`, gated at plan, labelled. */
-const fileCard = (name: string) => {
-  fs.mkdirSync(inboxAt(ROOT), { recursive: true });
-  fs.writeFileSync(
-    path.join(inboxAt(ROOT), `${name}.md`),
-    '---\nworkflow: deliver\ngate: plan\nlabels: { door: front }\n---\nParse the flag.\n',
-  );
-};
+const fileCard = (name: string) =>
+  plantCard(ROOT, name, '---\nworkflow: deliver\ngate: plan\nlabels: { door: front }\n---\nParse the flag.\n');
 
 /** The inbox's cards, by name. */
-const cards = () =>
-  fs
-    .readdirSync(inboxAt(ROOT))
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => f.slice(0, -'.md'.length))
-    .sort() satisfies string[];
+const cards = () => [...cardNames(ROOT)].sort() satisfies string[];
 
 /** One pass of the tick over the run `id`. */
 const pass = (b: Board, id: string) => stage.runWith(b.e, advanceRun(runRecord(ROOT, id)));
@@ -233,7 +222,7 @@ describe('a card of a factory sent on to a workflow its factory does not offer i
     const t = teardowns();
     b = stage.board();
     addFactoryAt(ROOT, { name: 'acme', volumes: [`${aRepo()}:rw`] });
-    fs.writeFileSync(path.join(inboxAt(ROOT), 'tidy-the-docs-m3n8.md'), '---\nfactory: acme\n---\nTidy the docs.\n');
+    plantCard(ROOT, 'tidy-the-docs-m3n8', '---\nfactory: acme\n---\nTidy the docs.\n');
     plantRecord(
       ROOT,
       runKey('tidy-the-docs-m3n8-r1'),

@@ -6,7 +6,7 @@
  *
  * Each refusal asserts its exit code and the command or the name it names, never its sentence.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { plantRecord, recordText, runKey, subscriptionKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -141,15 +141,15 @@ test('`nemia subscribe` gives a long-lived task a subscription, a former word sa
     /^subscribed watcher: t-long is told at once of a line taken by reason=NeedsHuman, and of the rest in a digest every 15 minutes/,
   );
   assert.match(made.err, /^nemia subscribe: .*NeedsHuman/m);
-  const file = path.join(store.root, 'subscriptions', 'watcher.json');
-  assert.deepEqual((JSON.parse(fs.readFileSync(file, 'utf8')) as { selectors: string[] }).selectors, ['reason=NeedsHuman']);
+  const held = () => recordText(store.root, subscriptionKey('watcher'));
+  assert.deepEqual((JSON.parse(held() ?? 'null') as { selectors: string[] }).selectors, ['reason=NeedsHuman']);
   const plain = await typed(['subscribe', 'plain', 't-long']);
   assert.match(plain.out, /taken by waits=person/);
   assert.equal(plain.err, '');
   assert.match((await typed(['subscribe', 'ghostly', 't-nobody'], 2)).err, /t-nobody/);
   assert.match((await typed(['subscribe', 'loud', 't-long', '--wake', 'failed'], 2)).err, /-l waits=person/);
   assert.equal((await typed(['unsubscribe', 'watcher'])).out, 'unsubscribed watcher: its task is told nothing more of the feed.\n');
-  assert.equal(fs.existsSync(file), false);
+  assert.equal(held(), undefined);
 });
 
 test('`nemia pairings approve <code>` approves the pairing a client asked for, which `pairings ls` lists; `board link` prints a link once', async () => {

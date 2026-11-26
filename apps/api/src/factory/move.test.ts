@@ -24,8 +24,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { BuiltinTemplates, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
-import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { BuiltinTemplates, cardNames, cardText, plantCard, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { appOver, eachTest } from '../../test/placed.ts';
@@ -161,10 +161,13 @@ function digestsOf(dir: string) {
 const heldOf = (s: Store, name: string) => ({
   file: fs.existsSync(path.join(s.home, 'factories', `${name}.json`)),
   folder: fs.existsSync(path.join(s.home, 'factories', name)),
-  cards: Object.entries(filesOf(path.join(s.home, 'inbox')))
+  cards: Object.entries(cardsOf(s.home))
     .filter(([, text]) => text.includes(`factory: ${name}`))
-    .map(([file]) => file),
+    .map(([card]) => card),
 });
+
+/** The cards the store `home` holds, by name, with their text. */
+const cardsOf = (home: string) => Object.fromEntries(cardNames(home).map((name) => [name, cardText(home, name) ?? '']));
 
 const NOTHING = { file: false, folder: false, cards: [] };
 
@@ -215,7 +218,7 @@ const endedToken = (s: Store) =>
         attempt: 1,
         task: 't-move-ended',
       });
-    }).pipe(Effect.provide(tokenDoorFiles(s.home))),
+    }).pipe(Effect.provide(tokenDoorAt(s.home))),
   );
 
 /** The repository `mill` works on: one of the test place's world, by its `file://` URL, which each store clones under itself. */
@@ -257,11 +260,13 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
     write(path.join(source.home, 'factories', 'mill', 'level.json'), `${JSON.stringify({ level: 'auto', since: SINCE })}\n`);
     [clone = ''] = applied.volumes.map((v) => v.path);
-    write(
-      path.join(source.home, 'inbox', 'polish-it.md'),
+    plantCard(
+      source.home,
+      'polish-it',
       `---\nworkflow: press\nfactory: mill\nrepo: ${clone}\nqueued: ${SINCE}\n---\n\nPolish it.\n`,
+      SINCE,
     );
-    write(path.join(source.home, 'inbox', 'pressed.md'), '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n');
+    plantCard(source.home, 'pressed', '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n', SINCE);
     runFrom(source, 'run-pressed', 'pressed', clone);
     before = digestsOf(source.home);
     exp = await answered<FactoryExport>(send(source, 'GET', '/api/factories/mill/export'));
@@ -373,21 +378,21 @@ describe("a templated factory moved to a store of a later install: its lineage, 
   });
   s.test('its card is filed there unqueued, with no repository, naming its old name; the card a run keeps stays', () => {
     assert.deepEqual(filed.cards, [{ name: 'polish-it', was: 'polish-it' }]);
-    const text = fs.readFileSync(path.join(target.home, 'inbox', 'polish-it.md'), 'utf8');
+    const text = cardText(target.home, 'polish-it') ?? '';
     assert.equal(/^(repo|queued):/m.test(text), false, text);
     assert.ok(text.includes('polish-it') && text.includes('laptop'), text);
-    assert.equal(fs.existsSync(path.join(target.home, 'inbox', 'pressed.md')), false);
+    assert.equal(cardText(target.home, 'pressed'), null);
   });
   s.test("the source's store is unchanged to the byte", () => {
     assert.deepEqual(digestsOf(source.home), before);
   });
   s.test('REFUSED: a second import of it is a 409, and the target holds what it held', async () => {
     const held = filesOf(path.join(target.home, 'factories'));
-    const cards = filesOf(path.join(target.home, 'inbox'));
+    const cards = cardsOf(target.home);
     const res = await send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop', volumes: { [key]: otherThere } });
     assert.equal(res.status, 409, await res.text());
     assert.deepEqual(filesOf(path.join(target.home, 'factories')), held);
-    assert.deepEqual(filesOf(path.join(target.home, 'inbox')), cards);
+    assert.deepEqual(cardsOf(target.home), cards);
   });
   s.test(
     "an upgrade to the target's version merges against the base that moved: the tree's edit kept, the new version's change taken",

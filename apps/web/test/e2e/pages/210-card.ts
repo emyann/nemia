@@ -1,11 +1,9 @@
-import path from 'node:path';
 import {
   expectUncovered,
   expectCardKeys,
   expectInstant,
   expectRendered,
   expectSource,
-  filesIn,
   sidebar,
   railPlace,
   litOf,
@@ -14,7 +12,7 @@ import {
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { store } from '../world.ts';
+import { storedCard } from '../world.ts';
 
 export default {
   /**
@@ -29,8 +27,7 @@ export default {
     await sidebar(page);
     await expectVisible(railPlace(page, 'Waiting').and(litOf(page)), "the rail lights Waiting on a card's page of the store");
     const { rich } = CARDS;
-    const inbox = path.join(store!, 'inbox');
-    const before = filesIn(inbox);
+    const before = storedCard(rich.name);
     await expectVisible(page.locator('h1', { hasText: rich.name }), `the page names the card (${rich.name})`);
     await expectVisible(trailLevel(page, 'Inbox'), 'and its trail leads up to the Inbox');
     await expectVisible(trailLevel(page, rich.name), 'and ends at the card');
@@ -62,8 +59,8 @@ export default {
       'the last key row is in the window with nothing over it once the page is scrolled to its end',
     );
     await page.evaluate(() => window.scrollTo(0, 0));
-    await expectSource(file, body, path.join(inbox, `${rich.name}.md`));
-    if (JSON.stringify(filesIn(inbox)) !== JSON.stringify(before))
-      throw new Refused(`a card's page writes nothing — ${inbox} changed while it was open`);
+    await expectSource(file, body, `nemia get card ${rich.name}`, before ?? '');
+    if (storedCard(rich.name) !== before)
+      throw new Refused(`a card's page writes nothing — the card ${rich.name} changed while it was open`);
   },
 } satisfies PageSpec;

@@ -13,6 +13,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
 import { inbox, janitorRun as groomWorld, typed } from './janitor-world.ts';
+import { cardText, plantCard } from 'agent-orchestrator/testing';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'groom.ts');
 
@@ -21,7 +22,10 @@ const PERIOD = { period: { from: '2026-09-15', to: '2026-09-28' }, against: { fr
 /** A day well before the period, when the planted cards were filed. */
 const LONG_AGO = new Date('2026-01-05T10:00:00Z');
 
-/** Plants the card `name` in the inbox of `root`, filed `at`, in the factory acme unless `factory` is null: its path. */
+/**
+ * Plants the card `name` in the inbox of `root` as a card file a person drops there, filed `at`, in the factory acme unless `factory` is
+ * null.
+ */
 function plant(root: string, name: string, body: string, at = LONG_AGO, factory: string | null = 'acme') {
   const dir = path.join(root, 'inbox');
   fs.mkdirSync(dir, { recursive: true });
@@ -158,16 +162,16 @@ test('REFUSED: an amendment applied after the card was edited by hand exits 1 an
   const { env, root, wf } = await groomWorld(t);
   const { dir: repo } = repository();
   const artifacts = scratch('nemia-groom-artifacts-');
-  const file = plant(root, 'move-the-reads-st4l', STALE_BODY);
+  plant(root, 'move-the-reads-st4l', STALE_BODY);
   const closeout = closeoutFile({
     verdicts: [verdict('move-the-reads-st4l', 'stale', { facts: [{ was: 'src/old.ts', now: 'src/new.ts', why: 'moved' }] })],
   });
   assert.equal(run(env, wf, repo, artifacts, [closeout]).code, 0);
-  const edited = fs.readFileSync(file, 'utf8').replace('Move the reads', 'Move every read');
-  fs.writeFileSync(file, edited);
+  const edited = (cardText(root, 'move-the-reads-st4l') ?? '').replace('Move the reads', 'Move every read');
+  plantCard(root, 'move-the-reads-st4l', edited, LONG_AGO.toISOString());
   const applied = typed(env, ['apply', '-f', path.join(artifacts, 'groom', 'move-the-reads-st4l.json')]);
   assert.equal(applied.code, 1, `${applied.out}${applied.err}`);
-  assert.equal(fs.readFileSync(file, 'utf8'), edited);
+  assert.equal(cardText(root, 'move-the-reads-st4l'), edited);
 });
 
 test('a verdict on a card no longer in play, or of another factory, is skipped; another factory’s cards and a card filed on the period’s last day may have none', async (t) => {

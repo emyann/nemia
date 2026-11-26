@@ -364,7 +364,7 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, s
     );
     yield* volumesMoved;
     yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
-    yield* Effect.try({ try: () => credentialKept(home), catch: (err) => err });
+    yield* credentialKept(home);
     const declared = (yield* PlaceService).declared;
     yield* Effect.try({ try: () => toolsOnPath(home, process.env, declared), catch: (err) => err });
     yield* adoptedAtStart(home, runningRelease());

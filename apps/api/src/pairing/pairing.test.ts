@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { boardBase, storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { boardBase, storeConfigLayer, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { TOKEN_COOKIE, type LinkClaimed, type Pairing, type PairingAsked, type PairingClaimed, type PairingList } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { ApiConfig } from '../layer.ts';
@@ -31,14 +31,14 @@ const TASK = 't-pairing-session';
 const personToken = Effect.runSync(
   Effect.gen(function* () {
     return yield* (yield* TokenDoor).persons.mint('pairing-laptop');
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** A session's token, of no run, live while `TASK` is filed and unsettled. */
 const sessionToken = Effect.runSync(
   Effect.gen(function* () {
     return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: TASK });
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** The session's task filed on the stand-in and left working: its token is live. */

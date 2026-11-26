@@ -5,7 +5,7 @@ import { cardsPath, heldIn, optionsIn, photograph, pickIn, themeOf } from '../bo
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, hiringStarts, noFactories, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredCard, OUT, store, storedCard } from '../world.ts';
 
 /** The idea filed in a factory on several repositories with no workflow picked. */
 const NOWHERE = 'File an idea in a factory on two repositories\n\nIts workflow, and so its repository, is chosen at start.';
@@ -25,7 +25,7 @@ function sentOf(filed: Response) {
   return (namespace === 'default' ? body : { ...body, factory: namespace }) satisfies unknown;
 }
 
-/** Type `idea` into the box and press File: the request's body as it was sent, and the card's file once the api took it. */
+/** Type `idea` into the box and press File: the request's body as it was sent, and the card's name once the api took it. */
 async function fileFrom(page: Page, idea: string) {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
@@ -37,16 +37,16 @@ async function fileFrom(page: Page, idea: string) {
   const {
     metadata: { name },
   } = (await filed.json()) as { metadata: { name: string } };
-  return { sent: sentOf(filed), file: path.join(store!, 'inbox', `${name}.md`) } satisfies { sent: unknown; file: string };
+  return { sent: sentOf(filed), name } satisfies { sent: unknown; name: string };
 }
 
-/** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key, and the card's `file` holds exactly `text`. */
-function expectFiled(filed: { sent: unknown; file: string }, expected: Record<string, string>, text: string, assertion: string) {
+/** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key, and the store holds the card `name` as exactly `text`. */
+function expectFiled(filed: { sent: unknown; name: string }, expected: Record<string, string>, text: string, assertion: string) {
   const keyed = (o: object) => JSON.stringify(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
   if (typeof filed.sent !== 'object' || filed.sent === null || keyed(filed.sent) !== keyed(expected))
     throw new Refused(`${assertion} — it sent ${JSON.stringify(filed.sent)}, not ${JSON.stringify(expected)}`);
-  const held = fs.readFileSync(filed.file, 'utf8');
-  if (held !== text) throw new Refused(`${assertion} — ${filed.file} holds ${JSON.stringify(held)}`);
+  const held = storedCard(filed.name);
+  if (held !== text) throw new Refused(`${assertion} — nemia get card ${filed.name} holds ${JSON.stringify(held)}`);
 }
 
 /**
@@ -81,7 +81,7 @@ async function severalRepos(page: Page, theme: string) {
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-none-${theme}.png`));
     const nowhere = await fileFrom(page, NOWHERE);
-    written.push(nowhere.file);
+    written.push(nowhere.name);
     expectFiled(
       nowhere,
       { body: NOWHERE, factory },
@@ -108,7 +108,7 @@ async function severalRepos(page: Page, theme: string) {
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-picked-${theme}.png`));
     const somewhere = await fileFrom(page, SOMEWHERE);
-    written.push(somewhere.file);
+    written.push(somewhere.name);
     expectFiled(
       somewhere,
       { body: SOMEWHERE, factory, workflow: WORKFLOWS.good.name },
@@ -116,7 +116,7 @@ async function severalRepos(page: Page, theme: string) {
       'a workflow picked, the box sends it by its name, never a repository nor an origin, and the card names no repo:',
     );
   } finally {
-    for (const card of written) fs.rmSync(card, { force: true });
+    for (const card of written) dropStoredCard(card);
     back();
     unhire();
   }

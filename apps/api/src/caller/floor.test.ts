@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { app } from '../app.ts';
 import { floorEntryOf } from './floor.ts';
 import { approvalKey, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
@@ -34,7 +34,7 @@ const agentToken = (name: string, factory: string | null, narrowed: 'read' | 'ac
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint(name, { kind: 'agent', agent: 'operator', factory, narrowed });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 const STORE_WIDE = agentToken('floor-ops', null, null);

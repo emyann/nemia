@@ -17,7 +17,7 @@ import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
 import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
-import { addFactory } from 'agent-orchestrator/testing';
+import { addFactory, cardKey, dropRecord } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which the factory `remover`, filed on it, lets the api
  * read.
@@ -117,7 +117,7 @@ describe("a person removes a folder of theirs: refused while it is stale, unsaid
       const error = await errorOf(res);
       for (const fact of [dir, 'card needing', 'nemia inbox queue needing --off']) assert.ok(error.includes(fact), `${fact}: ${error}`);
       assert.deepEqual(snapshot(dir), before);
-      fs.rmSync(card);
+      dropRecord(root, cardKey('needing'));
     },
   );
   s.test(

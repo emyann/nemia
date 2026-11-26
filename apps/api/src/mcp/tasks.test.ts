@@ -20,7 +20,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { loadSkills } from '@modelcontextprotocol/server/ext/skills/node';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { emitFeed, feedSize, freshFeedMemo, NEMIA_SKILLS, RunningCode, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { emitFeed, feedSize, freshFeedMemo, NEMIA_SKILLS, RunningCode, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { app as served, runtime } from '../app.ts';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { until, WAITED } from '../../test/waits.ts';
@@ -49,7 +49,7 @@ const agentToken = Effect.runSync(
   Effect.gen(function* () {
     const door: TokenDoorShape = yield* TokenDoor;
     return yield* door.persons.mint('tasks-ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** What answers `/mcp`: an app, or the port mounted alone. */

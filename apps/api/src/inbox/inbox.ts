@@ -2,11 +2,11 @@
  * What a card filed through the Card's verb files (`filingOf`, objects/cards.ts). A card listed, an entry that does not read among them
  * with its `status.error` saying why, is the package's Card (`cardList`), never read again here.
  *
- * The package's inbox: `$WF_ROOT/inbox/`, a card per `<name>.md`, read from disk on each request, as the workflows are, so a card a person
- * has just filed or dropped at the command line reads as it is now. Every verb of a card — listed, read alone with its file as written,
- * written whole (its `from:` among its keys), filed, dropped, started, queued and taken off the queue, and its labels edited — is the
- * Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's own is left: `GET /api/inbox/:name` and `PUT` and
- * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
+ * The package's inbox: a record of the store's keyspace per card, read through the Card door on each request — a card file a person drops
+ * into `$WF_ROOT/inbox/` taken up first — so a card a person has just filed or dropped at the command line reads as it is now. Every verb
+ * of a card — listed, read alone with its file as written, written whole (its `from:` among its keys), filed, dropped, started, queued and
+ * taken off the queue, and its labels edited — is the Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's
+ * own is left: `GET /api/inbox/:name` and `PUT` and `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
 import { readFactoryAtOnce } from 'agent-orchestrator';
 import type { CardFile, CardFileRef } from 'objects';

@@ -185,6 +185,83 @@ export function dropStoredRecord(id: string) {
   inApi('t.dropRecord(root, t.runKey(input));', id);
 }
 
+/** Every kind's files the seed wrote as a store before the keyspace taken up into its records, as each door's first read would. */
+export function storeTakenUp() {
+  inApi('t.kindsTakenUp(root);');
+}
+
+/**
+ * The keys under `prefix` in the seeded store: what a page reads the records it added by, to take them back.
+ * @param prefix The keys' prefix, `/registry/persontokens/` say.
+ */
+export function storedKeys(prefix: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.keysUnder(root, input));', prefix)) as string[];
+}
+
+/**
+ * `text` planted at `key` of the store `root`, over what is there: a record a page writes as no verb would, and takes back by its key.
+ * @param root The store's root folder.
+ * @param key The record's key.
+ * @param text What it holds.
+ */
+export function storeRecordAt(root: string, key: string, text: string) {
+  inApi('t.plantRecord(input.root, input.key, input.text);', { root, key, text });
+}
+
+/**
+ * The record at `key` taken out of the seeded store, there or not.
+ * @param key The record's key.
+ */
+export function dropStoredKey(key: string) {
+  inApi('t.dropRecord(root, input);', key);
+}
+
+/**
+ * The text of the card `name` in the seeded store, as the Card door reads it (a card file dropped into its inbox taken up first), or null
+ * where it holds none: what a page reads a card filed or written back by, now that a card is a record and no file.
+ * @param name The card's name.
+ */
+export function storedCard(name: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.cardText(root, input));', name)) as string | null;
+}
+
+/** The names of the cards the seeded store holds, sorted, as the Card door lists them. */
+export function storedCardNames() {
+  return JSON.parse(inApi('return JSON.stringify(t.cardNames(root));')) as string[];
+}
+
+/**
+ * The card `name` in the seeded store as its record holds it, its text and when it was filed (an ISO time), or null where it holds none:
+ * what a page keeps to put a card back as it was, its filing time with it, and reads to see a write kept that time.
+ * @param name The card's name.
+ */
+export function storedCardFiled(name: string) {
+  return JSON.parse(
+    inApi(
+      "return JSON.stringify(t.cardText(root, input) === null ? null : JSON.parse(t.recordText(root, t.cardKey(input)) ?? 'null'));",
+      name,
+    ),
+  ) as { text: string; filedAt: string } | null;
+}
+
+/**
+ * The card `name` in the seeded store written as `text`, over the one there or none: what a page plants or changes by hand.
+ * @param name The card's name.
+ * @param text The card's text.
+ * @param filedAt When it was filed, an ISO time: now where none is given.
+ */
+export function storeCard(name: string, text: string, filedAt?: string) {
+  inApi('t.plantCard(root, input.name, input.text, input.filedAt);', { name, text, filedAt });
+}
+
+/**
+ * The card `name` taken out of the seeded store, there or not: a card dropped as `nemia inbox rm` drops it.
+ * @param name The card's name.
+ */
+export function dropStoredCard(name: string) {
+  inApi('t.dropRecord(root, t.cardKey(input));', name);
+}
+
 /**
  * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the
  * api's package on the api's environment: the api ticks nothing in the e2e (`--no-tick`), and the board's list reads where a run's result

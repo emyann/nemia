@@ -15,7 +15,7 @@ import { CardDoor } from '../cards/cards.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
 import { factoryDoorMemory } from '../factory/door/memory.store.ts';
-import { cardDoorFiles } from '../cards/cards.store.ts';
+import { cardDoorAt } from '../cards/cards.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -280,11 +280,12 @@ test('a stray file listed before a card of its name is passed over; a card says 
   assert.equal(queued.status.place, 2, 'the place the listing judged');
 });
 
-test('a stray entry is listed, never hidden: under its file, with why it is no card, dated when it was written; walked apart from a card of its name', () => {
+test('a card file dropped into the inbox is listed as its card, a page at a time; an entry that is no card is not listed, and left where it is', () => {
   const home = scratch('card-strays-');
   const inbox = path.join(home, 'inbox');
   fs.mkdirSync(path.join(inbox, 'sub'), { recursive: true });
   fs.writeFileSync(path.join(inbox, 'notes.md'), aCard('Notes'));
+  fs.writeFileSync(path.join(inbox, 'idea.md'), aCard('Idea'));
   fs.writeFileSync(path.join(inbox, 'notes'), 'a stray file\n');
   fs.writeFileSync(path.join(inbox, 'idea.txt'), 'an idea saved as text\n');
   const walked = valueOf(
@@ -298,24 +299,18 @@ test('a stray entry is listed, never hidden: under its file, with why it is no c
           token = page.metadata.continue;
         } while (token !== undefined && pages.length < 10);
         return pages;
-      }).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer)),
+      }).pipe(Effect.provide(cardDoorAt(home)), Effect.provide(stand().layer)),
     ),
   );
   assert.deepEqual(
-    walked.map((c) => [c.metadata.name, c.status.file]),
+    walked.map((c) => [c.metadata.name, c.status.file, c.status.error]),
     [
-      ['idea.txt', 'idea.txt'],
-      ['notes', 'notes'],
-      ['notes', 'notes.md'],
-      ['sub/', 'sub/'],
+      ['idea', 'idea.md', undefined],
+      ['notes', 'notes.md', undefined],
     ],
-    'each entry once, a page at a time, the stray notes and the card notes.md two places of the list',
+    'each card once, a page at a time, and no stray',
   );
-  const saidWhy = walked.filter((c) => c.status.error !== undefined).map((c) => c.status.file);
-  assert.deepEqual(saidWhy, ['idea.txt', 'notes', 'sub/'], 'each stray says why it is no card');
-  const idea = walked[0];
-  assert.equal(idea?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'idea.txt')).mtime.toISOString(), 'dated by its file');
-  assert.equal(walked[3]?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'sub')).mtime.toISOString(), 'a folder by its own');
+  assert.deepEqual(fs.readdirSync(inbox).sort(), ['idea.txt', 'notes', 'sub'], 'the strays left where they are, the cards taken up');
 });
 
 test('a card the listing read and that no longer parses when its text is read is listed all the same, its status saying why', () => {
@@ -324,7 +319,7 @@ test('a card the listing read and that no longer parses when its text is read is
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'alpha.md'), '---\nnot-a-key: 1\n---\nAlpha\n');
   const read = inboxListing([{ file: 'alpha.md', text: aCard('Alpha') }], []);
-  const page = valueOf(Effect.runSyncExit(cardListOf(read, {}).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer))));
+  const page = valueOf(Effect.runSyncExit(cardListOf(read, {}).pipe(Effect.provide(cardDoorAt(home)), Effect.provide(stand().layer))));
   const [alpha] = page.items;
   assert.equal(alpha?.metadata.name, 'alpha');
   assert.equal('body' in (alpha?.spec ?? {}), false, 'no body of a text that does not parse');

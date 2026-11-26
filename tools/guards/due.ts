@@ -77,8 +77,8 @@ export const LINT_READS: readonly string[] = ['$TURBO_ROOT$/**/tsconfig*.json', 
 export const CONTRACTS_TOOL = '$TURBO_ROOT$/tools/contracts/**';
 
 /**
- * The jobs that run no turbo task, by the workspaces they reach, each with the workspaces those depend on. `e2e` (asked by `e2e-bound`
- * too) visits the board, served by the api it spawns (`apps/web/test/e2e/served.ts`), whose orchestrator finds the builtin templates by
+ * The jobs that run no turbo task, by the workspaces they reach, each with the workspaces those depend on. `e2e`
+ * visits the board, served by the api it spawns (`apps/web/test/e2e/served.ts`), whose orchestrator finds the builtin templates by
  * path; `e2e-look` runs the look's browser tests over the board's stories, and `e2e-stories` draws every story; `design-system`
  * builds the board's Design System artifact with its producer; each contracts leg proves the files `tools/contracts/legs.ts` gives it,
  * which lie in these workspaces (`test/due.test.ts` holds it).

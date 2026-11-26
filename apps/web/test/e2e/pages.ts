@@ -137,7 +137,6 @@ type Plan<P> = {
   light: boolean;
   measured: boolean;
   workers?: number;
-  shard?: { i: number; of: number };
   whole: boolean;
   look: boolean;
   stories: boolean;
@@ -146,18 +145,16 @@ type Plan<P> = {
 /**
  * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; whether a
  * page is `pictured`; whether it asked for `photos` and for `light`, which run.ts hands its workers; how many `workers` it asks for, if
- * it does; and whether it is `whole` — every page, in the dark theme alone, the run
- * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
+ * it does; and whether it is `whole` — every page, in the dark theme alone, whose own time is said past a step's tool (`pastTool`,
+ * timing.ts). With no flag, every page in the dark theme, pictured by none:
  * the assertions alone. `--photos` pictures each page visited, in the dark theme alone; `--light`, with `--photos`, visits light first
  * and pictures it too, and is refused without it (`themesOf`); `--pages <name,…>` visits only the pages
  * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
  * `measured` beside it (contrast.ts), in both themes, light then dark, and is refused without it; `--workers <n>` sets how many workers
- * visit them; and
- * `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`). A shard is no whole run either, so its
- * pages are never summed against their bound: a reporter sums every shard's instead (pages-bound.ts). Refuses a flag it does not know, a
- * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
- * one of `--shard` and `--of` without the other, `--shard` with `--pages`, a shard past the shards there are, and an `--of` past the
- * pages there are.
+ * visit them; and `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`), and is no whole run
+ * either. Refuses a flag it does not know, a name that is no page (listing the pages there are), `--pages` with no name after it,
+ * `--workers` with no whole number of one or more, one of `--shard` and `--of` without the other, `--shard` with `--pages`, a shard
+ * past the shards there are, and an `--of` past the pages there are.
  *
  * Whether it runs the `look`'s browser tests (`test/e2e/*.test.ts`, `LOOK_TESTS` in look.ts), before it builds anything: with `--look`, or
  * with no selector at all (`--pages`, `--shard`, `--look`), the whole e2e. `--look` alone visits no page and is no whole run; `--look
@@ -231,7 +228,6 @@ export function planOf<P extends { name: string }>(argv: readonly string[], page
       light,
       measured,
       workers,
-      shard: { i: shard, of },
       whole: false,
       look: false,
       stories: false,

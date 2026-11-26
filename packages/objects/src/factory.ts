@@ -81,7 +81,8 @@ export type HarnessSettings = typeof HarnessSettings.Type;
  * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the
  * repository each workflow it attaches works on, by the workflow's name to the repository's folder name (`nemia factory attach <factory>
  * <workflow>
- * --repo <name>`), absent where it names none: a workflow it names none for works on its only repository.
+ * --repo <name>`), absent where it names none: a workflow it names none for works on its only repository; and the values each label key
+ * it names takes (`labelValues`), absent where it names none: a label of such a key, written with another value, is refused.
  */
 export const FactorySpec = Schema.Struct({
   workflows: Schema.optionalKey(
@@ -119,6 +120,12 @@ export const FactorySpec = Schema.Struct({
     Schema.Record(Schema.String, Schema.String).annotate({
       description:
         "The repository each workflow it attaches works on, by the workflow's name to the repository's folder name; absent where it names none.",
+    }),
+  ),
+  labelValues: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.Array(Schema.String)).annotate({
+      description:
+        'The values each label key it names takes on its cards and runs: a label of such a key given another value is refused where it is written; absent where it names none.',
     }),
   ),
 }).annotate({

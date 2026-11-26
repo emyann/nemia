@@ -10,6 +10,7 @@
  */
 import type { LabelKeyShape } from '../../contracts/label-key.contract.ts';
 import type { LabelChange, Labels } from '../../contracts/labels.contract.ts';
+import type { LabelValuesRefused } from '../../contracts/label-values.contract.ts';
 import type { ClosedFeedLabels } from '../feed/index.ts';
 
 /**
@@ -176,5 +177,45 @@ export function parseLabelEdits(texts: readonly string[]) {
   }
   return { edits } satisfies { readonly edits: readonly LabelChange[] } | { readonly refused: string } as
     | { readonly edits: readonly LabelChange[] }
+    | { readonly refused: string };
+}
+
+/**
+ * Which of the labels `given` a factory whose rules are `rules` does not take: each whose key a rule names with a value it does not
+ * list, with the values that key takes. Pure, and proved by `contracts/label-values.contract.ts`.
+ * @param rules The keys the factory names, each with the values it takes.
+ * @param given The labels a write gives, as it sets them.
+ */
+export const labelValuesRefused: LabelValuesRefused = (rules, given) =>
+  given.flatMap((label) => {
+    const first = rules.find((rule) => rule.key === label.key);
+    if (first === undefined || rules.some((rule) => rule.key === label.key && rule.values.includes(label.value))) return [];
+    return [{ key: label.key, value: label.value, takes: first.values }];
+  });
+
+/**
+ * The values each key takes that `text` states, as `key=value` words apart by whitespace, each key its values in the order first written
+ * and each once; none for no word. Or the refusal of the first word that is no label a person may set with a value (`labelRefusal`), or
+ * no `key=value` at all. Pure: what a factory's template writes as its `labelValues`.
+ * @param text The words as written.
+ */
+export function labelValuesOf(text: string) {
+  const held = new Map<string, string[]>();
+  for (const word of text.split(/\s+/).filter((w) => w !== '')) {
+    const at = word.indexOf('=');
+    const key = word.slice(0, at);
+    const value = word.slice(at + 1);
+    const refused =
+      at <= 0 || value === '' ? `${JSON.stringify(word)} is no label value: write key=value, as in team=core` : labelRefusal(key, value);
+    if (refused !== undefined)
+      return { refused } satisfies { readonly values: Readonly<Record<string, readonly string[]>> } | { readonly refused: string } as
+        | { readonly values: Readonly<Record<string, readonly string[]>> }
+        | { readonly refused: string };
+    const was = held.get(key) ?? [];
+    if (!was.includes(value)) held.set(key, [...was, value]);
+  }
+  const values: Readonly<Record<string, readonly string[]>> = Object.fromEntries(held);
+  return { values } satisfies { readonly values: Readonly<Record<string, readonly string[]>> } | { readonly refused: string } as
+    | { readonly values: Readonly<Record<string, readonly string[]>> }
     | { readonly refused: string };
 }

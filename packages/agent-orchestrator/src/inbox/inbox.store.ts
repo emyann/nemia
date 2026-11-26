@@ -40,7 +40,7 @@ import { CardDoor, cardNameAt } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError } from '../step/step.ts';
-import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
+import { FactoryDoor, factoryOrNone, labelValuesJudged } from '../factory/door/factories.store.ts';
 import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
 import { keptRuns } from '../runs/runs.store.ts';
@@ -112,7 +112,9 @@ export const filedNames = () =>
  *
  * `labels` are label edits (`--label`, `key=value` / `key-`), refused `Invalid` before anything is written where one does not parse
  * (`parseLabelEdits`). The card is filed with the labels its `from:` runs agree on, its text's own `labels:` over them, and the edits over
- * those (`inheritedLabels`); a key two of those runs disagree on is left out, and answered on `labelsLeftOut`.
+ * those (`inheritedLabels`); a key two of those runs disagree on is left out, and answered on `labelsLeftOut`. A label of that map whose
+ * key the card's factory names with a value it does not take is refused `Invalid`, nothing filed (`labelValuesJudged`): a new card has no
+ * value that stands, so its whole map is judged.
  */
 export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   text: string;
@@ -150,6 +152,7 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
     ),
   );
   const inherited = inheritedLabels({ parents, ...(read.labels !== undefined ? { card: read.labels } : {}), edits: edits.edits });
+  yield* labelValuesJudged(read.factory, inherited.labels, 'Nothing was filed.');
   const labelled = parents.length > 0 || edits.edits.length > 0;
   const text = labelled ? labelledText(read, inherited.labels) : idea.text;
   const leftOut: readonly LeftOut[] = inherited.leftOut;

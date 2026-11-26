@@ -893,3 +893,59 @@ describe('REFUSED: `nemia inbox -l` with a malformed selector, and `nemia inbox 
     assert.equal(inInbox().length, 0, 'nothing filed');
   });
 });
+
+test('REFUSED: a card filed with a label its factory does not take, nothing filed; a value it takes, a key it names not, or none, files', async () => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  addFactoryAt(ROOT, { name: 'lv', volumes: [`${repo}:rw`] });
+  const file = path.join(ROOT, 'factories', 'lv.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), labelValues: { work: ['feature', 'fix'] } }));
+  const cards = () => (fs.existsSync(INBOX) ? fs.readdirSync(INBOX).length : 0);
+
+  assert.throws(
+    () => addToInbox({ text: 'Store it', factory: 'lv', labels: ['work=store'] }),
+    refusedWith('Invalid', 'work=store', 'feature'),
+  );
+  assert.equal(cards(), 0, 'nothing filed');
+  assert.throws(
+    () => addToInbox({ text: '---\nlabels:\n  work: store\n---\nStore it\n', factory: 'lv' }),
+    refusedWith('Invalid', 'work=store'),
+    "the text's own labels: are given too",
+  );
+  assert.equal(cards(), 0, 'nothing filed');
+
+  assert.deepEqual(addToInbox({ text: 'Fix it', factory: 'lv', labels: ['work=fix'] }).card.labels, { work: 'fix' });
+  assert.equal(addToInbox({ text: 'No work', factory: 'lv' }).card.labels, undefined);
+  assert.deepEqual(addToInbox({ text: 'Any area', factory: 'lv', labels: ['area=anything'] }).card.labels, { area: 'anything' });
+  assert.deepEqual(
+    addToInbox({ text: 'Default', labels: ['work=store'] }).card.labels,
+    { work: 'store' },
+    'the default factory judges none',
+  );
+  const unread = path.join(ROOT, 'factories', 'unread.json');
+  fs.writeFileSync(unread, '{ not json');
+  try {
+    assert.deepEqual(
+      addToInbox({ text: 'Unread factory', factory: 'unread', labels: ['work=store'] }).card.labels,
+      { work: 'store' },
+      'a factory whose file does not read judges none: the start says what is wrong with it',
+    );
+  } finally {
+    fs.rmSync(unread);
+  }
+
+  const parent = await runPlaced(startRun({ brief: 'parent', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
+  filed.labels.put(parent.id, { work: 'store' });
+  const before = cards();
+  assert.throws(
+    () => addToInbox({ text: `---\nfrom: ${parent.id}\n---\nFrom a run\n`, factory: 'lv' }),
+    refusedWith('Invalid', 'work=store'),
+    'a label its from: run hands down is judged, a new card having none that stands',
+  );
+  assert.equal(cards(), before, 'nothing filed');
+  assert.deepEqual(
+    addToInbox({ text: `---\nfrom: ${parent.id}\n---\nFrom a run\n`, factory: 'lv', labels: ['work=fix'] }).card.labels,
+    { work: 'fix' },
+    'an edit over the inherited value files',
+  );
+});

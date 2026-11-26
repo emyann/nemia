@@ -11,6 +11,7 @@ import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts'
 import { baseSpelled } from '../former/former.ts';
 import { OVERRIDABLE } from '../workflow/index.ts';
 import { selectorsRefusal } from '../watch/selector.ts';
+import { labelValuesOf } from '../label-spelling/label-spelling.ts';
 import {
   documentFile,
   documentRefusals,
@@ -158,6 +159,17 @@ function triggerRefusals(held: Held) {
     if (unread !== undefined) refusals.push(`trigger ${name}'s selector ${unread}`);
     return refusals.map((message) => ({ file: 'nemia.yaml', at, message }));
   });
+}
+
+/**
+ * The manifest's `labelValues` written whole whose words are no `key=value` labels (`labelValuesOf`). One a parameter writes is read once
+ * rendered.
+ */
+function labelValuesRefusals(held: Held) {
+  const written = held.manifest.labelValues;
+  if (typeof written !== 'string' || written.includes('${{')) return [];
+  const parsed = labelValuesOf(written);
+  return 'refused' in parsed ? [{ file: 'nemia.yaml', at: ['spec', 'labelValues'], message: `labelValues ${parsed.refused}.` }] : [];
 }
 
 /**
@@ -561,6 +573,7 @@ export function checkTemplate(
     ...documents,
     ...hireRefusals(held),
     ...triggerRefusals(held),
+    ...labelValuesRefusals(held),
     ...originRefusals(held),
     ...agentRefusals(held),
     ...stepRefusals(held),

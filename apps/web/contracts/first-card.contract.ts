@@ -1,33 +1,58 @@
 /**
- * The welcome's first card, its fourth milestone (src/lib/firstCard.ts): the workflow its Start picks (`firstWorkflowOf`), the cost line
- * said above Start (`costLineOf`), which of the four hints a run's page draws (`firstBeatOf`), and the next steps "You are set" offers
- * (`nextStepsOf`). Level-triggered: each reads what the store holds now — the factory's workflows, the stats, the run as the api reads it,
- * the factory's first writable volume — and never a flag kept in the browser, so a step done at a terminal shows as done on the board.
+ * The welcome's first card, its fourth milestone (src/lib/firstCard.ts): the workflow its Start picks (`firstWorkflowOf`), the gates its
+ * run is started with (`firstGatesOf`), the cost line said above Start (`costLineOf`), which of the four hints a run's page draws
+ * (`firstBeatOf`), and the next steps "You are set" offers (`nextStepsOf`). Level-triggered: each reads what the store holds now — the
+ * factory's workflows and the one it names for a first card, the workflow's steps as the factory lists them, the stats, the run as the api
+ * reads it, the factory's first writable volume — and never a flag kept in the browser, so a step done at a terminal shows as done on the
+ * board. No workflow or step is named here: what a first card runs in is the factory's word (`FactorySpec.firstWorkflow`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/**
- * The workflow a first card runs in, where its factory offers it: sdlc's, which lands a small change with a review and no spec. The
- * code keeps its own constant of the same word; this one is the law's (a contract exports types alone: its `spec` is never loaded at run
- * time).
- */
-const FIRST_WORKFLOW = 'quick';
+/** Whether the factory offers the workflow it names for a first card: it names one, and its workflows hold it. */
+const offersDeclared = (offered: readonly string[], declared: string | undefined) =>
+  declared !== undefined && offered.some((name) => name === declared);
 
-const firstWorkflowOfSpec = spec<(offered: readonly string[]) => string | undefined>({
+const firstWorkflowOfSpec = spec<(offered: readonly string[], declared: string | undefined) => string | undefined>({
   ensures: {
-    quickWhereOffered: {
-      description: 'A factory that offers quick runs its first card in quick',
-      condition: ({ input: [offered], output }) => !offered.includes(FIRST_WORKFLOW) || output === FIRST_WORKFLOW,
+    theDeclaredWhereOffered: {
+      description: 'A factory that names a workflow for a first card, and offers it, runs the card in that workflow',
+      condition: ({ input: [offered, declared], output }) => !offersDeclared(offered, declared) || output === declared,
     },
-    noPickWhereNotOffered: {
-      description: 'A factory with no quick picks nothing for the person: the page offers its own workflows to choose from',
-      condition: ({ input: [offered], output }) => offered.includes(FIRST_WORKFLOW) || output === undefined,
+    noPickOtherwise: {
+      description:
+        'A factory that names none, or names one it does not offer, picks nothing for the person: the page offers its own workflows to choose from',
+      condition: ({ input: [offered, declared], output }) => offersDeclared(offered, declared) || output === undefined,
     },
   },
 });
 
 /** `firstWorkflowOf`'s type, which src/lib/firstCard.ts takes. */
 export type FirstWorkflowOf = Implementation<typeof firstWorkflowOfSpec>;
+
+/** A step of a workflow as the factory's listing of it says it: its name, and the workspace it works in (`base` for an ending). */
+export type ListedStep = { readonly name: string; readonly spec: { readonly workspace?: string | null } };
+
+/** The name of the first step of `steps` that works on the base (`workspace: base`), the workflow's ending; undefined where none does. */
+const endingOf = (steps: readonly ListedStep[]) => steps.find((step) => step.spec.workspace === 'base')?.name;
+
+const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => readonly string[]>({
+  ensures: {
+    gatedAtTheEnding: {
+      description: 'A first run is gated at its workflow’s ending, the step that lands, so the person approves what lands',
+      condition: ({ input: [steps], output }) => {
+        const ending = steps === undefined ? undefined : endingOf(steps);
+        return ending === undefined || (output.length === 1 && output[0] === ending);
+      },
+    },
+    ungatedWithNoEnding: {
+      description: 'A workflow with no ending, or one whose steps were not read, is started with no gate: nothing of it lands',
+      condition: ({ input: [steps], output }) => (steps !== undefined && endingOf(steps) !== undefined) || output.length === 0,
+    },
+  },
+});
+
+/** `firstGatesOf`'s type, which src/lib/firstCard.ts takes: no workflow's name, only its steps as the factory lists them. */
+export type FirstGatesOf = Implementation<typeof firstGatesOfSpec>;
 
 /** What the stats say of the landed runs of a workflow: how many landed, and the mean cost and wall time of one, null where unmeasured. */
 export type LandedMeasure = {

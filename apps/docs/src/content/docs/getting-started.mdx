@@ -1,12 +1,12 @@
 ---
 title: Getting started
-description: Install Nemia with one line, open the board, and follow its milestones to a first landed change.
+description: Install Nemia with one line, open the board, and follow its milestones to your first landed change.
 ---
 
-From one line in a terminal to a first change landed in your repository, on your own laptop. The board walks you through it in
-milestones: a harness, a first factory, a first volume, and a first card. Each one is read from what the store holds now (a harness
-activated and signed in, a factory filed, a trusted volume, a run landed), so a milestone you do at a terminal shows as done on the board.
-Every page has a way past it.
+This guide takes you from one line in a terminal to your first change landed in your repository, on your own laptop. The board guides
+you through four milestones: a harness, a first factory, a first volume, and a first card. Each milestone reflects what Nemia has
+right now (a harness activated and signed in, a factory created, a trusted volume, a run landed). So if you complete one in a
+terminal, the board shows it as done. You can skip any page.
 
 ## Install
 
@@ -14,74 +14,74 @@ Every page has a way past it.
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
 ```
 
-It works on macOS (Apple silicon or Intel), on Linux (x64 or arm64), and on Windows in a WSL terminal. On a laptop it asks nothing: it
-lays the release down, starts Nemia on this machine alone, opens the board's welcome page in your browser, and ends on the link to it,
-under `http://localhost:8787/welcome`. The link signs that browser in to the board, once, within ten minutes. Where no browser opened,
-open the link yourself. Later, `nemia open` opens the board signed in at any time. [Install](/install/) says what the installer does,
-its flags, and the server's path.
+Nemia runs on macOS (Apple silicon or Intel), Linux (x64 or arm64), and Windows in a WSL terminal. On a laptop, the installer asks no
+questions. It installs the release, runs Nemia locally, opens the welcome page in your browser, and prints a link to it at
+`http://localhost:8787/welcome`. The link signs that browser in to the board. It works once, within ten minutes. If no browser opens,
+open the link yourself. Later, run `nemia open` to open the board, signed in, at any time. [Install](/install/) explains what the
+installer does, its options, and how to install a server.
 
 ## A harness
 
-The welcome page asks first which harness to activate, Claude Code or Codex: the harness runs Nemia's own agent and every session in
-your factories, and a release carries none. Press _Activate_, and the page follows the install of the version this release was tested
-with, then checks its version. Once it is signed in (the page says how where it is not), _Run the check_ sends one real turn
-through it, at a capped cost, and your plan's quota shows once that turn passed.
+First, the welcome page asks which harness to activate: Claude Code or Codex. The harness runs Nemia's own agent and every session in
+your factories. Nemia doesn't ship one. Click _Activate_, and the page installs the version this release was tested with, then checks
+its version. Once the harness is signed in (the page tells you how if it isn't), click _Run the check_. It sends one real turn
+through the harness, at a capped cost. Your plan's quota appears once that turn passes.
 
-At a terminal, `nemia doctor fix claude` does the same install. The board's _Setup_ page shows every harness and every other piece the
-machine needs ([Activate a harness](/install/#activate-a-harness)). Once both checks passed, _Next_ leads to the next
-milestone not done.
+In a terminal, `nemia doctor fix claude` does the same install. The board's _Setup_ page lists every harness and everything else the
+machine needs ([Activate a harness](/install/#activate-a-harness)). Once both checks pass, _Next_ takes you to the next unfinished
+milestone.
 
 ## A first factory
 
-A factory is where your workflows run, with the agents it hires ([Factories](/factories/)). The page asks how you want to make it, three
-ways:
+A factory is where your workflows run, with the agents it hires ([Factories](/factories/)). You can create one in three ways:
 
-- **Talk to Nemia**, recommended: her chat opens beside the page; tell her what you build and she makes the factory with you. The page
-  moves on by itself once she has filed it.
-- **From a template**: pick a team built into Nemia, such as sdlc, see its workflows and agents, give the factory a name, and fill
-  what the template asks, if anything: sdlc asks nothing, and its settings wait under More parameters, each at its default, which
-  you may change or leave.
-- **From scratch**: give it a name, and an empty factory is made, with a short guide to what goes in it: a workflow, an agent, a hire.
+- **Talk to Nemia** (recommended). Her chat opens beside the page. Tell her what you build, and she creates the factory with you. The
+  page moves on once she has created it.
+- **From a template.** Pick a team built into Nemia, such as sdlc, and review its workflows and agents. Name the factory and fill in
+  anything the template asks for. sdlc asks for nothing: its settings sit under More parameters, each at its default, and you can
+  change them or leave them.
+- **From scratch.** Give it a name, and Nemia creates an empty factory, with a short guide to what goes in it: a workflow, an agent,
+  and a hire.
 
-A factory may start with no volume: that is the next milestone. At a terminal, `nemia factory apply <name> --template <template>` makes
-one from a template and `nemia factory add <name>` an empty one.
+A factory can start without a volume: that's the next milestone. In a terminal, `nemia factory apply <name> --template <template>`
+creates a factory from a template, and `nemia factory add <name>` creates an empty one.
 
 ## A first volume
 
-_Where is the work?_ A factory's runs work in a git repository, its volume. Give it one of three ways:
+_Where is the work?_ A factory's runs work in a git repository, called its volume. You can add one in three ways:
 
-- **A folder on this machine**: type its path, and the folders under what you type are offered as you go. A folder that is no git
-  repository yet is offered `git init`: Nemia makes it one with one empty first commit, and commits none of your files.
-- **A repository by its address**, on GitHub, GitLab or any git host: Nemia clones it, with this machine's own git credentials
+- **A folder on this machine.** Type its path, and the page suggests folders as you type. If the folder isn't a git repository yet,
+  the page offers `git init`: Nemia turns it into one with a single empty commit, and commits none of your files.
+- **A repository by its URL**, on GitHub, GitLab, or any git host. Nemia clones it with this machine's own git credentials
   ([A repository by its URL](/install/#a-repository-by-its-url)).
-- **A new repository**: give it a name, and Nemia makes an empty one in its store.
+- **A new repository.** Give it a name, and Nemia creates an empty one in its store.
 
-The volume is added writable, and the page then asks you to trust it: no run starts in a folder until a harness trusts it. _Not now_
-leaves the factory waiting on that trust, which you give later from its Settings.
+The volume is added as writable. The page then asks you to trust it: no run starts in a folder until a harness trusts it. Click _Not
+now_ to leave the factory waiting, and give that trust later from its Settings.
 
-At a terminal, `nemia factory volume add <factory> <path>:rw` adds a volume and trusts it, and `nemia factory trust <factory>` asks
-the trust again.
+In a terminal, `nemia factory volume add <factory> <path>:rw` adds a volume and trusts it, and `nemia factory trust <factory>` asks for
+trust again.
 
 ## A first card
 
-_What first?_ A card says what you want, a workflow does it in steps, and a gate waits on you before it lands. Pick one of three small
-changes (say what the repository is in its README, ignore editor files, fix a typo), or write your own. The card runs in the factory's
-quick workflow where it has one, else in a workflow of the factory's you pick. Above _Start_, the page says what a small run costs and
-takes: what one took on this machine once one has landed, else an estimate.
+_What first?_ A card describes what you want. A workflow does it in steps, and a gate waits for you before the work lands. Pick one of
+three small changes (describe the repository in its README, ignore editor files, fix a typo), or write your own. The card runs in the
+factory's quick workflow if it has one. Otherwise, you pick one of the factory's workflows. Above _Start_, the page shows what a small
+run costs and how long it takes: the real figures once a run has landed on this machine, an estimate before that.
 
-_Start, gated before it lands_ files the card and starts its run, then opens the run's page, where a hint says where the run stands:
-the card filed, each step an agent at work, then the gate, which waits on you. Read the work, then approve it to land, or send it back.
-Once it has landed, the hint leads to _You are set_, the welcome's last page, which offers what comes next: raising Nemia's level so she
-watches your runs for you, landing through your git host where the factory's template follows one, and Nemia from a terminal or a coding
-agent.
+_Start, gated before it lands_ creates the card, starts its run, and opens the run's page. A hint there shows where the run stands:
+the card created, each step's agent at work, then the gate, which waits for you. Read the work, then approve it to land, or send it
+back. Once it lands, the hint leads to _You are set_, the last welcome page. It suggests what to do next: raise Nemia's level so she
+watches your runs for you, land through your git host if the factory's template supports it, and use Nemia from a terminal or a
+coding agent.
 
-[How a run lives](/how-a-run-lives/) follows a run from its start to its landing.
+[How a run lives](/how-a-run-lives/) follows a run from start to landing.
 
 ## From the repository
 
-To work on Nemia itself, run it from a checkout of its repository: `docs/working-on-nemia.md` says how, under _Running from the repository_.
+To work on Nemia itself, run it from a checkout of its repository. See `docs/working-on-nemia.md`, under _Running from the repository_.
 
 ## Sources
 
-This page is written from `tools/release/install.sh`, `apps/web/src/components/welcome/` (the welcome's pages, one a milestone),
-`packages/objects/src/milestones.ts` and `apps/web/src/lib/firstCard.ts`.
+This page is based on `tools/release/install.sh`, `apps/web/src/components/welcome/` (one welcome page per milestone),
+`packages/objects/src/milestones.ts`, and `apps/web/src/lib/firstCard.ts`.

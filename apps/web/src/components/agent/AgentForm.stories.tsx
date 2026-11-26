@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { skillsQuery } from '@/lib/api/skills';
 import { AgentForm } from './AgentForm';
 import { critic, scribe, skillPlaces } from '../../../.storybook/fixtures/agents';
@@ -46,7 +46,10 @@ export const Theirs: Story = {
 /** A new agent: nothing written yet, Create agent waiting for a change. */
 export const New: Story = { args: { listing: null } };
 
-/** Its harness's recorded list: the model is picked from the ids it lists, not typed, and an alias is not among them. */
+/**
+ * Its harness's recorded list: the model is picked from the ids it lists, not typed, and an alias is not among them. Its options are read
+ * once the popover has settled from its fade in, which starts at opacity 0.
+ */
 export const PicksItsModel: Story = {
   args: {
     listing: { ...scribe, keys: { ...scribe.keys, harness: 'local', model: 'old-model' } },
@@ -67,7 +70,9 @@ export const PicksItsModel: Story = {
     const form = within(canvasElement);
     await expect(form.queryByRole('textbox', { name: 'Model' })).toBeNull();
     await userEvent.click(form.getByRole('button', { name: /old-model/ }));
-    const listbox = within(await within(document.body).findByRole('listbox'));
+    const opened = await within(document.body).findByRole('listbox');
+    await waitFor(() => expect(opened.closest('[data-entering]')).toBeNull());
+    const listbox = within(opened);
     await expect(listbox.getByRole('option', { name: 'model-one' })).toBeVisible();
     await expect(listbox.getByRole('option', { name: 'model-two' })).toBeVisible();
     await expect(listbox.queryByRole('option', { name: 'b' })).toBeNull();

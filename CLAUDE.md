@@ -116,7 +116,7 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
   What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
   (`$WF_CARRIED_FILES`, the copy of the template's `carried/` folder the run took when it began, beside its workflow's; out of git while that is unset) and run with
   `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/carried/pull-request.ts` pushes a run's own
-  branch and opens or updates its pull request, and `packages/templates/sdlc/carried/landing.ts` merges that pull request
+  branch (Grace opens or updates the pull request through the GitHub server, and its `push` check labels it and proves its head), and `packages/templates/sdlc/carried/landing.ts` merges that pull request
   and fast-forwards the checkout (`build` and `quick` both run them, kept once there; `packages/templates/test/check-scripts.test.ts` holds every check to the folder its variable names). The
   one exception to the rule is a run's ending step (a workflow's last step, `workspace: base`), filed once a person approves it — or,
   where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `build` and `quick` land with no gate at all; an ending with a `check:` and
@@ -150,8 +150,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   git or gh write, run or read outside by (`read-only.allow.yaml`, `read-only.deny.yaml`), the writers' refusals (`writers.deny.yaml`,
   Grace's and Otto's one list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
   verb or a deny: a verb is added by asking what file it can be made to write and what program it can be made to run. The denies hold
-  the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. Agora alone allows `gh pr
-  view` and `gh pr checks`; the four read a tool's own help and version, gh's by `gh help <core command>` (never `gh
+  the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. None of the four allows a `gh` beyond a tool's help (Agora reads the pull request through the GitHub server); the four read a tool's own help and version, gh's by `gh help <core command>` (never `gh
   <command> --help`, which can run an alias or an extension) and claude's by exact lines measured safe (`help.allow.yaml`), while
   the writers keep gh refused whole. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
   holds the agents to the files and proves on their rendered fences, through the test kit's matcher (`test-kit/fence`), each read open

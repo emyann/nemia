@@ -3,21 +3,25 @@ and only it, then the part headed *Either way*.
 
 ### true — on GitHub
 
-**Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
-your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the run's
-frozen carried files (`$WF_CARRIED_FILES`) as your check reads it. Run it:
+**Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub. Your
+fence refuses every `git push` and every `gh` call, so the push is one frozen script, read from the run's frozen carried files
+(`$WF_CARRIED_FILES`) as your check reads it, and the pull request is yours, through the GitHub server. Run the script first:
 
 ```
-node "$WF_CARRIED_FILES/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md" --labels "${{ parameters.pullRequestLabels }}"
+node "$WF_CARRIED_FILES/pull-request.ts" branch
 ```
 
-Type the `--labels` as it stands: those are the factory's rules, and the script labels the pull request by them, from the run's
-labels, as it opens it, so no check of the repository sees it unlabelled; your check labels it again each round.
+It pushes your own branch, never another, never the base and never forced, calls no GitHub, and prints `repository <owner/repo>`, `head`,
+`base` and `commit`. Then write the body in a file of your files directory (`$WF_STEP_FILES/pr-body.md`): what the change does and what
+proves it, a few paragraphs, amended as the rounds go. Then, through the server (`mcp__github__<tool>`):
 
-Write that body first, in a file of your files directory: what the change does and what proves it, a few paragraphs, amended as the
-rounds go. The script pushes your own branch, never another and never the base and never forced, and opens the pull request or brings
-the open one up to date, never a draft. Name the address it prints (`nemia pr: <url>`) in your `artifacts` as a value, `{"name": "pull
-request", "value": "<the url>"}`.
+1. `list_pull_requests` with the repository's `owner` and `repo`, `head` as `<owner>:<head branch>` and `state` `open`;
+2. where none is open, `create_pull_request` with `owner`, `repo`, `head`, `base`, a `title` (the card's line) and the `body`, never `draft`;
+3. where one is open, `update_pull_request` with `owner`, `repo`, `pullNumber`, the `title` and the `body`.
+
+Name its address in your `artifacts` as a value, `{"name": "pull request", "value": "<the url>"}`. You label nothing: your check sets the
+labels the factory's rules give the run's labels (`${{ parameters.pullRequestLabels }}`), each round, and refuses a draft, another base,
+two open pull requests, or a head that is not your commit, however the pull request was opened.
 
 Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
 (`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context — or, where neither the head nor the base branch declares a CI workflow under
@@ -30,15 +34,14 @@ context has been re-run once by then, its failed jobs, so its refusal names the 
 time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
 change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
 
-**Don't wait on CI yourself.** Push (or open the pull request), then sign off: your check waits on `${{ parameters.ciCheck }}` and
+**Don't wait on CI yourself.** Push and open the pull request, then sign off: your check waits on `${{ parameters.ciCheck }}` and
 hands you its verdict, the failing jobs and their log included. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
 its slot and its context for nothing.
 
-**Read a red CI yourself where its lines do not say why.** The MCP server this factory reads CI through, none where nothing follows
-the colon: ${{ parameters.ciServer }}. Where it names one, your step loads it, and a red `${{ parameters.ciCheck }}` whose handed lines
+**Read a red CI yourself where its lines do not say why.** Your step loads the factory's `github` server, and a red `${{ parameters.ciCheck }}` whose handed lines
 do not explain the failure (a page's failure detail, a log the job printed past the tail, a job with no failing test) is read from the
 failed jobs themselves through it, read-only: `actions_list` the run's jobs, `actions_get` a run or a job, and `get_job_logs` the log of a
-failed job, each as `mcp__<that server>__<tool>`. Your fence refuses its writes (`actions_run_trigger`: run, re-run, cancel, delete
+failed job, each as `mcp__github__<tool>`. Your fence refuses its writes (`actions_run_trigger`: run, re-run, cancel, delete
 logs): the check re-runs what it re-runs.
 
 ### false — in this checkout

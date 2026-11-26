@@ -10,6 +10,7 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import type { TemplateParameterType } from 'objects';
 import type { InLayout } from '../../contracts/template-layout.contract.ts';
+import type { Expression } from '../../contracts/expression-written.contract.ts';
 import { checkFailurePolicyOf } from '../check/index.ts';
 
 /** The version of the template layout, the schema every document of a template is written in: no `apiVersion` objects serve. */
@@ -397,25 +398,37 @@ export const isParam = (value: unknown): value is ParamRef =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.param === 'string';
 
 /**
- * A parameter's value written inside a string or a text: `${{ parameters.<name> }}`, spaces inside the braces optional. A shell's `$VAR`
- * and `${VAR}` are none.
+ * An expression written inside a string or a text: `${{ parameters.<name> }}`, or
+ * `${{ case(parameters.<name>, '<then>', '<otherwise>') }}`, GitHub Actions' `case` limited to one predicate that is a
+ * parameter and two single-quoted literals with no quote inside. Spaces inside the braces and the
+ * parentheses are optional. A shell's `$VAR` and `${VAR}` are none.
  */
-const PARAMETER_EXPRESSION = /\$\{\{\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+const PARAMETER_EXPRESSION =
+  /\$\{\{\s*(?:parameters\.([A-Za-z_][A-Za-z0-9_]*)|case\(\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*\))\s*\}\}/g;
+
+/** The expression a match of `PARAMETER_EXPRESSION` is. */
+const expressionOf = (match: RegExpMatchArray) =>
+  match[1] === undefined
+    ? ({ kind: 'case', name: match[2] ?? '', then: match[3] ?? '', otherwise: match[4] ?? '' } satisfies Expression)
+    : ({ kind: 'plain', name: match[1] } satisfies Expression);
 
 /**
- * The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order.
+ * Each expression in `text`, with the offset it stands at, in order.
  * @param text The text looked in.
  */
 export const expressionsIn = (text: string) =>
-  [...text.matchAll(PARAMETER_EXPRESSION)].flatMap((match) => (match[1] === undefined ? [] : [{ name: match[1], index: match.index }]));
+  [...text.matchAll(PARAMETER_EXPRESSION)].map((match) => {
+    const expression = expressionOf(match);
+    return { name: expression.name, index: match.index, expression };
+  });
 
 /**
- * `text` with each `${{ parameters.<name> }}` in it replaced by what `write` gives its name.
+ * `text` with each expression in it replaced by what `write` gives it.
  * @param text The text whose expressions are replaced.
- * @param write What an expression is replaced by, given its parameter's name.
+ * @param write What an expression is replaced by, given the expression the parser found.
  */
-export const writeExpressions = (text: string, write: (name: string) => string) =>
-  text.replace(PARAMETER_EXPRESSION, (_, name: string) => write(name));
+export const writeExpressions = (text: string, write: (expression: Expression) => string) =>
+  text.replace(PARAMETER_EXPRESSION, (...match: string[]) => write(expressionOf(match as unknown as RegExpMatchArray)));
 
 /**
  * A key path as a person reads it: `spec.steps[1].budget`.

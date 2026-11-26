@@ -1,5 +1,6 @@
 # What no writer's run may do (an agent that runs auto and writes the workspace), each refused by its own deny since auto runs
-# what no deny reaches. The run pushes, opens the pull request and merges by its own scripts; a step does none of it.
+# what no deny reaches. The run pushes and merges by its own scripts, and the engineer opens
+# the pull request through the GitHub server; a step does none of the first two.
 #
 # Messages, schedules and triggers that reach past the step's own session.
 - SendMessage

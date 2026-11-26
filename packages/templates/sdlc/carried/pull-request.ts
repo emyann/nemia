@@ -6,13 +6,10 @@
  * `exec.ts`, how a command is run and CI waited on, and `rerun.ts`, the one re-run of a red that the landing's receipt asks too, and
  * no other: a run freezes the carried folder whole, so they are beside it wherever it runs.
  *
- * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
- *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
- *   never forced, and labels it by the rules from the run's labels as `push --labels` does, in the same call: GitHub has no labelled
- *   create, so the labels are set through REST the moment it answers, before a CI job that reads them can start, and a check that
- *   reads a pull request's labels never sees the run's unlabelled. The rules are her step's note's, rendered from the factory's
- *   parameter, never her own; `--labels` is required, its empty value labelling nothing, and every refusal of the labels comes before
- *   the push. It prints `nemia pr: <url>` last, which goes on her closeout as an artifact value.
+ * - `branch`, which the engineer types once a round after merging the base: it pushes her branch to `origin`, never forced, and makes no
+ *   call to GitHub, `git` alone reading the remote's default branch. It prints the repository (`owner/repo`), the head branch, the base
+ *   and the commit, which she gives the GitHub server's `create_pull_request` (or `update_pull_request` for the one `list_pull_requests`
+ *   finds open for her head): the pull request is hers to open, through the server, never a draft.
  * - `push`, which the round's check runs first: it pushes again, so the commit CI judges is the commit the check judges, then refuses
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`. GitHub
  *   moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds (`HEAD_SECONDS`)
@@ -68,7 +65,7 @@
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no `gh`
  * on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull request,
  * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
- * with its base; an `open` with no `--labels`; an `open --labels` or a `push --labels` whose rules, `WF_LABELS` or the repository's
+ * with its base; a `branch` given an argument; a `push --labels` whose rules, `WF_LABELS` or the repository's
  * labels are not as above; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported. A refusal a
  * change to the branch cannot answer — no `gh` or none authenticated, no `origin`, two open pull requests, a draft or another base, the
  * label rules, `WF_LABELS`, a run whose labels match no rule, or the repository's labels, a `push` or `wait` given other arguments than
@@ -240,23 +237,27 @@ function pulls(branch: string) {
   return parsed<Pr[]>(`the pull requests of ${branch}`, gh('pr', 'list', '--head', branch, '--state', 'open', '--json', fields));
 }
 
-/** The line the engineer types to open the pull request, for a refusal that asks for one. */
+/**
+ * The line the engineer types to push her branch, then what she does with the server, for a refusal that asks for one: the pull request
+ * is opened with `create_pull_request` (`owner`, `repo`, `head`, `base`, `title`, `body`, never `draft`) where `list_pull_requests`
+ * finds none open for her head, and brought up to date with `update_pull_request` (`pullNumber`, `title`, `body`) where it finds one.
+ */
 const OPEN_LINE =
-  'node "$WF_CARRIED_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md" ' +
-  '--labels "<the rules your step\'s note gives>"';
+  'node "$WF_CARRIED_FILES/pull-request.ts" branch, then the GitHub server\'s `create_pull_request` (or `update_pull_request` ' +
+  'where `list_pull_requests` finds one open for the head)';
 
 /** The `gh api` form of an edit of a pull request's own fields, for a refusal that asks a person to type one. */
 const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{repo}/pulls/${n} -f ${field}`;
 
 /**
- * The one open pull request of `open`, read as this script requires one; refuses a draft, another base, none, or two. Apart from
+ * The one open pull request of `push`, read as this script requires one; refuses a draft, another base, none, or two. Apart from
  * `landing.ts`'s, which tells a merged pull request from an open one instead.
  */
 function sole(open: readonly Pr[], branch: string, onto: string) {
   if (open.length === 0)
     throw new Refusal(
       `no open pull request has ${branch} as its head, and CI judges a pull request's head. Open it in your session, after you ` +
-        `merged the base, with the script of the run's workflow files:\n  ${OPEN_LINE}`,
+        `merged the base, by pushing it and opening it through the server:\n  ${OPEN_LINE}`,
     );
   if (open.length > 1)
     throw new PersonsRefusal(
@@ -388,7 +389,7 @@ function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, r
 }
 
 /**
- * The labels of `pr` set to `want`, through REST (`issues/<n>/labels`) for the reason `edited` says: what it lacks of `want` added, and
+ * The labels of `pr` set to `want`, through REST (`issues/<n>/labels`), never `gh pr edit`, whose GraphQL query asks for the project cards GitHub refuses since it deprecated Projects (classic): what it lacks of `want` added, and
  * what it carries of `givable` and not of `want` removed, a label no rule gives left as it is. The line that says what it set.
  */
 function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }) {
@@ -562,19 +563,6 @@ const timedOut = (entries: readonly Entry[], check: string) =>
     return cancelled && id && cutOff(id) ? { ...entry, conclusion: 'TIMED_OUT' } : entry;
   });
 
-/** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
-function openArgs(args: string[]) {
-  const opts = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 2) opts.set(args[i] ?? '', args[i + 1] ?? '');
-  const [title, bodyFile, labels] = ['--title', '--body-file', '--labels'].map((flag) => opts.get(flag));
-  if (!title || !bodyFile || labels === undefined || opts.size !== 3 || args.length !== 6)
-    throw new Refusal(
-      "open takes the title and the body you wrote, which it writes neither of, and the rules your step's note gives, " +
-        `\`--labels ""\` where it gives none, each once and nothing else: type the line your note gives,\n  ${OPEN_LINE}`,
-    );
-  return { title, bodyFile, rules: labelRules(['--labels', labels]) };
-}
-
 /** The branch, the run it names and its leaf, with the remote's default branch, every guard of the act passed. */
 function placed() {
   const named = branchOf();
@@ -589,37 +577,38 @@ function placed() {
   return { ...named, onto };
 }
 
-/**
- * `pr`'s title and body set to `title` and the contents of `bodyFile`, through REST rather than `gh pr edit`: that command's GraphQL
- * query asks for the pull request's project cards, which GitHub refuses since it deprecated Projects (classic), so it fails on a
- * pull request this script has every right to edit. `-F body=@<file>` has `gh` read the file, as `--body-file` did.
- */
-function edited(n: number, title: string, bodyFile: string) {
-  gh('api', '-X', 'PATCH', `repos/{owner}/{repo}/pulls/${n}`, '-f', `title=${title}`, '-F', `body=@${bodyFile}`);
+/** The remote's default branch, as git reads it (`git ls-remote --symref origin HEAD`); refuses where `origin` names none. */
+function defaultBranch() {
+  const said = git('the remote default branch', 'ls-remote', '--symref', 'origin', 'HEAD');
+  const name = /^ref: refs\/heads\/(\S+)\s+HEAD$/m.exec(said)?.[1];
+  if (!name) throw new Refusal('`git ls-remote --symref origin HEAD` named no default branch: the base of the pull request is unknown');
+  return name;
+}
+
+/** `owner/repo` of the GitHub address `url`, as the server's tools take them; the address itself where it is none. */
+function repoOf(url: string) {
+  const named = /[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
+  return named ? `${named[1]}/${named[2]}` : url;
 }
 
 /**
- * `open`: the branch pushed and the pull request opened or brought up to date, labelled by the rules from the run's labels, and its
- * address last, for the closeout. Every refusal of the labels comes before the push.
+ * `branch`: the run's branch pushed, never forced, and no call to GitHub. It prints what the engineer gives the server's
+ * `create_pull_request` and `update_pull_request` — `owner/repo`, the head branch, the base and the commit — and the address of nothing:
+ * she opens the pull request herself. Takes no argument.
  */
-function open(args: string[]) {
-  const { title, bodyFile, rules } = openArgs(args);
-  const { branch, run, onto } = placed();
-  const plan = labelPlan(rules, run);
-  const already = pulls(branch);
-  const standing = already.length ? sole(already, branch, onto) : undefined;
-  const said = [pushing(branch)];
-  const labelling = (pr: () => Pr) => (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]) satisfies string[];
-  if (standing) {
-    edited(standing.number, title, bodyFile);
-    const updated = `#${standing.number} brought up to date with the title and body you wrote`;
-    return [...said, updated, ...labelling(() => standing), standing.url] satisfies string[];
-  }
-  const printed = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile);
-  const url = printed.split('\n').at(-1)?.trim() ?? '';
-  const number = Number(/\/pull\/(\d+)$/.exec(url)?.[1]);
-  const made: Pr = { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] };
-  return [...said, 'opened', ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))), url] satisfies string[];
+function branched(args: string[]) {
+  if (args.length)
+    throw new Refusal(`branch takes no argument, and was given ${args.join(' ')}: type the line your note gives,\n  ${OPEN_LINE}`);
+  const named = branchOf();
+  const address = origin();
+  const onto = defaultBranch();
+  if (named.branch === onto)
+    throw new Refusal(
+      `HEAD is on \`${onto}\`, the remote's default branch, and this script never pushes the base: switch to the run's own branch ` +
+        `(\`git switch wf/${named.run}/${named.leaf}\`) and run it again`,
+    );
+  const pushed = pushing(named.branch);
+  return [pushed, `repository ${repoOf(address)}`, `head ${named.branch}`, `base ${onto}`, `commit ${head()}`] satisfies string[];
 }
 
 /**
@@ -990,7 +979,7 @@ const workflowsAt = (rev: string) => git(`the files of ${rev}`, 'ls-tree', '-r',
 
 /** The verbs, by name, each with the tag its lines are printed under. */
 const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> = {
-  open: { tag: 'nemia pr', act: open },
+  branch: { tag: 'nemia pr', act: branched },
   push: { tag: 'nemia pr', act: push },
   wait: { tag: 'nemia ci', act: wait },
   'declares-ci': { tag: 'nemia ci', act: declaresCiAtHead },
@@ -1005,7 +994,7 @@ function main() {
   const named = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
   const tag = named?.tag ?? 'nemia pr';
   try {
-    if (!named) throw new Refusal(`\`${verb}\` is no verb: give open, push, wait or declares-ci`);
+    if (!named) throw new Refusal(`\`${verb}\` is no verb: give branch, push, wait or declares-ci`);
     for (const line of named.act(args)) process.stdout.write(`${tag}: ${line}\n`);
     return 0;
   } catch (err) {

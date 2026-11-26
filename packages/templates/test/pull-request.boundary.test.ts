@@ -1,6 +1,6 @@
 /**
  * sdlc's pull-request door (`sdlc/carried/pull-request.ts`, which `build` and `quick` both run): the one act that pushes a
- * run's branch and opens the pull request CI judges. Driven as its three owners drive it — `open` by the engineer's session, `push` and
+ * run's branch and the check on the pull request CI judges. Driven as its owners drive it — `branch` by the engineer's session, `push` and
  * `wait --check <name>` by the round's check — in a scratch repository whose `origin` is a bare repository, so a push is a real push
  * and a diverged tip a real rejection, with a stub `gh` first on the PATH that records each call and answers from a fixture
  * (`test/origin.ts`), each a bounded subprocess. The CI context the wait reads is the one `--check` names, since that name is the
@@ -141,74 +141,48 @@ function commit(repo: string, name: string) {
   return gitIn(repo, 'rev-parse', 'HEAD').trim();
 }
 
-/** A body file to open the pull request with: its path. */
-function body(text = 'What this round changed.\n') {
-  const file = path.join(scratch('wf-pr-files-'), 'pr-body.md');
-  fs.writeFileSync(file, text);
-  return file;
+/** `origin` given the default branch `main` a clone would show, as `git ls-remote --symref origin HEAD` reads it. */
+function withMain(at: ReturnType<typeof placed>) {
+  gitIn(at.repo, 'push', '-q', 'origin', 'HEAD:refs/heads/main');
+  return at;
 }
 
-test("open pushes the run's branch and creates the pull request with the title and body it was given, never a draft", () => {
-  const at = placed();
-  at.gh.answers([
-    { when: 'auth status' },
-    { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
-    { when: 'pr list', out: '[]' },
-    { when: 'pr create', out: 'https://github.com/o/r/pull/7' },
-  ]);
-  const file = body();
-  const r = pr(at, 'open', ['--title', "A run's change is a pull request", '--body-file', file, '--labels', '']);
-  assert.equal(r.code, 0, r.err);
+test("branch pushes the run's branch, never forced, with no gh on the PATH, and prints the repository, head, base and commit the server's tools take", () => {
+  const at = withMain(placed());
+  const gitAlone = scratch('wf-pr-nogh-');
+  fs.symlinkSync(execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim(), path.join(gitAlone, 'git'));
+  const ran = spawnSync(process.execPath, [SCRIPT, 'branch'], {
+    cwd: at.repo,
+    env: { PATH: gitAlone, HOME: at.repo, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  assert.equal(ran.status, 0, ran.stderr);
   assert.equal(tip(at.bare!, at.branch), gitIn(at.repo, 'rev-parse', 'HEAD').trim(), 'the branch is on origin at HEAD');
-  const created = asked(r.calls, 'pr', 'create');
-  assert.equal(created.length, 1, JSON.stringify(r.calls));
-  assert.deepEqual(created[0].argv, [
-    'pr',
-    'create',
-    '--base',
-    'main',
-    '--head',
-    'wf/r-1/run',
-    '--title',
-    "A run's change is a pull request",
-    '--body-file',
-    file,
-  ]);
-  assert.ok(!r.calls.some((call) => call.argv.includes('--draft')), 'never a draft');
-  assert.equal(asked(r.calls, 'api').length, 0, 'the fields of a pull request it just created are not patched');
-  assert.match(r.out, /nemia pr: https:\/\/github\.com\/o\/r\/pull\/7/);
+  const sha = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  for (const line of ['head wf/r-1/run', 'base main', `commit ${sha}`, 'repository '])
+    assert.ok(ran.stdout.includes(`nemia pr: ${line}`), ran.stdout);
 });
 
-test('open on a branch whose pull request is already open updates its title and body, and creates no second one', () => {
-  const at = placed();
-  const file = body('A second round.\n');
-  const r = pr(at, 'open', ['--title', 'The same card', '--body-file', file, '--labels', '']);
-  assert.equal(r.code, 0, r.err);
-  assert.equal(asked(r.calls, 'pr', 'create').length, 0, 'never a second pull request');
-  assert.equal(asked(r.calls, 'pr', 'edit').length, 0, 'never `gh pr edit`, whose GraphQL query GitHub refuses');
-  assert.deepEqual(asked(r.calls, 'api')[0].argv, [
-    'api',
-    '-X',
-    'PATCH',
-    'repos/{owner}/{repo}/pulls/7',
-    '-f',
-    'title=The same card',
-    '-F',
-    `body=@${file}`,
-  ]);
-  assert.match(r.out, /nemia pr: https:\/\/github\.com\/o\/r\/pull\/7/);
-});
-
-test('REFUSED: open with no title or no body file, and a verb the script has not; nothing is pushed', () => {
-  const at = placed();
-  for (const args of [[], ['--title', 'x'], ['--body-file', body()], ['--title', 'x', '--draft', 'y']]) {
-    const r = pr(at, 'open', args);
-    assert.equal(r.code, 1, args.join(' '));
-    assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
-  }
+test('REFUSED: branch given an argument, on the remote default branch, or on no run branch, and a verb the script has not; nothing is pushed', () => {
+  const at = withMain(placed());
+  const given = pr(at, 'branch', ['--title', 'x']);
+  assert.equal(given.code, 1);
+  assert.ok(given.err.includes('pull-request.ts" branch'), given.err);
+  assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
+  const onBase = placed({ branch: 'main' });
+  gitIn(onBase.repo, 'push', '-q', 'origin', 'HEAD:refs/heads/main');
+  const base = pr(onBase, 'branch');
+  assert.equal(base.code, 1);
+  assert.ok(base.err.includes('HEAD is on `main`'), base.err);
+  const outside = placed({ branch: 'feature/x' });
+  const off = pr(outside, 'branch');
+  assert.equal(off.code, 1);
+  assert.match(off.err, /not a run's `wf\/<run>\/<leaf>`/);
+  assert.deepEqual(off.calls, [], 'no gh is called');
   const unknown = pr(at, 'merge');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`merge` is no verb: give open, push, wait or declares-ci/);
+  assert.match(unknown.err, /`merge` is no verb: give branch, push, wait or declares-ci/);
   assert.deepEqual(unknown.calls, []);
 });
 
@@ -283,12 +257,11 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   const at = placed();
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: listed(head, { isDraft: true }) }]);
-  const draft = pr(at, 'open', ['--title', 'x', '--body-file', body(), '--labels', '']);
+  const draft = pr(at, 'push');
   assert.equal(draft.code, PERSONS, draft.out);
   assert.match(draft.err, /#7 is a draft/);
   assert.match(draft.err, /gh pr ready 7/);
   assert.doesNotMatch(draft.err, TAGGED, 'a person marks it ready');
-  assert.equal(tip(at.bare!, at.branch), null, 'no push follows a draft');
   assert.equal(asked(draft.calls, 'api').length, 0);
 
   const other = placed();
@@ -297,7 +270,7 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
     ...passing(other.repo).filter((rule) => rule.when !== 'pr list'),
     { when: 'pr list', out: listed(at2, { baseRefName: 'release' }) },
   ]);
-  const based = pr(other, 'open', ['--title', 'x', '--body-file', body(), '--labels', '']);
+  const based = pr(other, 'push');
   assert.equal(based.code, PERSONS, based.out);
   assert.ok(based.err.includes('#7 is based on `release`'), based.err);
   assert.ok(based.err.includes("the remote's default branch `main`"), based.err);
@@ -348,7 +321,7 @@ test("push reads the pull request's head again for a bounded few seconds, since 
   assert.equal(r.calls.filter((call) => call.argv[0] === 'pr' && call.argv[1] === 'create').length, 0);
 });
 
-test('REFUSED: a pull request whose head is another commit, and none open at all; each names the open line', () => {
+test('REFUSED: a pull request whose head is another commit, and none open at all; each names the branch line and the create through the server', () => {
   const at = placed();
   const was = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   at.gh.answers(passing(at.repo));
@@ -357,18 +330,18 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.equal(stale.code, 1, stale.out);
   assert.ok(stale.err.includes(`#7 has ${was.slice(0, 12)} as its head and this workspace is on ${now.slice(0, 12)}`), stale.err);
   assert.match(stale.err, /0 s after the push/, 'a head elsewhere for the bound is refused, saying how long');
-  assert.ok(stale.err.includes('pull-request.ts" open --title'), stale.err);
-  assert.ok(stale.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), stale.err);
-  assert.notEqual(stale.code, PERSONS, 'the open that answers it is the work');
+  assert.ok(stale.err.includes('pull-request.ts" branch'), stale.err);
+  assert.ok(stale.err.includes('create_pull_request'), stale.err);
+  assert.notEqual(stale.code, PERSONS, 'the open through the server that answers it is the work');
 
   const none = placed();
   none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
   const unopened = pr(none, 'push');
   assert.equal(unopened.code, 1, unopened.out);
   assert.ok(unopened.err.includes('no open pull request has wf/r-1/run as its head'), unopened.err);
-  assert.ok(unopened.err.includes('pull-request.ts" open --title'), unopened.err);
-  assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
-  assert.notEqual(unopened.code, PERSONS, 'the open that answers it is the work');
+  assert.ok(unopened.err.includes('pull-request.ts" branch'), unopened.err);
+  assert.ok(unopened.err.includes('create_pull_request'), unopened.err);
+  assert.notEqual(unopened.code, PERSONS, 'the open through the server that answers it is the work');
 });
 
 /** The rules a factory's `pullRequestLabels` gives `push --labels`, in the tests below: two values of one key, each its own label. */
@@ -496,9 +469,9 @@ test('REFUSED, before anything is pushed: a label the rules give that the reposi
 });
 
 test("REFUSED, a person's exit before anything is pushed: a run whose labels match none of the rules, naming the key, its values and the relabel", () => {
-  for (const verb of ['push', 'open'] as const) {
+  for (const verb of ['push'] as const) {
     const at = labelled(['fix', 'bug']);
-    const args = verb === 'push' ? ['--labels', RULES] : ['--title', 'The card', '--body-file', body(), '--labels', RULES];
+    const args = ['--labels', RULES];
     const r = pr(at, verb, args, { WF_LABELS: JSON.stringify({ work: 'chore', area: 'api' }) });
     assert.equal(r.code, PERSONS, `${verb}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `${verb}: a refusal of the script's, not a crash:\n${r.err}`);
@@ -508,93 +481,6 @@ test("REFUSED, a person's exit before anything is pushed: a run whose labels mat
     assert.deepEqual(labelCalls(r.calls), [], `${verb}: no label is added or removed`);
     assert.equal(asked(r.calls, 'pr', 'create').length + asked(r.calls, 'api', '-X', 'PATCH').length, 0, `${verb}: nothing is opened`);
   }
-});
-
-/** A place with no open pull request yet, in a repository holding `REPO_LABELS`: the rules under which `open` creates one. */
-function unopened() {
-  const at = placed();
-  at.gh.answers([REPO_LABELS, ...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
-  return at;
-}
-
-/** The arguments of `open`, its title and a body file, with `more` after them. */
-const opening = (...more: string[]) => ['--title', 'The card', '--body-file', body(), ...more];
-
-test("open --labels creates the pull request, then labels it by the rules from the run's labels in the same call, through REST", () => {
-  const at = unopened();
-  const r = pr(at, 'open', opening('--labels', RULES), { WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
-  assert.equal(r.code, 0, r.err);
-  assert.deepEqual(
-    labelCalls(r.calls).map((call) => call.argv),
-    [['api', '-X', 'POST', 'repos/{owner}/{repo}/issues/7/labels', '-f', 'labels[]=internal']],
-  );
-  const created = r.calls.findIndex((call) => call.argv[0] === 'pr' && call.argv[1] === 'create');
-  const labelling = r.calls.findIndex((call) => labelCalls([call]).length > 0);
-  const known = r.calls.findIndex((call) => call.argv.some((arg) => arg.startsWith('repos/{owner}/{repo}/labels')));
-  assert.ok(
-    known >= 0 && known < created && created < labelling,
-    `the repository's labels read first, the label set after the create:\n${JSON.stringify(r.calls)}`,
-  );
-  assert.ok(!r.calls.some((call) => call.argv.includes('--label')), 'never `gh pr create --label`, a second GraphQL mutation');
-  assert.equal(asked(r.calls, 'pr', 'edit').length, 0);
-  assert.match(r.out, /nemia pr: .*internal/);
-  assert.match(r.out.trim().split('\n').at(-1) ?? '', /^nemia pr: https:\/\/github\.com\/o\/r\/pull\/7$/, 'the address is its last line');
-});
-
-test('open --labels on a pull request already open follows a relabelled run, as push does', () => {
-  const at = labelled(['fix', 'bug']);
-  const r = pr(at, 'open', opening('--labels', RULES), { WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
-  assert.equal(r.code, 0, r.err);
-  assert.equal(asked(r.calls, 'pr', 'create').length, 0);
-  assert.ok(asked(r.calls, 'api', '-X', 'PATCH').length === 1, 'its title and body are brought up to date');
-  assert.deepEqual(
-    labelCalls(r.calls).map((call) => call.argv),
-    [
-      ['api', '-X', 'POST', 'repos/{owner}/{repo}/issues/7/labels', '-f', 'labels[]=internal'],
-      ['api', '-X', 'DELETE', 'repos/{owner}/{repo}/issues/7/labels/fix'],
-    ],
-    '`bug`, which no rule can give, is left alone',
-  );
-});
-
-test('open with --labels "", or with rules and no WF_LABELS from an older daemon, opens the pull request with no label call', () => {
-  for (const [args, more] of [
-    [['--labels', ''], { WF_LABELS: JSON.stringify({ work: 'fix' }) }],
-    [['--labels', RULES], {}],
-  ] as const) {
-    const at = unopened();
-    const r = pr(at, 'open', opening(...args), more);
-    assert.equal(r.code, 0, `${args.join(' ')}: ${r.err}`);
-    assert.equal(asked(r.calls, 'pr', 'create').length, 1);
-    assert.deepEqual(labelCalls(r.calls), [], `${args.join(' ')}: no label is set`);
-    assert.equal(/WF_LABELS/.test(r.out), 'WF_LABELS' in more ? false : true, `${args.join(' ')}: a missing WF_LABELS is said:\n${r.out}`);
-  }
-});
-
-test('REFUSED, before anything is pushed or created: open with no --labels, a malformed rule, a WF_LABELS that is no object, a label the repository lacks', () => {
-  const cases: [string[], Record<string, string>, Rule | undefined, number][] = [
-    [opening(), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined, 1],
-    [opening('--labels', 'work=fix'), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined, PERSONS],
-    [opening('--labels', RULES), { WF_LABELS: '[]' }, undefined, PERSONS],
-    [
-      opening('--labels', RULES),
-      { WF_LABELS: JSON.stringify({ work: 'fix' }) },
-      { when: 'repos/{owner}/{repo}/labels', out: 'fix\nbug' },
-      PERSONS,
-    ],
-  ];
-  for (const [args, more, repo, code] of cases) {
-    const at = unopened();
-    if (repo) at.gh.answers([repo, ...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
-    const r = pr(at, 'open', args, more);
-    const whose = code === PERSONS ? "the rules, the run's labels and the repository's are a person's" : 'the open line is typed again';
-    assert.equal(r.code, code, `${args.slice(4).join(' ')}: ${whose}: ${r.out}`);
-    assert.ok(r.err.startsWith('nemia pr: '), `a refusal of the script's, not a crash:\n${r.err}`);
-    assert.equal(tip(at.bare!, at.branch), null, `${args.slice(4).join(' ')}: nothing is pushed`);
-    assert.equal(asked(r.calls, 'pr', 'create').length, 0, 'nothing is created');
-  }
-  const bare = pr(unopened(), 'open', opening());
-  assert.match(bare.err, /--labels/, 'a missing flag is named');
 });
 
 test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
@@ -622,7 +508,7 @@ test('wait reads mergeable again while GitHub computes it, polls the ci context 
   assert.equal(conflicting.code, 1, conflicting.out);
   assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
   assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
-  assert.ok(conflicting.err.includes('pull-request.ts" open --title'), `and the push of the round again:\n${conflicting.err}`);
+  assert.ok(conflicting.err.includes('pull-request.ts" branch'), `and the push of the round again:\n${conflicting.err}`);
   assert.notEqual(conflicting.code, PERSONS, 'the merge of the base that answers it is the work');
 });
 
@@ -1455,38 +1341,32 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   }
 });
 
-test("build's and quick's implement notes, rendered on GitHub, open the pull request labelled by the rules the factory set", async () => {
+test("build's and quick's implement notes, rendered on GitHub, type the branch line and open the pull request through the server", async () => {
   const at = (await renders()).labelled;
   for (const workflow of ['build', 'quick']) {
     const note = fs.readFileSync(path.join(at.tree, 'workflows', workflow, 'implement.md'), 'utf8');
-    const line = note.split('\n').find((text) => text.includes('pull-request.ts" open --title'));
-    assert.ok(line, `${workflow}'s note types the open line`);
-    assert.ok(line.includes(`--labels "${RULES}"`), `${workflow}: the rules on the open line itself:\n${line}`);
-    const place = unopened();
-    const file = body();
-    const typed = line.trim().replace("<the card's line>", 'The card').replace('$WF_STEP_FILES/pr-body.md', file);
-    const [cmd, ...argv] = checkArgv(typed);
+    const line = note.split('\n').find((text) => text.includes('pull-request.ts" branch'));
+    assert.ok(line, `${workflow}'s note types the branch line`);
+    assert.ok(!/--labels|--title|pull-request\.ts" open/.test(note), `${workflow}: no open line is left in the note`);
+    for (const tool of ['list_pull_requests', 'create_pull_request', 'update_pull_request'])
+      assert.ok(note.includes(tool), `${workflow}: the note names ${tool}`);
+    const place = withMain(placed());
+    const [cmd, ...argv] = checkArgv(line.trim().replace(/^`|`$/g, ''));
     const ran = spawnSync(cmd, argv, {
       cwd: place.repo,
       env: {
-        PATH: `${place.gh.bin}${path.delimiter}${process.env.PATH ?? ''}`,
+        PATH: process.env.PATH ?? '',
         HOME: place.repo,
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
         WF_CARRIED_FILES: path.join(at.tree, 'workflows', 'carried'),
-        WF_LABELS: JSON.stringify({ work: 'cleanup' }),
-        ...place.gh.env(),
       },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 120_000,
     });
     assert.equal(ran.status, 0, `${workflow}: ${ran.stderr}`);
-    assert.deepEqual(
-      labelCalls(place.gh.calls()).map((call) => call.argv.at(-1)),
-      ['labels[]=internal'],
-      `${workflow}: the line as rendered labels the pull request it opens`,
-    );
+    assert.equal(tip(place.bare!, place.branch), gitIn(place.repo, 'rev-parse', 'HEAD').trim(), `${workflow}: the line pushed the branch`);
   }
 });
 

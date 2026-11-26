@@ -228,17 +228,7 @@ export const signInShownOf = (state: string | null, oauth: boolean, held: SignIn
  * The sign-in of `server` of the factory `factory`, whose state the servers' read said `state`: drawn where its record has `oauth`
  * (`signInShownOf`), its sign-in's state read only then.
  */
-export function ServerSignIn({
-  factory,
-  server,
-  state,
-  oauth,
-}: {
-  factory: string;
-  server: string;
-  state: string | null;
-  oauth: boolean;
-}) {
+export function ServerSignIn({ factory, server, state, oauth }: { factory: string; server: string; state: string | null; oauth: boolean }) {
   const queryClient = useQueryClient();
   const servers = factoryServersQuery(factory);
   const stateQuery = signInStateQuery(factory, server);

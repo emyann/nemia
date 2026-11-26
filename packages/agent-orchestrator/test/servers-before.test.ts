@@ -66,7 +66,11 @@ test('a server that signs in through Nemia (`oauth`) refuses its steps at every 
   engine().plantMcpState('github', { status: 'connected', tools: 46 });
   assert.equal((await before()).refuses('claude', ['github']), null, 'connected: filed, whoever holds the token');
   engine().plantMcpState('github', { status: 'disabled' });
-  assert.equal((await before()).refuses('claude', ['github']), null, 'disabled: no sign-in would change it, so nothing is held back for one');
+  assert.equal(
+    (await before()).refuses('claude', ['github']),
+    null,
+    'disabled: no sign-in would change it, so nothing is held back for one',
+  );
 });
 
 test('the same step on a harness that files no sign-in of its own IS filed: it is shown its servers, never refused them', async () => {

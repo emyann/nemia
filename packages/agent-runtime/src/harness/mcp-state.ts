@@ -3,7 +3,7 @@
  *
  * `mcpServerStatus()` is a method on the Agent SDK's `query()` object (`sdk.d.ts:3209`), so a state can be read only from inside a
  * session. A session's first answer can be `pending`, since MCP startup is not blocking (measured 0.3.308): the hosted GitHub server,
- * handed with no token, answered `pending` at 0.4 s and `needs-auth` from 3.4 s on, in one session (measured 2026-11-26). So the read
+ * handed with no token, answered `pending` at 0.4 s and `needs-auth` from 3.4 s on, in one session (`docs/harness.md`). So the read
  * asks again in the same session while any server is `pending` (`settledStatus`), once a second, for at most `MCP_SETTLE_MS`, and
  * carries the last answer: a word still `pending` then is a server that did not settle in that time. `MCP_STATE_MS` is the deadline
  * that ends the session, as its own refusal says by naming the read again as the fix.
@@ -173,8 +173,8 @@ const saidOf = (s: McpServerStatus) => ({
 
 /**
  * The state of each server of `servers`, read in one session (`how.ask`, the real one by default, which asks until no server is
- * `pending`, and `how.withinMs` its bound): every server of the record named once, in the record's own order, with what the harness said of it — and a server the harness named not at
- * all left `pending`, since it was handed and has reported nothing.
+ * `pending`, and `how.withinMs` its bound): every server of the record named once, in the record's own order, with what the harness
+ * said of it — and a server the harness named not at all left `pending`, since it was handed and has reported nothing.
  *
  * A look that failed answers `{ read: false, why }`, naming what to type: a task whose server's state could not be read is filed, not
  * refused.

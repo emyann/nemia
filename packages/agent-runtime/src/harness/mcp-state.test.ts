@@ -141,7 +141,6 @@ describe('mcpServersRead: one session for a record, a failed look answered as a 
 });
 
 describe('settledStatus: a session is asked again while a server says pending, and its last answer is carried', () => {
-  /** A session's status that answers each of `answers` in turn, the last one for ever, counting the asks. */
   const answering = (...answers: (readonly McpServerStatus[])[]) => {
     let asked = 0;
     const status = async () => answers[Math.min(asked++, answers.length - 1)];
@@ -165,7 +164,10 @@ describe('settledStatus: a session is asked again while a server says pending, a
       ['connected', 'pending'],
     );
     assert.ok(asked() > 1, 'it was asked again inside the window');
-    assert.ok(MCP_SETTLE_MS < MCP_STATE_MS, "and the shipped window ends inside the read's bound, so a slow server is carried, not a failed look");
+    assert.ok(
+      MCP_SETTLE_MS < MCP_STATE_MS,
+      "and the shipped window ends inside the read's bound, so a slow server is carried, not a failed look",
+    );
   });
   test("the caller's bound stops the asking: no ask follows once it fired", async () => {
     const stop = new AbortController();

@@ -15,7 +15,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import { SubscriptionDoor } from './subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
-import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
+import { NEMIA_SUBSCRIPTION } from '../nemia/index.ts';
 import type { Level } from '../level/level.ts';
 import { formerHints } from '../former-reason/former-reason.ts';
 import {

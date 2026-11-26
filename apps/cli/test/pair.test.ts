@@ -104,7 +104,9 @@ test('`nemia pair <url>` claims through a waiting answer, writes the context 060
   assert.ok(!said.out.includes(TOKEN) && !said.err.includes(TOKEN), 'the token is printed nowhere');
   assert.match(said.out, /ABCD-EFGH/, 'the short code is shown');
   assert.match(said.out, /nemia pairings approve ABCD-EFGH/, 'the approve command is named');
-  assert.ok(said.out.includes(`NEMIA_URL=${server}`), "the profile's line for the plugin");
+  assert.ok(said.out.includes(`"url":"${server}/mcp"`), "the line connecting a session names the server's port");
+  assert.ok(said.out.includes('"headersHelper":"nemia config headers"'), 'its header comes from nemia');
+  assert.ok(!said.out.includes('NEMIA_URL'), 'no plugin variable is asked for');
   const requests = took.slice(from);
   assert.deepEqual(requests[0]?.body, { client: 'laptop' });
   assert.equal(requests.filter((r) => r.path === '/api/pairings/p-ok/claim').length, 3, 'asked again while it waited');

@@ -3,13 +3,13 @@
  * first, the feed, how it is told of the feed without polling, and how answers and refusals read. Each paragraph has two forms: the MCP
  * port's (`port`), which the port answers on `initialize` and `server/discover` (`portInstructions`), and the shell's (`shell`), which
  * Nemia's verbs skill opens with for her seat that types `nemia` (`shellGuidance`); null where the paragraph is true of the port's seat
- * alone (the feed as MCP resources). The port's names the one harness whose channel needs no polling, which a remote port can only point
- * at. Generic: it names no factory, repository or agent. Pure.
+ * alone (its skills, the feed as MCP resources). The port's names the one harness whose channel needs no polling, which a remote port
+ * can only point at. Generic: it names no factory, repository or agent. Pure.
  */
 import { RUN_STATES } from './words.ts';
 
 /** A paragraph of the guidance, by what it says. */
-export type GuidanceId = 'what' | 'search' | 'start' | 'resources' | 'feed' | 'answers';
+export type GuidanceId = 'what' | 'search' | 'skills' | 'start' | 'resources' | 'feed' | 'answers';
 
 /** A paragraph of the guidance: what it says, its port form, and its shell form, null where it is the port's seat's alone. */
 export type Guidance = { readonly id: GuidanceId; readonly port: string; readonly shell: string | null };
@@ -38,6 +38,14 @@ export const GUIDANCE: readonly Guidance[] = [
       'Reach for `nemia` when the task is about a run, a step, a gate, a card, a factory or what an agent of a run concluded: what is in',
       'flight, what waits on a person, starting or filing work, approving or retrying a step, reading what a step signed off with.',
     ].join('\n'),
+  },
+  {
+    id: 'skills',
+    port: [
+      "How to operate the store is said by this server's skills (skills/list, the Skills extension): load operate first",
+      "(skill://operate/SKILL.md), the role of the store's operator as you take it, and write-a-card before you file a card.",
+    ].join('\n'),
+    shell: null,
   },
   {
     id: 'start',

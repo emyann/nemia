@@ -166,7 +166,7 @@ const USAGE = [
   'nemia config headers [--context <name>]  print the Authorization header a harness sends (Claude Code’s headersHelper)',
 ];
 
-/** The variable whose token `nemia config headers` prints over every context's, as the plugin's static header read it before. */
+/** The variable whose token `nemia config headers` prints over every context's, as a host's static header of the port read it before. */
 export const TOKEN_VARIABLE = 'NEMIA_TOKEN';
 
 /** A `nemia config` typed otherwise than its usage: refused, naming it. */
@@ -291,8 +291,8 @@ export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv) {
 
 /**
  * `nemia config headers [--context <name>]`: the one verb that prints a token — as `{"Authorization":"Bearer <token>"}` on stdout, for
- * a harness that runs it for the headers of its connection (Claude Code's `headersHelper`, the nemia plugin's `.mcp.json`), never for a
- * person's terminal; `{}` where no token is held (`headersToken`).
+ * a harness that runs it for the headers of its connection (Claude Code's `headersHelper`, in the MCP entry `nemia pair` prints), never
+ * for a person's terminal; `{}` where no token is held (`headersToken`).
  */
 function headers(args: readonly string[], env: NodeJS.ProcessEnv) {
   const token = headersToken(args, env);

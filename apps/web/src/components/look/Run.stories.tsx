@@ -287,17 +287,23 @@ export const Panels: Story = {
 /** A title short enough to read whole on the line's width. */
 const SHORT = { ...RUN('1sw7'), brief: 'board: a short title' };
 
-/** The event a story's play sends its window to move what `Moves` holds down the page. */
+/** The event a story's play sends its window to move or take away what one `Moves` holds: its `detail` names which. */
 const MOVE = 'story-move';
 
-/** What it holds, moved down the page by a spacer once the window is sent `MOVE`, as a row is when a row comes in above it. */
-function Moves({ children }: { children: ReactNode }) {
+/**
+ * What it holds, under the name `name`: once the window is sent `MOVE` for `name`, moved down the page by a spacer, as a row is when a
+ * row comes in above it, or taken off the page where `gone`, as a row is when its run leaves the list.
+ */
+function Moves({ name, gone, children }: { name: string; gone?: boolean; children: ReactNode }) {
   const [moved, setMoved] = useState(false);
   useEffect(() => {
-    const move = () => setMoved(true);
+    const move = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === name) setMoved(true);
+    };
     window.addEventListener(MOVE, move);
     return () => window.removeEventListener(MOVE, move);
-  }, []);
+  }, [name]);
+  if (moved && gone) return null;
   return (
     <>
       <div style={{ height: moved ? 48 : 0 }} />
@@ -305,6 +311,32 @@ function Moves({ children }: { children: ReactNode }) {
     </>
   );
 }
+
+/** Sends the window `MOVE` for the case `name`. */
+const move = (name: string) => window.dispatchEvent(new CustomEvent(MOVE, { detail: name }));
+
+/** The tooltip that describes `trigger`, once it has opened and its entry has ended, so its box stands where it rests. */
+const tipOfTitle = (trigger: Element) =>
+  waitFor(() => {
+    const one = document.getElementById(trigger.getAttribute('aria-describedby') ?? '');
+    if (one?.getAttribute('role') !== 'tooltip') throw new Error('no tooltip describes the title');
+    if (one.hasAttribute('data-entering')) throw new Error('the tooltip is still entering');
+    return one;
+  });
+
+/**
+ * Refuses a tooltip whose box does not touch `title`'s words: just over them, and across them.
+ * @param tip The tooltip.
+ * @param title The title link it describes.
+ */
+const beside = async (tip: Element, title: Element) => {
+  const words = title.getBoundingClientRect();
+  const box = tip.getBoundingClientRect();
+  await expect(box.bottom, 'the tooltip sits just over the title').toBeGreaterThan(words.top - 16);
+  await expect(box.bottom).toBeLessThanOrEqual(words.top + 1);
+  await expect(box.right, 'the tooltip overlaps the title’s words across').toBeGreaterThan(words.left);
+  await expect(box.left).toBeLessThan(words.right);
+};
 
 /** The title link of the run drawn under the heading `name`. */
 const titleIn = (root: HTMLElement, name: string) =>
@@ -344,8 +376,10 @@ const atCorner = (box: DOMRect) => box.left < 16 && box.top < 16;
 
 /**
  * A run's title in the kit's tooltip only where it is cut, beside its words, and never at the window's corner: a title that reads whole
- * opens none; one cut to its line opens the whole title, its box touching the title's words; one moved down the page while its tooltip is
- * open closes it. A press on a heading first puts React Aria in the pointer's mode, as a person's pointer does: a hover alone does not.
+ * opens none; one cut to its line opens the whole title, its box touching the title's words; one unmounted while its delay runs draws
+ * none, and one moved then opens beside its words where it went; one moved down the page while its tooltip is open closes it; and an
+ * end on a short title stands at its row's end. The delays are played first, while React Aria's warm-up is cold. A press on a heading
+ * first puts React Aria in the pointer's mode, as a person's pointer does: a hover alone does not.
  */
 export const TitleTips: Story = {
   render: (args) => (
@@ -360,11 +394,30 @@ export const TitleTips: Story = {
           <Run {...args} size="sm" />
         </span>
       </Headed>
-      <Headed name="moved while open" width={320}>
-        <span data-tip-case="moved">
-          <Moves>
+      <Headed name="unmounted in its delay" width={320}>
+        <span data-tip-case="unmounted">
+          <Moves name="unmounted" gone>
             <Run {...args} size="sm" />
           </Moves>
+        </span>
+      </Headed>
+      <Headed name="moved in its delay" width={320}>
+        <span data-tip-case="delayed">
+          <Moves name="delayed">
+            <Run {...args} size="sm" />
+          </Moves>
+        </span>
+      </Headed>
+      <Headed name="moved while open" width={320}>
+        <span data-tip-case="moved">
+          <Moves name="moved">
+            <Run {...args} size="sm" />
+          </Moves>
+        </span>
+      </Headed>
+      <Headed name="an end on a short title" width={460}>
+        <span data-tip-case="end">
+          <Run {...args} run={SHORT} size="lg" titleEnd={<span data-title-end>›</span>} />
         </span>
       </Headed>
     </div>
@@ -372,6 +425,17 @@ export const TitleTips: Story = {
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByText('whole'));
     const tips = watching();
+    await userEvent.hover(titleIn(canvasElement, 'unmounted'));
+    move('unmounted');
+    const delayed = titleIn(canvasElement, 'delayed');
+    await userEvent.hover(delayed);
+    move('delayed');
+    await beside(await tipOfTitle(delayed), delayed);
+    await expect(tips.drawn, 'the unmounted title drew no tooltip, the moved one its own').toHaveLength(1);
+    await expect(tips.drawn.filter(atCorner), 'no tooltip at the window’s corner').toHaveLength(0);
+    await userEvent.unhover(delayed);
+    tips.drawn.length = 0;
+
     const whole = titleIn(canvasElement, 'whole');
     const wholeTried = tried(whole);
     await userEvent.hover(whole);
@@ -382,27 +446,22 @@ export const TitleTips: Story = {
 
     const cut = titleIn(canvasElement, 'cut');
     await userEvent.hover(cut);
-    const tip = await waitFor(() => {
-      const one = document.getElementById(cut.getAttribute('aria-describedby') ?? '');
-      if (one?.getAttribute('role') !== 'tooltip') throw new Error('no tooltip describes the cut title');
-      return one;
-    });
+    const tip = await tipOfTitle(cut);
     await expect(tip, 'the whole title').toHaveTextContent(titleOf(RUN('1sw7')));
-    const words = cut.getBoundingClientRect();
-    const box = tip.getBoundingClientRect();
-    await expect(box.bottom, 'the tooltip sits just over the title').toBeGreaterThan(words.top - 16);
-    await expect(box.bottom).toBeLessThanOrEqual(words.top + 1);
-    await expect(box.right, 'the tooltip overlaps the title’s words across').toBeGreaterThan(words.left);
-    await expect(box.left).toBeLessThan(words.right);
+    await beside(tip, cut);
     await userEvent.unhover(cut);
 
     const moved = titleIn(canvasElement, 'moved');
     await userEvent.hover(moved);
     await waitFor(() => expect(moved).toHaveAttribute('aria-describedby'));
-    window.dispatchEvent(new Event(MOVE));
+    move('moved');
     await waitFor(() => expect(document.querySelectorAll('[role="tooltip"]'), 'the moved title’s tooltip closes').toHaveLength(0));
     await expect(tips.drawn.filter(atCorner), 'no tooltip at the window’s corner').toHaveLength(0);
     tips.stop();
     await userEvent.unhover(moved);
+
+    const end = canvasElement.querySelector('[data-tip-case="end"] [data-title-end]')!.getBoundingClientRect();
+    const row = canvasElement.querySelector('[data-tip-case="end"] [data-run-says~="title"]')!.getBoundingClientRect();
+    await expect(Math.abs(end.right - row.right), 'the title’s end stands at its row’s end').toBeLessThanOrEqual(1);
   },
 };

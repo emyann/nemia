@@ -137,8 +137,8 @@ export function Run(props: RunProps) {
 
 /**
  * The run's title, a link to its page as wide as its words up to its room, on a card raised over the copy control's target (a
- * row's leaves it the control's); whole in the kit's tooltip only while it is cut, the tooltip beside its words; a card's heading
- * where `heading`.
+ * row's leaves it the control's); whole in the kit's tooltip only while it is cut, the tooltip beside its words; `end` at the row's
+ * end however short the title; a card's heading where `heading`.
  */
 function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; still?: string; end?: ReactNode; heading?: boolean }) {
   const Holder = heading ? 'h3' : 'span';
@@ -150,7 +150,7 @@ function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; s
         </TextLink>
         <HeldTooltip repeats>{look.title}</HeldTooltip>
       </TooltipTrigger>
-      {end}
+      {end && <span className="ml-auto inline-flex shrink-0">{end}</span>}
     </Holder>
   );
 }

@@ -115,8 +115,7 @@ const pollOutcomeSpec = spec<(answer: PollAnswer) => PollOutcome>({
     },
     anExpiredCodeEnds: {
       description: 'A code that expired ends the sign-in as expired',
-      condition: ({ input: [a], output }) =>
-        (a.error !== 'expired_token' && a.error !== 'token_expired') || output === 'expired',
+      condition: ({ input: [a], output }) => (a.error !== 'expired_token' && a.error !== 'token_expired') || output === 'expired',
     },
     aRefusalEnds: {
       description: 'A person who refused at the provider ends the sign-in as denied',
@@ -134,15 +133,24 @@ const pollOutcomeSpec = spec<(answer: PollAnswer) => PollOutcome>({
 });
 export type PollOutcomeOf = Implementation<typeof pollOutcomeSpec>;
 
+/** The largest instant or margin, in whole milliseconds, a clock gives: half of 2^53, so that no sum of two rounds. */
+const CLOCK_BOUND = 2 ** 52;
+
 /** Whether the access token is due at `now`: it expires, and `now` is within `marginMs` of that or past it. */
 const due = (held: HeldToken, now: number, marginMs: number) => held.expiresAt !== null && now >= held.expiresAt - marginMs;
 
 /** Whether a refresh token is held and still lives at `now`. */
-const refreshLives = (held: HeldToken, now: number) =>
-  held.refreshToken && (held.refreshExpiresAt === null || now < held.refreshExpiresAt);
+const refreshLives = (held: HeldToken, now: number) => held.refreshToken && (held.refreshExpiresAt === null || now < held.refreshExpiresAt);
 
 const tokenDueSpec = spec<(held: HeldToken, now: number, marginMs: number) => TokenDue>({
-  requires: ({ input: [, , marginMs] }) => marginMs >= 0,
+  requires: ({ input: [held, now, marginMs] }) =>
+    Number.isInteger(marginMs) &&
+    marginMs >= 0 &&
+    marginMs <= CLOCK_BOUND &&
+    Number.isInteger(now) &&
+    now >= -CLOCK_BOUND &&
+    now <= CLOCK_BOUND &&
+    (held.expiresAt === null || (Number.isInteger(held.expiresAt) && held.expiresAt >= -CLOCK_BOUND && held.expiresAt <= CLOCK_BOUND)),
   ensures: {
     aTokenNotDueIsHandedOn: {
       description: 'A token that never expires, or whose expiry is further off than the margin, is handed on as it is',
@@ -155,8 +163,7 @@ const tokenDueSpec = spec<(held: HeldToken, now: number, marginMs: number) => To
     },
     aDueTokenWithNoLivingRefreshIsGone: {
       description: 'A token due within the margin with no refresh token, or one that expired, is gone: the server asks a new sign-in',
-      condition: ({ input: [held, now, marginMs], output }) =>
-        !due(held, now, marginMs) || refreshLives(held, now) || output === 'gone',
+      condition: ({ input: [held, now, marginMs], output }) => !due(held, now, marginMs) || refreshLives(held, now) || output === 'gone',
     },
   },
 });

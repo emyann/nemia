@@ -263,6 +263,12 @@ const DAEMON: ServiceSeed = {
     lone('sessions.admitted', 'gauge', 5),
     lone('admission.wait', 'gauge', 1500),
     lone('machine.load', 'gauge', 0.6),
+    lone('process.memory.usage', 'gauge', 2_311_000_000),
+    lone('v8js.memory.heap.space.size', 'gauge', 868_000_000),
+    lone('v8js.memory.heap.used', 'gauge', 716_000_000),
+    lone('v8js.memory.heap.size_limit', 'gauge', 4_288_000_000),
+    lone('v8js.memory.external', 'gauge', 16_000_000),
+    lone('v8js.memory.array_buffers', 'gauge', 9_000_000),
     {
       name: 'disk.bytes',
       kind: 'gauge',

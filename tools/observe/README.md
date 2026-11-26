@@ -101,7 +101,8 @@ ms), so read the share again there before keeping it on.
 They sit in the folder `Nemia`, linked to each other at the top of each page. They are provisioned from the files: an edit made in
 Grafana cannot be saved, so edit the JSON here, and Grafana reads it again within ten seconds.
 
-- **System** — every metric the daemon and the api export, from Prometheus: a pass's time, its phases and its journal reads; the runs in
+- **System** — every metric the daemon and the api export, from Prometheus: a pass's time, its phases and its journal reads; the daemon's
+  memory (the row **Memory**: its resident size, its V8 heap committed and used, what it holds outside the heap and the heap's limit); the runs in
   the store, the sessions queued and admitted, the oldest one's wait and the machine's load; what the store takes on the disk (the row
   **Disk**, below); the api's reads by route; each step's cost,
   tokens, time, tries, checks and rounds over the range, by factory, workflow, step and agent; the feed's readers, the subscriptions and

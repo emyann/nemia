@@ -453,7 +453,7 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
             <StepGraph run={run} wrap={wrap} className={still} />
           </span>
           <CostSaid run={run} size="small" />
-          <span {...saying('action')} className="ml-auto inline-flex items-center gap-2">
+          <span {...saying('action')} className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
             {action}
             <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className={still}>
               {OPENS}

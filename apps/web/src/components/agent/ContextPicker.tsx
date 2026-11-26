@@ -90,7 +90,8 @@ export function ContextPicker({
 }
 
 /**
- * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not succeeded,
+ * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not
+ * succeeded,
  * not judged` badge for a run that has not succeeded; or why it could not be read.
  */
 export function ConcludedPreview({ run }: { run: string }) {

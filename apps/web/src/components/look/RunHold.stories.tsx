@@ -3,7 +3,7 @@ import { expect } from 'storybook/test';
 import { NOW_WORDS } from '@/lib/words';
 import { HoldLine } from './RunHold';
 
-/** A hold with no reason and nobody named: the runs it waits on, and the words `nemia ls` prints. */
+/** A hold with no reason and nobody named: the runs it waits on, and the words the api says of it. */
 const BARE = {
   at: '2026-11-15T17:30:00.000Z',
   runs: [{ run: 'cli-the-api-only-consumer-1sw7', missing: false, cancelledAt: null, gone: [], landed: false }],
@@ -12,7 +12,7 @@ const BARE = {
   waitingOnYou: false,
 };
 
-/** A reason near the 200 characters `nemia hold --why` takes. */
+/** A reason near the 200 characters a hold's why may hold. */
 const LONG_WHY =
   'Waits for 1sw7 to land first: its board change reads the hold’s new fields, which only that run serves; resuming before it lands would build against a schema the api does not answer yet.';
 

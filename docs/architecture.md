@@ -111,13 +111,17 @@ SDK's `query()` object, so only the runtime may ask it, and it travels runtime �
 The states are the harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disabled` — carried whole and never worded
 again above, and a look that failed says the state is unread, which is not an absence. **A sign-in is four engine verbs**,
 `mcpSignIn`, `mcpSignInState`, `mcpSignInCallback` and `mcpSignOut` (`agent-runtime/src/service/mcp-sign-in.ts`), since only the runtime spawns Claude Code
-or holds an SDK session: it stores a client secret it is handed in the harness's own store through a `claude mcp add --scope local`
-child under the engine's root, holds a session asked `mcpAuthenticate` in memory by its callback port until the server reads
-`connected` — or until the person pastes the address their browser was sent back to, which `mcpSignInCallback` checks against the
-redirect the sign-in asked for (`callbackRefusal`, `agent-runtime/src/harness/mcp-callback.ts`) and hands to the held session's
-`mcpSubmitOAuthCallbackUrl`, so a sign-in completes from a browser on another machine than the daemon's — and signs out through a `claude mcp add` with no secret then a `claude mcp remove --scope local`. Which secret a server is handed is the orchestrator's
-(`src/factory/servers/clients.ts`, keyed by client id, exported by no entry), and the api and the board carry an address to open and a state
-word, never a secret or a token.
+or holds an SDK session. Its road is chosen from what the server's provider advertises (`routeOf`, `agent-runtime/src/harness/mcp-device.ts`, RFCs 9728
+and 8414). **By a code** (the device grant, RFC 8628, where `oauth.clientId` is named and the provider offers it): the runtime asks the
+provider for a code, answers it with the page to type it at, polls in memory by the server's name, holds the token and its refresh in a
+file of its own under the engine's root (`harness/mcp-token.ts`, mode 0600), refreshes it before each spawn with no person present, and
+hands it to the session in the server's `Authorization` header (`SpawnRequest.mcpTokens`, a runner wrapper like telemetry, never the
+task's journalled `config`). **By the browser** (every other server): it holds a session asked `mcpAuthenticate` in memory by its
+callback port until the server reads `connected` — or until the person pastes the address their browser was sent back to, which
+`mcpSignInCallback` checks against the redirect the sign-in asked for (`callbackRefusal`, `agent-runtime/src/harness/mcp-callback.ts`)
+and hands to the held session's `mcpSubmitOAuthCallbackUrl` — and signs out through a `claude mcp add` then a `claude mcp remove --scope
+local`. A waiting sign-in of either road is cancelled by `mcpSignOut`, and read again by `mcpSignInState` on every load. No secret is
+shipped or stored: the api and the board carry a code or an address to open and a state word, never a secret or a token.
 
 **Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
 `ask(verb, request)` and `askNow`, over the contract of `src/place/place.ts`), required by every program that asks it and with no

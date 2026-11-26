@@ -4,6 +4,7 @@
  */
 import { Effect, Schema } from 'effect';
 import { claudeExecutableOf } from '../harness/mcp-sign-in.ts';
+import { tokensOf, withTokens } from '../harness/mcp-token.ts';
 import { mcpServersRead, type McpServersRead, type McpStatusAsk } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { verbHarnessOf, type HarnessDeclared } from '../harness/declaration.ts';
@@ -32,6 +33,9 @@ export const noMcpHarness = (declared: readonly HarnessDeclared[]) =>
  *
  * Traced where it opens a session, as `Engine.mcpState` with how many servers were asked: a refusal opens nothing and makes no span.
  *
+ * A server signed in to by a code is read with its held token (`heldToken`) as its `Authorization` header, as a session is handed it, so
+ * it reads `connected` where a session would.
+ *
  * `cwd` is the engine's own `root` (`engine.ts`), which is required and defaults to nothing: the probe lists the servers of the folder
  * it is opened in, so a cwd read off the process instead would list another checkout's. `ask` is the harness seam, the real one by
  * default; a test gives its own and reads the cwd the session was opened in. The Claude Code it opens is found at each read
@@ -56,7 +60,11 @@ export const mcpStateVerbOf = (
     const declared = declaredOf(harnesses);
     if (verbHarnessOf('mcp', undefined, declared).kind === 'refused') return yield* refuse(noMcpHarness(declared));
     const found = claudeExecutableOf(executable, harnessBin);
-    return yield* Effect.promise(() =>
-      mcpServersRead(servers, cwd, { ...(found === undefined ? {} : { executable: found }), ...(ask === undefined ? {} : { ask }) }),
-    ).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));
+    return yield* Effect.promise(async () => {
+      const tokens = await tokensOf(cwd, servers);
+      return mcpServersRead(withTokens(servers, tokens), cwd, {
+        ...(found === undefined ? {} : { executable: found }),
+        ...(ask === undefined ? {} : { ask }),
+      });
+    }).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));
   }) satisfies (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;

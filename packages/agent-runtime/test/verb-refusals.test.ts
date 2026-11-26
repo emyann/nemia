@@ -436,7 +436,7 @@ describe('each refusal is a tagged error, and refusalWords words it behind the v
       'mcpSignIn',
       'McpSignInRefused',
       () => effect((e) => e.mcpSignIn('github', { type: 'http', url: 'https://e.example/mcp' })),
-      /^`github` names no OAuth client with a callback port, and a sign-in is made through one\./,
+      /^`github` names no OAuth client, and a sign-in is made through one\./,
     ],
     [
       'mcpSignInCallback',
@@ -448,7 +448,7 @@ describe('each refusal is a tagged error, and refusalWords words it behind the v
       'mcpSignOut',
       'McpSignInRefused',
       () => effect((e) => e.mcpSignOut('github', { type: 'http', url: 'https://e.example/mcp' })),
-      /^`github` names no OAuth client with a callback port, and a sign-in is made through one\./,
+      /^`github` names no OAuth client, and a sign-in is made through one\./,
     ],
     [
       'forget',

@@ -243,6 +243,7 @@ async function pastesBack(page: Page) {
   try {
     const { problems } = watch(other);
     let taken = false;
+    let started: unknown;
     const until = '2099-01-01T00:00:00.000Z';
     const answer = (route: Route, json: unknown) =>
       // oxlint-disable-next-line landmines-testing/no-test-doubles -- servers answered: a state the seed cannot plant
@@ -260,13 +261,18 @@ async function pastesBack(page: Page) {
     );
     await other.route(
       (url) => url.pathname === githubAt('/sign-in'),
-      (route) =>
-        route.request().method() === 'POST'
-          ? answer(route, {
-              authUrl: `https://github.com/login/oauth/authorize?client_id=${RECORDED.github.oauth.clientId}&state=e2e`,
-              until,
-            })
-          : answer(route, taken ? { state: 'connected' } : { state: 'waiting', until }),
+      (route) => {
+        if (route.request().method() === 'POST') {
+          started = {
+            route: 'browser',
+            authUrl: `https://github.com/login/oauth/authorize?client_id=${RECORDED.github.oauth.clientId}&state=e2e`,
+            until,
+          };
+          return answer(route, started);
+        }
+        if (taken) return answer(route, { state: 'connected' });
+        return answer(route, started === undefined ? { state: 'none' } : { state: 'waiting', until, started });
+      },
     );
     await other.route(
       (url) => url.pathname === githubAt('/sign-in/callback'),
@@ -274,7 +280,7 @@ async function pastesBack(page: Page) {
         const { url } = (route.request().postDataJSON() ?? {}) as { url?: string };
         if (url !== PASTE.landed) return route.continue();
         taken = true;
-        return answer(route, { state: 'waiting', until });
+        return answer(route, { state: 'waiting', until, started });
       },
     );
     await other.goto(page.url(), { waitUntil: 'load' });
@@ -327,6 +333,62 @@ async function pastesBack(page: Page) {
   }
 }
 
+/**
+ * A sign-in by a code is drawn again on every load, with its Cancel. As `pastesBack`, a sign-in is never started for real: the page holds,
+ * by `route`, the servers' read (github `needs-auth`), the press of Sign in (a code answered), the sign-in's state (`none`, then
+ * `waiting` with what the press answered, until a Cancel) and the Cancel (`cancelled`). It presses Sign in, reloads, and sees the code
+ * and Cancel still drawn; presses Cancel and sees Sign in offered again.
+ */
+async function reloadsACode(page: Page) {
+  const other = await page.context().newPage();
+  try {
+    let started: unknown;
+    const until = '2099-01-01T00:00:00.000Z';
+    const answer = (route: Route, json: unknown) =>
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- servers answered: a state the seed cannot plant
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) });
+    await other.route(
+      (url) => url.pathname === `/api/namespaces/${FACTORY}/mcpservers`,
+      async (route) => {
+        const read = await route.fetch();
+        const list = (await read.json()) as McpServerList;
+        const items = list.items.map((s) => (s.metadata.name === 'github' ? { ...s, status: { ...s.status, state: 'needs-auth' } } : s));
+        await route.fulfill({ response: read, json: { ...list, items } });
+      },
+    );
+    await other.route(
+      (url) => url.pathname === githubAt('/sign-in'),
+      (route) => {
+        const method = route.request().method();
+        if (method === 'POST') {
+          started = { route: 'device', userCode: 'WDJB-MJHT', verificationUri: 'https://github.com/login/device', until };
+          return answer(route, started);
+        }
+        if (method === 'DELETE') {
+          started = undefined;
+          return answer(route, { ended: 'cancelled' });
+        }
+        return answer(route, started === undefined ? { state: 'none' } : { state: 'waiting', until, started });
+      },
+    );
+    await other.goto(page.url(), { waitUntil: 'load' });
+    await idle(other);
+    const row = other.locator('section[data-factory-servers] [data-factory-server="github"]');
+    await row.getByRole('button', { name: 'Sign in', exact: true }).click();
+    const panel = row.locator('[data-server-sign-in="waiting"]');
+    await expectVisible(panel.locator('[data-sign-in-code]', { hasText: 'WDJB-MJHT' }), 'a sign-in by a code shows the code');
+    await other.reload({ waitUntil: 'load' });
+    await idle(other);
+    await expectVisible(panel.locator('[data-sign-in-code]', { hasText: 'WDJB-MJHT' }), 'after a reload the code is drawn again');
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expectVisible(row.getByRole('button', { name: 'Sign in', exact: true }), 'a cancelled sign-in offers Sign in again');
+    await expectCount(row.locator('[data-sign-in-code]'), 0, 'and the code is gone');
+    await idle(other);
+  } finally {
+    await other.close();
+  }
+}
+
 export default {
   /**
    * A factory's MCP servers on its settings page: the two the record holds, each a row with the state its harness reported — or none
@@ -337,7 +399,8 @@ export default {
    * is read on load and on a press alone, which Check again then does. The form records a remote server, which lands in the store's
    * record and in the list, and Remove takes it off again; a header's value is shown as the mask, and a recorded server loaded back
    * into the form and recorded again keeps the value the record holds. A sign-in waiting is completed by pasting back the address the
-   * browser landed on, and a paste the api refuses is said in the panel (`pastesBack`). The record is taken back whatever happens.
+   * browser landed on, and a paste the api refuses is said in the panel (`pastesBack`);
+   * a sign-in by a code is drawn again on a reload, and cancelled (`reloadsACode`). The record is taken back whatever happens.
    *
    * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests of the McpServer's
    * write, each answered 422 by name, and not driven through the board, since the e2e's watch counts every 4xx against a page and a
@@ -369,6 +432,7 @@ export default {
       await recordAndRemove(page, section);
       await keepsTheMask(page, section);
       await pastesBack(page);
+      await reloadsACode(page);
     } finally {
       storeServers(FACTORY, {});
       fs.rmSync(folder, { recursive: true, force: true });

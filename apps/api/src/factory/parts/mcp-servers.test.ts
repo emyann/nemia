@@ -143,7 +143,7 @@ describe("A person keeps a factory's MCP servers: none recorded, one recorded an
             type: 'http',
             url: 'https://api.githubcopilot.com/mcp/',
             headers: { 'X-MCP-Toolsets': 'context,repos,issues,pull_requests,users,actions' },
-            oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 },
+            oauth: { clientId: 'Iv23liQBfm9prqhvXkuY' },
           },
           { origin: 'builtin', factories: [] },
         ],

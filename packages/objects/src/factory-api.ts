@@ -398,13 +398,16 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Starts signing a factory's MCP server in for the harness, written to the harness's own store. Answers SignInStarted, the address a person opens to sign in.",
+    "Starts signing a factory's MCP server in. Answers SignInStarted: a code to type at the provider's page, where its provider offers one, or an address to open in the browser.",
   ),
   HttpApiEndpoint.get('signInState', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
     params: cardParams,
     success: SignInState,
     error: objectErrors,
-  }).annotate(OpenApi.Description, "Reads where signing a factory's MCP server in stands. Answers SignInState."),
+  }).annotate(
+    OpenApi.Description,
+    "Reads where signing a factory's MCP server in stands, with the code or address a waiting sign-in answered. Answers SignInState.",
+  ),
   HttpApiEndpoint.post('signInCallback', '/api/namespaces/:namespace/mcpservers/:name/sign-in/callback', {
     params: cardParams,
     payload: SignInCallback,
@@ -412,13 +415,16 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Completes signing a factory's MCP server in with the address the person's browser landed on, which no answer or log carries. Answers SignInState.",
+    "Completes a sign-in by the browser with the address the person's browser landed on, which no answer or log carries. Answers SignInState.",
   ),
   HttpApiEndpoint.delete('signOut', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
     params: cardParams,
     success: SignedOut,
     error: objectErrors,
-  }).annotate(OpenApi.Description, "Signs a factory's MCP server out of the harness's store. Answers SignedOut."),
+  }).annotate(
+    OpenApi.Description,
+    "Cancels a waiting sign-in of a factory's MCP server, or signs it out, removing what it held. Answers SignedOut.",
+  ),
 ) {}
 
 /** A factory's schedules, in its namespace, each named by its workflow. */

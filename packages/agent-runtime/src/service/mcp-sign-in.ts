@@ -1,12 +1,17 @@
 /**
  * The engine's `mcpSignIn`, `mcpSignInState`, `mcpSignInCallback` and `mcpSignOut`: a remote MCP server signed in to from a page a
- * person holds open, and signed out of, on Claude Code (`harness/mcp-sign-in.ts`). None of them touches a task, and nothing of them is
- * journalled: the client secret a caller hands rides one `claude mcp add` child's environment and no record, and the address a person
- * pastes (`mcpSignInCallback`) is handed to the waiting session alone, never put in a refusal or a log.
+ * person holds open, and signed out of. None of them touches a task, and nothing of them is journalled.
  *
- * A sign-in is an interactive hold: its session lives in this engine's memory until the server reads `connected` or `SIGN_IN_MS`
- * passes, one per callback port, since the Claude Code child itself listens on that port. Nothing reads the hold on a pass: an engine
- * that restarts while the person is in their browser has forgotten it, and they press Sign in again.
+ * A server signs in by one of two roads, chosen from what its provider advertises (`routeOf`): by a **code** the person types at the
+ * provider (`device`, RFC 8628), which this engine polls for and then holds the token of (`mcp-token.ts`), handing it to each session
+ * in the server's `Authorization` header; or by the **browser** (`browser`), Claude Code's own sign-in, whose redirect the person
+ * pastes back when their browser runs elsewhere (`mcpSignInCallback`) and which Claude Code files in its own store
+ * (`harness/mcp-sign-in.ts`). The token, the device code and a pasted address are in no refusal, no log and no journal.
+ *
+ * A sign-in is an interactive hold, in this engine's memory until the server reads `connected`, the person cancels it
+ * (`mcpSignOut`) or its time passes: a device sign-in one per server name, a browser one per callback port, since the Claude Code
+ * child itself listens on that port. Nothing reads the hold on a pass: an engine that restarts while the person is at the provider has
+ * forgotten it, its state reads `none`, and they press Sign in again.
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -17,11 +22,12 @@ import {
   claudeMcpSignIn,
   clearSignIn,
   SIGN_IN_MS,
-  storeClientSecret,
   type McpCli,
   type McpSignInAsk,
   type McpSignInSession,
 } from '../harness/mcp-sign-in.ts';
+import { deviceCodeOf, pollOnce, routeOf, type DeviceCode, type SignInRoute } from '../harness/mcp-device.ts';
+import { dropToken, holdToken } from '../harness/mcp-token.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { verbHarnessOf, type HarnessDeclared } from '../harness/declaration.ts';
 import { callbackRefusal, pastedOf, redirectOf, redirectUriOf, type CallbackRefusal } from '../harness/mcp-callback.ts';
@@ -39,7 +45,8 @@ const CALLBACK_REFUSALS = ['none-waiting', 'unreadable', 'elsewhere', 'denied', 
 
 /**
  * A sign-in or sign-out this engine will not make, and why. `held` says it is refused because a sign-in already waits on the callback
- * port — another's sign-in, or this server's own — which passes once that one settles or expires; every other refusal is the ask's own.
+ * port — another's sign-in, or this server's own — or a sign-in by a code already waits for this server, which passes once that one
+ * settles or expires; every other refusal is the ask's own.
  * `callback` says why a pasted callback was refused (`mcpSignInCallback`), and is absent on every other refusal.
  */
 export class McpSignInRefused extends Schema.TaggedError<McpSignInRefused>()('McpSignInRefused', {
@@ -87,18 +94,30 @@ export const callbackRefused = (name: string, port: number | undefined, url: str
   return why === undefined ? undefined : new McpSignInRefused({ message: callbackWords(name, port, why), held: false, callback: why });
 };
 
-/** What a sign-in answers at once: the address the person opens, and when the sign-in stops waiting for them. */
-export type McpSignInStarted = { readonly authUrl: string; readonly until: string };
+/**
+ * What a sign-in answers at once, and what its state keeps while it waits: by a code, the code to type, the provider's page to type it
+ * at, and when it stops being good (`device`); or by the browser, the address to open and when the sign-in stops waiting (`browser`).
+ */
+export type McpSignInStarted =
+  | { readonly route: 'device'; readonly userCode: string; readonly verificationUri: string; readonly until: string }
+  | { readonly route: 'browser'; readonly authUrl: string; readonly until: string };
 
 /** The words of a sign-in's state, as this engine knows it: none asked, one waiting, or how the last one ended. */
 export const SIGN_IN_STATES = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
 
-/** A server's sign-in as this engine holds it: its word, when a waiting one stops waiting, and why a failed one failed. */
+/**
+ * A server's sign-in as this engine holds it: its word, when a waiting one stops waiting, why a failed one failed, and, while one
+ * waits, what it answered when it started (`started`), so a page opened later draws it again.
+ */
 export type McpSignInState = {
   readonly state: (typeof SIGN_IN_STATES)[number];
   readonly until?: string;
   readonly why?: string;
+  readonly started?: McpSignInStarted;
 };
+
+/** How a sign-out ended: a waiting sign-in was `cancelled`, or what was held of a finished one was removed (`signed-out`). */
+export type McpSignedOut = { readonly ended: 'cancelled' | 'signed-out' };
 
 /**
  * The folder, under the engine's root, a sign-in's `claude mcp add --scope local` files the server in, and its session runs in.
@@ -106,7 +125,10 @@ export type McpSignInState = {
  */
 export const SIGN_IN_FOLDER = 'mcp-sign-in';
 
-type Held = { readonly name: string; readonly session: McpSignInSession; readonly until: string };
+type Held = { readonly name: string; readonly session: McpSignInSession; readonly until: string; readonly started: McpSignInStarted };
+
+/** A sign-in by a code, waiting: ended by `abort`, which a cancel and a settle both fire. */
+type DeviceHold = { readonly abort: AbortController; readonly started: McpSignInStarted };
 
 /**
  * `held` watched until it settles: `connected` or `failed` as its session says, or `expired` once `withinMs` passes with neither.
@@ -127,10 +149,20 @@ const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) =
   );
 };
 
-/** The seams a test gives in place of Claude Code: the CLI child, the held session, and the sign-in's bound. */
-type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
+/**
+ * The seams a test gives: in place of Claude Code, the CLI child and the held session; the sign-in's bound; in place of reading the
+ * provider's metadata, the road; and `pace`, which scales every wait of a code's poll (1 by default), so a test waits a few
+ * milliseconds for what the provider asks seconds for.
+ */
+type SignInSeams = {
+  readonly cli?: McpCli;
+  readonly ask?: McpSignInAsk;
+  readonly withinMs?: number;
+  readonly route?: (server: RemoteMcpServer) => Promise<SignInRoute>;
+  readonly pace?: number;
+};
 
-/** The server a sign-in or sign-out may be asked of, or why not: a remote server with an OAuth client and a callback port. */
+/** The server a sign-in or sign-out may be asked of, or why not: a remote server with an OAuth client. */
 const signInRefusal = (name: unknown, server: unknown) => {
   if (typeof name !== 'string' || !/^[\w-]+$/.test(name)) {
     return `takes a server's name, letters, digits, - and _; it was handed ${JSON.stringify(name)}.`;
@@ -138,13 +170,17 @@ const signInRefusal = (name: unknown, server: unknown) => {
   const refused = mcpStateRefusal({ [name]: server });
   if (refused) return refused;
   const oauth = (server as RemoteMcpServer).oauth;
-  if (oauth === undefined || typeof oauth.clientId !== 'string' || typeof oauth.callbackPort !== 'number') return noClient(name);
+  if (oauth === undefined || typeof oauth.clientId !== 'string') return noClient(name);
   return undefined;
 };
 
-/** Why the server `name` cannot be signed in to: it names no OAuth client with a callback port. */
+/** Why the server `name` cannot be signed in to: it names no OAuth client. */
 const noClient = (name: string) =>
-  `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one. Give it \`oauth: { "clientId": "…", "callbackPort": 8791 }\`, as its app is registered.`;
+  `\`${name}\` names no OAuth client, and a sign-in is made through one. Give it \`oauth: { "clientId": "…" }\`, as its app is registered.`;
+
+/** Why the server `name` cannot be signed in to by the browser: its provider offers no code, and it names no callback port. */
+const noCallbackPort = (name: string) =>
+  `\`${name}\` signs in by the browser, which needs a callback port, and it names none. Give it \`oauth: { "clientId": "…", "callbackPort": 8791 }\`, as its app is registered.`;
 
 /**
  * The callback ports this engine's sign-ins hold: a port is claimed by name before a sign-in's first child is spawned, and held by its
@@ -167,7 +203,14 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
     held.session.end();
     states.set(held.name, state);
   };
-  return { byPort, claimed, waitsOn, portOf, settle };
+  const cancel = (port: number) => {
+    const held = byPort.get(port);
+    if (held === undefined) return;
+    byPort.delete(port);
+    held.session.end();
+    states.delete(held.name);
+  };
+  return { byPort, claimed, waitsOn, portOf, settle, cancel };
 };
 
 /**
@@ -177,15 +220,89 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
 export const noSignInHarness = (declared: readonly HarnessDeclared[]) =>
   `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
 
+/** The `claude mcp` CLI a sign-out runs: a test's own, else the Claude Code found at this ask, or why none was found. */
+const cliFor = (seams: SignInSeams, executable: string | undefined, harnessBin: string | undefined) => {
+  if (seams.cli) return seams.cli satisfies McpCli | string;
+  const claude = claudeExecutableOf(executable, harnessBin);
+  return (
+    claude === undefined
+      ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
+      : claudeCli(claude)
+  ) satisfies McpCli | string;
+};
+
+/** Claude Code's sign-in of `server` cleared in `cwd` by `cli`, or why not: no CLI was found, or the remove failed. */
+const clearedFromClaude = async (cli: McpCli | string, name: string, server: RemoteMcpServer, cwd: string) => {
+  if (typeof cli === 'string') return cli;
+  mkdirSync(cwd, { recursive: true });
+  return clearSignIn(cli, name, server, cwd);
+};
+
 /**
- * The four verbs over the harnesses this engine has, the hold of each waiting sign-in kept here by its callback port (`portsHeld`).
- * Each is refused, with nothing spawned, where no harness of the engine declares `mcp`: only Claude Code is measured to sign in
- * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret. The Claude Code each runs is found at each ask (`claudeExecutableOf`):
- * `executable`, else the one in `harnessBin`, else the SDK's bundled one, else the one on PATH.
+ * The sign-ins by a code this engine holds, by server name: `start` asks the provider for a code and polls for the token in the
+ * background (`pollDevice`), `has` says whether one waits, and `cancel` ends it, its state forgotten.
+ */
+const devicesHeld = (states: Map<string, McpSignInState>, root: string, pace: number) => {
+  const holds = new Map<string, DeviceHold>();
+  const starting = new Set<string>();
+  const start = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, route: DeviceRoute, clientId: string) {
+    const code = yield* Effect.tryPromise({
+      try: () => deviceCodeOf(route.deviceAuthorizationEndpoint, clientId),
+      catch: (e) =>
+        new McpSignInRefused({ message: `no code was given to sign in to \`${name}\` with: ${(e as Error).message}`, held: false }),
+    });
+    const until = new Date(Date.now() + code.expiresInSeconds * 1000).toISOString();
+    const started = { route: 'device', userCode: code.userCode, verificationUri: code.verificationUri, until } satisfies McpSignInStarted;
+    const hold: DeviceHold = { abort: new AbortController(), started };
+    holds.set(name, hold);
+    states.set(name, { state: 'waiting', until, started });
+    const settle = (state: McpSignInState) => {
+      if (holds.get(name) !== hold) return;
+      holds.delete(name);
+      states.set(name, state);
+    };
+    void pollDevice({ ...code, ...route, clientId, server, root, name, signal: hold.abort.signal, pace }).then(
+      (ended) => (ended === 'cancelled' ? undefined : settle(ended)),
+      (e: unknown) => settle({ state: 'failed', why: (e as Error).message }),
+    );
+    return started;
+  });
+  const cancel = (name: string) => {
+    const hold = holds.get(name);
+    if (hold === undefined) return false;
+    holds.delete(name);
+    hold.abort.abort();
+    states.delete(name);
+    return true;
+  };
+  const claim = (name: string) => {
+    if (holds.has(name) || starting.has(name)) return false;
+    starting.add(name);
+    return true;
+  };
+  return { start, cancel, claim, release: (name: string) => starting.delete(name) };
+};
+
+/** The road `server` signs in by, asked of its provider; refused, in words that say to try again, where the provider cannot be reached. */
+const routeAsked = (seams: SignInSeams, name: string, server: RemoteMcpServer) =>
+  Effect.tryPromise({
+    try: () => (seams.route ?? routeOf)(server),
+    catch: (e) =>
+      new McpSignInRefused({
+        message: `the provider of \`${name}\` could not be asked how to sign in: ${(e as Error).message}`,
+        held: false,
+      }),
+  });
+
+/**
+ * The four verbs over the harnesses this engine has, the hold of each waiting browser sign-in kept here by its callback port
+ * (`portsHeld`) and of each waiting sign-in by a code by its server's name. Each is refused, with nothing spawned, where no harness of
+ * the engine declares `mcp`: only Claude Code is measured to sign in (`signsInMcp`). The Claude Code each browser sign-in runs is found
+ * at each ask (`claudeExecutableOf`): `executable`, else the one in `harnessBin`, else the SDK's bundled one, else the one on PATH.
  * @param harnesses The engine's harnesses, each by its name.
- * @param root The engine's store root, under which a sign-in's folder is.
- * @param executable The harness program a sign-in runs, or undefined to look for one.
- * @param seams What a test gives in place of the real program: the CLI child, the held session and the sign-in's bound; none by default.
+ * @param root The engine's store root, under which a sign-in's folder and the held tokens are.
+ * @param executable The harness program a browser sign-in runs, or undefined to look for one.
+ * @param seams What a test gives in place of the real program and the provider's metadata; none by default.
  * @param harnessBin The folder the harness's program is looked for in first, or undefined for none.
  */
 export const mcpSignInVerbsOf = (
@@ -196,55 +313,52 @@ export const mcpSignInVerbsOf = (
   harnessBin?: string,
 ) => {
   const states = new Map<string, McpSignInState>();
-  const { byPort, claimed, waitsOn, portOf, settle } = portsHeld(states);
+  const devices = devicesHeld(states, root, seams.pace ?? 1);
+  const { byPort, claimed, waitsOn, portOf, settle, cancel } = portsHeld(states);
   const cwd = path.join(root, SIGN_IN_FOLDER);
   const withinMs = seams.withinMs ?? SIGN_IN_MS;
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
   const declared = declaredOf(harnesses);
   const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
-  const cliOf = () => {
-    if (seams.cli) return seams.cli satisfies McpCli | string;
-    const claude = claudeExecutableOf(executable, harnessBin);
-    return (
-      claude === undefined
-        ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
-        : claudeCli(claude)
-    ) satisfies McpCli | string;
-  };
-  const opened = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, port: number, clientSecret?: string) {
-    mkdirSync(cwd, { recursive: true });
-    if (clientSecret !== undefined) {
-      const cli = cliOf();
-      if (typeof cli === 'string') return yield* refuse(cli);
-      const why = yield* Effect.promise(() => storeClientSecret(cli, name, server, clientSecret, cwd));
-      if (why) return yield* refuse(why);
-    }
-    const ask = seams.ask ?? claudeMcpSignIn;
-    const session = yield* Effect.tryPromise({
-      try: () => ask(name, server, { cwd, executable: claudeExecutableOf(executable, harnessBin), redirectUri: redirectUriOf(port) }),
-      catch: (e) => new McpSignInRefused({ message: `the harness gave no address to sign in at: ${(e as Error).message}`, held: false }),
-    });
-    const until = new Date(Date.now() + withinMs).toISOString();
-    const held: Held = { name, session, until };
-    byPort.set(port, held);
-    states.set(name, { state: 'waiting', until });
-    watched(held, withinMs, (state) => settle(port, held, state));
-    return { authUrl: session.authUrl, until } satisfies McpSignInStarted;
-  });
-
-  const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, clientSecret?: string) {
-    const refused = signInRefusal(name, server) ?? noClaude();
+  const browser = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const port = server.oauth?.callbackPort;
-    if (refused || port === undefined) return yield* refuse(refused ?? noClient(name));
+    if (port === undefined) return yield* refuse(noCallbackPort(name));
     const waiting = waitsOn(port);
     if (waiting) {
       return yield* refuse(
-        `${waiting}, and the harness listens there for one at a time. Finish it in the browser, or ask again after then.`,
+        `${waiting}, and the harness listens there for one at a time. Finish it in the browser, cancel it, or ask again after then.`,
         true,
       );
     }
     claimed.set(port, name);
-    return yield* opened(name, server, port, clientSecret).pipe(Effect.ensuring(Effect.sync(() => claimed.delete(port))));
+    return yield* Effect.gen(function* () {
+      mkdirSync(cwd, { recursive: true });
+      const ask = seams.ask ?? claudeMcpSignIn;
+      const session = yield* Effect.tryPromise({
+        try: () => ask(name, server, { cwd, executable: claudeExecutableOf(executable, harnessBin), redirectUri: redirectUriOf(port) }),
+        catch: (e) => new McpSignInRefused({ message: `the harness gave no address to sign in at: ${(e as Error).message}`, held: false }),
+      });
+      const until = new Date(Date.now() + withinMs).toISOString();
+      const started = { route: 'browser', authUrl: session.authUrl, until } satisfies McpSignInStarted;
+      const held: Held = { name, session, until, started };
+      byPort.set(port, held);
+      states.set(name, { state: 'waiting', until, started });
+      watched(held, withinMs, (state) => settle(port, held, state));
+      return started;
+    }).pipe(Effect.ensuring(Effect.sync(() => claimed.delete(port))));
+  });
+
+  const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
+    const refused = signInRefusal(name, server) ?? noClaude();
+    const clientId = server.oauth?.clientId;
+    if (refused || clientId === undefined) return yield* refuse(refused ?? noClient(name));
+    if (!devices.claim(name)) {
+      return yield* refuse(`a sign-in to \`${name}\` already waits. Type its code at the provider, or cancel it and sign in again.`, true);
+    }
+    return yield* Effect.gen(function* () {
+      const route = yield* routeAsked(seams, name, server);
+      return route.route === 'device' ? yield* devices.start(name, server, route, clientId) : yield* browser(name, server);
+    }).pipe(Effect.ensuring(Effect.sync(() => devices.release(name))));
   });
 
   const mcpSignInState = (name: string) => Effect.sync(() => states.get(name) ?? { state: 'none' }) satisfies Effect.Effect<McpSignInState>;
@@ -252,23 +366,74 @@ export const mcpSignInVerbsOf = (
   const mcpSignOut = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const refused = signInRefusal(name, server) ?? noClaude();
     if (refused) return yield* refuse(refused);
+    if (devices.cancel(name)) return { ended: 'cancelled' as const } satisfies McpSignedOut;
     const port = portOf(name);
     if (port !== undefined) {
-      return yield* refuse(
-        `${waitsOn(port)}: there is nothing to sign out of yet. Finish it in the browser, or ask again after then.`,
-        true,
-      );
+      if (byPort.has(port)) {
+        cancel(port);
+        return { ended: 'cancelled' as const } satisfies McpSignedOut;
+      }
+      return yield* refuse(`${waitsOn(port)}: it is being started. Ask again in a moment.`, true);
     }
-    const cli = cliOf();
-    if (typeof cli === 'string') return yield* refuse(cli);
-    mkdirSync(cwd, { recursive: true });
-    const why = yield* Effect.promise(() => clearSignIn(cli, name, server, cwd));
-    if (why) return yield* refuse(why);
     states.delete(name);
-    return { signedOut: true as const };
+    if (dropToken(root, name, server)) return { ended: 'signed-out' as const } satisfies McpSignedOut;
+    const why = yield* Effect.promise(() => clearedFromClaude(cliFor(seams, executable, harnessBin), name, server, cwd));
+    if (why) return yield* refuse(why);
+    return { ended: 'signed-out' as const } satisfies McpSignedOut;
   });
 
   return { mcpSignIn, mcpSignInState, mcpSignInCallback: callbackVerbOf(byPort, states), mcpSignOut };
+};
+
+/** The device road a provider advertised: the endpoint a code is asked at and the one it is polled at. */
+type DeviceRoute = Extract<SignInRoute, { readonly route: 'device' }>;
+
+/**
+ * A sign-in by a code, polled until it ends: the token endpoint asked every `intervalSeconds` (5 s more after each `slow_down`), the
+ * token held under `root` once the provider gives one (`holdToken`), and the sign-in ended `expired` at `expiresInSeconds`. Answers the
+ * state it ended in, or `cancelled` where `signal` fired; a poll the network failed is asked again at the next interval. The wait is
+ * `pace` times its length, 1 outside a test. No state it answers quotes a code or a token.
+ */
+const pollDevice = async (
+  p: DeviceCode &
+    DeviceRoute & { clientId: string; server: RemoteMcpServer; root: string; name: string; signal: AbortSignal; pace: number },
+) => {
+  let waitMs = p.intervalSeconds * 1000 * p.pace;
+  const endsAt = Date.now() + p.expiresInSeconds * 1000 * p.pace;
+  while (!p.signal.aborted) {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, waitMs);
+      p.signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
+    });
+    if (p.signal.aborted) return 'cancelled' as const;
+    if (Date.now() >= endsAt)
+      return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' } satisfies McpSignInState;
+    const polled = await pollOnce(p.tokenEndpoint, p.clientId, p.deviceCode).catch(() => undefined);
+    if (p.signal.aborted) return 'cancelled' as const;
+    if (polled === undefined) continue;
+    switch (polled.outcome) {
+      case 'token':
+        if (polled.grant === undefined)
+          return { state: 'failed', why: 'the provider gave no token. Sign in again.' } satisfies McpSignInState;
+        holdToken(p.root, p.name, p.server, polled.grant, { tokenEndpoint: p.tokenEndpoint, clientId: p.clientId });
+        return { state: 'connected' } satisfies McpSignInState;
+      case 'slow-down':
+        waitMs += 5000 * p.pace;
+        break;
+      case 'expired':
+        return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' } satisfies McpSignInState;
+      case 'denied':
+        return {
+          state: 'failed',
+          why: 'the sign-in was refused at the provider. Sign in again, and approve the app there.',
+        } satisfies McpSignInState;
+      case 'failed':
+        return { state: 'failed', why: 'the provider ended the sign-in. Sign in again.' } satisfies McpSignInState;
+      case 'wait':
+        break;
+    }
+  }
+  return 'cancelled' as const;
 };
 
 /**

@@ -3225,7 +3225,7 @@ Its arguments:
     --json: as JSON
 ```
 
-Reads where signing a factory's MCP server in stands. Answers SignInState.
+Reads where signing a factory's MCP server in stands, with the code or address a waiting sign-in answered. Answers SignInState.
 
 Calls `GET /api/namespaces/:namespace/mcpservers/:name/sign-in`.
 

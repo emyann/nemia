@@ -159,7 +159,10 @@ describe("the kit's selected parts are ink, by its component tokens", () => {
     assert.match(look, cut, 'the fixture cuts a token the look writes');
     assert.ok(look.includes(radio), 'the fixture changes a token the look writes');
     const other = path.join(scratch('web-theme-'), 'DESIGN.md');
-    fs.writeFileSync(other, look.replace(cut, '').replace(radio, '--md-comp-radio-button-selected-icon-color: var(--md-sys-color-primary);'));
+    fs.writeFileSync(
+      other,
+      look.replace(cut, '').replace(radio, '--md-comp-radio-button-selected-icon-color: var(--md-sys-color-primary);'),
+    );
     const { light } = schemesOf(fs.readFileSync(path.join(generated(other).out, 'theme.css'), 'utf8'));
     assert.equal('--md-comp-switch-selected-track-color' in light, false);
     assert.equal(light['--md-comp-radio-button-selected-icon-color'], 'primary');
@@ -170,7 +173,8 @@ describe("the kit's selected parts are ink, by its component tokens", () => {
     assert.ok(look.includes('--md-comp-checkbox-selected-icon-color'));
     const start = look.indexOf('## Where we differ from Material');
     const end = look.indexOf('\n## ', start + 1);
-    const cut = look.slice(0, start) + look.slice(start, end).replaceAll('--md-comp-checkbox-selected-icon-color', 'the tick') + look.slice(end);
+    const cut =
+      look.slice(0, start) + look.slice(start, end).replaceAll('--md-comp-checkbox-selected-icon-color', 'the tick') + look.slice(end);
     assert.deepEqual(undeparted(cut), ['--md-comp-checkbox-selected-icon-color']);
   });
 });

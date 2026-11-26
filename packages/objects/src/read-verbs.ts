@@ -117,6 +117,7 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'delegations.list': BY_GET,
   'delegations.get': BY_GET,
   'server.health': 'a liveness probe: `nemia server version` reads that the api answers, and its release',
+  'server.models': "the board's agent form picks a model from it: no verb reads it yet",
   'server.metrics':
     "the runtime's raw instruments by name and attributes: a person's questions of the daemon are answered by `nemia passes`, `nemia series` and `nemia stats`",
   'readiness.fixOf':

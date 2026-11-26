@@ -13,7 +13,10 @@ import type { ListedModel } from 'agent-runtime/vocabulary';
 /** The file, in the store's root (`$WF_ROOT`). */
 const MODELS_FILE = 'models.json';
 
-/** What the daemon recorded of one harness: when it asked, and the models the harness listed. */
+/**
+ * What the daemon recorded of one harness: when it asked, and the models the harness listed.
+ * @public
+ */
 export type RecordedModels = { readonly at: string; readonly models: readonly ListedModel[] };
 
 /** Every harness the daemon recorded a list for, by its name. */

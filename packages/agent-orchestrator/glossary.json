@@ -238,6 +238,11 @@
       }
     },
     {
+      "term": "Recorded model list",
+      "meaning": "the models each harness lists, as the daemon last asked the runtime and wrote them (`models.json`, `recordedModels`): what a load, a start, a retry and the template lint judge a model by (`modelJudged`, `packages/agent-orchestrator/contracts/model-listed.contract.ts`); a harness with none recorded is not judged.",
+      "type": "RecordedModels"
+    },
+    {
       "term": "Timeout",
       "meaning": "how long a pause, a restart and an upgrade give each session's tool call in flight before it is cut: a file of the store's (`timeoutFile`), ten minutes where none is set, set by `nemia pause-timeout <d>` and given once by `--timeout <d>` (`timeoutAt`, `timeoutGiven`). A restart waits on the daemon's own sessions alone, up to it, and on no check; the jobs and the checks run on. Handed to the runtime's sessions' drain as its grace (`graceMs`), the runtime's own word for the same span.",
       "type": "TimeoutAt"

@@ -211,6 +211,11 @@
       ]
     },
     {
+      "term": "Listed model",
+      "meaning": "a model its harness lists for a session, by its canonical id (`ListedModel`): the id, the other words that resolve to it, its display name, whether it keeps auto mode and its effort levels, read off the rows of the harness's own list, which the `models` verb asks (`packages/agent-runtime/src/harness/claude/models.ts`, `packages/agent-runtime/contracts/listed-models.contract.ts`).",
+      "type": "ListedModel"
+    },
+    {
       "term": "MCP transport",
       "meaning": "what Claude Code loads an MCP server of a `.mcp.json` over, in the Agent SDK's words for a server a file declares (`MCP_TRANSPORTS`: stdio, http, sse); a written `type` that is none of them reads as `unknown` (`transportOf`).",
       "type": "McpTransport"

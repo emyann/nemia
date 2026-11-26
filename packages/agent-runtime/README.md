@@ -825,15 +825,14 @@ entry and on the end, beside `ranOn`; absent where nothing said one, and never r
 
 The lists are exported, from `agent-runtime` and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
-`CLAUDE_AUTO_DROPPED`, the models Claude Code drops `auto` on. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
+the models it lists asked of the harness (`models`, `ListedModel`: canonical id, aliases, `keepsAuto`, `efforts`). agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
 step before a run is written, and its form offers these lists.
 
-What a fence word reaches is answered beside them: `fenceReach(harness, model?)` gives, for Claude Code (`claude`) and Codex, whether a mode or a sandbox fences the session (`by`), how wide each word is (`rank`: plan 0;
+What a fence word reaches is answered beside them: `fenceReach(harness)` gives, for Claude Code (`claude`) and Codex, whether a mode or a sandbox fences the session (`by`), how wide each word is (`rank`: plan 0;
 dontAsk, default and manual 1; acceptEdits 2; auto 3; bypassPermissions 4 — read-only 0, workspace-write 1, danger-full-access 2),
 the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lowest rank that writes unasked (`writes`), the mode
 a session held to its directory runs in (`held`: `dontAsk`), the modes a session nobody attends runs in without stopping to ask a
-person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
-`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'claude-haiku-4-5' }`
+person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the word of the mode a model's `supportsAutoMode` speaks of (`autoMode`: `auto`; none on Codex). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'claude-haiku-4-5' }`
 is filed in `auto` and runs in `default` (measured on Claude Code 2.1.316 and again on 2.1.322, 2.1.323 and 2.1.325, where the `haiku` alias, now `claude-haiku-5-5`, keeps `auto`). `unruledIn(harness, path)` gives the first character of `path`
 that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
 every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
@@ -2202,7 +2201,7 @@ of pure code sits beside it.
 | `src/harness/forget.ts` | what every harness's `forget` and `kept` share (`forgetFiles`, `keptOf`): the files it keeps of a session, removed or, dry, listed, what it leaves that is not its own, and the same files named for a measure |
 | `src/harness/error.ts` | `RunnerError`, the one error a harness fails with, beneath the seam and every runner, whichever verb it was asked |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
-| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, the modes Claude Code drops on a model, the words that refuse what no allow rule reaches and the tools that need none; and `unruledIn`, the first character of a path its permission rules cannot carry |
+| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, the word of the mode a model may drop, the words that refuse what no allow rule reaches and the tools that need none; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/image.ts` | the code a runner's process runs, `IMAGE`: the real folder of this package, a Pod's container image, written on a session's run file and recorded on its attempt |
@@ -2234,6 +2233,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/session-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
 | `src/harness/claude/sign-in.ts` | whether this machine's Claude Code is signed in, asked before a job's spawn: `claude auth status` run bounded by `CLAUDE_SIGN_IN_MS` (`claudeSignedOutRefusal`), its answer judged by `claudeSignInOf` |
+| `src/harness/claude/models.ts` | Claude Code's models (`claudeModels`): the Agent SDK's `supportedModels()` put with no prompt, its rows read by `listedOf` into models by canonical id, each with its aliases, whether it keeps `auto` and its effort levels |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the Claude Code the sessions run (`quotaExecutable`) with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
 | `src/harness/claude/heard.ts` | the plan's utilization as the sessions heard it: the newest `rate_limit_event` any session of the store received, decoded (`heardOf`), kept in one file of the store (`claudeHeardFile`, `keepHeard`) by a job's process and a held session, and read (`readHeard`) onto a token's quota |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |

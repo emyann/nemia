@@ -11,7 +11,7 @@ team that works it is the `sdlc` template's, `packages/templates/sdlc/agents/`, 
 - A change its card settles, needing no design whatever its size, goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
   then a landing nobody is asked to approve — Agora's pass files it. `packages/templates/sdlc/workflows/quick/README.md` says what goes through it; a card that
   leaves a decision open goes straight to `build`.
-- A quick or build run's change is read by Agora, not by the person (build's spec is the person's, at design's gate): there is
+- A quick or build run's change is read by Agora, not by the person (build's spec is the person's, at the design step's gate): there is
   nothing to bring you for its landing, and `nemia approve` is refused
   there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
 - A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints

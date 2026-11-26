@@ -23,7 +23,7 @@ const ProgramStatus = Schema.Struct({
     description:
       'Pending where its task is not filed yet, Running where its process is up or waits out its back-off, Down where the runtime settled it.',
   }),
-  restarts: Schema.Number.annotate({ description: 'How many times the runtime started the program again after its process ended.' }),
+  restarts: Schema.Finite.annotate({ description: 'How many times the runtime started the program again after its process ended.' }),
   since: Schema.optionalKey(
     Schema.String.annotate({ description: 'When the program entered its phase, as an ISO timestamp; absent while it is Pending.' }),
   ),

@@ -158,39 +158,15 @@ export type Touched = { branch: string; radius: Radius | { error: string } };
  */
 export const notKnown = (said: string) => `what this run changed is not known: ${said}`;
 
-/** Files an agent reads as instructions before it reads the brief. A change to one changes every step after it. */
-export const AGENT_FACING: readonly string[] = [
-  '**/CLAUDE.md',
-  '**/AGENTS.md',
-  '**/.claude/',
-  '**/.codex/',
-  '**/.mcp.json',
-  '**/README.md',
-];
+/** The globs a factory's radius names (`Factory.radius`): the files its team wants shown at decide, each a list; none flags nothing. */
+export type RadiusGlobs = {
+  readonly agentFacing: readonly string[];
+  readonly checkAffecting: readonly string[];
+  readonly lessons: readonly string[];
+};
 
-/**
- * Files that decide what a check means: its scripts, its dependencies, its compiler, its lint, and its tests. A
- * change could edit one of these to make its check pass, so they are the default `--sensitive` list,
- * and their whole diff is on the screen.
- */
-export const CHECK_AFFECTING: readonly string[] = [
-  '**/package.json',
-  '**/package-lock.json',
-  '**/tsconfig*.json',
-  '**/turbo.json',
-  '**/.oxlintrc.json',
-  '**/.oxfmtrc.json',
-  '**/*.test.*',
-  '**/test/',
-  '**/.e2e/',
-];
-
-/**
- * Where the next agent reads what this one learned: these, and the `docs/` of
- * each workspace package (`lessonGlobs`). Not any `docs/`: an app's `src/routes/docs/` is product code, and a
- * lesson line that counts it says a lesson was written when none was — the one wrong answer the line is for.
- */
-export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/'];
+/** A radius that names no file: the core knows none of a repository's own. */
+export const NO_RADIUS: RadiusGlobs = { agentFacing: [], checkAffecting: [], lessons: [] };
 
 /**
  * A `workspaces` glob as the radius matches it: a leading `./` and a trailing `/` dropped, so `./packages/*` is `packages/*`, with or
@@ -202,24 +178,10 @@ const workspaceGlob = (written: string) => written.replace(/^(?:\.\/+)+/, '').re
 /**
  * The globs among a repository's `workspaces` that have `**`, as written. Not refused — the repository's `package.json` is not
  * ours — but named on the screen (`radiusLines`), since such a glob names a package at any depth: each file counts once all the
- * same, in the outermost package on its way (`packageOf`), and as a lesson only in that package's own `docs/` (`isLesson`).
+ * same, in the outermost package on its way (`packageOf`).
  * @param workspaces The repository's `workspaces` globs, as written.
  */
 export const deepWorkspaces = (workspaces: readonly string[]) => workspaces.filter((w) => workspaceGlob(w).includes('**'));
-
-/**
- * The lesson list for a repository: `LESSON`, and `<workspace>/docs/` for each of its npm `workspaces` globs without `**`. Made from
- * `packages/**`, that glob would take a `docs/` inside a package's source too — `packages/x/src/docs/`, product code — so a `**` glob's
- * packages are read one file at a time instead (`isLesson`).
- * @param workspaces The repository's `workspaces` globs, as written.
- */
-export const lessonGlobs = (workspaces: readonly string[]) => [
-  ...LESSON,
-  ...workspaces
-    .map(workspaceGlob)
-    .filter((w) => !w.includes('**'))
-    .map((w) => `${w}/docs/`),
-];
 
 /** The group of a file in no directory. */
 export const ROOT_GROUP = '(root)';
@@ -285,25 +247,20 @@ export function groupOf(file: string, workspaces: readonly string[] = []) {
 }
 
 /**
- * Whether a file is where the next agent reads: on `lessonGlobs`, or — for a package a `**` glob names — in the `docs/` of the one
- * package `packageOf` puts it in, and no `docs/` deeper in that package.
+ * Whether a file is where the next agent reads what this one learned: one a factory's `lessons` globs name.
  * @param file The file's path from the repository's root.
- * @param workspaces The repository's `workspaces` globs, as written; none where absent.
+ * @param lessons The factory's `lessons` globs.
  */
-export function isLesson(file: string, workspaces: readonly string[] = []) {
-  if (matches(file, lessonGlobs(workspaces))) return true;
-  const deep = deepWorkspaces(workspaces).map((w) => globRegExp(workspaceGlob(w)));
-  const pkg = deep.length ? packageOf(file, workspaces) : undefined;
-  return pkg !== undefined && deep.some((p) => p.test(pkg)) && file.startsWith(`${pkg}/docs/`);
-}
+export const isLesson = (file: string, lessons: readonly string[]) => matches(file, lessons);
 
 /**
  * What a branch touched, grouped by blast radius, from the files the place's `report` says it changed. A file counts in every group it
  * touched — a move from one package to another is a change to both — and a binary file counts as a file, with no lines.
  * @param files The files the branch changed, each with its lines added and removed.
  * @param workspaces The repository's `workspaces` globs, as written; none where absent.
+ * @param globs The factory's radius: the globs of the agent-facing, check-affecting and lesson files; a list left empty flags none.
  */
-export function radius(files: readonly Change[], workspaces: readonly string[] = []) {
+export function radius(files: readonly Change[], workspaces: readonly string[] = [], globs: RadiusGlobs = NO_RADIUS) {
   const changes = [...files];
   const groups = new Map<string, Group>();
   for (const c of changes) {
@@ -322,9 +279,9 @@ export function radius(files: readonly Change[], workspaces: readonly string[] =
   return {
     changes,
     groups: [...groups.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    agentFacing: touching(AGENT_FACING).map(nameOf),
-    checkAffecting: touching(CHECK_AFFECTING).map(nameOf),
-    lessons: changes.filter((c) => pathsOf(c).some((p) => isLesson(p, workspaces))),
+    agentFacing: touching(globs.agentFacing).map(nameOf),
+    checkAffecting: touching(globs.checkAffecting).map(nameOf),
+    lessons: changes.filter((c) => pathsOf(c).some((p) => isLesson(p, globs.lessons))),
     deepWorkspaces: deepWorkspaces(workspaces),
   };
 }
@@ -351,7 +308,7 @@ export function radiusLines(r: Radius) {
     ...(r.checkAffecting.length ? [`check-affecting  ${r.checkAffecting.join(', ')}`] : []),
     ...(r.deepWorkspaces?.length
       ? [
-          `workspaces       ${r.deepWorkspaces.join(', ')} in the base's package.json ${r.deepWorkspaces.length > 1 ? 'cross' : 'crosses'} directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/`,
+          `workspaces       ${r.deepWorkspaces.join(', ')} in the base's package.json ${r.deepWorkspaces.length > 1 ? 'cross' : 'crosses'} directories: a file counts once, in the outermost package on its way`,
         ]
       : []),
   ];

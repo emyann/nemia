@@ -804,3 +804,16 @@ describe("build's and quick's review notes say both cases of their land, and the
     assert.equal(quickReviewBrief([]).includes(GATES_AFTER), false);
   });
 });
+
+test("sdlc's wiring names quick for a first card, which lists an ending step, and the radius its parameters default to", () => {
+  const wiring = JSON.parse(fs.readFileSync(path.join(treeOf('plain'), 'factory.json'), 'utf8')) as {
+    firstWorkflow?: string;
+    radius?: { agentFacing: string[]; checkAffecting: string[]; lessons: string[] };
+  };
+  assert.equal(wiring.firstWorkflow, 'quick');
+  const ending = loaded('plain', 'quick').filter((step) => step.workspace === 'base');
+  assert.equal(ending.length, 1, "quick's ending, the step the board gates a first card at");
+  assert.ok(wiring.radius?.agentFacing.includes('**/CLAUDE.md'), JSON.stringify(wiring.radius));
+  assert.ok(wiring.radius?.checkAffecting.includes('**/package.json'), JSON.stringify(wiring.radius));
+  assert.ok(wiring.radius?.lessons.includes('docs/'), JSON.stringify(wiring.radius));
+});

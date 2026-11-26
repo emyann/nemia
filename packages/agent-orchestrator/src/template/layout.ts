@@ -68,6 +68,14 @@ export type FactorySpec = {
    * often a parameter's value: a label of such a key written with another value is refused. None where it renders empty.
    */
   labelValues?: string;
+  /**
+   * The files a branch changes that the team wants shown at decide, each a list of globs apart by whitespace, often a parameter's value:
+   * `agentFacing` (read by its agents as instructions), `checkAffecting` (change what its checks judge) and `lessons` (keep what was
+   * learned). A list none is named for renders empty and flags nothing.
+   */
+  radius?: { agentFacing?: string; checkAffecting?: string; lessons?: string };
+  /** The workflow of the template a first card on a factory made from it runs in. */
+  firstWorkflow?: string;
 };
 
 /** A template's card trigger (`FactorySpec.triggers`): its selector, and its target, a workflow of the template. */
@@ -343,6 +351,8 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
         },
       },
       labelValues: 'string',
+      radius: { fields: { agentFacing: 'string', checkAffecting: 'string', lessons: 'string' } },
+      firstWorkflow: 'string',
       imports: { list: 'not-yet' },
     },
     required: ['version', 'hires'],

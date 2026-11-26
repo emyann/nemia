@@ -10,7 +10,7 @@ HttpApi that serves them, importing only `effect`. `apps/api` puts the workflows
 The order is `web, cli → api → orchestrator → runtime`, with `objects` at the bottom beside the runtime: each layer reaches exactly the
 one below it, and nothing reaches up or skips one, but that every layer above the runtime imports `objects` by its entry and the runtime
 never does. Which layer owns what, the public contract of each and
-the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `README.md` and each
+the four rules and the tests that hold them are in `docs/architecture.md`: read it before you place a change. Read `docs/working-on-nemia.md` and each
 package's README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent), and both bins live in `apps/cli`; `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
 record there.

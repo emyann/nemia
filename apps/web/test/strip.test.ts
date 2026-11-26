@@ -58,6 +58,7 @@ const factory = (name: string, hires: Record<string, string>) =>
     volumes: [],
     costLines: {},
     workflowRepos: {},
+    firstWorkflow: null,
     template: null,
   }) satisfies Factory;
 

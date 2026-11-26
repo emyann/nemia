@@ -158,22 +158,42 @@ export const takenLine = (
 /** One fact under a gate, as the inspector lists it: a label, the words, and where to read more (a step's section on the run's page). */
 export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; step?: string };
 
-/** What a person's approval of a loop out of rounds adds to its last review's fact — its words, and the findings left open — or null. */
-function acceptedWords(looping: Pick<RunDetail['steps'][number], 'gate'>, findings: number | null) {
+/** What a person's approval of a loop out of rounds adds to its last word's fact — their words — or null. */
+function acceptedWords(looping: Pick<RunDetail['steps'][number], 'gate'>) {
   const approval = looping.gate?.approval;
   if (!approval) return null;
-  return `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open${approval.message ? `: ${approval.message}` : ''}`;
+  return `; a person accepted the work as it stands${approval.message ? `: ${approval.message}` : ''}`;
+}
+
+/**
+ * The last word of a looping step: no further round asked, or the first count its step declares and what it left, or how it signed off.
+ * @param looping The looping step, as the run's page reads it.
+ */
+function loopFact(looping: RunDetail['steps'][number]) {
+  const closeout = looping.closeout;
+  const output = closeout?.output ?? {};
+  const counted = closeout?.tallies[0];
+  const left = counted?.value ?? null;
+  const accepted = acceptedWords(looping);
+  const said = !closeout
+    ? `${looping.name} has yet to sign off`
+    : output.again === false
+      ? `${looping.name} asks no further round${left ? `; ${counted?.tally}: ${left}` : ''}`
+      : left !== null
+        ? `${looping.name} left ${counted?.tally}: ${left}${accepted ?? (output.again === true ? ', and asks another round' : '')}`
+        : `${looping.name} signed off ${closeout.outcome}`;
+  return { label: 'loop', said, state: output.again === false && !left ? 'good' : undefined, step: looping.name } satisfies GateFact;
 }
 
 /**
  * The facts under a gate, each off the record: the round the run is on of its loop's cap, and what it has cost; the last word of each
- * looping step (a review) — no further round asked, or how many findings it left; each check's verdict on its final try; and, off the run's
- * decision when it has been read, what the result touched and whether each branch still merges onto the base.
+ * looping step (a review) — no further round asked, or the count its step declares (`tally:`) and what it left; each check's verdict on
+ * its final try; and, off the run's decision when it has been read, what the result touched and whether each branch still merges.
  *
- * A looping step's word is read off its closeout's output, the keys `wf`'s loop reads (`again`) and the reviewer's `findings`; a closeout
- * without them says it signed off, and how. A step not run says so. A looping step a person approved out of rounds (an approval of a
- * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
- * `again: true` (`acceptedWords`).
+ * A looping step's word is read off its closeout's output, the key the loop reads (`again`), and the first count its step declares
+ * (`tallies`, valued by the api): a step that declares none has nothing counted, and a closeout without either says it signed off, and
+ * how. A step not run says so. A looping step a person approved out of rounds (an approval of a loop, its gate's approval) is said
+ * accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true` (`acceptedWords`).
  * @param run The run's detail: its steps and what it has cost.
  * @param decision The run's decision, or null where it has not been read.
  */
@@ -184,18 +204,7 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
   const cap = loops.map((s) => s.spec?.rounds).find((n): n is number => typeof n === 'number');
   facts.push({ label: 'round', said: `${cap ? `round ${round} of ${cap}` : `round ${round}`} · cost ${run.cost?.said ?? 'not measured'}` });
   for (const looping of loops) {
-    const closeout = looping.closeout;
-    const output = closeout?.output ?? {};
-    const findings = Array.isArray(output.findings) ? output.findings.length : null;
-    const accepted = acceptedWords(looping, findings);
-    const said = !closeout
-      ? `${looping.name} has yet to sign off`
-      : output.again === false
-        ? `${looping.name} asks no further round${findings ? `, and left ${findings} finding${findings === 1 ? '' : 's'}` : ''}`
-        : findings !== null
-          ? `${looping.name} left ${findings} finding${findings === 1 ? '' : 's'}${accepted ?? (output.again === true ? ' and asks another round' : '')}`
-          : `${looping.name} signed off ${closeout.outcome}`;
-    facts.push({ label: 'last review', said, state: output.again === false && !findings ? 'good' : undefined, step: looping.name });
+    facts.push(loopFact(looping));
   }
   for (const checked of run.steps.filter((s) => s.check)) facts.push(checkFact(checked));
   if (decision) facts.push(...decisionFacts(decision));

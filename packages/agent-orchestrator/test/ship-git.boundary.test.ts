@@ -33,7 +33,6 @@ import { runGiven, runOver } from './placed.ts';
 import {
   advanceRun,
   approveRun,
-  artifactFiles,
   artifactsDir,
   cancelRun,
   decideRun,
@@ -423,29 +422,6 @@ async function stagedAndSigned(given: Given & { message?: string; artifacts?: st
 
 const mergeHead = (repo: string) => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
 
-/**
- * What the ship's check leaves in its files directory when its e2e runs on the merged tree (`WF_ARTIFACTS`): a picture per page and
- * theme, `-failed` for a page that failed. By default the shape of a web run's `artifacts/ship` in the owner's store: 252 of them,
- * about 194 KB each, 48.9 MB. The bytes in the directory before, to measure what a landing frees.
- */
-const photographed = (id: string, { count = 252, bytes = 194_000 } = {}) => {
-  const dir = artifactsDir(ROOT, { id }, 'ship');
-  fs.mkdirSync(dir, { recursive: true });
-  const pictures = Array.from({ length: count }, (_, i) => `page-${String(i).padStart(3, '0')}-${i % 2 ? 'dark' : 'light'}.png`);
-  pictures[0] = 'answer-light-failed.png';
-  for (const name of pictures) fs.writeFileSync(path.join(dir, name), Buffer.alloc(bytes, 1));
-  return { dir, pictures, before: bytesIn(dir) };
-};
-const bytesIn = (dir: string) =>
-  artifactFiles(ROOT, { id: path.basename(path.dirname(path.dirname(dir))) }, 'ship').reduce((sum, f) => sum + f.bytes, 0);
-const pngsIn = (dir: string) =>
-  fs.existsSync(dir)
-    ? fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith('.png'))
-        .sort()
-    : [];
-
 test("an approved ending stages the merge and signs off its message; the run executes ship's check on the merged tree, and commits the merge only on its exit 0, read landed once a pass has read it", async () => {
   const { repo, id, branch, e, tasks, settle, base, signed, checkId } = await stagedAndSigned();
   const spec = tasks.get(`${id}-ship`)!.spec;
@@ -499,10 +475,6 @@ test("an approved ending stages the merge and signs off its message; the run exe
     assert.equal(mergeHead(repo), true, `${phase}: nothing is taken back, and the merge stays staged`);
   }
 
-  const shot = photographed(id);
-  await runWith(e, advanceRun(runRecord(ROOT, id)));
-  assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort(), "what the check's e2e took of the merged tree stays while it runs");
-
   settle(checkId, 'succeeded', undefined, 0);
   const landed = await runWith(e, advanceRun(runRecord(ROOT, id)));
   const head = git(repo, 'rev-parse', 'HEAD');
@@ -517,29 +489,6 @@ test("an approved ending stages the merge and signs off its message; the run exe
     landed.notes.includes(`ship: its check passed on the merge, and the run landed on main as ${head.slice(0, 7)}`),
     landed.notes.join('\n'),
   );
-  assert.deepEqual(pngsIn(shot.dir), [], 'landed, its pictures of the merged tree are read by nobody: removed on the pass that lands');
-  assert.ok(
-    landed.notes.includes(
-      'ship: removed the 252 pictures its check took of the merged tree (46.6 MB); e2e-pictures.txt says what they were',
-    ),
-    landed.notes.join('\n'),
-  );
-  const note = fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8');
-  assert.match(
-    note,
-    new RegExp(
-      `^ship's check passed on the merge, and the run committed it as ${head.slice(0, 12)}\\.\nSo the run removed the 252 pictures`,
-    ),
-  );
-  assert.ok(note.includes(`ae logs ${checkId}; its stderr: ae output ${checkId} stderr`), note);
-  assert.ok(note.includes('  answer-light-failed.png  189.5 KB\n'), note);
-  const after = bytesIn(shot.dir);
-  assert.equal(shot.before, 252 * 194_000);
-  assert.equal(after, Buffer.byteLength(note), 'a note in their place');
-  assert.ok(
-    shot.before - after > 48_000_000,
-    `on the store's shape, every byte of them less the note's is freed: freed ${shot.before - after} of ${shot.before} bytes`,
-  );
   assert.equal(landed.status, 'succeeded');
   await aPass();
   const { decision } = await runWith(e, decideRun(id));
@@ -551,12 +500,6 @@ test("an approved ending stages the merge and signs off its message; the run exe
     `the run landed on main as ${head.slice(0, 7)}`,
     'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
-
-  fs.writeFileSync(path.join(shot.dir, 'late.png'), 'a picture put there after the landing');
-  await runWith(e, advanceRun(runRecord(ROOT, id)));
-  assert.equal(git(repo, 'rev-parse', 'HEAD'), head, 'once for the try: a pass after it commits nothing more, whatever the checkout holds');
-  assert.deepEqual(pngsIn(shot.dir), ['late.png'], 'and removes nothing more');
-  assert.equal(fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'), note, 'nor writes the note again');
 });
 
 for (const [said, exitCode, words] of [
@@ -565,16 +508,8 @@ for (const [said, exitCode, words] of [
 ] as const) {
   test(`REFUSED at shipped defaults: a check that ${said} on the merge has the run abort it — the base branch never moves, and a try of ship merges again, never --recheck`, async () => {
     const { repo, id, e, tasks, settle, base, checkId } = await stagedAndSigned();
-    const shot = photographed(id, { count: 4, bytes: 10 });
     settle(checkId, 'failed', undefined, exitCode);
     const pass = await runWith(e, advanceRun(runRecord(ROOT, id)));
-    assert.deepEqual(
-      pngsIn(shot.dir),
-      [...shot.pictures].sort(),
-      "nothing landed, so every picture stays for whoever reads why, the failed page's among them",
-    );
-    assert.equal(fs.existsSync(path.join(shot.dir, 'e2e-pictures.txt')), false, 'and no note stands in for them');
-    assert.ok(!pass.notes.some((n) => n.includes('pictures')), pass.notes.join('\n'));
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'nothing landed');
     assert.equal(git(repo, 'status', '--porcelain'), '', 'and the checkout is as it was: the merge was aborted');
     assert.equal(mergeHead(repo), false);
@@ -662,10 +597,8 @@ test('REFUSED at shipped defaults: a merge the run is not to commit is aborted �
       '#!/bin/sh\necho "commit-msg: refused by the hook" >&2\necho "  see CONTRIBUTING" >&2\nexit 1\n',
       { mode: 0o755 },
     );
-    const shot = photographed(id, { count: 3, bytes: 10 });
     settle(checkId, 'succeeded', undefined, 0);
     await runWith(e, advanceRun(runRecord(ROOT, id)));
-    assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort(), 'its check passed and nothing landed: every picture is kept');
     const landed = runRecord(ROOT, id).steps.ship.landed as { aborted: string };
     assert.match(
       landed.aborted,

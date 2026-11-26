@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantAsk, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
+import { plantAsk, plantFactory, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -120,8 +120,18 @@ const workflow = [
   { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex' },
 ];
 
+const RADIUS = {
+  agentFacing: ['**/CLAUDE.md', '**/AGENTS.md', '**/.claude/', '**/.codex/', '**/.mcp.json', '**/README.md'],
+  checkAffecting: ['**/package.json', '**/package-lock.json', '**/tsconfig*.json', '**/.oxlintrc.json', '**/*.test.*', '**/test/'],
+  lessons: ['**/CLAUDE.md', '**/AGENTS.md', 'docs/', 'packages/*/docs/', 'apps/*/docs/'],
+};
+
+/** The factory every run here is filed in, which sets the radius its decision flags files by. */
+const FACTORY = 'radiused';
+
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+  plantFactory(root, FACTORY, JSON.stringify({ volumes: [], workflows: [], hires: {}, schedules: {}, radius: RADIUS }));
   plantRecord(
     root,
     runKey(run.id),
@@ -129,6 +139,7 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
       workspace: run.repo,
       branch: 'main',
       isolate: true,
+      factory: FACTORY,
       brief: 'Decide it',
       createdAt: at,
       workflowDir: path.join(root, 'no-such-workflow'),

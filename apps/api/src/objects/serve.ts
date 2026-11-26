@@ -65,7 +65,7 @@ const DOCUMENT = 'GET /openapi/v3/nemia/v1';
 /**
  * The most a write's body may be: 1 MiB. The largest object a client writes today is a skill whose body is a whole SKILL.md, 46 KB for
  * the largest in this repository (the orchestrator's `nemia/skills/verbs`), and a workflow written whole with its steps' prompts is
- * about 32 KB (sdlc's `build`): 1 MiB is twenty times the largest, and far below what holding a body in memory costs the api.
+ * tens of KB: 1 MiB is twenty times the largest, and far below what holding a body in memory costs the api.
  */
 export const OBJECT_BODY_LIMIT = ByteSize.mebibytes(1);
 

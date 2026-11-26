@@ -2,9 +2,8 @@
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
  * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds (`artifactFiles`), the
- * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`), and the pictures an ending's check took of the
- * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its path
- * under it and never through a link (`artifactFile`, `fileUnder`).
+ * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`); and one file of that directory or of a step's
+ * folder, read by its path under it and never through a link (`artifactFile`, `fileUnder`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -15,7 +14,7 @@ import path from 'node:path';
 import { handedCloseout, type Closeout } from '../closeout/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
-import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
+import { artifactPlace, HANDED_CLOSEOUT, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf, statUnder } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
@@ -351,86 +350,6 @@ export function artifactFiles(home: string, run: Pick<Run, 'id'>, stepName: stri
   };
   walk(top);
   return found.sort((a, b) => a.path.localeCompare(b.path));
-}
-
-/** The note a landed ending's files directory keeps in place of the pictures its check took (`dropLandedPictures`). */
-export const LANDED_PICTURES = 'e2e-pictures.txt';
-
-/**
- * Remove the pictures an ending's check took of the merged tree, once that check passed and the merge landed: what `landEnding` does on
- * the pass that writes `{ commit }`. The ending's check runs the e2e on the merge staged in the repository's checkout, with its files
- * directory as `WF_ARTIFACTS`, after the ending's gate — so no person and no step reads those pictures before it, and after a pass nothing
- * shows them but `nemia decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
- * implement step's, which are kept. A check that did not pass is never landed as a commit, so its pictures, the failed page's among them,
- * stay for whoever reads why.
- *
- * Only a regular `.png` directly in the directory that the ending's closeout does not name, and never through a link. In its place a note,
- * `e2e-pictures.txt`, says what was removed and where what the check said is kept — written before anything is removed, and left as it is
- * on a later pass, so a pass that dies halfway, or a picture that cannot be removed, leaves the whole list and the next pass that lands
- * removes the rest. Nothing to remove writes nothing.
- * @param home The store's root.
- * @param run The run, by its id.
- * @param stepName The ending step's name.
- * @param closeout The ending's closeout, whose files are kept; undefined where it has none.
- * @param said What landed: the commit, and the task of the check, whose logs the note names where it is given.
- */
-export function dropLandedPictures(
-  home: string,
-  run: Pick<Run, 'id'>,
-  stepName: string,
-  closeout: Closeout | undefined,
-  said: { commit: string; checkTaskId?: string },
-) {
-  const dir = artifactsDir(home, run, stepName);
-  const named = new Set(
-    (closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))),
-  );
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return { removed: [], bytes: 0 };
-  }
-  const pictures = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.png') && !named.has(path.join(dir, entry.name)))
-    .map((entry) => ({ name: entry.name, bytes: lstatOf(path.join(dir, entry.name))?.size ?? 0 }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  if (!pictures.length) return { removed: [], bytes: 0 };
-  const bytes = pictures.reduce((sum, p) => sum + p.bytes, 0);
-  const note = path.join(dir, LANDED_PICTURES);
-  if (!lstatOf(note)) fs.writeFileSync(note, landedPicturesNote(stepName, pictures, bytes, said));
-  const removed: string[] = [];
-  let freed = 0;
-  for (const picture of pictures) {
-    try {
-      fs.rmSync(path.join(dir, picture.name));
-      removed.push(picture.name);
-      freed += picture.bytes;
-    } catch {}
-  }
-  return { removed, bytes: freed };
-}
-
-/** The words of `e2e-pictures.txt`: why the pictures went, what they were, and where what the check said still is. */
-function landedPicturesNote(
-  stepName: string,
-  pictures: readonly { name: string; bytes: number }[],
-  bytes: number,
-  said: { commit: string; checkTaskId?: string },
-) {
-  return [
-    `${stepName}'s check passed on the merge, and the run committed it as ${said.commit.slice(0, 12)}.`,
-    `So the run removed the ${pictures.length} ${pictures.length === 1 ? 'picture' : 'pictures'} the check's e2e took of the merged tree (${sizeOf(bytes)}): after a pass nobody reads them.`,
-    "A check that does not pass keeps every picture it took, the failed page's among them.",
-    "The pictures of the branch that a reviewer read are the implement step's, in its own files directory, and are kept.",
-    ...(said.checkTaskId
-      ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ae output ${said.checkTaskId} stderr`]
-      : []),
-    '',
-    'Removed:',
-    ...pictures.map((p) => `  ${p.name}  ${sizeOf(p.bytes)}`),
-    '',
-  ].join('\n');
 }
 
 /**

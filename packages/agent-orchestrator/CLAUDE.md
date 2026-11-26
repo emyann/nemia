@@ -264,7 +264,6 @@ of its kind, never from an older file that looks alike:
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).
-- **A landed ending keeps no pictures of the merged tree but those its closeout names** (`dropLandedPictures`).
 
 ## Checks and worktrees
 

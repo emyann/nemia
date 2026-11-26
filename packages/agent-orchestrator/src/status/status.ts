@@ -220,7 +220,7 @@ export { endsOnBase };
  * on the base branch, where nothing can be taken back — so the approval is of the act, and it is given before the step is filed.
  *
  * An ending with no gate is filed by its workflow instead, once the step before it — one that can send the work back (`loop:`) — passes:
- * `quick`'s land, which its review routes. Nothing of this holds such a step: there is no approval to wait for, and nothing for a person
+ * a landing the review before it routes. Nothing of this holds such a step: there is no approval to wait for, and nothing for a person
  * to decide (`toDecide`, `endingSteps`).
  * @param step The step, its name, `gate:` and `workspace:`.
  * @param run The run, the gates it was started with among it.

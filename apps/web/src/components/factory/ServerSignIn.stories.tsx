@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Body } from '@/components/ui/ds';
 import { SignInView, signInShownOf, type SignInShown } from './ServerSignIn';
 
 /**
@@ -39,10 +40,20 @@ const view = (shown: SignInShown, refused: string | null = null, pasted = '') =>
   </div>
 );
 
-/** The row's sign-in as the board decides it from the server's `state` and whether its record has `oauth`, no sign-in held. */
+/**
+ * The row's sign-in as the board decides it from the server's `state` and whether its record has `oauth`, no sign-in held, under a
+ * line saying what it was given, so a story that decides nothing still draws what it decided of.
+ */
 const decided = ({ state, oauth }: { state: string; oauth: boolean }) => {
   const shown = signInShownOf(state, oauth, undefined);
-  return shown === null ? <div style={BOX} data-server-sign-in-none /> : view(shown);
+  return (
+    <div style={BOX} className="flex flex-col gap-2">
+      <Body size="small" component="p" className="text-on-surface-variant">
+        github reads {state}, {oauth ? 'with' : 'without'} oauth{shown === null ? ': no sign-in is drawn' : ''}
+      </Body>
+      {shown !== null && view(shown)}
+    </div>
+  );
 };
 
 /** A server that signs in through Nemia, read `pending`, as one with no sign-in can settle: the press that starts one. */

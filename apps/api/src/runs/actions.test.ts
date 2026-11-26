@@ -430,3 +430,44 @@ describe('POST …/steps/:step/route routes a condition as `nemia route` does, w
     assert.deepEqual(asked('r-route-none'), []);
   });
 });
+
+/** A run of `plan → ship`, `ship` judged by a check that waits on the condition `ci-green`, on its first try. */
+const waitingRun = (id: string) => {
+  runRecord(
+    id,
+    [
+      { name: 'plan', after: [], body: 'Plan it.' },
+      { name: 'ship', after: ['plan'], body: 'Ship it.', checks: [{ name: 'ci', condition: 'ci-green', after: [] }] },
+    ],
+    { plan: { taskId: `${id}-plan`, branch: `wf/${id}/plan` }, ship: { taskId: null } },
+  );
+  signedOff(`${id}-plan`, DONE);
+};
+
+const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers: BOARD, body: JSON.stringify(body) });
+
+describe('PUT …/steps/:step/conditions/:condition writes a condition a check of the step waits on, as `nemia condition` does; one the step does not wait on, another try and a run the store has not are refused, nothing written', () => {
+  const url = (run: string, condition = 'ci-green') => `/api/namespaces/default/runs/${run}/steps/ship/conditions/${condition}`;
+
+  test('a condition written for the try the step is on is kept, and answered as it stands', async () => {
+    waitingRun('r-cond-ok');
+    const res = await put(url('r-cond-ok'), { status: 'True', try: 1, message: 'green' });
+    assert.equal(res.status, 200, await res.clone().text());
+    const { condition } = (await res.json()) as { condition: { name: string; try: number; status: string; message: string } };
+    assert.deepEqual([condition.name, condition.try, condition.status, condition.message], ['ci-green', 1, 'True', 'green']);
+    assert.equal(asked('r-cond-ok').length, 1);
+  });
+  test('REFUSED: a condition no check of the step waits on is a 422, nothing written', async () => {
+    waitingRun('r-cond-undeclared');
+    assert.equal((await put(url('r-cond-undeclared', 'other'), { status: 'True', try: 1, message: '' })).status, 422);
+    assert.deepEqual(asked('r-cond-undeclared'), []);
+  });
+  test('REFUSED: a write for a try the step is not on is a 409, nothing written', async () => {
+    waitingRun('r-cond-try');
+    assert.equal((await put(url('r-cond-try'), { status: 'True', try: 2, message: '' })).status, 409);
+    assert.deepEqual(asked('r-cond-try'), []);
+  });
+  test('REFUSED: a run the store has not is a 404', async () => {
+    assert.equal((await put(url('r-cond-none'), { status: 'True', try: 1, message: '' })).status, 404);
+  });
+});

@@ -82,7 +82,7 @@ const templateCells = (template: TemplateListed) => [
 export const templateTable = (list: TemplateList) => tableOf(list, TEMPLATE_COLUMNS, templateCells) satisfies Table;
 
 /** The columns of a template's program's row, in the order its cells are. */
-export const PROGRAM_COLUMNS: readonly TableColumnDefinition[] = [
+const PROGRAM_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The program's name.", 0),
   column('Writes', 'The conditions it writes.', 0),
   column('Run', 'The command line it runs.', 1),

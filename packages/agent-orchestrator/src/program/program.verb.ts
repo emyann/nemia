@@ -71,7 +71,7 @@ export const declaredPrograms = (listing: readonly FactoryListing[]) =>
  * @param token The program's session token, minted as it is filed.
  * @param home The store's root folder.
  */
-export const programSpec = (d: Declared, token: string, home: string) => {
+const programSpec = (d: Declared, token: string, home: string) => {
   const bin = ownBin();
   const base = { ...process.env, ...(bin === undefined ? {} : { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` }) };
   return {
@@ -111,7 +111,7 @@ const heldOf = (e: Engine, ids: readonly string[]) =>
  * One beat: the programs declared read, the tasks of the record read off the engine, each task owed filed (its id recorded first, so a
  * filing that fails is tried again under the same id) and each owed a stop asked. Answers what it filed and what it stopped.
  */
-export const programsOnce = Effect.fn('programsOnce')(function* () {
+const programsOnce = Effect.fn('programsOnce')(function* () {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
   const declared = declaredPrograms(yield* listedAt(home));

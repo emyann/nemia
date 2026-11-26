@@ -118,7 +118,7 @@ export async function route(args: Args) {
  * @param runId The run's id.
  * @param step The step's name.
  */
-export const conditionLines = ({ condition: c }: RunConditionWritten, runId: string, step: string) => [
+const conditionLines = ({ condition: c }: RunConditionWritten, runId: string, step: string) => [
   `${runId}  ${step} ${c.name}: ${c.status ?? 'not written'} for try ${c.try}${c.message ? ` — ${c.message}` : ''}`,
   `   the next tick ${c.status === 'True' ? `goes on past ${step}'s check` : c.status === 'False' ? `refuses ${step}'s check, as a failed check is` : `leaves ${step} waiting`}`,
 ];

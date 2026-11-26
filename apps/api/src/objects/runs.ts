@@ -318,7 +318,6 @@ const written = (at: At & { readonly step: string; readonly condition: string },
         message: done.message,
         writtenAt: done.at,
         lastTransitionTime: done.transitionedAt,
-        writer: null,
       },
     };
   });

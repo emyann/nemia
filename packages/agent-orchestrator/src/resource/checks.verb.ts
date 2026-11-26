@@ -42,7 +42,6 @@ export type StepCheck = {
     message: string | null;
     writtenAt: string | null;
     lastTransitionTime: string | null;
-    writer: { factory: string; program: string; phase: 'Pending' | 'Running' | 'Restarting' | 'Down'; message: string } | null;
   };
   refused: {
     exit: string;
@@ -227,7 +226,6 @@ export const checksIn = (step: StepSpec, check: StepRecord['check'], views: View
         message: written?.message ?? null,
         writtenAt: written?.at ?? null,
         lastTransitionTime: written?.transitionedAt ?? null,
-        writer: null,
       },
     } satisfies StepCheck;
   });

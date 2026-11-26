@@ -16,6 +16,7 @@ import type { ConditionWritten, Run, StepRecord } from '../record/record.ts';
  * current try's.
  * @param written What was written for the condition, or null where nothing was.
  * @param current The try the step is on, from 1.
+ * @public
  */
 export const conditionStanding: ConditionStanding = (written, current) => {
   if (written === null || written.try !== current) return 'running';

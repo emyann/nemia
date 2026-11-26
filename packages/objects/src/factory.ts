@@ -28,7 +28,6 @@ import {
   FACTORY_CONDITION_STATUSES,
   FACTORY_CONDITION_TYPES,
   LEVELS,
-  PROGRAM_PHASES,
   PROPOSABLE_KINDS,
   PROPOSAL_PHASES,
   REVISIONS_POLICIES,
@@ -197,19 +196,6 @@ export const FactoryUntrusted = Schema.Struct({
 export type FactoryUntrusted = typeof FactoryUntrusted.Type;
 
 /**
- * A program of the factory's template, as it stands now: its name, the conditions it writes, where it stands, what to do where it is not
- * running, and how many times the runtime has started it again.
- */
-export const FactoryProgram = Schema.Struct({
-  name: Schema.String.annotate({ description: "The program's name, as its template declares it." }),
-  writes: Schema.Array(Schema.String).annotate({ description: 'The conditions it writes, by name.' }),
-  phase: Schema.Literals(PROGRAM_PHASES).annotate({ description: 'Where it stands: Pending, Running, Restarting or Down.' }),
-  message: Schema.String.annotate({ description: 'What to do about it where it is not running; empty where it is.' }),
-  restarts: describedNumber('How many times the runtime has started its process again after it ended.'),
-});
-export type FactoryProgram = typeof FactoryProgram.Type;
-
-/**
  * What the controller last observed of the factory: the generation of its spec it read (`observedGeneration`), its conditions (none on a
  * factory filed by hand, and before its first render), the template's version its base holds (`applied`), the upgrade waiting on the
  * person, its places a harness does not trust now, and why its record does not read (`error`, absent on a factory that reads).
@@ -222,12 +208,6 @@ export const FactoryStatus = Schema.Struct({
   applied: Schema.optionalKey(Schema.String.annotate({ description: "The template's version its base holds." })),
   upgrade: Schema.optionalKey(FactoryUpgrade.annotate({ description: 'The upgrade waiting on the person.' })),
   untrusted: Schema.Array(FactoryUntrusted).annotate({ description: 'Its places a harness does not trust now.' }),
-  programs: Schema.optionalKey(
-    Schema.Array(FactoryProgram).annotate({
-      description:
-        'The programs its template declares and where each stands, read from the runtime; absent where the template declares none or the runtime was not read.',
-    }),
-  ),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why its record does not read; absent on a factory that reads.' })),
 }).annotate({
   description:

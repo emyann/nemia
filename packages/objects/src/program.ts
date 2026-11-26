@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 
 /** What a program's document says. */
-export const ProgramSpec = Schema.Struct({
+const ProgramSpec = Schema.Struct({
   run: Schema.String.annotate({
     description: "The command line the daemon runs with the shell, in the factory's tree, for as long as the factory lives.",
   }),
@@ -15,7 +15,6 @@ export const ProgramSpec = Schema.Struct({
     description: 'The conditions the program writes, by name, each one a check of a step may wait on (`condition:`).',
   }),
 }).annotate({ description: 'The program as its document says it: the line it runs and the conditions it writes.' });
-export type ProgramSpec = typeof ProgramSpec.Type;
 
 /** A program of a template, as an object. */
 export const Program = Schema.Struct({

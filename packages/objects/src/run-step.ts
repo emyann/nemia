@@ -14,7 +14,6 @@ import {
   GATE_BUDGETS_FROM,
   OUTPUT_STREAMS,
   PEAK_MARKS,
-  PROGRAM_PHASES,
   RUNS_IN_BY,
   SAID_AFTER,
   SPAN_AT,
@@ -193,20 +192,8 @@ export const StepLog = Schema.Struct({
 export type StepLog = typeof StepLog.Type;
 
 /**
- * What a program of the factory says of itself, on a condition it writes: the factory it runs for, its name, where it stands
- * (`PROGRAM_PHASES`) and what to do about it.
- */
-export const StepConditionWriter = Schema.Struct({
-  factory: Schema.String.annotate({ description: 'The factory the program runs for.' }),
-  program: Schema.String.annotate({ description: "The program's name, as its template declares it." }),
-  phase: Schema.Literals(PROGRAM_PHASES).annotate({ description: 'Where the program stands: Pending, Running, Restarting or Down.' }),
-  message: Schema.String.annotate({ description: 'What to do about it: the command to type where it is not running.' }),
-});
-export type StepConditionWriter = typeof StepConditionWriter.Type;
-
-/**
  * The condition a check of a step waits on, as it stands for the try the step is on: its name, the try, what was written for that try
- * (`status`, null while nothing was), the writer's words, when, and the program of the factory that writes it, where one declares so.
+ * (`status`, null while nothing was), the writer's words and when.
  */
 export const StepCondition = Schema.Struct({
   name: Schema.String.annotate({ description: "The condition's name, as the check's condition: says it." }),
@@ -217,9 +204,6 @@ export const StepCondition = Schema.Struct({
   message: NullString.annotate({ description: "The writer's words with it; null while nothing was written." }),
   writtenAt: NullString.annotate({ description: 'When it was last written; null while nothing was.' }),
   lastTransitionTime: NullString.annotate({ description: 'When its status last changed; null while nothing was written.' }),
-  writer: Schema.NullOr(StepConditionWriter).annotate({
-    description: 'The program of the factory that writes it and where it stands; null where no program of the factory declares it.',
-  }),
 }).annotate({
   identifier: 'StepCondition',
   description:

@@ -13,7 +13,7 @@ const CONDITION_SHAPE = `nemia condition <runId> <step> <name> --status ${WRITTE
  * from 1; null where none is.
  * @param args The command line's arguments, by key.
  */
-export function conditionRefusal({ status, try: tried }: Args) {
+function conditionRefusal({ status, try: tried }: Args) {
   if (typeof status !== 'string' || !WRITTEN_CONDITION_STATUSES.some((s) => s === status))
     return `--status takes ${WRITTEN_CONDITION_STATUSES.join(', ')}, and here it is ${typeof status === 'string' ? status : 'left out'}: ${CONDITION_SHAPE}.`;
   if (typeof tried === 'string' && !/^[1-9][0-9]*$/.test(tried))

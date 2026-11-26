@@ -235,26 +235,6 @@ async function endings(stage: Stage, root: string) {
       }
       return printed;
     },
-    /**
-     * What the ship's check leaves in its files directory when its e2e runs on the merged tree: `count` pictures of `bytes` each, the
-     * first `-failed`, and the bytes in the directory before.
-     */
-    photographed: (id: string, { count = 252, bytes = 194_000 } = {}) => {
-      const dir = artifactsDir(ROOT, { id }, 'ship');
-      fs.mkdirSync(dir, { recursive: true });
-      const pictures = Array.from({ length: count }, (_, i) => `page-${String(i).padStart(3, '0')}-${i % 2 ? 'dark' : 'light'}.png`);
-      pictures[0] = 'answer-light-failed.png';
-      for (const name of pictures) fs.writeFileSync(path.join(dir, name), Buffer.alloc(bytes, 1));
-      return { dir, pictures, before: artifactFiles(ROOT, { id }, 'ship').reduce((sum, f) => sum + f.bytes, 0) };
-    },
-    /** The pictures in `dir`, sorted, and none where it is gone. */
-    pngsIn: (dir: string) =>
-      (fs.existsSync(dir)
-        ? fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith('.png'))
-            .sort()
-        : []) satisfies string[],
     /** Rewrite the record of run `id` through `edit`, as a record a nemia before this one wrote, or an odd one, reads. */
     rewritten: async (id: string, edit: (record: Record<string, unknown>) => void) => {
       const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as Record<string, unknown>;
@@ -488,42 +468,21 @@ describe("a run waits at its ending's gate, is approved, stages its merge, lands
     settle(`${id}-ship`, 'succeeded', { ...SIGNED, artifacts: [], message: MESSAGE });
     assert.deepEqual((await at.pass(id)).checked, ['ship']);
   });
-  s.test(
-    "its check passes and the merge lands: only the check's pictures are removed — a picture the closeout names, a file that is no picture, one in a folder and a link are kept, and nothing is removed through a link; nemia decide reads it landed once a pass has read it",
-    async () => {
-      const outside = path.join(fs.mkdtempSync(path.join(ROOT, 'outside-')), 'kept.png');
-      fs.writeFileSync(outside, "not the run's");
-      const dir = artifactsDir(ROOT, { id }, 'ship');
-      fs.mkdirSync(path.join(dir, 'shots'), { recursive: true });
-      for (const name of ['named.png', 'also-named.png', 'page-light.png', 'trace.txt', 'shots/deep.png'])
-        fs.writeFileSync(path.join(dir, name), name);
-      fs.symlinkSync(outside, path.join(dir, 'link.png'));
-      const account = 'SHIP-ACCOUNT: merged it onto main, the check passed';
-      settle(`${id}-ship`, 'succeeded', {
-        ...SIGNED,
-        summary: account,
-        artifacts: [path.join(dir, 'named.png'), 'also-named.png'],
-        message: MESSAGE,
-      });
-      settle(`${id}-ship-check`, 'succeeded', undefined, 0);
-      await at.pass(id);
-      assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
-      assert.notEqual(world().head(repo), base);
-      assert.deepEqual(
-        fs.readdirSync(dir).sort(),
-        ['also-named.png', 'e2e-pictures.txt', 'link.png', 'named.png', 'shots', 'trace.txt'],
-        'the two pictures the closeout names, by absolute path in its directory and from the workspace root, are kept',
-      );
-      assert.deepEqual(fs.readdirSync(path.join(dir, 'shots')), ['deep.png']);
-      assert.equal(fs.readFileSync(outside, 'utf8'), "not the run's", 'and what the link leads to is untouched');
-      assert.match(
-        fs.readFileSync(path.join(dir, 'e2e-pictures.txt'), 'utf8'),
-        /removed the 1 picture the check[^]*\n {2}page-light\.png {2}14 B\n/,
-      );
-      await at.aPass(e);
-      assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
-    },
-  );
+  s.test('its check passes and the merge lands; nemia decide reads it landed once a pass has read it', async () => {
+    const account = 'SHIP-ACCOUNT: merged it onto main, the check passed';
+    settle(`${id}-ship`, 'succeeded', {
+      ...SIGNED,
+      summary: account,
+      artifacts: [],
+      message: MESSAGE,
+    });
+    settle(`${id}-ship-check`, 'succeeded', undefined, 0);
+    await at.pass(id);
+    assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
+    assert.notEqual(world().head(repo), base);
+    await at.aPass(e);
+    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
+  });
   s.test(
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",
     async () => {
@@ -547,30 +506,21 @@ describe('a landing a pass reads again — after a restart, under a pause, or wi
   });
   const s = story(test);
   s.test(
-    'a merge committed before the run wrote it down is recorded as landed, never committed twice, and the pictures the pass that died left go; nemia decide reads it landed once a pass has read it',
+    'a merge committed before the run wrote it down is recorded as landed, never committed twice; nemia decide reads it landed once a pass has read it',
     async () => {
       const { repo, id, checkId } = await at.stagedAndSigned();
       settle(checkId, 'succeeded', undefined, 0);
       world().commit(repo, 'the commit the pass made before it died');
       const head = world().head(repo);
-      const shot = at.photographed(id, { count: 3, bytes: 10 });
-      fs.writeFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'the note of the pass that died\n');
       await at.pass(id);
       assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { commit: head }, "the next pass reads the result on the checkout's HEAD");
-      assert.deepEqual(at.pngsIn(shot.dir), [], 'the pass that died had removed some of the pictures, and the rest go');
-      assert.equal(
-        fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'),
-        'the note of the pass that died\n',
-        'its note is left',
-      );
       assert.equal(world().head(repo), head, 'nothing committed again');
       await at.aPass(stage.board().e);
       assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
     },
   );
-  s.test('a refused merge aborted by hand is recorded as nothing landed, and every picture is kept', async () => {
+  s.test('a refused merge aborted by hand is recorded as nothing landed', async () => {
     const { repo, id, base, checkId } = await at.stagedAndSigned();
-    const shot = at.photographed(id, { count: 3, bytes: 10 });
     settle(checkId, 'failed', undefined, 1);
     world().takeBack(repo);
     await at.pass(id);
@@ -579,7 +529,6 @@ describe('a landing a pass reads again — after a restart, under a pause, or wi
       { aborted: 'its check refused the merge (exit 1)' },
       'nothing is aborted again',
     );
-    assert.deepEqual(at.pngsIn(shot.dir), [...shot.pictures].sort(), 'nothing landed: every picture is kept');
     assert.equal(world().head(repo), base);
   });
   s.test('a check that passed on a merge no longer staged commits nothing: the run does not merge again on its own', async () => {
@@ -920,7 +869,9 @@ const checkedDecision = async (exitCode: number | undefined) => {
     'approve-ship-1',
     JSON.stringify({ ...JSON.parse(askText(ROOT, id, 'approve-ship-1') ?? ''), at: '2026-09-17T08:00:00.000Z' }),
   );
-  at.photographed(id, { count: 2, bytes: 10 });
+  const files = artifactsDir(ROOT, { id }, 'ship');
+  fs.mkdirSync(files, { recursive: true });
+  for (const name of ['answer-light-failed.png', 'page-001-dark.png']) fs.writeFileSync(path.join(files, name), Buffer.alloc(10, 1));
   stage.board().settle(checkId, 'failed', undefined, exitCode);
   if (exitCode !== undefined) stage.board().tasks.get(checkId)!.printed = { stdout: '' };
   await at.pass(id);

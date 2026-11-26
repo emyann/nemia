@@ -5,14 +5,8 @@
  * label that marks the card and its run, and the stated estimate. Level-triggered: each reads what the store holds now, never a flag of
  * the browser's, so a step done at a terminal shows as done on the board.
  */
-import type { CostLineOf, FirstBeatOf, FirstWorkflowOf, NextStepsOf, RunCost } from '../../contracts/first-card.contract.ts';
+import type { CostLineOf, FirstBeatOf, FirstGatesOf, FirstWorkflowOf, NextStepsOf, RunCost } from '../../contracts/first-card.contract.ts';
 import type { RunView } from './api/judged.ts';
-
-/** The workflow a first card runs in, where its factory offers it: one that lands a small change with a review and no spec. */
-export const FIRST_WORKFLOW = 'quick';
-
-/** The step a first run in `FIRST_WORKFLOW` is gated at: the landing, so the person approves what lands. */
-const FIRST_GATE = 'land';
 
 /** The label a first card is filed with, which its run is started with: how the run's page knows to draw the hints. */
 export const FIRST_CARD_LABEL = 'onboarding=first-card';
@@ -43,10 +37,13 @@ export const SUGGESTIONS: readonly Suggestion[] = [
 ];
 
 /**
- * The workflow a first card runs in: `FIRST_WORKFLOW` where the factory offers it, else none, and the page offers its own to choose.
+ * The workflow a first card runs in: the one the factory names (`firstWorkflow`) where it offers it, else none, and the page offers its
+ * own to choose.
  * @param offered The workflows the factory offers, by name.
+ * @param declared The workflow the factory names for a first card; undefined where it names none.
  */
-export const firstWorkflowOf: FirstWorkflowOf = (offered) => (offered.includes(FIRST_WORKFLOW) ? FIRST_WORKFLOW : undefined);
+export const firstWorkflowOf: FirstWorkflowOf = (offered, declared) =>
+  declared !== undefined && offered.some((name) => name === declared) ? declared : undefined;
 
 /**
  * The cost line's figures: what one landed run of the workflow cost and took here, where the store measured any, else the estimate.
@@ -96,15 +93,12 @@ export const nextStepsOf: NextStepsOf = (factory) =>
   factory.local && factory.follows ? ['level', 'github', 'terminal'] : ['level', 'terminal'];
 
 /**
- * The gates a first card's run is started with, so it waits on the person before what it does lands: `FIRST_GATE` in `FIRST_WORKFLOW`,
- * else the workflow's ending step (`workspace: base`) where its listing has one, else none.
- * @param workflow The workflow the card runs in.
+ * The gates a first card's run is started with, so it waits on the person before what it does lands: the workflow's ending step
+ * (`workspace: base`) where its listing has one, else none.
  * @param steps The workflow's steps as the factory lists it; undefined where they were not read.
  */
-export const firstGatesOf = (workflow: string, steps: readonly { name: string; spec: { workspace?: string | null } }[] | undefined) =>
-  workflow === FIRST_WORKFLOW
-    ? [FIRST_GATE]
-    : (steps ?? [])
-        .filter((step) => step.spec.workspace === 'base')
-        .map((step) => step.name)
-        .slice(0, 1);
+export const firstGatesOf: FirstGatesOf = (steps) =>
+  (steps ?? [])
+    .filter((step) => step.spec.workspace === 'base')
+    .map((step) => step.name)
+    .slice(0, 1);

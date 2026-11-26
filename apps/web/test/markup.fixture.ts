@@ -219,6 +219,7 @@ export const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}
     missing: [],
     replies: null,
     schema: {},
+    tallies: [],
     questions: [],
     raw: { outcome: 'done', summary },
     ...more,
@@ -494,6 +495,7 @@ export const planCloseout: StepCloseout = {
   artifacts: [],
   replies: null,
   missing: [],
+  tallies: [],
   questions: [],
   raw: {},
   output: {
@@ -555,6 +557,7 @@ export const filed = (name: string, extra: Partial<import('../src/lib/api/factor
     volumes: [],
     costLines: {},
     workflowRepos: {},
+    firstWorkflow: null,
     template: null,
     ...extra,
   }) satisfies import('../src/lib/api/factories.ts').Factory;

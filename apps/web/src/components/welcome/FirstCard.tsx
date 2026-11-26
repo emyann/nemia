@@ -18,7 +18,6 @@ import {
   ESTIMATE_WORDS,
   FIRST_CARD_LABEL,
   FIRST_RUN_ESTIMATE,
-  FIRST_WORKFLOW,
   firstGatesOf,
   firstWorkflowOf,
   SUGGESTIONS,
@@ -56,8 +55,9 @@ function useFirstStart() {
 /**
  * The welcome's fourth milestone, "What first?", at `/welcome/card`: the factory it is filed in (a choice where the store holds several),
  * three suggested small changes that fill the card's words, which the person may replace with their own, the workflow it runs in
- * (`firstWorkflowOf`: quick where the factory offers it, else a choice of the factory's own), the cost line above Start, and Start, which
- * files the card labelled `FIRST_CARD_LABEL` and starts it, gated at its landing in quick, then opens the run's page, where the hints are.
+ * (`firstWorkflowOf`: the one the factory names where it offers it, else a choice of the factory's own), the cost line above Start, and
+ * Start, which
+ * files the card labelled `FIRST_CARD_LABEL` and starts it, gated at its workflow's ending, then opens the run's page, where the hints are.
  * A refusal is said in the api's words; a skip leads to the board.
  */
 export function FirstCard() {
@@ -65,7 +65,7 @@ export function FirstCard() {
   const [chosen, setChosen] = useState<string | undefined>(undefined);
   const factory = factoryFiledIn(factories, chosen);
   const offered = factory?.workflows ?? [];
-  const first = firstWorkflowOf(offered);
+  const first = firstWorkflowOf(offered, factory?.firstWorkflow ?? undefined);
   const [picked, setPicked] = useState<string | undefined>(undefined);
   const workflow = first ?? (picked !== undefined && offered.includes(picked) ? picked : undefined);
   const [body, setBody] = useState('');
@@ -126,22 +126,21 @@ export function FirstCard() {
 }
 
 /**
- * The gates the first card's run is started with (`firstGatesOf`): quick's at once; another workflow's once the factory's listing of it
- * is read, which says its ending step; undefined while it is read. A workflow the factory wires to no one repository is started with none,
+ * The gates the first card's run is started with (`firstGatesOf`): once the factory's listing of its workflow is read, which says its
+ * ending step; undefined while it is read. A workflow the factory wires to no one repository is started with none,
  * and the start says the api's refusal.
  */
 function useFirstGates(factory: Factory | undefined, workflow: string | undefined) {
-  const on = factory !== undefined && workflow !== undefined && workflow !== FIRST_WORKFLOW ? startRepo(factory, workflow) : undefined;
+  const on = factory !== undefined && workflow !== undefined ? startRepo(factory, workflow) : undefined;
   const repo = on !== undefined && 'repo' in on ? on.repo : undefined;
   const listed = useQuery({
     ...factoryWorkflowsQuery({ factory: factory?.name ?? '', repo: repo ?? '' }),
     enabled: repo !== undefined,
   });
   if (workflow === undefined) return undefined;
-  if (workflow === FIRST_WORKFLOW || repo === undefined) return firstGatesOf(workflow, undefined);
-  if (listed.isError) return firstGatesOf(workflow, undefined);
+  if (repo === undefined || listed.isError) return firstGatesOf(undefined);
   if (!listed.data) return undefined;
-  return firstGatesOf(workflow, listed.data.find((w) => w.name === workflow && w.error === null)?.steps);
+  return firstGatesOf(listed.data.find((w) => w.name === workflow && w.error === null)?.steps);
 }
 
 /** The card's words: the three suggestions, a press filling the field, and the field the person may write in. */

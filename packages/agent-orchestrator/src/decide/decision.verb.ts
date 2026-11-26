@@ -8,11 +8,12 @@ import { Effect } from 'effect';
 import type { Decidable, RunDecision } from 'objects';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
+import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun, namesInOrder, type Run } from '../record/record.ts';
 import { approvedFirst, branchWord } from '../status/status.ts';
 import { stepsReading, type StepsReading } from '../object/read.verb.ts';
-import { branchesToRead, CHECK_AFFECTING, countsLine, lessonOf, resultSteps } from '../branches/index.ts';
+import { branchesToRead, countsLine, NO_RADIUS, lessonOf, resultSteps } from '../branches/index.ts';
 import { branchStandings, type BranchReader } from '../branches/branches.store.ts';
 import { changesOf, type BranchChanges } from '../branches/changes.store.ts';
 import { mergesRead } from '../branches/merges.verb.ts';
@@ -223,6 +224,8 @@ const branchesOf = Effect.fnUntraced(function* (
 ) {
   if (!isRepositoryRun(run)) return { touched: [], results: [], standings: [] };
   const place = yield* PlaceService;
+  const filed = yield* factoryOrNone(run.factory).pipe(Effect.orElseSucceed(() => undefined));
+  const radiusOf = filed?.radius ?? NO_RADIUS;
   const results = [
     ...new Set(
       resultSteps(steps)
@@ -236,7 +239,7 @@ const branchesOf = Effect.fnUntraced(function* (
     namesInOrder(run, decided.steps).map((name) => run.steps[name]?.branch),
     run.isolate ? run.branch : undefined,
   );
-  const changes = changesOf(place, run, [...toRead, ...branches, ...(run.isolate ? results : [])], how.sensitive ?? CHECK_AFFECTING);
+  const changes = changesOf(place, run, [...toRead, ...branches, ...(run.isolate ? results : [])], radiusOf, how.sensitive);
   const touched = toRead.map((branch) => changeOf(changes, branch));
   const read = branches.map((branch) => changeOf(changes, branch));
   if (!run.isolate) return { touched, results: read, standings: [] };

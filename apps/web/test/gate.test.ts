@@ -199,7 +199,11 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
       step('review', {
         spec: { loop: 'implement', rounds: 3 } as Step['spec'],
         tries: [tried(1), tried(2, 2)],
-        closeout: { outcome: 'succeeded', output: { again: false, findings: [] } } as unknown as Step['closeout'],
+        closeout: {
+          outcome: 'succeeded',
+          output: { again: false, concerns: [] },
+          tallies: [{ tally: 'concerns', value: 0 }],
+        } as unknown as Step['closeout'],
       }),
     ];
     const decision = {
@@ -208,7 +212,7 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     } as unknown as Decidable;
     assert.deepEqual(gateFacts(detail(steps), decision), [
       { label: 'round', said: 'round 2 of 3 · cost $1.20' },
-      { label: 'last review', said: 'review asks no further round', state: 'good', step: 'review' },
+      { label: 'loop', said: 'review asks no further round', state: 'good', step: 'review' },
       { label: 'check', said: 'implement: passed on try 2', state: 'good', step: 'implement' },
       { label: 'merges', said: 'conflicts with main in 1 file: src/a.ts', state: 'bad' },
     ]);
@@ -220,12 +224,16 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     const findings = [
       step('review', {
         spec: { loop: 'implement' } as Step['spec'],
-        closeout: { outcome: 'succeeded', output: { again: true, findings: [{}, {}] } } as unknown as Step['closeout'],
+        closeout: {
+          outcome: 'succeeded',
+          output: { again: true, concerns: [{}, {}] },
+          tallies: [{ tally: 'concerns', value: 2 }],
+        } as unknown as Step['closeout'],
       }),
     ];
     assert.deepEqual(gateFacts(detail(findings, { cost: null }), null), [
       { label: 'round', said: 'round 1 · cost not measured' },
-      { label: 'last review', said: 'review left 2 findings and asks another round', state: undefined, step: 'review' },
+      { label: 'loop', said: 'review left concerns: 2, and asks another round', state: undefined, step: 'review' },
     ]);
     const accepted = [
       {
@@ -236,19 +244,27 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     assert.deepEqual(
       gateFacts(detail(accepted, { cost: null }), null)[1],
       {
-        label: 'last review',
-        said: 'review left 2 findings; a person accepted the work as it stands, with them open: fan-in teams are follow-up work',
+        label: 'loop',
+        said: 'review left concerns: 2; a person accepted the work as it stands: fan-in teams are follow-up work',
         state: undefined,
         step: 'review',
       },
       'a loop a person ended out of rounds (`nemia approve`) still has `again: true` in its closeout: the fact says whose word ended it, with their words, not "asks another round"',
     );
-    const one = [
-      { ...accepted[0], closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] },
+    const undeclared = [
+      step('review', {
+        spec: { loop: 'implement' } as Step['spec'],
+        closeout: {
+          outcome: 'succeeded',
+          output: { again: true, findings: [{}, {}] },
+          tallies: [],
+        } as unknown as Step['closeout'],
+      }),
     ];
-    assert.match(
-      gateFacts(detail(one, { cost: null }), null)[1].said,
-      /^review left 1 finding; a person accepted the work as it stands, with it open: /,
+    assert.equal(
+      gateFacts(detail(undeclared, { cost: null }), null)[1]?.said,
+      'review signed off succeeded',
+      'a field named findings is counted by no one: nothing is counted where the step declares no tally',
     );
     const failed = [step('implement', { check: { verdict: { result: 'failed', exit: 1 } } as Step['check'] })];
     assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');

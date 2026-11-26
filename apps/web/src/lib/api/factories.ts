@@ -110,6 +110,8 @@ export type Factory = {
   costLines: Record<string, number>;
   /** The folder name of each workflow's repository, by the workflow's name (`startRepo`). */
   workflowRepos: Record<string, string>;
+  /** The workflow a first card on it runs in, null where it names none (`firstWorkflowOf`). */
+  firstWorkflow: string | null;
   /** How it comes to land as a clone of its template's followed host would: absent where its template follows none. */
   follow?: NonNullable<FactoryCommands['follow']>;
 };
@@ -158,6 +160,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands)
     untrusted: status.untrusted.map((u) => ({ place: u.place, harness: u.harness, withheld: u.withheld, never: u.never ?? null })),
     costLines: { ...spec.costLines },
     workflowRepos: { ...spec.workflowRepos },
+    firstWorkflow: spec.firstWorkflow ?? null,
     ...(commands.follow === undefined ? {} : { follow: commands.follow }),
     volumes: spec.volumes.map((v) => ({
       path: v.path,

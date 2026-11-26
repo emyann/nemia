@@ -508,6 +508,7 @@ const bare: StepCloseout = {
   missing: [],
   replies: null,
   schema: {},
+  tallies: [],
   questions: [],
   raw: {},
 };

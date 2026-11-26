@@ -203,6 +203,7 @@ const millView: Factory = {
   ],
   costLines: {},
   workflowRepos: {},
+  firstWorkflow: null,
 };
 
 /** The schedules of `mill` the fixtures make, as its Settings draws them. */

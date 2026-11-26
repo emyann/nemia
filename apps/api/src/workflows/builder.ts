@@ -185,7 +185,7 @@ export type StepBody = typeof STEP_BODY.Type;
 const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: string }>> = (() => {
   const strings = {
     is: (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
-    said: 'a list of strings, such as ["implement"]',
+    said: 'a list of strings, such as ["first"]',
   };
   const string = { is: (v: unknown) => typeof v === 'string', said: 'a string' };
   const number = { is: (v: unknown) => typeof v === 'number', said: 'a number' };

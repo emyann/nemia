@@ -135,6 +135,16 @@
       "type": "LabelValueRule"
     },
     {
+      "term": "Radius",
+      "meaning": "the files a branch changes that a factory's team wants shown at `nemia decide`, three lists of globs (`radius`: `agentFacing`, `checkAffecting`, `lessons`): kept in its own file, or in its tree's wiring where it is made from a template, rendered from the manifest's `spec.radius`, each list whitespace-apart words, often a parameter's value (`renderedSettings`, in `packages/agent-orchestrator/src/factory/applied/render.ts`). A factory that sets none flags nothing: the core names no file. Served on the factory's `spec.radius`; `?sensitive=` overrides `checkAffecting` for one call.",
+      "type": "Factory"
+    },
+    {
+      "term": "First workflow",
+      "meaning": "the workflow a first card on a factory runs in (`firstWorkflow`): kept as the radius is, rendered from the manifest's `spec.firstWorkflow`, which the template's check refuses where it names no workflow of the template (`firstWorkflowRefusals`, in `packages/agent-orchestrator/src/template/check.ts`). Served on the factory's `spec.firstWorkflow`; the board starts its welcome card there and gates it at the workflow's listed ending step.",
+      "type": "Factory"
+    },
+    {
       "term": "Harness settings",
       "meaning": "the settings of a harness a factory gives every session of its runs' steps on it, on top of the repository's own: for Claude Code, through the Agent SDK's settings option, never a file written into the repository. A factory sets `attribution`, `includeGitInstructions` and `language` alone, each changing what a session writes or says and none what it may reach or run; kept in the factory's own file, never in its template, and frozen on a run at its start.",
       "type": "HarnessSettings",

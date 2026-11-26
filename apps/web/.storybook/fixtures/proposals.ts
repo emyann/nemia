@@ -73,6 +73,7 @@ export const factoryView = (name: string, isDefault = false) => ({
   volumes: [],
   costLines: {},
   workflowRepos: { build: 'nemia' },
+  firstWorkflow: null,
 });
 
 /**

@@ -99,6 +99,9 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * its file holds one; a file written before the counter reads as 1 (`generationOf`). `labelValues`: the values each label key it names
  * takes on its cards and runs, when it names any — its file's, or its tree's wiring's where it is made from a template, which renders
  * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`).
+ * `radius`: the globs of the files a branch changes that its team wants shown at decide (`agentFacing`, `checkAffecting`, `lessons`),
+ * kept as `labelValues` is, rendered from its manifest's `spec.radius`; none flags nothing. `firstWorkflow`: the workflow a first
+ * card on it runs in, from its manifest's `spec.firstWorkflow`.
  */
 export type Factory = {
   name: string;
@@ -115,6 +118,8 @@ export type Factory = {
   workflowRepos?: Readonly<Record<string, string>>;
   triggers?: Readonly<Record<string, CardTrigger>>;
   labelValues?: Readonly<Record<string, readonly string[]>>;
+  radius?: { readonly agentFacing: readonly string[]; readonly checkAffecting: readonly string[]; readonly lessons: readonly string[] };
+  firstWorkflow?: string;
   generation?: number;
 };
 

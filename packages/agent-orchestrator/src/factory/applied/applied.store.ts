@@ -69,6 +69,14 @@ const TreeWiringSchema = Schema.StructWithRest(
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
     labelValues: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+    radius: Schema.optionalKey(
+      Schema.Struct({
+        agentFacing: Schema.Array(Schema.String),
+        checkAffecting: Schema.Array(Schema.String),
+        lessons: Schema.Array(Schema.String),
+      }),
+    ),
+    firstWorkflow: Schema.optionalKey(Schema.String),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

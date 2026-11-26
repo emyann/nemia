@@ -85,6 +85,12 @@ export const StepCloseout = Schema.Struct({
       description: 'The shape of each field of its schema its output marked by x-shape; absent where it marked none.',
     }),
   ),
+  tallies: List(
+    Schema.Struct({
+      tally: Schema.String.annotate({ description: 'The count its step declares (`tally:`), as the step wrote it.' }),
+      value: Schema.NullOr(Schema.Finite).annotate({ description: 'What the count is on this closeout; null where its field is absent.' }),
+    }),
+  ).annotate({ description: 'Each count its step declares, valued off this closeout, in the step order; empty where it declares none.' }),
   questions: List(Asked).annotate({ description: 'Its questions, by the output field they were asked under, each with its options.' }),
   raw: describedOne(Schema.Unknown, 'The closeout as it came, on a read that names every field (?fields=*); null otherwise.'),
   /**

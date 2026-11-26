@@ -37,7 +37,8 @@ export type TemplateRead = {
 /**
  * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
  * its runs follow merged revisions, where the manifest says (`spec.revisions`), and the values each label key it names takes, where the
- * manifest's `spec.labelValues` renders any (`renderedLabelValues`).
+ * manifest's `spec.labelValues` renders any (`renderedLabelValues`), the globs of its radius (`renderedSettings`) and the workflow its
+ * first card runs in, where the manifest names them.
  */
 export type Wiring = {
   workflows: string[];
@@ -45,6 +46,8 @@ export type Wiring = {
   revisions?: RevisionsPolicy;
   triggers?: Record<string, { selector: string; target: { kind: 'Workflow'; name: string }; since: string }>;
   labelValues?: Readonly<Record<string, readonly string[]>>;
+  radius?: { agentFacing: string[]; checkAffecting: string[]; lessons: string[] };
+  firstWorkflow?: string;
 };
 
 /**
@@ -79,6 +82,25 @@ function unreadTriggerRefusal(name: string, selector: string, unread: string, wr
     ? `set ${named.map((p) => `--set ${p}=<value>`).join(' and ')} to what makes it a selector, as the parameter's description says`
     : "mend the trigger's selector in nemia.yaml";
   return `nemia.yaml: trigger ${name}'s selector, as rendered, is refused: ${unread}. It would queue no card: ${fix}, and apply again.`;
+}
+
+/**
+ * The settings of a template's manifest the wiring carries beside its hires, parameters rendered: the globs of `spec.radius`, each list
+ * split on whitespace with the empty words dropped, none where the manifest names no radius, and the workflow of `spec.firstWorkflow`.
+ * @param manifest The manifest's spec, parameters substituted.
+ */
+function renderedSettings(manifest: Spec) {
+  const { radius, firstWorkflow } = manifest;
+  const globs = (key: string) => {
+    const written = isMap(radius) ? radius[key] : undefined;
+    return typeof written === 'string' ? written.split(/\s+/).filter((glob) => glob !== '') : [];
+  };
+  return {
+    ...(isMap(radius)
+      ? { radius: { agentFacing: globs('agentFacing'), checkAffecting: globs('checkAffecting'), lessons: globs('lessons') } }
+      : {}),
+    ...(typeof firstWorkflow === 'string' && firstWorkflow !== '' ? { firstWorkflow } : {}),
+  } satisfies Pick<Wiring, 'radius' | 'firstWorkflow'>;
 }
 
 /**
@@ -447,6 +469,7 @@ export function renderFactory(read: TemplateRead, params: Params) {
     ...(revisions === undefined ? {} : { revisions }),
     ...triggers.wiring,
     ...labelValues.wiring,
+    ...renderedSettings(manifest),
   };
   const out: Rendered = { files: [], copies: [], wiring, refusals: [...triggers.refused, ...labelValues.refused] };
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));

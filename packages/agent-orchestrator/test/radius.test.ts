@@ -5,16 +5,12 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
-  AGENT_FACING,
-  CHECK_AFFECTING,
-  LESSON,
   ROOT_GROUP,
   branchesToRead,
   deepWorkspaces,
   groupOf,
   inFullLines,
   isLesson,
-  lessonGlobs,
   lessonLine,
   matches,
   countsLine,
@@ -31,6 +27,22 @@ import { count, sumUsage, usedLines, peakMark, readWords, rebuiltCache } from '.
 import { budgetWord, dollars } from '../src/money/money.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
+/** A factory's radius, as its team might set it: the lists a decide screen is given, since the core names none. */
+const GLOBS = {
+  agentFacing: ['**/CLAUDE.md', '**/AGENTS.md', '**/.claude/', '**/.codex/', '**/.mcp.json', '**/README.md'],
+  checkAffecting: [
+    '**/package.json',
+    '**/package-lock.json',
+    '**/tsconfig*.json',
+    '**/turbo.json',
+    '**/.oxlintrc.json',
+    '**/.oxfmtrc.json',
+    '**/*.test.*',
+    '**/test/',
+    '**/.e2e/',
+  ],
+  lessons: ['**/CLAUDE.md', '**/AGENTS.md', 'docs/', 'packages/*/docs/', 'apps/*/docs/'],
+};
 /**
  * The files a branch changed, as the place's `report` lists them, each written `added<TAB>removed<TAB>path`: `-` for a binary file's
  * count, and a rename's path `from => to`.
@@ -55,6 +67,7 @@ test('radius reads a rename at both ends, a binary file with no counts, and a fi
       '1\t1\tdocs/old.md => notes/new.md',
     ),
     WORKSPACES,
+    GLOBS,
   );
 
   assert.deepEqual(r.changes, [
@@ -109,14 +122,28 @@ test('without workspaces a change groups by its top-level directory, and a file 
 });
 
 test('the agent-facing and check-affecting lines are absent when nothing qualifies', () => {
-  const lines = radiusLines(radius(numstat('3\t1\tsrc/index.ts', '10\t0\tsrc/testing/latest.ts', '1\t1\tdocs/claude.md'), WORKSPACES));
+  const lines = radiusLines(
+    radius(numstat('3\t1\tsrc/index.ts', '10\t0\tsrc/testing/latest.ts', '1\t1\tdocs/claude.md'), WORKSPACES, GLOBS),
+  );
   assert.deepEqual(lines, ['docs  1 file   +1 −1', 'src   2 files  +13 −1']);
   assert.ok(!lines.some((l) => l.startsWith('agent-facing') || l.startsWith('check-affecting')));
-  const both = radiusLines(radius(numstat('3\t1\tsrc/index.ts', '1\t0\t.mcp.json', '4\t0\tsrc/index.test.ts')));
+  const both = radiusLines(radius(numstat('3\t1\tsrc/index.ts', '1\t0\t.mcp.json', '4\t0\tsrc/index.test.ts'), [], GLOBS));
   assert.deepEqual(
     both.slice(-2),
     ['agent-facing     .mcp.json', 'check-affecting  src/index.test.ts'],
     'and present when something does, or the absence above would prove nothing',
+  );
+});
+
+test('a radius that names nothing flags nothing: the core knows no repository file, so no list is a default', () => {
+  const r = radius(numstat('1\t0\tCLAUDE.md', '1\t0\tpackage.json', '1\t0\tsrc/a.test.ts', '1\t0\tdocs/a.md'), WORKSPACES);
+  assert.deepEqual([r.agentFacing, r.checkAffecting, r.lessons], [[], [], []]);
+  assert.deepEqual(sensitivePaths(r.changes, r.checkAffecting), []);
+  assert.deepEqual(
+    radius(numstat('1\t0\tMakefile', '1\t0\tpackage.json'), [], { agentFacing: [], checkAffecting: ['**/Makefile'], lessons: [] })
+      .checkAffecting,
+    ['Makefile'],
+    'a factory that names a file has it flagged, and only it',
   );
 });
 
@@ -139,7 +166,7 @@ test("the base's workspaces are read from its package.json text: a list, or its 
   assert.deepEqual(workspacesIn('{not json'), []);
 });
 
-test('the shipped lists name what the brief names, and refuse what they do not', () => {
+test("a team's lists, as a factory states them, name what they name and refuse what they do not", () => {
   const inCheck = [
     'package.json',
     'apps/web/package.json',
@@ -167,8 +194,8 @@ test('the shipped lists name what the brief names, and refuse what they do not',
     'README.md',
     'oxlintrc.json',
   ];
-  for (const f of inCheck) assert.ok(matches(f, CHECK_AFFECTING), `check-affecting: ${f}`);
-  for (const f of notInCheck) assert.ok(!matches(f, CHECK_AFFECTING), `not check-affecting: ${f}`);
+  for (const f of inCheck) assert.ok(matches(f, GLOBS.checkAffecting), `check-affecting: ${f}`);
+  for (const f of notInCheck) assert.ok(!matches(f, GLOBS.checkAffecting), `not check-affecting: ${f}`);
 
   const inAgent = [
     'CLAUDE.md',
@@ -181,12 +208,12 @@ test('the shipped lists name what the brief names, and refuse what they do not',
     'README.md',
   ];
   const notInAgent = ['docs/claude.md', 'src/index.ts', 'CLAUDE.md.orig', 'my.claude/x', 'README.mdx', 'package.json'];
-  for (const f of inAgent) assert.ok(matches(f, AGENT_FACING), `agent-facing: ${f}`);
-  for (const f of notInAgent) assert.ok(!matches(f, AGENT_FACING), `not agent-facing: ${f}`);
+  for (const f of inAgent) assert.ok(matches(f, GLOBS.agentFacing), `agent-facing: ${f}`);
+  for (const f of notInAgent) assert.ok(!matches(f, GLOBS.agentFacing), `not agent-facing: ${f}`);
 
-  const lesson = lessonGlobs(WORKSPACES);
+  const lesson = GLOBS.lessons;
   for (const f of ['CLAUDE.md', 'AGENTS.md', 'apps/web/CLAUDE.md', 'docs/plan.md', 'packages/x/docs/features.md', 'apps/web/docs/a/b.md'])
-    assert.ok(matches(f, lesson), `lesson: ${f}`);
+    assert.ok(isLesson(f, lesson), `lesson: ${f}`);
   for (const f of [
     'README.md',
     'src/docs.ts',
@@ -198,22 +225,18 @@ test('the shipped lists name what the brief names, and refuse what they do not',
     'packages/docs/a.md',
     'vendor/lib/docs/a.md',
   ])
-    assert.ok(
-      !matches(f, lesson),
-      `not a lesson: ${f} — a docs/ that is not the root's or a workspace package's is product code, not where the next agent reads`,
-    );
+    assert.ok(!isLesson(f, lesson), `not a lesson: ${f}`);
   assert.ok(
-    matches('docs/a.md', lessonGlobs([])) && !matches('packages/x/docs/features.md', lessonGlobs([])),
-    "with no workspaces, only the root's docs/ is a package's",
+    !isLesson('packages/x/docs/features.md', ['docs/']),
+    "lessons are exactly the globs given: none is derived from the base's workspaces",
   );
-  assert.deepEqual(lessonGlobs(['packages/*/', 'apps/*']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
 });
 
 test('--sensitive with a glob that matches nothing names no path, and the heading says whose list it is', () => {
   const { changes } = radius(numstat('3\t1\tsrc/index.ts', '4\t0\tsrc/index.test.ts', '0\t0\ttest/a.ts => spec/a.ts'));
   assert.deepEqual(sensitivePaths(changes, parseGlobs('nothing/**, *.nope')), []);
   assert.deepEqual(
-    sensitivePaths(changes, CHECK_AFFECTING),
+    sensitivePaths(changes, GLOBS.checkAffecting),
     ['src/index.test.ts', 'spec/a.ts'],
     'a rename the default names at either end is asked by its path, and the place diffs both ends as one',
   );
@@ -222,7 +245,7 @@ test('--sensitive with a glob that matches nothing names no path, and the headin
   assert.deepEqual(parseGlobs(' , ,'), []);
 });
 
-const on = (branch: string, ...lines: string[]) => ({ branch, radius: radius(numstat(...lines), WORKSPACES) });
+const on = (branch: string, ...lines: string[]) => ({ branch, radius: radius(numstat(...lines), WORKSPACES, GLOBS) });
 const gone = (branch: string) => ({ branch, radius: { error: notKnown(`the place has no branch ${branch} in /r`) } });
 
 test("the lesson line: a branch that touched only a package's docs says so, and one that touched nothing agent-facing says nothing was written", () => {
@@ -353,7 +376,7 @@ test("REFUSED before, now read: `./packages/*` from the base's package.json grou
     '1\t0\tpackages/y/src/docs/b.md',
     '1\t0\tpackages/README.md',
   );
-  const r = radius(same, ['./packages/*']);
+  const r = radius(same, ['./packages/*'], GLOBS);
   assert.deepEqual(
     r.groups.map((g) => [g.name, g.files]),
     [
@@ -375,12 +398,11 @@ test("REFUSED before, now read: `./packages/*` from the base's package.json grou
       radius(same, ['packages/*']).groups,
       `${written}: taken as written, it matches no path git prints, every package in one packages group and nothing read as a lesson`,
     );
-  assert.deepEqual(lessonGlobs(['./packages/*', './apps/*/']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
   assert.deepEqual(radius(same, ['./packages/*']).deepWorkspaces, [], 'no ** glob, so nothing to name');
   assert.ok(!radiusLines(r).some((l) => l.startsWith('workspaces')), 'and the screen names none');
 });
 
-test('a workspace glob with `**` is not refused but named on the screen — and each file counts once: in the outermost package on its way, and as a lesson only in its docs/', () => {
+test('a workspace glob with `**` is not refused but named on the screen — and each file counts once, in the outermost package on its way', () => {
   const r = radius(
     numstat(
       '1\t0\tpackages/x/src/docs/a.md',
@@ -390,6 +412,7 @@ test('a workspace glob with `**` is not refused but named on the screen — and 
       '5\t0\tsrc/index.ts',
     ),
     ['packages/**', 'apps/*'],
+    GLOBS,
   );
   assert.deepEqual(r.groups, [
     { name: 'packages/docs', files: 1, added: 4, removed: 0, binary: 0 },
@@ -404,16 +427,12 @@ test('a workspace glob with `**` is not refused but named on the screen — and 
   assert.deepEqual(
     r.lessons.map((c) => c.path),
     ['packages/x/docs/notes.md'],
-    "not packages/**/docs/, which takes the source's docs/ and a docs/ directly under packages/ as lessons too",
+    "the factory's lessons are the globs it names, whatever the workspaces say",
   );
-  assert.ok(matches('packages/x/src/docs/a.md', ['packages/**/docs/']), 'the glob a ** workspace would have made');
-  assert.equal(isLesson('packages/x/src/docs/a.md', ['packages/**']), false);
-  assert.equal(isLesson('packages/x/docs/notes.md', ['./packages/**/']), true);
-  assert.deepEqual(lessonGlobs(['packages/**', 'apps/*']), [...LESSON, 'apps/*/docs/']);
   assert.deepEqual(deepWorkspaces(['./packages/**', 'apps/*']), ['./packages/**'], 'named as written');
   assert.equal(
     radiusLines(r).at(-1),
-    "workspaces       packages/** in the base's package.json crosses directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/",
+    "workspaces       packages/** in the base's package.json crosses directories: a file counts once, in the outermost package on its way",
   );
   assert.deepEqual(touchedLines([{ branch: 'wf/a', radius: r }]).filter((l) => l.includes('packages/**')).length, 1);
 });

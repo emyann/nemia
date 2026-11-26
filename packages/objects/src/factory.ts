@@ -128,6 +128,26 @@ export const FactorySpec = Schema.Struct({
         'The values each label key it names takes on its cards and runs: a label of such a key given another value is refused where it is written; absent where it names none.',
     }),
   ),
+  radius: Schema.optionalKey(
+    Schema.Struct({
+      agentFacing: Schema.Array(Schema.String).annotate({
+        description: 'Globs of the files its agents read as instructions; a change to one is listed as agent-facing.',
+      }),
+      checkAffecting: Schema.Array(Schema.String).annotate({
+        description: 'Globs of the files that change what its checks judge; a change to one is listed and read in full.',
+      }),
+      lessons: Schema.Array(Schema.String).annotate({
+        description: 'Globs of the files that keep what was learned; a change to one is counted as a lesson.',
+      }),
+    }).annotate({
+      description: 'The files a branch changes that its team wants shown at decide, by glob; absent where its record names none.',
+    }),
+  ),
+  firstWorkflow: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'The workflow a first card on this factory runs in; absent where its record names none.',
+    }),
+  ),
 }).annotate({
   description: "What the factory's record says: its volumes, workflows, hires, settings, template, level and cost lines.",
 });

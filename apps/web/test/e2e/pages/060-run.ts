@@ -103,36 +103,6 @@ export default {
     for (const group of ['(root)', 'apps/web']) {
       await expectVisible(decide.locator(`[data-group="${group}"] [data-bar]`), `a row for ${group}, with its +/− bar`);
     }
-    for (const file of FAKE.agentFacing) {
-      await expectVisible(
-        decide.locator('[data-chip="agent-facing"][title="the next agent reads this"]', { hasText: file }),
-        `${file} is an agent-facing chip`,
-      );
-    }
-    for (const file of FAKE.checkAffecting) {
-      await expectVisible(
-        decide.locator('[data-chip="check-affecting"][title="could make its check pass"]', { hasText: file }),
-        `${file} is a check-affecting chip`,
-      );
-    }
-    await photograph(decide.locator(`[data-touched="${FAKE.branch}"]`), path.join(OUT, `run-decide-files-${await themeOf(page)}.png`));
-    await expectVisible(
-      decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }),
-      `the lesson chip says what the run wrote (${FAKE.lesson})`,
-    );
-    await expectCount(decide.locator('details[open]'), 0, 'every check-affecting diff is folded until opened');
-    const capped = decide.locator(`details[data-diff="${FAKE.capped}"]`);
-    await capped.locator('summary').click();
-    await expectVisible(capped.locator('[data-line="hunk"]'), `${FAKE.capped}'s diff opens on a click, a hunk's header in it`);
-    await expectVisible(capped.locator('[data-line="added"]'), `${FAKE.capped}'s diff shows its added lines`);
-    await expectVisible(
-      capped.locator('[data-cut]', { hasText: /^\d+ more lines — the command line's decide prints them all$/ }),
-      `${FAKE.capped}'s diff is capped, and says so`,
-    );
-    const manifest = decide.locator('details[data-diff="package.json"]');
-    await manifest.locator('summary').click();
-    await expectVisible(manifest.locator('[data-line="removed"]'), "package.json's diff shows the line it removed");
-    await expectCount(manifest.locator('[data-cut]'), 0, "package.json's diff is shown whole");
     await expectVisible(
       decide.locator('section[aria-label="Used"] dd', { hasText: 'not measured' }),
       'the run total says not measured, since not every step was',

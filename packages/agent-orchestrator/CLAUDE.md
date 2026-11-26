@@ -251,6 +251,17 @@ of its kind, never from an older file that looks alike:
   object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every request
   (`diskPartsOf`, `src/object/run.verb.ts`), each step's artifacts folder by the run's own read alone: a listed object reads none.
   A new input of a run's object goes into what the informer checks, or into those parts.
+- **A served kind's `resourceVersion` is the highest revision of the records it is made of** (`WATCHED_KINDS`, `src/list-watch/kind-watch.ts`: each
+  prefix of the keyspace a kind reads, and the object a key under it names): a new input of a kind's object that is a record goes into its
+  table, or the object changes without a revision and a watch from one never sends it. What the informer judges from other records (a card's
+  `status.state` and `runs`) moves no revision yet. A definition stays a file and is indexed (`/registry/definitions/<scope>/<kind>/<name>`,
+  `src/definition-index/`, swept by the daemon every 2 s through `recordDue`): a new place definitions are read from goes into
+  `definitionsFound`, and a write of one reads the index again first (`definitionRevisionNow`). The api, not the orchestrator's objects,
+  stamps the revision (`apps/api/src/objects/revisioned.ts`); a verb's own digest is the content's, which a writer's precondition still
+  compares where its door does (`definitionVersionRefusal`). A record's digest is the version the doors give it counted with the skills
+  of each repository a factory works on (`_repo.<factory>` for a repository's own definitions, a `factory` record for a Factory's rules
+  and instruction), so an edit of a repository's skill moves the revision of the agent that names it; the index reads the doors, never
+  the stores. A proposal's folder write is held to the content digest read at its apply (`digestNow`), its own version being a revision.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/forget/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

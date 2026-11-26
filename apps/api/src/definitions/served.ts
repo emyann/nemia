@@ -4,10 +4,11 @@
  * (`definitionWriteRefusal`) as the `Api`'s error.
  */
 import { Effect, Result } from 'effect';
-import { addedOf, objectsListed, type ObjectQuery } from 'agent-orchestrator';
+import { addedOf, definitionRevisionNow, objectsListed, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite, type WriteAt } from 'agent-orchestrator/workflow';
 import { Conflict, DEFAULT_NAMESPACE, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 import { repoNeeded, type Place } from '../factory/place.ts';
+import type { Served as ServedRequest } from '../layer.ts';
 export { writtenAt } from '../workflows/builder.ts';
 
 /** An origin a definition is read from: the factory's tree, the repository, the person's library, or Nemia's builtin. */
@@ -150,4 +151,28 @@ export function addsGated<T>(home: string, namespace: string, kind: 'agents' | '
   const added = addedOf(home, namespace);
   if (added === undefined) return [...held] satisfies Held<T>[];
   return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name)) satisfies Held<T>[];
+}
+
+/**
+ * Refuses `Conflict` a write of a library definition whose writer read it at another revision than it stands at now (its files read
+ * again first, so a hand edit since the read counts): the revision the api served is the one the keyspace holds, and a write names it.
+ * @param s The request's services, the store's root among them.
+ * @param kind What the definition is.
+ * @param name The definition's name.
+ * @param read The `resourceVersion` the writer read it at.
+ * @param what What the writer did, as a message says it: `write` or `remove`.
+ */
+export async function readAtRevision(
+  s: Pick<ServedRequest, 'inRequest'>,
+  kind: 'Agent' | 'Skill' | 'Workflow',
+  name: string,
+  read: string,
+  what: 'write' | 'remove',
+) {
+  const now = String(await s.inRequest(definitionRevisionNow(kind, undefined, name)));
+  if (now !== read)
+    throw new Conflict({
+      error: `the ${kind} ${name} changed since it was read (it is at revision ${now}, not ${read}), and a ${what} would lose what changed: read it again, make the change on what it holds now, and ${what} that`,
+      users: [],
+    });
 }

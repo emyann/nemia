@@ -21,7 +21,7 @@ const unprinted = (rel: string) =>
  * What the api writes into its store as it serves the board, whatever a page does: the runner's sightings of a session's transcript
  * (`quiet/` under the engine's root), the feed its passes write of the runs they judged (`feed.jsonl` beside `runs/`), and the revisions
  * ledger a pass appends to for every kind a run of the seed resolves (`/registry/revisions/` of the keyspace, one record per kind and
- * name, which `liveRecords` leaves out).
+ * name), and the index of the definition files a read of them keeps (`/registry/definitions/`), which `liveRecords` leaves out.
  */
 const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^db\/state\.db-(wal|shm)$/];
 
@@ -38,7 +38,7 @@ function liveRecords(file: string) {
   try {
     const rows = db
       .prepare(
-        "SELECT k.name, k.value FROM kine k JOIN (SELECT name, MAX(id) AS id FROM kine WHERE name != 'compact_rev_key' AND name NOT LIKE '/registry/revisions/%' GROUP BY name) last ON last.id = k.id WHERE k.deleted = 0 ORDER BY k.name",
+        "SELECT k.name, k.value FROM kine k JOIN (SELECT name, MAX(id) AS id FROM kine WHERE name != 'compact_rev_key' AND name NOT LIKE '/registry/revisions/%' AND name NOT LIKE '/registry/definitions/%' GROUP BY name) last ON last.id = k.id WHERE k.deleted = 0 ORDER BY k.name",
       )
       .all();
     if (!rows.length) return undefined;

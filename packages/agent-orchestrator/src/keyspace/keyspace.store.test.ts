@@ -218,12 +218,66 @@ describe('the keyspace on disk', () => {
       [head, true],
     ]);
     assert.deepEqual(await Effect.runPromise(ks.since(head + 1, '/registry/t/')), { refused: 'ahead' });
-    assert.equal(await Effect.runPromise(ks.compact(1)), head - 1);
+    await Effect.runPromise(ks.compact(WINDOW, T0));
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW + 1)), head);
     assert.deepEqual(await Effect.runPromise(ks.since(0, '/registry/t/')), { refused: 'gone' });
-    const kept = await Effect.runPromise(ks.since(head - 1, '/registry/t/'));
-    assert.deepEqual('changes' in kept ? kept.changes.map((c) => c.revision) : kept, [head]);
+    assert.deepEqual(await Effect.runPromise(ks.since(head, '/registry/t/')), { changes: [], head });
+  });
+
+  test('a key removed is counted at the revision that removed it by `touched`, and is no live key of `revisions`', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('1')));
+    const gone = await Effect.runPromise(ks.write('/registry/t/a', { verb: 'delete', expected: a.revision, value: '' }));
+    assert.deepEqual([...(await Effect.runPromise(ks.revisions('/registry/t/')))], []);
+    assert.deepEqual([...(await Effect.runPromise(ks.touched('/registry/t/')))], [['/registry/t/a', gone.revision]]);
+  });
+
+  test('`before` reads the value a changed key held as of a revision: a removed one at its last value, a key made after at none', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('one')));
+    const c = await Effect.runPromise(ks.write('/registry/t/c', create('stays')));
+    const b = await Effect.runPromise(ks.write('/registry/t/b', create('two')));
+    await Effect.runPromise(ks.write('/registry/t/a', update('uno', a.revision)));
+    await Effect.runPromise(ks.write('/registry/t/b', { verb: 'delete', expected: b.revision, value: '' }));
+    await Effect.runPromise(ks.write('/registry/t/d', create('late')));
+    const atB = await Effect.runPromise(ks.before(b.revision, '/registry/t/'));
+    assert.deepEqual(
+      [...atB],
+      [
+        ['/registry/t/a', 'one'],
+        ['/registry/t/b', 'two'],
+      ],
+    );
+    const atC = await Effect.runPromise(ks.before(c.revision, '/registry/t/'));
+    assert.deepEqual([...atC], [['/registry/t/a', 'one']]);
+  });
+
+  test('a compaction keeps what the last sweep of at least the window ago had not seen', async () => {
+    const file = fileOf();
+    const ks = await Effect.runPromise(keyspaceAt(file));
+    const a = await Effect.runPromise(ks.write('/registry/t/a', create('1')));
+    await Effect.runPromise(ks.write('/registry/t/a', update('2', a.revision)));
+    const seen = await Effect.runPromise(ks.head);
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0)), 0);
+    await Effect.runPromise(ks.write('/registry/t/b', create('3')));
+    assert.equal(await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW - 1)), 0);
+    const head = await Effect.runPromise(ks.head);
+    const later = await Effect.runPromise(ks.compact(WINDOW, T0 + WINDOW + 1));
+    assert.equal(later, seen);
+    const resumed = await Effect.runPromise(ks.since(seen, '/registry/t/'));
+    assert.deepEqual('changes' in resumed ? resumed.changes.map((c) => c.revision) : resumed, [head]);
+    const other = Effect.scoped(
+      Effect.flatMap(
+        Effect.flatMap(Effect.scope, (scope) => keyspaceIn(file, scope)),
+        (reopened) => reopened.compact(WINDOW, T0 + WINDOW + 2),
+      ),
+    );
+    assert.equal(await Effect.runPromise(other), seen);
   });
 });
+
+const WINDOW = 300_000;
+const T0 = 1_000_000;
 
 describe('a pointer never dangles', () => {
   const FILE = '/registry/files/acme/file_a';
@@ -302,7 +356,8 @@ describe('a pointer never dangles', () => {
     await Effect.runPromise(ks.write(FILE, create('f')));
     const card = await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
     await Effect.runPromise(ks.write(CARD, { verb: 'update', expected: card.revision, value: 'c2', points: [FILE] }));
-    await Effect.runPromise(ks.compact(0));
+    await Effect.runPromise(ks.compact(0, T0));
+    await Effect.runPromise(ks.compact(0, T0 + 1));
     assert.deepEqual(await answered(ks.write(FILE, remove)), { refused: 'referenced', pointer: CARD });
   });
 });

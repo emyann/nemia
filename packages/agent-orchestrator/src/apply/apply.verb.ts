@@ -11,7 +11,7 @@ import type { ApplyAction } from '../../contracts/proposal-apply.contract.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { proposalApproval } from '../approval/index.ts';
 import { proposalApply, proposingRunOf, type RunState } from './apply.ts';
-import { currentOf, type ProposalPlace } from '../propose/current.verb.ts';
+import { currentOf, readFresh, type ProposalPlace } from '../propose/current.verb.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 import { factsOf, standingOf } from '../approval/standing.verb.ts';
 import { objectWritten } from './write.verb.ts';
@@ -30,7 +30,7 @@ const nowOf = (place: ProposalPlace, factory: string, objects: readonly Proposed
     Effect.map(currentOf(place, factory, object.kind, object.metadata.name), (now) => ({
       object,
       now,
-      current: now.version === (verbOf(object) === 'create' ? null : (object.metadata.resourceVersion ?? null)),
+      current: verbOf(object) === 'create' ? now.version === null : readFresh(now, object.metadata.resourceVersion),
     })),
   );
 

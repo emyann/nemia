@@ -46,7 +46,8 @@ export const ObjectMeta = Schema.Struct({
   ),
   creationTimestamp: Schema.String.annotate({ description: 'When it was made, as an ISO 8601 time.' }),
   resourceVersion: Schema.String.annotate({
-    description: 'An opaque word that changes on every write of it, which a writer hands back to say which change it read.',
+    description:
+      'A word that changes on every write of it, which a writer hands back, unmodified, to say which change it read: of an object of a kind the store watches, the revision of its last change, in decimal digits.',
   }),
   generation: Schema.optionalKey(
     describedNumber('How many times its spec was changed, for a kind whose spec a person edits; absent otherwise.'),
@@ -56,9 +57,9 @@ export type ObjectMeta = typeof ObjectMeta.Type;
 
 /**
  * Where a page of a list stands: `continue`, the opaque word that asks for the next page, absent on the last; how many items
- * remain after this page, when the server counted them; and `resourceVersion`, the list's position as it was read, which a watch of a
- * list that keeps its old versions (the Event lists, the feed's lines) resumes from (`?watch=true&resourceVersion=`), as Kubernetes'
- * ListMeta says it.
+ * remain after this page, when the server counted them; and `resourceVersion`, the list's position as it was read, which a watch of the
+ * list resumes from (`?watch=true&resourceVersion=`), as Kubernetes' ListMeta says it: the store's latest revision of a list of a kind
+ * the store watches, a byte of the feed for the Event lists.
  */
 export const ListMeta = Schema.Struct({
   continue: Schema.optionalKey(
@@ -70,7 +71,7 @@ export const ListMeta = Schema.Struct({
   resourceVersion: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "The list's position as it was read, which a watch of a list that keeps its old versions resumes from (?watch=true&resourceVersion=).",
+        "The list's position as it was read: the store's latest revision, or a byte of the feed for the Event lists, which a watch of the list resumes from (?watch=true&resourceVersion=), sent the objects changed after it and no state.",
     }),
   ),
 }).annotate({ description: 'Where a page of a list stands: the word for the next page, how many items remain, and its position.' });

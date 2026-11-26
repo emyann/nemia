@@ -629,6 +629,15 @@ export const emptyRuns = (root: string) => {
 };
 
 /**
+ * The keyspace of the store `root` compacted as the daemon's sweep does at `now`, keeping the last `windowMs`: the revision it
+ * compacted up to. A test that sweeps twice, a window apart, sees what a watch from a revision older than the first is refused.
+ * @param root The store's root folder.
+ * @param windowMs How long a revision is kept at least, in milliseconds.
+ * @param now The time of the sweep, in milliseconds.
+ */
+export const compactedAt = (root: string, windowMs: number, now: number) => Effect.runSync(keyspaceNow(root).compact(windowMs, now));
+
+/**
  * A key of the store `root` deleted, there or not.
  * @param root The store's root folder.
  * @param key The key.

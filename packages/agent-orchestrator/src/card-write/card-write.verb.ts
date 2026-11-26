@@ -1,10 +1,9 @@
 /**
  * A card written whole (the Card's update, `PUT /api/namespaces/<factory>/cards/<name>`, which `nemia apply` sends), through the Card
- * door (`replaceCard`), refused as `cardWriteRefusal` says; and the `resourceVersion` a card is served and compared at (`cardVersion`).
+ * door (`replaceCard`), refused as `cardWriteRefusal` says.
  * A controller: Effect programs over the Card and Run doors.
  */
 import { modelsText } from '../start/index.ts';
-import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardFileRef, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import { cardFilesJudged } from '../inbox/inbox.store.ts';
@@ -29,9 +28,6 @@ import {
   startedRefusal,
   type InboxCard,
 } from '../inbox/index.ts';
-
-/** The digest of a card's text, its `resourceVersion`: changed by every write of the file, and by nothing else. */
-export const cardVersion = versionDigest;
 
 /** What `replaceCard` did: the card as it reads now, its file, and whether the file was written (a write that changed nothing is not). */
 export type CardReplaced = { card: InboxCard; file: string; written: boolean };
@@ -122,20 +118,21 @@ const cardToWrite = Effect.fn('cardToWrite')(function* (name: string, namespace:
  *
  * Refused before anything is written, exit 2: a name that is not a card's (`inboxNameRefusal`), no card of that name in the namespace
  * (`Missing`), a card that does not read, and what `cardWriteRefusal` refuses — a started card and a stale `resourceVersion` (`Conflict`,
- * the version compared with the digest of the file as it reads now, which `cardObject` serves), a `queued` changed, a retired `repo` set
- * or changed, and no body (`Invalid`) — then a `spec.workflow` changed to what is no workflow's name (`cardWorkflowRefusal`; an old
+ * the version compared with the revision the card stands at now (`CardDoor`'s `revision`), which the api
+ * serves), a `queued` changed, a retired `repo` set or changed, and no body (`Invalid`) — then a `spec.workflow` changed to what is no
+ * workflow's name (`cardWorkflowRefusal`; an old
  * card's path sent back as read is kept), what `contextRefusal` refuses of `spec.from` (a run the store does not have, `Missing`), and
  * what `parseInboxCard` refuses of the card it would write (`Invalid`): a bad label, say; and a label it changes whose key the factory
  * names with a value it does not take (`labelValuesJudged`, `Invalid`), a value that stands on the card sent back as it is never judged.
  */
 export const replaceCard = Effect.fn('replaceCard')(function* (name: string, namespace: string, write: CardWrite) {
-  const { card, card$, file, started, text } = yield* cardToWrite(name, namespace);
+  const { card, card$, file, started } = yield* cardToWrite(name, namespace);
   const door = yield* CardDoor;
   const runDoor = yield* RunDoor;
   const { spec, metadata } = write;
   const refusal = cardWriteRefusal({
     started: started.length > 0,
-    versionNow: cardVersion(text),
+    versionNow: String((yield* door.cards.revision(card$)) ?? 0),
     ...(metadata.resourceVersion !== undefined ? { versionSent: metadata.resourceVersion } : {}),
     ...(card.queued !== undefined ? { queuedNow: card.queued } : {}),
     ...(spec.queued !== undefined ? { queuedSent: spec.queued } : {}),

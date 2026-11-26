@@ -1,21 +1,21 @@
 ---
-title: sdlc, the builtin template
-description: sdlc is the team that builds Nemia, made generic, a template Nemia has built in, and how to apply it to a repository of your own.
+title: sdlc, the built-in template
+description: sdlc is the team that builds Nemia, made generic and built into Nemia as a template. This page shows how to apply it to your own repository.
 ---
 
-sdlc is a factory template that comes with Nemia: the team that builds Nemia, with Nemia's own repository taken out of it. Applied to
-a repository of yours, it makes a factory that takes an idea to an intent, an intent to a change merged into your base branch, and
-reads its own stats to propose what to correct.
+sdlc is a factory template that ships with Nemia: the team that builds Nemia, with everything specific to Nemia's repository taken
+out. Apply it to one of your repositories to create a factory that turns an idea into an intent and an intent into a change merged
+into your base branch. It also reads its own stats and proposes what to improve.
 
-**It owns** six agents, five workflows, the skills their steps name, the scripts their checks run, and the rules every agent hired
-into the factory is told.
+**It owns** six agents, five workflows, the skills their steps use, the scripts their checks run, and the rules given to every agent
+hired into the factory.
 
-**It never touches** your repository's history but through a landing the run checks: a step never commits a merge onto your base
-branch or pushes, and the run does it in its place, by default in your own checkout on the local check's word, and on GitHub through
-the scripts the template carries.
+**It never touches** your repository's history except through a landing the run checks. A step never commits a merge to your base
+branch and never pushes. The run does that instead: by default in your own checkout, once the local check passes, or on GitHub
+through the scripts the template includes.
 
-**It is reached through** its name: `nemia factory apply` takes a bare word at its template flag as a template Nemia has built in, and
-the factory's file records that name. Its folder is in the templates workspace, `packages/templates/`.
+**Its entry point** is its name. `nemia factory apply` treats a bare word passed to its template flag as a built-in template, and the
+factory's file records that name. Its folder is in the templates workspace, `packages/templates/`.
 
 ## Its agents
 
@@ -28,74 +28,80 @@ the factory's file records that name. Its folder is in the templates workspace, 
 | Otto   | release engineer       |
 | Argus  | janitor                |
 
-Seldon, Agora, Iris and Argus read the repository and never write it; Grace and Otto write it, and are refused a push. Every agent's
-fence refuses an edit of your store's factories, workflows and inbox.
+Seldon, Agora, Iris, and Argus read the repository and never write to it. Grace and Otto write to it, and can't push. Every agent's
+fence blocks edits to your store's factories, workflows, and inbox.
 
 ## Its workflows
 
-- **front-door** routes a raw card to the workflow it needs, with no gate: sdlc's `front-door` trigger queues here each card in the
-  sprint and ready to work (`sdlc/stage=sprint` and `sdlc/state=ready-to-work`, [its labels](#its-labels)) that names no workflow,
-  and Iris, as a read-only judge, sends it as given to intake, build or quick, answers it, or files it back to the backlog. She asks
-  you only where she cannot tell.
-- **intake** turns an idea into an intent, Iris asking you what it leaves open.
-- **build** takes an intent to your base branch: a design you approve, an implement in rounds, then a review whose pass lands it, with
-  no gate at the landing.
-- **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
-- **janitor**, on demand, reads the factory's stats and files what it proposes as cards in your inbox, starting none.
+- **front-door** routes a raw card to the workflow it needs, with no gate. sdlc's `front-door` trigger queues here every card that is
+  in the sprint, ready to work (`sdlc/stage=sprint` and `sdlc/state=ready-to-work`, see [its labels](#its-labels)), and names no
+  workflow. Iris, as a read-only judge, then sends it unchanged to intake, build, or quick, answers it, or files it back to the
+  backlog. She only asks you when she can't tell.
+- **intake** turns an idea into an intent, with Iris asking you about anything it leaves open.
+- **build** takes an intent to your base branch: a design you approve, an implementation in rounds, then a review whose approval lands
+  it, with no gate at the landing.
+- **quick** takes a card that fully specifies its change to your base branch: an implementation, then a review whose approval lands
+  it, with no gate.
+- **janitor** runs on demand. It reads the factory's stats and adds what it proposes as cards to your inbox, without starting any.
 
-In build and quick, implement tries again on its own, up to twice a round, when its check refuses, handed what the check printed; a
-refusal only you can answer (no `gh`, a draft pull request, CI that never ran) its scripts exit 78 on, which implement's check
-failure policy names, so the run waits on you without trying it again; and past its budget, its second try or a check that did not finish, the run waits on you.
+In build and quick:
+
+- When its check fails, implement retries on its own, up to twice per round, and receives what the check printed.
+- For a failure only you can resolve (no `gh`, a draft pull request, CI that never ran), its scripts exit with code 78. Implement's
+  check failure policy lists that code, so the run waits for you instead of retrying.
+- Past its budget, after its second retry, or when a check didn't finish, the run waits for you.
 
 ## Its parameters
 
-What your repository decides is a parameter, given with `--set` when you apply the template; one you do not give takes its default.
+Anything your repository decides is a parameter, set with `--set` when you apply the template. Any parameter you don't set takes its
+default.
 
-| Parameter      | What it says                                                                                                           | Its default                                                                              |
+| Parameter      | What it sets                                                                                                           | Its default                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| github         | whether the factory judges and lands its work on GitHub (`true`) or in your checkout                                   | false                                                                                    |
-| localCheck     | in your checkout: the command that judges each round, and the merged tree at landing                                   | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
+| github         | whether the factory checks and lands its work on GitHub (`true`) or in your checkout                                   | false                                                                                    |
+| localCheck     | in your checkout: the command that checks each round, and the merged code at landing                                   | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
 | ciCheck        | on GitHub: the name of the CI status check a pull request waits on                                                     | ci                                                                                       |
 | roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                              | npm run --if-present lint && npm run --if-present typecheck                              |
-| implementCheck | either way: a command of your own that implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
+| implementCheck | in both modes: your own command, which implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
 | areas          | the areas of the repository a card names, in the factory's rules                                                       | the top-level folders of the repository                                                  |
 | storeRoot      | the store the agents' fences keep them out of                                                                          | ~/.agent-workflows                                                                       |
 
-github is a boolean, refused at apply unless it is `true` or `false`. A factory reads localCheck where it is false, and ciCheck and
-roundCheck where it is true, and implementCheck either way: set it to add a check of your own to
-implement's check in build and quick, rather than editing their check lines, and an upgrade that changes those lines merges with no
+github is a boolean: applying the template fails unless it is `true` or `false`. A factory uses localCheck when github is false, and
+ciCheck and roundCheck when it is true. It uses implementCheck in both cases. Set implementCheck to add your own check to implement's
+check in build and quick, instead of editing their check lines. That way, an upgrade that changes those lines merges without a
 conflict on them.
 
-On the board, the welcome that makes a factory from sdlc asks nothing: sdlc marks no parameter `ask: true`, so its parameters wait
-under More parameters, each at its default. github is drawn nowhere: the factory's first writable volume sets it. A field you leave
-empty or at its default sends no `--set`.
+On the board, the welcome flow that creates a factory from sdlc asks nothing: sdlc marks no parameter `ask: true`, so its parameters
+sit under More parameters, each at its default. github isn't shown at all: the factory's first writable volume sets it. A field you
+leave empty or at its default sends no `--set`.
 
-storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
-other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
-settings' folder, so the fence would deny nothing.
+Write storeRoot the way Claude Code reads a path in a permission rule: `~/` for a store under your home folder, and two slashes for
+any other absolute path, such as `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash, Claude Code reads the path
+relative to the settings folder, so the fence would block nothing.
 
-To change a parameter later without a new version of sdlc, preview it at the version the factory is applied at with
-`nemia factory diff`, its `--to` that version and a `--set` for each parameter, then type the upgrade line it prints
+To change a parameter later without a new version of sdlc, preview the change with `nemia factory diff`, passing `--to` the version
+the factory is on and a `--set` for each parameter. Then run the upgrade command it prints
 ([change a template's parameter](/factories/#change-a-templates-parameter)).
 
 ## Its labels
 
-sdlc plans its cards with labels of its own, prefixed sdlc/ so you tell them from yours:
+sdlc plans its cards with its own labels, prefixed sdlc/ so you can tell them apart from yours:
 
-| Label       | Values                    | What it says                                 | Read by                  |
-| ----------- | ------------------------- | -------------------------------------------- | ------------------------ |
-| sdlc/stage  | `backlog`, `sprint`       | where the card sits in your planning         | the `front-door` trigger |
-| sdlc/state  | `refine`, `ready-to-work` | how ready the card is                        | the `front-door` trigger |
-| sdlc/sprint | a week, such as `w48`     | which sprint the card is in, a planning mark | nothing                  |
+| Label       | Values                    | What it means                                  | Read by                  |
+| ----------- | ------------------------- | ---------------------------------------------- | ------------------------ |
+| sdlc/stage  | `backlog`, `sprint`       | where the card sits in your planning           | the `front-door` trigger |
+| sdlc/state  | `refine`, `ready-to-work` | how ready the card is                          | the `front-door` trigger |
+| sdlc/sprint | a week, such as `w48`     | which sprint the card is in, for planning only | nothing                  |
 
-Every factory made from sdlc has the card trigger `front-door`, its selector `sdlc/stage=sprint,sdlc/state=ready-to-work`: a card in
-the sprint and ready to work that names no workflow is queued on the front door, and one that names its workflow on that one. A card
-with no sdlc/stage is in the backlog, and a card in the backlog is never queued, whatever its state. `refine` starts nothing: it marks
-an idea you know is to be refined, and any other state is simply not ready. The door alone routes; no label routes a card past it, and
-when it files a card back it sets `sdlc/stage=backlog`, so the card keeps its sprint and its state and is selected no more.
+Every factory created from sdlc has the card trigger `front-door`, with the selector `sdlc/stage=sprint,sdlc/state=ready-to-work`. A
+card in the sprint and ready to work that names no workflow is queued on the front door. One that names its workflow is queued on
+that workflow. A card without sdlc/stage is in the backlog, and a card in the backlog is never queued, whatever its state. `refine`
+starts nothing: it marks an idea you know needs refining, and any other state just means not ready. Only the front door routes cards:
+no label sends a card past it. When the front door files a card back, it sets `sdlc/stage=backlog`, so the card keeps its sprint and
+state but is no longer selected.
 
-To plan a later week ahead, file the card with `sdlc/stage=backlog` and `sdlc/sprint=w49`, and move it to the sprint when the week
-starts: `nemia label inbox <card> sdlc/stage=sprint --overwrite`.
+To plan ahead for a later week, file the card with `sdlc/stage=backlog` and `sdlc/sprint=w49`, then move it into the sprint when the
+week starts: `nemia label inbox <card> sdlc/stage=sprint --overwrite`.
 
 ## Apply it
 
@@ -105,7 +111,7 @@ nemia factory apply myapp --template sdlc --volume ~/code/myapp:rw \
   --set areas='src, docs and scripts'
 ```
 
-That factory works in your checkout, with no remote. To judge and land on GitHub instead:
+That factory works in your checkout, with no remote. To check and land on GitHub instead:
 
 ```bash
 nemia factory apply myapp --template sdlc --volume ~/code/myapp:rw \
@@ -114,92 +120,96 @@ nemia factory apply myapp --template sdlc --volume ~/code/myapp:rw \
   --set roundCheck='npm run lint'
 ```
 
-That files the factory `myapp` on the repository, made from sdlc with your parameters, and trusts the repository for the harness, as
-[a factory's volumes](/factories/#its-volumes) says (`--no-trust` trusts nothing). The daemon renders the template into the
-factory, its workflows and agents yours to change after. A `--set` may be repeated, one per parameter, and `--volume` too, for a factory
-that works on more than one repository or reads a folder (`:ro`). `nemia factory diff` and `nemia factory upgrade` take the same name at their template flag.
+This creates the factory `myapp` on the repository, from sdlc with your parameters, and trusts the repository for the harness, as
+[a factory's volumes](/factories/#its-volumes) explains (`--no-trust` skips the trust). The daemon renders the template into the
+factory, and its workflows and agents are yours to change afterwards. You can repeat `--set`, once per parameter, and `--volume`
+too, for a factory that works on more than one repository or reads a folder (`:ro`). `nemia factory diff` and
+`nemia factory upgrade` accept the same name for their template flag.
 
 ## In your checkout, the default
 
-With github false, nothing is pushed and no pull request is opened. Implement's check runs localCheck on each round's tree. To land,
-the land step stages every branch of the run's result in one merge in your repository's own checkout, committing nothing; the run then
-runs localCheck on that merged tree, commits the merge onto your base branch when it passes, and takes it back when it does not. A merge
-that conflicts is aborted, and the work goes back. localCheck is the only judge here, so give it the commands that run your tests.
+When github is false, nothing is pushed and no pull request is opened. Implement's check runs localCheck on each round's code. To
+land, the land step stages every branch of the run's result as one merge in your repository's own checkout, without committing. The
+run then runs localCheck on the merged code. If it passes, the run commits the merge to your base branch. If it fails, the run undoes
+the merge. A merge that conflicts is aborted, and the work goes back. localCheck is the only check here, so make sure it runs your
+tests.
 
 ## Before you apply it on GitHub
 
-With github true, sdlc lands a change through a pull request on GitHub, and waits on your CI to judge it. Before a run of build or
-quick can land:
+When github is true, sdlc lands each change through a pull request on GitHub, and waits for your CI to pass it. Before a build or
+quick run can land:
 
-- **`gh` is logged in** on the machine the daemon runs on, to the account that may push your repository's branches and open and merge
-  its pull requests.
-- **Your base branch is protected, requiring the CI check named by ciCheck**, so a pull request merges only once that check passes on
-  it. The landing refuses a pull request whose check is not green at the head the review read.
+- **`gh` is signed in** on the machine the daemon runs on, with an account that can push your repository's branches and open and
+  merge its pull requests.
+- **Your base branch is protected and requires the CI check named by ciCheck**, so a pull request only merges once that check
+  passes. The landing rejects a pull request whose check isn't green at the commit the review read.
 
-Under GitHub, CI is the judge. The round check between implement's rounds is a quick refusal of what is plainly broken, not the
-verdict: a repository with neither a `lint` nor a `typecheck` script passes the default round check having checked nothing, and its
-CI is then the only check its changes meet. Give roundCheck the commands your repository has.
+On GitHub, CI is the real check. The round check between implement's rounds only catches obvious breakage quickly; it isn't the
+verdict. A repository with neither a `lint` nor a `typecheck` script passes the default round check without anything being checked,
+so CI is then the only check its changes face. Set roundCheck to the commands your repository has.
 
 ## Upgrading from 1.0.0
 
-sdlc 1.0.0 landed on GitHub, and had no github parameter. From 2.0.0 the default is your checkout, so a factory applied at 1.0.0
-that should stay on GitHub is given `github: true` as it upgrades: preview it with
-`nemia factory diff <name> --to 2.0.0 --set github=true`, which names each parameter the factory holds that 2.0.0 does not declare (`dropped:`), then type the upgrade line it
-prints (`… files it`), which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
+sdlc 1.0.0 landed on GitHub, and had no github parameter. From 2.0.0, the default is your checkout. So a factory applied at 1.0.0
+that should stay on GitHub needs `github: true` when it upgrades. Preview the upgrade with
+`nemia factory diff <name> --to 2.0.0 --set github=true`, which lists each parameter the factory has that 2.0.0 doesn't declare
+(`dropped:`). Then run the upgrade command it prints (`… files it`), which includes the same `--set` and the plan's `--plan`. A new
+factory sets it when you apply the template, with `--set github=true`.
 
 ## Upgrading to 5.0.0
 
-sdlc 5.0.0 removes the frontDoorLabel parameter, with no alias, and ships the `front-door` trigger on [its labels](#its-labels).
-Preview it with `nemia factory diff <name> --to 5.0.0`, which names frontDoorLabel `dropped:`, then type the upgrade line it prints. A card that carried the
-old key is no longer queued: label it `sdlc/stage=sprint` and `sdlc/state=ready-to-work` for the door to route it.
+sdlc 5.0.0 removes the frontDoorLabel parameter, with no alias, and adds the `front-door` trigger based on [its labels](#its-labels).
+Preview the upgrade with `nemia factory diff <name> --to 5.0.0`, which lists frontDoorLabel as `dropped:`, then run the upgrade
+command it prints. A card with the old key is no longer queued: label it `sdlc/stage=sprint` and `sdlc/state=ready-to-work` so the
+front door routes it.
 
 ## Moving onto it from another template
 
-A factory applied from a template of another name, such as one you made by hand, can move onto sdlc by an upgrade. It is a template
-switch: the two templates share no base, so nothing tells your own changes from the old template's text. Preview it with
-`nemia factory diff <name> --to <version> --template sdlc`. Its first line names both templates, and its `switch:` line says there is
-no common base.
+A factory applied from a different template, such as one you made by hand, can switch to sdlc through an upgrade. Because the two
+templates share no common base, nothing can tell your own changes apart from the old template's text. Preview the switch with
+`nemia factory diff <name> --to <version> --template sdlc`. Its first line names both templates, and its `switch:` line says there
+is no common base.
 
-- A file both hold, the same, is clean.
-- A file only sdlc holds is added, from the template.
-- A file only your factory holds is a conflict whose template side is none.
-- A file both hold, different, is a conflict on each run of lines that differs, even a run only sdlc holds, so you see every line it
-  would insert. The factory's file and a step's frontmatter are asked key by key.
+- A file both have, identical, is clean.
+- A file only sdlc has is added from the template.
+- A file only your factory has is a conflict with no template side.
+- A file both have, but different, is a conflict for each block of lines that differs, even a block only sdlc has, so you see every
+  line it would add. The factory's file and each step's frontmatter are compared key by key.
 
-First type the upgrade line the diff printed (`… files it`): a switch is always filed with its `--plan`, and a conflict is resolved
-only once its upgrade is filed. Then answer each conflict with the `nemia factory resolve` line the diff printed after it. To keep
-your factory's own prose, take `--ours` on its rules and step files. To drop an old file of the template you left, take `--theirs`.
+First, run the upgrade command the diff printed (`… files it`). A switch is always filed with its `--plan`, and a conflict can only be
+resolved once its upgrade is filed. Then answer each conflict with the `nemia factory resolve` command the diff printed after it. To
+keep your factory's own text, choose `--ours` for its rules and step files. To drop a file from the old template, choose `--theirs`.
 
-Once merged, the factory's base is sdlc. A later upgrade of sdlc merges three ways, and carries the prose you kept as your tree's
-edits.
+Once merged, the factory's base is sdlc. Later sdlc upgrades use a three-way merge, and keep the text you kept as your own edits.
 
 ## Fit it to your repository
 
-Once the daemon has rendered the factory, its tree is yours to change. Four changes a repository often needs are already possible:
+Once the daemon has rendered the factory, its tree is yours to change. Four common changes are already possible:
 
-- **Leave a workflow out.** `nemia factory fire myapp --step janitor/argus` takes back the janitor's hire, then
-  `nemia factory detach myapp janitor` takes the workflow back. A detach is refused while the factory still hires someone into one
-  of the workflow's steps, so fire first.
-- **Keep every step from a command.** A step's file in the tree takes a `disallowedTools` line of its own, which adds to its agent's
-  fence, and a deny beats any allow. Take a suite too heavy for a machine other work shares: deny `npm test` on each step, say in your
-  repository's CLAUDE.md how a step runs the one test file it changed, and let your CI run the whole suite as the judge. A rule is
-  matched as it is typed, so it holds against the usual spellings and not against a quoted one.
-- **Let the reading agents run your checks.** Seldon, Agora, Iris and Argus run in `dontAsk` mode, and run only what they are allowed.
-  A step's own `allowedTools` may only narrow its agent's, never widen them, so allow their read-only checks (the linter, the
-  typecheck, one test file) in your repository's `.claude/settings.json`, where they travel with it. From sdlc 6.0.0, Agora reads the
-  pull request it reviews on GitHub through the factory's `github` MCP server, and the four deny every form of `gh` but a tool's help. An allow of `gh` in your
-  settings reaches every reading agent, so leave it out.
-- **Commit before a landing.** The landing runs in your checkout, on your base branch, either way. It refuses a checkout with
-  uncommitted changes before it merges anything, and leaves them as they are: on GitHub, its script refuses changes to tracked
-  files; in your checkout, the land step checks it first, as the git place's _Stage a landing_ says, and signs off blocked with
-  nothing staged. A person commits them or sets them aside, then retries the step. A run starts from your checkout's last commit,
-  so work you have not committed is not in it.
+- **Leave out a workflow.** `nemia factory fire myapp --step janitor/argus` removes the janitor's hire, then
+  `nemia factory detach myapp janitor` removes the workflow. A detach is rejected while the factory still hires someone into one of
+  the workflow's steps, so fire first.
+- **Block a command for every step.** A step's file in the tree accepts its own `disallowedTools` line, which adds to its agent's
+  fence, and a deny beats any allow. For example, if your test suite is too heavy for a shared machine: deny `npm test` on each step,
+  explain in your repository's CLAUDE.md how a step runs just the test file it changed, and let your CI run the whole suite as the
+  final check. A rule matches the command as typed, so it covers the usual spellings, not a quoted one.
+- **Let the read-only agents run your checks.** Seldon, Agora, Iris, and Argus run in `dontAsk` mode, and only run what they are
+  allowed to. A step's own `allowedTools` can only narrow its agent's, never widen them. So allow their read-only checks (the linter,
+  the typecheck, a single test file) in your repository's `.claude/settings.json`, where they travel with the repository. From sdlc
+  6.0.0, Agora reads the pull request it reviews on GitHub through the factory's `github` MCP server, and the four agents deny every
+  form of `gh` except a tool's help. Allowing `gh` in your settings would reach every read-only agent, so leave it out.
+- **Commit before a landing.** In both modes, the landing runs in your checkout, on your base branch. It refuses a checkout with
+  uncommitted changes before merging anything, and leaves those changes as they are. On GitHub, its script rejects changes to tracked
+  files. In your checkout, the land step checks first, as the git place's _Stage a landing_ explains, and stops,
+  marked blocked, without staging anything. Commit the changes or set them aside, then retry the step. A run starts from your checkout's last commit, so
+  uncommitted work isn't included.
 
 ## Sources
 
-This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml`,
-`packages/templates/sdlc/workflows/front-door/README.md` (_Its labels_) and
-`packages/agent-orchestrator/src/template/door/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Moving onto it from another
-template_ is written from `packages/agent-orchestrator/src/factory/upgrade/merge.ts`. _Fit it to your repository_ is written from `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
+This page is based on `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml`,
+`packages/templates/sdlc/workflows/front-door/README.md` (_Its labels_), and
+`packages/agent-orchestrator/src/template/door/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Moving onto it from
+another template_ is based on `packages/agent-orchestrator/src/factory/upgrade/merge.ts`. _Fit it to your repository_ is based on
+`packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
 `packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/carried/landing.ts`,
-`packages/templates/sdlc/workflows/build/land.md` and `packages/agent-orchestrator/place/git/SKILL.md`.
+`packages/templates/sdlc/workflows/build/land.md`, and `packages/agent-orchestrator/place/git/SKILL.md`.

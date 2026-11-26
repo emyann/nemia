@@ -38,17 +38,22 @@ const DISABLED = 'bg-on-surface/12 text-on-surface/38';
  * cut shape around it, as wide and as far as the kit's ring and shown with the keyboard on it; then its words on a shape of its own,
  * the top-right and bottom-left corners cut, exactly the button's box, in the hue of what waits on a person, with a state layer in
  * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline along the whole cut shape, both cuts
- * too, for a button beside what already says the wait; `disabled` draws the shape in the disabled ground and ink, with no state
+ * too, for a button beside what already says the wait; `beside`, for a quiet one set beside a filled one, draws it at the filled
+ * one's height and shape, since two buttons side by side are one size and only fill against hairline sets them apart (Material's
+ * button groups: "all buttons in a standard group should be the same size", m3.material.io/components/button-groups/guidelines);
+ * `disabled` draws the shape in the disabled ground and ink, with no state
  * layer and no ring; `pending` draws the kit's small ProgressIndicator (`Pending`) before its words, which stay its name.
  */
 function Body({
   disabled = false,
   quiet = false,
+  beside = false,
   pending = false,
   children,
 }: {
   disabled?: boolean;
   quiet?: boolean;
+  beside?: boolean;
   pending?: boolean;
   children: string;
 }) {
@@ -68,7 +73,7 @@ function Body({
         data-cut-shape
         className={cn(
           'relative inline-flex items-center gap-2 whitespace-nowrap uppercase',
-          quiet ? 'h-8 px-4' : 'h-10 px-6',
+          quiet && !beside ? 'h-8 px-4' : 'h-10 px-6',
           disabled ? DISABLED : quiet ? QUIET : filled.yours,
         )}
         style={{ clipPath: cutShape(CUT) }}
@@ -94,23 +99,30 @@ function Body({
   );
 }
 
-/** React Aria's link drawn as the look's filled button (`Body`), or its quiet form; the link itself is clipped by nothing. */
+/**
+ * React Aria's link drawn as the look's filled button (`Body`), or its quiet form, at the filled one's height with `beside`; the link
+ * itself is clipped by nothing.
+ */
 function Cut({
   className,
   quiet = false,
+  beside = false,
   children,
   ...props
-}: Omit<LinkProps, 'className' | 'children'> & { className?: string; quiet?: boolean; children: string }) {
+}: Omit<LinkProps, 'className' | 'children'> & { className?: string; quiet?: boolean; beside?: boolean; children: string }) {
   return (
     <AriaLink {...props} data-cut-button="link" data-quiet={quiet || undefined} className={cn(HOLDER, className)}>
-      <Body quiet={quiet}>{children}</Body>
+      <Body quiet={quiet} beside={beside}>
+        {children}
+      </Body>
     </AriaLink>
   );
 }
 
 /**
  * The look's filled button with two cut corners, as a link to a route (`routeLink`): pressed, or Enter on it, it navigates once; with
- * `quiet`, drawn with no ground inside a hairline.
+ * `quiet`, drawn with no ground inside a hairline, and with `beside` too, at the filled one's height, for a quiet button set beside a
+ * filled one.
  */
 export const CutButton = routeLink(Cut);
 

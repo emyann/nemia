@@ -1,25 +1,26 @@
 ---
 title: Agents
-description: Who does a step's work, with its tools, its fence and its skills, and the five layers of what it is told.
+description: Who does a step's work, with its tools, fence, and skills, and the five layers of instructions it receives.
 ---
 
-An agent is who does a step's work. A step is a place in a workflow, with its wiring; an agent is what is attached to it, and the run
-hands it a brief. One agent can do the work of many steps, in many workflows: a reviewer is written once and named by every step that
-needs a review.
+An agent is who does a step's work. A step is a position in a workflow, with its connections. An agent is attached to that position,
+and the run gives it a brief. One agent can do the work of many steps, in many workflows: you write a reviewer once, and every step
+that needs a review names it.
 
 **It owns** who the worker is: its instructions, the harness and model it runs on, the tools it has, what it may not do, and the
-skills it is given.
+skills it has.
 
-**It never touches** the wiring. Which step comes after which, the check, the gate and the loop are the step's, and an agent file that
-names one is refused, saying it belongs on the step.
+**It never touches** how the steps connect. Which step comes after which, the check, the gate, and the loop all belong to the step. An
+agent file that sets one of them is rejected, with a message saying it belongs on the step.
 
-**It is reached through** a step's `agent` key. At the start of a run, each step's agent is read once and frozen on the run, so an
-edit to an agent changes only the runs started after it.
+**Its entry point** is a step's `agent` key. When a run starts, each step's agent is read once and frozen on the run. So editing an
+agent only affects runs started after the edit.
 
 ## An agent's file
 
-An agent is one markdown file in an `agents` folder, beside the workflow folders: under the `agents` folder of a repository's `workflows`, or under
-`~/.agent-workflows/workflows/agents/` for your own. Its frontmatter holds a role's keys, and its body holds its instructions.
+An agent is one Markdown file in an `agents` folder, next to the workflow folders. In a repository, that is the `agents` folder
+inside `workflows`. For your own agents, it is `~/.agent-workflows/workflows/agents/`. The frontmatter holds the role's keys, and the
+body holds its instructions.
 
 ```md
 ---
@@ -38,116 +39,115 @@ claude:
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
-The frontmatter is YAML, as a step's is. Quote a value that holds `: ` or ` #`, as in
-`description: "Reviews a change: correctness, not style"`, and write a long one as a literal block, `|-` and the value on the lines
-below it, indented. A key that takes a list, such as `tools`, reads `Read, Grep` and `[Read, Grep]` alike.
+The frontmatter is YAML, like a step's. Quote a value that contains `: ` or ` #`, as in
+`description: "Reviews a change: correctness, not style"`. Write a long value as a literal block: `|-`, with the value indented on
+the lines below it. A key that takes a list, such as `tools`, accepts both `Read, Grep` and `[Read, Grep]`.
 
-The fence keys sit under the block of the harness the agent runs on: `claude` takes `permissionMode`, `tools`, `allowedTools` and
-`disallowedTools` under its `fence`, and `codex` takes `sandbox`. A block holds its `fence` and nothing else. A fence key written at the
-top level, as files did before, is still read as the key in the block, and the start of a run names each file that writes one. To move
-them into the block, type `nemia frontmatter rewrite <folder>`: it keeps every value as written. A permission mode in a step that
-names neither its harness nor an agent beside it stays where it is, since either harness could run it, and the rewrite says so: add a
-harness line and rewrite again.
+Fence keys go under the block for the harness the agent runs on. `claude` takes `permissionMode`, `tools`, `allowedTools`, and
+`disallowedTools` under its `fence`, and `codex` takes `sandbox`. A block holds its `fence` and nothing else. Older files put fence keys
+at the top level. Those are still read as if they were in the block, and starting a run lists each file that still does this. To move
+them into the block, run `nemia frontmatter rewrite <folder>`, which keeps every value as written. One case stays put: a permission
+mode in a step that names neither its harness nor an agent next to it, since either harness could run it. The rewrite tells you so:
+add a harness line and run the rewrite again.
 
-The agent's keys are defaults. A step may set one of the same keys, and the step's wins, with one exception: a key of the fence only
-narrows (below).
+The agent's keys are defaults. A step can set any of the same keys, and the step's value wins, with one exception: fence keys can only
+narrow (see below).
 
 ## What a step may override
 
-A step may always override the properties of the harness its agent runs on: `model`, `effort`, `context` and `harness`. An agent says
-what else a step may override of it, on its `overridable` line. The words are `remote`, `output`, `fence`, `skills` and `mcp`
-(`OVERRIDABLE`); a harness property on the line is refused. `fence` stands for every fence key at once, and a step still only
-narrows it; `skills` and `mcp` only add. The reviewer above lets a step narrow its fence, and nothing else of its behaviour.
+A step can always override the properties of the harness its agent runs on: `model`, `effort`, `context`, and `harness`. Anything
+else a step may override is listed on the agent's `overridable` line. The allowed words are `remote`, `output`, `fence`, `skills`, and
+`mcp` (`OVERRIDABLE`). A harness property on that line is rejected. `fence` covers every fence key at once, and a step can still only
+narrow it. `skills` and `mcp` can only add. The reviewer above lets a step narrow its fence, and nothing else about its behavior.
 
-A step that sets something the line leaves out is refused when the workflow is read (`offerRefusal`), naming the key and the agent.
-Delete the step's line, or add the word to the agent's. It holds the same for a step that names its agent and for one a factory hires
-it into. An agent with no `overridable` line offers everything, and the start of a run says to add one. The agents are read by `packages/agent-orchestrator/src/agents/read.store.ts`. The `sdlc` template's team sits in
+If a step sets something the line doesn't allow, the workflow is rejected when it is read (`offerRefusal`), with the key and the agent
+named. Either delete the step's line, or add the word to the agent's. This applies both to a step that names its agent and to one a
+factory hires the agent into. An agent with no `overridable` line allows everything, and starting a run suggests adding one.
+`packages/agent-orchestrator/src/agents/read.store.ts` reads the agents. The `sdlc` template's team is in
 `packages/templates/sdlc/agents/`.
 
 ## Tools and the fence
 
-Three things say what a session can do:
+Three things control what a session can do:
 
-- **Its tools** (`tools`) are the only tools the session has. A session without `Edit` or `Write` cannot edit a file with them, but a
-  tool such as `Bash` can still write one, so the tools alone never make an agent read-only.
-- **Its fence** is what it may do with them. On Claude Code, it is a permission mode (`permissionMode`), a list of allowed calls
-  (`allowedTools`) and a list of denied calls (`disallowedTools`), such as `Bash(git push:*)`. A deny beats every allow. On Codex, it
-  is a sandbox (`sandbox`): `read-only`, `workspace-write` or `danger-full-access`.
-- **Its mode decides what is not listed.** In `dontAsk`, a call no allow reaches is refused without asking anyone. The reviewer above
-  has `Bash`, but runs only the commands its `allowedTools` names, here a diff, a log and the lint, and those the repository's
-  `.claude/settings.json` allows; any other shell call is refused.
-  That fence, not its list of tools, is what keeps it read-only. The `sdlc` template's reviewer, Agora, is fenced this way
-  (`packages/templates/sdlc/agents/agora/agent.yaml`).
+- **Its tools** (`tools`) are the only tools the session has. A session without `Edit` or `Write` can't edit a file with them. But a
+  tool such as `Bash` can still write one, so the tool list alone never makes an agent read-only.
+- **Its fence** is what it may do with those tools. On Claude Code, the fence is a permission mode (`permissionMode`), a list of
+  allowed calls (`allowedTools`), and a list of denied calls (`disallowedTools`), such as `Bash(git push:*)`. A deny beats every
+  allow. On Codex, the fence is a sandbox (`sandbox`): `read-only`, `workspace-write`, or `danger-full-access`.
+- **Its mode decides everything not listed.** In `dontAsk` mode, any call no allow covers is refused without asking anyone. The
+  reviewer above has `Bash`, but it can only run the commands its `allowedTools` lists (here a diff, a log, and the lint) and those the
+  repository's `.claude/settings.json` allows. Any other shell call is refused. That fence, not its tool list, is what keeps it
+  read-only. The `sdlc` template's reviewer, Agora, is fenced this way (`packages/templates/sdlc/agents/agora/agent.yaml`).
 
-**Fences only tighten.** A step may narrow its agent's fence, never widen it, and a step that would is refused when the workflow is read
-(`fenceRefusal`). Its denies add to the agent's, so it can never take one of them away; its tools may only be ones the agent has, and
-its permission mode may be
-no wider than the agent's. From narrowest, the modes are `plan`; then `dontAsk`, `default` and `manual`; then `acceptEdits`; then
-`auto`; then `bypassPermissions`. A step that needs a wider fence needs another agent.
+**Fences only tighten.** A step can narrow its agent's fence, never widen it. A step that tries is rejected when the workflow is read
+(`fenceRefusal`). Its denies add to the agent's, so it can never remove one. Its tools must be ones the agent has, and its permission
+mode can be no wider than the agent's. From narrowest to widest, the modes are: `plan`; then `dontAsk`, `default`, and `manual`; then
+`acceptEdits`; then `auto`; then `bypassPermissions`. A step that needs a wider fence needs a different agent.
 
 ## Skills
 
-A skill is a folder of instructions and files for one kind of work, with a SKILL.md file at its head (this repository's `.claude/skills/look/SKILL.md` is one). An agent lists the skills it is
-given (`skills`), and a step may add more for its own position, but never take one of the agent's away. A skill is found in a
-`skills` folder beside the agents, in the repository's `.claude/skills/`, in your store's library, then among the skills built into
-Nemia; the first place that has the name wins.
+A skill is a folder of instructions and files for one kind of work, with a SKILL.md file at its top (this repository's
+`.claude/skills/look/SKILL.md` is one). An agent lists the skills it has (`skills`). A step can add more for its own position, but can
+never remove one of the agent's. Nemia looks for a skill in this order: a `skills` folder next to the agents, the repository's
+`.claude/skills/`, your store's library, then the skills built into Nemia. The first place that has the name wins.
 
-On Claude Code, each step's agent is rendered when the run starts: its instructions, your custom instructions and the factory's rules
-go after Claude Code's own prompt, and its skills
-become a plugin of the step's own, `nemia-<agent>`, which the session loads by name. A step's session is listed the skills its agent and
-its step name, and Claude Code's own bundled ones, and no other of the repository's: every other skill name the run could see is turned
-off, so a step is never listed one another step was given.
+On Claude Code, each step's agent is rendered when the run starts. Its instructions, your custom instructions, and the factory's rules
+come after Claude Code's own prompt. Its skills become a plugin for that step, `nemia-<agent>`, which the session loads by name. A
+step's session sees only the skills its agent and its step name, plus Claude Code's own bundled skills. Every other skill the run could
+see is turned off, so a step never sees a skill that was given to another step.
 
 ## What an agent is told: five layers
 
-What reaches an agent comes in five layers, each written by whoever owns it:
+An agent's instructions come in five layers, each written by whoever owns it:
 
 1. **Instructions**: the agent's own body, written once in its file. Who it is and how it works, whatever step it does.
-2. **Custom instructions**: what a person adds to an agent they use without rewriting it. They live in your store, one file per agent,
-   `~/.agent-workflows/custom-instructions/<agent>.md` (`WF_ROOT`), never in the agent's folder. They only add words: they never widen
-   a fence, give a tool, or change the model. They are frozen with the step when the run starts (`StepAgent.customInstructions`).
-3. **The folder's files**: the files the harness itself reads in the folder the agent works in, today `CLAUDE.md` and `AGENTS.md`.
-   They hold for every agent at work there, and for a person too. Nemia composes nothing of them: the harness reads them as it would
-   for anyone. They rank above the agent's own instructions and below the factory's rules and the step's policy — a place's facts beat
-   a role's generic defaults, and the factory knows its work and the step knows its process better than a folder knows either. This
-   holds although a harness presents a folder's files as overriding everything it is told: that framing is the harness's, not Nemia's.
-4. **The factory's rules**: the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
-   step. One file a factory, kept in your store and never in a repository, `~/.agent-workflows/factories/<name>/RULES.md` (see
-   [Factories](/factories/#its-rules)). They only add words, as custom instructions do, and are frozen with every step when the run
-   starts (`StepAgent.factoryRules`). A factory with none tells nothing, and a step on a remote agent is told none.
-5. **The step's policy**: the step's own words and keys. What this place in this process asks of whoever does its work, such as "in
-   this team, also check the build".
+2. **Custom instructions**: what you add to an agent you use, without rewriting it. They live in your store, one file per agent,
+   `~/.agent-workflows/custom-instructions/<agent>.md` (`WF_ROOT`), never in the agent's folder. They only add text: they never widen
+   a fence, add a tool, or change the model. They are frozen with the step when the run starts (`StepAgent.customInstructions`).
+3. **The folder's files**: the files the harness itself reads in the folder where the agent works, today `CLAUDE.md` and `AGENTS.md`.
+   They apply to every agent working there, and to people too. Nemia adds nothing to them: the harness reads them as it would for
+   anyone. They rank above the agent's own instructions and below the factory's rules and the step's policy. A place's facts beat a
+   role's general defaults, and the factory knows its work, and the step its process, better than a folder knows either. This holds
+   even though a harness presents a folder's files as overriding everything: that framing is the harness's, not Nemia's.
+4. **The factory's rules**: the rules and policies of one factory, given to every agent hired into it, whatever the agent and
+   whatever the step. There is one file per factory, kept in your store and never in a repository:
+   `~/.agent-workflows/factories/<name>/RULES.md` (see [Factories](/factories/#its-rules)). Like custom instructions, they only add
+   text, and they are frozen with every step when the run starts (`StepAgent.factoryRules`). A factory with no rules adds nothing, and
+   a step on a remote agent gets none.
+5. **The step's policy**: the step's own text and keys. What this position in this process asks of whoever does its work, such as
+   "in this team, also check the build".
 
-The number is precedence, not arrival. Where two layers say different things, the higher number wins — the folder's facts over the
-role's generic words, the factory over the folder, the step's process over the factory — and the task is above them all. The order the
-words arrive in is a separate thing: the instructions, then the custom instructions, then the factory's rules, then the step's policy,
-then the task, with the folder's files read by the harness itself wherever the agent works.
+The number is precedence, not delivery order. When two layers disagree, the higher number wins: the folder's facts over the role's
+general instructions, the factory over the folder, and the step's process over the factory. The task is above them all. The order the
+text arrives in is separate: the instructions, then the custom instructions, then the factory's rules, then the step's policy, then
+the task. The harness reads the folder's files itself, wherever the agent works.
 
-A session is told this precedence. Every layer Nemia composes is headed by its number and its owner — `## 1. Instructions — your
-role's own words`, `## 4. The factory's rules — every step of this factory` — in the prompt a step's agent is rendered into, or at the
-head of its brief on a harness that takes no prompt of ours. And every brief opens on one sentence that names each layer by number and
-says the higher number wins, the task above them all. It is the last thing Nemia says, after the harness's own statement that the files
-of the folder the session works in override everything, so a session reads it as an instruction rather than as a note.
+Each session is told this precedence. Every layer Nemia writes is headed by its number and its owner, such as `## 1. Instructions —
+your role's own words` or `## 4. The factory's rules — every step of this factory`. The headings appear in the prompt a step's agent
+is rendered into, or at the top of its brief on a harness that takes no prompt from Nemia. Every brief also opens with one sentence
+that names each layer by number and says the higher number wins, with the task above them all. Nemia says this last, after the
+harness's own statement that the folder's files override everything, so the session reads it as an instruction rather than a note.
 
-**Where a new instruction goes.** Given something you want an agent to be told, ask these in order and stop at the first yes:
+**Where a new instruction goes.** When you want an agent to be told something, ask these questions in order and stop at the first
+yes:
 
-1. Does it hold for this role everywhere, whatever the work and whoever hires it? Then the agent's **instructions**.
-2. Is it yours alone — how you want this role to work for you, in every factory? Then your **custom instructions**.
-3. Does it hold for anyone working in this folder, agent or person, whatever they are doing? Then the **folder's files**.
-4. Does it hold for every agent in this body of work, whichever step they do? Then the **factory's rules**.
-5. Does it hold for this one position of this one process alone? Then the **step's policy**.
+1. Does it apply to this role everywhere, whatever the work and whoever hires it? Then put it in the agent's **instructions**.
+2. Is it just for you, how you want this role to work for you in every factory? Then put it in your **custom instructions**.
+3. Does it apply to anyone working in this folder, agent or person, whatever they are doing? Then put it in the **folder's files**.
+4. Does it apply to every agent in this body of work, whatever step they do? Then put it in the **factory's rules**.
+5. Does it apply only to this one position in this one process? Then put it in the **step's policy**.
 
-A procedure is none of them: it belongs in a skill the agent or the step is given. Nor is a rule the machinery can refuse — that
-belongs in a fence, a gate or a test, which holds whether or not the words were read.
+A procedure is none of these: it belongs in a skill given to the agent or the step. And a rule the system can enforce doesn't belong
+in text at all: it belongs in a fence, a gate, or a test, which holds whether or not anyone reads the words.
 
-The run page on the board shows a step's layers apart, as the run froze them (`toldLayers`): the agent's instructions and skills, your
-custom instructions, the factory's rules where the run froze some, the step's policy and the skills it adds, then the task.
+On the board, the run page shows a step's layers separately, as the run froze them (`toldLayers`): the agent's instructions and
+skills, your custom instructions, the factory's rules if the run froze any, the step's policy and the skills it adds, then the task.
 
-A factory's instruction, `NEMIA.md`, is not one of these layers: it is written for Nemia, and no step is told it (see
+A factory's instruction file, `NEMIA.md`, is not one of these layers. It is written for Nemia, and no step sees it (see
 [Factories](/factories/#its-instruction)).
 
 ## Sources
 
-This page is written from `packages/agent-orchestrator/README.md` (_An agent is a node's attachment_, _Five layers_, _An agent rendered
-for Claude Code_, _What a step may have_, _What a step may not have_), and from
-`packages/agent-orchestrator/src/agents/read.store.ts`.
+This page is based on `packages/agent-orchestrator/README.md` (_An agent is a node's attachment_, _Five layers_, _An agent rendered
+for Claude Code_, _What a step may have_, _What a step may not have_), and on `packages/agent-orchestrator/src/agents/read.store.ts`.

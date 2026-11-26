@@ -1,24 +1,24 @@
 ---
 title: The model
-description: What each layer keeps, entity by entity, and the one id that links the two.
+description: What each layer stores, entity by entity, and the one id that links the two.
 ---
 
-Each layer has its own model: the things it keeps on disk, what each holds, and which id names each. The runtime keeps tasks, their
-attempts and their sessions. The orchestrator keeps runs, their steps, the tries of each step and its rounds, and around them the
-inbox, the factories, the places, the agents and the feed.
+Each layer has its own model: what it stores on disk, what each record holds, and which id names it. The runtime stores tasks, their
+attempts, and their sessions. The orchestrator stores runs, their steps, each step's tries and rounds, and around them the inbox, the
+factories, the places, the agents, and the feed.
 
 ## Linked by id alone
 
-The two models never hold each other's entities. Where the orchestrator needs the runtime's work, it holds the id the runtime gave it:
-a try names the task it ran as by its `TaskId`, and nothing more. The orchestrator declares that id as the runtime's, without
-importing the runtime (`packages/agent-orchestrator/src/record/record.model.ts`), so in its diagram the runtime's task is a box known
-by its id alone. To learn what that task did, the orchestrator asks the runtime, through its one client.
+Neither model holds the other's entities. When the orchestrator needs the runtime's work, it keeps the id the runtime gave it: a try
+records the `TaskId` of the task it ran as, and nothing more. The orchestrator declares that id as the runtime's without importing
+the runtime (`packages/agent-orchestrator/src/record/record.model.ts`), so its diagram shows the runtime's task as a box known only by
+its id. To find out what that task did, the orchestrator asks the runtime, through its one client.
 
 ## The two models side by side
 
-Each diagram is drawn from its layer's code, which prints it: the runtime's from `packages/agent-runtime/src/core/model.ts`, the
-orchestrator's from `packages/agent-orchestrator/src/model/diagram.model.ts`. A key marked PK is the entity's own id, and one marked FK
-names another entity, here or in the other layer.
+Each layer's code prints its own diagram: the runtime's from `packages/agent-runtime/src/core/model.ts`, the orchestrator's from
+`packages/agent-orchestrator/src/model/diagram.model.ts`. A key marked PK is the entity's own id. A key marked FK points to another
+entity, in the same layer or the other one.
 
 <div class="side-by-side">
 

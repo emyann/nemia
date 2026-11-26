@@ -16,8 +16,12 @@ description: "Build a change from its spec in this repository: tests first where
    rule about order or names; a time or a wait; a failure that shows only under load; a test that depends on the environment; a
    test that reads source text; a field moved to another key or added to a returned type; a value that comes from outside (a file,
    a page, JSON, a child process); a stand-in for the real thing.
-3. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
-4. **Check what you changed**: its test files, the tests that read a doc, skill or workflow file you touched, and the packages you
+3. **Remove what the change makes dead**: what the spec names as replaced or left unused, and what your change makes unused as you go
+   — the old path, the alias, the fallback, the flag, and the tests and docs of the behaviour it takes away. Search the repository for
+   each before it goes: what another package, app or template still reaches is not dead. Keep a compatibility path only where the
+   spec gives its reason.
+4. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
+5. **Check what you changed**: its test files, the tests that read a doc, skill or workflow file you touched, and the packages you
    touched where a file alone does not say enough, each as the repository's instructions say how; then the checks the repository's
    instructions say a session runs whole. Never more than they say: where your step has a check, it runs the rest outside your
    session, and a failing test you did not run comes back as its refusal, answered in the next try. Green is the floor, not the bar.
@@ -27,9 +31,9 @@ description: "Build a change from its spec in this repository: tests first where
    Never sign off while a check you started is still running. Stop only what you started: bound it with `timeout`, or keep the pid of
    what you start in the background (`$!`) and `kill <pid>`. Never `pkill` or `killall`: other runs share this machine, and your fence
    refuses them.
-5. **Never make it pass by weakening it**: a test loosened, a limit's ceiling raised, a check skipped. Cut the function; lower the
+6. **Never make it pass by weakening it**: a test loosened, a limit's ceiling raised, a check skipped. Cut the function; lower the
    ceiling of a file you shrank.
-6. **Answer the review**, from the second round: for each finding, fix it, or say in `replies` why not (`won't fix`, and the reason). A
+7. **Answer the review**, from the second round: for each finding, fix it, or say in `replies` why not (`won't fix`, and the reason). A
    finding you cannot answer honestly is a reason to sign off `blocked`, saying what you need.
 
 When the spec is wrong — it names what is not there, or asks what a rule refuses — do not build around it: sign off `blocked` and say so.

@@ -7,7 +7,7 @@ import { StepGlance } from './StepGlance';
 import { CODES, NOW, PLAN, measured, runOf, stepOf, tryOf } from '../../../.storybook/fixtures/steps';
 
 /** The card a diamond shows on hover or focus: a few live facts of its step, one story a kind of step. */
-const meta: Meta = { title: 'Run/StepGlance' };
+const meta: Meta<{ run: RunDetail }> = { title: 'Run/StepGlance', render: ({ run }) => glance(run) };
 export default meta;
 
 const RUNS = {
@@ -44,31 +44,31 @@ const small = async (canvas: HTMLElement, kind: string) => {
 };
 
 /** A step at work: its agent and model, its word and since, its try and what it has spent so far. */
-export const AtWork: StoryObj = {
-  render: () => glance(RUNS.work),
+export const AtWork: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.work },
   play: ({ canvasElement }) => small(canvasElement, 'work'),
 };
 
 /** A step at its gate, waiting on a person. */
-export const AtAGate: StoryObj = {
-  render: () => glance(RUNS.gate),
+export const AtAGate: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.gate },
   play: ({ canvasElement }) => small(canvasElement, 'gate'),
 };
 
 /** A step done: its spend of its cap. */
-export const Done: StoryObj = {
-  render: () => glance(RUNS.done),
+export const Done: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.done },
   play: ({ canvasElement }) => small(canvasElement, 'done'),
 };
 
 /** A step to come: nothing said yet beyond its word. */
-export const ToCome: StoryObj = {
-  render: () => glance(RUNS.come),
+export const ToCome: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.come },
   play: ({ canvasElement }) => small(canvasElement, 'come'),
 };
 
 /** A step that failed. */
-export const Failed: StoryObj = {
-  render: () => glance(RUNS.failed),
+export const Failed: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.failed },
   play: ({ canvasElement }) => small(canvasElement, 'failed'),
 };

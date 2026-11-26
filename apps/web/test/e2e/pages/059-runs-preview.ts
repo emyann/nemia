@@ -151,9 +151,9 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
 /** By the keyboard: the focus on a diamond shows the glance, and Enter opens the step in the side sheet. */
 async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts) {
   await page.mouse.move(0, 0);
-  await page.keyboard.press('Shift');
-  await bar.focus();
-  if (!(await focusedOn(bar))) throw new Refused('the diamond takes the focus');
+  await page.locator(`${FLIGHT} tr[data-run="${run}"]`).focus();
+  for (let at = 0; at < 12 && !(await focusedOn(bar)); at += 1) await page.keyboard.press('ArrowRight');
+  if (!(await focusedOn(bar))) throw new Refused("the table's arrows reach the diamond along its row");
   await glanceReads(page, want, 'by the keyboard');
   await page.keyboard.press('Enter');
   await sheetOpens(page, run, step, 'by the keyboard');

@@ -59,12 +59,27 @@ export const Button: StoryObj<{ step: string }> = {
   },
 };
 
-/** A press opens the modal over the page, named for the step, holding the step's part and its Close button. */
+/**
+ * A press opens the modal over the page, named for the step: one cut frame, the step's, in its hue, the title and the Close button
+ * inside it above the step's part, and no surface of the kit's dialog drawn around it.
+ */
 export const Open: StoryObj<{ step: string }> = {
   play: async ({ canvasElement, args }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: `Approve ${args.step}` }));
     const dialog = await waitFor(() => within(document.body).getByRole('dialog', { name: `Approve ${args.step}` }));
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Close' })).toBeVisible());
     await waitFor(() => expect(dialog.querySelector('[data-step-part="M"]')).not.toBeNull());
+    const frames = dialog.querySelectorAll('[data-cut-frame]');
+    await expect(frames).toHaveLength(1);
+    const frame = frames[0];
+    await expect(frame.getAttribute('data-cut-frame')).toBe('yours');
+    await expect(frame.contains(within(dialog).getByRole('heading', { name: `Approve ${args.step}` }))).toBe(true);
+    await expect(frame.contains(within(dialog).getByRole('button', { name: 'Close' }))).toBe(true);
+    await expect(frame.contains(dialog.querySelector('[data-step-part="M"]'))).toBe(true);
+    const surface = getComputedStyle(dialog.querySelector('[data-slot="dialog-content"]') as Element);
+    await expect(surface.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    await expect((surface.boxShadow.match(/rgba?\([^)]*\)/g) ?? []).filter((c) => !c.endsWith(', 0)'))).toEqual([]);
+    await expect(surface.padding).toBe('0px');
+    await expect(surface.borderRadius).toBe('0px');
   },
 };

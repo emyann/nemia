@@ -541,13 +541,28 @@
     },
     {
       "term": "Keyspace",
-      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, the inbox's cards and the tick's tries of them, and the factories' records (a factory under `/registry/factories/<name>`, its level, its servers and what the controller last observed of it) follow, each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, the inbox's cards and the tick's tries of them, and the factories' records (a factory under `/registry/factories/<name>`, its level, its servers and what the controller last observed of it) follow, and the definition index beside them (`/registry/definitions/<scope>/<kind>/<name>`), each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
       "type": "Keyspace"
     },
     {
       "term": "Keyspace revision",
-      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, and the revision a list was read at. A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`). Not a ledger's `Revision`.",
+      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, an object's `resourceVersion` (the highest revision among the records it is made of, `WATCHED_KINDS`) and the revision a list was read at (the keyspace head). A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`). Not a ledger's `Revision`.",
       "type": "WriteRefusal"
+    },
+    {
+      "term": "Definition index",
+      "meaning": "the keyspace's record of each definition that stays a file, `/registry/definitions/<scope>/<kind>/<name>` holding `{ digest, path }` (the scope a factory's name, `_library` or `_builtin`): the daemon's sweep reads the files every 2 seconds and writes a record only where it differs from what the index holds, so an agent, a skill or a workflow has a revision a watch can start from and a write of it names (`indexSweep`, `packages/agent-orchestrator/src/definition-index/definition-index.store.ts`).",
+      "type": "RecordDue"
+    },
+    {
+      "term": "Observed record",
+      "meaning": "a record the daemon keeps of a world it does not hold, written only when what it observes differs from what the record holds (`recordDue`, proved by `packages/agent-orchestrator/contracts/observed.contract.ts`): the definition index's today, a run's observed status when it moves into the keyspace.",
+      "type": "RecordDue"
+    },
+    {
+      "term": "Object change",
+      "meaning": "what a watch from a revision sends of an object whose records moved after it: ADDED where it was made since, MODIFIED where it was held and is still there, DELETED where it was held and is gone, and nothing where it was made and removed since (`objectChange`, proved by `packages/agent-orchestrator/contracts/kind-watch.contract.ts`); the records each served kind is made of are `WATCHED_KINDS` (`packages/agent-orchestrator/src/list-watch/kind-watch.ts`).",
+      "type": "ObjectChange"
     },
     {
       "term": "Write verb",
@@ -556,7 +571,7 @@
     },
     {
       "term": "Compaction",
-      "meaning": "the keyspace's removal of the rows a later row supersedes and of its tombstones, older than the last 1,000 revisions, every 5 minutes in the daemon (`packages/agent-orchestrator/src/keyspace/compact.verb.ts`, `compactTo`): a watch from a revision compacted away is refused `gone`, the api's 410, and one past the head `ahead` (`watchStart`).",
+      "meaning": "the keyspace's removal of the rows a later row supersedes and of its tombstones, up to the head the sweep of at least 5 minutes before saw, every 5 minutes in the daemon (`packages/agent-orchestrator/src/keyspace/compact.verb.ts`, `compactTo`, each sweep's head and time kept in the file's `kine_sweeps`): the last 5 minutes of revisions at least can be watched from, a watch from a revision compacted away is refused `gone`, the api's 410, and one past the head `ahead` (`watchStart`).",
       "type": "WatchRefusal"
     },
     {

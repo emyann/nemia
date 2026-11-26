@@ -112,14 +112,19 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   real api mints a token into that api's store and sends it (`test/main.test.ts`).
 - **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a GET whose success is a `<Kind>List` is watched by
   the mount with nothing to add (`src/objects/serve.ts`), which `src/watch/watch.test.ts` holds for every such endpoint of the `Api`; a
-  watch asked for a `Table` is refused 406. A watch reads its list again, so each open one costs a list read per feed line (at most one
-  per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below). The Event
-  lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`), and resumes from a
-  `resourceVersion` (a page's `metadata.resourceVersion`, the feed's end, or the last event's), sending no state and a BOOKMARK once it
-  has caught up with the feed it opened on; any other list refuses one 400, and a byte the feed cannot be read from is 410
-  (`watchStartOf`, proved by `contracts/watch-start.contract.ts`). A list whose objects
-  carry parts measured to the read hands `watchable` the version it compares them at (the runs' `runWatchVersion`, which leaves out a
-  going run's `wallMs` and `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
+  watch asked for a `Table` is refused 406. A list of a kind the keyspace watches (`isWatchedKind`, `WATCHED_KINDS` in the
+  orchestrator's `src/list-watch/kind-watch.ts`) is served at its revisions (`src/objects/revisioned.ts`: each object's
+  `resourceVersion` the highest revision of the records it is made of, the list's the keyspace head read before its items) and its watch
+  replays the keyspace from a `resourceVersion` (`kindReplay`) and follows the head on `Beats.feed`, sending no state to a resume; 410
+  where compaction removed the revision (the daemon keeps the last 5 minutes at least), 400 past the head or for no version
+  (`watchStartOf`, proved by `contracts/watch-start.contract.ts`). Where a kind's status is judged by the informer from other records
+  (a card's `status.state` and `runs`, from its run), it moves without a revision until the run's observed status is a record of the
+  keyspace (the card `store: a run's observed status is a record of the keyspace`). The runs' list is that exception today: it reads its
+  list again on a feed line and on `Beats.watch` and compares a run leaving out the times measured to the read (`runWatchVersion`),
+  sends its state whole to every reconnect and answers a `resourceVersion` 400. The Event lists follow the feed (`eventsFollowed`,
+  `src/feed-objects/events-watch.ts`) and resume from a byte of it (a page's `metadata.resourceVersion`, the feed's end, or the last
+  event's), a byte the feed cannot be read from 410. A write of a library definition names the revision it was read at (`readAtRevision`,
+  the definition index read again first, so a hand edit since counts). Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`
   endpoints.
 - **No read answers past the app's bound** (`AnswerBound`, `ANSWER_MOST`): every group is built with `readsBounded`

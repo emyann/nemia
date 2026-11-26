@@ -122,7 +122,9 @@ test('without workspaces a change groups by its top-level directory, and a file 
 });
 
 test('the agent-facing and check-affecting lines are absent when nothing qualifies', () => {
-  const lines = radiusLines(radius(numstat('3\t1\tsrc/index.ts', '10\t0\tsrc/testing/latest.ts', '1\t1\tdocs/claude.md'), WORKSPACES, GLOBS));
+  const lines = radiusLines(
+    radius(numstat('3\t1\tsrc/index.ts', '10\t0\tsrc/testing/latest.ts', '1\t1\tdocs/claude.md'), WORKSPACES, GLOBS),
+  );
   assert.deepEqual(lines, ['docs  1 file   +1 −1', 'src   2 files  +13 −1']);
   assert.ok(!lines.some((l) => l.startsWith('agent-facing') || l.startsWith('check-affecting')));
   const both = radiusLines(radius(numstat('3\t1\tsrc/index.ts', '1\t0\t.mcp.json', '4\t0\tsrc/index.test.ts'), [], GLOBS));
@@ -138,7 +140,8 @@ test('a radius that names nothing flags nothing: the core knows no repository fi
   assert.deepEqual([r.agentFacing, r.checkAffecting, r.lessons], [[], [], []]);
   assert.deepEqual(sensitivePaths(r.changes, r.checkAffecting), []);
   assert.deepEqual(
-    radius(numstat('1\t0\tMakefile', '1\t0\tpackage.json'), [], { agentFacing: [], checkAffecting: ['**/Makefile'], lessons: [] }).checkAffecting,
+    radius(numstat('1\t0\tMakefile', '1\t0\tpackage.json'), [], { agentFacing: [], checkAffecting: ['**/Makefile'], lessons: [] })
+      .checkAffecting,
     ['Makefile'],
     'a factory that names a file has it flagged, and only it',
   );
@@ -222,8 +225,11 @@ test("a team's lists, as a factory states them, name what they name and refuse w
     'packages/docs/a.md',
     'vendor/lib/docs/a.md',
   ])
-  assert.ok(!isLesson('packages/x/docs/features.md', ['docs/']), "lessons are exactly the globs given: none is derived from the base's workspaces");
-  assert.ok(!isLesson('packages/x/docs/features.md', ['docs/']), 'lessons are exactly the globs given: none is derived from the base\'s workspaces');
+    assert.ok(!isLesson(f, lesson), `not a lesson: ${f}`);
+  assert.ok(
+    !isLesson('packages/x/docs/features.md', ['docs/']),
+    "lessons are exactly the globs given: none is derived from the base's workspaces",
+  );
 });
 
 test('--sensitive with a glob that matches nothing names no path, and the heading says whose list it is', () => {

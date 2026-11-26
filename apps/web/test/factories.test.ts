@@ -58,6 +58,7 @@ const factory = (name: string, extra: Partial<Factory> = {}) =>
     volumes: [],
     costLines: {},
     workflowRepos: {},
+    firstWorkflow: null,
     template: null,
     ...extra,
   }) satisfies Factory;

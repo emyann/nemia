@@ -204,6 +204,7 @@ export const step = (extra: Partial<Step> = {}) =>
       missing: ['replies'],
       replies: [{ finding: 'a.ts:1', answer: 'fixed', why: 'Cut.' }],
       schema: { notes: { type: 'array' } },
+      tallies: [],
       questions: [
         {
           field: 'open',

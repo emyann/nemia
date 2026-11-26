@@ -500,7 +500,6 @@ test("an approved ending stages the merge and signs off its message; the run exe
     `the run landed on main as ${head.slice(0, 7)}`,
     'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
-
 });
 
 for (const [said, exitCode, words] of [

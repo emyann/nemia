@@ -109,7 +109,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`; its own card triggers, by name (`triggers`), kept here as its schedules are; and
  * the values each label key it names takes (`labelValues`), where it is made from no template (one made from a template keeps them in
- * its tree's wiring, rendered from its manifest); and, kept the same way, its `radius` and `firstWorkflow`. A key a later `nemia` writes is kept.
+ * its tree's wiring, rendered from its manifest); and, kept the same way, its `radius` and `firstWorkflow`. A key a later `nemia` writes
+ * is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -125,7 +126,11 @@ const FactoryFileSchema = Schema.StructWithRest(
     triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
     labelValues: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(Schema.String))),
     radius: Schema.optionalKey(
-      Schema.Struct({ agentFacing: Schema.Array(Schema.String), checkAffecting: Schema.Array(Schema.String), lessons: Schema.Array(Schema.String) }),
+      Schema.Struct({
+        agentFacing: Schema.Array(Schema.String),
+        checkAffecting: Schema.Array(Schema.String),
+        lessons: Schema.Array(Schema.String),
+      }),
     ),
     firstWorkflow: Schema.optionalKey(Schema.String),
     generation: Schema.optionalKey(Schema.Number),

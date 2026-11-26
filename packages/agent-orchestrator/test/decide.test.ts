@@ -11,7 +11,7 @@
  */
 import { keysUnder, listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
 import { createFactoryAt, rewriteRun } from '../testing.ts';
-import { inRadiusFactory, RADIUS } from './radius-fixture.ts';
+import { inRadiusFactory, RADIUS } from './radius.fixture.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -341,26 +341,29 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       'the globs choose what is read whole, not what is true: the radius still names the check file',
     );
   });
-  s.test("the radius is the run's factory's: a factory that names other files has those flagged, and one that names none flags nothing", async () => {
-    const own = runRecord(ROOT, a.run.id).factory;
-    const in_ = async (name: string, radius?: typeof RADIUS) => {
-      createFactoryAt(ROOT, { name, volumes: [], workflows: [], hires: {}, schedules: {}, ...(radius ? { radius } : {}) });
-      rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: name });
-      const { d } = await decidable(a.run.id);
-      const [touched] = d.touched;
-      assert.ok(touched && !('error' in touched.radius), JSON.stringify(touched));
-      return { radius: touched.radius, inFull: d.sensitive.flatMap((b) => b.files.map((f) => f.path)) };
-    };
-    try {
-      const other = await in_('other-radius', { agentFacing: ['**/add.ts'], checkAffecting: ['**/add.ts'], lessons: [] });
-      assert.deepEqual([other.radius.agentFacing, other.radius.checkAffecting], [['packages/x/src/add.ts'], ['packages/x/src/add.ts']]);
-      assert.deepEqual(other.inFull, ['packages/x/src/add.ts'], 'and its diff is the one read in full');
-      const none = await in_('no-radius');
-      assert.deepEqual([none.radius.agentFacing, none.radius.checkAffecting, none.inFull], [[], [], []]);
-    } finally {
-      rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: own });
-    }
-  });
+  s.test(
+    "the radius is the run's factory's: a factory that names other files has those flagged, and one that names none flags nothing",
+    async () => {
+      const own = runRecord(ROOT, a.run.id).factory;
+      const in_ = async (name: string, radius?: typeof RADIUS) => {
+        createFactoryAt(ROOT, { name, volumes: [], workflows: [], hires: {}, schedules: {}, ...(radius ? { radius } : {}) });
+        rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: name });
+        const { d } = await decidable(a.run.id);
+        const [touched] = d.touched;
+        assert.ok(touched && !('error' in touched.radius), JSON.stringify(touched));
+        return { radius: touched.radius, inFull: d.sensitive.flatMap((b) => b.files.map((f) => f.path)) };
+      };
+      try {
+        const other = await in_('other-radius', { agentFacing: ['**/add.ts'], checkAffecting: ['**/add.ts'], lessons: [] });
+        assert.deepEqual([other.radius.agentFacing, other.radius.checkAffecting], [['packages/x/src/add.ts'], ['packages/x/src/add.ts']]);
+        assert.deepEqual(other.inFull, ['packages/x/src/add.ts'], 'and its diff is the one read in full');
+        const none = await in_('no-radius');
+        assert.deepEqual([none.radius.agentFacing, none.radius.checkAffecting, none.inFull], [[], [], []]);
+      } finally {
+        rewriteRun(ROOT, { ...runRecord(ROOT, a.run.id), factory: own });
+      }
+    },
+  );
   s.test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
     const world = stage.place().world;
     world.branch(a.repo, 'wf/source-docs', { 'packages/x/src/docs/strings.ts': 'export const title = "Docs";\n' });

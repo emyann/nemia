@@ -71,6 +71,7 @@ export const PLAN: StepCloseout = {
     steps: { type: 'array', items: { type: 'string' } },
     again: { type: 'boolean', description: 'true when the plan wants another round.' },
   },
+  tallies: [],
   questions: [],
   raw: { outcome: 'done', summary: 'Parse the flag, then store it.' },
 };

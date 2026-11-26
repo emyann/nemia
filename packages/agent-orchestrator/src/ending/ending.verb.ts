@@ -11,7 +11,6 @@ import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import type { Verdict } from '../check/index.ts';
 import type { StepSpec } from '../workflow.ts';
-import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingClaimedAt, landedWords, landingDue, landingOpen } from './ending.ts';
 import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type LandingRecord, type Run, type TaskPhase } from '../record/record.ts';

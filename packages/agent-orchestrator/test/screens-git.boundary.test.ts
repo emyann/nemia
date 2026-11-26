@@ -10,7 +10,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
-import { inRadiusFactory, RADIUS } from './radius-fixture.ts';
+import { inRadiusFactory, RADIUS } from './radius.fixture.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

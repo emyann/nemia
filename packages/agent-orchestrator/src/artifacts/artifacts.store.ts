@@ -2,8 +2,8 @@
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
  * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds (`artifactFiles`), the
- * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`); and one file of that directory or of a step's folder, read by its path
- * under it and never through a link (`artifactFile`, `fileUnder`).
+ * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`); and one file of that directory or of a step's
+ * folder, read by its path under it and never through a link (`artifactFile`, `fileUnder`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -14,7 +14,7 @@ import path from 'node:path';
 import { handedCloseout, type Closeout } from '../closeout/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
-import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
+import { artifactPlace, HANDED_CLOSEOUT, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf, statUnder } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';

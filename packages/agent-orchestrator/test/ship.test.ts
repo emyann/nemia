@@ -469,19 +469,19 @@ describe("a run waits at its ending's gate, is approved, stages its merge, lands
     assert.deepEqual((await at.pass(id)).checked, ['ship']);
   });
   s.test('its check passes and the merge lands; nemia decide reads it landed once a pass has read it', async () => {
-      const account = 'SHIP-ACCOUNT: merged it onto main, the check passed';
-      settle(`${id}-ship`, 'succeeded', {
-        ...SIGNED,
-        summary: account,
-        artifacts: [],
-        message: MESSAGE,
-      });
-      settle(`${id}-ship-check`, 'succeeded', undefined, 0);
-      await at.pass(id);
-      assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
-      assert.notEqual(world().head(repo), base);
-      await at.aPass(e);
-      assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
+    const account = 'SHIP-ACCOUNT: merged it onto main, the check passed';
+    settle(`${id}-ship`, 'succeeded', {
+      ...SIGNED,
+      summary: account,
+      artifacts: [],
+      message: MESSAGE,
+    });
+    settle(`${id}-ship-check`, 'succeeded', undefined, 0);
+    await at.pass(id);
+    assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
+    assert.notEqual(world().head(repo), base);
+    await at.aPass(e);
+    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
   });
   s.test(
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",

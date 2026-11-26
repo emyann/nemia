@@ -79,8 +79,8 @@ export type StepReply = { finding: string; answer: string; why: string };
  * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
  *
  * `tallies` is each count its step declares (`tally:`), valued by `tallyIn` off this closeout, in the step's order, empty where it declares
- * none. `shapes` is the shape (objects' `FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`, absent where it marked
- * none — as on a run frozen before shapes were kept.
+ * none. `shapes` is the shape (objects' `FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`, absent where it
+ * marked none — as on a run frozen before shapes were kept.
  *
  * `questions` is what it asks a person through its question fields (`askedQuestions`): each field whose schema is the package's shape
  * of questions and whose value decodes as them, in the schema's order. Empty for a closeout that asks none; a field that does not decode

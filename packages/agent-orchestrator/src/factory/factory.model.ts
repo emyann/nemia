@@ -103,7 +103,11 @@ export const Factory = Schema.Struct({
   triggers: Schema.optional(Schema.Record(Schema.String, CardTrigger)),
   labelValues: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
   radius: Schema.optional(
-    Schema.Struct({ agentFacing: Schema.Array(Schema.String), checkAffecting: Schema.Array(Schema.String), lessons: Schema.Array(Schema.String) }),
+    Schema.Struct({
+      agentFacing: Schema.Array(Schema.String),
+      checkAffecting: Schema.Array(Schema.String),
+      lessons: Schema.Array(Schema.String),
+    }),
   ),
   firstWorkflow: Schema.optional(Schema.String),
   generation: Schema.optional(Schema.Number),

@@ -66,14 +66,7 @@ export {
   wfRoot,
 } from './config/config.store.ts';
 export { StoreRoot, storeConfigLayer, storeRootLayer } from './config/root.store.ts';
-export {
-  branchesToRead,
-  countsLine,
-  inFullLines,
-  lessonLine,
-  parseGlobs,
-  touchedLines,
-} from './branches/index.ts';
+export { branchesToRead, countsLine, inFullLines, lessonLine, parseGlobs, touchedLines } from './branches/index.ts';
 export { budgetWord, dollars } from './money/money.ts';
 export { peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './usage/usage.ts';
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';

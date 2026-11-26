@@ -588,6 +588,7 @@ const factoryOn = (name: string, repos: string[], error: string | null = null) =
     volumes: [],
     costLines: {},
     workflowRepos: {},
+    firstWorkflow: null,
     template: null,
   }) satisfies Factory;
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];

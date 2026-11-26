@@ -66,8 +66,8 @@ export const Measured: Story = {
 };
 
 /**
- * A factory with no quick: its own workflows are offered to choose from, and Start waits for one. The one picked is started gated at its
- * ending step, `land`, read off the factory's listing of it, so its run waits on the person as quick's does.
+ * A factory whose named first workflow it does not offer: its own workflows are offered to choose from, and Start waits for one. The one
+ * picked is started gated at its ending step, read off the factory's listing of it, so its run waits on the person.
  */
 export const NoQuick: Story = {
   parameters: { msw: firstCardStore({ workflows: ['build', 'janitor'] }) },

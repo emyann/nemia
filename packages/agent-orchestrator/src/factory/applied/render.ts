@@ -85,14 +85,22 @@ function unreadTriggerRefusal(name: string, selector: string, unread: string, wr
 }
 
 /**
- * The globs of a template's `spec.radius`, its parameters rendered, each list split on whitespace with the empty words dropped: none
- * where the manifest names no radius.
- * @param radius The manifest's `radius`, parameters substituted.
+ * The settings of a template's manifest the wiring carries beside its hires, parameters rendered: the globs of `spec.radius`, each list
+ * split on whitespace with the empty words dropped, none where the manifest names no radius, and the workflow of `spec.firstWorkflow`.
+ * @param manifest The manifest's spec, parameters substituted.
  */
-function renderedRadius(radius: unknown): Pick<Wiring, 'radius'> {
-  if (!isMap(radius)) return {};
-  const globs = (key: string) => (typeof radius[key] === 'string' ? radius[key].split(/\s+/).filter((glob) => glob !== '') : []);
-  return { radius: { agentFacing: globs('agentFacing'), checkAffecting: globs('checkAffecting'), lessons: globs('lessons') } };
+function renderedSettings(manifest: Spec) {
+  const { radius, firstWorkflow } = manifest;
+  const globs = (key: string) => {
+    const written = isMap(radius) ? radius[key] : undefined;
+    return typeof written === 'string' ? written.split(/\s+/).filter((glob) => glob !== '') : [];
+  };
+  return {
+    ...(isMap(radius)
+      ? { radius: { agentFacing: globs('agentFacing'), checkAffecting: globs('checkAffecting'), lessons: globs('lessons') } }
+      : {}),
+    ...(typeof firstWorkflow === 'string' && firstWorkflow !== '' ? { firstWorkflow } : {}),
+  } satisfies Pick<Wiring, 'radius' | 'firstWorkflow'>;
 }
 
 /**
@@ -461,8 +469,7 @@ export function renderFactory(read: TemplateRead, params: Params) {
     ...(revisions === undefined ? {} : { revisions }),
     ...triggers.wiring,
     ...labelValues.wiring,
-    ...renderedRadius(manifest.radius),
-    ...(typeof manifest.firstWorkflow === 'string' && manifest.firstWorkflow !== '' ? { firstWorkflow: manifest.firstWorkflow } : {}),
+    ...renderedSettings(manifest),
   };
   const out: Rendered = { files: [], copies: [], wiring, refusals: [...triggers.refused, ...labelValues.refused] };
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));

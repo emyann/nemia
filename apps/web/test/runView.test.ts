@@ -185,6 +185,7 @@ const closeout = (summary: string) =>
     missing: [],
     replies: null,
     schema: {},
+    tallies: [],
     questions: [],
     raw: null,
   }) satisfies RunObject.StepCloseout;

@@ -180,7 +180,7 @@ test('REFUSED: branch given an argument, on the remote default branch, or on no 
   assert.deepEqual(off.calls, [], 'no gh is called');
   const unknown = pr(at, 'merge');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`merge` is no verb: give branch, push, wait or declares-ci/);
+  assert.match(unknown.err, /`merge` is no verb: give branch, push or declares-ci/);
   assert.deepEqual(unknown.calls, []);
 });
 

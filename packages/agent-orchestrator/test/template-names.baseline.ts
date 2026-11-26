@@ -14,10 +14,4 @@ export const TEMPLATE_CARDS: Readonly<Record<string, string>> = {
 };
 
 /** Each core file that says a template's name today. */
-export const TEMPLATE_NAMES: Readonly<Record<string, TemplateDebt>> = {
-  'packages/agent-orchestrator/src/check/check.ts': {
-    count: 1,
-    card: '7kuf',
-    why: "its deadline comment is sized on one template's CI wait",
-  },
-};
+export const TEMPLATE_NAMES: Readonly<Record<string, TemplateDebt>> = {};

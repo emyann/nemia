@@ -1546,6 +1546,8 @@ describe("an ending whose last check is a condition gives the checkout back once
     const { repo, a, b } = two;
     at.mergedByHand(repo, b.branch);
     await writeBaseCi(a.id, 'True');
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'the written condition files its check, which exits 0');
+    settle(`${a.id}-ship-check-base-ci`, 'succeeded', undefined, 0);
     await at.pass(a.id);
     assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
     assert.notEqual(world().head(repo), mergedA, "B's result is on the base past it");

@@ -482,6 +482,7 @@ function readCi(a: Asked, pr: Pr, check: string, served: ServedStepCheck) {
  * head, done, and the condition's status and words where one is to be written.
  */
 function judgeHead(a: Asked, served: ServedStepCheck, check: string, due: boolean) {
+  if (decidedIn(served)) return undefined;
   const prs = pullsOf(a.cwd, a.branch);
   const pr = standingOn(prs);
   const pull = pullOf(pr);

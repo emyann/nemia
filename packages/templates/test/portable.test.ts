@@ -141,6 +141,7 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^workflows\/([\w-]+)\/README\.md$/, (file) => `# ${file.split('/')[1]}\n`],
   [/^workflows\/[\w-]+\/workflow\.yaml$/, () => 'kind: Workflow'],
   [/^carried\/ci-log\.ts$/, () => 'export function failures'],
+  [/^carried\/ci-write\.ts$/, () => 'export const conditionDue'],
   [/^carried\/exec\.ts$/, () => 'export function run'],
   [/^carried\/refresh\.ts$/, () => 'export function refresh'],
   [/^carried\/rerun\.ts$/, () => 'export function rerunOnce'],

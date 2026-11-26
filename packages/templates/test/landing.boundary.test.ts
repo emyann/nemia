@@ -286,7 +286,7 @@ test('REFUSED: a verb the script has not, and a merge with no subject, no body f
   w.gh.answers(mergeable(w));
   const unknown = land(w, 'land');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`land` is no verb: give merge, receipt or base-ci/);
+  assert.match(unknown.err, /`land` is no verb: give merge or receipt/);
   assert.deepEqual(unknown.calls, []);
 
   const file = body();

@@ -320,7 +320,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
   assert.match(probing.err, /cannot tell which probes are live/);
   assert.deepEqual(
     printed(probing).map((at) => at >= 0),
-    [true, false, false, false, false],
+    [true, false, false, false],
     'the probes are read second, after the size',
   );
 

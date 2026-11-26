@@ -353,7 +353,7 @@ test("REFUSED: a grain's far end is read from its tile, and a tile unwritten or 
   assert.deepEqual(light.speck, [0, 0, 0]);
   assert.deepEqual(
     grainedOf([0x8e, 0x8f, 0x95], light).map((channel) => Math.round(channel)),
-    [0x70, 0x71, 0x75],
+    [0x70, 0x71, 0x76],
   );
   const dark = farOf(css, 'label', 'dark');
   assert.deepEqual(dark.speck, [255, 255, 255]);

@@ -82,7 +82,7 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
 
 /**
  * A program of a factory's template (`programs/<name>/program.yaml`): the command the daemon keeps running for the factory, and the
- * conditions it writes (`nemia condition set`), by name.
+ * conditions it writes (`nemia condition`), by name.
  */
 export type Program = { readonly run: string; readonly writes: readonly string[] };
 

@@ -376,7 +376,7 @@ export type RouteBy = 'table' | 'script' | 'judge' | 'person';
 type RouteRecord = { route: string; try: number; by: RouteBy };
 
 /**
- * A condition as written for a try of a step (`nemia condition set`, or a program of the template): what the writer gave (`status`,
+ * A condition as written for a try of a step (`nemia condition`, or a program of the template): what the writer gave (`status`,
  * `message`), when (`at`), when the status last changed (`transitionedAt`), and who wrote it (`by`, an agent's name, or null for a person).
  */
 export type ConditionWritten = {
@@ -759,7 +759,7 @@ export type RunStore = {
      */
     readonly route: (id: string, step: string, n: number, route: { route: string; at: string }) => string;
     /**
-     * Write the condition `name` of the step `step` for its try `n` (`nemia condition set`, a program), whole over the one there: never
+     * Write the condition `name` of the step `step` for its try `n` (`nemia condition`, a program), whole over the one there: never
      * spent, read on every pass, laid on the step's record while `n` is the try it is on. Answers it as kept, with when its status last
      * changed.
      */

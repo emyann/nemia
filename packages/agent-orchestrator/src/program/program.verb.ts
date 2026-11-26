@@ -5,7 +5,7 @@
  * program's task is the runtime's command harness, long-lived (`restartPolicy: 'Always'`): its restart and its back-off are the
  * runtime's, never this controller's, and a task the runtime settled is not filed again under its id. The program runs in its factory's
  * tree with the factory's carried files (`WF_CARRIED_FILES`) and its own session token (`WF_SESSION_TOKEN`), minted as it is filed, in
- * the factory and no run's, so what it writes through the api (`nemia condition set`) is a token holder's. Level-triggered: it carries
+ * the factory and no run's, so what it writes through the api (`nemia condition`) is a token holder's. Level-triggered: it carries
  * nothing between beats, so a restart owes what the record and the engine say.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the keeper, and the
@@ -130,7 +130,7 @@ const programsOnce = Effect.fn('programsOnce')(function* () {
   }
   for (const h of held.filter((one) => one.settled && declared.some((d) => d.id === one.id)))
     yield* Effect.logWarning(
-      `The program task ${h.id} is down and the runtime will not restart it: change its \`run:\` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon after \`nemia rm\` of the task.`,
+      `The program task ${h.id} is down and the runtime will not restart it: change its \`run:\` in programs/<name>/program.yaml and apply the template again (nemia factory upgrade), or restart the daemon.`,
     );
   for (const id of due.stop) yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
   return due;

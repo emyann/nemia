@@ -79,7 +79,7 @@ describe('each shape of checks: the loader cannot take is refused at load', () =
     ['a name outside the word', 'checks:\n  - name: A b\n    run: one'],
     ['no run:', 'checks:\n  - name: a'],
     ['an enabled: that is no boolean', 'checks:\n  - name: a\n    run: one\n    enabled: maybe'],
-    ['a usesCheckout: key, which no check takes', 'checks:\n  - name: a\n    run: one\n    usesCheckout: false'],
+    ['a key no check takes (`holds:`)', 'checks:\n  - name: a\n    run: one\n    holds: false'],
     ['every check turned off', 'checks:\n  - name: a\n    run: one\n    enabled: false'],
     ['a check with both run: and condition:', 'checks:\n  - name: a\n    run: one\n    condition: ready'],
     ['a condition: that is no name', 'checks:\n  - name: a\n    condition: Not A Name'],

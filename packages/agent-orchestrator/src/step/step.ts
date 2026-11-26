@@ -19,10 +19,7 @@ import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEY
 export type CheckSpec = {
   readonly name: string;
   readonly after: readonly string[];
-} & (
-  | { readonly run: string; readonly condition?: undefined }
-  | { readonly condition: string; readonly run?: undefined }
-);
+} & ({ readonly run: string; readonly condition?: undefined } | { readonly condition: string; readonly run?: undefined });
 
 /**
  * What a check is as a person reads it: its shell line, or `condition: <name>` for one that waits on a condition.

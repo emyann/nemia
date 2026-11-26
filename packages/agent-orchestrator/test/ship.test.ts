@@ -1494,7 +1494,15 @@ describe("an ending whose last check is a condition gives the checkout back once
   const writeBaseCi = (id: string, status: 'True' | 'False') =>
     stage.runWith(
       stage.board().e,
-      CONDITION.handler({ runId: id, step: 'ship', condition: 'base-ci', status, try: 1, message: 'main is judged', caller: { kind: 'person' } }),
+      CONDITION.handler({
+        runId: id,
+        step: 'ship',
+        condition: 'base-ci',
+        status,
+        try: 1,
+        message: 'main is judged',
+        caller: { kind: 'person' },
+      }),
     );
   const twoChecksFolder = () => {
     const dir = at.folder();
@@ -1555,10 +1563,7 @@ describe("an ending whose last check is a condition gives the checkout back once
     await writeBaseCi(a.id, 'False');
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
-    assert.ok(
-      landed && 'aborted' in landed,
-      `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`,
-    );
+    assert.ok(landed && 'aborted' in landed, `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`);
     assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, "B's ending is still filed");
     assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined);
   });

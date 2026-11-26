@@ -210,7 +210,8 @@ export const checksHoldCheckout: ChecksHoldCheckout = (checks, signedDone) =>
  * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its
  * session in flight, its checks holding it (`checksHoldCheckout`: a check that runs there running, or, for a step that signed off done, one
  * not passed), or its merge staged. A condition holds nothing: once every check that runs a command has passed,
- * another run's ending may be filed there while it is still unwritten, and the step is still judged on it. What keeps another run's ending out of
+ * another run's ending may be filed there while it is still unwritten, and the step is still judged on it. What keeps another run's
+ * ending out of
  * the checkout (`mainClaim`) and `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
  * @param step The ending's spec.
  * @param run The run's record.

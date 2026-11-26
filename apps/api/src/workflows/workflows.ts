@@ -449,10 +449,17 @@ const routingOf = (step: StepSpec) => ({
   relabel: step.relabel ?? null,
 });
 
-/** A step's `checks:` as its line writes it, in YAML flow (JSON, which YAML reads): each check's name, its line or condition, and its waits. */
+/**
+ * A step's `checks:` as its line writes it, in YAML flow (JSON, which YAML reads): each check's name, its line or condition, and its
+ * waits.
+ */
 const checksLine = (checks: NonNullable<StepSpec['checks']>) =>
   JSON.stringify(
-    checks.map((c) => ({ name: c.name, ...(c.condition === undefined ? { run: c.run } : { condition: c.condition }), after: [...c.after] })),
+    checks.map((c) => ({
+      name: c.name,
+      ...(c.condition === undefined ? { run: c.run } : { condition: c.condition }),
+      after: [...c.after],
+    })),
   );
 
 /**

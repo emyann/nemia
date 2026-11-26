@@ -216,8 +216,7 @@ describe('REFUSED: a command node or a named check the run could not file as wri
     [
       'a check with a key a check does not take',
       {
-        'review.md':
-          '---\nafter: implement\nplace: git\nchecks:\n  - { name: wait, run: npm run wait, usesCheckout: false }\n---\nReview it.\n',
+        'review.md': '---\nafter: implement\nplace: git\nchecks:\n  - { name: wait, run: npm run wait, holds: false }\n---\nReview it.\n',
       },
       'review:',
     ],

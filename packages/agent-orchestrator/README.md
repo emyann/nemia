@@ -4276,7 +4276,7 @@ screen of the board.
   or `launchctl print`'s `pid`: the daemon lets the lease go before its process exits, and systemd answers a start of a unit still
   active as done and does nothing), and resumes the store once the new daemon has completed its first pass — never on a daemon that
   only ticks. It waits
-  on no check, a landing's wait on CI included: each runs on its worker through the restart, and the new daemon reads its result. The
+  on no check, a landing's check included: each runs on its worker through the restart, and the new daemon reads its result. The
   pause it puts and the drain it holds the sessions by each name the process that put them, so a restart killed while it waits leaves
   neither standing past the daemon's next pass (`liftLapsedPause`, `putDrain`). A new daemon that stops before that pass, or a lease that does
   not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused; where the unit then runs

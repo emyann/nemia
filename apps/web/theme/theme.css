@@ -110,6 +110,23 @@
   --md-sys-color-on-tertiary-fixed: hsl(216 9% 11%);
   --md-sys-color-tertiary-fixed-dim: hsl(240 4% 78%);
   --md-sys-color-on-tertiary-fixed-variant: hsl(216 3% 28%);
+
+  /* Component tokens: where this project differs from Material (DESIGN.md) */
+  --md-comp-switch-selected-track-color: var(--md-sys-color-on-surface);
+  --md-comp-switch-selected-handle-color: var(--md-sys-color-surface);
+  --md-comp-switch-selected-hover-handle-color: var(--md-sys-color-surface-container-highest);
+  --md-comp-switch-selected-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-checkbox-selected-container-color: var(--md-sys-color-on-surface);
+  --md-comp-checkbox-selected-icon-color: var(--md-sys-color-surface);
+  --md-comp-radio-button-selected-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-track-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-handle-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-stop-indicator-container-color: var(--md-sys-color-surface);
+  --md-comp-primary-navigation-tab-active-indicator-color: var(--md-sys-color-on-surface);
+  --md-comp-primary-navigation-tab-with-label-text-active-label-text-color: var(--md-sys-color-on-surface);
+  --md-comp-primary-navigation-tab-with-icon-active-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-button-text-label-text-color: var(--md-sys-color-on-surface);
+  --md-comp-icon-button-standard-selected-icon-color: var(--md-sys-color-on-surface);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -171,6 +188,22 @@
     --md-sys-color-on-tertiary-fixed: hsl(216 9% 11%);
     --md-sys-color-tertiary-fixed-dim: hsl(240 4% 78%);
     --md-sys-color-on-tertiary-fixed-variant: hsl(216 3% 28%);
+
+    --md-comp-switch-selected-track-color: var(--md-sys-color-on-surface);
+    --md-comp-switch-selected-handle-color: var(--md-sys-color-surface);
+    --md-comp-switch-selected-hover-handle-color: var(--md-sys-color-surface-container-highest);
+    --md-comp-switch-selected-icon-color: var(--md-sys-color-on-surface);
+    --md-comp-checkbox-selected-container-color: var(--md-sys-color-on-surface);
+    --md-comp-checkbox-selected-icon-color: var(--md-sys-color-surface);
+    --md-comp-radio-button-selected-icon-color: var(--md-sys-color-on-surface);
+    --md-comp-slider-active-track-color: var(--md-sys-color-on-surface);
+    --md-comp-slider-active-handle-color: var(--md-sys-color-on-surface);
+    --md-comp-slider-active-stop-indicator-container-color: var(--md-sys-color-surface);
+    --md-comp-primary-navigation-tab-active-indicator-color: var(--md-sys-color-on-surface);
+    --md-comp-primary-navigation-tab-with-label-text-active-label-text-color: var(--md-sys-color-on-surface);
+    --md-comp-primary-navigation-tab-with-icon-active-icon-color: var(--md-sys-color-on-surface);
+    --md-comp-button-text-label-text-color: var(--md-sys-color-on-surface);
+    --md-comp-icon-button-standard-selected-icon-color: var(--md-sys-color-on-surface);
   }
 }
 

@@ -1,2 +1,0 @@
-apps/web/src/components/ui/checkbox.tsx#on-primary
-apps/web/src/components/ui/checkbox.tsx#primary

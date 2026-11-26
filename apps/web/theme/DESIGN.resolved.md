@@ -213,6 +213,37 @@ follows the spec.
   and 300. Motion is short and decisive.
 - **Faces:** Michroma, Barlow, Chakra Petch for labels and JetBrains Mono
   for mono, where Material has a brand face and a plain one.
+- **The kit's selected and active parts** take the text's ink, `on-surface`,
+  through Material's component tokens, where Material draws them in
+  `primary`. What is drawn on that ink takes `surface`, the ground the ink
+  is read on, so each pair is the text's own turned over. Selection and
+  state are ink, so `primary` keeps one meaning: your move.
+- **Switch, selected:** `--md-comp-switch-selected-track-color` and
+  `--md-comp-switch-selected-icon-color` are `on-surface`, where Material has
+  `primary` and the kit `on-primary-container`;
+  `--md-comp-switch-selected-handle-color` is `surface`, where Material has
+  `on-primary`; `--md-comp-switch-selected-hover-handle-color` is
+  `surface-container-highest`, one tonal step off the resting handle, where
+  Material has `primary-container`.
+- **Checkbox, selected:** `--md-comp-checkbox-selected-container-color` is
+  `on-surface`, where Material has `primary`;
+  `--md-comp-checkbox-selected-icon-color` is `surface`, where Material has
+  `on-primary`.
+- **Radio, selected:** `--md-comp-radio-button-selected-icon-color` is
+  `on-surface`, where Material has `primary`.
+- **Slider, active:** `--md-comp-slider-active-track-color` and
+  `--md-comp-slider-active-handle-color` are `on-surface`, where Material has
+  `primary`; `--md-comp-slider-active-stop-indicator-container-color` is
+  `surface`, where Material has `on-primary`.
+- **Tabs, primary, active:** `--md-comp-primary-navigation-tab-active-indicator-color`,
+  `--md-comp-primary-navigation-tab-with-label-text-active-label-text-color` and
+  `--md-comp-primary-navigation-tab-with-icon-active-icon-color` are
+  `on-surface`, where Material has `primary`.
+- **Button, text:** `--md-comp-button-text-label-text-color` is `on-surface`,
+  where Material has `primary`. A text press is no main action: it is ink
+  like every action but the one filled.
+- **IconButton, selected standard:** `--md-comp-icon-button-standard-selected-icon-color`
+  is `on-surface`, where Material has `primary`.
 - **What the board adds beside the kit,** none of it Material's: the four
   meanings, the cut corner, the sticker, the grain, the scan lines and the
   scroll bar.
@@ -314,14 +345,13 @@ Everything a person selects or sets is ink, never yellow and never violet:
 Yellow outside a part that waits on a person is under three hundredths of
 a view: one filled button, and nothing else.
 
-The theme says this as far as the kit lets it. `primary` is the yellow, so
-the kit's filled button is right as it comes. `secondary` and `tertiary`
-are ink, so the kit's selected and tonal parts are neutral as they come.
-The kit also draws its primary on a switch, a checkbox, a radio, a slider,
-a tab's indicator and a text button: those take ink through the kit's
-component colours, which the kit must offer a theme (asked of the kit; see
-*What the kit owes this look*). The board draws no text button meanwhile:
-a text action is the look's link.
+The theme says this whole. `primary` is the yellow, so the kit's filled
+button is right as it comes. `secondary` and `tertiary` are ink, so the
+kit's selected and tonal parts are neutral as they come. The kit's switch,
+checkbox, radio, slider, primary tab, text button and selected standard
+icon button take ink through the component tokens the reference block
+writes (see *Where we differ from Material*), so yellow is drawn on no kit
+part a person only selects or sets. A text action is the look's link.
 
 ### The four meanings
 
@@ -468,23 +498,13 @@ spent sparingly.
 
 ## What the kit owes this look
 
-Two things the theme cannot say today, asked of the kit (the design system
-repository), since a theme change alone cannot split them:
+One thing the theme cannot say today, asked of the kit (the design system
+repository), since a theme change alone cannot say it:
 
-1. **Component colours a theme can point elsewhere**, as Material's own
-   component tokens do: the selected colour of the switch, checkbox, radio
-   and slider, the tab's indicator, the text button's and the icon
-   button's ink. This look points each at `on-surface`.
-2. **Static colours**, as Material's theme builder gives them: a named
+1. **Static colours**, as Material's theme builder gives them: a named
    colour of the project's own that the generator turns into its four
    roles in both schemes. The four meanings are written by hand beside the
    theme until then.
-
-**Debt, until the kit's release.** The kit's switch, checkbox, radio,
-slider and primary tabs stay `primary`, yellow, when selected: the theme
-cannot point them elsewhere until the kit offers their component colours
-(1. above). It is the one place yellow is not your move, and it goes when
-the board takes that release.
 
 ## Elevation and motion
 
@@ -578,6 +598,21 @@ measured against its far end, the speck at its strongest 2%.
   --md3-duration-long-2: 500ms;
   --md3-duration-long-3: 550ms;
   --md3-duration-long-4: 600ms;
+  --md-comp-switch-selected-track-color: var(--md-sys-color-on-surface);
+  --md-comp-switch-selected-handle-color: var(--md-sys-color-surface);
+  --md-comp-switch-selected-hover-handle-color: var(--md-sys-color-surface-container-highest);
+  --md-comp-switch-selected-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-checkbox-selected-container-color: var(--md-sys-color-on-surface);
+  --md-comp-checkbox-selected-icon-color: var(--md-sys-color-surface);
+  --md-comp-radio-button-selected-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-track-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-handle-color: var(--md-sys-color-on-surface);
+  --md-comp-slider-active-stop-indicator-container-color: var(--md-sys-color-surface);
+  --md-comp-primary-navigation-tab-active-indicator-color: var(--md-sys-color-on-surface);
+  --md-comp-primary-navigation-tab-with-label-text-active-label-text-color: var(--md-sys-color-on-surface);
+  --md-comp-primary-navigation-tab-with-icon-active-icon-color: var(--md-sys-color-on-surface);
+  --md-comp-button-text-label-text-color: var(--md-sys-color-on-surface);
+  --md-comp-icon-button-standard-selected-icon-color: var(--md-sys-color-on-surface);
 }
 ```
 

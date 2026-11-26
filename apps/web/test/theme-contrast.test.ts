@@ -63,3 +63,38 @@ for (const scheme of ['light', 'dark'] as const)
       `under ${CONTRAST_THRESHOLD}:1 in the ${scheme} scheme: change DESIGN.md's colours, then npm run theme:generate`,
     );
   });
+
+/** Each pair a part draws: the ink, and the ground it is drawn on, both as component tokens or roles. */
+const PART_PAIRS = [
+  ['--md-comp-switch-selected-handle-color', '--md-comp-switch-selected-track-color'],
+  ['--md-comp-switch-selected-hover-handle-color', '--md-comp-switch-selected-track-color'],
+  ['--md-comp-switch-selected-icon-color', '--md-comp-switch-selected-handle-color'],
+  ['--md-comp-switch-selected-icon-color', '--md-comp-switch-selected-hover-handle-color'],
+  ['--md-comp-checkbox-selected-icon-color', '--md-comp-checkbox-selected-container-color'],
+  ['--md-comp-slider-active-stop-indicator-container-color', '--md-comp-slider-active-track-color'],
+  ['--md-comp-radio-button-selected-icon-color', 'surface-container-low'],
+  ['--md-comp-slider-active-track-color', 'surface-container-low'],
+  ['--md-comp-primary-navigation-tab-active-indicator-color', 'surface-container-low'],
+  ['--md-comp-primary-navigation-tab-with-label-text-active-label-text-color', 'surface-container-low'],
+  ['--md-comp-button-text-label-text-color', 'surface-container-low'],
+  ['--md-comp-icon-button-standard-selected-icon-color', 'surface-container-low'],
+] as const;
+
+/** The role each component token points at in a block of the theme. */
+const componentRoles = (block: string) =>
+  new Map([...block.matchAll(/(--md-comp-[a-z-]+):\s*var\(--md-sys-color-([a-z-]+)\)\s*;/g)].map((m) => [m[1], m[2]]));
+
+for (const scheme of ['light', 'dark'] as const)
+  test(`each part's own pair reads at ${CONTRAST_THRESHOLD}:1 at least, in the ${scheme} scheme`, () => {
+    const block = scheme === 'light' ? css.slice(0, at) : css.slice(at);
+    const tokens = componentRoles(block);
+    const roles = SCHEMES[scheme];
+    const colour = (name: string) => roles.get(name.startsWith('--') ? (tokens.get(name) ?? '') : name);
+    const unwritten = [...new Set(PART_PAIRS.flat().filter((name) => colour(name) === undefined))];
+    assert.deepEqual(unwritten, [], `not written in the ${scheme} scheme: point them in DESIGN.md, then npm run theme:generate`);
+    const under = PART_PAIRS.flatMap(([ink, ground]) => {
+      const read = ratio(colour(ink)!, colour(ground)!);
+      return read < CONTRAST_THRESHOLD ? [`${ink} on ${ground}: ${read.toFixed(2)}:1`] : [];
+    });
+    assert.deepEqual(under, [], `under ${CONTRAST_THRESHOLD}:1 in the ${scheme} scheme`);
+  });

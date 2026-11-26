@@ -152,13 +152,13 @@ export const Done: StoryObj = {
 };
 
 /** The run at work whose session reports another model than the one its step asked for. */
-const ranElsewhere = (): RunDetail => {
+const ranElsewhere = () => {
   const working = RUNS.atWork.steps[0];
   const latest = working?.attempts.latest;
   return {
     ...RUNS.atWork,
     steps: working ? [{ ...working, attempts: { ...working.attempts, latest: latest && { ...latest, model: 'the-long-model-id' } } }] : [],
-  };
+  } satisfies RunDetail;
 };
 
 /** A step at work on another model than the one it was asked for: its Model fact says both ids. Drawn from its args, the run. */

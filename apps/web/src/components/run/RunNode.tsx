@@ -15,7 +15,7 @@ import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
 import { assigneeName } from '@/lib/runWords';
-import { ENDED, NOW_WORDS } from '@/lib/words';
+import { ENDED, NOW_WORDS, STANDING } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
@@ -269,7 +269,7 @@ function TouchedLine({ run }: { run: RunView }) {
 
 /**
  * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context,
- * each on hover (`reads`); to decide (`decide`, `toDecideOfYou`); waiting on you; who has it in hand, the assignee's
+ * each on hover (`reads`); to decide (`decide`, `toDecideOfYou`); waiting, on you (`STANDING.waiting`); who has it in hand, the assignee's
  * words on hover; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
@@ -282,7 +282,11 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
         </Tag>
       )}
       {decide && <Tag className="bg-yours text-on-yours">to decide</Tag>}
-      {waitsOnYou(run) && <Tag className="bg-yours-container text-on-yours-container">waiting on you</Tag>}
+      {waitsOnYou(run) && (
+        <Tag data-waits-on-you className="bg-yours-container text-on-yours-container">
+          {STANDING.waiting}
+        </Tag>
+      )}
       {run.assignee && !cancelled && (
         <Tag variant="outlined" data-assignee-chip title={run.assignee.word} className="text-on-surface-variant">
           {NOW_WORDS.hasIt(assigneeName(run.assignee))}

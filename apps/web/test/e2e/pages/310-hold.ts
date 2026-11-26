@@ -45,7 +45,7 @@ export default {
         throw new Refused(`the card's hold says itself whole and how to lift it on hover — it says ${JSON.stringify(title)}`);
       await expectCount(gateApprove(card), 0, 'and offers no Approve: the package refuses it on a held run');
       await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
-      await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
+      await expectCount(card.locator('[data-waits-on-you]'), 0, 'and does not say it waits on you');
       await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
       await expectVisible(card.locator(`[data-run-steps] [data-step="${gated}"][data-state="held"]`), `${gated}'s node is held`);
       for (const step of GATED.steps.filter((name) => name !== gated)) {
@@ -79,7 +79,7 @@ export default {
       await expectVisible(step.locator('[data-step-tag]', { hasText: /^held$/i }), `and its part's tag says held`);
       await expectCount(step.getByRole('button', { name: 'Approve', exact: true }), 0, `and ${gated}'s part offers no Approve`);
       await expectCount(page.locator('[data-fold="decide"]'), 0, 'and the page no Decide fold');
-      await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
+      await expectCount(page.locator('[data-run-state="waiting"], [data-waits-on-you]'), 0, 'and nothing on it says it waits on you');
       await expectCount(page.locator('[data-gate-band]'), 0, 'and no step of it has a gate band');
       await settled(page);
       await photograph(page, path.join(OUT, `hold-run-${theme}.png`), { fullPage: true });

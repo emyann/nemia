@@ -248,7 +248,7 @@ export default {
       `the bottom's card says ${DIAMOND.words.bottom} on hover, in wf ls's words: the side that landed is waited on no more`,
     );
     await expectCount(
-      cardOf(page, bottom.id).getByText('waiting on you', { exact: true }),
+      cardOf(page, bottom.id).locator('[data-waits-on-you]'),
       0,
       'and does not wait on you: the side it waits on may still land',
     );
@@ -380,7 +380,7 @@ export default {
     );
     await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no card on the floor says its kind in the old word, git');
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
-    await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
+    await expectCount(unmerged.locator('[data-waits-on-you]'), 0, 'and it waits on nobody: every step of it finished');
     await expectCount(
       cardOf(page, LANDED.id),
       0,
@@ -426,7 +426,7 @@ export default {
       wordsSaying(cardOf(page, orphan.id), DIAMOND.words.orphan),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, as a wait on a person`,
     );
-    await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);
+    await expectVisible(cardOf(page, orphan.id).locator('[data-waits-on-you]', { hasText: /^waiting$/ }), `${orphan.id} waits on you`);
     await expectCount(
       edgeOf(page, cancelled.id, orphan.id).locator('.react-flow__edge-path[data-state="to-come"]'),
       1,
@@ -457,7 +457,7 @@ export default {
       gated.locator(`[data-step="${GATED.gated}"][data-state="awaiting-approval"][data-live]`),
       'and its graph shows the step as awaiting approval, a node that waits on a person, the step the run is at',
     );
-    await expectVisible(gated.getByText('waiting on you', { exact: true }), 'and waits on you');
+    await expectVisible(gated.locator('[data-waits-on-you]', { hasText: /^waiting$/ }), 'and waits on you');
     await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
     await expectVisible(
       card.locator(`[data-need="asks"][data-step="${FAKE.blocked}"]`, { hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}` }),

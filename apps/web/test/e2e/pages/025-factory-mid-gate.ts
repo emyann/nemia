@@ -33,7 +33,7 @@ export default {
       card,
       `a run held at ${gated}'s gate, in the middle of the run, is on the default floor: it waits on a person (${id})`,
     );
-    await expectVisible(card.getByText('waiting on you', { exact: true }), 'and says it waits on you');
+    await expectVisible(card.locator('[data-waits-on-you]', { hasText: /^waiting$/ }), 'and says it waits on you');
     await expectVisible(
       card.locator(`[data-gate-line="${gated}"]`, { hasText: `approve what ${gated} handed on, or send it back` }),
       `and what approving ${gated} does`,

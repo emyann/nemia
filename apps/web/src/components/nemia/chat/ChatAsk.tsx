@@ -19,6 +19,7 @@ import { container } from '@/lib/meaning';
 import { askAnswered, linksOf, type ChatAsk as Ask } from '@/lib/chatFollowing';
 import type { AskPick, AskQuestion, PermissionFacts } from '@/lib/api/chat';
 import { timeOfDay } from '@/lib/timeOfDay';
+import { ASKING } from '@/lib/words';
 import { Markdown } from '../../markdown/Markdown';
 
 /**
@@ -38,7 +39,7 @@ export const askTag = (ask: Ask) =>
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }
     : ask.kind === 'proposal'
       ? { words: 'Proposes', hue: 'yours' }
-      : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' }) satisfies {
+      : { words: ask.kind === 'permission' ? 'Asks to run' : ASKING, hue: 'yours' }) satisfies {
     words: string;
     hue: 'yours' | 'grey';
   };

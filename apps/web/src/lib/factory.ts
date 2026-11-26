@@ -8,7 +8,7 @@ import type { EdgeState } from './canvas.ts';
 import { durationWords } from './duration.ts';
 import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
-import { ENDED } from './words.ts';
+import { ENDED, STANDING } from './words.ts';
 import type { Frozen } from './frozen.ts';
 
 /**
@@ -116,12 +116,12 @@ export const onYouOf = (
 };
 
 /**
- * Where a run stands, in a word, as the start form offers it to wait on: cancelled; waiting on you (`waitsOnYou`) — a run that waits on
- * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
+ * Where a run stands, in a word (`STANDING`), as the start form offers it to wait on: cancelled; waiting, on you (`waitsOnYou`) — a run
+ * that waits on a run that never lands is one, though it has filed nothing and is not in flight; running; or finished.
  * @param run The run as the api lists it.
  */
 export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>) =>
-  run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
+  run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? STANDING.waiting : inFlight(run) ? STANDING.running : STANDING.finished;
 
 type Clocked = Frozen<
   Pick<RunView, 'createdAt' | 'startedAt' | 'cancelledAt'> & Held & { waitingOnYou?: RunView['waitingOnYou']; atWork?: AtWork | null }

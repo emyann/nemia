@@ -181,7 +181,7 @@ describe('quotaOf and harnessQuotaOf: what the board and the daemon are shown of
       assert.deepEqual(q.windows, []);
       assert.ok(q.said!.startsWith('Claude Code answered the usage request in a shape this board does not read: '), q.said!);
       assert.match(q.said!, what);
-      assert.match(q.said!, /get_usage is experimental: see README\.md, The quota on the board\./);
+      assert.match(q.said!, /get_usage is experimental: see apps\/api\/README\.md, The quota on the board\./);
     };
     unknown(
       { kind: 'unknown', what: 'it refused the request (Unsupported control request subtype: get_usage_nope)' },
@@ -458,7 +458,7 @@ describe('The board polls the quota: one ask through the harness, kept, asked ag
       q.said,
       "The api's engine would not ask Claude Code for the quota (quota: the `claude` harness reports no quota.): this is the engine " +
         'refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine ' +
-        'the api runs has no claude harness that answers a quota: see README.md, The quota on the board. Asked again in 10 min.',
+        'the api runs has no claude harness that answers a quota: see apps/api/README.md, The quota on the board. Asked again in 10 min.',
     );
     clock += QUOTA_KEEP_MS - 1;
     assert.equal((await readQuota({ ask, now, mono })).state, 'failed');

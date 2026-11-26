@@ -12,12 +12,12 @@ const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 const GETTING_STARTED = fs.readFileSync(path.join(ROOT, 'apps', 'docs', 'src', 'content', 'docs', 'getting-started.mdx'), 'utf8');
 
 /** The text between the first bash fence's lines, trimmed, or undefined where there is none. */
-function installOf(text: string): string | undefined {
+function installOf(text: string) {
   return /^```bash\n([\s\S]*?)\n```/m.exec(text)?.[1]?.trim();
 }
 
 /** The relative targets of the links and images of a text, with no fragment, for which `exists` says no. */
-function unresolved(text: string, exists: (file: string) => boolean): string[] {
+function unresolved(text: string, exists: (file: string) => boolean) {
   const missing: string[] = [];
   for (const m of text.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)) {
     const target = m[1]!;

@@ -49,11 +49,11 @@ async function load(page: Page, route: string) {
 export default {
   /**
    * The Inbox lists the cards still in play by default, and those whose run ended under Ended (`?cards=ended`), each segment counted. A
-   * card filed in the factory and started from the board reads under In play, its run's phase on a chip (`at work`, or `waiting its turn`
+   * card filed in the factory and started from the board reads under In play, its run's phase on a chip (`working`, or `pending`
    * with no daemon to take it); once its run is called off — its `.cancelled` marker written beside the record, as `wf cancel` writes it,
-   * the board having no Call off of its own — In play no longer lists it, Ended does, as `called off`, and each count has moved by one.
+   * the board having no Call off of its own — In play no longer lists it, Ended does, as `cancelled`, and each count has moved by one.
    * Before, the card's own page and its label's page show the same chip; after, a second card, started as a copy of GATED's run, which
-   * waits at its gate, reads `waits on you`. The runs, the claim, the cards and the factory's hires are taken back.
+   * waits at its gate, reads `waiting`. The runs, the claim, the cards and the factory's hires are taken back.
    */
   name: 'inbox-in-play',
   route: '/inbox',
@@ -99,9 +99,9 @@ export default {
       await expectVisible(chip, "and carries its run's phase on a chip");
       const phase = await chip.getAttribute('data-card-state');
       const word = (await chip.textContent())?.trim();
-      if (!((phase === 'running' && word === 'at work') || (phase === 'pending' && word === 'waiting its turn')))
+      if (!((phase === 'running' && word === 'working') || (phase === 'pending' && word === 'pending')))
         throw new Refused(
-          `the chip says the run in flight as a person would, "at work" or "waiting its turn" — it says ${JSON.stringify(word)} for ${phase}`,
+          `the chip says the run in flight as a person would, "working" or "pending" — it says ${JSON.stringify(word)} for ${phase}`,
         );
       await expectCounts(other, inPlay, ended, 'started, the card stays in play: neither count moves');
       await settled(other);
@@ -135,7 +135,7 @@ export default {
       const over = cardIn(other, CARD);
       await expectVisible(over.locator(`[data-started-as] a[href="/runs/${id}"]`), `under Ended, ${CARD} is listed, linked to ${id}`);
       await expectVisible(
-        over.locator('[data-card-state="cancelled"]', { hasText: /^called off$/ }),
+        over.locator('[data-card-state="cancelled"]', { hasText: /^cancelled$/ }),
         'its chip says the run was called off, never cancelled',
       );
       await expectCount(over.getByRole('button', { name: 'Start' }), 0, 'and it offers no Start');
@@ -151,7 +151,7 @@ export default {
       storeRecord(WAITING_RUN, JSON.stringify({ ...gated, id: WAITING_RUN, from: { inbox: WAITING } }));
       await load(other, '/inbox');
       await expectVisible(
-        cardIn(other, WAITING).locator('[data-card-state="waiting"]', { hasText: /^waits on you$/ }),
+        cardIn(other, WAITING).locator('[data-card-state="waiting"]', { hasText: /^waiting$/ }),
         'a card whose run waits on a person is in play, its chip saying it waits on you',
       );
       await settled(other);

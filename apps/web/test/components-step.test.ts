@@ -166,7 +166,7 @@ test("a chip shows a person's word for the state, never the status; on hover wha
   const cancelled = renderToStaticMarkup(
     createElement(StatusChip, { codes: { phase: 'stopped', reason: 'Stopped', on: null, via: null }, runCancelled: true, runHeld: false }),
   );
-  assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
+  assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'cancelled');
   const paused = renderToStaticMarkup(
     createElement(StatusChip, {
       codes: { phase: 'pending', reason: 'Waiting', on: 'pause', via: null },
@@ -662,8 +662,8 @@ test('the legend draws an edge in each state as the canvas draws it: dashed and 
       .slice(1)
       .map((item) => [/([a-z ]+)<\/span>(?:<\/div>){0,2}$/.exec(item)?.[1], item]),
   );
-  assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
-  assert.match(items.get('to come')!, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
+  assert.deepEqual([...items.keys()], ['pending', 'running', 'done', 'loops back', 'human gate']);
+  assert.match(items.get('pending')!, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
   assert.match(items.get('running')!, /stroke:var\(--edge-running\);stroke-width:2"/);
   assert.match(items.get('done')!, /stroke:var\(--edge-done\);stroke-width:1.5"/);
   assert.match(items.get('loops back')!, /stroke:var\(--edge-loop\);stroke-width:1.5;stroke-dasharray:5 4/);
@@ -1783,7 +1783,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
   assert.doesNotMatch(html(null), /data-fact="reach"/, 'not bridged: no row');
 });
 
-test("a step's node says what it needs: a gate's question after `waits on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
+test("a step's node says what it needs: a gate's question after `waiting`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
   const footer = /<p data-slot="typography" class="[^"]*\btruncate\b[^"]*" data-gate-band="true" title="([^"]*)">([\s\S]*?)<\/p>/.exec(
@@ -1902,7 +1902,7 @@ test('a prose field is drawn as markdown; a number as it is', () => {
   );
 });
 
-test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waits on you` — and on a run called off, not', () => {
+test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
   assert.match(html, /border-yours/);
@@ -1980,11 +1980,11 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
         .slice(1)
         .map((item) => [/([a-z ]+)<\/span>(?:<\/div>){0,2}$/.exec(item)?.[1], item]),
     );
-  assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
+  assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['pending', 'running', 'done', 'loops back', 'human gate']);
   const items = itemsOf(legendOf(true));
   assert.deepEqual(
     [...items.keys()],
-    ['to come', 'running', 'done', 'loops back', 'waits until it lands', 'reads what it concluded', 'human gate', 'to decide'],
+    ['pending', 'running', 'done', 'loops back', 'waits until it lands', 'reads what it concluded', 'human gate', 'to decide'],
     'the edge between cards, the line of what a card reads, and the ring round a card whose result nobody has decided, which only the Factory draws',
   );
   assert.match(items.get('to decide')!, /ring-1 ring-yours/);

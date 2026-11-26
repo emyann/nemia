@@ -68,7 +68,7 @@ export default {
     );
     await expectVisible(
       node(LOOPING.exhausted).locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, {
-        hasText: 'waits on you',
+        hasText: 'waiting',
       }),
       `${LOOPING.exhausted}, out of rounds, is a chip that waits on a person on the graph, its note after what that means on hover, with no room under a chip`,
     );
@@ -77,7 +77,7 @@ export default {
       `${LOOPING.exhausted}, out of rounds, is drawn as a human gate, as a step signed off blocked is`,
     );
     await expectVisible(
-      node(LOOPING.exhausted).locator('[data-gate-band]', { hasText: 'waits on you' }),
+      node(LOOPING.exhausted).locator('[data-gate-band]', { hasText: 'waiting' }),
       `${LOOPING.exhausted}, out of rounds, says in its band that it waits on you on the graph`,
     );
     await expectCount(node('implement').locator('[data-gate-band]'), 0, 'implement, done on its own word, is not a human gate');
@@ -109,7 +109,7 @@ export default {
     const inspector = stepBar(page, LOOPING.id, LOOPING.exhausted);
     await expectVisible(inspector.locator('[data-part-said]'), `${LOOPING.exhausted}'s inspector draws what it said: it has signed off`);
     await expectVisible(
-      inspector.locator('[data-step-tag]', { hasText: /^waits on you$/i }),
+      inspector.locator('[data-step-tag]', { hasText: /^waiting$/i }),
       `the step inspector opens on a click on ${LOOPING.exhausted}, its tag saying it waits on you`,
     );
     await expectVisible(

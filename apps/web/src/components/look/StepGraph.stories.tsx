@@ -56,7 +56,7 @@ export const AtWork: Story = {
   args: { run: graphRun(AT_WORK) },
   play: async ({ canvasElement, userEvent }) => {
     const node = canvasElement.querySelector('[data-step="implement"] [role="img"]')!;
-    await expect(await tipOf(userEvent, node)).toHaveTextContent('implement · at work');
+    await expect(await tipOf(userEvent, node)).toHaveTextContent('implement · working');
     atRest();
   },
 };

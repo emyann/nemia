@@ -322,7 +322,7 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
       ['implement', 'unverified'],
       ['land', 'awaiting approval'],
     ]).steps;
-    assert.equal(railSaid(mixed, false, false), 'design verified, implement done, land waits on you', 'a check is told from a word');
+    assert.equal(railSaid(mixed, false, false), 'design verified, implement done, land waiting', 'a check is told from a word');
     assert.equal(railSaid(mixed, false, true), 'design verified, implement done, land held');
     assert.equal(
       railSaid(
@@ -333,7 +333,7 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
         false,
         false,
       ),
-      'a at work, b to come',
+      'a working, b pending',
     );
     assert.equal(railSaid(summary([['a', 'waiting on the pause']]).steps, false, false), `a ${PAUSED.rail}`);
     assert.equal(
@@ -345,7 +345,7 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
         false,
         true,
       ),
-      'design to come, implement to come',
+      'design pending, implement pending',
       'a held run whose steps have not started: each said as any step to come, the run itself saying it is held',
     );
   });
@@ -445,11 +445,11 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
     assert.equal(nowOf(failed)?.tone, 'failure');
   });
   test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working', null, false), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval', null, false), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check', null, false), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting', 'run', false), 'review, to come');
+    assert.equal(barSaid('implement', 'working', null, false), 'implement, working');
+    assert.equal(barSaid('design', 'awaiting-approval', null, false), 'design, waiting');
+    assert.equal(barSaid('land', 'failed-check', null, false), 'land, failed');
+    assert.equal(barSaid('review', 'waiting', 'run', false), 'review, pending');
     assert.equal(barSaid('theme', 'waiting', 'pause', false), `theme, ${PAUSED.rail}`, 'a check the pause holds');
-    assert.equal(barSaid('review', 'waiting', 'run', true), 'review, to come', 'not started on a held run: to come');
+    assert.equal(barSaid('review', 'waiting', 'run', true), 'review, pending', 'not started on a held run: pending');
   });
 });

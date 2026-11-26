@@ -280,7 +280,7 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
   test("the step graph: one node a step by its mark, at work and waiting on you a size larger, read aloud as a group named, each node told in the kit's tooltip", async () => {
     const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS) }));
     assert.match(tagWith(html, 'data-run-steps'), /role="group"/);
-    assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
+    assert.match(html, /aria-label="design verified, implement working, review failed, land waiting"/);
     assert.deepEqual(
       [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)" data-mark="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
       [
@@ -290,7 +290,7 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
         ['land', 'awaiting-approval', 'yours'],
       ],
     );
-    assert.match(html, /role="img" aria-label="review · failed its check"[^>]*tabindex="0"/, 'each node a stop of the keyboard, told');
+    assert.match(html, /role="img" aria-label="review · failed"[^>]*tabindex="0"/, 'each node a stop of the keyboard, told');
     const sizeOf = (step: string) => Number(/d="M0,-([\d.]+) /.exec(html.slice(html.indexOf(`data-step="${step}"`)))![1]);
     assert.ok(sizeOf('implement') > sizeOf('design') && sizeOf('land') > sizeOf('design'), 'at work and yours a size larger');
     assert.equal(html.match(/data-step-pulse/g)?.length, 1, 'the step at work alone pulses');
@@ -308,10 +308,7 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
     const wrap = (node: unknown, step: { name: string; state: string }) =>
       createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, node as ReactElement);
     const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS), wrap }));
-    assert.match(
-      tagWith(html, 'data-run-steps'),
-      /aria-label="design verified, implement at work, review failed its check, land waits on you"/,
-    );
+    assert.match(tagWith(html, 'data-run-steps'), /aria-label="design verified, implement working, review failed, land waiting"/);
     assert.deepEqual(
       [...html.matchAll(/data-step="([^"]+)"[^>]*><button data-wrapped="([^"]+)"/g)].map((m) => [m[1], m[2]]),
       [
@@ -345,7 +342,7 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
     const gate = await drawn(createElement(StepGraph, { run: graphRun(STEPS, true) }));
     assert.match(tagWith(gate, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
     assert.equal(markOf(gate, 'land'), 'waits', 'and as not started');
-    assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
+    assert.match(html, /aria-label="design done, implement verified, review pending"/, 'read aloud, a check is told from a word');
   });
   test('a run listed without its graph says what to do', async () => {
     const html = await drawn(createElement(StepGraph, { run: { ...graphRun(STEPS), graph: undefined as never } }));

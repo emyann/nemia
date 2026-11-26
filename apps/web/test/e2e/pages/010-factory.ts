@@ -360,7 +360,7 @@ export default {
     await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
     await expectVisible(
       ending.locator(
-        `[data-step="${ENDING.ending}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${ENDING.ending}, waits on you"]`,
+        `[data-step="${ENDING.ending}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${ENDING.ending}, waiting"]`,
       ),
       `and its graph shows ${ENDING.ending} as awaiting approval, a node that waits on you, said so by its button`,
     );
@@ -436,7 +436,7 @@ export default {
     await expectLeftOf(cardOf(page, cancelled.id), cardOf(page, orphan.id), `${cancelled.id} is left of ${orphan.id}, which waits on it`);
     await expectVisible(
       page.locator(
-        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][data-mark="yours"] [data-step-bar][aria-label="${LOOPING.exhausted}, waits on you"]`,
+        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][data-mark="yours"] [data-step-bar][aria-label="${LOOPING.exhausted}, waiting"]`,
       ),
       `the loop's graph shows ${LOOPING.exhausted} out of rounds as a node that waits on a person, said so by its button (${LOOPING.id})`,
     );
@@ -467,7 +467,7 @@ export default {
     await expectVisible(
       pill(FAKE.refused)
         .and(page.locator('[data-state="failed-check"][data-mark="failure"]'))
-        .locator(`[data-step-bar][aria-label="${FAKE.refused}, failed its check"]`),
+        .locator(`[data-step-bar][aria-label="${FAKE.refused}, failed"]`),
       `the card's graph shows ${FAKE.refused}'s refused check as a red node, its button saying failed its check`,
     );
     await expectCount(pills, FAKE.steps.length, `a node per step on the card at rest (${FAKE.steps.join(', ')})`);

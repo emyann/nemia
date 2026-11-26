@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      # Every shard runs: one shard's failing page says nothing about the other three, and the bound below needs every shard's times.
+      # Every shard runs: one shard's failing page says nothing about the other three.
       fail-fast: false
       matrix:
         # 1 to 4, contiguous: the run takes its count off strategy.job-total, so the count is written here and nowhere else, and the
@@ -318,29 +318,13 @@ jobs:
         working-directory: apps/web
       - name: Visit this shard's pages
         # The shard is the leg's own and the count is read back off the matrix: a literal here would leave a shard's pages unvisited the
-        # day the matrix changes. A shard is a run of some pages, so it is held to no bound itself; the bound is the e2e-bound job's.
+        # day the matrix changes. What a shard's pages cost is said in its log and refuses nothing.
         # A shard runs none of the look's browser tests (apps/web/test/e2e/*.test.ts): the e2e-look job runs them, once per push.
         if: steps.due.outputs.due == 'true'
         run: npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
         env:
-          # The e2e writes its pictures and this shard's page times here (OUT, apps/web/test/e2e/world.ts).
+          # The e2e writes its pictures here (OUT, apps/web/test/e2e/world.ts).
           WF_ARTIFACTS: ${{ github.workspace }}/.e2e
-      - name: Upload this shard's page times
-        # On a pass alone: run.ts writes the file after the pages passed, so a failing shard has none to upload — and the bound job
-        # below then names that shard as failed or cancelled, rather than summing less than the whole silently. if-no-files-found:
-        # error — a shard that passed and wrote no times is a broken runner, not a quiet success. The due condition holds success()
-        # in it, as every step's if: does that names no status function; a shard that is not due visits nothing and uploads nothing,
-        # and the bound job, asking the same key, sums nothing.
-        if: steps.due.outputs.due == 'true'
-        uses: actions/upload-artifact@v7
-        timeout-minutes: 5
-        with:
-          name: pages-${{ matrix.shard }}-of-${{ strategy.job-total }}
-          path: .e2e/pages-*.json
-          # The e2e writes under .e2e, and upload-artifact skips a dotted path unless it is told not to: without this the upload found
-          # no file and if-no-files-found failed every shard that had passed. ci-workflow.test.ts refuses a hidden path without it.
-          include-hidden-files: true
-          if-no-files-found: error
       - name: Upload the failing pages' pictures
         # Only a failure's: a passing run with no --photos takes no picture but a failing page's, and there is nothing to keep.
         if: failure()
@@ -487,50 +471,6 @@ jobs:
           # .vitest is hidden, and upload-artifact skips a dotted path unless it is told not to.
           include-hidden-files: true
           if-no-files-found: ignore
-
-  e2e-bound:
-    # The whole e2e's page time, summed across the shards and held to PAGES_BOUND_MS — the bound that is additive and that a shard, like
-    # --pages, silences inside a run. Its one writer is apps/web/test/e2e/timing.ts: no copy of the number belongs in this file.
-    needs: [e2e]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Whatever the shards did: a shard that failed or was cancelled uploaded no times (the upload above is on a pass alone), so this job
-    # names each such shard as failed or cancelled, its own failure being the verdict, rather than summing less than the whole.
-    if: always()
-    steps:
-      - uses: actions/checkout@v7
-        timeout-minutes: 5
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v7
-        timeout-minutes: 5
-        with:
-          node-version: '24.16.0'
-      - name: Decide whether the e2e is due
-        id: due
-        # The shards' own key, e2e: where they visited nothing, there is nothing to sum.
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BEFORE: ${{ github.event.before }}
-        run: node tools/guards/due.ts e2e
-      - name: Download every shard's page times
-        if: steps.due.outputs.due == 'true'
-        uses: actions/download-artifact@v8
-        timeout-minutes: 5
-        with:
-          pattern: pages-*-of-*
-          merge-multiple: true
-          path: .e2e
-      - name: Sum the shards' page time against the whole run's bound
-        # No npm ci: the command imports node and the e2e's own files, nothing installed.
-        if: steps.due.outputs.due == 'true'
-        # Reported, not required, since 2026-11-25: over the bound it prints the sum and the slowest pages and fails the step alone.
-        # Main sits about 3% under the bound and one commit read 9% apart on two attempts, so it failed green work seven times that
-        # day. What replaces it, or which pages go, is the card "ci: the browser tests' time bound stops failing green work on a
-        # runner's noise"; take this line out with that change.
-        continue-on-error: true
-        run: node apps/web/test/e2e/pages-bound.ts .e2e
 
   build:
     # The board builds, and the two paths a generator writes are the bytes that are committed. A stale one is green here without this
@@ -859,7 +799,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [test, lint, typecheck, contracts, e2e, e2e-look, e2e-stories, e2e-bound, build, gitleaks, guards, design-system]
+    needs: [test, lint, typecheck, contracts, e2e, e2e-look, e2e-stories, build, gitleaks, guards, design-system]
     # A dispatched run — the release workflow's, on the release pull request's head — also posts the ci context as a commit status. Its
     # check runs belong to a check suite no pull request is linked to, so the pull request never counts them; a status belongs to the
     # commit, and one posted with this token is set by GitHub Actions, the app branch protection pins. This job alone may write one,

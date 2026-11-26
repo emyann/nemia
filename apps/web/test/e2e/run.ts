@@ -21,11 +21,8 @@
  *     takes of itself, into $WF_ARTIFACTS when a run gives one — the step's files directory — and into `.e2e/` at the repository root
  *     otherwise.
  *  6. Reads what each worker wrote, refusing two that served one store, api or app (`apart`); and says last the ten slowest pages, what
- *     each worker took, and how many pages passed, in which themes, in how many seconds. A whole run — every page, in the dark theme —
- *     says what its pages cost summed, and fails when that passes their bound, naming its slowest pages (`overBound`, timing.ts); its
- *     own time refuses nothing, and is said when it passed a step's tool (`pastTool`). A run of one shard (`--shard <i> --of <n>`) is
- *     a run of some pages, held to no bound either; it writes its page times to `pages-<i>-of-<n>.json` in the same place the pictures
- *     go, for the shards of one run to be summed against that bound together afterwards (`pages-bound.ts`).
+ *     each worker took, and how many pages passed, in which themes, in how many seconds. What the pages cost refuses nothing; a whole
+ *     run's own time is said when it passed a step's tool (`pastTool`, timing.ts).
  *
  * Exits non-zero when a worker fails, saying each failure, and last the first by the pages' order, naming the page, the theme and the
  * assertion, with a screenshot of what the page looked like. A worker stops at its first failing page; its seat then starts another on
@@ -41,7 +38,7 @@ import path from 'node:path';
 import { current, inputsOf, stamp } from './built.ts';
 import { lookTests } from './look.ts';
 import { loadPages, planOf } from './pages.ts';
-import { overBound, pagesLine, pastTool, rankLines, type PageTiming, type ShardPages } from './timing.ts';
+import { pastTool, rankLines, type PageTiming } from './timing.ts';
 import { exitOn } from './visit.ts';
 import {
   apart,
@@ -56,7 +53,7 @@ import {
   type Seat,
 } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
-import { fromNodeModules, OUT, plain, REPO, WEB } from './world.ts';
+import { fromNodeModules, plain, REPO, WEB } from './world.ts';
 
 /** How many of the slowest pages a run says at its end. */
 const RANKED = 10;
@@ -192,19 +189,6 @@ function build() {
   stamp(WEB, inputsOf(WEB, REPO));
 }
 
-/**
- * What `shard` cost, written to `pages-<i>-of-<n>.json` in `OUT` — where the pictures go, $WF_ARTIFACTS when a run gives one and `.e2e/`
- * otherwise, so no caller says where the e2e writes — and the path it wrote. A shard is a run of some pages and is held to no bound of its
- * own; its times are written down for the shards of one run to be summed against that bound together afterwards (`pages-bound.ts`).
- */
-function wroteShard(shard: { i: number; of: number }, timings: readonly PageTiming[]) {
-  const file = path.join(OUT, `pages-${shard.i}-of-${shard.of}.json`);
-  const wrote: ShardPages = { shard: shard.i, of: shard.of, pages: [...timings] };
-  fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(wrote, undefined, 2)}\n`);
-  return file;
-}
-
 /** The line saying what each worker took: its pages, its whole time and its setup. */
 const workerLine = (r: WorkerResult) =>
   `worker ${r.worker}: ${new Set(r.timings.map((t) => t.name)).size} pages in ${Math.round(r.ms / 1000)} s ` +
@@ -260,12 +244,7 @@ async function main() {
   if (shots.length) console.log(`\ne2e: the pages pictured:\n${shots.map((shot) => `  ${shot}`).join('\n')}`);
   console.log(`\ne2e: the slowest pages:\n  ${rankLines(timings, RANKED).join('\n  ')}`);
   console.log(`\ne2e: ${results.map(workerLine).join('\n     ')}`);
-  if (plan.whole) console.log(`     ${pagesLine(timings)}`);
-  if (plan.shard)
-    console.log(`\ne2e: shard ${plan.shard.i} of ${plan.shard.of} wrote its page times to ${wroteShard(plan.shard, timings)}`);
   const totalMs = performance.now() - started;
-  const late = overBound(timings, plan.whole);
-  if (late) throw new Error(late);
   const slow = pastTool(totalMs, results.length, plan.whole);
   if (slow) console.log(`\ne2e: ${slow}`);
   console.log(

@@ -77,7 +77,7 @@ test('the runner refuses two workers sharing a store, an api or an app, and a wo
   );
 });
 
-test('a whole run whose pages cost more than their bound fails: the runner throws what overBound says of them, never of its own time', () => {
+test("a whole run that took longer than a step's tool allows passes: the runner says what pastTool says, and throws nothing after it", () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
@@ -86,21 +86,12 @@ test('a whole run whose pages cost more than their bound fails: the runner throw
   );
   assert.match(
     runner,
-    /const late = overBound\(timings, plan\.whole\);\s*if \(late\) throw new Error\(late\);/,
-    'the runner holds a whole run to the bound of its pages, and fails with what overBound says',
-  );
-});
-
-test("a whole run that took longer than a step's tool allows passes: the runner says what pastTool says, and throws nothing after it", () => {
-  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  assert.match(
-    runner,
     /const totalMs = performance\.now\(\) - started;[\s\S]*?const slow = pastTool\(totalMs, results\.length, plan\.whole\);\s*if \(slow\) console\.log\(/,
     'the time the whole run took is said, by the workers it got',
   );
   const after = runner.slice(runner.indexOf('const slow = pastTool('), runner.indexOf('exitOn(main()'));
   assert.ok(after.includes('pages passed in the'), 'the pass line is said after it, last');
-  assert.doesNotMatch(after, /\bthrow\b/, 'nothing is refused once the pages passed their bound');
+  assert.doesNotMatch(after, /\bthrow\b/, 'nothing is refused once the pages passed');
 });
 
 test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {
@@ -289,7 +280,7 @@ test('--contrast measures what --photos pictures, in light then dark, and is ref
   );
 });
 
-test('only a run of every page in the dark theme is whole, the run a check makes and holds to its bound', () => {
+test('only a run of every page in the dark theme is whole', () => {
   assert.equal(planOf([], ABC).whole, true);
   assert.equal(planOf(['--workers', '2'], ABC).whole, true, 'however many workers');
   assert.equal(planOf(['--photos'], ABC).whole, false);
@@ -402,30 +393,20 @@ test('the shards deal every page into exactly one of them, in the pages’ order
   }
 });
 
-test('--shard <i> --of <n> visits that shard and is no whole run, so the bound is silent inside it', async () => {
+test('--shard <i> --of <n> visits that shard and is no whole run', async () => {
   const pages = await loadPages();
   const plan = planOf(['--shard', '2', '--of', '4'], pages);
   assert.deepEqual(
     plan.visit.map((p) => p.name),
     shardOf(pages, 2, 4).map((p) => p.name),
   );
-  assert.equal(
-    plan.whole,
-    false,
-    'a shard is a run of some pages: its pages are not the whole e2e’s, and summing them would refuse nothing',
-  );
-  assert.deepEqual(
-    plan.shard,
-    { i: 2, of: 4 },
-    'the plan says which shard it is, so the run can write its page times down under that name',
-  );
+  assert.equal(plan.whole, false, 'a shard is a run of some pages: its pages are not the whole e2e’s');
   assert.deepEqual(plan.themes, ['dark'], 'a shard runs the assertions, in the dark theme, as a whole run does');
   assert.equal(
     plan.visit.some((p) => plan.pictured(p.name)),
     false,
     'a shard pictures nothing without --photos',
   );
-  assert.equal(planOf([], pages).shard, undefined, 'a run that is no shard says so by having none');
   assert.equal(planOf(['--shard', '1', '--of', '1'], pages).visit.length, pages.length, 'one shard of one visits every page');
   assert.equal(planOf(['--shard', '1', '--of', '1'], pages).whole, false, 'and is still no whole run: --shard says a subset was asked for');
 });

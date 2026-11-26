@@ -4,7 +4,8 @@
  * given), then those its label selectors take off the record's whole map (`selectedRuns`), sorts them by name and cuts its page
  * (`pageOf`) — all before any run is judged — and only then judges the runs of the page into their objects (`runList`), so a page
  * of `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in
- * `unjudged` with why, never dropped with no word.
+ * `unjudged` with why, never dropped with no word. A run the daemon's pass has recorded (`/registry/runstatus/<id>`, `run-status/`) is
+ * served from its record and not judged at all; one with no record yet is judged on demand and nothing is written.
  *
  * A list asked by a field (`?fieldSelector=status.state…`, `runStateSelector`, or `status.outcome…`, `runOutcomeSelector`) is the board's:
  * it judges every run its namespace and labels keep, to count them by state (`metadata.counts`) before it selects (`selectorTakes`) and
@@ -37,7 +38,9 @@ import {
 } from './run-list.ts';
 
 export { runNamespace };
-import { diskPartsOf, type RunObjectAnswer, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
+import { diskPartsOf, type RunObjectAnswer, runMetadataOf, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
+import { runStatusesHeld, type StatusHeld } from '../run-status/run-status.store.ts';
+import { servedStatus, stateOfRecord } from '../run-status/index.ts';
 import { readFailed, runReadingOf, stepsReadingOf } from '../object/read.verb.ts';
 import { informedJudgements, keepObject, keptObject } from '../rest/informer.verb.ts';
 import { folderReader } from '../summary/reads.verb.ts';
@@ -134,12 +137,15 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
   const judging = (some: readonly Run[]) => informedJudgements(e, home, some, read, git, () => all);
   const { home } = how;
   const objectOf = objectsOf(e, how, reads, read.verify, git);
-  if (field !== undefined) return yield* byState(all, query, field, { home, judging, objectOf });
+  const held = recordsUsable(yield* runStatusesHeld());
+  if (field !== undefined) return yield* byState(all, query, field, { home, judging, objectOf, held });
   return yield* runListOf(all, query, (page) =>
     Effect.gen(function* () {
-      const judged = yield* judging(page);
+      const judged = yield* judging(page.filter((run) => !held.has(run.id)));
       return yield* Effect.forEach(page, (run) =>
         Effect.gen(function* () {
+          const record = held.get(run.id);
+          if (record !== undefined) return recordObject(run, record, undefined);
           const one = judged.runs.get(run.id) ?? (yield* notJudged(run));
           return 'unjudged' in one ? one : yield* objectOf(run, one.judgement);
         }),
@@ -147,6 +153,26 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
     }),
   );
 });
+
+/** The status records a list serves from: those whose status says a state, a record that does not is read as none. */
+const recordsUsable = (held: ReadonlyMap<string, StatusHeld>) =>
+  new Map([...held].filter(([, { record }]) => stateOfRecord(record) !== undefined));
+
+/**
+ * A run's object served from its status record: its metadata built from the run, its spec and status the record's (`servedStatus`), its
+ * `resourceVersion` the record's revision until the api stamps the highest of those the run is made of.
+ * @param run The run's record.
+ * @param held The run's observed status and its revision.
+ * @param asOf The instant a list asked by state is read at, in epoch ms, or undefined for a plain list.
+ */
+const recordObject = (run: Run, held: StatusHeld, asOf: number | undefined) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Run',
+    metadata: { ...runMetadataOf(run), resourceVersion: String(held.revision) },
+    spec: held.record.spec,
+    status: servedStatus(held.record, asOf),
+  }) satisfies RunObject;
 
 /** The defect of a run handed to its judgement that came back without one. */
 const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`));
@@ -157,8 +183,14 @@ const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} 
  * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under
  * `verify`, one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request
  * (`folderReader`).
+ * @param e The engine the objects are built through.
+ * @param how The store's root and the informer the objects are kept in.
+ * @param reads What a run's object reads besides its judgement.
+ * @param verify Whether an object served from memory is built afresh too and compared.
+ * @param git Where branches stand.
  */
-const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
+export const objectsOf = (e: Engine, how: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
+  const { home, memo } = how;
   const folders = folderReader(home);
   const built = (run: Run, one: JudgedOrWhy) =>
     Effect.gen(function* () {
@@ -195,6 +227,7 @@ type ByStateReads<E, R, O = R> = {
   readonly home: string;
   readonly judging: (some: readonly Run[]) => Effect.Effect<Judgements, E, R>;
   readonly objectOf: (run: Run, judgement: Judgement) => Effect.Effect<RunObjectAnswer, E, O>;
+  readonly held: ReadonlyMap<string, StatusHeld>;
 };
 
 /**
@@ -203,7 +236,7 @@ type ByStateReads<E, R, O = R> = {
  */
 type Stated = {
   run: Run;
-  one: JudgedOrWhy;
+  one: JudgedOrWhy | StatusHeld;
   summary: ReturnType<typeof summaryOf> | undefined;
   state: RunState;
   outcome: RunOutcome | null;
@@ -238,6 +271,22 @@ const countsOf = (stated: readonly Stated[]) => {
   return counts;
 };
 
+/** `run` as a list asked by state keeps it off its status record: the state, outcome and finish the pass recorded. */
+const statedOfRecord = (run: Run, held: StatusHeld) => {
+  const state = stateOfRecord(held.record) ?? unjudgedStateOf(run);
+  const { outcome, finishedAt } = held.record.status;
+  const finished = state === 'finished';
+  return {
+    run,
+    one: held,
+    summary: undefined,
+    state,
+    outcome: finished ? (outcome ?? null) : null,
+    name: run.id,
+    finishedAt: finished ? (finishedAt ?? run.createdAt) : run.createdAt,
+  } satisfies Stated;
+};
+
 /** `run` as a list asked by state keeps it: summarized off its judgement (`summaryOf`), or stated as the list counts one left unjudged. */
 const statedOf = (run: Run, one: JudgedOrWhy, home: string) => {
   const summary = 'judgement' in one ? summaryOf(one.judgement, home) : undefined;
@@ -269,10 +318,15 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
 ) {
   const kept = keptOf(all, query);
   if (kept instanceof Invalid) return yield* Effect.fail(kept);
-  const judged = yield* reads.judging(kept);
+  const judged = yield* reads.judging(kept.filter((run) => !reads.held.has(run.id)));
   const now = Date.now();
   const stated: Stated[] = [];
-  for (const run of kept) stated.push(statedOf(run, judged.runs.get(run.id) ?? (yield* notJudged(run)), reads.home));
+  for (const run of kept) {
+    const record = reads.held.get(run.id);
+    stated.push(
+      record === undefined ? statedOf(run, judged.runs.get(run.id) ?? (yield* notJudged(run)), reads.home) : statedOfRecord(run, record),
+    );
+  }
   const counts = countsOf(stated);
   const selected = stated.filter((one) => selectorTakes(field, one));
   const asked = { limit: query.limit ?? null, continue: query.continue };
@@ -282,6 +336,10 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
   const items: RunObject[] = [];
   const unjudged: RunUnjudged[] = [];
   for (const one of page.items) {
+    if ('record' in one.one) {
+      items.push(recordObject(one.run, one.one, now));
+      continue;
+    }
     const answer = 'judgement' in one.one ? yield* reads.objectOf(one.run, one.one.judgement) : one.one;
     if ('unjudged' in answer || one.summary === undefined || !('judgement' in one.one)) unjudged.push(unjudgedOf(one, answer));
     else items.push(framed(answer, framePartsOf(one.summary, one.one.judgement, now)));

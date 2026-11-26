@@ -11,7 +11,7 @@
  *
  * Every list the `Api` serves is watched (`watchable`, src/watch/watch.ts): a GET whose endpoint's success is a `<Kind>List`, read off the
  * `Api` (`listAt`, `endpointOf` in endpoints.ts), never off a hand list. The Event lists' watch follows the feed instead of reading it
- * again (`eventsFollowed`), and the Run lists' compares a run leaving out its frame's time measured to the read (`runWatchVersion`).
+ * again (`eventsFollowed`); the Run lists are a watched kind, served from the runs' status records, like any other.
  *
  * What HttpApi answers on its own is said in the api's words, as every other refusal of the api: a request its decoding refuses — a path's
  * name, a query or a body its endpoint's Schema does not take — is a 400 `BadRequest` naming the refused key (`field`,
@@ -24,7 +24,7 @@ import { ByteSize, Context, Effect, Layer } from 'effect';
 import { HttpIncomingMessage, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder, HttpApiError } from 'effect/http-api';
 import type { Context as RequestContext } from 'hono';
-import { isWatchedKind, runWatchVersion } from 'agent-orchestrator';
+import { isWatchedKind } from 'agent-orchestrator';
 import { Api, refusedIn } from 'objects';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
@@ -236,13 +236,12 @@ export function mount(runtime: ApiRuntime) {
   const stamped = revisioned(handed, (method, path) => endpointOf(method, path)?.kinds ?? []);
   const watched = {
     plain: watchable(handed),
-    RunList: watchable(handed, { versionOf: runWatchVersion }),
     EventList: watchable(handed, { follow: eventsFollowed }),
   };
   return (async (c) => {
     const kind = c.req.method === 'GET' ? listAt(new URL(c.req.url).pathname) : undefined;
     if (kind === undefined) return stamped(c);
-    if (kind === 'RunList' || kind === 'EventList') return watched[kind](c);
+    if (kind === 'EventList') return watched[kind](c);
     const of = kind.replace(/List$/, '');
     return isWatchedKind(of) ? watchable(stamped, { kind: of })(c) : watched.plain(c);
   }) satisfies (c: RequestContext<ApiEnv>) => Promise<Response>;

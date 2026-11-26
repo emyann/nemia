@@ -5,6 +5,7 @@
  * handed the rows written since under each of its kind's prefixes, and an object whose records moved is sent. Pure.
  */
 import type { ObjectChangeOf, OwnRow } from '../../contracts/kind-watch.contract.ts';
+import { ASKS_PREFIX, RUNMARKS_PREFIX, RUNS_PREFIX, RUNSTATUS_PREFIX } from '../runs/run-keys.ts';
 
 export type { ObjectChange, OwnRow } from '../../contracts/kind-watch.contract.ts';
 
@@ -53,6 +54,7 @@ export const WATCHED_KIND_NAMES = [
   'Skill',
   'Workflow',
   'Template',
+  'Run',
 ] as const;
 
 /** A kind a list serves that is watched from a revision. */
@@ -68,6 +70,11 @@ const byName = (rest: string) => ({ namespace: null, name: rest }) satisfies Tar
 const inNamespace = (rest: string) => {
   const at = rest.indexOf('/');
   return at < 0 ? null : ({ namespace: rest.slice(0, at), name: rest.slice(at + 1) } satisfies Target);
+};
+/** The run a record under a run's own prefix (markers, asks) names: the id before its first `/`, in every namespace. */
+const underRun = (rest: string) => {
+  const at = rest.indexOf('/');
+  return { namespace: null, name: at < 0 ? rest : rest.slice(0, at) } satisfies Target;
 };
 const ofFactory = (rest: string) => ({ namespace: rest, name: null }) satisfies Target;
 const ofFactoryNamed = (rest: string) => ({ namespace: null, name: rest }) satisfies Target;
@@ -139,6 +146,12 @@ export const WATCHED_KINDS = {
   Skill: [{ prefix: DEFINITIONS_PREFIX, own: true, target: definitionOf('skill') }],
   Workflow: [{ prefix: DEFINITIONS_PREFIX, own: true, target: definitionOf('workflow') }],
   Template: [{ prefix: DEFINITIONS_PREFIX, own: true, target: definitionOf('template') }],
+  Run: [
+    { prefix: RUNS_PREFIX, own: true, target: byName },
+    { prefix: RUNMARKS_PREFIX, own: false, target: underRun },
+    { prefix: ASKS_PREFIX, own: false, target: underRun },
+    { prefix: RUNSTATUS_PREFIX, own: false, status: true, target: byName },
+  ],
 } as const satisfies Record<WatchedKind, readonly Source[]>;
 
 /**

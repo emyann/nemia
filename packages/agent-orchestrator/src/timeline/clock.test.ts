@@ -7,7 +7,8 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
-import { clockOf, waitingSinceOf, type RunClock } from './clock.ts';
+import { clockOf, clockReadingOf, waitingSinceOf, type RunClock } from './clock.ts';
+import { clockNow } from '../run-status/index.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
 import { filedViews } from '../../test/filed.ts';
 
@@ -206,4 +207,27 @@ describe("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up
     assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, [], null), null);
     assert.equal(waitingSinceOf(run(), filedViews(new Map(), FILED), STEPS, ['side'], null), null);
   });
+});
+
+describe("`clockReadingOf`'s growing part: laid to a later instant by `clockNow`, a clock is the clock read there", () => {
+  const LATER = UNTIL + 7 * MIN;
+  const rows = [
+    { name: 'a session at work', growing: 'sessionsMs', read: () => ({ ...approved(ran(at(11, 42), null)), waiting: [] as string[] }) },
+    {
+      name: 'a check running',
+      growing: 'checksMs',
+      read: () => ({ run: run(), views: new Map([...VIEWS, ['pc', ran(at(10, 41), null)]]), waiting: [] as string[] }),
+    },
+    { name: 'a wait on a person', growing: 'personMs', read: () => ({ run: run(), views: VIEWS, waiting: ['plan'] }) },
+    { name: 'a task waiting for a slot', growing: 'slotMs', read: () => ({ ...approved(QUEUED), waiting: [] as string[] }) },
+    { name: 'nothing open', growing: 'restMs', read: () => ({ run: run(), views: VIEWS, waiting: [] as string[] }) },
+  ] as const;
+  for (const row of rows)
+    test(`${row.name}: ${row.growing} grows, and the clock laid to a later instant is the clock read there`, () => {
+      const { run: r, views, waiting } = row.read();
+      const filed = filedViews(views, FILED);
+      const now = clockReadingOf(r, filed, STEPS, waiting, UNTIL);
+      assert.equal(now.growing, row.growing);
+      assert.deepEqual(clockNow(now.clock, now.growing, UNTIL, LATER), clockOf(r, filed, STEPS, waiting, LATER));
+    });
 });

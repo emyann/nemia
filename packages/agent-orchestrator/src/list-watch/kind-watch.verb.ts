@@ -8,6 +8,9 @@ import { StoreRoot } from '../config/root.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { changesOf, revisionTable, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
 
+/** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
+export type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
+
 /** The prefixes of the keyspace a kind is made of, each once. */
 const prefixesOf = (kind: WatchedKind) => [...new Set(WATCHED_KINDS[kind].map((s) => s.prefix))];
 
@@ -25,14 +28,18 @@ export const kindReplay = Effect.fn('kindReplay')(function* (kind: WatchedKind, 
   let head = Number.POSITIVE_INFINITY;
   for (const prefix of prefixesOf(kind)) {
     const since = yield* keyspace.since(after, prefix);
-    if ('refused' in since) return { refused: since.refused } as const;
+    if (!('changes' in since)) {
+      const refused: KindReplay = { refused: since.refused };
+      return refused;
+    }
     head = Math.min(head, since.head);
     for (const c of since.changes)
       rows.push({ prefix, key: c.key, revision: c.revision, createRevision: c.createRevision, deleted: c.deleted });
   }
   rows.sort((a, b) => a.revision - b.revision);
   const changes: readonly KindChange[] = changesOf(kind, after, rows);
-  return { changes, head } as const;
+  const replayed: KindReplay = { changes, head };
+  return replayed;
 });
 
 /**
@@ -46,4 +53,11 @@ export const kindRevisions = Effect.fn('kindRevisions')(function* (kind: Watched
   const held = new Map<string, ReadonlyMap<string, number>>();
   for (const prefix of prefixesOf(kind)) held.set(prefix, yield* keyspace.revisions(prefix));
   return { of: revisionTable(kind, held), head } as const;
+});
+
+/** The keyspace's head of the store `StoreRoot` names: the position a list read after it stands at least at. */
+export const keyspaceHead = Effect.fn('keyspaceHead')(function* () {
+  const home = yield* StoreRoot;
+  const keyspace = yield* keyspaceAt(keyspaceFile(home));
+  return yield* keyspace.head;
 });

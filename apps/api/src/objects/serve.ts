@@ -24,7 +24,7 @@ import { ByteSize, Context, Effect, Layer } from 'effect';
 import { HttpIncomingMessage, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder, HttpApiError } from 'effect/http-api';
 import type { Context as RequestContext } from 'hono';
-import { runWatchVersion } from 'agent-orchestrator';
+import { isWatchedKind, runWatchVersion } from 'agent-orchestrator';
 import { Api, refusedIn } from 'objects';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
@@ -43,6 +43,7 @@ import { workflowsHandlers } from '../workflows/index.ts';
 import { delegationsHandlers, proposalsHandlers } from '../proposals/index.ts';
 import { AnswerPastBound } from './answer-bound.ts';
 import { endpointOf } from './endpoints.ts';
+import { revisioned } from './revisioned.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 import { filesHandlers } from '../files/files.ts';
@@ -230,6 +231,7 @@ export function mount(runtime: ApiRuntime) {
   const { handler } = objectsHandler(runtime);
   const handed: Listed = (c, request = c.req.raw) =>
     served(c, async (s) => inApiWords(c, await handler(request, Context.make(ServedNow, s))));
+  const stamped = revisioned(handed, (method, path) => endpointOf(method, path)?.kinds ?? []);
   const watched = {
     plain: watchable(handed),
     RunList: watchable(handed, { versionOf: runWatchVersion }),
@@ -237,7 +239,9 @@ export function mount(runtime: ApiRuntime) {
   };
   return (async (c) => {
     const kind = c.req.method === 'GET' ? listAt(new URL(c.req.url).pathname) : undefined;
-    if (kind === undefined) return handed(c);
-    return (kind === 'RunList' || kind === 'EventList' ? watched[kind] : watched.plain)(c);
+    if (kind === undefined) return stamped(c);
+    if (kind === 'RunList' || kind === 'EventList') return watched[kind](c);
+    const of = kind.replace(/List$/, '');
+    return isWatchedKind(of) ? watchable(stamped, { kind: of })(c) : watched.plain(c);
   }) satisfies (c: RequestContext<ApiEnv>) => Promise<Response>;
 }

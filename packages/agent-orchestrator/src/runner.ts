@@ -458,6 +458,9 @@ export {
 } from './kind-table/index.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
+export { isWatchedKind, type KindChange, type WatchedKind } from './list-watch/kind-watch.ts';
+export { keyspaceHead, kindReplay, kindRevisions } from './list-watch/kind-watch.verb.ts';
+export { definitionRevisionNow, LIBRARY_SCOPE, type DefinitionKind } from './definition-index/definition-index.store.ts';
 export { runWatchVersion } from './runlist/runlist.ts';
 export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';

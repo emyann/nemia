@@ -1,0 +1,75 @@
+/**
+ * A watched kind's objects served at their revision: every object of a kind the keyspace watches (`isWatchedKind`) leaves the api with
+ * `metadata.resourceVersion` the keyspace revision of its last change — the highest among the records it is made of — and every list of
+ * one with `metadata.resourceVersion` the keyspace head read before its items were, so a watch from it loses no change between the two.
+ * A GET writes nothing here, and nothing is kept between two requests.
+ */
+import type { Context as RequestContext } from 'hono';
+import { isWatchedKind, keyspaceHead, kindRevisions, type WatchedKind } from 'agent-orchestrator';
+import type { ApiEnv } from '../layer.ts';
+import type { Listed } from '../watch/watch.ts';
+
+/** The kind a `<Kind>List` is of, where the keyspace watches it. */
+const watchedListOf = (kind: string | undefined) => {
+  const base = kind?.replace(/List$/, '');
+  return kind?.endsWith('List') === true && base !== undefined && isWatchedKind(base) ? base : undefined;
+};
+
+/** What `body` is of a watched kind: an object or a list, as the keyspace watches it. */
+type Stamped = { readonly kind: WatchedKind; readonly list: boolean };
+
+/** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
+const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
+
+const stampedOf = (body: unknown): Stamped | undefined => {
+  if (typeof body !== 'object' || body === null || !('kind' in body) || typeof body.kind !== 'string') return undefined;
+  const list = watchedListOf(body.kind);
+  if (list !== undefined) return { kind: list, list: true };
+  return isWatchedKind(body.kind) ? { kind: body.kind, list: false } : undefined;
+};
+
+/** `object` with the revision it stands at as its `metadata.resourceVersion`, where it is an object with metadata. */
+const withRevision = (object: unknown, revision: (namespace: string | undefined, name: string) => number) => {
+  if (typeof object !== 'object' || object === null || !('metadata' in object)) return object;
+  const { metadata } = object;
+  if (typeof metadata !== 'object' || metadata === null || !('name' in metadata) || typeof metadata.name !== 'string') return object;
+  const namespace = 'namespace' in metadata && typeof metadata.namespace === 'string' ? metadata.namespace : undefined;
+  return { ...object, metadata: { ...metadata, resourceVersion: String(revision(namespace, metadata.name)) } };
+};
+
+/**
+ * `list` answering objects of a watched kind at their revision: a list's items each, and its position the head read before it was read; a
+ * single object read or written each. Any other answer as it is.
+ * @param list The handler that answers a request.
+ * @param kindsAt The kinds a request's endpoint answers, from its method and its path: none where it answers no object of the api's.
+ */
+export const revisioned =
+  (list: Listed, kindsAt: (method: string, path: string) => readonly string[]): Listed =>
+  async (c: RequestContext<ApiEnv>, request = c.req.raw) => {
+    const path = new URL(request.url).pathname;
+    const kinds = kindsAt(request.method, path);
+    if (!kinds.some((kind) => stampedOf({ kind }) !== undefined)) return list(c, request);
+    const before = request.method === 'GET' && kinds.some((kind) => watchedListOf(kind) !== undefined);
+    const head = before ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
+    const response = await list(c, request);
+    if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
+    const body: unknown = await response.clone().json();
+    const stamped = stampedOf(body);
+    if (stamped === undefined) return response;
+    const { of } = await c.var.runtime.runPromise(kindRevisions(stamped.kind));
+    const template = TEMPLATE_PATH.exec(path)?.[1];
+    const templates = template === undefined ? undefined : (await c.var.runtime.runPromise(kindRevisions('Template'))).of;
+    const revision = (namespace: string | undefined, name: string) =>
+      templates !== undefined && stamped.kind !== 'Template' ? templates(undefined, template ?? '') : of(namespace, name);
+    const served =
+      stamped.list && typeof body === 'object' && body !== null && 'items' in body && Array.isArray(body.items)
+        ? {
+            ...body,
+            items: body.items.map((item: unknown) => withRevision(item, revision)),
+            metadata: { ...('metadata' in body && typeof body.metadata === 'object' ? body.metadata : {}), ...(head === undefined ? {} : { resourceVersion: String(head) }) },
+          }
+        : withRevision(body, revision);
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(JSON.stringify(served), { status: response.status, headers });
+  };

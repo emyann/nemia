@@ -122,7 +122,6 @@ export const servedStatus = (record: StatusRecord, asOf: number | undefined) => 
   return { ...status, wallMs: clock.wallMs, clock } satisfies RunObject['status'];
 };
 
-/** The state of a record's run, as its status says it. */
 /**
  * The state a record's run is in, as its status says it, or undefined where it says none.
  * @param record The run's observed status.

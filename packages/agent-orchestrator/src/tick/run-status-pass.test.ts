@@ -18,9 +18,10 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
 import { freshRestMemo, tickRun } from './tick.verb.ts';
-import { Informer, informerMemo } from '../rest/informer.verb.ts';
+import { Informer, informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { keyspaceHead, kindReplay } from '../list-watch/kind-watch.store.ts';
+import { runList } from '../run-list/run-list.verb.ts';
 import { runStatusesHeld } from '../run-status/run-status.store.ts';
 
 const ROOT = scratch('wf-run-status-pass-');
@@ -51,20 +52,27 @@ beforeEach(() => {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 });
 
-/** A run of one step, `work`, advanced one pass so its step is filed, its session at work. */
-const atWork = async () => {
+/**
+ * A run of one step, `work`, advanced one pass so its step is filed, its session at work; with a gate on `work`, its step signed and
+ * waiting at it.
+ */
+const atWork = async (gates: string[] = []) => {
   const dir = scratch('wf-run-status-team-');
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: folder\n---\nwork it\n');
   const repo = scratch('wf-run-status-repo-');
   stand().world.repository(repo, {});
-  const run = await runPlaced(startRun({ brief: 'record me', repo, workflowDir: dir, gates: [] }));
+  const run = await runPlaced(startRun({ brief: 'record me', repo, workflowDir: dir, gates }));
   await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
-  engine().settle(`${run.id}-work`, 'working', { startedAt: AT, spawnedAt: AT });
+  if (gates.length === 0) engine().settle(`${run.id}-work`, 'working', { startedAt: AT, spawnedAt: AT });
+  else {
+    engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
+    await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
+  }
   return run;
 };
 
 /** One pass of the daemon over the store, through the informer `memo`. */
-const pass = (memo: ReturnType<typeof informerMemo>) =>
+const pass = (memo: InformerMemo) =>
   runWith(e(), tickRun({ repo: ROOT, memo: freshRestMemo(), verifyRest: false }).pipe(Effect.provideService(Informer, memo)));
 
 test('a step finishing moves the run, and a watch from before it is handed the run once, MODIFIED', async () => {
@@ -96,4 +104,36 @@ test('a status unchanged across passes writes nothing, a run going measured at a
   await pass(memo);
   const second = (await runPlaced(runStatusesHeld())).get(run.id);
   assert.equal(second?.revision, first.revision);
+});
+
+test('a run waiting at its gate, unchanged across passes, keeps its record at the revision it had', async () => {
+  const run = await atWork(['work']);
+  const memo = informerMemo();
+  await pass(memo);
+  const first = (await runPlaced(runStatusesHeld())).get(run.id);
+  assert.equal(first?.record.status.state, 'waiting');
+  await pass(memo);
+  await pass(memo);
+  const later = (await runPlaced(runStatusesHeld())).get(run.id);
+  assert.equal(later?.revision, first?.revision);
+});
+
+/** The runs list as the api reads it, plain or asked by state, through `memo`. */
+const listed = (memo: InformerMemo, fieldSelector?: string) =>
+  runWith(e(), runList(e(), { home: ROOT, memo, verify: false }, { memo: { said: new Map() } }, { fieldSelector }));
+
+/** `answer` without what a read measures or stamps: the instant, the clocks, and each run's revision. */
+const unstamped = (answer: object) =>
+  JSON.parse(
+    JSON.stringify(answer, (key, value) => (['asOf', 'clock', 'wallMs', 'resourceVersion'].includes(key) ? undefined : value)),
+  ) satisfies object;
+
+test('a run served from the record the pass wrote is the run judged on demand, in a plain list and in a list asked by state', async () => {
+  await atWork(['work']);
+  const memo = informerMemo();
+  const plain = unstamped(await listed(memo));
+  const byState = unstamped(await listed(memo, 'status.state=waiting'));
+  await pass(memo);
+  assert.deepEqual(unstamped(await listed(informerMemo())), plain);
+  assert.deepEqual(unstamped(await listed(informerMemo(), 'status.state=waiting')), byState);
 });

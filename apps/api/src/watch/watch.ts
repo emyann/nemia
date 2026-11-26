@@ -23,7 +23,6 @@
  */
 import { type Context as RequestContext } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { isObject } from 'effect/Predicate';
 import { Context, Data, type Duration, Effect, Schema, Stream } from 'effect';
 import {
   BOOKMARK_EVERY,
@@ -254,19 +253,6 @@ const goneObject = (kind: WatchedKind, change: KindChange) =>
 const revisionOf = (o: WatchedObject) => Number(o.metadata.resourceVersion);
 
 /**
- * An object as a watcher draws it: its JSON without its revision, which a record beside it that it does not show moves alone, and, for a
- * run still going, without the wall time and clock its list measures to the read, which time moves alone.
- */
-const shownOf = (o: WatchedObject) => {
-  const status = o['status'];
-  const going = isObject(status) && (status['state'] === 'waiting' || status['state'] === 'inFlight');
-  const shown = { ...o, metadata: { ...o.metadata, resourceVersion: undefined } };
-  if (!going) return JSON.stringify(shown);
-  const { wallMs: _wallMs, clock: _clock, ...still } = status;
-  return JSON.stringify({ ...shown, status: still });
-};
-
-/**
  * The frames of `changes`, each object they name sent once as it stands in `read`, in the order of the changes: an object changed after
  * `after` and still in the list as its change says (MODIFIED for each of a namespace's), DELETED the object that is gone. An object the
  * list no longer holds, or holds at a revision the watcher was sent, is sent nothing. DELETED is sent for an object this watch sent
@@ -279,7 +265,6 @@ const framesOfChanges = (
   changes: readonly KindChange[],
   read: Read | undefined,
   known: Set<string>,
-  shown: Map<string, string>,
   filter: WatchFilter,
 ) => {
   const sent = new Set<string>();
@@ -301,7 +286,6 @@ const framesOfChanges = (
             : [`${space}/${change.name ?? ''}`];
     return keys.map((key) => {
       known.delete(key);
-      shown.delete(key);
       const at = key.indexOf('/');
       const space = key.slice(0, at);
       return frameOf({
@@ -326,11 +310,7 @@ const framesOfChanges = (
       if (revisionOf(object) <= after || sent.has(keyOf(object))) return [];
       sent.add(keyOf(object));
       known.add(keyOf(object));
-      if (kind !== 'Run') return [frameOf({ type: change.change, object })];
-      const drawn = shownOf(object);
-      const same = change.change === 'MODIFIED' && shown.get(keyOf(object)) === drawn;
-      shown.set(keyOf(object), drawn);
-      return same ? [] : [frameOf({ type: change.change, object })];
+      return [frameOf({ type: change.change, object })];
     });
   });
 };
@@ -408,7 +388,6 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
   const page = await c.var.runtime.runPromise(WatchPage);
   const readNow = () => readAll(list, c, url, page, 0);
   const known = new Set<string>();
-  const shown = new Map<string, string>();
   let first: { frames: string[]; at: number };
   if (start.kind === 'since') {
     const replay = await c.var.runtime.runPromise(kindReplay(kind, start.revision));
@@ -416,17 +395,14 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
     const read = replay.changes.length === 0 ? undefined : await readNow();
     if (read instanceof Response) return read;
     first = {
-      frames: framesOfChanges(kind, start.revision, replay.changes, read, known, shown, watchFilterOf(kind, url)).map((f) => f.data),
+      frames: framesOfChanges(kind, start.revision, replay.changes, read, known, watchFilterOf(kind, url)).map((f) => f.data),
       at: replay.head,
     };
   } else {
     const at = await c.var.runtime.runPromise(keyspaceHead());
     const read = await readNow();
     if (read instanceof Response) return read;
-    for (const object of read.objects.values()) {
-      known.add(keyOf(object));
-      shown.set(keyOf(object), shownOf(object));
-    }
+    for (const object of read.objects.values()) known.add(keyOf(object));
     first = { frames: [...read.objects.values()].map((object) => frameOf({ type: 'ADDED', object }).data), at };
   }
   const opened = first;
@@ -447,7 +423,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
         if (!('changes' in replay)) return yield* new ListRefused({ status: replay.refused === 'gone' ? 410 : 400 });
         const read = replay.changes.length === 0 ? undefined : yield* Effect.promise(readNow);
         if (read instanceof Response) return yield* new ListRefused({ status: read.status });
-        const frames = framesOfChanges(kind, state.at, replay.changes, read, known, shown, watchFilterOf(kind, url));
+        const frames = framesOfChanges(kind, state.at, replay.changes, read, known, watchFilterOf(kind, url));
         state.at = replay.head;
         for (const frame of frames) yield* write(frame);
       });

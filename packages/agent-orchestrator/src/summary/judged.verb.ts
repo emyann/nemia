@@ -120,7 +120,8 @@ export const spentOf = (spend: Spend) =>
  * `runs` are the package's `waitsOf`: each run in `after` that has not succeeded or been released, and, for one that never
  * will without a person, why — the store has no such run (`missing`), it was cancelled, or it failed (`failed`). `word` is
  * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `waitingOnYou` is
- * whether a person has to act — some run of `runs` never succeeds on its own — which is when `nemia ls` prints `→ waiting on you:` before the
+ * whether a person has to act — some run of `runs` never succeeds on its own — which is when `nemia ls` prints `→ waiting on you:`
+ * before the
  * advice.
  */
 export type RunWaiting = {
@@ -136,10 +137,12 @@ export type RunWaiting = {
  *
  * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not released it,
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has released it and the
- * next tick has not yet lifted the hold, each of them `released`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
+ * next tick has not yet lifted the hold, each of them `released`. `word` is what `nemia ls` prints under the run (`holdWord`), with the
+ * person's
  * why and name when the hold has them, and `advice` the line
  * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold waits on a person: exactly when a run it names never
- * succeeds on its own, and false for a hold that names no run, which is the person's word already given (`holdNeedsYou`, the rule `nemia ls`
+ * succeeds on its own, and false for a hold that names no run, which is the person's word already given (`holdNeedsYou`, the rule `nemia
+ * ls`
  * prints the advice by). `runs` is empty for such a hold. A hold asks nothing of anyone while it stands:
  * every verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`)
  * and nothing is offered.

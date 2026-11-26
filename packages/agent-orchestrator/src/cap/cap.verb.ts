@@ -16,7 +16,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import type { Settings } from '../config/config.store.ts';
 import { parentsRead, passParents, type Parents } from '../views/views.verb.ts';
-import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
+import { type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { readRun } from '../tick/told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';

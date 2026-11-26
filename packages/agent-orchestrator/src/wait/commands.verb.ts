@@ -1,4 +1,5 @@
-/** `nemia hold` and `nemia release`, entries of the command table: a run held until other runs succeed or a person lifts it (`hold`), or lifted (`unhold`). */
+/** `nemia hold` and `nemia release`, entries of the command table: a run held until other runs succeed or a person lifts it (`hold`), or
+ * lifted (`unhold`). */
 import { type Hold, type Released } from '../record/record.ts';
 import { hold, unhold } from './wait.verb.ts';
 import { release } from './release.verb.ts';

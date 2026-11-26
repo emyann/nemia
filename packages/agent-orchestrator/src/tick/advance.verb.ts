@@ -21,7 +21,7 @@ import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { isRepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, stepStatus } from '../status/status.ts';
-import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
+import { hasStarted, runReady, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { behindNow, followPass, passRevisions, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
@@ -31,16 +31,7 @@ import type { FeedWords } from '../feed/index.ts';
 import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
-import {
-  headsFor,
-  headsNow,
-  NOTHING_READ,
-  standingLive,
-  standingNow,
-  standingReader,
-  standingSnapshot,
-  type PassStanding,
-} from '../standing/standing.verb.ts';
+import { headsFor, headsNow, standingNow, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/index.ts';
 import { everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { waitsForWord } from '../views/views-words.ts';
@@ -498,7 +489,8 @@ type Admission = {
 };
 
 /**
- * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has released its waiters and the cap
+ * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has released its waiters
+ * and the cap
  * leaves it a slot.
  */
 const admit = Effect.fnUntraced(function* (
@@ -526,9 +518,6 @@ const holdFirst = Effect.fnUntraced(function* (f: Filing, held: RunSlot | undefi
   f.notes.push(`${ready.join(', ')}: ${slotWord(held)} — filed once a run in flight settles`);
   return true;
 });
-
-/** Whether `run` reads other runs: one it waits on (`waitedOn`), or one it is handed as context before it starts. */
-const readsOthers = (run: Run) => waitedOn(run).length > 0 || (!hasStarted(run) && Boolean(run.context?.length));
 
 /**
  * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`standing`, `headsFor`),

@@ -12,7 +12,6 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
-import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -51,11 +50,7 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
  * a person merged all the same — and a closeout that does not parse each say so in the section, and the roots are filed all the same.
  * Whether a run read has succeeded is read by `parentRead`, and fails with the refusal that read failed with.
  */
-export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
-  e: Engine,
-  ids: readonly string[],
-  how: ParentCloseout['how'],
-) {
+export const parentCloseouts = Effect.fn('parentCloseouts')(function* (e: Engine, ids: readonly string[], how: ParentCloseout['how']) {
   const door = yield* RunDoor;
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {

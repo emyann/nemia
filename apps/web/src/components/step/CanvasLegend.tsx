@@ -11,7 +11,8 @@ import { Body } from '@/components/ui/ds';
  * edge does, and is as still as one where the person asked for reduced motion.
  *
  * `cards`, on the Factory: the edge between two cards too, from a run to one that waits until it succeeds (`afterEdges`) — filed `--after`
- * it, or held until it succeeds (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which; a run that
+ * it, or held until it succeeds (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which; a run
+ * that
  * has started draws none from its waits. The faint dotted line of a run read as context, drawn for the card hovered or selected
  * (`readEdges`), which waits on nothing. And the ring round a card whose result nobody has decided, which stays on the floor, finished,
  * until a person decides it.

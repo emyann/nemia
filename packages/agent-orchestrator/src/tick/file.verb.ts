@@ -46,7 +46,6 @@ import {
 import { composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import type { Provisioned } from '../workspace/workspace.ts';
 import { handedOf } from '../brief/handed.verb.ts';
-import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, SESSION_TOKEN, tryModel } from '../filed/filed.ts';

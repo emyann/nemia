@@ -1,5 +1,6 @@
 /**
- * `nemia hold`: hold a run until other runs succeed, or until a person lifts it (`hold`), and lift a hold by hand (`unhold`), each writing the
+ * `nemia hold`: hold a run until other runs succeed, or until a person lifts it (`hold`), and lift a hold by hand (`unhold`), each
+ * writing the
  * person's own file, refused before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`): each
  * verb is a program that fails with its refusal (`Invalid`, `Missing`, `Conflict`) and dies of anything else the store, git or the engine
  * throws.
@@ -64,14 +65,26 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     succeeded = assess(runRead).status === 'succeeded';
   }
   const others = yield* (yield* RunDoor).runs.list();
-  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) }, others, succeeded);
+  const refused = holdRefusal(
+    run,
+    until,
+    (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) },
+    others,
+    succeeded,
+  );
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const put = yield* (yield* RunDoor).holds.put(RunId.read(id), until, { ...said, by: said.by ?? osUser() });
   if (!put) {
     const again = yield* (yield* RunDoor).runs.read(RunId.read(id));
     return yield* Effect.fail(
       new Conflict({
-        message: holdRefusal(again, until, (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) }, []) ?? `${id} is already held: nemia ls ${id}.`,
+        message:
+          holdRefusal(
+            again,
+            until,
+            (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) },
+            [],
+          ) ?? `${id} is already held: nemia ls ${id}.`,
       }),
     );
   }

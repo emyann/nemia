@@ -222,7 +222,11 @@ export function verdictWords({ result, exit }: CheckVerdict) {
  * succeeds without a person, and a check that did not finish, which refused nothing.
  */
 export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
-  hold: { tag: () => 'held', sentence: () => 'It is held until a run that never succeeds on its own: lift the hold, or release it.', open: opens },
+  hold: {
+    tag: () => 'held',
+    sentence: () => 'It is held until a run that never succeeds on its own: lift the hold, or release it.',
+    open: opens,
+  },
   after: { tag: () => 'waits on a run', sentence: () => 'It waits on a run that will not finish without you.', open: opens },
   unfinished: {
     tag: () => 'check unfinished',
@@ -234,7 +238,8 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
 /**
  * The words a runs-page row says beside its chip of what its step waits on, where it waits on no person: the run it waits on (`waits
  * on` before its id), the checkout (`waits on` the id of the run that has it and `· the checkout`, or the checkout alone where no run
- * is named), a run slot, a hold until a run succeeds (`until` and `succeeds` around its id, and after it why it never succeeds where it will not:
+ * is named), a run slot, a hold until a run succeeds (`until` and `succeeds` around its id, and after it why it never succeeds where it
+ * will not:
  * called off, not in the store, failed), a step past its cap; a held row's hold line (`noWhy` where its person said no why, `by`
  * before who they said they are); and on hover, its round of its rounds, its budget's ring and how many runs wait on it.
  */

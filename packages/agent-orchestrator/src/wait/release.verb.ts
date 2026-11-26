@@ -20,7 +20,8 @@ import { RunId } from '../record/record.model.ts';
 export type Releasing = { run: Run; released: Released };
 
 /**
- * Release the waiters of a run — `nemia release <run>`: every run that waits on it (`--after`, `hold --until`, a card's `after:`) goes on at
+ * Release the waiters of a run — `nemia release <run>`: every run that waits on it (`--after`, `hold --until`, a card's `after:`) goes
+ * on at
  * the next tick, as if it had succeeded, and keeps going: the release is written once and never taken back, since a waiter that started
  * cannot be un-started. A waiter starts from its base branch as it is then, whatever the run did.
  *
@@ -36,13 +37,21 @@ export const release = Effect.fn('release')(function* (id: string, actor?: Actor
   const door = yield* RunDoor;
   if (!(yield* door.runs.exists(RunId.read(id))))
     return yield* Effect.fail(
-      new Missing({ message: `no such run: ${id}. nemia release takes the run others wait on, by its id, as nemia ls lists it: nemia release <runId>.` }),
+      new Missing({
+        message: `no such run: ${id}. nemia release takes the run others wait on, by its id, as nemia ls lists it: nemia release <runId>.`,
+      }),
     );
   const run = yield* door.runs.read(RunId.read(id));
-  if (run.released) return yield* Effect.fail(new Conflict({ message: `${id}'s waiters were released at ${run.released.at}: nothing more to release.` }));
+  if (run.released)
+    return yield* Effect.fail(new Conflict({ message: `${id}'s waiters were released at ${run.released.at}: nothing more to release.` }));
   if (honoursAsks(run) && assess((yield* readRun(yield* EngineService, run)).read).status === 'succeeded')
-    return yield* Effect.fail(new Conflict({ message: `${id} has succeeded, so what waits on it goes on without a release: nemia ls shows them.` }));
+    return yield* Effect.fail(
+      new Conflict({ message: `${id} has succeeded, so what waits on it goes on without a release: nemia ls shows them.` }),
+    );
   const put = yield* door.released.put(RunId.read(id), actor);
-  if (!put) return yield* Effect.fail(new Conflict({ message: `${id}'s waiters were released by another caller just now: nothing more to release.` }));
+  if (!put)
+    return yield* Effect.fail(
+      new Conflict({ message: `${id}'s waiters were released by another caller just now: nothing more to release.` }),
+    );
   return { run: { ...run, released: put }, released: put } satisfies Releasing;
 });

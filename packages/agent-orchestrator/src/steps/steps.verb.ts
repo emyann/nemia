@@ -13,9 +13,8 @@ import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { tried } from '../runtime-client.ts';
-import { isRepositoryRun, type Run } from '../record/record.ts';
+import { type Run } from '../record/record.ts';
 import { frozenStepsOf, UnloadedFolder, unloadedFolder } from './steps.ts';
-import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import type { ParentRun } from '../wait/wait.ts';
 
 /**
@@ -122,7 +121,4 @@ export const parentRecord = (id: string) =>
     const record = read.value;
     const frozen = yield* stepsOrWhy(record);
     return 'unloaded' in frozen ? { record, unread: frozen.unloaded } : { record };
-  }) satisfies Effect.Effect<Pick<ParentRun, 'record' | 'unread'>, Refusal> as Effect.Effect<
-    Pick<ParentRun, 'record' | 'unread'>,
-    Refusal
-  >;
+  }) satisfies Effect.Effect<Pick<ParentRun, 'record' | 'unread'>, Refusal> as Effect.Effect<Pick<ParentRun, 'record' | 'unread'>, Refusal>;

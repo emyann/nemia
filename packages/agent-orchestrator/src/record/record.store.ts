@@ -377,7 +377,9 @@ function saidIn(words: readonly string[]) {
 /**
  * A run's markers as its records hold them: each marker's text where the run has it, and the words said to its steps in the order kept.
  */
-export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'released' | 'assignee' | 'unassigned' | 'labels']?: string } & {
+export type RunMarks = {
+  readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'released' | 'assignee' | 'unassigned' | 'labels']?: string;
+} & {
   readonly said?: readonly string[];
 };
 
@@ -390,7 +392,8 @@ const assignedIn = (marks: RunMarks) => {
   return {
     ...(marks.assignee === undefined ? {} : { assignee: assigneeIn(marks.assignee) }),
     ...(unassigned ? { unassigned } : {}),
-  } satisfies Pick<Run, 'assignee' | 'unassigned'>;
+    ...(marks.released === undefined ? {} : { released: releasedIn(marks.released) }),
+  } satisfies Pick<Run, 'assignee' | 'unassigned' | 'released'>;
 };
 
 /**
@@ -402,12 +405,11 @@ const assignedIn = (marks: RunMarks) => {
  * @param marks The run's markers.
  */
 export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks) => {
-  const [cancelled, pruned, hold, unheld, released, labels, saidBefore] = [
+  const [cancelled, pruned, hold, unheld, labels, saidBefore] = [
     marks.cancelled === undefined ? undefined : cancelledIn(marks.cancelled),
     marks.pruned === undefined ? undefined : prunedIn(marks.pruned),
     marks.hold === undefined ? undefined : holdIn(marks.hold),
     marks.unheld === undefined ? undefined : unheldIn(marks.unheld),
-    marks.released === undefined ? undefined : releasedIn(marks.released),
     marks.labels === undefined ? undefined : labelsIn(marks.labels),
     saidIn(marks.said ?? []),
   ];
@@ -433,7 +435,6 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
     ...(unheld ? { unheld } : {}),
-    ...(released ? { released } : {}),
     ...assignedIn(marks),
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),

@@ -27,7 +27,6 @@ import { pausedRead } from '../list/list.verb.ts';
 import type { Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
 import { EngineService } from '../runtime-client.ts';
-import { standingLive } from '../standing/standing.verb.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -41,7 +40,8 @@ import { settingsNamed } from '../harness-settings/harness-settings.ts';
  * start did not take, and the cards of its `after:` that had not succeeded (`waitedOn`); for a brief, the `--repo` that only found the
  * factory, where its wiring placed the run on another (`repoFoundFactory`, as typed); the store's pause as it stood once the run was
  * written (`pausedRead`), while one stands; `succeeded`, the
- * runs it is handed as context that had succeeded when it started; and `hints`, a line for each file of its folder that still writes a former
+ * runs it is handed as context that had succeeded when it started; and `hints`, a line for each file of its folder that still writes a
+ * former
  * spelling, read through the Workflow door (`hints`), where any does.
  */
 export type Started = {
@@ -182,7 +182,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
     fix: given.fix ?? '--factory <name>',
-    landed: yield* requestLanded(yield* EngineService),
+    landed: requestLanded(yield* EngineService),
   });
   return {
     id: started.run.id,
@@ -265,7 +265,8 @@ type Concluded = { run: string; succeeded: boolean; section: string };
 
 /**
  * `nemia concluded <run>`: what a run started now with `--from <run>` would be handed of it — the `## From run <id>` section its roots
- * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled succeeded or not succeeded, not judged, as `parentOf`
+ * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled succeeded or not succeeded, not judged, as
+ * `parentOf`
  * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
  * the store is read, and with `Missing` for a run the store does not have.
  */

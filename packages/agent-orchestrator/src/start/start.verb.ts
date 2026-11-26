@@ -52,8 +52,6 @@ import {
 } from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
-import type { BranchReader } from '../branches/branches.store.ts';
-import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { NO_ALLOWS, repoAllows, type Allows } from '../trust/allows.verb.ts';
 import {

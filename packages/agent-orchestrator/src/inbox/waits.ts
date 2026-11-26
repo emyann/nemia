@@ -1,5 +1,6 @@
 /**
- * What a card waits on (`after:`): whether each card it names has released its waiters (`cardLanded`, proved by `contracts/card-landing.contract.ts`),
+ * What a card waits on (`after:`): whether each card it names has released its waiters (`cardLanded`, proved by
+ * `contracts/card-landing.contract.ts`),
  * following its work through the cards its runs passed it on to (`cardWaitsOf`); a cycle of `after:` lines (`afterCycle`); and whether a
  * wait will never be released without a person (`waitStalled`). Read from the level on every pass and written nowhere. Pure: the listing
  * hands it what the store said (inbox.ts, inbox.verb.ts).
@@ -11,7 +12,8 @@ export type { CardLanding } from '../../contracts/card-landing.contract.ts';
 
 /**
  * Where the work of one card another waits on stands: missing where the store knows nothing of it; released where a run of its own, or a
- * card its runs passed its work on to, has released its waiters (it succeeded, or a person released them); else waiting, at the first card it was passed on to that still waits, else missing by
+ * card its runs passed its work on to, has released its waiters (it succeeded, or a person released them); else waiting, at the first
+ * card it was passed on to that still waits, else missing by
  * the first that is gone, else at itself.
  * @param card The card: its name, whether the store knows it, and the runs started from it, each with whether it released its waiters.
  * @param onward Where each card its runs passed its work on to stands, already judged by this same decision.
@@ -27,24 +29,28 @@ export const cardLanded: CardLanded = (card, onward) => {
   return { kind: 'waiting', card: card.name };
 };
 
-/** The states of the card a wait stands at from which nothing the tick does releases it: a run ended without succeeding, or a start refused. */
+/** The states of the card a wait stands at from which nothing the tick does releases it: a run ended without succeeding, or a start
+ * refused. */
 const ENDED_UNLANDED: readonly CardState[] = ['failed', 'stopped', 'cancelled', 'refused'];
 
 /**
- * Whether a wait will never be released without a person: a name the store knows nothing of, a cycle, or a card whose run ended without succeeding
+ * Whether a wait will never be released without a person: a name the store knows nothing of, a cycle, or a card whose run ended without
+ * succeeding
  * or whose start was refused.
  * @param wait The wait's kind, and the state of the card it stands at as the inbox lists it (null where not read).
  */
 export const waitStalled: WaitStalled = (wait) => wait.kind !== 'waiting' || (wait.state !== null && ENDED_UNLANDED.includes(wait.state));
 
-/** A card as the walk reads it: whether the store knows it, its runs with whether each released its waiters, and the cards its runs passed work on to. */
+/** A card as the walk reads it: whether the store knows it, its runs with whether each released its waiters, and the cards its runs
+ * passed work on to. */
 export type CardLook = { readonly known: boolean; readonly runs: readonly WaitedRun[]; readonly onward: readonly string[] };
 
 /** A card named in an `after:` that has not released its waiters, and where its work stands (`cardLanded`'s waiting or missing). */
 type CardWaitOn = { readonly card: string; readonly landing: Exclude<CardLanding, { kind: 'released' }> };
 
 /**
- * The cards of `after` that have not released their waiters, in the order written, each with where its work stands: `cardLanded` asked of each card, and
+ * The cards of `after` that have not released their waiters, in the order written, each with where its work stands: `cardLanded` asked
+ * of each card, and
  * of each card its runs passed its work on to before it, each card read once (`look`) and a hand-off back to a card already on the way
  * passed over, so the walk ends whatever the hand-offs say.
  * @param after The names a card's `after:` gives.

@@ -93,7 +93,8 @@ function waitOf(id: string, { record, standing, unread }: ParentRun) {
   if (standing.kind === 'released') return { run: id, released: true } satisfies Wait;
   if (standing.kind === 'yours') {
     if (standing.why === 'missing') return { run: id, missing: true } satisfies Wait;
-    if (standing.why === 'cancelled') return { run: id, cancelledAt: record?.cancelledAt || 'a time its record no longer says' } satisfies Wait;
+    if (standing.why === 'cancelled')
+      return { run: id, cancelledAt: record?.cancelledAt || 'a time its record no longer says' } satisfies Wait;
     return { run: id, failed: true } satisfies Wait;
   }
   return (standing.on === 'unread' ? { run: id, unread: unread ?? 'its workflow was not read' } : { run: id }) satisfies Wait;
@@ -164,7 +165,11 @@ export function waitAdvice(run: Run, waits: readonly Wait[]) {
     return `nothing of ${run.id} is filed until ${runList(waits.map((w) => w.run))} ${waits.length > 1 ? 'have' : 'has'} succeeded; nothing to decide yet`;
   }
   const why = never.map(neverWhy);
-  const outs = [...never.flatMap(waysOut), `nemia cancel ${run.id}`, `start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`];
+  const outs = [
+    ...never.flatMap(waysOut),
+    `nemia cancel ${run.id}`,
+    `start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`,
+  ];
   return `${why.join('; ')} — yours to resolve: ${outs.join(', or ')}`;
 }
 

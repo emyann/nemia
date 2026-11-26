@@ -37,7 +37,8 @@ export function ContextPicker({
         {label}
       </Body>
       <Body size="small">
-        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not succeeded, not judged.
+        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not succeeded, not
+        judged.
       </Body>
       {runs.error ? (
         <ReadTrouble what="the runs to read" error={runs.error} size="small" />

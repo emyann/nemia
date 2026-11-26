@@ -252,7 +252,9 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       <Body size="medium" component="legend" id={legend} className="font-medium">
         After
       </Body>
-      <Body size="small">Waits until it succeeds: nothing of it is filed until each has succeeded, and it is handed what each concluded.</Body>
+      <Body size="small">
+        Waits until it succeeds: nothing of it is filed until each has succeeded, and it is handed what each concluded.
+      </Body>
       {!repo ? (
         <Body size="small" data-no-repo>
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.

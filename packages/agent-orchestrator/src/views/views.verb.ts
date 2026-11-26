@@ -9,7 +9,7 @@
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
-import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, asked, denialText, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   attemptVerdict,
   CHECK_TAIL_LINES,
@@ -28,8 +28,7 @@ import {
 } from '../check/index.ts';
 import { checkLine, stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
-import { resultSteps } from '../branches/index.ts';
-import { isRepositoryRun, checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { taskSpend, type SpendOf } from '../status/status.ts';
 import { type Consumed } from '../usage/usage.ts';
 import { waitedOn, waitStanding, type ParentRun } from '../wait/wait.ts';
@@ -37,7 +36,6 @@ import { assess } from '../tick/assess.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
-import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
@@ -699,7 +697,10 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string) {
   const { record } = known;
   const released = Boolean(record?.released);
   if (!record || record.cancelledAt) {
-    return { ...known, standing: waitStanding({ known: Boolean(record), status: record ? 'cancelled' : null, released }) } satisfies ParentRun;
+    return {
+      ...known,
+      standing: waitStanding({ known: Boolean(record), status: record ? 'cancelled' : null, released }),
+    } satisfies ParentRun;
   }
   const frozen = yield* stepsOrWhy(record);
   if ('unloaded' in frozen) {

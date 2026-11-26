@@ -54,9 +54,11 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
  * `## From run <id>`: what a run this one waited on concluded, as data, on each of this run's roots.
  *
  * The first line of what it was asked, and for each of its terminal steps the closeout's `summary` and what its `output:` declares, as
- * `## From <step>` gives it. The summary travels here as an account a person has judged: the parent succeeded, which says nothing of whether its work
+ * `## From <step>` gives it. The summary travels here as an account a person has judged: the parent succeeded, which says nothing of
+ * whether its work
  * was merged: this run is cut from the base branch as it stood. Between steps of a run it is in the step's
- * `closeout.json`, the author's view of unjudged work; one run later it is the record of work that may be in the workspace. It is still another run's words — fenced,
+ * `closeout.json`, the author's view of unjudged work; one run later it is the record of work that may be in the workspace. It is still
+ * another run's words — fenced,
  * under a label saying whose — and the change it describes is on disk to weigh it against.
  *
  * A parent whose record or closeout cannot be read says so and why, rather than handing nothing silently: the run starts all the same.

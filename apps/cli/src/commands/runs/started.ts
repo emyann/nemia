@@ -120,7 +120,8 @@ const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**
- * The line of a card started by hand while cards of its `after:` had not succeeded: it was started all the same, from the base as it is now.
+ * The line of a card started by hand while cards of its `after:` had not succeeded: it was started all the same, from the base as it is
+ * now.
  * @param card The card started.
  * @param waitedOn The cards of its `after:` that had not succeeded.
  */

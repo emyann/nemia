@@ -428,7 +428,8 @@ export const RunStepStatus = Schema.Struct({
   .annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
-/** The runs a run waits on or is held until, each that has not released it and why it never will on its own (`RunWaiting`, `RunHolding`). */
+/** The runs a run waits on or is held until, each that has not released it and why it never will on its own (`RunWaiting`,
+ * `RunHolding`). */
 const waitedRun = {
   run: Schema.String.annotate({ description: "The waited-on run's id." }),
   missing: Schema.Boolean.annotate({ description: 'Whether the store has no such run.' }),
@@ -454,7 +455,12 @@ export type RunWaiting = typeof RunWaiting.Type;
 /** A person's hold on a run (`RunHolding`, judged.verb.ts), in the package's words. */
 export const RunHolding = Schema.Struct({
   at: Schema.String.annotate({ description: 'When the hold was put (nemia hold).' }),
-  runs: List(Schema.Struct({ ...waitedRun, released: Schema.Boolean.annotate({ description: 'Whether the run succeeded or a person released its waiters.' }) })).annotate({
+  runs: List(
+    Schema.Struct({
+      ...waitedRun,
+      released: Schema.Boolean.annotate({ description: 'Whether the run succeeded or a person released its waiters.' }),
+    }),
+  ).annotate({
     description:
       'The runs the hold waits for, each with why it never succeeds on its own where it will not, and whether it released the hold; empty for a hold that names none.',
   }),

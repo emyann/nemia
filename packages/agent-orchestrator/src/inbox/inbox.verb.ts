@@ -58,7 +58,6 @@ import { StoreRoot } from '../config/root.store.ts';
 import { FileDoor, filesDir } from '../start/files.store.ts';
 import { keptParent, passParents, type Parents } from '../views/views.verb.ts';
 import { over, type Engine } from '../runtime-client.ts';
-import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -649,7 +648,7 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
   const factories = yield* readableFactories();
   const started = new Set(runs.flatMap((r) => (r.from?.inbox === undefined ? [] : [r.from.inbox])));
   const waiting = namedAfter(entries, (name) => started.has(name)).length
-    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), yield* requestLanded(e))
+    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), requestLanded(e))
     : undefined;
   return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()), waiting);
 });
@@ -658,6 +657,4 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
  * Whether each run has released its waiters for one request, each run once (`releasedThrough`).
  * @param e The engine.
  */
-export const requestLanded = Effect.fnUntraced(function* (e: Engine) {
-  return releasedThrough(e, passParents());
-});
+export const requestLanded = (e: Engine) => releasedThrough(e, passParents());

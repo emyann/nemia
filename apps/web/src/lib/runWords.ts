@@ -202,8 +202,10 @@ const neverWord = (run: HeldRun) => {
 };
 
 /**
- * The words of a held run: `held · until <run> succeeds`, the run being the first not released that never succeeds on its own, else the first not
- * released, with why it never succeeds after its id (`neverWord`); `held` alone where every run it names released it, or it names none. The same
+ * The words of a held run: `held · until <run> succeeds`, the run being the first not released that never succeeds on its own, else the
+ * first not
+ * released, with why it never succeeds after its id (`neverWord`); `held` alone where every run it names released it, or it names none.
+ * The same
  * words whether the hold waits on a person or not: the hold is said, never its holder as the reader.
  * @param holding The run's hold, null where nobody holds it.
  */

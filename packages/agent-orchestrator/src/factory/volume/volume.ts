@@ -238,3 +238,9 @@ export const volumeSwitched: VolumeSwitched = (volumes, name, switches) => {
     },
   };
 };
+
+/**
+ * A volume with its name: the one its file stores, or the one `volumesNamed` gives it on read.
+ * @public
+ */
+export type NamedVolume = Volume & { readonly name: string };

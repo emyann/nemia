@@ -25,8 +25,9 @@ export { SPEAKER_NAME_MAX } from './speaker-words.ts';
  * Who a message is from (`ChatFrom`, objects' `CHAT_FROM`): the task's agent (`agent`), the person, the keeper, whose words are a quiet
  * marker, or another agent that wrote to the task in its chat with a token of its own (`peer`, the message carrying its `name`);
  * and where a tool call stands (`CallState`, objects' `CALL_STATES`): done, at work, failed, not begun, or waiting on the person.
+ * @public
  */
-export type { CallState };
+export type { CallState, ChatFrom };
 
 /**
  * One event of a chat, unique by its `id`:

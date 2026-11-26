@@ -24,6 +24,12 @@ export { CLIENT_VERBS, type ClientVerb, READ_VERBS, type ReadVerb } from './verb
  */
 export { MACHINE_VERBS, MOVED_COMMANDS };
 
+/**
+ * One of `MACHINE_VERBS`.
+ * @public
+ */
+export type MachineVerb = (typeof MACHINE_VERBS)[number];
+
 /** One of `MOVED_COMMANDS`. */
 export type MovedName = MovedCommand;
 

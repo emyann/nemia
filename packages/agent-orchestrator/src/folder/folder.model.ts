@@ -36,7 +36,8 @@ const WorkflowStep = Schema.Struct({
   gate: Schema.optional(Schema.NullOr(Schema.Boolean)),
   check: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: 'WorkflowStep' });
-type WorkflowStep = typeof WorkflowStep.Type;
+/** @public */
+export type WorkflowStep = typeof WorkflowStep.Type;
 
 /** The folder's own name: its path's last segment. */
 const folderName = (dir: string) => dir.slice(dir.lastIndexOf('/') + 1);

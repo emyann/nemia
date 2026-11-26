@@ -43,7 +43,8 @@ const Template = Schema.Struct({
   workflows: Schema.Array(WorkflowName.OnRead),
   digest: Schema.optional(Schema.String),
 }).annotate({ identifier: 'Template' });
-type Template = typeof Template.Type;
+/** @public */
+export type Template = typeof Template.Type;
 
 /** A file of a tree written: its path in the folder, its permission bits, its bytes (`TreeFile`, `archive.ts`). */
 const TreeFileWrite = Schema.Struct({

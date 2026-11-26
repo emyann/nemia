@@ -66,8 +66,8 @@ holds what every change needs.
   a change touched never run them: CI runs them, and a person runs them before a push.
 - `npx knip` — the files, exports and dependencies no workspace uses, by knip (pinned at the root, `knip.jsonc`): what it reports
   is removed, with what served only it; what reaches a file where knip cannot see (a path run by `node`, a bundle's door) is an entry
-  of `knip.jsonc` with why, and an export kept for a reader knip cannot see (tsverify, a type equality, a `node -e` line) says
-  `@public` in its doc. A session's measure, never run by the suite or CI.
+  of `knip.jsonc` with why, and an export kept for a reader knip cannot see (tsverify, a type equality, a `node -e` line, a glossary
+  row's `type`) says `@public` in its doc. A session's measure, never run by the suite or CI.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages

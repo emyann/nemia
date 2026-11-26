@@ -99,8 +99,9 @@ export type { HerSubscription, HerTask, NemiaAct } from '../../contracts/nemia-k
  * refused, its refusal said to the person; `filed`, her task open while some factory is above `manual`, not yet subscribed with her floor;
  * `kept`, open and subscribed, operating; `talking`, open with every factory at `manual`, in conversation with the person; `leaving`, put
  * to rest by the keeper, the stop asked; `stopped`, her task ended with no rest of the keeper's, filed again only once the person speaks.
+ * @public
  */
-type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 'talking' | 'leaving' | 'stopped';
+export type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 'talking' | 'leaving' | 'stopped';
 
 /** How long the conversation is quiet, her session idle since the last word said to her, before she rests at `manual`. */
 export const NEMIA_REST_AFTER = '15 minutes';

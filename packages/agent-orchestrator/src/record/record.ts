@@ -563,6 +563,13 @@ export function unloadedWords(runId: string, why: string, by: string) {
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
 /**
+ * The verb a person's ask answers with: a try or a round (`nemia retry`, `--round` for a round), a yes at a gate or to a loop out of
+ * rounds (`nemia approve`), the base brought into a loop's work (`nemia refresh --base`).
+ * @public
+ */
+export type AskKind = 'retry' | 'approve' | 'refresh';
+
+/**
  * Which ask of its verb, as its file is named: a try (`retry-…`), a round (`round-…`), an approval at a gate (`approve-…`), a loop out of
  * rounds ended as it stands (`accept-…`), a merge of the base (`merge-…`). The files keep the names they had, so no ask on disk is
  * orphaned.

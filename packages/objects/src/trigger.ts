@@ -22,6 +22,11 @@ const TRIGGER_TARGET_KINDS = ['Workflow'] as const;
  * workflow it reaches cannot be read and nothing else settles it.
  */
 export const TRIGGER_QUOTAS = ['spends', 'free', 'unknown'] as const;
+/**
+ * One of `TRIGGER_QUOTAS`.
+ * @public
+ */
+export type TriggerQuota = (typeof TRIGGER_QUOTAS)[number];
 
 /** Where a trigger is defined: the factory's own file, or its template's rendered wiring. */
 const TRIGGER_ORIGINS = ['factory', 'template'] as const;

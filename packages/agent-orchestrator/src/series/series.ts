@@ -12,7 +12,8 @@ import { PASS_BOUNDS, PHASES, READ_BOUNDS, type Phase, type RecentPass } from '.
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
 export const SERIES_LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
-type SeriesLabelKey = (typeof SERIES_LABEL_KEYS)[number];
+/** @public */
+export type SeriesLabelKey = (typeof SERIES_LABEL_KEYS)[number];
 /** The words a label may say: a closed set for a pass's `phase` (the meter's) and the store's disk `part` and `kind` (the disk's). */
 type LabelWord<K extends SeriesLabelKey> = K extends 'phase' ? Phase : K extends 'part' ? DiskPart : K extends 'kind' ? DiskKind : string;
 export type Labels = { [K in SeriesLabelKey]?: LabelWord<K> };

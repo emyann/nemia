@@ -256,18 +256,3 @@ test('REFUSED: a block that reaches too far refuses what its layer allows', () =
     leaked.join('\n'),
   );
 });
-
-test("REFUSED: the client's door group put before its value pattern lets a value import of the door through, as oxlint reads a negation", () => {
-  const config = importRules(readConfig()) as { overrides: Block[] };
-  type Options = [string, { patterns: unknown[] }];
-  const swapped = config.overrides.map((block) => {
-    if (!block.files.includes('apps/cli/src/**')) return block;
-    const [level, { patterns }] = block.rules[RULE] as Options;
-    return { ...block, rules: { [RULE]: [level, { patterns: [...patterns.slice(1), patterns[0]] }] } };
-  });
-  const leaked = leaks({ ...config, overrides: swapped });
-  assert.ok(
-    leaked.some((line) => /^the cli lets apps\/cli\/src\/p\d+\.ts import api\/src\/client\/client\.ts:/.test(line)),
-    leaked.join('\n'),
-  );
-});

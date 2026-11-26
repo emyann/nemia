@@ -66,7 +66,8 @@ const AppliedTemplate = Schema.Struct({
   version: Schema.String,
   params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
 }).annotate({ identifier: 'AppliedTemplate' });
-type AppliedTemplate = typeof AppliedTemplate.Type;
+/** @public */
+export type AppliedTemplate = typeof AppliedTemplate.Type;
 
 /** The workflow a hire's key `<workflow>/<step>` names. */
 const workflowOf = (step: string) => step.slice(0, step.indexOf('/'));

@@ -21,8 +21,11 @@ const ON_INSTALLED = 'NEMIA_ON_INSTALLED';
 /** The script of a tag's root `package.json` that an upgrade runs as the release's checks, after `npm ci` and `npm run build`. */
 export const RELEASE_CHECK = 'release:check';
 
-/** How a release came to the store: built from a tag of its repository, or unpacked from a published archive. */
-type ReleaseFrom = 'build' | 'archive';
+/**
+ * How a release came to the store: built from a tag of its repository, or unpacked from a published archive.
+ * @public
+ */
+export type ReleaseFrom = 'build' | 'archive';
 
 /** The platforms a release archive is published for: `process.platform` and `process.arch` of the machines Nemia installs on. */
 export const RELEASE_PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'] as const;

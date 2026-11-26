@@ -129,11 +129,13 @@ const headWriteSpec = spec<(read: HeadRead) => Act>({
         (live(r) && r.ours && (r.pull === 'conflicting' || (r.pull === 'open' && r.ci === 'failed' && r.red !== 'rerun'))),
     },
     rerunsARedOnceOnItsFirstAttempt: {
-      description: "The failed jobs are re-run exactly where the head is red, none of its red jobs is the change's, and its run is on its first attempt",
+      description:
+        "The failed jobs are re-run exactly where the head is red, none of its red jobs is the change's, and its run is on its first attempt",
       condition: ({ input: [r], output }) => (output === 'rerun') === (live(r) && openOurs(r) && r.ci === 'failed' && r.red === 'rerun'),
     },
     dispatchesARunGitHubNeverStarted: {
-      description: 'A queued run is dispatched exactly where the context is absent at the head and GitHub queued a run there it never started',
+      description:
+        'A queued run is dispatched exactly where the context is absent at the head and GitHub queued a run there it never started',
       condition: ({ input: [r], output }) => (output === 'dispatch') === (live(r) && openOurs(r) && r.ci === 'absent' && r.stuck),
     },
   },
@@ -171,7 +173,8 @@ const mergeWriteSpec = spec<(read: MergeRead) => Act>({
           ((r.ci === 'failed' && r.red !== 'rerun' && r.tip !== 'passed') || (r.ci === 'superseded' && r.tip === 'failed'))),
     },
     rerunsARedAtTheMergeOnce: {
-      description: "The merge's failed jobs are re-run exactly where it is red on its run's first attempt and the base's tip that holds it did not pass",
+      description:
+        "The merge's failed jobs are re-run exactly where it is red on its run's first attempt and the base's tip that holds it did not pass",
       condition: ({ input: [r], output }) =>
         (output === 'rerun') ===
         (live(r) && r.waits && r.merged && !r.sameTree && r.ci === 'failed' && r.red === 'rerun' && r.tip !== 'passed'),

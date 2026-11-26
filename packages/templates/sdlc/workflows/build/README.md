@@ -31,12 +31,13 @@ notes of implement, review and land each open with the answer and hold a part fo
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
 - **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes its branch and opens a pull request through the factory's `github` MCP server, its check runs
-  `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's checks are a
-  receipt, then `base-ci`, the wait on the base branch's CI, which runs once the checkout is given back to the next run's ending.
-  Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
+  `roundCheck`, and the `ci` condition waits on the CI context `ciCheck` names, which the factory's `ci-watch` program writes; land merges that
+  pull request on GitHub; the land step's checks are the `ci` condition (CI at a head a landing refresh pushed), a receipt, then `base-ci`, a
+  condition too, the wait on the base branch's CI, which holds no checkout, so the checkout is given back to the next run's ending once the receipt passes.
+  Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still judged by its context) and the `local` check runs the factory's `localCheck`, the program writing `ci` `True` within one pass, and the landing merges the pull request with no context: nothing waits on CI that will not come.
   The rest of this README, but where it says otherwise, is this way's.
 
-The CI context the scripts wait on and land on is the factory's `ciCheck` parameter (`ci` by default), handed to each script as
+The CI context the program watches and the scripts land on is the factory's `ciCheck` parameter (`ci` by default), handed to each as
 `--check <name>`; the implement step's round check runs the factory's `roundCheck` parameter (the repository's lint and typecheck, where it has
 them, by default). Either way, the implement step's check runs the factory's own check, its `implementCheck` parameter (`true`, the default,
 checks nothing), after `parts.ts check` and before the push or the local check.
@@ -47,26 +48,25 @@ then opens or updates the one pull request of the branch through the server (`li
 `update_pull_request`, never a draft), her fence allowing those two and refusing its merge, its pushes and its run trigger, and puts the
 address on her closeout as an artifact value. Her check pushes again through the same
 script and refuses unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is
-read again for up to 30 s before the refusal — then runs the round check, then, unless GitHub says the pull request conflicts with its
-base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (`START_SECONDS`
-for it to start, `WHOLE_SECONDS` whole, both in `exec.ts`), reading only the latest run of each check on the head, so a failure a later run of the same check
-superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
-refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
-reads it for them. A red the context judged is first told apart by the logs of its red jobs: where a job GitHub concluded failed
-has a log that names a line that failed it (a test, a type error, a lint rule), the change's, which a second run of the same commit would
-fail again, the red is refused at once, never re-run, and the refusal says so, naming each red job and whose it was. Any other red — a job
-timed out or started up wrong, a failure whose log names no failing line or gave none — is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
-(`gh run rerun <id> --failed`), waited on within the same whole bound, and only a run on its first attempt is re-run, as GitHub says, so a
-head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
-second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's
-verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red that is no Actions job is not re-run, said in a line. A context still absent at half the start bound,
-where the head has a workflow run GitHub queued and never started (`queued`, no job started, which no re-run or cancel frees), has that
-run's own workflow dispatched once on the branch (`gh workflow run <file> --ref <branch>`), waited on within the same start bound and
-said in the pass or the refusal; a dispatched run checks the branch head, not the merge ref, so the landing's wait on the base's own
-context stays the last word. A dispatch GitHub refuses is a person's refusal at once, naming the stuck run and the dispatch to type, with
-`-f` for each input the workflow requires, then the retry. A dispatched run's red, whose entry links its run rather than a job, is
-told apart, re-run and read as any other: its failing jobs and their lines are read from the run. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
-the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself, through the server's `pull_request_read` (`get`, `get_status`,
+read again for up to 30 s before the refusal — then runs the round check, then the `local` check (the factory's local check where no CI is declared). Nothing in the check waits on CI: the `ci-watch` program
+(`programs/ci-watch/program.yaml`, one per factory, run from `ci-watch.ts` with `gh`'s sign-in) polls every 30 s (`WF_CI_WATCH_SECONDS`; the server is
+reachable over Tailscale only, so no webhook reaches it) and, for each step of the factory's unfinished runs that is checking and has reached a condition
+(`conditionDue`: every check before it passed on this try, so `push` proved the pull request's head is the step's commit), reads GitHub and writes the
+condition for the try: `True` where the context passed at the head, `False` where it is red and the red is the change's, or the pull request conflicts with
+its base (a merge of the base, named), `Unknown` with words where it waits (still running, none reported, none open: the step stays `checking`
+and its note says why). It reads only the latest run of each check on the head, so a failure a later run of the same check superseded is neither judged
+nor listed, and writes nothing for a head that is not the tip of the run's result branch. A red the context judged is first told apart by the logs of its
+red jobs: where a job GitHub concluded failed has a log that names a line that failed it (a test, a type error, a lint rule), the change's, which a
+second run of the same commit would fail again, it is `False` at once, never re-run, with the failing jobs and the Actions address (the log lines
+are read through the server, `actions_list` and `get_job_logs`: Grace's step loads it). Any other red — a job timed out or started up wrong, a failure whose
+log names no failing line or gave none — has the failed jobs of its workflow run re-run once (`gh run rerun <id> --failed`), and only a run on its first attempt
+is re-run, as GitHub's `run_attempt` says, so a head is never re-run twice, even across a restart of the program; a job red again is the change's, `False`.
+Where the context is absent and the head has a workflow run GitHub queued and never started (`queued`, no job started, which no re-run or cancel frees)
+for 15 minutes (`WF_CI_STUCK_SECONDS`), the program dispatches that run's own workflow once on the branch (`gh workflow run <file> --ref <branch>`); a
+dispatch GitHub refuses is written `Unknown` naming the stuck run and the dispatch to type, with `-f` for each input the workflow requires. A dispatched run's
+red, whose entry links its run rather than a job, is told apart, re-run and read as any other. Where the context is red on the base branch too, at the commit
+of it the head holds, `False` says so and names the base's jobs that did not pass; it stays the try's. A factory with `github` false has no `ci` condition
+and the program writes nothing. The reviewer alone reads the pull request and its checks itself, through the server's `pull_request_read` (`get`, `get_status`,
 `get_check_runs`); it holds no `gh` allow beyond a tool's help, and its fence still refuses every form of `gh`.
 
 When the implement step's check refuses, either way — a red, cancelled or missing CI context, `probe.ts`, `parts.ts`, the factory's own check or the
@@ -112,29 +112,24 @@ otherwise commits it, pushes the branch with no force and leaves `refreshed.json
 the command changed nothing of, on a merge that went clean, is taken back, and the merge goes on as before. So two runs that change one
 derived file side by side both land: the landed commit differs from the reviewed head only in the files `landingDerives` names. Land's
 check then merges a head so refreshed, where none is merged and `refreshed.json` names this run's open pull request at it: once the CI
-context is green there (red refuses, with the `nemia retry <run> review --message "…"` that sends the work back) and while it holds the
+context reads green there, in the one read (the `ci` condition, before the receipt, waited for it; red or not over refuses, with the `nemia retry <run> review --message "…"` that sends the work back) and while it holds the
 base (a base that moved past it refuses with the land retry line), with `--match-head-commit <head>` and the session's subject and body,
 then fast-forwards the checkout. Past that, land's first check, `receipt`, is the receipt alone — the pull request `MERGED` with a merge commit reachable
 from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run with an equivalent patch on
 HEAD (`git cherry`, so a part taken as a commit of its own counts as taken) — which is what the run needs to record `landed` on the
 commit that landed. It runs no suite: CI judged the head the review read, and the merge commit's first parent is the base. Once it
-passed, the checkout is given back: the land step's second check, `base-ci`, says `usesCheckout: false`, so another run's ending is
-filed into the checkout while it runs, and it reads nothing of the checkout's working tree, index or HEAD. Where the factory's
-`landingWaitsOnCi` is true (the default), `base-ci` waits on the CI context at the merge commit on the base branch
-(`base-ci --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
-while another check there still runs, and `WHOLE_SECONDS` in all, the bounds the implement step's wait keeps in `exec.ts`, inside the
-check's own deadline); a merge commit whose tree is the refreshed head's the receipt waited at is not waited on again. Green passes. A red is first re-run, once, any red it judged, failing lines or not, where the implement step's wait first reports one whose job's
-log names a failing line (`rerun.ts`, which both scripts import): the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a retry
-of the land step never re-runs it twice, waited on within the same bound; green the second time passes, naming each job re-run and how
-it ended. Red still fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass and each job
-re-run: red twice is a real break of the base, and the refusal says so and points at the merge commit's checks, where a person lands a
-fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, `base-ci` passes and
-says so. A merge whose own run was cancelled — a CI
-that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's compare says it
-holds the merge: green there passes, naming the commit read and why; red there fails the step naming that commit; anything else waits
-on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming `landingWaitsOnCi`: a
-repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and `base-ci` then waits on
-nothing.
+passed, the checkout is given back: the land step's third check, `base-ci`, is a condition and runs nothing, so another run's ending is
+filed into the checkout while it waits. The `ci-watch` program writes it, reading only GitHub and the repository's REST API, never the checkout. Where the
+factory's `landingWaitsOnCi` is true (the default), it reads the CI context at the merge commit on the base branch (`--wait-on-ci <true|false>` on the
+program's line); a merge commit whose tree is the head's `ci` judged is passed at once. Green is `True`. A red is first re-run, once, any red it judged, failing lines or not (`rerun.ts`):
+the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a restart never re-runs it twice; green the
+second time is `True`, naming the jobs re-run. Red still is `False`, which fails the step though the merge stands — nothing is taken back — naming
+the jobs that did not pass: red twice is a real break of the base, and the words say so and point at the merge commit's checks, where a person lands a
+fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, `base-ci` is `True` and says so. A
+merge whose own run was cancelled — a CI that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where
+GitHub's compare says it holds the merge: green there is `True`, naming the commit read and why; red there is `False` naming that commit; anything else is
+`Unknown`, the step waiting. Never reported stays `Unknown`, naming `landingWaitsOnCi`: a repository whose CI does not run on pushes to the base sets it false
+(`--set landingWaitsOnCi=false`), and `base-ci` is then `True` at once.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
 `<run>-probe-<label>` (`node "$WF_CARRIED_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder

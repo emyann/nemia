@@ -1,8 +1,8 @@
 /**
- * The lines of a failing CI job's log that say why it failed, for `pull-request.ts`'s refusal of a red CI context, and how a check of a
+ * The lines of a failing CI job's log that say whose it is, for `ci-watch.ts`'s reading of a red CI context, and how a check of a
  * commit reads — its name, whether it is over, its verdict, the latest run of each, whether a context's runs were all superseded, and the
- * jobs that did not pass as a refusal lists them — for that script's wait and `landing.ts`'s, and what `landing.ts`'s receipt says of
- * its wait at the merge: pure,
+ * jobs that did not pass as a refusal lists them — for that script and `landing.ts`'s receipt, and what the watcher says of a red at the
+ * merge: pure,
  * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
  * with them: a run freezes the carried folder whole (`$WF_CARRIED_FILES`), so a script reads it there, as it is read here. It also
  * decides whose a red job is and whether a red context is worth a second run before the step hears of it (`toldOf`, `rerunDue`, which
@@ -261,7 +261,7 @@ export const listing = (listed: readonly Check[]) => [
 ];
 
 /**
- * A landing as the receipt's wait on CI names it in what it says: its pull request's number and address, its merge commit, the base
+ * A landing as the watcher's words on CI at the merge name it: its pull request's number and address, its merge commit, the base
  * branch it is on, and the CI context waited on.
  */
 export type Landing = { number: number; url: string; oid: string; onto: string; check: string };
@@ -277,49 +277,6 @@ export const noVerdict = (ours: readonly Check[]) =>
   ours.length
     ? "the merge's own run was cancelled, most likely replaced by a newer run of the base's CI"
     : "the merge's own was not reported there";
-
-/** What the receipt says where the context passed at `sha`, the base's tip, which holds the merge: red there, or `none` of its own. */
-export const greenLater = (l: Landing, sha: string, none?: string) =>
-  none === undefined
-    ? `\`${l.check}\` was red on \`${l.onto}\` at the merge ${l.oid.slice(0, 12)}, and is green at ${sha.slice(0, 12)}, the base's tip, which holds it`
-    : `\`${l.check}\` is green on \`${l.onto}\` at ${sha.slice(0, 12)}, the base's tip, which holds the merge ${l.oid.slice(0, 12)}: ${none}`;
-
-/**
- * What the wait says of the context at the merge once `secs` are out: never read from GitHub, naming the last error `unread`; still
- * running; cancelled; or never reported.
- */
-export function unfinished(l: Landing, entries: readonly Check[], secs: number, unread?: string) {
-  const [ours, at] = [named(entries, l.check), `\`${l.check}\` on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number},`];
-  if (unread !== undefined)
-    return `${at} could not be read from GitHub within ${secs} s; the last read said: ${unread}\n  Read ${commitUrl(l, l.oid)}.`;
-  if (seenOf(ours) === 'pending') {
-    const states = ours.map((entry) => (entry.status ?? entry.state ?? '').toLowerCase()).join(', ');
-    return `${at} was still ${states} after ${secs} s: read ${linkOf(ours[0]) || commitUrl(l, l.oid)}, and retry the step once it is over.`;
-  }
-  if (ours.length)
-    return [
-      `${at} was cancelled, most likely replaced by a newer run of the base's CI, and no later commit of \`${l.onto}\` that holds ` +
-        `it had a verdict within ${secs} s:`,
-      ...listing(ours),
-      `  A person re-runs it at its link, or the step is retried once a later commit's \`${l.check}\` is over.`,
-    ].join('\n');
-  return unreported(l, entries, secs);
-}
-
-/**
- * The refusal of a context never reported at the merge within `secs`: the other checks there still running or not passed, with their
- * URLs, and that CI may not run it on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
- */
-function unreported(l: Landing, entries: readonly Check[], secs: number) {
-  const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
-  return [
-    `no \`${l.check}\` was reported on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number}, within ${secs} s ` +
-      `(${commitUrl(l, l.oid)}).`,
-    ...(told.length ? ['  The other checks there still running or not passed:', ...listing(told)] : []),
-    `  Either CI does not run \`${l.check}\` on pushes to \`${l.onto}\`, and the factory sets \`landingWaitsOnCi\` false ` +
-      '(`--set landingWaitsOnCi=false`), or it has not reported yet, and the step is retried.',
-  ].join('\n');
-}
 
 /**
  * The refusal of a red context at `sha` on the base, its retry line left to the caller: where — the merge, which turned the base red,

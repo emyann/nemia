@@ -1,20 +1,17 @@
 /**
- * The one re-run of a red CI context, said once for the two waits that ask it: `pull-request.ts`'s wait on a round's head and
- * `landing.ts`'s receipt at the merge commit on the base. A red the context judged — a failure or a time-out, never one only cancelled,
- * skipped or neutral — has the failed jobs of each workflow run its red entries name re-run, once (`gh run rerun <id> --failed`, which
- * brings back the jobs that depend on them). Once is read from GitHub, never carried: a run is re-run only while its `run_attempt`
- * (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so a retry of the step that waits never re-runs it again. Until GitHub has
- * replaced every job re-run, the red it still shows is no verdict (`seenAfter`); the pass or the refusal then names the jobs re-run and
- * how each ended the second time (`rerunSaid`). `pull-request.ts`'s wait asks first whether the red is worth it: it reads the logs
- * of the red jobs a re-run would bring back (`redJobsOf`) and re-runs only where none is the change's (`rerunDue`, `ci-log.ts`),
- * saying in a line whose each was (`toldSaid`); the receipt re-runs any red it judged. An attempt that cannot be read, a re-run `gh`
- * refuses, or a red entry that is no Actions job means no re-run, said in a line. Each script keeps beside its own code how long it
- * waits and what its refusal says.
+ * The one re-run of a red CI context, said once for the two reads `ci-watch.ts` makes of one: a round's head and the merge commit on the
+ * base. A red the context judged — a failure or a time-out, never one only cancelled, skipped or neutral — has the failed jobs of each
+ * workflow run its red entries name re-run, once (`gh run rerun <id> --failed`, which brings back the jobs that depend on them). Once is
+ * read from GitHub, never carried: a run is re-run only while its `run_attempt` (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so
+ * a watcher started again never re-runs it a second time. The watcher asks first whether the red is worth it: it reads the logs of the red
+ * jobs a re-run would bring back (`redJobsOf`) and re-runs only where none is the change's (`rerunDue`, `ci-log.ts`), saying in a line
+ * whose each was (`toldSaid`); the merge's red is re-run whichever jobs it names. An attempt that cannot be read, a re-run `gh` refuses,
+ * or a red entry that is no Actions job means no re-run, said in a line.
  *
  * It imports `ci-log.ts`, for how a check reads, and `exec.ts`, for how `gh` is run: the run freezes the carried folder whole
  * (`$WF_CARRIED_FILES`), so they are beside it wherever it runs.
  */
-import { type Check, type Second, type Told, PASSED, checkKey, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import { type Check, type Second, type Told, PASSED, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 import { run } from './exec.ts';
 
 /** The verdicts that judge nothing: a pass, and what CI or a person runs again rather than the work answers. */
@@ -32,11 +29,11 @@ export const jobIdOf = (entry: Check) => /\/job\/(\d+)/.exec(linkOf(entry))?.[1]
  */
 export const runIdOf = (entry: Check) => /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(linkOf(entry))?.[1];
 
-/** What a wait re-ran of a red: the workflow runs, their red jobs as they were, and the lines that say why a run was not re-run. */
-export type Rerun<T extends Check = Check> = { runs: string[]; was: T[]; lines: string[] };
-
-/** The attempt GitHub says the workflow run `id` is on; `undefined` where it cannot be read or is no number. */
-function attemptOfRun(id: string) {
+/**
+ * The attempt GitHub says the workflow run `id` is on; `undefined` where it cannot be read or is no number.
+ * @param id The workflow run's id.
+ */
+export function attemptOfRun(id: string) {
   const ran = run('gh', ['api', `repos/{owner}/{repo}/actions/runs/${id}`]);
   try {
     const said = ran.status === 0 ? (JSON.parse(ran.out) as { run_attempt?: unknown }).run_attempt : undefined;
@@ -49,9 +46,10 @@ function attemptOfRun(id: string) {
 /**
  * The failed jobs of each workflow run a red entry of `ours`, the CI context's, names re-run, once, where it failed; none asked of a
  * context pending, green, or only cancelled, skipped or neutral. Once: only a run GitHub says is on its first attempt, so whichever
- * invocation asks, a run is re-run once at most. `entries`, the commit's latest checks, give the jobs re-run.
+ * watcher asks, a run is re-run once at most. Answers the runs re-run and the lines that say why a run was not.
+ * @param ours The CI context's entries of the commit.
  */
-export function rerunOnce<T extends Check>(ours: readonly T[], entries: readonly T[]) {
+export function rerunOnce(ours: readonly Check[]) {
   const red = ours.filter(judgedRed);
   if (seenOf(ours) !== 'failed' || !red.length) return undefined;
   const lines = red.filter((entry) => !runIdOf(entry)).map((entry) => `  not re-run: ${nameOf(entry)} names no job of an Actions run`);
@@ -64,14 +62,7 @@ export function rerunOnce<T extends Check>(ours: readonly T[], entries: readonly
     if (asked?.status !== 0) lines.push(`  not re-run: run ${id}, as ${not}`);
     return asked?.status === 0;
   });
-  return {
-    runs,
-    was: redJobsOf(
-      red.filter((entry) => runs.includes(runIdOf(entry) ?? '')),
-      entries,
-    ),
-    lines,
-  };
+  return { runs, lines };
 }
 
 /**
@@ -106,33 +97,3 @@ export function toldSaid(jobs: readonly Check[], told: readonly Told[], due: Sec
         `${named}. A failing line this change did not touch (a flaky test) is said so in the sign-off.`
     : `  a second run is due, since no red job's log names a line that failed it: ${named}`;
 }
-
-/**
- * Which run of a check `entry` is: its job's id, or, for an entry that links only its workflow run (a dispatched run's), that link and
- * when it started, since a re-run keeps the run's link and starts the job again.
- */
-const attemptOf = (entry: Check) => jobIdOf(entry) ?? `${linkOf(entry)}@${entry.startedAt ?? ''}`;
-
-/** How a job the wait re-ran ended the second time, by `entries`: empty while GitHub still shows its first time, which is no verdict. */
-function second(entries: readonly Check[], was: Check) {
-  const now = entries.find((entry) => checkKey(entry) === checkKey(was));
-  return !now || attemptOf(now) === attemptOf(was) ? '' : (verdict(now) || now.status || 'no verdict').toLowerCase();
-}
-
-/** Whether a job re-run is red again, its second time over and judged red: a real break, not a flake. */
-export const redTwice = (rerun: Rerun | undefined, entries: readonly Check[]) =>
-  rerun?.was.some((was) => {
-    const now = entries.find((entry) => checkKey(entry) === checkKey(was));
-    return now !== undefined && attemptOf(now) !== attemptOf(was) && judgedRed(now);
-  }) ?? false;
-
-/** What the wait re-ran and how each job ended the second time, then why any run was not re-run; nothing where it asked nothing. */
-export function rerunSaid(rerun: Rerun | undefined, entries: readonly Check[]) {
-  if (!rerun?.runs.length) return rerun?.lines ?? [];
-  const jobs = rerun.was.map((was) => `${nameOf(was)}: ${second(entries, was) || 'not replaced yet'}`);
-  return [`  re-ran the failed jobs of run ${rerun.runs.join(', ')} once; the second time, ${jobs.join(', ')}`, ...rerun.lines];
-}
-
-/** How the CI context's entries `ours` read now, where a job the wait re-ran still shows its first time in `entries`: not over yet. */
-export const seenAfter = (rerun: Rerun | undefined, entries: readonly Check[], ours: readonly Check[]) =>
-  rerun?.was.some((was) => !second(entries, was)) ? 'pending' : seenOf(ours);

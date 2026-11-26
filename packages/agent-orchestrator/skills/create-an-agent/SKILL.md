@@ -40,7 +40,7 @@ Frontmatter, then its instructions. The other keys are how its sessions run — 
 ---
 role: Code reviewer
 harness: claude
-model: opus
+model: claude-opus-5-5
 overridable: output, fence
 claude:
   fence:
@@ -56,7 +56,8 @@ claude:
   `[Read, Grep]`; the board writes the first.
 - Say `effort:` and `context:` (`200k`): a job reads no user settings, and a session left unbounded reads up to a million tokens on every
   call.
-- `auto` is refused at load on the models measured to drop it (`claude-haiku-4-5`, `claude-sonnet-4-5`: the runtime's `CLAUDE_AUTO_DROPPED`, measured on Claude Code 2.1.322, 2.1.323 and 2.1.325, where the `haiku` alias keeps `auto`); name `dontAsk` with rules there.
+- `model:` names the id the harness lists (`claude-opus-5-5`), never an alias (`opus`): the daemon records each harness's list, and a load refuses an alias, naming the id it resolves to, and a word the harness does not list, naming the ids. Where no list is recorded, any word passes.
+- `auto` is refused at load on a model whose harness row says it does not keep it; name `dontAsk` with rules there.
 
 ## Its instructions
 

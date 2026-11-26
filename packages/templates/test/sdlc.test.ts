@@ -120,6 +120,26 @@ test('nemia template lint passes sdlc and prints its digest', () => {
   assert.match(real.out, /^digest of the content: sha256:[0-9a-f]{64}$/m);
 });
 
+/** A store whose daemon recorded what Claude Code lists: `claude-opus-5-5`, which the alias `opus` resolves to. */
+const recordedStore = () => {
+  const env = storeEnv(scratch('nemia-sdlc-models-'));
+  const root = env.WF_ROOT ?? '';
+  fs.mkdirSync(root, { recursive: true });
+  const models = [{ id: 'claude-opus-5-5', aliases: ['opus'], name: 'Opus 5.5', keepsAuto: true }];
+  fs.writeFileSync(path.join(root, 'models.json'), JSON.stringify({ claude: { at: '2026-11-26T10:00:00.000Z', models } }));
+  return env;
+};
+
+test('nemia template lint, where the store records what Claude Code lists, passes sdlc and refuses an agent naming the alias `opus`', () => {
+  const env = recordedStore();
+  const real = nemia(env, 'template', 'lint', SDLC);
+  assert.equal(real.code, 0, real.err);
+  const aliased = copyOf(SDLC, { 'agents/grace/agent.yaml': (text) => text.replace('model: claude-opus-5-5', 'model: opus') });
+  const refused = nemia(env, 'template', 'lint', aliased);
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.err, /claude-opus-5-5/, 'the refusal names the id the alias resolves to');
+});
+
 test('applied with every parameter set, each is written where the template says, and no expression is left', () => {
   const tree = treeOf('set');
   const build = checkOf(tree, 'build', 'implement');

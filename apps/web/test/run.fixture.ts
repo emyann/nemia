@@ -233,6 +233,7 @@ export const step = (extra: Partial<Step> = {}) =>
         reason: null,
         release: null,
         harness: null,
+        model: null,
       },
     },
     used: used(),

@@ -47,9 +47,10 @@ const recordIn = Schema.decodeUnknownOption(Schema.fromJsonString(RecordFile));
 /**
  * The record of the store at `home`. A store with no file, a file that is not JSON, and one that does not read as a record hold nothing:
  * a load never fails on the record, and the daemon's next ask writes it again.
- * @param home The store's home folder.
+ * @param home The store's home folder; none (`''`) records nothing.
  */
 export function recordedModels(home: string) {
+  if (home === '') return {} satisfies ModelRecord as ModelRecord;
   let text: string;
   try {
     text = fs.readFileSync(modelsFile(home), 'utf8');

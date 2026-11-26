@@ -151,6 +151,20 @@ export const Done: StoryObj = {
   play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'done', 'none', 'Open the step')),
 };
 
+/** A step whose session ran on another model than the one it was asked for: its Model fact says both ids. */
+export const RanOnAnotherModel: StoryObj = {
+  render: () => {
+    const done = RUNS.done.steps[0]!;
+    const latest = done.attempts.latest;
+    const ran = { ...done, attempts: { ...done.attempts, latest: latest && { ...latest, model: 'claude-opus-5-5' } } };
+    return <Sizes run={{ ...RUNS.done, steps: [ran] }} whole={false} />;
+  },
+  play: async ({ canvasElement }) => {
+    const card = await cardAtM(canvasElement, 'done', 'none', 'Open the step');
+    await expect(card.querySelector('[data-step-facts]')?.textContent).toContain('claude-opus-5-5 · asked opus');
+  },
+};
+
 /** A step tried again after its check failed the first try: the picker of its tries, the second at work. */
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };
 

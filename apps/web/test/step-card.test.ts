@@ -215,6 +215,23 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
       { key: 'Permission', value: 'auto' },
     ]);
   });
+  test('the Model fact says the model the session ran on, with the one it was asked for beside it where they differ', () => {
+    const modelOf = (model: string | null, asked: string | null = 'opus') =>
+      cardOf('implement', STATUSES, [
+        quiet('implement', 'running (working)', {
+          tries: [aTry(1)],
+          spec: { ...step().spec!, model: asked },
+          filed: { ...step().filed!, model: asked },
+          attempts: {
+            count: 1,
+            latest: { startedAt: NOW.toISOString(), ended: null, endedAt: null, reason: null, release: null, harness: null, model },
+          },
+        }),
+      ]).facts?.find((fact) => fact.key === 'Model')?.value;
+    assert.equal(modelOf('claude-opus-5-5'), 'claude-opus-5-5 · asked opus');
+    assert.equal(modelOf('claude-opus-5-5', 'claude-opus-5-5'), 'claude-opus-5-5');
+    assert.equal(modelOf(null), 'opus', 'a session that said none shows what it was asked for');
+  });
   test('no card says its place among the run\'s steps: "step x of y" is the rail\'s', () => {
     const cards = [
       cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(1)] })]),

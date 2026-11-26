@@ -212,12 +212,23 @@ const contextSaid = (tokens: number | null) =>
 /** The first of `values` that is set, else `default`. */
 const firstSet = (...values: Array<string | null | undefined>) => values.find((value) => value != null) ?? 'default';
 
+/**
+ * The model the session ran on, as its harness reported it, where its latest attempt did: with the model it was asked for beside it where
+ * that differs (`claude-opus-5-5 · asked opus`); else the one it was filed with or its step sets, or `default`.
+ */
+function modelSaid(step: StepView) {
+  const asked = firstSet(step.filed?.model, step.spec?.model);
+  const ran = step.attempts.latest?.model ?? null;
+  if (ran === null) return asked;
+  return asked === 'default' || asked === ran ? ran : `${ran} · asked ${asked}`;
+}
+
 /** The session's five facts, whole: its harness, model, effort, context and permission, from what its try was filed with first. */
 function factsOf(step: StepView) {
   const { spec, filed } = step;
   return [
     { key: 'Harness', value: firstSet(spec?.harness) },
-    { key: 'Model', value: firstSet(filed?.model, spec?.model) },
+    { key: 'Model', value: modelSaid(step) },
     { key: 'Effort', value: firstSet(filed?.effort, spec?.effort) },
     { key: 'Context', value: contextSaid(filed?.contextTokens ?? spec?.context ?? null) },
     { key: 'Permission', value: firstSet(filed?.fence, spec?.fence, spec?.sandbox) },

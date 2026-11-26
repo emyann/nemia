@@ -18,6 +18,7 @@ import {
   type AgentListing,
 } from '@/lib/api/agents';
 import { keyFormQuery } from '@/lib/api/builder';
+import { modelsQuery } from '@/lib/api/models';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '@/lib/agents';
 import { invalidateAgents } from '@/lib/agentWrites';
 import { FACTORY_WAY } from '@/lib/factories';
@@ -53,6 +54,7 @@ const code = (text: string) => <code className="font-mono text-body-small wrap-a
 export function AgentPage({ from, name, place }: { from: string; name: string; place: PagePlace }) {
   const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));
   const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: models } = useQuery(modelsQuery);
   const { data: factories } = useQuery({ ...factoriesQuery, enabled: agent.from === 'repo' && place.repo === undefined });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -86,6 +88,7 @@ export function AgentPage({ from, name, place }: { from: string; name: string; p
       key={formKey}
       listing={agent}
       keyForm={keyForm}
+      models={models}
       readOnly={!mine}
       onSkillCopied={async () => {
         const now = await readAgent(from, name, place).catch(() => null);

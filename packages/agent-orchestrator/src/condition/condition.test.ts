@@ -60,6 +60,28 @@ describe('conditionWaitWords', () => {
     assert.match(unknown, /queued/);
   });
 
+  test('says whether the writer runs, is not started or is down, with what to type, and that no program writes it', () => {
+    const words = (writer: Parameters<typeof conditionWaitWords>[4]) => conditionWaitWords(run(0), 'run-1', 'merge', ['ci'], writer);
+    assert.match(
+      words(() => ({ program: 'ci-writer', phase: 'Running' })),
+      /ci-writer.*running/,
+    );
+    assert.match(
+      words(() => ({ program: 'ci-writer', phase: 'Pending' })),
+      /not started/,
+    );
+    assert.match(
+      words(() => ({ program: 'ci-writer', phase: 'Down' })),
+      /nemia factory upgrade/,
+    );
+    assert.match(
+      words(() => null),
+      /no program of its factory writes it/,
+    );
+    for (const said of [words(() => null), words(() => ({ program: 'ci-writer', phase: 'Down' }))])
+      assert.match(said, /nemia condition run-1 merge ci/);
+  });
+
   test('says nothing of a condition that is decided', () => {
     assert.equal(conditionWaitWords(withConditions(run(0), [written()]), 'run-1', 'merge', ['ci']), '');
   });

@@ -5,7 +5,7 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { programTaskId } from './program.ts';
+import { programStatus, programTaskId, writerOfIn } from './program.ts';
 import { declaredPrograms } from './program.verb.ts';
 import type { FactoryListing } from '../factory/factory.ts';
 
@@ -46,5 +46,51 @@ describe('declaredPrograms', () => {
       got.map((d) => [d.factory, d.name, d.tree]),
       [['mill', 'ci-writer', '/trees/mill']],
     );
+  });
+});
+
+describe('programStatus', () => {
+  const attempt = (startedAt: string, endedAt: string | null = null) => ({ startedAt, endedAt });
+
+  test('is Pending where the engine holds no task, or one not filed', () => {
+    assert.deepEqual(programStatus(undefined, 'p'), { phase: 'Pending', restarts: 0 });
+    assert.deepEqual(programStatus({ settled: null, attempts: [] }, 'p'), { phase: 'Pending', restarts: 0 });
+  });
+
+  test('is Running while the task is not settled, its restarts the attempts after the first and since the latest start', () => {
+    const status = programStatus(
+      {
+        filedAt: '2026-11-26T10:00:00.000Z',
+        settled: null,
+        attempts: [attempt('2026-11-26T10:00:01.000Z', '2026-11-26T10:05:00.000Z'), attempt('2026-11-26T10:05:10.000Z')],
+      },
+      'p',
+    );
+    assert.deepEqual([status.phase, status.restarts, status.since], ['Running', 1, '2026-11-26T10:05:10.000Z']);
+  });
+
+  test('is Down once settled, with what to type', () => {
+    const status = programStatus(
+      {
+        filedAt: '2026-11-26T10:00:00.000Z',
+        settled: 'failed',
+        attempts: [attempt('2026-11-26T10:00:01.000Z', '2026-11-26T10:00:02.000Z')],
+      },
+      'p',
+    );
+    assert.deepEqual([status.phase, status.restarts, status.since], ['Down', 0, '2026-11-26T10:00:02.000Z']);
+    assert.match('message' in status ? String(status.message) : '', /nemia factory upgrade/);
+  });
+});
+
+describe('writerOfIn', () => {
+  const standing = [
+    { name: 'ci-writer', writes: ['ci'], phase: 'Running' },
+    { name: 'deploy-writer', writes: ['deployed'], phase: 'Down' },
+  ] as const;
+
+  test('names the program that writes a condition and its phase, and none where no program does', () => {
+    assert.deepEqual(writerOfIn(standing)('deployed'), { program: 'deploy-writer', phase: 'Down' });
+    assert.equal(writerOfIn(standing)('other'), null);
   });
 });

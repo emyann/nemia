@@ -921,7 +921,7 @@
     },
     {
       "term": "Program",
-      "meaning": "a long-lived command a template declares (`programs/<name>/program.yaml`), which the daemon keeps running for each factory made from it, as a task of the runtime's command harness restarted by the runtime when it ends; it writes the conditions its `writes:` names."
+      "meaning": "a long-lived command a template declares (`programs/<name>/program.yaml`), which the daemon keeps running for each factory made from it, as a task of the runtime's command harness restarted by the runtime when it ends; it writes the conditions its `writes:` names. Served as a kind in its factory's namespace with a status (`phase`: Pending, Running or Down; its restarts and since when), read off the engine's task (`programStatus`)."
     },
     {
       "term": "Proposal",

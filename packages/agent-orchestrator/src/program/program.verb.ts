@@ -56,7 +56,13 @@ const recorded = (home: string, ids: readonly string[]) => {
 };
 
 /** A program a factory declares, with what its task is filed from. */
-type Declared = { readonly id: string; readonly name: string; readonly factory: string; readonly tree: string; readonly program: Program };
+export type Declared = {
+  readonly id: string;
+  readonly name: string;
+  readonly factory: string;
+  readonly tree: string;
+  readonly program: Program;
+};
 
 /**
  * Every program the listed factories declare: a factory with no tree, or none declared, gives none, and a factory the listing could not
@@ -118,13 +124,13 @@ const heldOf = (e: Engine, ids: readonly string[]) =>
   });
 
 /**
- * One beat: the programs declared read, the tasks of the record read off the engine, each task owed filed (its id recorded first, so a
+ * One beat over the programs `declared`: the tasks of the record read off the engine, each task owed filed (its id recorded first, so a
  * filing that fails is tried again under the same id) and each owed a stop asked. Answers what it filed and what it stopped.
+ * @param declared The programs the factories' templates declare now (`declaredPrograms`).
  */
-const programsOnce = Effect.fn('programsOnce')(function* () {
+export const programsBeat = Effect.fn('programsBeat')(function* (declared: readonly Declared[]) {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const declared = declaredPrograms(yield* listedAt(home));
   const ids = filedIds(home);
   const held = yield* heldOf(e, ids);
   const due = programsDue(
@@ -142,6 +148,11 @@ const programsOnce = Effect.fn('programsOnce')(function* () {
     yield* Effect.logWarning(programDownMessage(h.id));
   for (const id of due.stop) yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
   return due;
+});
+
+/** One beat: the programs declared read, then `programsBeat` over them. */
+const programsOnce = Effect.fn('programsOnce')(function* () {
+  return yield* programsBeat(declaredPrograms(yield* listedAt(yield* StoreRoot)));
 });
 
 /**

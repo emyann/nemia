@@ -516,6 +516,32 @@ describe('PUT …/conditions/:condition judged by the session that presents it: 
     assert.equal(((await res.json()) as { reason?: string }).reason, 'own-step');
     assert.deepEqual(asked('r-cond-own'), []);
   });
+  test('a program of the factory, whose token is no run’s, writes it', async () => {
+    sessionsRun('r-cond-program');
+    write(
+      path.join(root, 'engine', 'tasks', 'program-mill-ci-writer.jsonl'),
+      jsonl([
+        { kind: 'filed', at: at(0), brief: 'program', cwd: '/code/app', maxAttempts: 1, harness: 'command' },
+        { kind: 'starting', at: at(1), attempt: 1 },
+        { kind: 'spawned', at: at(1), attempt: 1 },
+      ]),
+    );
+    const token = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* TokenDoor).tokens.mint({
+          agent: 'ci-writer',
+          factory: 'mill',
+          run: null,
+          step: null,
+          attempt: 1,
+          task: 'program-mill-ci-writer',
+        });
+      }).pipe(Effect.provide(tokenDoorAt(root))),
+    );
+    const res = await app.request(url('r-cond-program'), { method: 'PUT', headers: { ...BOARD, authorization: `Bearer ${token}` }, body });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(asked('r-cond-program').length, 1);
+  });
   test('another step’s session writes it', async () => {
     sessionsRun('r-cond-other');
     const res = await app.request(url('r-cond-other'), { method: 'PUT', headers: sessionOf('r-cond-other', 'lint'), body });

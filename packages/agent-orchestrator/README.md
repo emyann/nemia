@@ -2339,8 +2339,12 @@ spec:
   harness, long-lived (`restartPolicy: 'Always'`), run in the factory's tree with `WF_CARRIED_FILES`, `WF_FACTORY` and its own session
   token, which writes through the api as any token holder does. The runtime restarts a program whose process ends, with its back-off;
   the controller files what a factory declares and stops what it no longer does (`programsDue`, proved by
-  `contracts/programs-due.contract.ts`), so a factory taken away stops its programs. A task the runtime settled is said in the daemon's
-  log, with what to do.
+  `contracts/programs-due.contract.ts`), so a factory taken away stops its programs.
+- **A program is a kind with a status**, served in its factory's namespace (`GET /api/namespaces/<factory>/programs`, `programList`,
+  `programObject`): its phase (`Pending`, `Running`, `Down`), the times the runtime started it again and since when, read off the engine's
+  task (`programStatus`), and, where it is `Down`, what to type. The factory's settings page draws a row of it. A step that waits on a
+  condition says in its note which program writes it and where that task stands (`writerOfIn`, `conditionWaitWords`), and that no
+  program does where none does; the daemon's log says a settled task too.
 
 ## A command node: `run:`
 

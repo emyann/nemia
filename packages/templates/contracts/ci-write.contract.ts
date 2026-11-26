@@ -17,7 +17,6 @@ import { type Implementation, spec } from '@emyann/tsverify';
  * One check of the step's current try as the api serves it, in the step's order: its name, whether it passed on this try, and the
  * condition it waits on where it waits on one.
  */
-export type ServedCheck = { readonly name: string; readonly passed: boolean; readonly condition: string | null };
 
 /**
  * Where the run's pull request stands on GitHub: `none` open nor merged, `open` and mergeable or not yet computed, `conflicting` with its
@@ -93,15 +92,12 @@ const live = (r: { due: boolean; decided: boolean }) => r.due && !r.decided;
 /** The run's open pull request, at the step's head, mergeable or not yet computed. */
 const openOurs = (r: HeadRead) => r.pull === 'open' && r.ours;
 
-const conditionDueSpec = spec<(checking: boolean, checks: readonly ServedCheck[], condition: string) => boolean>({
+const conditionDueSpec = spec<(checking: boolean, waits: boolean, ahead: readonly boolean[]) => boolean>({
   ensures: {
-    dueExactlyOnceTheChecksBeforeItPassed: {
+    dueExactlyWhereItIsWaitedOnAndTheChecksAheadPassed: {
       description:
-        "A condition is due exactly where the step is checking its try, a check of it waits on the condition, and every check listed before the first such check passed on this try: never while the step's session runs, nor before the checks that act for its head (the push) passed",
-      condition: ({ input: [checking, checks, condition], output }) => {
-        const at = checks.findIndex((c) => c.condition === condition);
-        return output === (checking && at >= 0 && checks.slice(0, at).every((c) => c.passed));
-      },
+        "A condition is due exactly where the step is checking its try (its session does not run), a check of it waits on the condition, and every check listed before the first such check passed on this try: the push, which proves the pull request's head is the step's commit, comes first",
+      condition: ({ input: [checking, waits, ahead], output }) => output === (checking && waits && ahead.every((passed) => passed)),
     },
   },
 });

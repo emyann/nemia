@@ -5,32 +5,18 @@
  * `contracts/ci-write.contract.ts`, beside the template. It imports only that contract's types, by a whole `import type`, which the run's
  * type stripping erases, so the frozen copy, where no `contracts/` sits, loads nothing of it.
  */
-import type {
-  Act,
-  Ci,
-  ConditionDue,
-  HeadRead,
-  HeadWrite,
-  MergeRead,
-  MergeWrite,
-  Pull,
-  Red,
-  ServedCheck,
-} from '../../contracts/ci-write.contract.ts';
+import type { Act, Ci, ConditionDue, HeadRead, HeadWrite, MergeRead, MergeWrite, Pull, Red } from '../../contracts/ci-write.contract.ts';
 
-export type { Act, Ci, HeadRead, MergeRead, Pull, Red, ServedCheck };
+export type { Act, Ci, HeadRead, MergeRead, Pull, Red };
 
 /**
- * Whether the step has reached `condition`: it is checking its try, a check of it waits on the condition, and every check listed before
+ * Whether the step has reached a condition: it is checking its try, a check of it waits on the condition, and every check listed before
  * the first such check passed on this try.
  * @param checking Whether the step's status is `checking`.
- * @param checks The step's checks of the current try, in its order.
- * @param condition The condition's name.
+ * @param waits Whether a check of the step waits on the condition.
+ * @param ahead Whether each check listed before the first that waits on the condition passed, in order.
  */
-export const conditionDue: ConditionDue = (checking, checks, condition) => {
-  const at = checks.findIndex((c) => c.condition === condition);
-  return checking && at >= 0 && checks.slice(0, at).every((c) => c.passed);
-};
+export const conditionDue: ConditionDue = (checking, waits, ahead) => checking && waits && ahead.every((passed) => passed);
 
 /**
  * What is done for the condition `ci` of a step's try.

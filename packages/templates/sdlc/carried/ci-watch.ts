@@ -50,17 +50,7 @@ import {
   toldOf,
   verdict,
 } from './ci-log.ts';
-import {
-  type Act,
-  type Ci,
-  type HeadRead,
-  type MergeRead,
-  type Red,
-  type ServedCheck,
-  conditionDue,
-  headWrite,
-  mergeWrite,
-} from './ci-write.ts';
+import { type Act, type Ci, type HeadRead, type MergeRead, type Red, conditionDue, headWrite, mergeWrite } from './ci-write.ts';
 import { Refusal, run, seconds, sleep } from './exec.ts';
 import { attemptOfRun, jobIdOf, judgedRed, redJobsOf, rerunOnce, runIdOf, toldSaid } from './rerun.ts';
 
@@ -747,6 +737,12 @@ function write(a: Asked, served: ServedStepCheck, name: string, written: Written
   return true;
 }
 
+/** Whether each check of `checks` listed before the first that waits on the condition `name` passed on this try, in order. */
+const aheadOf = (checks: readonly ServedStepCheck[], name: string) => {
+  const at = checks.findIndex((c) => c.condition?.name === name);
+  return checks.slice(0, at < 0 ? 0 : at).map((c) => c.verdict?.result === 'passed');
+};
+
 /** One condition of one step, read and written; a refusal of the read is said, and the pass goes on. */
 function settle(a: Asked, waiting: ServedStepCheck, name: 'ci' | 'base-ci', check: string, waits: boolean) {
   try {
@@ -768,14 +764,10 @@ function passOver(served: ServedRun, check: string, waits: boolean) {
   const branch = branchOfRun(served);
   for (const step of served.status.steps) {
     const checks = checksOf(step);
-    const given: ServedCheck[] = checks.map((c) => ({
-      name: c.name,
-      passed: c.verdict?.result === 'passed',
-      condition: c.condition?.name ?? null,
-    }));
     for (const name of ['ci', 'base-ci'] as const) {
       const waiting = checks.find((c) => c.condition?.name === name);
-      if (!waiting || !conditionDue(step.status === 'checking', given, name)) continue;
+      const due = conditionDue(step.status === 'checking', waiting !== undefined, aheadOf(checks, name));
+      if (!waiting || !due) continue;
       if (!branch || !step.workspace) {
         process.stderr.write(`nemia ci-watch: ${served.metadata.name} ${step.name}: no result branch or workspace to read GitHub from\n`);
         continue;

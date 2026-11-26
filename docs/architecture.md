@@ -578,7 +578,7 @@ factory controller reads a template through the door on every pass (`renderedAt`
 (`BuiltinTemplates`, found by path) before the door, which reads whole paths alone, and the orchestrator imports nothing of that
 workspace (`test/contract.test.ts`). A parameter's value reaches inside text: a render writes each `${{ parameters.<name> }}` with it in
 every string of a document and in every text it writes (a step's and an agent's instructions, `NEMIA.md`, `RULES.md`), copies a carried
-file (a script, a skill's files, a schema) byte for byte, and the lint refuses a name `nemia.yaml` does not declare
+file (a script, a skill's files, a schema) byte for byte, writes `${{ case(parameters.<boolean>, '<a>', '<b>') }}` as `<a>` or `<b>` by the boolean, and the lint refuses a name `nemia.yaml` does not declare
 (`packages/agent-orchestrator/src/factory/applied/params.ts`, `src/template/check.ts`).
 
 **The Agent and Skill doors.** An agent and a skill, one context read through the same lookup roots, are each read and written through

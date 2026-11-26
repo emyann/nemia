@@ -1,7 +1,10 @@
 # build
 
 Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora
-reviews it and sends it back while a finding is worth a round, five at most; Otto lands it, once a person approves the landing.
+reviews it and sends it back while a finding is worth a round, five at most; its pass files the landing, which Otto makes with no gate,
+as quick's does. A person decides on the spec, at design's gate; on a diff that the review and CI already passed, a person's approval
+of the landing would be a stamp. A person who wants to read the change before it lands says so at the run's start, `nemia start …
+--gate land`, or by the card's own `gate: land`.
 A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 
 ```
@@ -240,4 +243,6 @@ Seldon declares each such page in `sources` on its output — the address, the d
 the spec takes from it — and the review, which reads design (`input: design`), is handed it in its brief with design's other declared
 fields, as implement is. The review's fetch stays as narrow as it is: a gating reviewer that may fetch any page can be pointed at any
 page by the change it judges, and would read the page as it is then, not as design read it. Agora checks each claim against its
-passage, and names a claim it cannot check at the top of its sign-off, where the person who approves the landing reads it.
+passage. A claim it cannot check stops the landing: the review signs off `blocked`, naming each claim and its page, for a person to
+answer, since no gate follows it; on a run started with `--gate land`, it names the claim at the top of its sign-off instead, where the
+person who approves the landing reads it.

@@ -1,7 +1,7 @@
 /**
  * The builtin templates on the api, on a scratch builtin folder, never the package's own: listed and read as `Template`s, and each one's
- * documents — its workflows, agents and skills — served as the Workflows, Agents and Skills a namespace serves, read from its render with
- * its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled by the template's
+ * documents — its workflows, agents, skills and programs — served as the Workflows, Agents, Skills and Programs a namespace serves, read
+ * from its render with its parameters' defaults, origin `builtin`, in no namespace and with no revision of the ledger's, each step filled by the template's
  * hires as in a factory applied from it; a document it lacks a 404, an unknown
  * template a 404, and one that does not render with its defaults a 422 on its documents while the template itself still reads.
  *
@@ -16,7 +16,20 @@ import { Layer, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
 import { TemplateRenders } from 'agent-orchestrator';
-import { Agent, AgentList, LISTED_WITHOUT, Skill, SkillList, Template, TemplateList, Workflow, WorkflowList, filesHeld } from 'objects';
+import {
+  Agent,
+  AgentList,
+  LISTED_WITHOUT,
+  Program,
+  ProgramList,
+  Skill,
+  SkillList,
+  Template,
+  TemplateList,
+  Workflow,
+  WorkflowList,
+  filesHeld,
+} from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -78,6 +91,19 @@ function template(folder: string, name: string, parameters?: string) {
   );
   write(path.join(at, 'agents', 'drafter', 'instructions.md'), 'You draft.\n');
   write(path.join(at, 'skills', 'inking', 'SKILL.md'), '---\nname: inking\ndescription: Ink a draft.\n---\n\nInk it.\n');
+  write(
+    path.join(at, 'programs', 'proofing', 'program.yaml'),
+    [
+      'apiVersion: nemia/v1',
+      'kind: Program',
+      'metadata:',
+      '  name: proofing',
+      'spec:',
+      '  run: node proof.ts',
+      '  writes: [proofed]',
+      '',
+    ].join('\n'),
+  );
 }
 
 /** A builtin folder holding `mill`, and `asks`, the same with a parameter that has no default. */
@@ -191,6 +217,20 @@ test("a template's skills are served as Skills read from its render", async () =
   assert.ok(inking.status.dir.startsWith(renders), 'read from the render, under the folder of renders');
 });
 
+test("a template's programs are served as Programs read from its render", async () => {
+  const list = await get('/api/templates/mill/programs');
+  assert.equal(list.status, 200);
+  assert.deepEqual(
+    Schema.decodeUnknownSync(ProgramList)(list.body).items.map((o) => o.metadata.name),
+    ['proofing'],
+  );
+  const one = await get('/api/templates/mill/programs/proofing');
+  assert.equal(one.status, 200);
+  const proofing = Schema.decodeUnknownSync(Program)(one.body);
+  assert.equal(proofing.metadata.namespace, undefined, 'a template is in no namespace');
+  assert.deepEqual(proofing.spec.writes, ['proofed']);
+});
+
 test('a page of a document list is cut by its limit', async () => {
   const page = await get('/api/templates/mill/workflows?limit=1');
   assert.equal(page.status, 200);
@@ -198,10 +238,10 @@ test('a page of a document list is cut by its limit', async () => {
 });
 
 test('a document the template lacks is a 404, and so is every read of a template Nemia does not build in', async () => {
-  for (const plural of ['workflows', 'agents', 'skills'])
+  for (const plural of ['workflows', 'agents', 'skills', 'programs'])
     assert.equal((await get(`/api/templates/mill/${plural}/nowhere`)).status, 404, `no ${plural} document named nowhere`);
   assert.equal((await get('/api/templates/nowhere')).status, 404);
-  for (const plural of ['workflows', 'agents', 'skills']) {
+  for (const plural of ['workflows', 'agents', 'skills', 'programs']) {
     assert.equal((await get(`/api/templates/nowhere/${plural}`)).status, 404, `no template's ${plural}`);
     assert.equal((await get(`/api/templates/nowhere/${plural}/press`)).status, 404, `no template's ${plural} document`);
   }
@@ -209,7 +249,7 @@ test('a document the template lacks is a 404, and so is every read of a template
 
 test('a template with a parameter that has no default does not render: its documents a 422, the template itself still read', async () => {
   assert.equal((await get('/api/templates/asks')).status, 200);
-  for (const plural of ['workflows', 'agents', 'skills']) {
+  for (const plural of ['workflows', 'agents', 'skills', 'programs']) {
     assert.equal((await get(`/api/templates/asks/${plural}`)).status, 422, `its ${plural} listed`);
     assert.equal((await get(`/api/templates/asks/${plural}/press`)).status, 422, `one of its ${plural} read`);
   }

@@ -470,6 +470,7 @@ export {
   YourStore,
 } from './server-api.ts';
 export { HarnessModelList, HarnessModels, ListedModelRead } from './models.ts';
+export { Program, ProgramList } from './program.ts';
 export { SessionAnswer, SessionGroup } from './session.ts';
 export {
   FINISHING_KINDS,
@@ -641,7 +642,6 @@ export {
   type ReadCommand,
   type RestCommand,
   type RunCommand,
-  type WriterCommand,
 } from './commands.ts';
 export {
   AGENTS_WRITE_WORDS,

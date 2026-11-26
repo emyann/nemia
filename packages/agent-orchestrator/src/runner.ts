@@ -449,6 +449,7 @@ export {
   hireTable,
   libraryAddTable,
   mcpServerTable,
+  programTable,
   proposalTable,
   scheduleTable,
   skillTable,
@@ -470,7 +471,14 @@ export { hireList, hireObject } from './factory/object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
-export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
+export {
+  templateList,
+  templateObject,
+  templatePrograms,
+  templateProgram,
+  templateTree,
+  TemplateRenders,
+} from './template/object/template.verb.ts';
 export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
 export {

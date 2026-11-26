@@ -139,6 +139,8 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'templates.agent': ONE,
   'templates.skills': LIST,
   'templates.skill': ONE,
+  'templates.programs': LIST,
+  'templates.program': ONE,
   'subscriptions.listAll': LIST,
   'subscriptions.get': ONE,
   'events.listAll': LIST,

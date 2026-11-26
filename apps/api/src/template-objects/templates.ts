@@ -1,7 +1,7 @@
 /**
  * The templates group's handlers (`objects`' `Api`): the templates Nemia builds in, which no namespace holds, listed and read as objects
- * (`templateList`, `templateObject`), and each one's documents — its workflows, agents and skills — served in the Schemas a namespace
- * serves them in.
+ * (`templateList`, `templateObject`), and each one's documents — its workflows, agents, skills and programs — served in the Schemas a
+ * namespace serves them in.
  *
  * A template's documents are its render with its parameters' defaults (`templateTree`, written once per digest), read as a factory's tree
  * is read: the request placed in a factory of the template's wiring whose tree is the render (`renderedIn`), then the definitions' own
@@ -12,9 +12,12 @@
  */
 import {
   agentTable,
+  programTable,
   skillTable,
   templateList,
   templateObject,
+  templateProgram,
+  templatePrograms,
   templateTable,
   templateTree,
   workflowTable,
@@ -115,5 +118,12 @@ export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
         const one = servedNamed(await treeSkillsHeld(at, 'builtin'), doc, undefined, listPath(name, 'skills'));
         return theOne(await skillObjectsOf(at, [one]), doc);
       }),
-    ),
+    )
+    .handle('programs', ({ params: { name }, query }) =>
+      listOrTable(
+        answeredWrite((s) => s.inRequest(templatePrograms(name, queryOf(query)))),
+        programTable,
+      ),
+    )
+    .handle('program', ({ params: { name, doc } }) => answeredWrite((s) => s.inRequest(templateProgram(name, doc)))),
 );

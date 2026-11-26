@@ -63,6 +63,7 @@ import {
   type VolumeSwitchesWrite,
   Hire,
   HireList,
+  ProgramList,
   LibraryAdd,
   LibraryAddList,
   type LabelEdit,
@@ -746,6 +747,15 @@ export const schedules = {
       (c) => c.schedules.delete({ params: { namespace, name } }),
       write(Schedule, "The schedule may be removed: read the factory's schedules again before removing it again."),
     ),
+};
+
+/** A factory's programs: the long-lived commands its template keeps running, each with where its task runs now. */
+export const programs = {
+  /** Every program of the factory `namespace`, every page. */
+  list: (namespace: string) =>
+    everyPage((asked) =>
+      call((c) => c.programs.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(ProgramList)),
+    ).then((l) => [...l.items]),
 };
 
 /** What a trigger's write may have done, and what to read before sending it again. */

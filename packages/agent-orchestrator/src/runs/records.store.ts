@@ -31,6 +31,7 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { routeAsk } from '../route/index.ts';
+import { conditionAsk, personConditions } from '../condition/condition.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { paused } from '../record/files.store.ts';
 import {
@@ -582,6 +583,24 @@ function askMethods(open: Opened, held: Held) {
           ),
         ),
       ),
+    condition: (id, written) =>
+      Effect.flatMap(open, (ks) => {
+        const name = conditionAsk(written.step, written.try, written.name);
+        const key = askKeyOf(id, name);
+        return racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              const there = yield* tx.get(key);
+              const before = there === undefined ? undefined : personConditions([name], () => heldText(there.value))[0];
+              const kept = before !== undefined && before.status === written.status ? before.transitionedAt : written.at;
+              const whole = { ...written, transitionedAt: kept };
+              const value = JSON.stringify(whole);
+              yield* tx.write(key, there === undefined ? create(value) : overwrite(value));
+              return whole;
+            }),
+          ),
+        );
+      }),
     route: (id, step, n, route) =>
       Effect.flatMap(open, (ks) => {
         const key = askKeyOf(id, routeAsk(step, n));

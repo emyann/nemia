@@ -45,6 +45,8 @@ import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { readRun, type RunRead } from '../tick/told.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
+import type { ConditionWriter } from '../program/program.ts';
+import { writersOfRuns } from '../program/program.verb.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { readPause } from '../pause/pause.store.ts';
@@ -90,6 +92,8 @@ export type ListReadingHow = {
    * is said.
    */
   releases?: string;
+  /** Who writes each condition in the run's factory (`ListingInput`'s `writerOf`); left out, the row says no more than that it runs. */
+  writerOf?: ((condition: string) => ConditionWriter) | undefined;
 };
 
 /**
@@ -161,6 +165,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
     admissionWaitOf: admissionWaitOf(views),
     deniedOf: deniedOf(views),
     ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
+    writerOf: how.writerOf,
     parkedOf: (taskId) => parkedOf(views.get(taskId)),
     memoryOf: (taskId) => killedMemoryOf(views.get(taskId)),
     holds: holdsOf(run, parent),
@@ -186,9 +191,22 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
  * person reading the list wants the detail. Where the run's result stands against the base branch is what says a finished run is one
  * nobody has decided; one no pass read is said unread.
  */
-export const list = Effect.fn('list')(function* (e: Engine, run: Run, slot?: RunSlot, standing?: PassStanding, releases?: string) {
+export const list = Effect.fn('list')(function* (
+  e: Engine,
+  run: Run,
+  slot?: RunSlot,
+  standing?: PassStanding,
+  releases?: string,
+  writerOf?: (condition: string) => ConditionWriter,
+) {
   const read = standing ?? (yield* standingSnapshot());
-  return yield* listReading(e, run, { slot, git: standingReader(read), checkout: read, ...(releases === undefined ? {} : { releases }) });
+  return yield* listReading(e, run, {
+    slot,
+    git: standingReader(read),
+    checkout: read,
+    ...(releases === undefined ? {} : { releases }),
+    writerOf,
+  });
 });
 
 /**
@@ -201,8 +219,9 @@ const readOrUnjudged = Effect.fnUntraced(function* (
   slot: RunSlot | undefined,
   standing: PassStanding,
   releases: string | undefined,
+  writerOf: ((condition: string) => ConditionWriter) | undefined,
 ) {
-  const exit = yield* Effect.exit(list(e, run, slot, standing, releases));
+  const exit = yield* Effect.exit(list(e, run, slot, standing, releases, writerOf));
   if (Exit.isSuccess(exit)) return exit.value;
   const unjudged = yield* unjudgedOf(e, run, Cause.squash(exit.cause), 'nemia ls');
   return unjudged ?? (yield* Effect.failCause(exit.cause));
@@ -232,11 +251,16 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   const git = standingReader(standing);
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const among = yield* stepsAmong(runs);
+  const writers = yield* writersOfRuns(
+    e,
+    home,
+    runs.map((run) => ({ run, steps: among.get(run.id) ?? [] })),
+  );
   if (runs.length) {
     const viewed = viewedOnce(e);
     const held = yield* runSlots(viewed, store, yield* StoreConfig, passParents(git));
     for (const run of runs) {
-      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing, releases);
+      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing, releases, writers.get(run.id));
       const steps = among.get(run.id) ?? [];
       listed.push({ run, listed: read, result: resultBranches(run, steps) });
       reads.push({ run, read, steps, staged: () => mergeStaged(run, steps, memo) });

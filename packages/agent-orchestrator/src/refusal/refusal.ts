@@ -29,9 +29,13 @@ export class Invalid extends TaggedError('Invalid')<{ readonly message: string }
 /**
  * Who asks may not do what it asks of a proposal or a delegation: a session proposing in another factory, an agent approving what the
  * machinery does not let it (`proposalApproval`'s reason), an agent declining or writing a delegation, which are the person's alone
- * (`person-only`). Its `reason` is the one `objects`' `Forbidden` answers with.
+ * (`person-only`), or a step's own session writing a condition its step waits on (`own-step`). Its `reason` is the one `objects`'
+ * `Forbidden` answers with.
  */
-export class Forbidden extends TaggedError('Forbidden')<{ readonly message: string; readonly reason: ProposalRefusal }> {
+export class Forbidden extends TaggedError('Forbidden')<{
+  readonly message: string;
+  readonly reason: ProposalRefusal | 'own-step';
+}> {
   readonly exitCode = 2;
 }
 

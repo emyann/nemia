@@ -102,6 +102,7 @@ export const Factory = Schema.Struct({
   workflowRepos: Schema.optional(Schema.Record(WorkflowName.OnRead, Schema.String)),
   triggers: Schema.optional(Schema.Record(Schema.String, CardTrigger)),
   labelValues: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+  programs: Schema.optional(Schema.Record(Schema.String, Schema.Struct({ run: Schema.String, writes: Schema.Array(Schema.String) }))),
   radius: Schema.optional(
     Schema.Struct({
       agentFacing: Schema.Array(Schema.String),

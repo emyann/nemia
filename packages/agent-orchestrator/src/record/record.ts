@@ -375,8 +375,28 @@ export type RouteBy = 'table' | 'script' | 'judge' | 'person';
 /** The route a condition answered on a try, copied onto its record once (`StepRecord.route`). */
 type RouteRecord = { route: string; try: number; by: RouteBy };
 
+/**
+ * A condition as written for a try of a step (`nemia condition`, or a program of the template): what the writer gave (`status`,
+ * `message`), when (`at`), when the status last changed (`transitionedAt`), and who wrote it (`by`, an agent's name, or null for a person).
+ */
+export type ConditionWritten = {
+  readonly step: string;
+  readonly name: string;
+  readonly try: number;
+  readonly status: 'True' | 'False' | 'Unknown';
+  readonly message: string;
+  readonly at: string;
+  readonly transitionedAt: string;
+  readonly by: string | null;
+};
+
 export type StepRecord = {
   taskId: string | null;
+  /**
+   * The conditions written for the try the step is on, by name, composed onto the record as it is read from the run's asks and never
+   * written into it (`withConditions`). Absent where nothing was written for this try.
+   */
+  conditions?: Readonly<Record<string, ConditionWritten>>;
   /** The route a condition answered on the try it is on, written once per try by the tick. Absent on any other step. */
   route?: RouteRecord;
   /** The card a workflow node filed (`<run>-<node>`), and when: once, never taken back. Absent on any other step. */
@@ -738,6 +758,12 @@ export type RunStore = {
      * pass. Answers where a person finds it.
      */
     readonly route: (id: string, step: string, n: number, route: { route: string; at: string }) => string;
+    /**
+     * Write the condition `name` of the step `step` for its try `n` (`nemia condition`, a program), whole over the one there: never
+     * spent, read on every pass, laid on the step's record while `n` is the try it is on. Answers it as kept, with when its status last
+     * changed.
+     */
+    readonly condition: (id: string, written: Omit<ConditionWritten, 'transitionedAt'>) => ConditionWritten;
   };
   readonly holds: {
     /**

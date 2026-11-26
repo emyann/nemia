@@ -21,6 +21,7 @@ import {
   ASSIGN,
   CANCEL,
   CONCLUDED,
+  CONDITION,
   dropInformed,
   HOLD,
   Informer,
@@ -41,7 +42,18 @@ import {
   SHOW,
   verifiesRest,
 } from 'agent-orchestrator';
-import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type RunRetry, type RunSay, Unjudged, WriteFailed } from 'objects';
+import {
+  Api,
+  Missing,
+  type RunApprove,
+  type RunConditionWrite,
+  type RunPrune,
+  type RunRefresh,
+  type RunRetry,
+  type RunSay,
+  Unjudged,
+  WriteFailed,
+} from 'objects';
 import type { Served } from '../layer.ts';
 import { workflowPageOf } from '../step/step.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
@@ -288,6 +300,28 @@ const said = (at: At & { readonly step: string }, payload: RunSay) =>
     return done.from === undefined ? said : { ...said, from: done.from, words: done.words };
   });
 
+/**
+ * The condition `at.condition` of the step `at.step` written (`nemia condition`), by the caller the request is (`Served.caller`, by its
+ * session token), for the try the body names: refused to the step's own session, for a condition the step waits on no check of and for a
+ * try the step is not on. Answers the condition as it is kept, read back as the run object serves it.
+ */
+const written = (at: At & { readonly step: string; readonly condition: string }, payload: RunConditionWrite) =>
+  acted(at, async (s) => {
+    const done = await s.inRequest(
+      CONDITION.handler({ runId: at.name, step: at.step, condition: at.condition, ...payload, caller: s.caller }),
+    );
+    return {
+      condition: {
+        name: done.name,
+        try: done.try,
+        status: done.status,
+        message: done.message,
+        writtenAt: done.at,
+        lastTransitionTime: done.transitionedAt,
+      },
+    };
+  });
+
 export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => page(undefined, query))
@@ -322,6 +356,7 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     .handle('route', ({ params, payload: { route } }) =>
       acted(params, (s) => s.inRequest(ROUTE.handler({ runId: params.name, step: params.step, route }))),
     )
+    .handle('condition', ({ params, payload }) => written(params, payload))
     .handle('say', ({ params, payload }) => said(params, payload))
     .handle('show', ({ params: { name } }) => one(name))
     .handle('lines', ({ params: { name } }) =>

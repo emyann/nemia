@@ -24,7 +24,7 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
-import { endsOnBase, type CheckSpec, type StepSpec } from '../step/step.ts';
+import { checkLine, endsOnBase, type CheckSpec, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/index.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
@@ -335,7 +335,8 @@ export const checksContract = (checks: readonly CheckSpec[]) =>
     'have passed, checks that wait on nothing between them run side by side, and none starts after one refuses.',
     '',
     ...checks.map(
-      (c) => `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(c.run)}`,
+      (c) =>
+        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${c.condition === undefined ? codeSpan(c.run) : `then waits on the condition ${codeSpan(c.condition)}, which its writer writes and never this session`}`,
     ),
     '',
     'Nothing that waits on this step starts until every one has passed. Do not weaken them to pass them: the commands come from the run, not',
@@ -379,14 +380,14 @@ export const landingContract = (checks: readonly CheckSpec[], words?: LandingWor
 /** The checks an ending's session is told the run executes once it signs off: its one check's line, or each of several by its name. */
 const landingChecksTold = (checks: readonly CheckSpec[]) => {
   const only = checks.length === 1 ? checks[0] : undefined;
-  if (only) return [`Once you sign off, the run executes ${codeSpan(only.run)} in this checkout, as it executes any step's check.`];
+  if (only) return [`Once you sign off, the run executes ${codeSpan(checkLine(only))} in this checkout, as it executes any step's check.`];
   const free = checks.filter((c) => c.usesCheckout === false);
   return [
     "Once you sign off, the run executes these checks in this checkout, as it executes any step's checks, each once those it waits on passed:",
     '',
     ...checks.map(
       (c) =>
-        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(c.run)}${c.usesCheckout === false ? ' (uses no checkout)' : ''}`,
+        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(checkLine(c))}${c.usesCheckout === false ? ' (uses no checkout)' : ''}`,
     ),
     '',
     ...(free.length

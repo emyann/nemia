@@ -58,6 +58,7 @@ import {
   HiresGroup,
   LibraryAddsGroup,
   McpServersGroup,
+  ProgramsGroup,
   SchedulesGroup,
   TriggersGroup,
   VolumesGroup,
@@ -73,6 +74,7 @@ import {
   WorkflowObject,
   WorkflowsGroup,
 } from './definition-api.ts';
+import { Program, ProgramList } from './program.ts';
 export { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing, Unauthorized, Unjudged, WriteFailed };
 
 export { KINDS, type Kind };
@@ -147,6 +149,20 @@ class TemplatesGroup extends HttpApiGroup.make('templates').add(
     success: SkillObject,
     error: definitionErrors,
   }).annotate(OpenApi.Description, "Reads one skill of a template, rendered with its parameters' defaults. Answers the Skill."),
+  HttpApiEndpoint.get('programs', '/api/templates/:name/programs', {
+    params: templateParams,
+    query: listQuery,
+    success: [ProgramList, Table],
+    error: definitionErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's programs, the long-lived commands the daemon keeps running for each factory made from it, a page at a time. Answers a ProgramList, or the same page as a Table where the request asks for one.",
+  ),
+  HttpApiEndpoint.get('program', '/api/templates/:name/programs/:doc', {
+    params: documentParams,
+    success: Program,
+    error: definitionErrors,
+  }).annotate(OpenApi.Description, 'Reads one program of a template: the line it runs and the conditions it writes. Answers the Program.'),
 ) {}
 
 /**
@@ -244,6 +260,7 @@ export const RESOURCE_PLURALS = {
   Agent: AgentsGroup.identifier,
   Skill: SkillsGroup.identifier,
   Template: TemplatesGroup.identifier,
+  Program: ProgramsGroup.identifier,
   Subscription: SubscriptionsGroup.identifier,
   Event: EventsGroup.identifier,
   Proposal: ProposalsGroup.identifier,
@@ -267,6 +284,7 @@ export const Api = HttpApi.make('nemia')
   .add(AgentsGroup)
   .add(SkillsGroup)
   .add(TemplatesGroup)
+  .add(ProgramsGroup)
   .add(SubscriptionsGroup)
   .add(EventsGroup)
   .add(ProposalsGroup)

@@ -95,7 +95,7 @@ const checksTold = (step: StepSpec, run: Run, words: LandingWords | undefined) =
   const plan = stepChecks(step);
   if (plan.length && landsOnCheck(step, run)) return [landingContract(plan, words)];
   const only = plan.length === 1 ? plan[0] : undefined;
-  if (only) return [checkContract(only.run)];
+  if (only?.condition === undefined && only) return [checkContract(only.run)];
   return plan.length ? [checksContract(plan)] : [];
 };
 

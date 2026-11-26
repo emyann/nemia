@@ -65,6 +65,12 @@ sign-in (`codexSignIn`), which the spawn's refusal shares. The api
 serves them and lets three routes through with no token, each named by its method and path (`POST /api/pairings`, `POST
 /api/pairings/:id/claim`, `POST /api/links/claim`; `needOf`), each judging its own secret; it refuses a public or wildcard bind at its start unless acknowledged (`NEMIA_BIND_PUBLIC=1`), as `nemia service install` does.
 
+**A condition a step waits on, and the programs that write it, are the orchestrator's** (`src/condition/`, `src/program/`): what a
+written condition means for a check is decided from the run's record alone (`conditionStanding`), and kept as a file of the run's asks
+laid on the record as a person's route is; a decided one is filed as a check's task. A template's programs are kept running by a
+controller beside the keeper (`programs()`), each as a `command` task the runtime restarts (`restartPolicy: 'Always'`: how often and
+how soon are the runtime's, which task runs is the controller's).
+
 **Each run's judgement is the orchestrator's, held in memory by the daemon that serves it — the informer** (`Informer`,
 `src/rest/informer.verb.ts`): a per-daemon cache of each run's judgement, filled by the tick's pass as it judges each run it reads, and
 read by the api's run object, its list and its sub-resources (tries, a try, a closeout, told), so a request and the tick never judge one

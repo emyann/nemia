@@ -26,7 +26,7 @@ import {
   checkFailureAction,
   decidingCheckTask,
 } from '../check/index.ts';
-import { stepChecks, type StepSpec } from '../step/step.ts';
+import { checkLine, stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { isRepositoryRun, checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
@@ -490,7 +490,7 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
     const tasks = checkTasksOf(check);
     const [name, taskId] = tasks.find(([, id]) => phaseOf(id) === 'failed') ??
       tasks.find(([, id]) => phaseOf(id) === 'stopped') ?? [first.name, check.taskId];
-    const command = plan.find((c) => c.name === name)?.run ?? first.run;
+    const command = checkLine(plan.find((c) => c.name === name) ?? first);
     reports.set(step.name, { passed: checksPhase(check, phaseOf) === 'succeeded', ...(yield* refusalRead(command, taskId)) });
   }
   return reports;
@@ -585,7 +585,7 @@ export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, s
     for (const c of plan) {
       const taskId = tasks[c.name];
       if (!taskId || (plan.length > 1 && !(yield* asked('view', (yield* EngineService).view(taskId))).state.brief)) continue;
-      const handed = yield* checkHandedRead(name, c.run, taskId);
+      const handed = yield* checkHandedRead(name, checkLine(c), taskId);
       out.push(plan.length > 1 ? { ...handed, check: c.name } : handed);
     }
   }

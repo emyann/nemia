@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Context, Effect, Result, Schema } from 'effect';
-import { API_VERSION, type Template, TemplateSpec, type TemplateStatus } from 'objects';
+import { API_VERSION, type Program, type Template, TemplateSpec, type TemplateStatus } from 'objects';
 import { digestOf, entriesIn, stageFolder, treeWiringOf, type Entry } from '../../factory/applied/applied.store.ts';
 import { renderedAt } from '../../factory/applied/applied.verb.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
@@ -34,6 +34,7 @@ type TemplateTreeRendered = {
   dir: string;
   workflows: string[];
   hires: Record<string, string>;
+  programs: Readonly<Record<string, { readonly run: string; readonly writes: readonly string[] }>>;
 };
 
 /** The user the folder of renders belongs to, by uid: this process's; none where the platform has no uid, and nothing is checked. */
@@ -217,5 +218,47 @@ export const templateTree = Effect.fn('templateTree')(function* (name: string) {
     dir,
     workflows: [...wiring.wiring.workflows],
     hires: { ...wiring.wiring.hires },
+    programs: { ...wiring.wiring.programs },
   } satisfies TemplateTreeRendered;
+});
+
+/** The programs of a render, as objects: its digest the version of each. */
+const programObjectsOf = (tree: Pick<TemplateTreeRendered, 'source' | 'digest' | 'programs'>) =>
+  Object.entries(tree.programs)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([name, spec]) =>
+        ({
+          apiVersion: API_VERSION,
+          kind: 'Program',
+          metadata: { name, creationTimestamp: bornAt(tree.source), resourceVersion: tree.digest },
+          spec: { run: spec.run, writes: [...spec.writes] },
+        }) satisfies Program,
+    );
+
+/**
+ * A page of the programs the builtin template `name` declares (`programs/<name>/program.yaml`), as a `ProgramList`, sorted by name; what
+ * `templateTree` refuses, it refuses.
+ * @param name The builtin template's name.
+ * @param query The list's query: its limit, its continue token and its label selectors.
+ */
+export const templatePrograms = Effect.fn('templatePrograms')(function* (name: string, query: ObjectQuery) {
+  return yield* objectsListed('Program', programObjectsOf(yield* templateTree(name)), query, 'program');
+});
+
+/**
+ * The program `program` of the builtin template `name`, as a `Program`; `Missing` where the template declares none of that name, naming
+ * the list.
+ * @param name The builtin template's name.
+ * @param program The program's name.
+ */
+export const templateProgram = Effect.fn('templateProgram')(function* (name: string, program: string) {
+  const found = programObjectsOf(yield* templateTree(name)).find((one) => one.metadata.name === program);
+  if (found === undefined)
+    return yield* Effect.fail(
+      new Missing({
+        message: `The template ${name} declares no program named ${program}: GET /api/templates/${name}/programs lists them.`,
+      }),
+    );
+  return found;
 });

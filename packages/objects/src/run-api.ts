@@ -6,7 +6,7 @@
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
-import { BadRequest, Conflict, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
+import { BadRequest, Conflict, Forbidden, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
 import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
@@ -17,6 +17,8 @@ import {
   RunApproved,
   RunAsked,
   RunCancelled,
+  RunConditionWrite,
+  RunConditionWritten,
   RunAssign,
   RunAssigned,
   RunHeld,
@@ -98,6 +100,12 @@ const runParams = { ...namespaceParams, name: Schema.String.annotate({ descripti
 
 /** A step of a run, by the run's namespace and name and the step's. */
 const runStepParams = { ...runParams, step: Schema.String.annotate({ description: "The step's name." }) };
+
+/** A condition of a step, by its name. */
+const runConditionParams = {
+  ...runStepParams,
+  condition: Schema.String.annotate({ description: "The condition's name, one a check of the step waits on in its condition:." }),
+};
 
 /** An action's answer, taken and not yet done: a 202. */
 const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annotate({ httpApiStatus: 202 }));
@@ -242,6 +250,15 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }).annotate(
     OpenApi.Description,
     "Gives a condition step's route by hand, for its try that stands. Answers RunRouted: the condition, its try, the route and its file; the next pass files the steps whose when: names the route.",
+  ),
+  HttpApiEndpoint.put('condition', '/api/namespaces/:namespace/runs/:name/steps/:step/conditions/:condition', {
+    params: runConditionParams,
+    payload: RunConditionWrite,
+    success: RunConditionWritten,
+    error: [...runActionErrors, Forbidden],
+  }).annotate(
+    OpenApi.Description,
+    "Writes a condition a check of the step waits on, for the try the step is on: True lets the step go on, False refuses it as a failed check is, Unknown leaves it waiting. Refused to the step's own session (403), for a condition the step does not wait on (422) and for another try (409). Answers RunConditionWritten: the condition as it stands.",
   ),
   HttpApiEndpoint.post('say', '/api/namespaces/:namespace/runs/:name/steps/:step/say', {
     params: runStepParams,

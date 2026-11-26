@@ -305,6 +305,19 @@ export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
 /** One of `FACTORY_CONDITION_STATUSES`. */
 export type ConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
 
+/**
+ * The status a condition is written with: Kubernetes' two a factory's conditions take, and `Unknown`, the writer's word for "not decided
+ * yet", which leaves what waits on it waiting.
+ */
+export const WRITTEN_CONDITION_STATUSES = [...FACTORY_CONDITION_STATUSES, 'Unknown'] as const;
+
+/**
+ * Why a condition's write is refused: the writer is a session of the step it writes for (`own-step`, a 403: a step never vouches for its
+ * own work), the step waits on no condition of that name (`undeclared`, a 422), or the write speaks of a try the step is not on
+ * (`other-try`, a 409).
+ */
+export const CONDITION_WRITE_REFUSALS = ['own-step', 'undeclared', 'other-try'] as const;
+
 /** What an MCP server's header value is served as: never a value a header is sent with. Sent back, it keeps the stored value. */
 export const HEADER_MASK = '********';
 
@@ -729,6 +742,7 @@ export const KINDS = [
   'Agent',
   'Skill',
   'Template',
+  'Program',
   'Subscription',
   'Event',
   'Proposal',
@@ -1039,3 +1053,12 @@ export type TicketState = (typeof TICKET_STATES)[number];
  * stream, a file's bytes.
  */
 export const READ_SHAPES = ['page', 'cursor', 'part', 'one', 'stream', 'bytes'] as const;
+
+/**
+ * Where a program's task stands: not filed yet, running (its process is up or waiting out its back-off), or down (the runtime settled
+ * it).
+ */
+export const PROGRAM_PHASES = ['Pending', 'Running', 'Down'] as const;
+
+/** One of `PROGRAM_PHASES`. */
+export type ProgramPhase = (typeof PROGRAM_PHASES)[number];

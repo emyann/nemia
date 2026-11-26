@@ -6,6 +6,8 @@
 import {
   type Args,
   CANCEL_WORDS,
+  DEFAULT_NAMESPACE,
+  type RunConditionWritten,
   type Event,
   type FeedWait,
   HOLD_WORDS,
@@ -108,6 +110,39 @@ export async function route(args: Args) {
     c.runs.route({ params: { namespace, name, step }, payload: { route: textArg(args, 'route') ?? '' } }),
   );
   said(routeLines(routed, name));
+  return 0;
+}
+
+/**
+ * What `nemia condition` prints of the condition written.
+ * @param runId The run's id.
+ * @param step The step's name.
+ */
+const conditionLines = ({ condition: c }: RunConditionWritten, runId: string, step: string) => [
+  `${runId}  ${step} ${c.name}: ${c.status ?? 'not written'} for try ${c.try}${c.message ? ` — ${c.message}` : ''}`,
+  `   the next tick ${c.status === 'True' ? `goes on past ${step}'s check` : c.status === 'False' ? `refuses ${step}'s check, as a failed check is` : `leaves ${step} waiting`}`,
+];
+
+/**
+ * `nemia condition <runId> <step> <name> --status …`: the condition written for the try the step is on, or the one `--try` names (the api
+ * refuses any other).
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function condition(args: Args) {
+  const name = runOf(args);
+  const step = textArg(args, 'step') ?? '';
+  const run = await asked('condition', (c) => c.runs.show({ params: { name } }));
+  const namespace = run.metadata.namespace ?? DEFAULT_NAMESPACE;
+  const given = textArg(args, 'try');
+  const tried = given === undefined ? (run.status.steps.find((s) => s.name === step)?.current?.try ?? 1) : Number(given);
+  const status = textArg(args, 'status') === 'True' ? 'True' : textArg(args, 'status') === 'False' ? 'False' : 'Unknown';
+  const written = await asked('condition', (c) =>
+    c.runs.condition({
+      params: { namespace, name, step, condition: textArg(args, 'condition') ?? '' },
+      payload: { status, try: tried, message: textArg(args, 'message') ?? '' },
+    }),
+  );
+  said(conditionLines(written, name, step));
   return 0;
 }
 

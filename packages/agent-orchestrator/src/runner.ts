@@ -455,7 +455,7 @@ export { isWatchedKind, type KindChange, type WatchedKind } from './list-watch/i
 export { keyspaceHead, kindReplay, kindRevisions } from './list-watch/kind-watch.store.ts';
 export { cardHeld } from './cards/cards.store.ts';
 export { definitionRevisionNow, definitionsRefreshed, sweepBegun } from './definition-index/definition-index.store.ts';
-export { runWatchVersion } from './runlist/runlist.ts';
+export { runHeld } from './runs/run-held.store.ts';
 export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';

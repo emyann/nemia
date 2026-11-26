@@ -6,6 +6,7 @@
  * belongs to the first part that covers it, in that order, so two sessions side by side count once, and a session at work while another
  * step waits at its gate is a session at work. `TimelineTotal` sums durations instead, and a fan-out's sum is more than its wall.
  */
+import type { ClockPart } from '../../contracts/run-clock.contract.ts';
 import { runTasks, type Run } from '../record/record.ts';
 import { hasGate, sessionTasks } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
@@ -103,8 +104,12 @@ const slotWaits = (run: Run, tl: Timeline) => {
   return [...tasks, ...(tl.slot.filedAt ? spanOf(tl.slot.from, tl.slot.filedAt) : [])];
 };
 
+/** Whether an interval of `spans` is still open. */
+const anyOpen = (spans: readonly Ran[]) => spans.some((s) => s.to === null);
+
 /**
- * A run's clock (`RunClock`) from its creation to `until`, never before it.
+ * A run's clock (`RunClock`) from its creation to `until`, never before it, with the one part of it that grows at that instant: the first
+ * of the sessions, the checks, the person's turn and the slot whose time is open, else the rest.
  *
  * @param run The run whose clock is read.
  * @param views The engine's view of every task of the run (`runTasks`), each saying when it was filed (`State.filedAt`); a task it does
@@ -113,7 +118,7 @@ const slotWaits = (run: Run, tl: Timeline) => {
  * @param waiting The steps that wait on a person now (`waitingOnYou`), each an open wait.
  * @param until The instant the clock is read at, in epoch milliseconds.
  */
-export function clockOf(
+export function clockReadingOf(
   run: Run,
   views: ReadonlyMap<string, TaskClock>,
   steps: readonly StepSpec[],
@@ -125,16 +130,29 @@ export function clockOf(
   const tl = timeline(run, views, steps);
   const sessionIds = new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)));
   const checkIds = [...new Set(runTasks(run))].filter((id) => !sessionIds.has(id));
-  const sessions = clipped(ranOf([...sessionIds], views), wall);
-  const checks = [...sessions, ...clipped(ranOf(checkIds, views), wall)];
-  const person = [...checks, ...clipped([...gateWaits(run, tl, steps), ...answerWaits(tl), ...openWaits(tl, steps, waiting)], wall)];
-  const slot = [...person, ...clipped(slotWaits(run, tl), wall)];
+  const sessionRan = ranOf([...sessionIds], views);
+  const checkRan = ranOf(checkIds, views);
+  const personWaits = [...gateWaits(run, tl, steps), ...answerWaits(tl), ...openWaits(tl, steps, waiting)];
+  const slotSpans = slotWaits(run, tl);
+  const sessions = clipped(sessionRan, wall);
+  const checks = [...sessions, ...clipped(checkRan, wall)];
+  const person = [...checks, ...clipped(personWaits, wall)];
+  const slot = [...person, ...clipped(slotSpans, wall)];
   const sessionsMs = unionMs(sessions);
   const checksReach = unionMs(checks);
   const personReach = unionMs(person);
   const slotReach = unionMs(slot);
   const wallMs = wall.to - wall.from;
-  return {
+  const growing: ClockPart = anyOpen(sessionRan)
+    ? 'sessionsMs'
+    : anyOpen(checkRan)
+      ? 'checksMs'
+      : anyOpen(personWaits)
+        ? 'personMs'
+        : anyOpen(slotSpans)
+          ? 'slotMs'
+          : 'restMs';
+  const clock: RunClock = {
     wallMs,
     sessionsMs,
     checksMs: checksReach - sessionsMs,
@@ -142,7 +160,25 @@ export function clockOf(
     slotMs: slotReach - personReach,
     restMs: wallMs - slotReach,
   };
+  return { clock, growing };
 }
+
+/**
+ * A run's clock (`RunClock`) from its creation to `until`, never before it.
+ *
+ * @param run The run whose clock is read.
+ * @param views The engine's view of every task of the run, as `clockReadingOf` takes them.
+ * @param steps The workflow the run is judged by.
+ * @param waiting The steps that wait on a person now (`waitingOnYou`), each an open wait.
+ * @param until The instant the clock is read at, in epoch milliseconds.
+ */
+export const clockOf = (
+  run: Run,
+  views: ReadonlyMap<string, TaskClock>,
+  steps: readonly StepSpec[],
+  waiting: readonly string[],
+  until: number,
+) => clockReadingOf(run, views, steps, waiting, until).clock;
 
 /**
  * When a run's present wait on a person began, as an ISO instant: the earliest start among the waits open on one — each step of

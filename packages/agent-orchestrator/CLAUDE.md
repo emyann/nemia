@@ -248,13 +248,17 @@ of its kind, never from an older file that looks alike:
   run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same
   inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too. Beside a run's
   judgement it keeps the RunList's object built on it (`keepObject`), served exactly while that judgement is (`keptObject`); the
-  object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every request
+  object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every pass
   (`diskPartsOf`, `src/object/run.verb.ts`), each step's artifacts folder by the run's own read alone: a listed object reads none.
-  A new input of a run's object goes into what the informer checks, or into those parts.
+  A new input of a run's object goes into what the informer checks, or into those parts. **The RunList is served from records**: the
+  pass writes each run's observed status to `/registry/runstatus/<id>` (`runStatusesObserved`, `src/run-status/`) only where it differs
+  from the record, the times measured to the read (a going run's `wallMs` and `clock`) left out of what is compared and anchored in the
+  record to be laid to the read's instant (`clockNow`, proved by `contracts/run-clock.contract.ts`); the disk parts are part of that
+  status. A run with no record (before its first pass, `--no-tick`) is judged on demand and writes nothing.
 - **A served kind's `resourceVersion` is the highest revision of the records it is made of** (`WATCHED_KINDS`, `src/list-watch/kind-watch.ts`: each
   prefix of the keyspace a kind reads, and the object a key under it names): a new input of a kind's object that is a record goes into its
   table, or the object changes without a revision and a watch from one never sends it. What the informer judges from other records (a card's
-  `status.state` and `runs`) moves no revision yet. A definition stays a file and is indexed (`/registry/definitions/<scope>/<kind>/<name>`,
+  `status.state` and `runs`) moves no revision yet. A Run is at the highest of its record, markers, asks and status record. A definition stays a file and is indexed (`/registry/definitions/<scope>/<kind>/<name>`,
   `src/definition-index/`, swept by the daemon every 2 s through `recordDue`): a new place definitions are read from goes into
   `definitionsFound`, and a write of one reads the index again first (`definitionRevisionNow`). The api, not the orchestrator's objects,
   stamps the revision (`apps/api/src/objects/revisioned.ts`); a verb's own digest is the content's, which a writer's precondition still

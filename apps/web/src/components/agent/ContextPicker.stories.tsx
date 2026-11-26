@@ -9,7 +9,7 @@ import { nothingWaits, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 /** The run in flight a story picks: lgll, being checked. */
 const LGLL = TARGET_RUNS.lgll.metadata.name;
 
-/** What lgll would hand a run that reads it: it has not landed, so its preview is badged. */
+/** What lgll would hand a run that reads it: it has not succeeded, so its preview is badged. */
 const HANDS: Concluded = {
   run: LGLL,
   succeeded: false,
@@ -45,7 +45,7 @@ export const NothingPicked: Story = {
 };
 
 /**
- * lgll picked: its box ticked, and what it would hand drawn under the list, badged not landed. It warns on axe, its test to come: the
+ * lgll picked: its box ticked, and what it would hand drawn under the list, badged not succeeded. It warns on axe, its test to come: the
  * preview draws the section's `##` as an `h6` under its own `h4` (`heading-order`), on the page as here; that is the preview's outline
  * to mend.
  */

@@ -7,7 +7,7 @@ import { HoldLine } from './RunHold';
 const BARE = {
   at: '2026-11-15T17:30:00.000Z',
   runs: [{ run: 'cli-the-api-only-consumer-1sw7', missing: false, cancelledAt: null, failed: false, released: false }],
-  word: 'held until cli-the-api-only-consumer-1sw7 lands',
+  word: 'held until cli-the-api-only-consumer-1sw7 succeeds',
   advice: '',
   waitingOnYou: false,
 };

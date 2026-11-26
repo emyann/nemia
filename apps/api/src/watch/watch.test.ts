@@ -3,7 +3,8 @@
  * a card filed, relabelled, tried and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED naming the card and the revision that
  * removed it; a watch from a revision (a list's, an event's) sent the objects changed after it and no state, refused 410 where
  * compaction removed the revision, 400 past the head or for no version; a labelSelector kept on every read, a card relabelled out of it
- * DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
+ * DELETED; the runs of a store holding one watched, plain and namespaced, from a revision as any other kind (its status record moved
+ * sends the run once, MODIFIED); a fieldSelector
  * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every
  * GET list of the `Api` watchable; the watch's query refused before any stream; the feed's reader let go when the request is aborted; and
  * the Event list's watch resumed from a `resourceVersion` (a page's, or the last event's), sent no state, its refusals 400, 410 and 422.
@@ -22,7 +23,16 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
-import { cardKey, compactedAt, definitionsIndexed, dropRecord, plantCard, plantRecord, runKey } from 'agent-orchestrator/testing';
+import {
+  cardKey,
+  compactedAt,
+  definitionsIndexed,
+  dropRecord,
+  plantCard,
+  plantRecord,
+  runKey,
+  runStatusKey,
+} from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -378,6 +388,48 @@ test('a watch of the runs by state sends no MODIFIED for the clock alone: a run 
   }
 });
 
+test('a step finishing moves the run: a watch of the runs from before it is sent the run once, MODIFIED, at the revision its status record is at', async (t) => {
+  const id = 'r-watch-status';
+  gatedRun(t, id);
+  t.onTestFinished(() => dropRecord(root, runStatusKey(id)));
+  const read = async () =>
+    (await (await app.request('/api/runs')).json()) as {
+      metadata: { resourceVersion: string };
+      items: { metadata: { name: string; resourceVersion: string }; spec: object; status: object }[];
+    };
+  const item = (await read()).items.find((o) => o.metadata.name === id);
+  assert.ok(item, 'the run is listed, judged on demand where no record is');
+  const recorded = (anchor: object) => JSON.stringify({ spec: item.spec, status: { ...item.status, state: 'waiting' }, ...anchor });
+  plantRecord(root, runStatusKey(id), recorded({}));
+  const before = await read();
+  plantRecord(root, runStatusKey(id), recorded({ anchor: { at: 1, growing: 'sessionsMs' } }));
+  const after = await read();
+  const served = after.items.find((o) => o.metadata.name === id);
+  assert.equal(served?.metadata.resourceVersion, after.metadata.resourceVersion, 'the run is at the revision of its last record written');
+  assert.ok(Number(after.metadata.resourceVersion) > Number(before.metadata.resourceVersion));
+  const w = await watch(t, `/api/runs?watch=true&resourceVersion=${before.metadata.resourceVersion}`);
+  try {
+    assert.deepEqual(
+      (await w.initial()).map((e) => `${e.type} ${named(e)}`),
+      [`MODIFIED ${id}`],
+      'the run once, and no other',
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch of the runs from a revision past the head is refused 400, and one compaction removed 410, as of any watched kind', async () => {
+  const list = (await (await app.request('/api/runs')).json()) as { metadata: { resourceVersion: string } };
+  const ahead = await app.request(`/api/runs?watch=true&resourceVersion=${Number(list.metadata.resourceVersion) + 1000}`);
+  assert.equal(ahead.status, 400);
+  const T0 = 2_000_000;
+  compactedAt(root, 300_000, T0);
+  compactedAt(root, 300_000, T0 + 300_001);
+  const expired = await app.request('/api/runs?watch=true&resourceVersion=0');
+  assert.equal(expired.status, 410);
+});
+
 test('the watch refuses watch=yes, and limit or continue beside watch=true, with 400 before any stream, a Table asked with 406; an unknown namespace is the list own refusal', async () => {
   for (const query of ['watch=yes', 'watch=true&limit=2', 'watch=true&continue=YQ']) {
     const res = await app.request(`/api/cards?${query}`);
@@ -401,7 +453,7 @@ const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
 test('aborting a watch lets its feed reader go', async (t) => {
   const before = followers();
-  const w = await watch(t, '/api/runs?watch=true');
+  const w = await watch(t, '/api/events?watch=true');
   await w.initial();
   await waitFor(t, () => followers() > before, 'followers() > before');
   await w.stop();
@@ -556,11 +608,7 @@ test('a watch resumed from the resourceVersion of the last event it was sent rep
 });
 
 test('a resourceVersion asked of a list read again, or that names no byte, is refused 400 naming it; one inside a line or past the end 410; a bad selector 422', async () => {
-  for (const url of [
-    '/api/runs?watch=true&resourceVersion=5',
-    '/api/events?watch=true&resourceVersion=abc',
-    '/api/events?watch=true&resourceVersion=007',
-  ]) {
+  for (const url of ['/api/events?watch=true&resourceVersion=abc', '/api/events?watch=true&resourceVersion=007']) {
     const res = await app.request(url);
     assert.equal(res.status, 400, url);
     assert.match(((await res.json()) as { error: string }).error, /resourceVersion/, `${url} names the key`);

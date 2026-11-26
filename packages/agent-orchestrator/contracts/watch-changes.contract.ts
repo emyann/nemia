@@ -13,8 +13,7 @@ import type { WatchEventType } from 'objects';
 export type WatchChangeType = Exclude<WatchEventType, 'BOOKMARK'>;
 
 /**
- * An object of a list, by its key, unique in the list, and its version: the object as its list's route compares it, its JSON as served
- * unless the route leaves out parts measured to the read (a run's, `runWatchVersion`).
+ * An object of a list, by its key, unique in the list, and its version: the object as its list's route compares it, its JSON as served.
  */
 export type Versioned = { readonly key: string; readonly version: string };
 

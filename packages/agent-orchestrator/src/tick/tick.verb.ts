@@ -54,6 +54,7 @@ import {
 import { informedJudgements, Informer, type InformerMemo, informerRead, passStarted } from '../rest/informer.verb.ts';
 import { sameJudgement } from '../summary/judgement.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { runStatusesObserved } from '../run-status/run-status.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { passParents, reportedEngine } from '../views/views.verb.ts';
 import { inboxNow, landedThrough, startQueued, type RunLanded } from '../inbox/inbox.verb.ts';
@@ -271,6 +272,9 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *   terms, one schedule's due fire (`startDue`).
  * - where the process keeps an informer (`Informer`, the api's daemon), the pass begins its number first (`passStarted`), and once every
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
+ * - and once they are judged, each run's observed status is written to the keyspace where it differs from the record
+ *   (`runStatusesObserved`, `/registry/runstatus/<id>`), the record of a run no longer judged removed, so the runs' lists are served from
+ *   records and their revisions move exactly when a run's status does.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed, each factory's level in force, its conflicts pending and its library adds
  * missing among it, read beside
@@ -313,7 +317,12 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const landed = landedThrough(e, passParents(standingReader(standing)));
   yield* withinEffect('act', assigneesEnded(e, home, judging));
   const inbox = yield* inboxOfPass(runs, landed, judging);
-  if (informer) yield* informed(e, informer, runs, judging, verify);
+  if (informer) {
+    const judged = yield* informed(e, informer, runs, judging, verify);
+    yield* runStatusesObserved(e, informer, runs, judged.runs, Date.now()).pipe(
+      Effect.catchCause((cause) => Effect.logWarning(`the runs' observed status was not recorded on this pass: ${Cause.pretty(cause)}`)),
+    );
+  }
   yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
@@ -412,7 +421,7 @@ const informed = Effect.fnUntraced(function* (
   const read = yield* informerRead(e, informer, verify, git, sameJudgement);
   read.only(runs.map((run) => run.id));
   for (const run of runs) if (unjudged.has(run.id)) read.drop(run);
-  yield* informedJudgements(
+  return yield* informedJudgements(
     e,
     yield* StoreRoot,
     runs.filter((run) => !unjudged.has(run.id)),

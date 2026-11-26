@@ -119,9 +119,12 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   where compaction removed the revision (the daemon keeps the last 5 minutes at least), 400 past the head or for no version
   (`watchStartOf`, proved by `contracts/watch-start.contract.ts`). Where a kind's status is judged by the informer from other records
   (a card's `status.state` and `runs`, from its run), it moves without a revision until the run's observed status is a record of the
-  keyspace (the card `store: a run's observed status is a record of the keyspace`). The runs' list is that exception today: it reads its
-  list again on a feed line and on `Beats.watch` and compares a run leaving out the times measured to the read (`runWatchVersion`),
-  sends its state whole to every reconnect and answers a `resourceVersion` 400. The Event lists follow the feed (`eventsFollowed`,
+  keyspace: the runs' lists are now such a kind, each run served from its status record (`/registry/runstatus/<id>`, written by the daemon's
+  pass where it moved, its `metadata.resourceVersion` the highest revision among the run's record, markers, asks and status record), so a
+  watch of them resumes from a revision like any other; the card's own run-derived `status.state` and `runs` still move without one (the
+  card `store: a run's observed status is a record of the keyspace` made the Run's part). A run with no record yet (before its first pass,
+  or an api served `--no-tick`) is judged on demand and may change without a revision. `WATCH_RESYNC` stays for the plain lists, which are
+  read again on a feed line and on `Beats.watch`. The Event lists follow the feed (`eventsFollowed`,
   `src/feed-objects/events-watch.ts`) and resume from a byte of it (a page's `metadata.resourceVersion`, the feed's end, or the last
   event's), a byte the feed cannot be read from 410. A write of a library definition names the `resourceVersion` it was read at, and the orchestrator's writer refuses it `Conflict` where
   the definition has moved (`definitionJudged`): the api judges nothing, but a builder's schemas, written before its folder, are judged first

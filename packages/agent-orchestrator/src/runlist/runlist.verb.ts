@@ -11,7 +11,7 @@ import { stepSpend, taskSpend } from '../status/status.ts';
 import { spentOf } from '../summary/judged.verb.ts';
 import type { Judgement } from '../summary/judgement.verb.ts';
 import { type RunSummary, unjudgedFields } from '../summary/summary.verb.ts';
-import { clockOf, waitingSinceOf } from '../timeline/index.ts';
+import { clockReadingOf, waitingSinceOf } from '../timeline/index.ts';
 import { clockUntilOf, finishedAtOf, kindOf, outcomeOf, wallMsOf } from '../run-state/run-state.ts';
 import { asksOfAPerson } from '../phase/phase.ts';
 
@@ -34,15 +34,27 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
  * @param now The instant the list is read at, in epoch ms.
  */
 export function framePartsOf(summary: Summarized, judgement: Judgement, now: number) {
+  return framedPartsOf(summary, judgement, now).parts;
+}
+
+/**
+ * The frame's parts of a run (`framePartsOf`) with the part of its clock that grows at `now` (`clockReadingOf`), which the run's observed
+ * status records beside them.
+ * @param summary The run's summary, as the whole list summarizes it.
+ * @param judgement The run's judgement on this read: its record, its tasks' views and its steps.
+ * @param now The instant the list is read at, in epoch ms.
+ */
+export function framedPartsOf(summary: Summarized, judgement: Judgement, now: number) {
   const { run, views, steps } = judgement;
   const state = kindOf(summary);
   const held = summary.holding?.waitingOnYou ? summary.holding.at : null;
   const waiting = state === 'waiting';
   const finished = state === 'finished';
-  return {
+  const { clock, growing } = clockReadingOf(run, views, steps, summary.waitingOnYou, clockUntilOf(summary, now));
+  const parts = {
     state,
     wallMs: wallMsOf(summary, now),
-    clock: clockOf(run, views, steps, summary.waitingOnYou, clockUntilOf(summary, now)),
+    clock,
     stepCosts: waiting
       ? summary.steps.map(({ name }) => ({ step: name, cost: spentOf(stepSpend(run, name, (id) => taskSpend(views.get(id)))) }))
       : null,
@@ -50,6 +62,7 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, now: num
     finishedAt: finished ? finishedAtOf(summary) : null,
     outcome: finished ? outcomeOf(summary) : null,
   } satisfies FrameParts;
+  return { parts, growing };
 }
 
 /**

@@ -556,7 +556,7 @@
     },
     {
       "term": "Definition index",
-      "meaning": "the keyspace's record of each definition that stays a file, `/registry/definitions/<scope>/<kind>/<name>` holding `{ digest, path }` (the scope a factory's name, `_library` or `_builtin`): the daemon's sweep reads the files every 2 seconds and writes a record only where it differs from what the index holds, so an agent, a skill or a workflow has a revision a watch can start from and a write of it names (`indexSweep`, `packages/agent-orchestrator/src/definition-index/definition-index.store.ts`).",
+      "meaning": "the keyspace's record of each definition that stays a file, `/registry/definitions/<scope>/<kind>/<name>` holding `{ digest, path }` (the scope a factory's name, `_library` or `_builtin`): the daemon's sweep reads the files every 2 seconds and writes a record only where it differs from what the index holds, so an agent, a skill or a workflow has a revision a watch can start from and a write of it names (`indexSweep`, `packages/agent-orchestrator/src/definition-index/definition-index.store.ts`). A definition no sweep has numbered, or whose files moved since its record, reads as the next revision, worked out with no write (`indexedRevision`, proved by `packages/agent-orchestrator/contracts/indexed-revision.contract.ts`): only the sweep writes the index.",
       "type": "RecordDue"
     },
     {

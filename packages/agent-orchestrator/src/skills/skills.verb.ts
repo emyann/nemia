@@ -161,5 +161,20 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
   print: () => [],
 };
 
+/**
+ * The library's skill `name` removed from the folder of skills `library`, at the `version` it was read at where one is given: judged
+ * against the revision it stands at now (`definitionJudged`), and the index swept once it is gone.
+ * @param library The folder of skills the skill is removed from.
+ * @param name The skill's name.
+ * @param version The `resourceVersion` the skill was read at, none to remove it unseen.
+ */
+export const skillRemoved = Effect.fn('skillRemoved')(function* (library: string, name: string, version: string | undefined) {
+  const door = yield* SkillDoor;
+  yield* definitionJudged('Skill', undefined, name, version, 'remove');
+  const held = version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(name), library)) ?? version);
+  yield* door.skills.remove(SkillName.read(name), library, held);
+  yield* definitionsSwept();
+});
+
 /** The board's skill entries, in the order the table lists them. */
 export const SKILL_ENTRIES: readonly Command[] = [SKILLS_LIST, SKILLS_READ, SKILLS_WRITE] as readonly Command[];

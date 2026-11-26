@@ -9,9 +9,7 @@
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, factoryText } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
@@ -37,8 +35,7 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
 
 /** The factory's file as it is on disk, or null where there is none: what a refusal must leave as it was. */
 const fileOf = (name: string) => {
-  const file = path.join(root, 'factories', `${name}.json`);
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  return factoryText(root, name) ?? null;
 };
 
 /** That `res` was refused with `status`, and the factory `name`'s file is as it was before. */
@@ -105,7 +102,7 @@ describe('a person removes a factory: its file is gone and the answer says so, a
   s.test('a DELETE removes its file, answering it, and a GET of it is a 404 after', async () => {
     const removed = await answered<FactoryRemoved>(send('DELETE', '/api/factories/gone'));
     assert.equal(removed.name, 'gone');
-    assert.equal(removed.file, path.join(root, 'factories', 'gone.json'));
+    assert.equal(removed.file, '/registry/factories/gone');
     assert.equal(fileOf('gone'), null);
     assert.equal((await app.request('/api/factories/gone')).status, 404);
   });

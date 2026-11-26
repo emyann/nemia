@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
 import { type Said, servedStore, write } from './served.ts';
-import { keysUnder, recordText, runKey } from 'agent-orchestrator/testing';
+import { keysUnder, recordText, runKey, markerText } from 'agent-orchestrator/testing';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const TEAM = path.join(import.meta.dirname, '..', '..', '..', 'packages', 'agent-orchestrator', 'test', 'fixtures', 'team');
@@ -227,11 +227,11 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
   const id = await started('Hold me.');
   const held = await store.nemia(['hold', id, '--why', 'waiting on legal']);
   assert.equal(held.code, 0, held.err);
-  assert.ok(fs.existsSync(path.join(store.root, 'runs', `${id}.hold`)));
+  assert.ok(markerText(store.root, id, 'hold') !== undefined);
   assert.match(held.out, new RegExp(`nemia hold ${id} --off`));
   const lifted = await store.nemia(['hold', id, '--off']);
   assert.equal(lifted.code, 0, lifted.err);
-  assert.equal(fs.existsSync(path.join(store.root, 'runs', `${id}.hold`)), false);
+  assert.equal(markerText(store.root, id, 'hold') !== undefined, false);
   const kept = await store.nemia(['say', id, 'implement', 'mind', 'the', 'cache']);
   assert.equal(kept.code, 0, kept.err);
   assert.ok(kept.out.includes('mind the cache'), kept.out);
@@ -239,23 +239,23 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
 
 test('nemia assign puts a run in hand, a second refused while it stands, and --off gives it back', async () => {
   const id = await started('Assign me.');
-  const file = path.join(store.root, 'runs', `${id}.assignee`);
+  const held = () => JSON.parse(markerText(store.root, id, 'assignee') ?? 'null') as { name: string; forMs: number } | null;
   const put = await store.nemia(['assign', id, '--to', 'ann', '--why', 'reading it', '--for', '2h']);
   assert.equal(put.code, 0, put.err);
-  assert.deepEqual([JSON.parse(fs.readFileSync(file, 'utf8')).name, JSON.parse(fs.readFileSync(file, 'utf8')).forMs], ['ann', 7_200_000]);
+  assert.deepEqual([held()?.name, held()?.forMs], ['ann', 7_200_000]);
   assert.match(put.out, new RegExp(`nemia assign ${id} --off`));
   const again = await store.nemia(['assign', id]);
   assert.equal(again.code, 1, `a Conflict exits 1: ${again.out}${again.err}`);
   const back = await store.nemia(['assign', id, '--off']);
   assert.equal(back.code, 0, back.err);
-  assert.equal(fs.existsSync(file), false);
+  assert.equal(held(), null);
 });
 
 test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and of a run with no record, what was left under its id', async () => {
   const id = await started('Cancel me.');
   const cancelled = await store.nemia(['cancel', id]);
   assert.equal(cancelled.code, 0, cancelled.err);
-  assert.ok(fs.existsSync(path.join(store.root, 'runs', `${id}.cancelled`)));
+  assert.ok(markerText(store.root, id, 'cancelled') !== undefined);
   const asks = path.join(store.root, 'runs', 'nobody-1.asks');
   write(path.join(asks, 'implement.json'), '{}');
   const gone = await store.nemia(['rm', id, 'nobody-1', '--delete-branches']);
@@ -345,6 +345,6 @@ test('under a remote context, nemia start and nemia hold land on the remote stor
   const id = idIn(said);
   assert.equal(recordOf(exposed.root, id).brief, 'Add a cache, away.');
   assert.equal((await nemia(['hold', id], env)).code, 0);
-  assert.ok(fs.existsSync(path.join(exposed.root, 'runs', `${id}.hold`)), 'held on the remote store');
+  assert.ok(markerText(exposed.root, id, 'hold') !== undefined, 'held on the remote store');
   assert.equal(fs.existsSync(env.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
 });

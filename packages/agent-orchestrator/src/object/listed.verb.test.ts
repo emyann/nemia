@@ -2,6 +2,7 @@
  * Objects listed the one way (`objectsListed`), on the factories as objects off a listing as `nemia factory` reads it, its file beside it
  * in a scratch store: a page walked and selected as a CardList is.
  */
+import { factoriesNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -33,7 +34,7 @@ fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
 fs.writeFileSync(acme.file, JSON.stringify(filed));
 const stray: FactoryListing = { name: 'broken', file: path.join(home, 'factories', 'broken.json'), error: 'does not read as JSON' };
 const listed: FactoryListed = { factories: [acme, stray], untrusted: [] };
-const objects = factoryObjectsOf(listed, home);
+const objects = factoriesNow(home, factoryObjectsOf(listed, home));
 
 test('a page is cut by limit and continue, sorted by name, and counts what remains', async () => {
   const first = await Effect.runPromise(objectsListed('Factory', objects, { limit: 2 }, 'factory'));

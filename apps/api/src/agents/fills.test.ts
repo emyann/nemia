@@ -23,7 +23,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 import { everyOrigin, workflowsListed } from '../../test/definitions.ts';
-import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, dropFactory, hireAgent, plantFactory } from 'agent-orchestrator/testing';
 
 type LibraryAgent = import('./agents.ts').LibraryAgent;
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
@@ -129,13 +129,13 @@ test('in the default factory every agent is listed, each tagged with the factori
 });
 
 test('a factory whose file does not read tags nothing, and hides no other', async () => {
-  write(path.join(root, 'factories', 'broken.json'), '{ not json');
+  plantFactory(root, 'broken', '{ not json');
   try {
     const listed = await agents();
     assert.deepEqual(one(listed, 'user', 'zed').factories, ['other']);
     assert.deepEqual(one(listed, 'repo', 'ada').factories, ['hired']);
   } finally {
-    fs.rmSync(path.join(root, 'factories', 'broken.json'));
+    dropFactory(root, 'broken');
   }
 });
 

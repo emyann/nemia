@@ -5,7 +5,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { FACTORIES, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, storeStatus, dropStoredFactory, store, storeFactory } from '../world.ts';
 
 /** The factory the page files, made from a template, and takes back at its end. */
 const SHAPED = 'shaped';
@@ -67,13 +67,12 @@ export default {
   name: 'factory-template',
   route: '/',
   expect: async (page) => {
-    const file = path.join(store!, 'factories', `${SHAPED}.json`);
+    const file = SHAPED;
     const folder = path.join(store!, 'factories', SHAPED);
     const card = page.locator(`[data-template="${TEMPLATE.source}"]`);
-    const writeStatus = (applied: typeof RENDERED) =>
-      fs.writeFileSync(path.join(folder, 'status.json'), `${JSON.stringify(statusOf(applied), null, 2)}\n`);
+    const writeStatus = (applied: typeof RENDERED) => storeStatus(SHAPED, statusOf(applied));
     try {
-      fs.writeFileSync(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), template: TEMPLATE }, null, 2)}\n`);
+      storeFactory(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), template: TEMPLATE }, null, 2)}\n`);
       await factoryAt(page, SHAPED);
       await expectCount(page.locator('[data-template], [data-factory-template]'), 0, 'the floor draws no template');
       await pictured(page, 'floor');
@@ -122,7 +121,7 @@ export default {
       await expectVisible(page.locator(`[data-factory-settings="${FACTORIES.hiring.name}"]`), "the untemplated factory's Settings");
       await expectCount(page.locator('[data-template], [data-factory-template]'), 0, 'a factory made from no template shows none');
     } finally {
-      fs.rmSync(file, { force: true });
+      dropStoredFactory(file);
       fs.rmSync(folder, { recursive: true, force: true });
     }
   },

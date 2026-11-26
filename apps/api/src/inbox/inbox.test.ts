@@ -20,14 +20,18 @@ import {
   cardKey,
   cardNames,
   cardText,
-  plantCard,
+  dropFactory,
   dropRecord,
   emptyCards,
   emptyRuns,
   hireAgent,
   keysUnder,
+  markerText,
+  plantCard,
+  plantFactory,
   plantRecord,
   removeFactory,
+  runFolderNames,
   runKey,
   runsNow,
 } from 'agent-orchestrator/testing';
@@ -87,11 +91,7 @@ hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
 const cards = () => cardNames(root).map((n) => `${n}.md`);
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
-    ...keysUnder(root, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(root), ...keysUnder(root, '/registry/runs/')].sort();
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** The factory a card's namespace names: none for `default`. */
@@ -938,11 +938,7 @@ describe("a card's labels: filed with them, listed with them, selected by them w
     const res = await startCard({ workflow: 'dev', from: 'repo', card: core, label: ['tier=2'] });
     assert.equal(res.status, 201, await res.clone().text());
     const { id } = (await res.json()) as CardStarted;
-    assert.deepEqual(
-      JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.labels`), 'utf8')),
-      { team: 'core', tier: '2' },
-      "the card's labels, and the one sent",
-    );
+    assert.deepEqual(JSON.parse(markerText(root, id, 'labels') ?? ''), { team: 'core', tier: '2' }, "the card's labels, and the one sent");
     const refused = await startCard({ workflow: 'dev', from: 'repo', card: docs, label: 'tier=2' });
     assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
     names(((await refused.json()) as { error: string }).error, '`payload.label`');
@@ -961,13 +957,14 @@ const acmeFactory = () => {
   const tree = path.join(root, 'factories', 'acme', 'tree');
   const folders = path.join(tree, 'workflows');
   fs.cpSync(TEAM, folders, { recursive: true });
-  write(
-    path.join(root, 'factories', 'acme.json'),
+  plantFactory(
+    root,
+    'acme',
     JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
   const gone = () => {
-    fs.rmSync(path.join(root, 'factories', 'acme.json'), { force: true });
+    dropFactory(root, 'acme');
     fs.rmSync(path.join(root, 'factories', 'acme'), { recursive: true, force: true });
   };
   return { dev: path.join(folders, 'dev'), repo, gone };

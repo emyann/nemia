@@ -7,6 +7,7 @@
  * client prints it, and its tests hold the lines. Each checkpoint opens on a harness file and a store of factories of its own (`anew`), on
  * a store of its own at `ROOT`, given as `ENV`.
  */
+import { clearFactories } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,7 @@ import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
 import { typed as handlerOf } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
-import { readFactoriesAt } from '../factory/factory.store.ts';
+import { readFactoriesAt } from '../../testing.ts';
 import type { Env } from '../config/config.store.ts';
 import type { PlaceTrust, Untrusted } from './trust.ts';
 
@@ -36,7 +37,7 @@ let file = '';
 function anew() {
   process.env.CLAUDE_CONFIG_DIR = scratch('wf-trust-harness-');
   file = path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json');
-  fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+  clearFactories(ROOT);
 }
 
 /** What `nemia factory add` and `nemia factory trust` answer of the trust they asked of each place. */

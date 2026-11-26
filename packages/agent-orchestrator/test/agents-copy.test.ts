@@ -24,7 +24,7 @@ import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { configGiven } from './config-given.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../testing.ts';
 import { runWith as runEngine, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';

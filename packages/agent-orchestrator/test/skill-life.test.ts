@@ -22,7 +22,7 @@ import { staged, story } from './story.ts';
 import { Effect } from 'effect';
 import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
 import { isRefusal, runWith as runEngine } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, knownAt } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from '../src/skills/skills.verb.ts';
@@ -258,7 +258,7 @@ describe("a library skill's life: written as Nemia ships one, given, switched, m
     refuses(() => writeSkill(ROOT, library, DRAFT, { version: null }), 'Invalid', library, 'nemia factory volume add <factory> <repo>:rw');
     assert.equal(fs.existsSync(path.join(library, DRAFT.name)), false, 'a .git beside it makes no repository known');
     addFactoryAt(ROOT, { name: 'skill-known', volumes: [checkout].map((r) => `${r}:rw`) });
-    writeSkill(ROOT, library, DRAFT, { version: null });
+    writeSkill(ROOT, library, DRAFT, { version: null, known: knownAt(ROOT) });
     assert.ok(fs.existsSync(path.join(library, DRAFT.name, 'SKILL.md')), "a factory's repository");
   });
 });

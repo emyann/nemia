@@ -9,6 +9,7 @@
  *
  * Each walk is on a side of its own: a fresh store, or a fresh stand-in.
  */
+import type { Status } from '../src/factory/applied/applied.store.ts';
 import assert from 'node:assert/strict';
 import type { DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
@@ -45,6 +46,15 @@ const filed = (door: Door, name: string, more: Partial<Factory> = {}) => done(do
 
 const since = '2026-11-01T00:00:00.000Z';
 
+/** What the controller observed of a factory made from a template at `version`: rendered, applied. */
+const aStatus = (version: string) =>
+  ({
+    version,
+    digest: null,
+    params: {},
+    conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'ok' }],
+  }) satisfies Status;
+
 export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   ...FOLDER_WALKS,
   'factories.list': [
@@ -68,8 +78,8 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return done(door.factories.listed()).map((l) => ({ name: l.name, file: l.file, workflows: 'workflows' in l ? l.workflows : [] }));
       },
       says: [
-        { name: 'alpha', file: '<root>/factories/alpha.json', workflows: [] },
-        { name: 'zeta', file: '<root>/factories/zeta.json', workflows: ['build'] },
+        { name: 'alpha', file: '/registry/factories/alpha', workflows: [] },
+        { name: 'zeta', file: '/registry/factories/zeta', workflows: ['build'] },
       ],
     },
   ],
@@ -97,7 +107,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     },
   ],
   'factories.create': [
-    { name: 'filed at its name', walk: ({ door }) => filed(door, 'acme'), says: '<root>/factories/acme.json' },
+    { name: 'filed at its name', walk: ({ door }) => filed(door, 'acme'), says: '/registry/factories/acme' },
     {
       name: 'REFUSED: a name taken is a Conflict, the first left as it was',
       walk: ({ door }) => {
@@ -120,7 +130,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'a factory with no volume is filed: it is given its volumes after',
       walk: ({ door }) => ({ made: done(door.factories.create(aFactory('acme', { volumes: [] }))), list: done(door.factories.list()) }),
-      says: { made: '<root>/factories/acme.json', list: ['default', 'acme'] },
+      says: { made: '/registry/factories/acme', list: ['default', 'acme'] },
     },
     {
       name: 'REFUSED: a volume named twice is Invalid, nothing filed',
@@ -148,7 +158,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         const file = done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
         return { file, hires: readFiled(door, 'acme').hires };
       },
-      says: { file: '<root>/factories/acme.json', hires: { 'build/review': 'reviewer' } },
+      says: { file: '/registry/factories/acme', hires: { 'build/review': 'reviewer' } },
     },
     {
       name: 'REFUSED: a hire into a workflow it does not offer is Invalid, nothing written',
@@ -210,7 +220,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
           again: act(door.factories.remove(nameOf('acme'))),
         };
       },
-      says: { file: '<root>/factories/acme.json', read: { refused: 'Missing' }, again: { refused: 'Missing' } },
+      says: { file: '/registry/factories/acme', read: { refused: 'Missing' }, again: { refused: 'Missing' } },
     },
     {
       name: 'REFUSED: the default factory is a Conflict, and still read',
@@ -351,6 +361,43 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return { read: done(door.servers.read(nameOf('default'))), list: done(door.factories.list()) };
       },
       says: { read: { docs: { type: 'http', url: 'https://docs.example/mcp' } }, list: ['default'] },
+    },
+  ],
+  'status.read': [
+    {
+      name: 'none where the controller observed none',
+      walk: ({ door }) => ({ read: done(door.status.read(nameOf('acme'))) }),
+      says: { read: undefined },
+    },
+    {
+      name: 'what was written, as it was written',
+      walk: ({ door }) => {
+        done(door.status.write(nameOf('acme'), aStatus('1.0.0')));
+        return done(door.status.read(nameOf('acme')))?.version;
+      },
+      says: '1.0.0',
+    },
+  ],
+  'status.write': [
+    {
+      name: 'a change is written and answers true, the same status again answers false',
+      walk: ({ door }) => {
+        const first = done(door.status.write(nameOf('acme'), aStatus('1.0.0')));
+        const same = done(door.status.write(nameOf('acme'), aStatus('1.0.0')));
+        const changed = done(door.status.write(nameOf('acme'), aStatus('1.1.0')));
+        return { first, same, changed, read: done(door.status.read(nameOf('acme')))?.version };
+      },
+      says: { first: true, same: false, changed: true, read: '1.1.0' },
+    },
+    {
+      name: 'the factory removed, its status goes with it',
+      walk: ({ door }) => {
+        filed(door, 'acme');
+        done(door.status.write(nameOf('acme'), aStatus('1.0.0')));
+        done(door.factories.remove(nameOf('acme')));
+        return { read: done(door.status.read(nameOf('acme'))) };
+      },
+      says: { read: undefined },
     },
   ],
   'rules.read': [

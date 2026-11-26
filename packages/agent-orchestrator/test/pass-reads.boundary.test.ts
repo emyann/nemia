@@ -14,7 +14,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
-import { acceptKey, askNames, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
+import { acceptKey, askNames, plantMarker, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
@@ -45,7 +45,6 @@ import {
   startRun,
   tickRun,
 } from '../src/runner.ts';
-import { pruneFile } from '../src/record/record.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { passRead } from '../src/cap/cap.verb.ts';
 import { passRevisions } from '../src/revisions/pin.verb.ts';
@@ -370,7 +369,7 @@ row(
     const held = await runPlaced(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
     await runWith(b.e, hold(held.id, [until.id]));
     for (const r of [handed, until, pruned])
-      fs.writeFileSync(pruneFile(ROOT, r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
+      plantMarker(ROOT, r.id, 'pruned', JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
     await onePass(b);
     const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
     for (const r of [done, handed, until, pruned]) {

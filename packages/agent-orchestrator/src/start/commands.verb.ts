@@ -241,7 +241,6 @@ export const START: Served<Started, StartInput> = {
   ...START_WORDS,
   input: StartInput,
   handler: Effect.fnUntraced(function* (given: StartInput) {
-    const home = yield* StoreRoot;
     const started = yield* startOf(given);
     const paused = yield* pausedRead();
     const landed: string[] = [];
@@ -249,8 +248,8 @@ export const START: Served<Started, StartInput> = {
     const git = context.length ? yield* standingLive([started.run]) : undefined;
     for (const id of context) if (git && (yield* parentRead(id, git)).landed) landed.push(id);
     const hints = yield* hintsOf(started.run);
-    const notMounted = leftOutMounts(home, started.run);
-    const notVolumes = leftOutVolumes(home, started.run);
+    const notMounted = yield* leftOutMounts(started.run);
+    const notVolumes = yield* leftOutVolumes(started.run);
     return {
       ...started,
       ...(paused.pause ? { paused } : {}),

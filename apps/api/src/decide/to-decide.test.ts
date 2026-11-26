@@ -22,7 +22,7 @@ import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import { plantAsk, plantRecord, recordText, runKey, runsNow, plantMarker } from 'agent-orchestrator/testing';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -604,7 +604,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
     steps: { implement: { taskId: 'r-plain-implement', branch: 'wf/r-plain/implement' } },
   });
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', 'r-off.cancelled'), at);
+  plantMarker(root, 'r-off', 'cancelled', at);
 
   const before = gitCount();
   const running1 = await detailOf('r-running');

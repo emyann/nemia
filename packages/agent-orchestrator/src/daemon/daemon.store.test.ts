@@ -22,6 +22,7 @@ import { nodeChild } from '../../test/child.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
+import { factoryText } from '../../testing.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { collector, seriesOf } from '../../test/collector.ts';
@@ -1189,7 +1190,7 @@ test("`up` moves a factory's file an earlier release wrote into one list of volu
     () => assert.fail('the daemon returned'),
     (err: unknown) => assert.equal(err, STOP),
   );
-  const moved = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  const moved = JSON.parse(factoryText(ROOT, 'moved') ?? '{}') as Record<string, unknown>;
   assert.equal('repos' in moved || 'origins' in moved, false, 'the keys an earlier release wrote are gone');
   assert.deepEqual(
     moved.volumes,

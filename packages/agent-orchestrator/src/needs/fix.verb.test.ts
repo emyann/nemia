@@ -24,7 +24,7 @@ import { declared } from '../../place/memory/place.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { engineOf, runWith, type EngineService } from '../runtime-client.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { createFactoryAt } from '../factory/factory.store.ts';
+import { createFactoryAt } from '../../testing.ts';
 import { toolsDir, type StoreRoot } from '../config/root.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { trustPlaces } from '../trust/trust.verb.ts';

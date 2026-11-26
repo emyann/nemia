@@ -10,7 +10,7 @@ import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
-import { templatedTreeOf } from '../factory/door/factories.store.ts';
+import { templatedOf } from '../factory/door/factories.store.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
 import { agentRead } from '../roster/roster.store.ts';
@@ -112,10 +112,10 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
   handler: ({ from, name, factory, version, draft, schema, ...given }) =>
     Effect.gen(function* () {
       const root = yield* StoreRoot;
-      const tree = (named: string) => templatedTreeOf(root, named, 'nemia agents write');
-      const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : given.repo));
+      const tree = from === 'factory' && factory !== undefined ? (yield* templatedOf(factory, 'nemia agents write')).tree : undefined;
+      const repo = tree ?? given.repo;
       const dir = yield* tried(() =>
-        yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),
+        yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: () => tree ?? '' }),
       );
       const sidecar: AgentSidecar | null | undefined = schema;
       const door = yield* AgentDoor;

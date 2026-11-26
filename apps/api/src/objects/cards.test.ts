@@ -4,7 +4,7 @@
  * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
-import { cardKey, cardText, dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardKey, cardText, dropMarker, dropRecord, plantMarker, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -264,7 +264,7 @@ test("a card filed from runs that disagree on a label says the key it left out, 
         steps: { implement: { taskId: null } },
       }),
     );
-    fs.writeFileSync(path.join(runs, `${id}.labels`), JSON.stringify({ team, area: 'inbox' }));
+    plantMarker(root, id, 'labels', JSON.stringify({ team, area: 'inbox' }));
   };
   run('left-a1', 'core');
   run('left-b2', 'infra');
@@ -357,11 +357,12 @@ test('POST a started card to resend: filed as <run>-resent in its namespace, han
   card('r-ended', { team: 'core' });
   card('r-working');
   run('ended-c3', 'r-ended');
-  fs.writeFileSync(path.join(runs, 'ended-c3.cancelled'), '2026-11-05T01:00:00.000Z');
+  plantMarker(root, 'ended-c3', 'cancelled', '2026-11-05T01:00:00.000Z');
   run('working-d4', 'r-working');
   t.onTestFinished(() => {
     for (const name of ['r-ended', 'r-working', 'ended-c3-resent']) dropRecord(root, cardKey(name));
-    for (const file of ['ended-c3.json', 'ended-c3.cancelled', 'working-d4.json']) fs.rmSync(path.join(runs, file), { force: true });
+    for (const file of ['ended-c3.json', 'working-d4.json']) fs.rmSync(path.join(runs, file), { force: true });
+    dropMarker(root, 'ended-c3', 'cancelled');
   });
   const post = (url: string, body: unknown) => app.request(url, { method: 'POST', headers, body: JSON.stringify(body) });
 

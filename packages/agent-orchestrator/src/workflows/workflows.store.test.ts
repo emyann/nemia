@@ -15,6 +15,8 @@ import { aStep, aWorkflow, carried, schemaOf, WORKFLOW_WALKS, yoursOn, type Work
 import { WorkflowDoor, workflowDoorFiles } from './workflows.store.ts';
 import { placesAroundAt, writeWorkflowAt } from '../folder/write.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { knownIn } from '../folder/known.store.ts';
+import { factoriesNow } from '../../testing.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { AgentDoor, agentDoorFiles, agentFiles } from '../agents/agent-door.store.ts';
 import { agentDoorMemory } from '../agents/agent-memory.store.ts';
@@ -53,7 +55,7 @@ test("a folder written through the door is, byte for byte, the folder today's wr
   const draft = aWorkflow(undefined, '# Dev\n\nPlans, then builds.\n');
   done(side.door.workflows.write(yoursOn(side, 'dev'), draft));
   const theirs = path.join(root, 'workflows', 'theirs');
-  const where = { dir: theirs, places: placesAroundAt(root, theirs) };
+  const where = { dir: theirs, places: placesAroundAt(root, theirs, factoriesNow(root, knownIn(root))) };
   const found = { agents: agentFiles(root).agents.found(where), skills: skillFiles(root).skills.found(where) };
   writeWorkflowAt(root, theirs, draft.steps, draft.readme, { found });
   assert.deepEqual(bytes(path.join(root, 'workflows', 'dev')), bytes(theirs));

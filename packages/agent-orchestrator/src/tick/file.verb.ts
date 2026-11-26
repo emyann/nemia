@@ -467,7 +467,7 @@ const trySpec = (
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
-      ...filedAt(f.run, f.home, record.workspace ?? f.run.workspace),
+      ...filedAt(f.run, f.home, record.workspace ?? f.run.workspace, t.told.servers),
       ...t.token,
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
@@ -600,7 +600,7 @@ function roundSpec(
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        ...filedAt(run, f.home, record.workspace ?? run.workspace),
+        ...filedAt(run, f.home, record.workspace ?? run.workspace, told.servers),
         ...token,
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
@@ -904,7 +904,7 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        ...filedAt(run, f.home, place.workspace),
+        ...filedAt(run, f.home, place.workspace, told.servers),
         ...token,
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,

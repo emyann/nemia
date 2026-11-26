@@ -113,8 +113,8 @@ export const retryRun = Effect.fn('retry')(function* (
   }
   const denied = landingDenies(run, place);
   const home = yield* StoreRoot;
-  const { own } = yield* toldOf(run, step);
-  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own));
+  const { own, servers } = yield* toldOf(run, step);
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own, servers));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask = askOf(run, stepName, how, actor);
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'retry', of: 'try', ask });
@@ -143,7 +143,8 @@ export const retryRun = Effect.fn('retry')(function* (
  * The runtime's refusal of the config the try asked for would be filed with (`filedConfig`, as the tick files a try: on the model the
  * try runs on and with its cap), said as the step's after the line it comes from: the flag the retry typed where it chose the field
  * (`--model`, on a fresh try, and `--budget`), else the step's own (`filedRefusal`); `own` is the harness's own arguments the
- * tick tells the step with (`toldOf`), which the caller yields. A recheck files no session, and a step on a remote
+ * tick tells the step with (`toldOf`), which the caller yields, and `servers` the MCP servers it is told with. A recheck files no session,
+ * and a step on a remote
  * agent is configured by its operator: neither is asked.
  */
 function tryRefused(
@@ -155,6 +156,7 @@ function tryRefused(
   denied: readonly string[],
   home: string,
   own: StepTold['own'],
+  servers: StepTold['servers'],
 ) {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
@@ -162,7 +164,7 @@ function tryRefused(
   const config = filedConfig(step, steps, run, {
     model: tryModel(step, record, how),
     budgetUsd,
-    ...filedAt(run, home, run.steps[step.name]?.workspace ?? run.workspace),
+    ...filedAt(run, home, run.steps[step.name]?.workspace ?? run.workspace, servers),
     own,
     landingDenied: () => denied,
   });

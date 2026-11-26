@@ -27,14 +27,19 @@ import {
   addFactory,
   attachWorkflow,
   clearSchedule,
+  dropFactory,
   dropRecord,
+  factoryText,
   hireAgent,
   keysUnder,
+  plantFactory,
   plantRecord,
   removeFactory,
+  runFolderNames,
   runKey,
   runsNow,
   setSchedule,
+  writeStatus,
 } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
 import { TABLE_ACCEPT, tableLines } from 'objects';
@@ -102,11 +107,7 @@ const get = async <T>(url: string) => {
 };
 const said = (body: unknown) => (body as { error: string }).error;
 const names = (listings: WorkflowListing[]) => listings.map((w) => w.name);
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
-    ...keysUnder(root, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(root), ...keysUnder(root, '/registry/runs/')].sort();
 
 const post = (url: string, body: unknown) =>
   app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -488,7 +489,7 @@ describe('a person reads the factories: the default first, each by name, a broke
   s.test(
     'GET /api/factories serves a FactoryList: the default factory first, then each factory by name, and one whose file does not read with why, hiding no other',
     async () => {
-      write(path.join(root, 'factories', 'broken.json'), '{ not json');
+      plantFactory(root, 'broken', '{ not json');
       try {
         const { status, body } = await get<FactoryList>('/api/factories');
         assert.equal(status, 200);
@@ -554,16 +555,16 @@ describe('a person reads the factories: the default first, each by name, a broke
         assert.equal((await get<Factory>('/api/factories/default')).body.metadata.name, 'default');
         assert.equal((await get('/api/factories/nowhere')).status, 404);
       } finally {
-        fs.rmSync(path.join(root, 'factories', 'broken.json'));
+        dropFactory(root, 'broken');
       }
     },
   );
   s.test(
     "a factory's volumes as the package lists them: resolved, sorted, once each, each named, with the line that takes it back",
     async () => {
-      const file = path.join(root, 'factories', 'vols.json');
-      write(
-        file,
+      plantFactory(
+        root,
+        'vols',
         JSON.stringify({
           name: 'vols',
           workflows: [],
@@ -606,7 +607,7 @@ describe('a person reads the factories: the default first, each by name, a broke
         });
         assert.equal(commands.volume, 'nemia factory volume add vols <path|url>:ro|:rw');
       } finally {
-        fs.rmSync(file);
+        dropFactory(root, 'vols');
       }
     },
   );
@@ -620,18 +621,15 @@ describe('a person reads the factories: the default first, each by name, a broke
     try {
       assert.deepEqual((await shaped()).spec.template, { source: '/t/team', version: '0.1.0', params: { budget: 7 } });
       assert.deepEqual((await shaped()).status, { conditions: [], untrusted: (await shaped()).status.untrusted });
-      const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' };
-      const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' };
-      write(
-        path.join(root, 'factories', 'shaped', 'status.json'),
-        JSON.stringify({
-          version: '0.1.0',
-          digest: 'sha256:0',
-          params: { budget: 7 },
-          conditions: [drift, pending],
-          observedGeneration: 1,
-        }),
-      );
+      const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' } as const;
+      const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' } as const;
+      writeStatus(root, 'shaped', {
+        version: '0.1.0',
+        digest: 'sha256:0',
+        params: { budget: 7 },
+        conditions: [drift, pending],
+        observedGeneration: 1,
+      });
       const status = (await shaped()).status;
       assert.equal(status.applied, '0.1.0');
       assert.deepEqual(status.conditions, [drift, pending]);
@@ -832,9 +830,8 @@ test('the factories asked as a Table answer the columns of a factory, the defaul
 describe("GET /api/factories/:name/home: a factory's home read whole, for a client to render it as a run's copy", () => {
   test('a templated factory whose tree holds home/ answers its files and digest; one with no home and a name no factory has are 404s', async () => {
     const name = 'homed';
-    const file = path.join(root, 'factories', `${name}.json`);
     const folder = path.join(root, 'factories', name);
-    write(file, JSON.stringify({ volumes: [], template: { source: '/templates/homed', version: '1.0.0', params: {} } }));
+    plantFactory(root, name, JSON.stringify({ volumes: [], template: { source: '/templates/homed', version: '1.0.0', params: {} } }));
     write(path.join(folder, 'tree', 'factory.json'), JSON.stringify({ workflows: [], hires: {} }));
     try {
       const bare = await get<unknown>(`/api/factories/${name}/home`);
@@ -851,20 +848,19 @@ describe("GET /api/factories/:name/home: a factory's home read whole, for a clie
       assert.equal((await get<unknown>('/api/factories/solo/home')).status, 404, 'a factory made by hand has no home');
       assert.equal((await get<unknown>('/api/factories/nobody/home')).status, 404, 'no factory of the name');
     } finally {
-      fs.rmSync(file, { force: true });
+      dropFactory(root, name);
       fs.rmSync(folder, { recursive: true, force: true });
     }
   });
 });
 
 test("a factory's label values, as its file states them, are served on its spec, and none where it states none", async () => {
-  const file = path.join(root, 'factories', 'solo.json');
-  const was = fs.readFileSync(file, 'utf8');
+  const was = factoryText(root, 'solo') ?? '';
   try {
     assert.equal((await get<Factory>('/api/factories/solo')).body.spec.labelValues, undefined);
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(was), labelValues: { work: ['feature', 'fix'] } }));
+    plantFactory(root, 'solo', JSON.stringify({ ...JSON.parse(was), labelValues: { work: ['feature', 'fix'] } }));
     assert.deepEqual((await get<Factory>('/api/factories/solo')).body.spec.labelValues, { work: ['feature', 'fix'] });
   } finally {
-    fs.writeFileSync(file, was);
+    plantFactory(root, 'solo', was);
   }
 });

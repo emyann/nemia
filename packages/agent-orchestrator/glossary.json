@@ -307,7 +307,7 @@
     },
     {
       "term": "Label",
-      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling, its key an optional prefix (a DNS subdomain, as in team.example/stage) and a name, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `runs/<id>.labels`, never in its record.",
+      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling, its key an optional prefix (a DNS subdomain, as in team.example/stage) and a name, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `/registry/runmarks/<id>/labels`, never in its record.",
       "type": "Labels",
       "retired": []
     },
@@ -541,7 +541,7 @@
     },
     {
       "term": "Keyspace",
-      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, and the inbox's cards and the tick's tries of them follow, each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, the inbox's cards and the tick's tries of them, and the factories' records (a factory under `/registry/factories/<name>`, its level, its servers and what the controller last observed of it) follow, each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
       "type": "Keyspace"
     },
     {
@@ -1002,6 +1002,10 @@
             {
               "path": "packages/agent-orchestrator/src/rest/kept.ts",
               "why": "names `RunStore.runs.find`, the interface's method"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/runs/marks.store.ts",
+              "why": "`DoorOf<RunStore, RunId>`, the keyspace layer typed by the store's interface"
             }
           ]
         }

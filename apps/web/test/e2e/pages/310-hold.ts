@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
@@ -6,7 +5,7 @@ import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photog
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { DIAMOND, GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, plantStoredMarker, storedMarker, unreadName } from '../world.ts';
 
 export default {
   /**
@@ -25,7 +24,6 @@ export default {
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
     const word = `held until ${unreadName(until)} lands`;
     const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has landed; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
@@ -36,8 +34,8 @@ export default {
     await expectCount(edge, 0, 'and no hold edge comes into it');
 
     try {
-      if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
-      fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page writes one — the hold record is there`);
+      plantStoredMarker(id, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2));
       fed(id, 'held');
 
       const said = wordsSaying(card, word);
@@ -86,8 +84,8 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `hold-run-${theme}.png`), { fullPage: true });
     } finally {
-      fs.rmSync(hold, { force: true });
-      fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+      dropStoredMarker(id, 'hold');
+      dropStoredMarker(id, 'unheld');
       fed(id, gated, 'awaiting approval');
     }
 
@@ -110,16 +108,14 @@ export default {
  */
 async function heldWithWords(page: Page) {
   const { id, gated } = GATED;
-  const hold = path.join(store!, 'runs', `${id}.hold`);
   const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
   const word = `held until ${unreadName(HELD.id)} lands (why: ${why}; by operator)`;
   const noted = `held until ${HELD.id} lands (why: ${why}; by operator); its approval is asked once the hold lifts`;
   const whole = new RegExp(`^${literal(word)}$`);
   try {
-    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one with words — ${hold} is there`);
-    fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [HELD.id], why, by: 'operator' }, null, 2), {
-      flag: 'wx',
-    });
+    if (storedMarker(id, 'hold') !== null)
+      throw new Refused(`no hold on ${id} before the page writes one with words — the hold record is there`);
+    plantStoredMarker(id, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [HELD.id], why, by: 'operator' }, null, 2));
     fed(id, 'held');
     const theme = await themeOf(page);
 
@@ -159,8 +155,8 @@ async function heldWithWords(page: Page) {
     await settled(page);
     await photograph(page, path.join(OUT, `hold-said-run-${theme}.png`), { fullPage: true });
   } finally {
-    fs.rmSync(hold, { force: true });
-    fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+    dropStoredMarker(id, 'hold');
+    dropStoredMarker(id, 'unheld');
     fed(id, gated, 'awaiting approval');
   }
   await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold with words lifted, the run page says no hold');
@@ -173,10 +169,9 @@ async function heldWithWords(page: Page) {
  */
 async function heldNotStarted(page: Page) {
   const { id } = DIAMOND.bottom;
-  const hold = path.join(store!, 'runs', `${id}.hold`);
   try {
-    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
-    fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [HELD.id] }, null, 2), { flag: 'wx' });
+    if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page writes one — the hold record is there`);
+    plantStoredMarker(id, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [HELD.id] }, null, 2));
     fed(id, 'held');
     const theme = await themeOf(page);
 
@@ -212,8 +207,8 @@ async function heldNotStarted(page: Page) {
     await settled(page);
     await photograph(page, path.join(OUT, `hold-not-started-run-${theme}.png`), { fullPage: true });
   } finally {
-    fs.rmSync(hold, { force: true });
-    fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+    dropStoredMarker(id, 'hold');
+    dropStoredMarker(id, 'unheld');
     fed(id, 'waiting');
   }
 }

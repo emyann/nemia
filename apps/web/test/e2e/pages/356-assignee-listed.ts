@@ -1,12 +1,10 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Page } from 'playwright';
 import { runPath } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { store } from '../world.ts';
+import { dropStoredMarker, storedMarker } from '../world.ts';
 
 /** Who the page gives the run to, and why. */
 const WHO = 'ann';
@@ -44,10 +42,10 @@ export default {
   route: '/runs',
   expect: async (page) => {
     const { id } = GATED;
-    const file = path.join(store!, 'runs', `${id}.assignee`);
+    const marker = () => storedMarker(id, 'assignee');
     const waiting = section(page, 'waiting');
     const flight = section(page, 'in-flight');
-    if (fs.existsSync(file)) throw new Refused(`no assignee on ${id} before the page gives it — ${file} is there`);
+    if (marker() !== null) throw new Refused(`no assignee on ${id} before the page gives it — its record is there`);
     try {
       await expectVisible(waiting.locator(`article[data-run="${id}"]`), `${id} waits on you at its gate: a card under Waiting on you`);
       await expectCount(flight.locator(`tr[data-run="${id}"]`), 0, 'and no row in flight');
@@ -55,7 +53,7 @@ export default {
 
       const put = await sent(page, 'POST', { to: WHO, why: WHY });
       if (put.status !== 200) throw new Refused(`the api gives the run to ${WHO} — it answered ${put.status}: ${put.text}`);
-      if (!fs.existsSync(file)) throw new Refused(`the api wrote ${file} — it is not there`);
+      if (marker() === null) throw new Refused('the api wrote the assignee record — it is not there');
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectCount(waiting.locator(`article[data-run="${id}"]`), 0, `in someone's hand, ${id} is not under Waiting on you`);
@@ -80,7 +78,7 @@ export default {
 
       const back = await sent(page, 'DELETE');
       if (back.status !== 200) throw new Refused(`the api takes the run back — it answered ${back.status}: ${back.text}`);
-      if (fs.existsSync(file)) throw new Refused(`giving it back removed ${file} — it is still there`);
+      if (marker() !== null) throw new Refused('giving it back removed the assignee record — it is still there');
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       await expectVisible(waiting.locator(`article[data-run="${id}"]`), `given back, ${id} is under Waiting on you again`);
@@ -89,8 +87,8 @@ export default {
       if (JSON.stringify(again) !== JSON.stringify([before, inFlight]))
         throw new Refused(`the counts are as they were — they say ${again}, from ${before} and ${inFlight}`);
     } finally {
-      fs.rmSync(file, { force: true });
-      fs.rmSync(file.replace(/\.assignee$/, '.unassigned'), { force: true });
+      dropStoredMarker(id, 'assignee');
+      dropStoredMarker(id, 'unassigned');
     }
   },
 } satisfies PageSpec;

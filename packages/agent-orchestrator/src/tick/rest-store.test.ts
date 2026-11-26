@@ -25,6 +25,9 @@ import {
   runKey,
   runRecord,
   runsNow,
+  markCancelled,
+  plantMarker,
+  dropMarker,
 } from '../../testing.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
@@ -46,7 +49,7 @@ import { placeOver, unreadBy } from '../../test/place-over.ts';
 import { story } from '../../test/story.ts';
 import * as verbs from '../runner.ts';
 import { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun } from '../runner.ts';
-import { holdFile, markCancelled, pruneFile, runsDir } from '../record/record.store.ts';
+import { runsDir } from '../record/record.store.ts';
 import { resumePause, putPause } from '../pause/pause.store.ts';
 import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { feedFile } from '../feed/feed.store.ts';
@@ -601,7 +604,7 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
       assert.ok(s.memo.runs.has(run.id), 'at rest after the pass that judged it');
       assert.equal(await s.rested(), before + 1, 'answered from memory on the next, and judged the same in full (verifyRest)');
       assert.equal((await s.answered(run.id)).status, 'cancelled');
-      await s.evicts(".pruned, a word of a person's, which takes it out as it takes any run out", pruned, run);
+      await s.evicts("its pruned marker, a word of a person's, which takes it out as it takes any run out", pruned, run);
     },
   );
   const worktreesGone = (run: Run) => {
@@ -730,9 +733,8 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
 
 /** An event the runtime appends to a task: what it cost. */
 const measuredEvent = (usage: object) => ({ kind: 'measured', at: new Date().toISOString(), attempt: 1, usage }) satisfies Event;
-/** A marker of `.pruned`, as `nemia prune` writes it. */
-const pruned = (run: Run) =>
-  fs.writeFileSync(pruneFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
+/** A `pruned` marker, as `nemia prune` writes it. */
+const pruned = (run: Run) => plantMarker(ROOT, run.id, 'pruned', `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
 
 /**
  * The informer (`informerRead`, informer.verb.ts), which the board's reads keep: an answer kept for a run at rest is given back while its
@@ -794,14 +796,14 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     const s = await small();
     await s.evicts('the record', (run) => plantRecord(ROOT, runKey(run.id), recordText(ROOT, runKey(run.id)) ?? ''));
   });
-  test("a person's .cancelled beside the record, and the pass that reads it says so", async () => {
+  test("a person's cancelled marker beside the record, and the pass that reads it says so", async () => {
     const s = await small();
-    const run = await s.evicts('.cancelled', (r) => markCancelled(ROOT, r.id));
+    const run = await s.evicts('its cancelled marker', (r) => markCancelled(ROOT, r.id));
     assert.equal((await s.answered(run.id)).status, 'cancelled');
   });
-  test("a person's .pruned beside the record, and the pass that reads it says so", async () => {
+  test("a person's pruned marker beside the record, and the pass that reads it says so", async () => {
     const s = await small();
-    const run = await s.evicts('.pruned', pruned);
+    const run = await s.evicts('its pruned marker', pruned);
     assert.ok((await s.answered(run.id)).run.pruned, 'the run reads as pruned');
   });
   test("a hold, for as long as it holds: what it waits on is another run's", async () => {
@@ -809,17 +811,17 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     const run = s.aResting();
     const before = await s.rested();
     const steadily = await s.measured();
-    fs.writeFileSync(holdFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [] })}\n`);
+    plantMarker(ROOT, run.id, 'hold', `${JSON.stringify({ at: new Date().toISOString(), until: [] })}\n`);
     const held = await s.measured();
     assert.deepEqual(
       [held.rested, held.records],
       [before - 1, steadily.records + 1],
       'held on no run, the held run is judged afresh, and no other',
     );
-    fs.writeFileSync(holdFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [s.inFlight[0].id] })}\n`);
+    plantMarker(ROOT, run.id, 'hold', `${JSON.stringify({ at: new Date().toISOString(), until: [s.inFlight[0].id] })}\n`);
     assert.equal(await s.rested(), before - 1);
     assert.equal(await s.rested(), before - 1, 'held, it is judged afresh on every pass');
-    fs.rmSync(holdFile(ROOT, run.id));
+    dropMarker(ROOT, run.id, 'hold');
     assert.equal(await s.rested(), before - 1, 'the hold lifted, the pass that reads it judges afresh');
     assert.equal(await s.rested(), before);
   });
@@ -955,7 +957,7 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     assert.notEqual(s.memo.cursor, undefined);
     assert.equal(await s.rested(), before, 'and the pass after answers from memory what it answered before');
   });
-  test("a run's stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory", async () => {
+  test("a run's stamp moves with any record of its markers, said words included, and not with its own directory", async () => {
     const s = await small();
     const run = s.aResting();
     const stamp = () => runsNow(ROOT).runs.stamps().get(run.id);
@@ -964,11 +966,12 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     fs.mkdirSync(path.join(runsDir(ROOT), run.id, 'inputs'), { recursive: true });
     fs.writeFileSync(path.join(runsDir(ROOT), run.id, 'inputs', 'brief.md'), 'what the run was given\n');
     assert.equal(stamp(), was, 'its directory — its files and inputs — is no input of a pass');
-    fs.writeFileSync(path.join(runsDir(ROOT), `${run.id}.later`), 'a marker a later version writes\n');
-    assert.notEqual(stamp(), was, 'a file named for the run is stamped, whatever it is called');
-    fs.rmSync(path.join(runsDir(ROOT), `${run.id}.later`));
-    assert.equal(stamp(), was, 'and, gone, the stamp is as it was');
-    assert.equal(runsNow(ROOT).runs.stamps().has(`${run.id}-other`), false, 'a run with no files has no stamp');
+    plantMarker(ROOT, run.id, 'refresh', '{}');
+    const marked = stamp();
+    assert.notEqual(marked, was, 'a marker of the run is stamped');
+    runsNow(ROOT).said.put(run.id, 'work', 'a word before the step was filed');
+    assert.notEqual(stamp(), marked, 'and so is a word said to a step');
+    assert.equal(runsNow(ROOT).runs.stamps().has(`${run.id}-other`), false, 'a run with no records has no stamp');
   });
   test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchanged, throws under verifyRest, naming the run', async () => {
     const s = await small();
@@ -1013,12 +1016,12 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     assert.equal((await l.read(memo)).kept(run), undefined, 'its task appended');
     assert.equal(memo.runs.has('fed'), false);
   });
-  test('REFUSED: the list: a file beside its record takes the run out', async () => {
+  test('REFUSED: the list: a marker beside its record takes the run out', async () => {
     const l = listMemo();
     const run = l.stored('written');
     const memo = await l.memoOf(run, 'done');
-    fs.writeFileSync(path.join(runsDir(ROOT), 'written.cancelled'), '2026-10-04T11:00:00.000Z');
-    assert.equal((await l.read(memo)).kept(run), undefined, 'a file beside its record');
+    plantMarker(ROOT, 'written', 'cancelled', '2026-10-04T11:00:00.000Z');
+    assert.equal((await l.read(memo)).kept(run), undefined, 'a marker beside its record');
   });
   test('REFUSED: the list: a run read otherwise, or its record rewritten, is answered no more', async () => {
     const l = listMemo();

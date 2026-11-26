@@ -30,7 +30,7 @@ const pickRepository = (name: string, repos: readonly string[]) =>
   });
 
 /**
- * What the page reads in `place` (`placeFor`), the store's factories being `listings` (`listedAtOnce`):
+ * What the page reads in `place` (`placeFor`), the store's factories being `listings` (`listedAt`):
  *
  * - A factory named: its repository, or `several-repositories` where it works on several and the request names none.
  * - A `?repo=` in the default factory: that repository, one a factory works on (`placeFor`).

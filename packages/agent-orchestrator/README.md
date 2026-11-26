@@ -3174,8 +3174,8 @@ board's Lift…) does. Every screen says `held until a person lifts it`, with it
 the board's bell stays quiet. Its file says `until: []`, so a restart keeps it. A folder run may take this
 hold, and only this one: it names no branch to land on.
 
-The hold is a person's fact in a file of its own, `runs/<id>.hold`, `{ at, until, why?, by }`, beside
-the record, as `.cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
+The hold is a person's fact in a record of its own, `/registry/runmarks/<id>/hold`, `{ at, until, why?, by }`, beside
+the record, as `cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
 hold it read: one put again since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
 is held until says so and names the `wf hold … --off` that lets it go.
 
@@ -3210,7 +3210,7 @@ two and the keys a feed line or a selector reads itself (`run`, `step`, `agent`,
 - **Where they are set**: a card's `labels:` map in its frontmatter; `--label key=value` on `nemia inbox add` and `nemia start`;
   `nemia label run <id> team=core old-` and `nemia label inbox <name> …`, kubectl's shape, a changed value taking `--overwrite`; and the
   board, on a card's page and a run's.
-- **Where they are kept**: a card's in its own file; a run's in `runs/<id>.labels`, a person's file beside the record, composed on read
+- **Where they are kept**: a card's in its own file; a run's in `/registry/runmarks/<id>/labels`, a person's record beside the run's, composed on read
   and never written into it, so a relabel never races the tick's rewrite of the record. `nemia rm` removes it.
 - **Inherited once, at creation**: from the card and from every `--after` and `--from` run. A key the runs agree on is copied, the
   card's beat the runs', a typed `--label` beats both and `--label key-` drops one; a key two runs disagree on is left out, and the start
@@ -3568,10 +3568,10 @@ $ wf factory detach pipao build
 $ wf factory rm pipao
 ```
 
-- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
-  all included; its name is the file's. `wf factory
-  add` writes it whole to a hidden file and links it onto its name, so a reader never sees half of one and two adds of one
-  name file one. A key beside `volumes` is kept when the file is read; a file
+- **A factory is the record `/registry/factories/<name>`** (the file `$WF_ROOT/factories/<name>.json` of before is imported once), `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
+  all included; its name is the record's. `wf factory
+  add` creates it whole, so a reader never sees half of one and two adds of one
+  name file one. A key beside `volumes` is kept when the record is read; a file
   an earlier release wrote, with `repos` and `origins`, is moved into volumes once, when the daemon starts.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
   `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
@@ -4434,7 +4434,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 - **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
   workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
-  asks directory and its `done/`: `restStamps`, one `readdir` and a `stat` each), each of its tasks' journals (the runtime's feed, read
+  asks directory and its `done/`: the revisions of its record, asks and markers), each of its tasks' journals (the runtime's feed, read
   once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (read off the heads
   of the pass's one `standing` a repository, place and base branch, `passStanding`). Its record is not read again either while its stamp holds: the memo keeps the run as it read it and hands it to the
   listing (`keptOf`), so a pass reads only the records of runs in flight or whose files moved. The breakdown says how many (`, 200 runs at
@@ -4459,7 +4459,7 @@ the engine has tasks, not runs, and "file nothing further" is not a fact any one
 Stopping the session ends the work burning right now; the mark on the run is what stops the next
 tick cheerfully filing the step after it.
 
-The mark is a file of its own — `runs/<id>.cancelled`, not a field in the run's json — and that
+The mark is a record of its own — `/registry/runmarks/<id>/cancelled`, not a field in the run's json — and that
 is not fussiness. The json has a writer that rewrites it constantly: a tick reads the record,
 spends seconds observing sessions and cutting worktrees, then writes back what it filed. `wf
 cancel` is a second writer, and the whole point of it is to be typed while that daemon is running.
@@ -4589,8 +4589,8 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | path | what it is | written by | `wf rm` |
 |---|---|---|---|
 | `db/state.db`, its `-wal` and `-shm` | the store's keyspace: each run's record, the claim it holds on its card, and its asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent under `done/` | `wf start`, `wf retry` (and `--round`), `wf approve`; the tick, while the run's record exists | the run's records removed, its record first |
-| `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
-| `runs/<id>.pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
+| `/registry/runmarks/<id>/cancelled` | when it was called off | `wf cancel` | removed |
+| `/registry/runmarks/<id>/pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
@@ -4706,7 +4706,7 @@ has is refused, not handed off.
 - **a folder run** (`place: folder`): its steps' folders are its work, kept until `wf rm`.
 - whatever `wf rm` refuses, and for the same reasons: a step waiting at its gate, an ask no pass has spent.
 
-**A pruned run is marked, and read as over.** `wf prune` writes `runs/<id>.pruned` — when, and each worktree
+**A pruned run is marked, and read as over.** `wf prune` writes `/registry/runmarks/<id>/pruned` — when, and each worktree
 with its size — before it removes anything, so a pass that reads the run mid-prune files nothing into a
 worktree about to go. The mark is a person's fact beside the record, composed on read as a cancellation is.
 `wf ls` prints `(pruned)` beside the run, `wf decide` says when and what it kept, and the board's run page
@@ -4899,7 +4899,7 @@ holding a concurrency slot forever.
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines, a daemon's start and the free sweep's processes ended written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `emitLeftEnded`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/following/following.ts` | one step's session followed live, pure: the moments a follower is handed (`StepMoment`), and where a following goes each time the step is read again — another attempt, a wait on the feed, or its end (`nextOf`) |
 | `src/following/following.verb.ts` | one step's session followed live across a person's answer, the next turn and a try, waking on the step's lines of the feed between them (`followStep`) |
-| `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
+| `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`countRead`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `skills/read.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a repository run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches/branches.store.ts` | where a run's result branches stand, read off a `BranchReader` over the place's `standing`: whether each landed and where it stands (`standingsOf`, `shippedOf`, `branchStandings`, `resultBranches`), a parent run as its record and the standing say it (`parentRecord`), and the tips of a run's branches (`resultTips`) |
@@ -4964,12 +4964,12 @@ for the same reason, and so does the `wf` command.
 
 | path | |
 |---|---|
-| `db/state.db` | the store's keyspace: a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it the claim it holds on its card and a person's asks — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds; a person's markers stay files in `runs/`: `<id>.cancelled` and the rest |
-| `imported/` | a store's run files from before the keyspace (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`), moved aside once imported, never deleted |
+| `db/state.db` | the store's keyspace: a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it the claim it holds on its card and a person's asks — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds; a person's markers are records beside it, under `/registry/runmarks/<id>/` (`cancelled`, `pruned`, `hold`, `unheld`, `assignee`, `unassigned`, `labels`, `refresh`, `said/<n>`), and `nemia rm`'s at `/registry/forgetting/<id>`; the factories, their levels, servers and status are records under `/registry/` too |
+| `imported/` | a store's files from before the keyspace — a run's (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`), its markers (`runs/<id>.cancelled` and the rest, `runs/<id>.said/`, `forgetting/<id>.json`) and the factories' (`factories/<name>.json`, and `level.json`, `servers.json` and `status.json` in a factory's folder) — moved aside once imported, never deleted |
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`, and `inputs/cards/` for `--card`) and `artifacts/<step>/`, each mounted read-only on the steps of a run handed this one (`--from`); a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
-| `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
+| `factories/` | a factory each, the record `/registry/factories/<name>` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, `stoppedAt` once it stopped, and what its engine holds and serves (`holder`, never a secret) (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |

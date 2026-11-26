@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { cardsPath, fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredCard, OUT, store, storeCard, storedRecord, storedRuns, storeRecord, takeBackRuns } from '../world.ts';
+import { dropStoredCard, OUT, plantStoredMarker, store, storeCard, storedRecord, storedRuns, storeRecord, takeBackRuns } from '../world.ts';
 
 /** The card this page files in the factory, starts from the Inbox, and sees ended once its run is called off. */
 const CARD = 'show-the-cards-in-play-e2e0';
@@ -59,7 +58,6 @@ export default {
   name: 'inbox-in-play',
   route: '/inbox',
   expect: async (page) => {
-    const runsDir = path.join(store!, 'runs');
     const runsBefore = storedRuns();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
@@ -125,7 +123,7 @@ export default {
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-in-play-label-${theme}.png`), { fullPage: true });
 
-      fs.writeFileSync(path.join(runsDir, `${id}.cancelled`), new Date().toISOString());
+      plantStoredMarker(id, 'cancelled', new Date().toISOString());
       fed(id, 'cancelled');
       await load(other, '/inbox');
       await expectCount(cardIn(other, CARD), 0, `its run called off, ${CARD} leaves In play`);

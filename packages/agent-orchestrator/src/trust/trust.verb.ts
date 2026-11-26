@@ -5,7 +5,8 @@
  * again (`FACTORY_TRUST`). The repository a folder is in is the place's answer (`root`), and the trust is the runtime's.
  */
 import { StoreRoot } from '../config/root.store.ts';
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
+import type { FactoryListing } from '../factory/factory.ts';
 import { Effect, Schema } from 'effect';
 import { tried, trustFolder } from '../runtime-client.ts';
 import { FACTORY_TRUST_WORDS } from 'objects';
@@ -62,8 +63,7 @@ export const TrustInput = Schema.Struct({ factory: Schema.String });
 export type TrustInput = typeof TrustInput.Type;
 
 /** The places of the factory `name`; refuses, as `Missing`, a name the store has no factory under, and one whose file does not read. */
-function placesOf(home: string, name: string) {
-  const all = listedAtOnce(home);
+function placesOf(all: readonly FactoryListing[], name: string) {
   const found = all.find((f) => f.name === name);
   if (!found)
     throw new Missing({
@@ -89,7 +89,8 @@ export const FACTORY_TRUST: Served<{ name: string; trusts: readonly PlaceTrust[]
   handler: ({ factory: name }) =>
     Effect.gen(function* () {
       const home = yield* StoreRoot;
-      const repos = yield* tried(() => placesOf(home, name));
+      const all = yield* listedAt(home);
+      const repos = yield* tried(() => placesOf(all, name));
       return { name, trusts: yield* trustPlaces(repos) };
     }),
 };

@@ -12,7 +12,7 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
-import { keysUnder, recordText, runKey, runsNow } from '../testing.ts';
+import { keysUnder, plantFactory, recordText, runFolderNames, runKey, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -279,9 +279,8 @@ describe("REFUSED at nemia start, before a run is written: a step's first filing
     const repo = aRepo();
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
     const dir = lone('settings-asked', 'agent: plain', { plain: '---\nrole: Builder\n---\nBuild it.\n' });
-    fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
     const file = { volumes: [{ path: repo, readOnly: false }], workflows: ['settings-asked'], harnessSettings };
-    fs.writeFileSync(path.join(ROOT, 'factories', 'settled.json'), JSON.stringify(file));
+    plantFactory(ROOT, 'settled', JSON.stringify(file));
     started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[6]) });
     assert.deepEqual(asked, [harnessSettings]);
     const steps = loadWorkflows(dir, PLACES);
@@ -404,11 +403,7 @@ describe("nemia start copies the workflow folder whole into the run's own, read-
   test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
     const dir = folder('linked', lines({ implement: '' }));
     fs.symlinkSync(path.join(ROOT, 'notes.md'), path.join(dir, 'helper.ts'));
-    const dirs = () =>
-      [
-        ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
-        ...keysUnder(ROOT, '/registry/runs/'),
-      ].sort();
+    const dirs = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
     const before = dirs();
     await refused(() => started(dir), path.join(dir, 'helper.ts'));
     assert.deepEqual(dirs(), before, 'no run directory either');

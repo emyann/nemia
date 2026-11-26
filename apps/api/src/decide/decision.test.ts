@@ -15,7 +15,7 @@ import { prunedKept, prunedWords } from 'agent-orchestrator';
 import type { Decidable, DecideCommand, RunDecision } from 'objects';
 import { app } from '../app.ts';
 import { objectOf } from '../../test/run-reads.ts';
-import { plantAsk, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { plantAsk, plantRecord, runKey, plantMarker } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -353,7 +353,7 @@ describe("a run's decision on the api, and the run object beside it: one reading
       writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d10-implement', branch }, review: { taskId: null } } });
       assert.deepEqual((await detailOf('r-d10')).status.waitingOnYou, ['implement']);
       const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
-      fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
+      plantMarker(root, 'r-d10', 'pruned', JSON.stringify(pruned));
       assert.deepEqual((await decidable('r-d10')).commands, []);
       const page = await detailOf('r-d10');
       assert.deepEqual(
@@ -374,7 +374,7 @@ describe("a run's decision on the api, and the run object beside it: one reading
   );
   s.test('a run called off is a 200 carrying `nothing` alone; an unknown run is a 404 that says where to look', async () => {
     writeRun({ id: 'r-d4', repo, baseRef: base, steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: null } } });
-    fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
+    plantMarker(root, 'r-d4', 'cancelled', '2026-09-13T01:00:00.000Z');
     const { status, body } = await decisionOf('r-d4');
     assert.deepEqual([status, Object.keys(body)], [200, ['nothing']]);
     const res = await app.request('/api/runs/no-such-run/decision');

@@ -21,6 +21,7 @@ import {
   runKey,
   runRecord,
   runsNow,
+  markCancelled,
 } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
@@ -63,7 +64,7 @@ import {
 } from '../src/runner.ts';
 import { decidedOf } from './screens.ts';
 import { typed as onHandler } from './typed.ts';
-import { inputsDir, markCancelled, runsDir } from '../src/record/record.store.ts';
+import { inputsDir, runsDir } from '../src/record/record.store.ts';
 import { sayRun } from '../src/say/say.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { Invalid, isRefusal, type Refusal } from '../src/refusal/refusal.ts';

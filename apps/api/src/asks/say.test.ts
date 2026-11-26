@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
-import { keysUnder, plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, plantMarker, plantRecord, recordText, runFolderNames, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -35,11 +35,6 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /** A Claude Code task filed and left in `phase`, with `closeout` where it ended. */
 const task = (taskId: string, phase: Parameters<ReturnType<typeof testEngine>['settle']>[1], closeout?: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
@@ -74,7 +69,7 @@ const record = (id: string, steps: Record<string, { taskId: string | null }>) =>
   );
 record(R, { implement: { taskId: 't-implement' }, settled: { taskId: 't-settled' }, review: { taskId: null } });
 record(C, { implement: { taskId: 't-cancelled' } });
-write(path.join(root, 'runs', `${C}.cancelled`), at(5));
+plantMarker(root, C, 'cancelled', at(5));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -94,8 +89,7 @@ const sayTo = (step: string, body: unknown, headers: Record<string, string> = BO
 /** Every file the api could have written, the runs' records and marks, and every word the engine was asked to say. */
 const written = () => ({
   files: Object.fromEntries(
-    fs
-      .readdirSync(path.join(root, 'runs'))
+    runFolderNames(root)
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(root, 'runs', f), 'utf8')]),
   ),

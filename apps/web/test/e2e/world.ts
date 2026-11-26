@@ -185,6 +185,64 @@ export function dropStoredRecord(id: string) {
   inApi('t.dropRecord(root, t.runKey(input));', id);
 }
 
+/**
+ * The text of the record of the factory `name` in the seeded store, as the store holds it: what a page keeps to put back. Throws where
+ * there is none.
+ * @param name The factory's name.
+ */
+export function storedFactory(name: string) {
+  const text = inApi("return t.factoryText(root, input) ?? '';", name);
+  if (!text) throw new Error(`the seeded store holds no factory ${name}: seed it first`);
+  return text;
+}
+
+/**
+ * The record of the factory `name` in the seeded store written as `text`, over the one there or none: what a page plants or changes.
+ * @param name The factory's name.
+ * @param text The record's text.
+ */
+export function storeFactory(name: string, text: string) {
+  inApi('t.plantFactory(root, input.name, input.text);', { name, text });
+}
+
+/**
+ * The MCP servers recorded for the factory `name` in the seeded store, by server name: none where none is recorded.
+ * @param name The factory's name.
+ */
+export function storedServers(name: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.readFactoryServers(root, input) ?? {});', name)) as Record<
+    string,
+    { url?: string; headers?: Record<string, string> }
+  >;
+}
+
+/**
+ * The MCP servers of the factory `name` in the seeded store written as `servers`: what a page plants for a card to read.
+ * @param name The factory's name.
+ * @param servers The servers, by server name.
+ */
+export function storeServers(name: string, servers: object) {
+  inApi('t.writeFactoryServers(root, input.name, input.servers);', { name, servers });
+}
+
+/**
+ * What the controller observed of the factory `name` in the seeded store, written as `status`: what a page plants for a card to read.
+ * @param name The factory's name.
+ * @param status The status, as `statusOf` of the page's applied state gives it.
+ */
+export function storeStatus(name: string, status: object) {
+  inApi('t.writeStatus(root, input.name, input.status);', { name, status });
+}
+
+/**
+ * The factory `name` taken out of the seeded store, its level, servers and status with it, there or not: what a page does to take back
+ * a factory it made.
+ * @param name The factory's name.
+ */
+export function dropStoredFactory(name: string) {
+  inApi('t.dropFactory(root, input);', name);
+}
+
 /** Every kind's files the seed wrote as a store before the keyspace taken up into its records, as each door's first read would. */
 export function storeTakenUp() {
   inApi('t.kindsTakenUp(root);');
@@ -206,6 +264,37 @@ export function storedKeys(prefix: string) {
  */
 export function storeRecordAt(root: string, key: string, text: string) {
   inApi('t.plantRecord(input.root, input.key, input.text);', { root, key, text });
+}
+
+/** A marker a person keeps beside a run (`plantMarker`, the orchestrator's testing entry). */
+export type StoredMarker = 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'assignee' | 'unassigned' | 'labels' | 'refresh';
+
+/**
+ * The text of the run `id`'s marker in the seeded store, or null where it has none.
+ * @param id The run's id.
+ * @param marker Which marker.
+ */
+export function storedMarker(id: string, marker: StoredMarker) {
+  return JSON.parse(inApi('return JSON.stringify(t.markerText(root, input.id, input.marker) ?? null);', { id, marker })) as string | null;
+}
+
+/**
+ * `text` planted as the run `id`'s marker in the seeded store, over what is there: a marker a page writes as no verb would, and takes back.
+ * @param id The run's id.
+ * @param marker Which marker.
+ * @param text What it holds.
+ */
+export function plantStoredMarker(id: string, marker: StoredMarker, text: string) {
+  inApi('t.plantMarker(root, input.id, input.marker, input.text);', { id, marker, text });
+}
+
+/**
+ * The run `id`'s marker taken out of the seeded store, there or not.
+ * @param id The run's id.
+ * @param marker Which marker.
+ */
+export function dropStoredMarker(id: string, marker: StoredMarker) {
+  inApi('t.dropMarker(root, input.id, input.marker);', { id, marker });
 }
 
 /**
@@ -377,24 +466,28 @@ export function restoreRunKeys(before: Record<string, string>) {
 }
 
 /**
- * The run `id` taken out of the seeded store, its record and every ask of it, there or not: what a page that wrote a run takes back.
+ * The run `id` taken out of the seeded store, its record, every ask of it and every marker beside it, there or not: what a page that
+ * wrote a run takes back.
  * @param id The run's id.
  */
 export function dropStoredRun(id: string) {
-  inApi('for (const name of t.askNames(root, input)) t.dropAsk(root, input, name); t.dropRecord(root, t.runKey(input));', id);
+  inApi(
+    'for (const name of t.askNames(root, input)) t.dropAsk(root, input, name); for (const marker of t.markerKeys(root, input)) t.dropMarker(root, input, marker); t.dropRecord(root, t.runKey(input));',
+    id,
+  );
 }
 
 /**
- * The runs a page started since it read `before` (`storedRuns`) taken back by hand: each one's record, its asks, the claim of the card it
- * was started from where that claim names it, and each of its files under `runs/` (its folder and its marks): what `nemia rm` removes of
- * a run.
+ * The runs a page started since it read `before` (`storedRuns`) taken back by hand: each one's record, its asks, its markers, the claim
+ * of the card it was started from where that claim names it, and each of its files under `runs/` (its folder): what `nemia rm` removes
+ * of a run.
  * @param before The ids of the runs the store held before the page started any.
  */
 export function takeBackRuns(before: readonly string[]) {
   const made = storedRuns().filter((id) => !before.includes(id));
   if (!made.length) return;
   inApi(
-    "const ids = new Set(input); for (const key of t.keysUnder(root, t.claimKey(''))) { try { if (ids.has(JSON.parse(t.recordText(root, key) ?? '{}').run ?? '')) t.dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of t.askNames(root, id)) t.dropAsk(root, id, name); t.dropRecord(root, t.runKey(id)); }",
+    "const ids = new Set(input); for (const key of t.keysUnder(root, t.claimKey(''))) { try { if (ids.has(JSON.parse(t.recordText(root, key) ?? '{}').run ?? '')) t.dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of t.askNames(root, id)) t.dropAsk(root, id, name); t.dropRecord(root, t.runKey(id)); for (const marker of t.markerKeys(root, id)) t.dropMarker(root, id, marker); }",
     made,
   );
   const runsDir = path.join(store!, 'runs');

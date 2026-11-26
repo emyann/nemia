@@ -1,6 +1,6 @@
 /**
  * `nemia up` as a person runs it brings a factory made from a template to it: a process of its own, on a scratch store where
- * `nemia factory apply` filed the factory's file alone, renders its base, seeds its tree and writes its status, with no other verb run.
+ * `nemia factory apply` filed the factory's record alone, renders its base, seeds its tree and writes its status, with no other verb run.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo, in the child as in any test that ticks a store.
  */
 import { test } from 'vitest';
@@ -14,6 +14,7 @@ import { typed } from './typed.ts';
 import { builtinGitPlace, engine } from '../src/runner.ts';
 import { teamCopy } from './team.ts';
 import { WAITED } from 'agent-runtime/testing';
+import { readStatus } from '../testing.ts';
 
 const PKG = path.join(import.meta.dirname, '..');
 const BIN = path.join(PKG, 'bin', 'nemia.ts');
@@ -52,10 +53,13 @@ test(
     t.onTestFinished(() => {
       up.child.kill();
     });
-    const status = path.join(folder, 'status.json');
     const tree = path.join(folder, 'tree', 'factory.json');
-    await up.until(() => fs.existsSync(status) && fs.existsSync(tree), "the controller writes the factory's status and seeds its tree");
-    const written = JSON.parse(fs.readFileSync(status, 'utf8')) as { version: string; conditions: { type: string; reason: string }[] };
+    await up.until(
+      () => readStatus(root, 'shaped') !== undefined && fs.existsSync(tree),
+      "the controller writes the factory's status and seeds its tree",
+    );
+    const written = readStatus(root, 'shaped');
+    assert.ok(written, 'the status is a record');
     assert.equal(written.version, '0.1.0');
     assert.deepEqual(
       written.conditions.map((c) => `${c.type} ${c.reason}`),

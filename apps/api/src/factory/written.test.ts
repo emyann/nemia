@@ -5,7 +5,7 @@
  * instruct --clear` took off an instruction. A story in a scratch store
  * whose factory is filed with the package's own verb; a read answers no `written`.
  */
-import { root } from '../../test/harness.ts';
+import '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,7 +28,7 @@ const step = path.join(folder, 'workflows', 'make', 'code.md');
 fs.mkdirSync(path.dirname(step), { recursive: true });
 fs.writeFileSync(step, '---\nplace: git\n---\nDo code.\n');
 addFactory({ name: 'wrote', volumes: [folder].map((r) => `${r}:rw`) });
-const FILE = path.join(root, 'factories', 'wrote.json');
+const FILE = '/registry/factories/wrote';
 
 const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown = {}) => app.request(url, { method, headers: json, body: JSON.stringify(body) });
@@ -81,7 +81,7 @@ describe('each write of a factory and its parts says the file it wrote and what 
   });
   s.test('a server recorded says the address it replaced, and its removal the record it wrote', async () => {
     const route = '/api/namespaces/wrote/mcpservers/docs';
-    const servers = path.join(root, 'factories', 'wrote', 'servers.json');
+    const servers = '/registry/servers/wrote';
     assert.deepEqual((await answered<McpServer>(send('PUT', route, { url: 'https://a.example/mcp' }))).written, {
       file: servers,
       was: null,

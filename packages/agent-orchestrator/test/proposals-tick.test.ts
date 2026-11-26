@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { ProposedObject } from 'objects';
 import { scratch } from 'test-kit/scratch';
+import { plantFactory } from '../testing.ts';
 import { staged, story } from './story.ts';
 import { startRun, tickRun, runWith } from '../src/runner.ts';
 import { main } from '../src/cli/main.ts';
@@ -47,8 +48,9 @@ const run = <A, E>(program: Effect.Effect<A, E, any>) => stage.runWith(stage.boa
 function factory(name: string) {
   const factories = path.join(ROOT, 'factories');
   fs.mkdirSync(factories, { recursive: true });
-  fs.writeFileSync(
-    path.join(factories, `${name}.json`),
+  plantFactory(
+    ROOT,
+    name,
     JSON.stringify({
       volumes: [{ path: scratch('wf-proposals-tick-repo-'), readOnly: false }],
       template: { source: '/t/team', version: '0.1.0', params: {} },

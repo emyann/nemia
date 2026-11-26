@@ -10,7 +10,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { askKeyOf, askNames, dropRecord, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, dropRecord, plantRecord, recordText, runKey, runRecord, markCancelled } from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -35,7 +35,7 @@ import {
   startRun,
   runWith,
 } from '../src/runner.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { told } from './typed.ts';

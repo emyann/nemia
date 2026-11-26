@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { tickRun, runWith, readFeed } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { levelsNow } from '../src/level/levels.verb.ts';
 import { readPause } from '../src/pause/pause.store.ts';

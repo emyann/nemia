@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { handled } from '../../../test/typed.ts';
-import { addFactoryAt, readFactoryAt } from '../factory.store.ts';
+import { addFactoryAt, factoryText, readFactoryAt } from '../../../testing.ts';
 import type { Env } from '../../config/config.store.ts';
 import { FACTORY_VOLUME_SET } from './volume.verb.ts';
 
@@ -30,9 +30,9 @@ const stored = () => readFactoryAt(ROOT, 'mill').volumes;
 
 /** That `run` is refused with `tag`, naming `named`, and leaves the factory's file as it was. */
 async function refused(run: Promise<unknown>, tag: 'Invalid' | 'Missing' | 'Conflict', named: string) {
-  const before = fs.readFileSync(file, 'utf8');
+  const before = factoryText(ROOT, 'mill');
   await assert.rejects(run, (err: Error & { _tag?: string }) => err._tag === tag && err.message.includes(named));
-  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(factoryText(ROOT, 'mill'), before);
 }
 
 test('a switch given is written on the volume named, its name stored, its folder, its mark and the other volume as they read', async () => {

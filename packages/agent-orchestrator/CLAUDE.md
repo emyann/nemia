@@ -27,7 +27,7 @@ of its kind, never from an older file that looks alike:
   asks the function before each write; `src/pause/pause.store.test.ts` walks every mode and event against both, and refuses another
   writer.
 - **A state written as several marks that combine**: a person's marks on a run. `contracts/run-marks.contract.ts`,
-  `src/run-marks/run-marks.ts` (a word for every set of the marks, so no set of files is unreadable), `src/record/marks.store.test.ts`.
+  `src/run-marks/run-marks.ts` (a word for every set of the marks, so no set of files is unreadable), `src/runs/marks.store.test.ts`.
 - **A state worked out on every pass and never written**: whether a run has ended. `contracts/run-ending.contract.ts` and
   `src/run-ending/run-ending.ts`: one table over the closed type, which each reader asks in place of a list of its own. No move function
   and no writer: there is nothing to write.
@@ -131,7 +131,7 @@ of its kind, never from an older file that looks alike:
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
   compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
   reads as no drift and a reverted one as behind.
-- **A run's labels are a person's file, `runs/<id>.labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
+- **A run's labels are a person's record, `/registry/runmarks/<id>/labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.
@@ -148,11 +148,11 @@ of its kind, never from an older file that looks alike:
   `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it stands,
   its claim written with its record and removed with it (`runs.forget`). An ask's refusal names its key, not a path.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/door/factories.store.ts`), whose default is rooted**:
-  it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
+  it reads the records at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
   with `StoreRoot` given where its program is composed (`storeConfigLayer`). A test that only needs a factory to exist gives its program one
   `factoryDoorMemory()` (`src/factory/door/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); no file
-  of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`, with no baseline); a synchronous caller
-  names its root (`doorAtOnce`). A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
+  of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`, with no baseline); a caller with no door
+  given opens one at its root (`doorAt`). A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
 - **A card is read and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`), rooted as the Factory door is**: the
   inbox's verbs are programs that yield it, so a test runs one with its root given (`Effect.provideService(program, StoreRoot, root)`;
@@ -242,7 +242,7 @@ of its kind, never from an older file that looks alike:
 - **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine(env)`
   hands the runtime the ceiling and the pools. A new engine verb is a row of `ENGINE_VERBS`, its phase and what it changes of a task
   (`src/engine-verbs/engine-verbs.verb.ts`), which the typecheck demands; an admitted task starts on the runtime's next pass.
-- **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
+- **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into the run's stamp (`stampsOf`, `src/runs/records.store.ts`) (and
   into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
   missed for good. The informer beside it (`src/rest/`) holds every
   run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same

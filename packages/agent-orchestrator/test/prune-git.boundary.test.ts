@@ -4,7 +4,7 @@
  * no branch and a locked one, each refused with the command that clears it; and a worktree detached since a prompt's listing, judged
  * again and kept. On `gitPlaceLayer` and the engine's stand-in, over a store of its own at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { markerText, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -37,8 +37,6 @@ const git = (cwd: string, ...args: string[]) =>
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
-const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
-
 /** A repository with one commit, whose `.gitignore` names what a worktree is given: `node_modules`. */
 const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -118,14 +116,14 @@ test('REFUSED at shipped defaults: a worktree on no branch, holding a commit no 
   const d = await runWith(detached.e, prune(detached.run.id, { yes: true, unmerged: true }));
   assert.equal(d.kind, 'refused');
   names(d.refusal, detached.wt, head.slice(0, 7), `git -C ${detached.wt} switch -c <branch>`, `nemia prune ${detached.run.id} --unmerged`);
-  assert.ok(fs.existsSync(detached.wt) && !under('runs', `${detached.run.id}.pruned`));
+  assert.ok(fs.existsSync(detached.wt) && markerText(ROOT, detached.run.id, 'pruned') === undefined);
 
   const locked = await aFinished();
   git(locked.repo, 'worktree', 'lock', '--reason', 'on a stick', locked.wt);
   const l = await runWith(locked.e, prune(locked.run.id, { yes: true, unmerged: true }));
   assert.equal(l.kind, 'refused');
   names(l.refusal, locked.wt, 'on a stick', `git -C ${locked.repo} worktree unlock ${locked.wt}`);
-  assert.ok(fs.existsSync(locked.wt) && !under('runs', `${locked.run.id}.pruned`));
+  assert.ok(fs.existsSync(locked.wt) && markerText(ROOT, locked.run.id, 'pruned') === undefined);
 });
 
 test('after a prompt each run is judged again before its removal: one whose worktree was detached on a commit no branch has since the listing is refused and kept, and the other is pruned', async () => {
@@ -155,7 +153,10 @@ test('after a prompt each run is judged again before its removal: one whose work
     ['refused', 'pruned'],
   );
   names('pruning' in done[0] ? done[0].pruning.refusal : undefined, first.wt, 'git -C', 'switch -c <branch>');
-  assert.ok(fs.existsSync(first.wt) && !under('runs', `${ids[0]}.pruned`), 'the detached worktree stands, and its run is not marked');
+  assert.ok(
+    fs.existsSync(first.wt) && markerText(ROOT, ids[0], 'pruned') === undefined,
+    'the detached worktree stands, and its run is not marked',
+  );
   assert.ok(!fs.existsSync(second.wt));
   const inventoried = asked.flatMap((a) =>
     a.verb === 'inventory' ? [path.basename((a.request as PlaceRequests['inventory']).under)] : [],

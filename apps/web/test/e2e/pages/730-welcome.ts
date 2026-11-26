@@ -8,7 +8,7 @@ import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { GATED, LANDED } from '../seed.ts';
 import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { apiEnv, OUT, store } from '../world.ts';
+import { apiEnv, dropStoredMarker, OUT, store } from '../world.ts';
 
 /** A check of a harness, as the api answers it: the keys the page reads. */
 type Check = { name: 'version' | 'turn'; state: 'passed' | 'failed' | 'running' | 'unrun'; message: string; fixes: [] };
@@ -220,7 +220,7 @@ async function labelRun(page: Page, id: string, edits: string[]) {
 /** The labels a first card's hints read taken back from the seeded run `id`, and the file the edit left. */
 async function unlabelRun(page: Page, id: string) {
   await labelRun(page, id, ['onboarding-']).catch(() => undefined);
-  if (store !== undefined) fs.rmSync(path.join(store, 'runs', `${id}.labels`), { force: true });
+  if (store !== undefined) dropStoredMarker(id, 'labels');
 }
 
 /** The workflows sdlc's render gives a factory made from it, which the board's first card picks quick among. */

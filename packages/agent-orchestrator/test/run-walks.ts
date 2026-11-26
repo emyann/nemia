@@ -379,7 +379,7 @@ const RUNS: Record<string, Walk[]> = {
   ],
   'runs.forget': [
     {
-      name: "a run forgotten loses its record and every person's file, in order, another run keeps its own, and a second forget removes nothing",
+      name: 'a run forgotten loses its record, its asks and every marker, in key order, another run keeps its own, and a second forget removes nothing',
       walk: ({ door }) => {
         for (const id of ['w-forget', 'w-forget-other']) {
           made(door, id);
@@ -404,12 +404,12 @@ const RUNS: Record<string, Walk[]> = {
         removed: [
           '/registry/runs/w-forget',
           '/registry/asks/w-forget/approve-implement-1',
-          'runs/w-forget.cancelled',
-          'runs/w-forget.pruned',
-          'runs/w-forget.hold',
-          'runs/w-forget.refresh',
-          'runs/w-forget.labels',
-          'runs/w-forget.said/',
+          '/registry/runmarks/w-forget/cancelled',
+          '/registry/runmarks/w-forget/hold',
+          '/registry/runmarks/w-forget/labels',
+          '/registry/runmarks/w-forget/pruned',
+          '/registry/runmarks/w-forget/refresh',
+          '/registry/runmarks/w-forget/said/1',
         ],
         taken: false,
         kept: true,
@@ -922,9 +922,9 @@ const FORGETTING: Record<string, Walk[]> = {
   ],
   'forgetting.where': [
     {
-      name: "a run's marker is found under forgetting/",
+      name: "a run's marker is found at its key under /registry/forgetting/",
       walk: ({ door }) => act(door.forgetting.where(idOf('w-fg-where'))),
-      says: '<root>/forgetting/w-fg-where.json',
+      says: '/registry/forgetting/w-fg-where',
     },
   ],
 };

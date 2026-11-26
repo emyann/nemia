@@ -99,8 +99,8 @@ place's to answer** (its `root` verb). The orchestrator asks both when a place j
 `src/trust/trust.verb.ts`), and says no harness's word of it: every sentence that names the harness, its file or its key is the
 runtime's, carried whole (`HARNESS_WORDS` in `packages/agent-orchestrator/test/words.test.ts`).
 
-**A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a file beside the factory,
-`factories/<name>/servers.json`, read and written by `packages/agent-orchestrator/src/factory/servers/` — its store taking the store's root as
+**A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a record of the keyspace,
+`/registry/servers/<name>`, read and written by `packages/agent-orchestrator/src/factory/servers/` — its store taking the store's root as
 a required `home: string`, as every store function does since the root became a service (`StoreRoot`). What a session is handed is the
 runtime's: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of a server object's bytes, in one fixed key order,
 feeding both the session's `Options.mcpServers` and the state read, because the harness files a sign-in under those bytes and two
@@ -172,7 +172,7 @@ below it and asks one it cannot read (`Scope`), naming no agent. The static rule
 command's class (`nemiaFence`).
 
 **Levels** are the person's and the orchestrator's (`src/level/`): each factory's default, `manual`, `semi-auto` or `auto`, in its own
-file (`factories/<name>/level.json`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for
+record (`/registry/levels/<name>`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for
 the default factory, and a raise for a stretch that ends by itself, read as it passes with no write (`levelOf`).
 
 **The policies** are the person's and the orchestrator's (`src/auto/`, a folder named as the store's `auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
@@ -484,10 +484,13 @@ methods take a `RunId` and answer Effects failing with a refusal. It has two lay
 (`runDoorKeyspace`, over `runRecords` in `src/runs/records.store.ts`) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`,
 which no file of `src` imports: `STAND_INS` in `test/boundary.test.ts`). On the keyspace a run's record is the record at
 `/registry/runs/<id>`, its card's claim the one at `/registry/claims/<card>` naming it, and each ask a person writes the one at
-`/registry/asks/<id>/<name>`, spent under `done/<name>` (`src/runs/run-keys.ts`); a person's markers stay files beside them under
-`runs/` until they become records too, and every read composes them onto the run. Writes that belong together are one transaction
+`/registry/asks/<id>/<name>`, spent under `done/<name>` (`src/runs/run-keys.ts`); a person's markers are records beside them under
+`/registry/runmarks/<id>/` (`cancelled`, `pruned`, `hold`, `unheld`, `labels`, `refresh`, each word said at `said/<n>`; `src/runs/marks.store.ts`),
+and `nemia rm`'s marker at `/registry/forgetting/<id>`, outside them, since it outlives the run's record; every read composes the markers
+onto the run, and the run's stamp is the revisions of its record, asks and markers. Writes that belong together are one transaction
 (`within`, `src/keyspace/keyspace.store.ts`): a run created with its card's claim, a pass's record written with the asks it spent
-(`runs.settle`), a run forgotten with its claim and its asks. Each write is checked first, on both layers: a new run decodes through
+(`runs.settle`), a guarded marker write asking the marks' machine first (`runMarkMove`), a run forgotten with its claim, its asks and its
+markers. Each write is checked first, on both layers: a new run decodes through
 the model's `Run` (`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a
 break of an invariant is `Invalid`; a new run at an id with a record is `Conflict`. One table of walks holds the layers to each other
 (`test/run-walks.ts`, run on the keyspace by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's
@@ -522,8 +525,12 @@ verb's. Its default departs from the Run door's on one point, which the pattern 
 and `Invalid`, naming the fix, where none was given — a new door may read no root of its own module's (rule 4's `root-given`), and a
 required service would change every controller's type at once. The Run door keeps its module-root default until its files store takes
 a root. No file of `src` but the door's imports the stores it is over or calls one, with no baseline (`src/factory/door/factories.store.test.ts`);
-a synchronous caller names its root and reads through the door at once (`readFactoryAtOnce`, `filedAtOnce`, `listedAtOnce`,
-`startFactoryAtOnce`, `doorAtOnce`).
+a caller that has no door given opens one at its root (`doorAt`) and runs the Effect it asks (`factoryOrNone`, `listedAt`, `startFactory`).
+
+The factories' own records are the keyspace's too: a factory (`/registry/factories/<name>`), its level, its servers and what the controller last
+observed of it (`/registry/applied/<name>`), written by the Factory door's layer in one transaction where several move together, a level beside the
+generation it counts; the files of before — `factories/<name>.json` and `level.json`, `servers.json`, `status.json` in the factory's folder — are imported
+once by the kind's import (`FACTORY_FILES`) and moved under `<root>/imported/`. A factory's folder, its rules and its instruction stay files.
 
 **The Card door.** A card of the inbox, and the tick's tries of a queued one, are read and written through `CardDoor`
 (`packages/agent-orchestrator/src/cards/cards.store.ts`), rooted as the Factory door is: two layers built the one way (`cardDoorOver`),
@@ -653,7 +660,7 @@ keyspace (`<kind>Records`), its memory stand-in the same code over a keyspace in
 imported by one decision (`src/keyspace/import.store.ts`, an `ImportKind` per kind: its folders, and for each file its key, where it is
 moved aside and how its text reads), each file the first time a process opens the keyspace after it, moved under `<root>/imported/` and
 never deleted; a file that does not read is left where it was. The keyspace is its owner's alone: `db/` is 0700 and `state.db` 0600. A
-run's markers and the factory's record stay files until a card of their own moves them.
+run's markers are imported by their own kind (`RUN_MARK_FILES`); the factory's record stays files until a card of its own moves it.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the

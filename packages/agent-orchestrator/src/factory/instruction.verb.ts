@@ -10,7 +10,7 @@ import { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FactoryInstructionWo
 import type { Served } from '../command/entry.verb.ts';
 import { defaultFactoryRefusal, DEFAULT_INSTRUCTION, instructionPathRefusal, type InstructionAt } from './factory.ts';
 import type { FactoryInstruction } from './instruction.store.ts';
-import { doorAtOnce, FactoryDoor, filedFactory } from './door/factories.store.ts';
+import { doorAt, FactoryDoor, filedFactory } from './door/factories.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
@@ -19,15 +19,14 @@ export type { FactoryInstruction };
 
 /**
  * The instruction of the factory `name` in the store `home`, read afresh where its file says it is kept (`instructionAt`), through the
- * Factory door at once: the plain spelling the package's entry exports, for a caller that is no program. Refused as the door refuses its
- * read.
+ * Factory door: the spelling the package's entry exports, for a caller that names its root. Refused as the door refuses its read.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function factoryInstruction(home: string, name: string) {
-  if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('instruction') });
-  return doorAtOnce(home, (door) => door.instruction.read(FactoryName.read(name)));
-}
+export const factoryInstruction = (home: string, name: string) =>
+  name === DEFAULT_NAMESPACE
+    ? Effect.fail(new Conflict({ message: defaultFactoryRefusal('instruction') }))
+    : doorAt(home, (door) => door.instruction.read(FactoryName.read(name)));
 
 /** The instruction of the factory `name`, read through the Factory door. */
 const instructionNow = (name: string) =>
@@ -70,8 +69,10 @@ function placeAsked({ clear, store, path }: InstructionInput) {
  * removed, so it reads `NEMIA.md` in its first folder again; written back through the door. Refused before anything is written: a path
  * that is not one (`instructionPathRefusal`, `Invalid`), the factory (`filedFactory`), and one made from a template, whose instruction
  * is its tree's (`Invalid`).
+ * @param name The factory's name.
+ * @param at Where its instruction is kept: a path in its first folder, the store, or undefined to remove the key.
  */
-const instructionPlaced = (name: string, at: InstructionAt | undefined) =>
+export const instructionPlaced = (name: string, at: InstructionAt | undefined) =>
   Effect.gen(function* () {
     if (at !== undefined && 'path' in at) {
       const bad = instructionPathRefusal(at.path);

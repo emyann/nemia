@@ -4,7 +4,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, dropStoredFactory, store, storeFactory } from '../world.ts';
 
 /** The factory the page writes, on the checkout, offering no workflow, so it hires no one into `mine`'s steps. */
 const FACTORY = 'unhirer-e2e';
@@ -24,11 +24,11 @@ export default {
   route: '/agents',
   expect: async (page) => {
     const { yours } = WORKFLOWS;
-    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
+    const factoryName = FACTORY;
     const madeFile = path.join(store!, 'workflows', 'agents', `${MADE.name}.md`);
     const refused = await page.context().newPage();
     try {
-      fs.writeFileSync(factoryFile, JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [] }, null, 2));
+      storeFactory(factoryName, JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [] }, null, 2));
       const { problems } = watch(refused);
       const creator = `/agents/new?into=${FACTORY}&workflow=${yours.name}&step=plan`;
       await refused.goto(new URL(creator, page.url()).href, { waitUntil: 'load' });
@@ -77,7 +77,7 @@ export default {
     } finally {
       await refused.close();
       fs.rmSync(madeFile, { force: true });
-      fs.rmSync(factoryFile, { force: true });
+      dropStoredFactory(factoryName);
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

@@ -1,10 +1,10 @@
 /**
  * The Factory: a factory served as an object, which no namespace holds (it is the namespace its parts are in). Its `spec` is what its
- * file says — its volumes, the writable ones those it works on, the workflows it offers, its hires by `<workflow>/<step>`, its harness
+ * record says — its volumes, the writable ones those it works on, the workflows it offers, its hires by `<workflow>/<step>`, its harness
  * settings,
  * whether its runs follow merged revisions, the template it was applied from and its own level — and its `status` what the controller
  * last observed of it: the generation it read, its conditions, the template's version its base holds, an upgrade waiting, its places a
- * harness does not trust now, and why its file does not read. Its `metadata.generation` counts the changes to its spec.
+ * harness does not trust now, and why its record does not read. Its `metadata.generation` counts the changes to its spec.
  *
  * Beside it, its sub-resources: its rules (`FactoryRules`), its instruction (`FactoryInstruction`) and the lines a person types for it
  * (`FactoryCommands`), with the bodies their writes are sent; and what its other writes are sent and answer: its revisions policy, a
@@ -69,14 +69,14 @@ export const FactoryTemplate = Schema.Struct({
 });
 export type FactoryTemplate = typeof FactoryTemplate.Type;
 
-/** A factory's harness settings, by harness, each a record of the settings its file names, as the file holds them. */
+/** A factory's harness settings, by harness, each a record of the settings its record names, as the record holds them. */
 export const HarnessSettings = Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown));
 export type HarnessSettings = typeof HarnessSettings.Type;
 
 /**
- * What a factory's file says: its volumes, the folders and repositories it reaches, its writable ones those it works on; the workflows it
+ * What a factory's record says: its volumes, the folders and repositories it reaches, its writable ones those it works on; the workflows it
  * offers, absent on the default factory, which offers every workflow
- * found; its hires, `<workflow>/<step>` to an agent's name; and, where its file names them, its harness settings, its
+ * found; its hires, `<workflow>/<step>` to an agent's name; and, where its record names them, its harness settings, its
  * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
  * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the
  * repository each workflow it attaches works on, by the workflow's name to the repository's folder name (`nemia factory attach <factory>
@@ -98,12 +98,12 @@ export const FactorySpec = Schema.Struct({
   }),
   harnessSettings: Schema.optionalKey(
     HarnessSettings.annotate({
-      description: 'Its harness settings, by harness, each a record of the settings its file names; absent where its file names none.',
+      description: 'Its harness settings, by harness, each a record of the settings its record names; absent where its record names none.',
     }),
   ),
   revisions: Schema.optionalKey(
     Schema.Literals(REVISIONS_POLICIES).annotate({
-      description: 'Whether its runs follow merged revisions or keep the ones they started on; absent where its file names none.',
+      description: 'Whether its runs follow merged revisions or keep the ones they started on; absent where its record names none.',
     }),
   ),
   template: Schema.optionalKey(
@@ -129,7 +129,7 @@ export const FactorySpec = Schema.Struct({
     }),
   ),
 }).annotate({
-  description: "What the factory's file says: its volumes, workflows, hires, settings, template, level and cost lines.",
+  description: "What the factory's record says: its volumes, workflows, hires, settings, template, level and cost lines.",
 });
 export type FactorySpec = typeof FactorySpec.Type;
 
@@ -198,7 +198,7 @@ export type FactoryUntrusted = typeof FactoryUntrusted.Type;
 /**
  * What the controller last observed of the factory: the generation of its spec it read (`observedGeneration`), its conditions (none on a
  * factory filed by hand, and before its first render), the template's version its base holds (`applied`), the upgrade waiting on the
- * person, its places a harness does not trust now, and why its file does not read (`error`, absent on a factory that reads).
+ * person, its places a harness does not trust now, and why its record does not read (`error`, absent on a factory that reads).
  */
 export const FactoryStatus = Schema.Struct({
   observedGeneration: Schema.optionalKey(describedNumber('The generation of the spec the controller last read.')),
@@ -208,10 +208,10 @@ export const FactoryStatus = Schema.Struct({
   applied: Schema.optionalKey(Schema.String.annotate({ description: "The template's version its base holds." })),
   upgrade: Schema.optionalKey(FactoryUpgrade.annotate({ description: 'The upgrade waiting on the person.' })),
   untrusted: Schema.Array(FactoryUntrusted).annotate({ description: 'Its places a harness does not trust now.' }),
-  error: Schema.optionalKey(Schema.String.annotate({ description: 'Why its file does not read; absent on a factory that reads.' })),
+  error: Schema.optionalKey(Schema.String.annotate({ description: 'Why its record does not read; absent on a factory that reads.' })),
 }).annotate({
   description:
-    'What the controller last observed of the factory: its conditions, the template version applied, an upgrade waiting, its untrusted places, and why its file does not read.',
+    'What the controller last observed of the factory: its conditions, the template version applied, an upgrade waiting, its untrusted places, and why its record does not read.',
 });
 export type FactoryStatus = typeof FactoryStatus.Type;
 
@@ -329,12 +329,12 @@ export const FactoryTrusted = Schema.Struct({
 export type FactoryTrusted = typeof FactoryTrusted.Type;
 
 /**
- * A factory removed (`DELETE /api/factories/<name>`): the factory, the file removed, and the folder of the instruction and the rules the
+ * A factory removed (`DELETE /api/factories/<name>`): the factory, its record removed, and the folder of the instruction and the rules the
  * store kept for it, removed whole (null where it kept none). A trust given to its places is left.
  */
 export const FactoryRemoved = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory removed.' }),
-  file: Schema.String.annotate({ description: "The factory's file that was removed." }),
+  file: Schema.String.annotate({ description: "The key of the factory's record that was removed." }),
   instruction: Schema.NullOr(Schema.String).annotate({
     description: 'The folder of the instruction and rules the store kept for it, removed whole; null where it kept none.',
   }),
@@ -382,7 +382,7 @@ export type FactoryInstructionWords = typeof FactoryInstructionWords.Type;
  */
 export const FactoryCommands = Schema.Struct({
   attach: Schema.String.annotate({ description: 'The line that attaches a workflow to the factory.' }),
-  rm: Schema.String.annotate({ description: "The line that removes the factory's file." }),
+  rm: Schema.String.annotate({ description: "The line that removes the factory's record." }),
   add: Schema.String.annotate({ description: 'The line that files the factory again.' }),
   schedule: Schema.String.annotate({ description: 'The line that schedules one of its workflows.' }),
   trust: Schema.String.annotate({ description: "The line that asks its places' trust again." }),
@@ -446,11 +446,11 @@ export const FactoryCreate = Schema.Struct({
 });
 export type FactoryCreate = typeof FactoryCreate.Type;
 
-/** What a filing answers: the factory, its volumes, its file, and what was asked for each of its places' trust. */
+/** What a filing answers: the factory, its volumes, its record's key, and what was asked for each of its places' trust. */
 export const FactoryCreated = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory filed.' }),
   volumes: Schema.Array(FactoryVolume).annotate({ description: 'Its volumes, none where it was filed with none.' }),
-  file: Schema.String.annotate({ description: 'Its file.' }),
+  file: Schema.String.annotate({ description: "Its record's key." }),
   trusts: Schema.Array(FactoryPlaceTrust).annotate({ description: "What was asked for each of its places' trust." }),
 });
 export type FactoryCreated = typeof FactoryCreated.Type;
@@ -484,7 +484,7 @@ export type VolumeWrite = typeof VolumeWrite.Type;
  * of its trust, none for a read-only one or under `noTrust`.
  */
 export const VolumeAdded = Schema.Struct({
-  file: Schema.String.annotate({ description: "The factory's file written." }),
+  file: Schema.String.annotate({ description: "The key of the factory's record written." }),
   volume: FactoryVolume.annotate({ description: 'The volume mounted.' }),
   was: Schema.NullOr(Schema.Boolean).annotate({
     description: 'What a volume of its path was marked before: true if read-only, false if writable; null for none.',
@@ -500,9 +500,9 @@ export const VolumeAdded = Schema.Struct({
 });
 export type VolumeAdded = typeof VolumeAdded.Type;
 
-/** A volume taken off (`DELETE /api/factories/<factory>/volumes?path=`): the factory's file written, and the path it mounts no more. */
+/** A volume taken off (`DELETE /api/factories/<factory>/volumes?path=`): the factory's record written, and the path it mounts no more. */
 export const VolumeRemoved = Schema.Struct({
-  file: Schema.String.annotate({ description: "The factory's file written." }),
+  file: Schema.String.annotate({ description: "The key of the factory's record written." }),
   removed: Schema.String.annotate({ description: 'The path it mounts no more.' }),
 });
 export type VolumeRemoved = typeof VolumeRemoved.Type;
@@ -535,7 +535,7 @@ export type FactoryApplyWrite = typeof FactoryApplyWrite.Type;
 export const FactoryApplied = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory filed.' }),
   volumes: Schema.Array(FactoryVolume).annotate({ description: 'Its volumes, none where it was made with none.' }),
-  file: Schema.String.annotate({ description: 'Its file.' }),
+  file: Schema.String.annotate({ description: "Its record's key." }),
   template: FactoryTemplate.annotate({ description: 'The template it was made from.' }),
   place: Schema.String.annotate({ description: 'Where the template is read.' }),
   tree: Schema.String.annotate({ description: 'The tree it runs from.' }),
@@ -556,10 +556,10 @@ export const FactoryAdoptWrite = Schema.Struct({
 });
 export type FactoryAdoptWrite = typeof FactoryAdoptWrite.Type;
 
-/** What a takeover wrote: the factory, its file, the template it is now made from, and the tree it runs from. */
+/** What a takeover wrote: the factory, its record's key, the template it is now made from, and the tree it runs from. */
 export const FactoryAdopted = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory taken over.' }),
-  file: Schema.String.annotate({ description: 'Its file.' }),
+  file: Schema.String.annotate({ description: "Its record's key." }),
   template: FactoryTemplate.annotate({ description: 'The template it is now made from.' }),
   tree: Schema.String.annotate({ description: 'The tree it runs from.' }),
 });
@@ -724,7 +724,7 @@ export const FactoryUpgraded = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory.' }),
   from: Schema.optionalKey(Schema.String.annotate({ description: 'The version its base holds; absent where no status names it.' })),
   to: Schema.String.annotate({ description: 'The version wanted.' }),
-  file: Schema.String.annotate({ description: 'Its file.' }),
+  file: Schema.String.annotate({ description: "Its record's key." }),
   dropped: Schema.Array(Schema.String).annotate({ description: 'The parameters the upgrade drops.' }),
   conflicts: describedNumber('How many conflicts wait for a choice.'),
 });

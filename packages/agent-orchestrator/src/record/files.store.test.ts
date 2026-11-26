@@ -1,7 +1,8 @@
 /**
  * The run store's two reads of a store that holds hundreds: `runs.find`, one run by id, found among the keys the store holds and never
  * read by a path made of the id; and `keptRuns`, every run projected off a memo keyed by the run's stamp, which every read that wants
- * a little of every run goes through. And a run's labels, a person's file beside the record (`runs/<id>.labels`): composed onto every
+ * a little of every run goes through. And a run's labels, a person's record beside the run's (`/registry/runmarks/<id>/labels`):
+ * composed onto every
  * read, never written into the record, written whole and removed by an empty map or with the run, and in the run's stamp.
  */
 import { beforeEach, describe, test, vi } from 'vitest';
@@ -10,14 +11,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
-import { labelsFile, writeLabels } from './files.store.ts';
-import { runsDir, restStamps } from './record.store.ts';
+import { runsDir } from './record.store.ts';
 import { recordMemo } from '../rest/index.ts';
 import { metered } from '../meter/tally.store.ts';
 import { keptRuns } from '../runs/runs.store.ts';
 import { RUNS_PREFIX } from '../runs/run-keys.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { dropRecord, emptyRuns, keysUnder, plantRecord, recordText, runKey, runsNow } from '../../testing.ts';
+import {
+  dropRecord,
+  emptyRuns,
+  keysUnder,
+  markerKeys,
+  markerText,
+  plantMarker,
+  plantRecord,
+  recordText,
+  runKey,
+  runsNow,
+} from '../../testing.ts';
 import type { Run } from './record.ts';
 
 const ROOT = scratch('wf-files-store-');
@@ -117,27 +128,11 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
   assert.deepEqual([...memo.runs.keys()], ['r-edit']);
 });
 
-/** What `body` wrote to stderr while it ran, line by line, and what it answered. */
-const stderrOf = <T>(body: () => T) => {
-  const lines: string[] = [];
-  const write = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (chunk: string | Uint8Array) => {
-    lines.push(...String(chunk).split('\n').filter(Boolean));
-    return true;
-  };
-  try {
-    return { lines, value: body() };
-  } finally {
-    process.stderr.write = write;
-  }
-};
-
-describe("a run's labels are a person's file beside the record: composed on every read, never written into it, and their write moves the stamp", () => {
-  test('`runs/<id>.labels` is read onto the run as `labels` by read, find, list and keptRuns; a run with none reads no `labels` key', () => {
+describe("a run's labels are a person's record beside the run's: composed on every read, never written into it, and their write moves the stamp", () => {
+  test('the labels record is read onto the run as `labels` by read, find, list and keptRuns; a run with none reads no `labels` key', () => {
     put('r-labelled');
     put('r-unlabelled');
-    assert.equal(labelsFile(ROOT, 'r-labelled'), path.join(runsDir(ROOT), 'r-labelled.labels'));
-    fs.writeFileSync(labelsFile(ROOT, 'r-labelled'), JSON.stringify({ team: 'core', tier: 'gold' }));
+    plantMarker(ROOT, 'r-labelled', 'labels', JSON.stringify({ team: 'core', tier: 'gold' }));
     const labels = { team: 'core', tier: 'gold' };
     assert.deepEqual(files.runs.read('r-labelled').labels, labels);
     assert.deepEqual(files.runs.find('r-labelled')?.labels, labels);
@@ -153,7 +148,7 @@ describe("a run's labels are a person's file beside the record: composed on ever
   });
   test('a run the memo keeps is listed as the very run given, its labels not read again', () => {
     put('r-kept');
-    fs.writeFileSync(labelsFile(ROOT, 'r-kept'), JSON.stringify({ team: 'core' }));
+    plantMarker(ROOT, 'r-kept', 'labels', JSON.stringify({ team: 'core' }));
     const kept = { ...files.runs.read('r-kept'), brief: 'kept' };
     const listed = files.runs.list(
       () => {},
@@ -166,59 +161,42 @@ describe("a run's labels are a person's file beside the record: composed on ever
   });
   test('`rewrite` writes no `labels` key into the record, and a `labels` key the record carries is not read as labels', () => {
     put('r-labelled');
-    writeLabels(ROOT, 'r-labelled', { team: 'core' });
+    files.labels.put('r-labelled', { team: 'core' });
     assert.ok(files.runs.rewrite({ ...files.runs.read('r-labelled'), brief: 'changed' }));
     const written = JSON.parse(recordText(ROOT, runKey('r-labelled')) ?? '{}') as Record<string, unknown>;
     assert.equal(written.brief, 'changed');
     assert.equal('labels' in written, false);
     assert.deepEqual(files.runs.read('r-labelled').labels, { team: 'core' });
     put('r-labels-in-record', { ...aRecord('r-labels-in-record'), labels: { team: 'stale' } });
-    assert.equal('labels' in files.runs.read('r-labels-in-record'), false, 'only the file says a run is labelled');
+    assert.equal('labels' in files.runs.read('r-labels-in-record'), false, 'only the marker says a run is labelled');
   });
-  test('`writeLabels` writes the whole map over the one there, an empty map removes the file, and no hidden file is left', () => {
+  test('`labels.put` writes the whole map over the one there, and an empty map removes the record, there or not', () => {
     put('r-labelled');
     files.labels.put('r-labelled', { a: '1', b: '2' });
     files.labels.put('r-labelled', { b: '3' });
-    assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile(ROOT, 'r-labelled'), 'utf8')), { b: '3' });
+    assert.deepEqual(JSON.parse(markerText(ROOT, 'r-labelled', 'labels') ?? '{}'), { b: '3' });
     assert.deepEqual(files.runs.read('r-labelled').labels, { b: '3' });
     files.labels.put('r-labelled', {});
-    assert.equal(fs.existsSync(labelsFile(ROOT, 'r-labelled')), false);
+    assert.equal(markerText(ROOT, 'r-labelled', 'labels'), undefined);
     assert.equal('labels' in files.runs.read('r-labelled'), false);
     files.labels.put('r-labelled', {});
-    assert.equal(fs.existsSync(labelsFile(ROOT, 'r-labelled')), false, 'removing none is no refusal');
-    assert.deepEqual(fs.readdirSync(runsDir(ROOT)), []);
-  });
-  test('a labels file that is no JSON object of strings reads as no labels, and is said, naming the file and the verb that mends it', () => {
-    for (const [id, text] of [
-      ['r-labels-text', 'not json'],
-      ['r-labels-list', '["team"]'],
-      ['r-labels-number', '{"team": 3}'],
-    ] as const) {
-      put(id);
-      fs.writeFileSync(labelsFile(ROOT, id), text);
-      const { lines, value } = stderrOf(() => files.runs.read(id));
-      assert.equal('labels' in value, false, id);
-      assert.equal(lines.length, 1, `${id} said once: ${lines.join('\n')}`);
-      assert.ok(lines[0].includes(labelsFile(ROOT, id)), lines[0]);
-      assert.ok(lines[0].includes(`nemia label run ${id}`), lines[0]);
-    }
+    assert.deepEqual(markerKeys(ROOT, 'r-labelled'), [], 'removing none is no refusal');
   });
   test("the run's rest stamp moves when its labels are written, and again when they are removed", () => {
     put('r-labels-stamp');
     const before = files.runs.stamps().get('r-labels-stamp');
     files.labels.put('r-labels-stamp', { team: 'core' });
     const written = files.runs.stamps().get('r-labels-stamp');
-    assert.ok(restStamps(ROOT).has('r-labels-stamp'), 'the labels file is a marker the stamp reads');
     files.labels.put('r-labels-stamp', {});
     const removed = files.runs.stamps().get('r-labels-stamp');
     assert.ok(before);
     assert.notEqual(written, before);
     assert.notEqual(removed, written);
   });
-  test('`nemia rm` removes the labels file with the run', () => {
+  test('`nemia rm` removes the labels record with the run', () => {
     put('r-labels-rm');
     files.labels.put('r-labels-rm', { team: 'core' });
-    assert.ok(files.runs.forget('r-labels-rm').includes(path.join('runs', 'r-labels-rm.labels')));
-    assert.equal(fs.existsSync(labelsFile(ROOT, 'r-labels-rm')), false);
+    assert.ok(files.runs.forget('r-labels-rm').includes('/registry/runmarks/r-labels-rm/labels'));
+    assert.deepEqual(markerKeys(ROOT, 'r-labels-rm'), []);
   });
 });

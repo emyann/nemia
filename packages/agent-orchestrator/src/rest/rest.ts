@@ -5,12 +5,13 @@
  * `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
- * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its
+ * they were when a pass last judged it — its record and every file a person keeps beside it (the Run door's stamps), each of its
  * tasks' journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and reads and judges every
  * run afresh. While a run's stamp holds, the memo answers it from the run it read, and its record is not read again until the stamp moves.
  * Nothing is written for it, and no verb, `nemia ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.
  */
 import type { Run } from '../record/record.ts';
+import { asksPrefix, runKey, runMarkKey, saidPrefix } from '../runs/run-keys.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Informed } from '../../contracts/informed.contract.ts';
 import type { HoldKeepsOut } from '../../contracts/rest-hold.contract.ts';
@@ -131,7 +132,8 @@ export const informedOf: Informed = ({ stampHeld, quiet, tipsHeld, atRest, sameP
   stampHeld && quiet && tipsHeld && (atRest || samePass) ? 'serve' : 'judge';
 
 /**
- * How an input of a run's judgement is watched: `stamp`, a file named for the run in the store, stamped (`restStamps`, record.store.ts);
+ * How an input of a run's judgement is watched: `stamp`, a record of the run in the keyspace, stamped by its revision (`stamps`, the Run
+ * door);
  * `feed`, a task's journal, by its line on the engine's feed (`followedFeed`); `tips`, a branch's tip as git reads it
  * (`BranchReader.heads`); `request`, read again on every request and never kept (`diskPartsOf`, object/run.verb.ts).
  */
@@ -168,19 +170,19 @@ type RunInput = keyof typeof RUN_INPUTS;
 export type InputsWatchedBy<W extends Watch> = { [K in RunInput]: (typeof RUN_INPUTS)[K] extends W ? K : never }[RunInput];
 
 /**
- * The file each stamped input is, named for the run in the store's `runs/`: `<id>.<suffix>`. `restStamps` stamps these, and any other
- * file so named, a marker nobody has named yet included.
+ * The key each stamped input sits at in the keyspace, a run's id written `<id>`: its record, its asks and each marker a person keeps
+ * beside it (`run-keys.ts`). The store's stamp is the revisions of these keys, so a marker written or removed moves its run's stamp.
  */
-export const STAMPED_FILES: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = {
-  record: 'json',
-  cancelled: 'cancelled',
-  pruned: 'pruned',
-  hold: 'hold',
-  unheld: 'unheld',
-  assignee: 'assignee',
-  unassigned: 'unassigned',
-  labels: 'labels',
-  said: 'said',
-  refresh: 'refresh',
-  asks: 'asks',
+export const STAMPED_KEYS: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = {
+  record: runKey('<id>'),
+  cancelled: runMarkKey('<id>', 'cancelled'),
+  pruned: runMarkKey('<id>', 'pruned'),
+  hold: runMarkKey('<id>', 'hold'),
+  unheld: runMarkKey('<id>', 'unheld'),
+  assignee: runMarkKey('<id>', 'assignee'),
+  unassigned: runMarkKey('<id>', 'unassigned'),
+  labels: runMarkKey('<id>', 'labels'),
+  said: saidPrefix('<id>'),
+  refresh: runMarkKey('<id>', 'refresh'),
+  asks: asksPrefix('<id>'),
 };

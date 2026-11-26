@@ -8,7 +8,7 @@
  * (`contracts/assignee.contract.ts`, `contracts/waits-on-you.contract.ts`); this file holds the files, the verb and the pass. The test's
  * store is its own, at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { markerText, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -31,9 +31,9 @@ const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
-const fileOf = (id: string, suffix: 'assignee' | 'unassigned' | 'hold') => path.join(ROOT, 'runs', `${id}.${suffix}`);
+const textOf = (id: string, suffix: 'assignee' | 'unassigned' | 'hold') => markerText(ROOT, id, suffix);
 const readFile = (id: string, suffix: 'assignee' | 'unassigned' | 'hold') =>
-  JSON.parse(fs.readFileSync(fileOf(id, suffix), 'utf8')) as Record<string, unknown>;
+  JSON.parse(textOf(id, suffix) ?? '') as Record<string, unknown>;
 
 /** What `nemia assign` answers: the run, whether it was given back, and the assignee. */
 type Assigned = { id: string; ended: boolean; assignee: { at: string; forMs: number; name?: string; why?: string } };
@@ -110,14 +110,14 @@ describe('a run at its gate assigned: in flight while it stands, given back to w
     assert.ok(summary.assignee?.comesBackAt, 'an ask is timed');
   });
   s.test('a second assignee is refused while one stands, and the first stands as it was', async () => {
-    const before = fs.readFileSync(fileOf(id, 'assignee'), 'utf8');
+    const before = textOf(id, 'assignee');
     await assert.rejects(assignTyped(id, '--to', 'ann'), refusedAs('Conflict'));
-    assert.equal(fs.readFileSync(fileOf(id, 'assignee'), 'utf8'), before);
+    assert.equal(textOf(id, 'assignee'), before);
   });
   s.test('`--off` gives it back: the file gone, its receipt says given back, and the run waits on you again', async () => {
     const back = await assignTyped(id, '--off');
     assert.equal(back.ended, true);
-    assert.equal(fs.existsSync(fileOf(id, 'assignee')), false);
+    assert.equal(textOf(id, 'assignee') !== undefined, false);
     assert.equal(readFile(id, 'unassigned').how, 'given-back');
     assert.equal(kindOf(await summaryOf(b, id)), 'waiting');
   });
@@ -140,7 +140,7 @@ test('a cancelled run is refused an assignee, and nothing is written', async () 
   const run = await atItsGate(b, aRepo(), 'cancelled at its gate');
   await stage.runWith(b.e, cancelRun(run.id));
   await assert.rejects(assignTyped(run.id), refusedAs('Conflict'));
-  assert.equal(fs.existsSync(fileOf(run.id, 'assignee')), false);
+  assert.equal(textOf(run.id, 'assignee') !== undefined, false);
 });
 
 test('a held run may be assigned: both files stand, and neither is the other', async () => {
@@ -149,7 +149,7 @@ test('a held run may be assigned: both files stand, and neither is the other', a
   const run = await atItsGate(b, repo, 'held and assigned');
   await stage.runWith(b.e, hold(run.id, []));
   await assignTyped(run.id);
-  assert.ok(fs.existsSync(fileOf(run.id, 'hold')) && fs.existsSync(fileOf(run.id, 'assignee')));
+  assert.ok(textOf(run.id, 'hold') !== undefined && textOf(run.id, 'assignee') !== undefined);
   const record = runRecord(ROOT, run.id);
   assert.ok(record.hold && record.assignee, 'the record carries both');
 });
@@ -165,7 +165,7 @@ test('the tick ends an assignee whose ask waited past its time, on its first pas
   } finally {
     vi.useRealTimers();
   }
-  assert.equal(fs.existsSync(fileOf(run.id, 'assignee')), false);
+  assert.equal(textOf(run.id, 'assignee') !== undefined, false);
   assert.equal(readFile(run.id, 'unassigned').how, 'lapsed');
 });
 
@@ -175,6 +175,6 @@ test('the tick ends an assignee whose run is over, and its receipt says it ended
   await assignTyped(run.id);
   await stage.runWith(b.e, cancelRun(run.id));
   await stage.runWith(quiet(b), tickRun());
-  assert.equal(fs.existsSync(fileOf(run.id, 'assignee')), false);
+  assert.equal(textOf(run.id, 'assignee') !== undefined, false);
   assert.equal(readFile(run.id, 'unassigned').how, 'ended');
 });

@@ -30,29 +30,32 @@ export const libraryServerThere = (home: string, name: string) => {
  * name shadows, each with the factories that add it.
  * @param home The store's root.
  */
-export function libraryServerObjects(home: string) {
+export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* (home: string) {
   const mine = libraryServers(home);
   const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
-  const own = Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt));
-  const builtin = builtinServers(BUILTIN_SERVERS)
-    .filter((s) => mine[s.name] === undefined)
-    .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt));
+  const own = yield* Effect.all(Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt)));
+  const builtin = yield* Effect.all(
+    builtinServers(BUILTIN_SERVERS)
+      .filter((s) => mine[s.name] === undefined)
+      .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt)),
+  );
   return [...own, ...builtin].sort((a, b) =>
     a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0,
-  ) satisfies McpServer[] as McpServer[];
-}
+  ) satisfies McpServer[];
+});
 
 /** The object of the library server `name` at `origin`, with the factories that add it. */
-const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string) => {
-  const status = { origin, factories: libraryUsers(home, { kind: 'McpServer', name }) };
-  return {
-    apiVersion: API_VERSION,
-    kind: 'McpServer',
-    metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
-    spec,
-    status,
-  } satisfies McpServer;
-};
+const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string) =>
+  Effect.map(libraryUsers(home, { kind: 'McpServer', name }), (factories) => {
+    const status = { origin, factories };
+    return {
+      apiVersion: API_VERSION,
+      kind: 'McpServer',
+      metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+      spec,
+      status,
+    } satisfies McpServer;
+  });
 
 /**
  * The library's server `name` recorded in the user library from `write`, a header sent as the mask keeping the value held, refused
@@ -88,6 +91,6 @@ export function libraryServerRemoved(home: string, name: string) {
  * @param query The list's query: its selector, limit and token.
  */
 export const libraryServerList = Effect.fn('libraryServerList')(function* (home: string, query: ObjectQuery) {
-  const listed: McpServerList = yield* objectsListed('McpServer', libraryServerObjects(home), query, 'library server');
+  const listed: McpServerList = yield* objectsListed('McpServer', yield* libraryServerObjects(home), query, 'library server');
   return listed;
 });

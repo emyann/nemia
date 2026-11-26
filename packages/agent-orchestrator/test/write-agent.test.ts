@@ -22,7 +22,7 @@ import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentSkillsFound, isRefusal, runWith as runEngine, StoreRoot } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, knownAt } from '../testing.ts';
 import { removeAgent, writeAgent } from '../src/agents/agents.store.ts';
 import { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } from '../src/agents/library.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -359,7 +359,7 @@ describe('REFUSED: a write or a removal the store will not make, by its kind and
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
       fs.rmSync(path.join(agents, 'scribe.md'));
       addFactoryAt(ROOT, { name: 'agent-known', volumes: [checkout].map((r) => `${r}:rw`) });
-      writeAgent(ROOT, agents, scribe, v);
+      writeAgent(ROOT, agents, scribe, { ...v, known: knownAt(ROOT) });
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },
   );

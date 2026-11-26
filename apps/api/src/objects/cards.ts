@@ -179,7 +179,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           throw new Refused({
             message: "`workflow` is a workflow folder's name, with no `/`: send one, or leave it out. Nothing was filed.",
           });
-        const { text, ...keys } = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s.home);
+        const { text, ...keys } = await filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s);
         const { card, labelsLeftOut } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));
         const filed = await cardIn(s, card.factory ?? DEFAULT_NAMESPACE, card.name);
         return labelsLeftOut?.length ? { ...filed, status: { ...filed.status, labelsLeftOut } } : filed;
@@ -198,7 +198,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
         orFailed(async (s) => {
           await cardIn(s, namespace, name);
           const factory = factoryOf(namespace);
-          const placed = factory === undefined ? s : { ...s, ...s.placedIn(namespace) };
+          const placed = factory === undefined ? s : { ...s, ...(await s.placedIn(namespace)) };
           const started = await cardStart(placed, name, payload, factory ?? s.factory?.name, namespace);
           return started;
         }),

@@ -11,7 +11,7 @@
  * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run of its
  * store, at `ROOT`.
  */
-import { dropRecord, plantRecord, runKey } from '../../testing.ts';
+import { dropRecord, plantRecord, runKey, dropMarker, plantMarker } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import { story } from 'test-kit/checkpoints';
@@ -201,11 +201,11 @@ describe("A serving process's memo: each call reads again only the runs whose in
     viewedRuns();
   });
   s.test('a run whose files in the store changed is read again, and no other', async () => {
-    fs.writeFileSync(path.join(ROOT, 'runs', 's-b.cancelled'), `${ended}\n`);
+    plantMarker(ROOT, 's-b', 'cancelled', `${ended}\n`);
     const answer = await through(memo);
     assert.deepEqual(viewedRuns(), ['s-b', 's-moving']);
     assert.deepStrictEqual(answer, await afresh());
-    fs.rmSync(path.join(ROOT, 'runs', 's-b.cancelled'));
+    dropMarker(ROOT, 's-b', 'cancelled');
     await through(memo);
     viewedRuns();
   });

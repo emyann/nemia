@@ -47,8 +47,8 @@ const named = (route: string, namespace: string, name: string) => {
 };
 
 /** The library's server `name`, read now; `Missing` naming the list where the library holds none. */
-const libraryServerIn = (s: Served, name: string) => {
-  const found = libraryServerObjects(s.home).find((one) => one.metadata.name === name);
+const libraryServerIn = async (s: Served, name: string) => {
+  const found = (await s.inRequest(libraryServerObjects(s.home))).find((one) => one.metadata.name === name);
   if (found === undefined)
     throw new Missing({
       error: `the library holds no server ${name}: list them with GET /api/mcpservers, or record it with PUT /api/mcpservers/${name}.`,
@@ -58,6 +58,14 @@ const libraryServerIn = (s: Served, name: string) => {
 
 /** The server `name` of `namespace`, read now. */
 const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, namespace, name));
+
+/** The library's server `name` removed, once its users are read: refused where a factory still names it; the server as it was. */
+const libraryRemoved = async (s: Served, name: string) => {
+  writeGoes('library', 'remove', libraryServerThere(s.home, name), await s.inRequest(libraryUsers(s.home, { kind: 'McpServer', name })));
+  const server = await libraryServerIn(s, name);
+  libraryServerRemoved(s.home, name);
+  return server;
+};
 
 export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
   handlers
@@ -75,14 +83,7 @@ export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
         return libraryServerIn(s, name);
       }),
     )
-    .handle('deleteLibrary', ({ params: { name } }) =>
-      answered(async (s) => {
-        writeGoes('library', 'remove', libraryServerThere(s.home, name), libraryUsers(s.home, { kind: 'McpServer', name }));
-        const server = libraryServerIn(s, name);
-        libraryServerRemoved(s.home, name);
-        return server;
-      }),
-    )
+    .handle('deleteLibrary', ({ params: { name } }) => answered((s) => libraryRemoved(s, name)))
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>
         answered(async (s) => {

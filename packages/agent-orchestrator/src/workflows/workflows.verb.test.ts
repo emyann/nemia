@@ -5,7 +5,7 @@
  * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
  * given as `ENV`.
  */
-import { cardKey, dropRecord, runsNow } from '../../testing.ts';
+import { dropFactory, cardKey, dropRecord, plantFactory, runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -170,11 +170,7 @@ function cardOn(name: string, dir: string, queued: boolean) {
 
 /** A factory's file: its repositories, the workflows it attaches and its hires. */
 function factoryOf(name: string, repos: string[], workflows: string[], hires: Record<string, string>) {
-  fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
-  fs.writeFileSync(
-    path.join(ROOT, 'factories', `${name}.json`),
-    JSON.stringify({ volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows, hires }),
-  );
+  plantFactory(ROOT, name, JSON.stringify({ volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows, hires }));
 }
 
 test('a folder of yours removed through the entry is gone, with every file it held named', async () => {
@@ -342,6 +338,6 @@ test('REFUSED: a factory offering the name with nothing else to give under it, a
   fs.mkdirSync(path.join(repo, 'workflows', 'offered'), { recursive: true });
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
-  fs.rmSync(path.join(ROOT, 'factories', 'shop.json'));
-  fs.rmSync(path.join(ROOT, 'factories', 'elsewhere.json'));
+  dropFactory(ROOT, 'shop');
+  dropFactory(ROOT, 'elsewhere');
 });

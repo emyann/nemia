@@ -169,7 +169,7 @@ export const answeredWrite = answering(true);
  * @param work The handler's body, given the services placed in that factory.
  */
 export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>) =>
-  answered((s) => work({ ...s, ...s.placedIn(namespace) }));
+  answered(async (s) => work({ ...s, ...(await s.placedIn(namespace)) }));
 
 /**
  * `answeredIn` for a write that touches the disk (`answeredWrite`).
@@ -177,7 +177,7 @@ export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>
  * @param work The handler's body, given the services placed in that factory.
  */
 export const answeredWriteIn = <A>(namespace: string, work: (s: Served) => Promise<A>) =>
-  answeredWrite((s) => work({ ...s, ...s.placedIn(namespace) }));
+  answeredWrite(async (s) => work({ ...s, ...(await s.placedIn(namespace)) }));
 
 /**
  * The answer of a start that made the run `id` given its address, `Location: /api/runs/<id>`, where the run object is read whatever

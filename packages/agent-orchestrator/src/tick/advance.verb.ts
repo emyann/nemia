@@ -123,7 +123,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
  * - lifts a person's hold on the pass that reads every run it names landed (`keptParent`), and goes on on that pass. A lift sticks, as a
- *   start after `--after` does; only the hold this pass read is lifted (`removeHold`), so one put again since stays; and one that names
+ *   start after `--after` does; only the hold this pass read is lifted, so one put again since stays; and one that names
  *   no run is never lifted here (`holdAdvice`).
  * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
  *   person approved, a run called off. What waits on it is filed on this same pass, since the run reads it settled once it signed
@@ -435,7 +435,7 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
 });
 
 /**
- * Lift a person's hold once every run it names has landed, each read through `parents`, and only the hold this pass read (`removeHold`):
+ * Lift a person's hold once every run it names has landed, each read through `parents`, and only the hold this pass read:
  * answers with its note, and with the moment the hold it lifted was put (`lifted`), which the feed writes as this pass's own deed and not
  * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */

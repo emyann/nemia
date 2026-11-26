@@ -78,7 +78,7 @@ export async function taskOfStep(id: string, step: string, home: string) {
     return { error: noSuchRun(id) } satisfies { run: Run; taskId: string | null } | { error: string } as
       | { run: Run; taskId: string | null }
       | { error: string };
-  if (!stepNames(run, workflowsOf(run, home).steps).includes(step)) {
+  if (!stepNames(run, (await Effect.runPromise(workflowsOf(run, home))).steps).includes(step)) {
     return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` } satisfies
       | { run: Run; taskId: string | null }
       | { error: string } as { run: Run; taskId: string | null } | { error: string };

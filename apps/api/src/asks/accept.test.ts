@@ -13,12 +13,11 @@
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { acceptKey, askNames, dropAsk, plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { acceptKey, askNames, dropAsk, plantRecord, recordText, runKey, runsNow, testPlace, plantMarker } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from 'objects';
 import { acceptRun, list, roundRun } from 'agent-orchestrator';
@@ -36,11 +35,6 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
@@ -112,7 +106,7 @@ beforeEachTest(() => {
   loopingRun(LEFT, 1, true);
   loopingRun(ENDED, 2, false);
   loopingRun(CANCELLED, 2, true);
-  write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+  plantMarker(root, CANCELLED, 'cancelled', at(20));
 });
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */

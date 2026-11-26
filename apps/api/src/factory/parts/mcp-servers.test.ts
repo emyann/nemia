@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { BUILTIN_SERVERS, builtinServers } from 'agent-orchestrator';
-import { addFactory } from 'agent-orchestrator/testing';
+import { addFactory, recordText } from 'agent-orchestrator/testing';
 import { HEADER_MASK, TABLE_ACCEPT, tableLines, type Table } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../../app.ts';
@@ -24,7 +24,7 @@ type McpServerList = import('objects').McpServerList;
 
 addFactory({ name: 'mcpmill', volumes: [scratch('nemia-api-servers-folder-')].map((r) => `${r}:rw`) });
 
-const FILE = path.join(root, 'factories', 'mcpmill', 'servers.json');
+const FILE = '/registry/servers/mcpmill';
 const URL = '/api/namespaces/mcpmill/mcpservers';
 const BUILTIN = '/api/mcpservers';
 
@@ -40,8 +40,8 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
   return body;
 }
 
-/** The record's file, or null: what a refusal must leave as it was. */
-const held = () => (fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : null);
+/** The record's text, or null: what a refusal must leave as it was. */
+const held = () => recordText(root, FILE) ?? null;
 
 /** A request refused with `status`, its words, and the record as it was. */
 async function refused(res: () => Response | Promise<Response>, status: number) {
@@ -127,7 +127,7 @@ describe("A person keeps a factory's MCP servers: none recorded, one recorded an
   s.test('a server removed leaves the record, and one the factory does not record is 404', async () => {
     assert.match(await refused(() => send('DELETE', `${URL}/nosuch`, {}), 404), /nosuch/);
     assert.equal((await answered<McpServer>(send('DELETE', `${URL}/github`, {}))).metadata.name, 'github', 'answered what it took off');
-    assert.equal(held(), null, 'the last server gone, the file is removed rather than left empty');
+    assert.equal(held(), null, 'the last server gone, the record is removed rather than left empty');
     assert.deepEqual((await answered<McpServerList>(app.request(URL))).items, []);
   });
   s.test('the builtin read answers what the builtin folder holds, a spec each and no namespace', async () => {

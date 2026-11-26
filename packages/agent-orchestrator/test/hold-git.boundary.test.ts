@@ -5,7 +5,8 @@
  * sets up together. Over a store and repositories of its own, with git for real. The rest of `nemia hold` is told on the stage, in
  * `hold.test.ts`, and its pure refusals in `src/wait/wait.test.ts`.
  */
-import { runRecord } from '../testing.ts';
+import { recordText, runRecord } from '../testing.ts';
+import { runMarkKey } from '../src/runs/run-keys.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -34,7 +35,6 @@ const git = (cwd: string, ...args: string[]) =>
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
-const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
 
 /** A repository with one commit. */
 const aRepo = () => {
@@ -205,5 +205,5 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
     dropped.id,
   );
 
-  for (const r of [pruned, folder, run]) assert.ok(!fs.existsSync(holdFileOf(r.id)), `no hold written on ${r.id}`);
+  for (const r of [pruned, folder, run]) assert.ok(recordText(ROOT, runMarkKey(r.id, 'hold')) === undefined, `no hold written on ${r.id}`);
 });

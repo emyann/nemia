@@ -12,7 +12,7 @@
  * Every story starts its own runs and counts only its own: they share this file's store at `ROOT`, given as `ENV`.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
  */
-import { keysUnder, listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
+import { keysUnder, listRuns, plantRecord, runKey, runRecord, markCancelled } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -43,7 +43,7 @@ import {
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { UnloadedFolder } from '../src/steps/steps.ts';
 import { isRepositoryRun } from '../src/run.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';

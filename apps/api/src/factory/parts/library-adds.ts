@@ -28,7 +28,7 @@ export const libraryAddsHandlers = readsBounded(Api, 'libraryadds', (handlers) =
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         factoryNamed(routeOf('GET', namespace, name), namespace);
-        return libraryAddNamed(s.home, namespace, name);
+        return s.inRequest(libraryAddNamed(s.home, namespace, name));
       }),
     )
     .handle('put', ({ params: { namespace, name } }) =>

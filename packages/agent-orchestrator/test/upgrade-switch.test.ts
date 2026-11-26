@@ -22,8 +22,10 @@ import { approveProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
-import { readFactoryAt } from '../src/factory/factory.store.ts';
-import { appliedDir, digestOf, entriesIn, readStatus, resolutionsFile, statusFile, treeDir } from '../src/factory/applied/applied.store.ts';
+import { factoryText, readFactoryAt } from '../testing.ts';
+import { appliedDir, digestOf, entriesIn, resolutionsFile, treeDir } from '../src/factory/applied/applied.store.ts';
+import { plantKey, readStatus, recordText } from '../testing.ts';
+import { appliedKey } from '../src/factory/door/index.ts';
 import { factoryTyped } from './factory-typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -168,19 +170,18 @@ describe('a switch onto another template: previewed with no common base, held to
     },
   );
   s.test('nemia factory upgrade refuses a switch without its plan, and files it with it', async () => {
-    const file = path.join(FACTORIES, 'crew.json');
-    const filedAs = fs.readFileSync(file, 'utf8');
+    const filedAs = factoryText(ROOT, 'crew');
     await assert.rejects(
       stage.main(['factory', 'upgrade', 'crew', '--to', '1.0.0', '--template', dirs.other]),
       refusedWith('Invalid', /--plan/),
     );
-    assert.equal(fs.readFileSync(file, 'utf8'), filedAs, 'refused, nothing written');
+    assert.equal(factoryText(ROOT, 'crew'), filedAs, 'refused, nothing written');
     const filed = (await stage.main(['factory', 'upgrade', 'crew', '--to', '1.0.0', '--template', dirs.other, '--plan', plan])) as {
       from: string;
       to: string;
     };
     assert.deepEqual([filed.from, filed.to], ['0.1.0', '1.0.0']);
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).template.source, dirs.other);
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'crew') ?? '').template.source, dirs.other);
   });
   s.test('the controller waits with the status alone: the base still named team, each conflict with no base side', async () => {
     const before = bytesUnder(tree());
@@ -256,9 +257,9 @@ test('a base whose status names no template is refused a switch until a pass nam
   await reconciled(factory('later'));
   const diff = ['factory', 'diff', 'later', '--to', '1.0.0', '--template', dirs.other];
   const unnamed = (change: (status: Record<string, unknown>) => void = () => {}) => {
-    const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'later'), 'utf8'));
+    const { template: _named, ...status } = JSON.parse(recordText(ROOT, appliedKey('later')) ?? '{}');
     change(status);
-    fs.writeFileSync(statusFile(ROOT, 'later'), JSON.stringify(status));
+    plantKey(ROOT, appliedKey('later'), JSON.stringify(status));
   };
   unnamed();
   const before = bytesUnder(FACTORIES);
@@ -286,8 +287,8 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   await reconciled(factory('moved'));
-  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'moved'), 'utf8'));
-  fs.writeFileSync(statusFile(ROOT, 'moved'), JSON.stringify(status));
+  const { template: _named, ...status } = JSON.parse(recordText(ROOT, appliedKey('moved')) ?? '{}');
+  plantKey(ROOT, appliedKey('moved'), JSON.stringify(status));
   const aside = path.join(scratch('wf-upgrade-switch-aside-'), 'team');
   fs.renameSync(dirs.team, aside);
   const gone = await reconciled(factory('moved'));
@@ -311,8 +312,8 @@ test('a factory whose template changed under its version is named after that tem
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   await reconciled(factory('kit'));
   rewrite(dirs.team, RULES, 'Never push.', 'Never push to main.');
-  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'kit'), 'utf8'));
-  fs.writeFileSync(statusFile(ROOT, 'kit'), JSON.stringify(status));
+  const { template: _named, ...status } = JSON.parse(recordText(ROOT, appliedKey('kit')) ?? '{}');
+  plantKey(ROOT, appliedKey('kit'), JSON.stringify(status));
   const changed = await reconciled(factory('kit'));
   assert.deepEqual([changed.conditions[0]?.reason, changed.template], ['ContentChanged', 'team']);
   const before = bytesUnder(FACTORIES);

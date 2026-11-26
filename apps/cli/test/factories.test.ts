@@ -62,7 +62,7 @@ describe('a person files a factory, wires its parts, sees each in the listing, a
   s.test('`factory add` with a repository typed relative files it on the folder by its whole path', async () => {
     const said = await out(['factory', 'add', 'mill', '--volume', 'mill:rw', '--no-trust']);
     assert.match(said, new RegExp(`^mill  ${repo}$`, 'm'));
-    assert.match(said, /^filed: .*mill\.json$/m);
+    assert.match(said, /^filed: \/registry\/factories\/mill$/m);
     assert.match(await out(['factory', 'ls']), new RegExp(`^mill +${repo}$`, 'm'));
   });
   s.test('`factory attach` attaches the workflow, and says so again unchanged; `hire` and `fire` fill its step', async () => {

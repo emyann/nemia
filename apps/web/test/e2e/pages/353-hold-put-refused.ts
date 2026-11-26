@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { askRunAction, fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredMarker, OUT, plantStoredMarker, storedMarker } from '../world.ts';
 
 export default {
   /**
@@ -18,12 +17,11 @@ export default {
   expect: async (page) => {
     const { id } = GATED;
     const until = HELD.id;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
-    const circle = path.join(store!, 'runs', `${until}.hold`);
     const refused = await page.context().newPage();
     try {
-      if (fs.existsSync(hold) || fs.existsSync(circle)) throw new Refused(`no hold on ${id} or ${until} before the page writes one`);
-      fs.writeFileSync(circle, JSON.stringify({ at: new Date().toISOString(), until: [id] }, null, 2), { flag: 'wx' });
+      if (storedMarker(id, 'hold') !== null || storedMarker(until, 'hold') !== null)
+        throw new Refused(`no hold on ${id} or ${until} before the page writes one`);
+      plantStoredMarker(until, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [id] }, null, 2));
       fed(until, 'held');
       const { problems } = watch(refused);
       await refused.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
@@ -45,7 +43,7 @@ export default {
       if (!(await said.textContent())?.includes(`Not held. The api refused it:${sentence}`))
         throw new Refused(`in the package's words — it says ${JSON.stringify(await said.textContent())}`);
       await expectVisible(dialog.locator(`[data-hold-run="${until}"]`), 'and stays open, the run still offered');
-      if (fs.existsSync(hold)) throw new Refused(`nothing is written — ${hold} is there`);
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`nothing is written — the hold record is there`);
       await expectCount(refused.locator('section[aria-label="Held"]'), 0, `and ${id}'s page says no hold`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `hold-put-refused-says-${await themeOf(refused)}.png`), { fullPage: true });
@@ -61,9 +59,9 @@ export default {
         );
     } finally {
       await refused.close();
-      const left = fs.existsSync(circle);
-      fs.rmSync(circle, { force: true });
-      fs.rmSync(hold, { force: true });
+      const left = storedMarker(until, 'hold') !== null;
+      dropStoredMarker(until, 'hold');
+      dropStoredMarker(id, 'hold');
       fed(until, HELD.blocked, 'running');
       if (left) await idle(page);
     }

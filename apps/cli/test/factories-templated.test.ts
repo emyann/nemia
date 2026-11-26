@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
+import { factoryText } from 'agent-orchestrator/testing';
 import { type Said, servedStore, write } from './served.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -72,8 +73,7 @@ async function out(argv: readonly string[], env?: NodeJS.ProcessEnv) {
 }
 
 /** The factory `name`'s file in the store at `root`. */
-const fileOf = (root: string, name: string) =>
-  JSON.parse(fs.readFileSync(path.join(root, 'factories', `${name}.json`), 'utf8')) as { template?: { source: string } };
+const fileOf = (root: string, name: string) => JSON.parse(factoryText(root, name) ?? '{}') as { template?: { source: string } };
 
 describe("under this machine's context a person makes a factory from a template's folder, and takes a hand-made one over by it", () => {
   const s = story(test);
@@ -142,7 +142,7 @@ describe("under a remote context, a template folder is packed here and kept by t
   });
   s.test("REFUSED: a repository typed relative names the daemon's machine, and its api refuses it; nothing is read here", async () => {
     assert.notEqual((await nemia(['factory', 'add', 'near', '--volume', 'mill:rw', '--no-trust'], laptop)).code, 0);
-    assert.equal(fs.existsSync(path.join(exposed.root, 'factories', 'near.json')), false);
+    assert.equal(factoryText(exposed.root, 'near') !== undefined, false);
     assert.equal(fs.existsSync(laptop.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
   });
 });

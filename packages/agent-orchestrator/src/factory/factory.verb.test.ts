@@ -14,7 +14,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { FACTORY } from './factory.verb.ts';
-import { addFactoryAt, attachWorkflowAt, setScheduleAt } from './factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../../testing.ts';
 import { recordMemo } from '../rest/index.ts';
 import { metered } from '../meter/tally.store.ts';
 import { runWith as runEngine, engineOf } from '../runtime-client.ts';

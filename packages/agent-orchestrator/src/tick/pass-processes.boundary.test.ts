@@ -26,7 +26,7 @@ import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { gitPlaceLayer, builtinGitPlace } from '../place/builtin.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../../testing.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-pass-processes-');

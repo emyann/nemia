@@ -304,7 +304,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const pause = yield* tried(() => readPause(home));
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const conflicts = yield* conflictsNow().pipe(Effect.orElseSucceed(() => undefined));
-  const missing = yield* tried(() => addsMissingNow(home)).pipe(Effect.orElseSucceed(() => undefined));
+  const missing = yield* addsMissingNow(home).pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
@@ -622,7 +622,8 @@ const passOf = (
 
 /**
  * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
- * inputs it answered on — its files in the store (`restStamps`), the run as read, and the result branches whose tips it would read. And
+ * inputs it answered on — its record, asks and markers (their revisions), the run as read, and the result branches whose tips it would
+ * read. And
  * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
  * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed. And `standing`,
  * what the pass's `standing` last read of each result branch against its run's `baseRef` (`StandingMemo`), which the place believes only

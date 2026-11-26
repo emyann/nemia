@@ -470,7 +470,7 @@ test('nemia rm prints the run it forgot in one line, worded off the answer, as i
         'the engine forgot 1 task of it (2.0 KB of journal, 1 feed line)',
         'it left ~/.claude/projects/x',
         "1 task of it waits — still running — and the daemon's passes forget it once it settles, from runs/r-2.forgetting",
-        'the engine refused to forget 1 task of it: not settled runs/r-2.forgetting keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm runs/r-2.forgetting',
+        'the engine refused to forget 1 task of it: not settled runs/r-2.forgetting keeps their ids and the daemon asks again each pass; settle what the engine refused on it, and the next pass lifts it',
       ].join('; '),
     ],
     [
@@ -524,7 +524,7 @@ test('nemia rm prints the run it forgot in one line, worded off the answer, as i
       [
         'r-6  forgotten: no worktrees',
         'no branches left',
-        'the engine refused to forget its tasks: forget: the store is read-only. runs/r-6.forgetting keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm runs/r-6.forgetting',
+        'the engine refused to forget its tasks: forget: the store is read-only. runs/r-6.forgetting keeps their ids and the daemon asks again each pass; settle what the engine refused on it, and the next pass lifts it',
       ].join('; '),
     ],
   ];

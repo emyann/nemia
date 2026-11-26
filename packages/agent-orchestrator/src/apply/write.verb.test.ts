@@ -18,6 +18,7 @@ import { objectWritten } from './write.verb.ts';
 import { currentOf } from '../propose/current.verb.ts';
 import { mergedSpec } from '../propose/propose.verb.ts';
 import { needsDeclaredIn, workflowNeeds, workflowReadme } from '../folder/folder.store.ts';
+import { plantFactory } from '../../testing.ts';
 import { readLibraryAdds } from '../library/library.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -85,8 +86,9 @@ function plantedNeeds(prefix: string) {
   const home = scratch(prefix);
   const factories = path.join(home, 'factories');
   fs.mkdirSync(factories, { recursive: true });
-  fs.writeFileSync(
-    path.join(factories, `${FACTORY}.json`),
+  plantFactory(
+    home,
+    FACTORY,
     JSON.stringify({
       volumes: [{ path: scratch(`${prefix}repo-`), readOnly: false }],
       template: { source: '/t/team', version: '0.1.0', params: {} },

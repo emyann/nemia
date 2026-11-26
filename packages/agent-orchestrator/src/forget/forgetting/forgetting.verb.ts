@@ -2,7 +2,7 @@
  * The engine's tasks of a run forgotten through the runtime's `forget`: by `nemia rm` once the run is removed (`forgetTasks`), by the
  * tick for what had not settled then (`finishForgetting`), and asked without removing anything (`engineForgetting` with `yes: false`).
  * A controller, reaching the runtime through the client (`runtime-client.ts`): Effect programs that require the engine as a service
- * (`EngineService`). What `nemia rm` has yet to see forgotten is written down beside the store's runs (the Run door's `forgetting`), so a
+ * (`EngineService`). What `nemia rm` has yet to see forgotten is written down as a record of the store (the Run door's `forgetting`), so a
  * pass reads it again until nothing of it is left: nothing is carried between passes.
  */
 import { Cause, Effect, Result } from 'effect';
@@ -62,29 +62,22 @@ export const forgetTasks = Effect.fn('forgetTasks')(function* (id: string, taskI
   return forgetting;
 });
 
-/** A line of what a pass forgot of removed runs (`finishForgetting`): a warning where the engine refused, or a marker does not read. */
+/** A line of what a pass forgot of removed runs (`finishForgetting`): a warning where the engine refused. */
 export type ForgettingLine = { text: string; warn?: true };
 
 /**
  * Once a pass: for each run `nemia rm` left a marker of whose record is gone, its tasks forgotten that have settled since, and the marker
  * lifted when none is left (`forgetTasks`). A marker beside a record is a `nemia rm` not finished, and is not touched: the run is still
- * listed, and its views are read. Answers a line for each run the engine forgot something of, or refused, and for each marker that does
- * not read, which only a person removes; none when there is no marker, and then the engine is not asked. Never fails: what fails is a line.
+ * listed, and its views are read. Answers a line for each run the engine forgot something of, or refused; none when there is no marker,
+ * and then the engine is not asked. Never fails: what fails is a line.
  */
 export const finishForgetting = () =>
   Effect.gen(function* () {
     const said: ForgettingLine[] = [];
     for (const id of yield* (yield* RunDoor).forgetting.list()) {
       if (yield* (yield* RunDoor).runs.exists(RunId.read(id))) continue;
-      const marker = yield* (yield* RunDoor).forgetting.where(RunId.read(id));
       const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
-      if (!taskIds) {
-        said.push({
-          text: `${marker} does not read as the tasks nemia rm forgets of ${id}: nothing of it is forgotten; a person removes it: rm ${marker}`,
-          warn: true,
-        });
-        continue;
-      }
+      if (!taskIds) continue;
       const forgetting = yield* forgetTasks(id, taskIds);
       const refused = forgettingRefused(forgetting);
       if (forgetting.forgotten.length || refused)

@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { askKeyOf, cardText, plantAsk, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { askKeyOf, cardText, markerText, plantAsk, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
 import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -225,8 +225,7 @@ describe("each action answers its status on the run's namespaced path, and refus
 
 test("REFUSED: a body its action's Schema refuses is a 400 naming the key, before any command runs — nothing written", async () => {
   seed();
-  const hold = path.join(root, 'runs', `${R}.hold`);
-  const holdBefore = fs.existsSync(hold) ? fs.readFileSync(hold, 'utf8') : null;
+  const holdBefore = markerText(root, R, 'hold') ?? null;
   for (const [method, address, body, key] of [
     ['POST', `${run()}/steps/implement/retry`, { mode: 'sideways' }, 'mode'],
     ['POST', `${run()}/refresh`, { base: 'yes' }, 'base'],
@@ -240,7 +239,7 @@ test("REFUSED: a body its action's Schema refuses is a 400 naming the key, befor
     assert.equal(res.status, 400, `${method} ${address}: ${JSON.stringify(res.body)}`);
     assert.ok(String(res.body.field).startsWith(`payload.${key}`), `${address} names payload.${key}: ${JSON.stringify(res.body)}`);
   }
-  assert.equal(fs.existsSync(hold) ? fs.readFileSync(hold, 'utf8') : null, holdBefore, 'the hold as it was');
+  assert.equal(markerText(root, R, 'hold') ?? null, holdBefore, 'the hold as it was');
 });
 
 test('the routes the actions replace are gone: a write on /api/runs/:runId/… and POST /api/runs answer 404, and GET /api/runs is no array', async () => {

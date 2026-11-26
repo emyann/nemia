@@ -16,14 +16,14 @@ import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal, workedOn } from '../factory/factory.ts';
-import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
+import { FactoryDoor, factoryOrNone, templatedOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { isDirectory } from '../record/record.store.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { stillNeeded, type Fills } from '../folder/folder.ts';
@@ -55,15 +55,15 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined) => ({
  * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
  * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names
  * none — and in `home`, and its steps filled with the factory's hires into them and its rules (`factoryFills`). Refused as
- * `templatedTreeOf` refuses the factory.
+ * `templatedOf` refuses the factory.
  * @param home The store's root folder.
  * @param name The templated factory's name.
  * @param workflow The workflow's name.
  */
-export function factoryWriteOf(home: string, name: string, workflow: string) {
-  const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
+export const factoryWriteOf = Effect.fn('factoryWriteOf')(function* (home: string, name: string, workflow: string) {
+  const { factory, tree } = yield* templatedOf(name, 'nemia workflows write').pipe(Effect.provideService(StoreRoot, home));
   return { places: { repo: workedOn(factory)[0] ?? tree, home }, fills: factoryFills(home, factory, workflow).fills };
-}
+});
 
 /**
  * Where `nemia workflows write` reads the draft folder of the workflow `workflow` for the templated factory `name` from, in the store
@@ -73,9 +73,10 @@ export function factoryWriteOf(home: string, name: string, workflow: string) {
  * @param name The templated factory's name.
  * @param workflow The workflow's name.
  */
-export function factoryDraftOf(home: string, name: string, workflow: string) {
-  return factoryDraftIn(home, templatedAtOnce(home, name, 'nemia workflows write').factory, workflow);
-}
+export const factoryDraftOf = Effect.fn('factoryDraftOf')(function* (home: string, name: string, workflow: string) {
+  const { factory } = yield* templatedOf(name, 'nemia workflows write').pipe(Effect.provideService(StoreRoot, home));
+  return factoryDraftIn(home, factory, workflow);
+});
 
 /**
  * Where a draft folder of the workflow `workflow`, read in the factory `factory` of the store `home`, looks for its agents and skills,
@@ -103,7 +104,10 @@ export function factoryDraftIn(
 const writeJudgedOf = (where: Where, home: string) =>
   (where.from === 'factory' && where.factory !== undefined
     ? factoryWriteOf(home, where.factory, where.name)
-    : { places: placesOf(where, home) }) satisfies { places: Places; fills?: Fills } as { places: Places; fills?: Fills };
+    : Effect.succeed({ places: placesOf(where, home) })) satisfies Effect.Effect<
+    { places: Places; fills?: Fills },
+    Refusal
+  > as Effect.Effect<{ places: Places; fills?: Fills }, Refusal>;
 
 /**
  * The folder of yours a writer (`who`) names, `<home>/workflows/<name>`, or of a factory's tree, `<tree>/workflows/<name>`, as the
@@ -111,15 +115,20 @@ const writeJudgedOf = (where: Where, home: string) =>
  * (`workflowNameRefusal`), and for a folder that is no workflow's (`workflowDirAt`). Minted here, where a writer's folder is resolved,
  * rather than in `yoursOrRefused`, which resolves the holders of agents and skills too.
  */
-function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string) {
-  const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, {
-    factory,
-    treeOf: (factory) => templatedTreeOf(home, factory, who),
+const yoursWorkflowDir = Effect.fn('yoursWorkflowDir')(function* (
+  who: string,
+  { from = '', name, repo = '', factory }: Where,
+  home: string,
+) {
+  const tree =
+    from === 'factory' && factory !== undefined ? (yield* templatedOf(factory, who).pipe(Effect.provideService(StoreRoot, home))).tree : '';
+  return yield* tried(() => {
+    const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, { factory, treeOf: () => tree });
+    const badName = workflowNameRefusal(name);
+    if (badName) throw new Invalid({ message: `${who}: ${badName}` });
+    return workflowDirAt(path.resolve(yours, name));
   });
-  const badName = workflowNameRefusal(name);
-  if (badName) throw new Invalid({ message: `${who}: ${badName}` });
-  return workflowDirAt(path.resolve(yours, name));
-}
+});
 
 /** The steps of a draft as the writer hands them, read by the command line off its draft folder and drafted by the builder. */
 const StepDrafts = Schema.declare((u: unknown): u is StepDraft[] => Array.isArray(u));
@@ -181,8 +190,8 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
   handler: ({ draft: steps, readme, files, whole, version, ...where }) =>
     Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
-        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', where, home));
-        const { places, fills } = yield* tried(() => writeJudgedOf(where, home));
+        const dir = yield* yoursWorkflowDir('nemia workflows write', where, home);
+        const { places, fills } = yield* writeJudgedOf(where, home);
         const carried: CarriedFile[] | undefined = files && files.map((f) => ({ ...f }));
         const door = yield* WorkflowDoor;
         return yield* door.workflows.write(
@@ -243,9 +252,9 @@ export const WORKFLOWS_REMOVE: Served<WorkflowRemoved, WorkflowRemoveInput> = {
   handler: ({ version, ...where }) =>
     Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
-        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', where, home));
+        const dir = yield* yoursWorkflowDir('nemia workflows rm', where, home);
         const users = yield* usersOf(dir);
-        const { places } = yield* tried(() => writeJudgedOf(where, home));
+        const { places } = yield* writeJudgedOf(where, home);
         const door = yield* WorkflowDoor;
         return yield* door.workflows.remove(dir, version, users, places);
       }),

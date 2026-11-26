@@ -4,7 +4,8 @@
  * factory` lists it (`factoriesListed`), a file that does not read listed all the same, its `status.error` saying why, so it hides no
  * other. A factory's parts read it through `factoryFiled`: its spec and its listing, off one read of the store's factories, no status, and
  * no run. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
- * `status.json` (its conditions, each with the time it last moved, the generation that pass observed, the version applied and an upgrade
+ * status record (`/registry/applied/<name>`: its conditions, each with the time it last moved, the generation that pass observed, the
+ * version applied and an upgrade
  * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec, and of its rules and
  * its instruction, the sub-resources read beside it (`partsOf`), never of its status: an edit of its rules or its instruction moves it as
  * a write of its spec does, so a proposal read before either goes stale, and a controller's pass, which writes only the status, moves
@@ -27,16 +28,15 @@ import {
   type FactoryStatus,
   type ObjectMeta,
 } from 'objects';
-import { readStatus } from '../applied/applied.store.ts';
 import { declaredAt } from '../applied/declared.verb.ts';
 import type { Parameter } from '../../template/index.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
-import { generationOf } from '../door/generation.ts';
+import { generationOf } from '../door/index.ts';
 import type { FactoryListing } from '../factory.ts';
 import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
-import { doorAt, doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
+import { doorAt, FactoryDoor } from '../door/factories.store.ts';
 import { fromThrow as tried } from '../../door/door.store.ts';
 import { homeAt, homeFilesOf, workflowFilesDigest } from '../../frozen/frozen.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory.model.ts';
@@ -89,19 +89,17 @@ const isBlank = (read: { words: string | null; error: string | null }) => read.w
  * neither, so a factory with no sub-resource keeps the version of its spec and status alone. Where the instruction's place cannot be said,
  * its error is read.
  */
-const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string) => {
-  const name = FactoryName.read(listing.name);
-  const { words, error } = doorAtOnce(home, (door) => door.rules.read(name));
-  const rules = { words, error };
-  let instruction: InstructionRead;
-  try {
-    const read = doorAtOnce(home, (door) => door.instruction.read(name));
-    instruction = { words: read.words, error: read.error };
-  } catch (err) {
-    instruction = { words: null, error: err instanceof Error ? err.message : String(err) };
-  }
-  return isBlank(rules) && isBlank(instruction) ? undefined : { rules, instruction };
-};
+const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string) =>
+  Effect.gen(function* () {
+    const name = FactoryName.read(listing.name);
+    const { words, error } = yield* doorAt(home, (door) => door.rules.read(name));
+    const rules = { words, error };
+    const instruction: InstructionRead = yield* doorAt(home, (door) => door.instruction.read(name)).pipe(
+      Effect.map((read) => ({ words: read.words, error: read.error })),
+      Effect.catch((err) => Effect.succeed({ words: null, error: err.message })),
+    );
+    return isBlank(rules) && isBlank(instruction) ? undefined : { rules, instruction };
+  });
 
 /**
  * A factory's object, of its spec and status and when it was filed: its `resourceVersion` the digest of its spec and its `parts`' where
@@ -117,17 +115,14 @@ const objectOf = (meta: Omit<ObjectMeta, 'resourceVersion'>, spec: FactoryObject
   }) satisfies FactoryObject;
 
 /**
- * The factory `name`'s own default level, from its level file: none where it follows the store's, an error where the file does not
+ * The factory `name`'s own default level, from its level record: none where it follows the store's, an error where the record does not
  * read.
  */
-const ownLevel = (home: string, name: string) => {
-  try {
-    const own = doorAtOnce(home, (door) => door.level.read(FactoryName.read(name)))?.level;
-    return own === undefined ? {} : { level: own };
-  } catch (err) {
-    return { error: err instanceof Invalid ? err.message : String(err) };
-  }
-};
+const ownLevel = (home: string, name: string) =>
+  doorAt(home, (door) => door.level.read(FactoryName.read(name))).pipe(
+    Effect.map((own) => (own?.level === undefined ? {} : { level: own.level })),
+    Effect.catch((err) => Effect.succeed({ error: err instanceof Invalid ? err.message : String(err) })),
+  );
 
 /**
  * The object of one factory `listing` of the store, read at the store `home`: a file that reads as its spec, its status the controller's
@@ -137,12 +132,12 @@ const ownLevel = (home: string, name: string) => {
  * @param listed The store's listing whole, whose places a harness does not trust are read.
  * @param home The store's root.
  */
-const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string) => {
-  const { metadata, spec } = filedOf(listing, home);
+const factoryObjectOf = Effect.fn('factoryObjectOf')(function* (listing: FactoryListing, listed: FactoryListed, home: string) {
+  const { metadata, spec } = yield* filedOf(listing, home);
   if ('error' in listing)
     return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` }) satisfies FactoryObject;
-  const written = readStatus(home, listing.name);
-  const level = ownLevel(home, listing.name);
+  const written = yield* doorAt(home, (door) => door.status.read(FactoryName.read(listing.name)));
+  const level = yield* ownLevel(home, listing.name);
   const status: FactoryStatus = {
     ...(written?.observedGeneration === undefined ? {} : { observedGeneration: written.observedGeneration }),
     conditions: (written?.conditions ?? listing.status?.conditions ?? []).map((c) => ({ ...c })),
@@ -153,8 +148,8 @@ const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: s
     untrusted: untrustedOf(listed.untrusted, listing.name),
     ...('error' in level ? { error: level.error } : {}),
   };
-  return objectOf(metadata, spec, status, partsOf(listing, home)) satisfies FactoryObject;
-};
+  return objectOf(metadata, spec, status, yield* partsOf(listing, home)) satisfies FactoryObject;
+});
 
 /**
  * The factory of one `listing` of the store as its parts read it, at the store `home`: a file that reads as its spec, its own level among
@@ -162,10 +157,10 @@ const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: s
  * @param listing The factory's file as the store listed it, or why it does not read.
  * @param home The store's root.
  */
-const filedOf = (listing: FactoryListing, home: string) => {
+const filedOf = Effect.fn('filedOf')(function* (listing: FactoryListing, home: string) {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
   if ('error' in listing) return { metadata: meta, spec: { workflows: [], hires: {}, volumes: [] } };
-  const level = ownLevel(home, listing.name);
+  const level = yield* ownLevel(home, listing.name);
   const spec: FactoryObject['spec'] = {
     workflows: [...listing.workflows],
     hires: { ...listing.hires },
@@ -192,7 +187,7 @@ const filedOf = (listing: FactoryListing, home: string) => {
     ...('level' in level ? { level: level.level } : {}),
   };
   return { metadata: { ...meta, generation: generationOf(listing) }, spec };
-};
+});
 
 /**
  * The default factory's object: with no volume (a volume is a factory's own, given with `nemia factory volume add`), offering every
@@ -211,8 +206,11 @@ const defaultFactoryObject = (home: string) =>
  * @param listed The store's listing of its factories' files.
  * @param home The store's root.
  */
-export const factoryObjectsOf = (listed: FactoryListed, home: string) =>
-  [defaultFactoryObject(home), ...listed.factories.map((l) => factoryObjectOf(l, listed, home))] satisfies FactoryObject[];
+export const factoryObjectsOf = Effect.fn('factoryObjectsOf')(function* (listed: FactoryListed, home: string) {
+  const objects: FactoryObject[] = [defaultFactoryObject(home)];
+  for (const l of listed.factories) objects.push(yield* factoryObjectOf(l, listed, home));
+  return objects;
+});
 
 /**
  * The refusal of a factory no object has the name of: it names the list.
@@ -255,7 +253,7 @@ const unlisted = (home: string, name: string) =>
 export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, name: string) {
   const listing = (yield* factoriesListed(home)).factories.find((l) => l.name === name);
   if (listing !== undefined) {
-    const filed: Filed = { factory: filedOf(listing, home), listing };
+    const filed: Filed = { factory: yield* filedOf(listing, home), listing };
     return filed;
   }
   yield* unlisted(home, name);
@@ -265,7 +263,7 @@ export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, n
 
 /** A page of the factories (`FactoryList`), the default first, read now at the store `home`. */
 export const factoryList = Effect.fn('factoryList')(function* (home: string, query: ObjectQuery) {
-  const objects = factoryObjectsOf(yield* factoriesListed(home, () => true), home);
+  const objects = yield* factoryObjectsOf(yield* factoriesListed(home, () => true), home);
   const listed: FactoryList = yield* objectsListed('Factory', objects, query, 'factory');
   return listed;
 });
@@ -274,7 +272,7 @@ export const factoryList = Effect.fn('factoryList')(function* (home: string, que
 export const factoryObject = Effect.fn('factoryObject')(function* (home: string, name: string) {
   const listed = yield* factoriesListed(home, (l) => l.name === name);
   const listing = listed.factories.find((l) => l.name === name);
-  if (listing !== undefined) return factoryObjectOf(listing, listed, home);
+  if (listing !== undefined) return yield* factoryObjectOf(listing, listed, home);
   yield* unlisted(home, name);
   return defaultFactoryObject(home);
 });

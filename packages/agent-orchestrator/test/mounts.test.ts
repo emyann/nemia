@@ -14,6 +14,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { clearFactories, runFolderNames } from '../testing.ts';
 import { keysUnder, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -36,7 +37,7 @@ import { loadAgents } from '../src/agents/read.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt, plantFactory } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { inboxViewOf } from '../src/tick/told.verb.ts';
@@ -86,7 +87,7 @@ function workflow(team: string, name: string, files: Record<string, string>) {
  * on three repositories, both attached, `plain` working on the first. Its repositories, sorted, the team and the two folders.
  */
 function fresh() {
-  fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+  clearFactories(ROOT);
   const team = teamCopy();
   const plain = workflow(team, 'plain', {
     implement: '---\nplace: git\nagent: implementer\n---\nBuild what was asked.\n',
@@ -132,11 +133,7 @@ async function typed(argv: string[]) {
 }
 
 /** The runs in the store, by file. */
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
-    ...keysUnder(ROOT, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
 
 /**
  * The folders a filing mounts that its brief does not name as it mounts them: a writable one on the line that says it may be written, a
@@ -200,10 +197,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
   s.test(
     "implement's first filing writes its folder alone, reads the rest, and names each on its brief; the factory changed since changes none",
     async () => {
-      fs.writeFileSync(
-        path.join(ROOT, 'factories', 'trio.json'),
-        `${JSON.stringify({ volumes: [...repos, aRepo()].map((at) => ({ path: at, readOnly: false })) })}\n`,
-      );
+      plantFactory(ROOT, 'trio', JSON.stringify({ volumes: [...repos, aRepo()].map((at) => ({ path: at, readOnly: false })) }));
       await pass(id);
       const first = filedFor(id, 'implement');
       assert.deepEqual(first.config?.mounts, writes);

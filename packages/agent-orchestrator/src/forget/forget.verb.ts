@@ -88,8 +88,9 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *    it by once a person has dealt with them.
  * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as the inventory read it —
  *    never one a hand-off just committed onto — or forced; through the place's `remove`.
- * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
- *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`).
+ * 3. **Its record, its claim, its asks and its markers, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the keys in one
+ *    transaction, so the run is never read without the cancellation it had, then the run's own directory. A pass halfway through the run
+ *    writes nothing back (`rewriteRun`).
  * 4. **Its tasks, through the engine** (`forgetTasks`): every task its record names (`runTasks`, the adopted ones among them) was written
  *    down once nothing refused (the Run door's `forgetting`), before anything was removed, and the engine's `forget` removes each settled
  *    one's journal, feed lines and session files. A task just closed has not settled: it waits, with the marker, for the tick to forget it

@@ -17,7 +17,7 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { writeWorkflow } from '../src/runner.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, knownAt } from '../testing.ts';
 
 const ROOT = scratch('wf-write-');
 
@@ -168,7 +168,9 @@ test("written where the board lists workflows from — the store's workflows/ an
     '---\nrole: Engineer\ndescription: Only in the repository.\n---\nYou are.\n',
   );
   assert.deepEqual(
-    writeWorkflow(ROOT, path.join(repo, 'workflows', 'dev'), [step('implement', { agent: 'only-here' })]).written,
+    writeWorkflow(ROOT, path.join(repo, 'workflows', 'dev'), [step('implement', { agent: 'only-here' })], undefined, {
+      known: knownAt(ROOT),
+    }).written,
     ['implement.md'],
     "a factory's repository's, its agents found in its .claude/",
   );

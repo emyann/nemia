@@ -4,7 +4,7 @@ import { cancelledAt, nextVisit, photograph, themeOf, isRunStart, trailLevel } f
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { checkoutIn, DIAMOND, DIAMOND_RUNS, FACTORIES, FAKE, REVIEWER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, runsHeld, store } from '../world.ts';
+import { OUT, runsHeld, store, storeFactory, storedFactory } from '../world.ts';
 
 const { hiring } = FACTORIES;
 /** The checkout's `dev` read in FACTORIES' `hiring`, the one factory on the checkout: the default one works on no repository. */
@@ -29,8 +29,8 @@ export default {
   route: `/workflows/repo/${WORKFLOWS.good.name}${IN}`,
   expect: async (page) => {
     const { good, broken, yours } = WORKFLOWS;
-    const factoryFile = path.join(store!, 'factories', `${hiring.name}.json`);
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryName = hiring.name;
+    const factoryText = storedFactory(factoryName);
     const reviewerFile = path.join(store!, 'checkout', 'workflows', 'agents', `${REVIEWER}.md`);
     const takeBack = checkoutIn(store!, [good.name, broken.name]);
     try {
@@ -128,13 +128,9 @@ export default {
       await expectInside(graph.locator('.react-flow__node'), graph, "every step is inside the page's graph");
 
       fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
-      fs.writeFileSync(
-        factoryFile,
-        JSON.stringify(
-          { ...(JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as object), hires: { [`${good.name}/review`]: REVIEWER } },
-          null,
-          2,
-        ),
+      storeFactory(
+        factoryName,
+        JSON.stringify({ ...(JSON.parse(storedFactory(factoryName)) as object), hires: { [`${good.name}/review`]: REVIEWER } }, null, 2),
       );
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -285,7 +281,7 @@ export default {
       });
     } finally {
       fs.rmSync(reviewerFile, { force: true });
-      fs.writeFileSync(factoryFile, factoryText);
+      storeFactory(factoryName, factoryText);
       takeBack();
     }
   },

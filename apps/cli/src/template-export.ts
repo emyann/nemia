@@ -4,13 +4,11 @@
  * its rules and its instruction: `factories.get`, `factories.rules`, `factories.instruction`) and hands them to the orchestrator's
  * `template export` on stdin (`--factory-parts -`), which reads no store; the same under this machine's context and a remote one.
  */
-import path from 'node:path';
 import { Effect } from 'effect';
 import type { Factory, FactoryInstruction, FactoryRules } from 'objects';
 import { chosenOf } from './context.ts';
 import { type Entry, piped } from './local.ts';
 import { asked } from './objects.ts';
-import { storeRoot } from './where.ts';
 
 /** The verb as the api is asked under it. */
 const VERB = 'template export';
@@ -34,14 +32,12 @@ export const exportsAFactory = (words: readonly string[]) =>
   words[0] === 'template' && words[1] === 'export' && !words.includes('--help') && factoryNamed(words) !== undefined;
 
 /**
- * Where the factory `name` is kept, as an export says where its hires came from: its file in this machine's store under this machine's
+ * Where the factory `name` is kept, as an export says where its hires came from: its address on this machine's daemon under this machine's
  * context, else its address on the daemon the context names.
  */
 const keptAt = (name: string, env: NodeJS.ProcessEnv) => {
   const chosen = chosenOf(env);
-  return chosen.kind === 'remote'
-    ? `${chosen.server.replace(/\/+$/, '')}/api/factories/${name}`
-    : path.join(storeRoot(env), 'factories', `${name}.json`);
+  return chosen.kind === 'remote' ? `${chosen.server.replace(/\/+$/, '')}/api/factories/${name}` : `/api/factories/${name}`;
 };
 
 /**

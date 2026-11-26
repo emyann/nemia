@@ -14,7 +14,8 @@ import { exportedTemplate } from '../src/template/template.verb.ts';
 import type { FactoryParts } from '../src/template/template.store.ts';
 import { instructionAt } from '../src/factory/factory.ts';
 import { instructionFile, readInstructionAt } from '../src/factory/instruction.store.ts';
-import { factoriesDirAt, FactoryDoor, filedFactory } from '../src/factory/door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../src/factory/door/factories.store.ts';
+import { factoryKey } from '../src/factory/door/index.ts';
 import { FactoryName } from '../src/factory/factory.model.ts';
 import { reconcileFactory } from '../src/factory/applied/applied.verb.ts';
 
@@ -44,7 +45,7 @@ const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
   const rules = yield* (yield* FactoryDoor).rules.read(FactoryName.read(name));
   const at = instructionAt(factory, instructionFile(home, factory.name));
   const instruction = { ...readInstructionAt(at), file: at.file };
-  return { factory, file: path.join(factoriesDirAt(home), `${name}.json`), instruction, rules } satisfies FactoryParts;
+  return { factory, file: factoryKey(name), instruction, rules } satisfies FactoryParts;
 });
 
 /** `nemia template export`'s program with the parts of the factory `factory` names read from the store, as the client hands them. */

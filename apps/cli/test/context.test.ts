@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { servedStore, type Said } from './served.ts';
+import { factoryText } from 'agent-orchestrator/testing';
 import { chosenOf, configFileOf, configWritten, contextOf } from '../src/context.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -178,12 +179,12 @@ test('under a remote context `nemia factory add --volume <url>:rw` files the fac
   const added = await nemia(['factory', 'add', 'mill', '--volume', `${url}:rw`, '--no-trust'], env);
   assert.equal(added.code, 0, added.err);
   const into = path.join(vps.root, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
-  const mill = JSON.parse(fs.readFileSync(path.join(vps.root, 'factories', 'mill.json'), 'utf8'));
+  const mill = JSON.parse(factoryText(vps.root, 'mill') ?? '{}');
   assert.deepEqual(mill.volumes, [{ path: into, readOnly: false, origin: url, name: 'r' }]);
   assert.ok(fs.existsSync(path.join(into, '.git')), 'the clone is made on the server');
   const secret = await nemia(['factory', 'add', 'secret', '--volume', 'https://u:p@host/o/r:rw', '--no-trust'], env);
   assert.equal(secret.code, 2, secret.err);
-  assert.equal(fs.existsSync(path.join(vps.root, 'factories', 'secret.json')), false, 'nothing filed');
+  assert.equal(factoryText(vps.root, 'secret') !== undefined, false, 'nothing filed');
   assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
 });
 
@@ -210,7 +211,7 @@ describe('`nemia factory add --template` is refused naming `nemia factory apply`
     const said = await nemia(typed, env);
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);
-    assert.equal(fs.existsSync(path.join(root, 'factories', 'mill.json')), false, 'nothing filed');
+    assert.equal(factoryText(root, 'mill') !== undefined, false, 'nothing filed');
   });
 });
 

@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
 import { cardsPath, heldIn, optionsIn, photograph, pickIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, hiringStarts, noFactories, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredCard, OUT, store, storedCard } from '../world.ts';
+import { OUT, dropStoredCard, store, storeFactory, storedCard, storedFactory } from '../world.ts';
 
 /** The idea filed in a factory on several repositories with no workflow picked. */
 const NOWHERE = 'File an idea in a factory on two repositories\n\nIts workflow, and so its repository, is chosen at start.';
@@ -60,7 +59,7 @@ async function severalRepos(page: Page, theme: string) {
   const checkout = path.join(store!, 'checkout');
   const unhire = hiringStarts(store!);
   const { back } = onSeveralRepos(store!);
-  const file = path.join(store!, 'factories', `${factory}.json`);
+  const file = factory;
   const written: string[] = [];
   try {
     await open(page, `/inbox?factory=${factory}`);
@@ -98,8 +97,8 @@ async function severalRepos(page: Page, theme: string) {
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-unwired-${theme}.png`));
 
-    const found = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
-    fs.writeFileSync(file, JSON.stringify({ ...found, workflowRepos: { [WORKFLOWS.good.name]: 'checkout' } }, null, 2));
+    const found = JSON.parse(storedFactory(file)) as object;
+    storeFactory(file, JSON.stringify({ ...found, workflowRepos: { [WORKFLOWS.good.name]: 'checkout' } }, null, 2));
     await open(page, `/inbox?factory=${factory}`);
     await pickIn(page, workflows, WORKFLOWS.good.name);
     await expectTexts(box.locator('[data-factory-repo]'), [checkout], `wired to checkout, the box says ${checkout} as text`);
@@ -124,7 +123,7 @@ async function severalRepos(page: Page, theme: string) {
 
 /** The box in a store with no factory on file: the one choice, no factory, and the line that files one, in the api's words. */
 async function noFactory(page: Page, theme: string) {
-  const back = noFactories(store!);
+  const back = noFactories();
   try {
     await open(page, '/inbox');
     const box = page.locator('form[aria-label="File a card"]');

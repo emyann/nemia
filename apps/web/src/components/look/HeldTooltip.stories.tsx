@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor, within } from 'storybook/test';
-import { Focusable, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Label, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { tipOf } from '../../../.storybook/play';
 import { HeldTooltip } from './HeldTooltip';
@@ -43,21 +43,27 @@ function Case({
   }, [name]);
   return (
     <div data-case={name} data-tried={tried || undefined} style={{ width }}>
-      <span className="text-label-small text-on-surface-variant uppercase">{name}</span>
+      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+        {name}
+      </Label>
       <TooltipTrigger defaultOpen={nowhere} onOpenChange={(open) => open && setTried(true)}>
         {left ? (
-          <span className="block text-body-medium text-on-surface-variant">gone</span>
+          <Body size="medium" component="span" colorRole="on-surface-variant" className="block">
+            gone
+          </Body>
         ) : (
           <Focusable>
-            <span
+            <Body
+              size="medium"
+              component="span"
               role="img"
               aria-label={SAID}
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the tooltip by focusing it
               tabIndex={0}
-              className={cn('block w-fit max-w-full truncate text-body-medium text-on-surface', nowhere && 'hidden', focusRing())}
+              className={cn('block w-fit max-w-full truncate text-on-surface', nowhere && 'hidden', focusRing())}
             >
               {children}
-            </span>
+            </Body>
           </Focusable>
         )}
         <HeldTooltip repeats={repeats}>{SAID}</HeldTooltip>
@@ -67,7 +73,7 @@ function Case({
 }
 
 /** The kit's tooltip held to its trigger: drawn only where its trigger stands, and, where it repeats its trigger's text, only where cut. */
-const meta: Meta = { title: 'Look/HeldTooltip' };
+const meta: Meta<{ short: string }> = { title: 'Look/HeldTooltip' };
 export default meta;
 
 /** The trigger of the case named `name`. */
@@ -78,11 +84,12 @@ const triggerOf = (root: HTMLElement, name: string) => root.querySelector<HTMLEl
  * corner; a text that reads whole opens no tooltip that repeats it, and one cut opens it, by the keyboard; a trigger that leaves the page
  * while its tooltip is open closes it. A press on a heading first puts React Aria in the pointer's mode, as a person's pointer does.
  */
-export const Held: StoryObj = {
-  render: () => (
+export const Held: StoryObj<{ short: string }> = {
+  args: { short: 'every record' },
+  render: ({ short }) => (
     <div style={BOARD}>
       <Case name="whole" repeats>
-        every record
+        {short}
       </Case>
       <Case name="cut" width={160} repeats>
         {SAID}

@@ -41,8 +41,8 @@ const watch = (triggerRef: RefObject<Element | null>, trigger: Element, at: DOMR
  * measure, one drawn nowhere or off the page as it opens, at the window's top-left corner; this one never draws there. A tooltip closed
  * at once, as React Aria closes one when the pointer reaches the next trigger, is taken off the page with its state: React Aria keeps it
  * waiting on the exit it skipped, and would draw it again, unplaced, at that corner when it next ends one. With `repeats`, for a tooltip
- * that only says again the text its trigger shows, it opens only while that text is cut, measured as it opens.
- * @param props The kit tooltip's props, and `repeats`, set where the tooltip only repeats its trigger's text.
+ * that only says again the text its trigger shows, it opens only while that text is cut, measured as it opens. It takes the kit
+ * tooltip's props besides.
  */
 export function HeldTooltip({ repeats = false, ...props }: TooltipProps & { repeats?: boolean }) {
   const state = useContext(TooltipTriggerStateContext);

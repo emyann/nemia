@@ -6127,6 +6127,19 @@ Left, each to its own card:
 - **A sign-in held across a restart**: the hold is the engine's memory, so an api restart while the person is in GitHub's tab loses it,
   and they press again.
 
+## Shipped: a factory's `github` server signs in by a code, and Nemia holds the token (2026-11-26)
+
+The board's **Sign in** on a server whose provider advertises the device grant (RFC 8628, read from its protected resource and
+authorization server metadata, RFCs 9728 and 8414) answers a code to type at the provider's page, `github.com/login/device` for GitHub,
+with no address to copy and no callback port. The runtime polls the provider, holds the token and its refresh in its own store under the
+engine's root (`mcp-tokens/`, mode 0600), refreshes it with no person present, and hands it to every session as the server's
+`Authorization` header (`tokened`, `withTokens`). A refresh the provider refuses removes the token, and the server reads `needs-auth`.
+Every other server keeps the harness's browser sign-in and its paste. The settings page draws a waiting sign-in again on every load, with
+a **Cancel**, which is the api's `DELETE …/sign-in`. The shipped client secret (`clients.ts`) and `github`'s callback port are gone.
+
+What it leaves: a held session keeps the header it was spawned with, so its `github` server reads `needs-auth` once the 8-hour token
+expires, until it is spawned again; and the board does not yet say how to install the App when a sign-in reaches no repository.
+
 ## Shipped: `nemia pause` and `nemia resume` are lines of the feed, on a Store kind (2026-10-23)
 
 Signals S4 gave a person's approve, cancel and hold their own feed lines and left pause and resume out (the owner's word, 2026-10-16):

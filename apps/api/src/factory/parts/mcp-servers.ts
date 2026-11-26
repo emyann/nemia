@@ -2,8 +2,10 @@
  * The mcpservers and builtin groups' handlers (`objects`' `Api`): a factory's MCP servers as objects, in its namespace — a page of them
  * (`mcpServerList`), one (`mcpServerObject`), each header masked — recorded (`nemia factory server add`, a header sent as the mask keeping
  * the value stored, `headerWritten`) and taken off (`server rm`), each answered with what it wrote (`written`); its sign-in to one
- * started, read, completed with the address a person's browser landed on (the body's `url`, which no answer or log carries) and signed out
- * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and the store's
+ * started (a code to type at the provider, or an address to open), read (a waiting one answers what it started with), completed by the
+ * browser with the address a person's browser landed on (the body's `url`, which no answer or log carries) and cancelled or signed out
+ * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each handed to the engine, which holds the sign-in; and
+ * the store's
  * library of servers, in no namespace (`/api/mcpservers`): the user library's beside Nemia's builtins, each with the factories that add
  * it, kept at the store's level, a builtin never removed and one a factory adds refused its removal naming each.
  */

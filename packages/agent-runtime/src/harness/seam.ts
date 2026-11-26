@@ -69,6 +69,14 @@ export type SpawnRequest = {
    * (`telemetered`), absent otherwise, and then none is.
    */
   telemetry?: Telemetry;
+  /**
+   * The access token of each remote MCP server of the task signed in to by a code, by the server's name: set by an engine at each spawn
+   * (`tokened`, `mcp-token.ts`), never on `config`, which is journalled, and never in an attached session's run file
+   * (`keptRequest`). A job's request file (`<run>.request.json`, mode 0600, owner-only like the task's `config`) holds it for the bin to
+   * read. A harness that hands servers to its session lays each as the server's `Authorization` header (`withTokens`).
+   * Absent: no server has one.
+   */
+  mcpTokens?: Readonly<Record<string, string>>;
 };
 
 /**
@@ -92,9 +100,9 @@ export type LocalMcpServer = { type?: 'stdio'; command: string; args?: string[];
  * `callbackPort`. The
  * SDK's own schema for an http or sse server declares `oauth` as `{ clientId?, callbackPort?, authServerMetadataUrl?, scopes?, xaa? }`
  * (read off `sdk.mjs`), so the two keys we set are known to it — which is why they are neither stripped nor refused, and why a value
- * of the wrong shape is now refused rather than ignored. It carries no secret: Claude Code reads the client secret from its own store
- * alone, and `oauth` sits outside the sign-in key's hash (`name|sha256({type,url,headers})[:16]`), which is why changing it asks for
- * no new sign-in. Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
+ * of the wrong shape is now refused rather than ignored. It carries no secret, and `oauth` sits outside the sign-in key's hash
+ * (`name|sha256({type,url,headers})[:16]`), which is why changing it asks for no new sign-in.
+ * Look for it in `sdk.d.ts` on each SDK bump, and say here when it is declared.
  */
 export type RemoteMcpServer = {
   type: 'http' | 'sse';

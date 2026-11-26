@@ -43,7 +43,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/card:CardDescription': kit('Body'),
   '@/components/ui/card:CardHeader': kit('CardContent'),
   '@/components/ui/card:CardTitle': kit('Title'),
-  '@/components/ui/checkbox:Checkbox': kit('Checkbox'),
   '@/components/ui/empty:Empty': kit('EmptyState'),
   '@/components/ui/empty:EmptyContent': kit('EmptyState'),
   '@/components/ui/empty:EmptyDescription': kit('EmptyState'),

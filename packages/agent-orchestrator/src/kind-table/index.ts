@@ -20,4 +20,4 @@ export {
   triggerTable,
   volumeTable,
 } from './wiring-table.ts';
-export { templateTable, workflowTable } from './definition-table.ts';
+export { programTable, templateTable, workflowTable } from './definition-table.ts';

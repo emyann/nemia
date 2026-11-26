@@ -30,6 +30,7 @@ import { asksOfAPerson, RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
 import { waitingSinceOf } from '../timeline/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
+import type { ConditionWriter } from '../program/program.ts';
 import type { CheckVerdict } from '../check/index.ts';
 import {
   runCodes,
@@ -567,6 +568,8 @@ export type JudgeHow = {
   config?: Settings;
   /** The store's runs as the caller listed them, the checkout's claims read among them (`ListReadingHow`'s `store`); left out, listed. */
   store?: () => readonly Run[];
+  /** Who writes each condition in the run's factory (`ListReadingHow`'s `writerOf`); left out, a step says no more than that it runs. */
+  writerOf?: ((condition: string) => ConditionWriter) | undefined;
 };
 
 /**
@@ -598,7 +601,7 @@ export const judge = Effect.fn('judge')(function* (
   names: readonly string[],
   folder: readonly StepSpec[] | null,
   views: Views,
-  { reader, git, standings = () => [], parent, config, store }: JudgeHow,
+  { reader, git, standings = () => [], parent, config, store, writerOf }: JudgeHow,
 ) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
@@ -612,6 +615,7 @@ export const judge = Effect.fn('judge')(function* (
     ...(config ? { config } : {}),
     ...(parent ? { parent } : {}),
     ...(store ? { store } : {}),
+    writerOf,
   });
   const { status, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);

@@ -4,7 +4,7 @@
  * priority 0 by default and 1 when asked wide, a row per item of the page in its order, and the item's metadata beside its cells
  * (`PartialObjectMetadata`). It reads only what a list serves of each, never a file's content (`LISTED_WITHOUT`). Pure.
  */
-import type { Table, TableColumnDefinition, TemplateList, WorkflowList } from 'objects';
+import type { ProgramList, Table, TableColumnDefinition, TemplateList, WorkflowList } from 'objects';
 import { definitionNote } from './kind-table.ts';
 import { column, firstLine, tableOf } from './table-of.ts';
 
@@ -80,3 +80,27 @@ const templateCells = (template: TemplateListed) => [
  * @param list The page of templates, as the list answers it.
  */
 export const templateTable = (list: TemplateList) => tableOf(list, TEMPLATE_COLUMNS, templateCells) satisfies Table;
+
+/** The columns of a template's program's row, in the order its cells are. */
+const PROGRAM_COLUMNS: readonly TableColumnDefinition[] = [
+  column('Name', "The program's name.", 0),
+  column('Writes', 'The conditions it writes.', 0),
+  column('Run', 'The command line it runs.', 1),
+  column('Phase', 'Where its task runs now: Pending, Running or Down; none for a template’s declaration.', 0),
+  column('Restarts', 'How many times the runtime started it again.', 1, 'integer'),
+];
+
+/** The cells of a program's row, in `PROGRAM_COLUMNS`' order. */
+const programCells = (program: ProgramList['items'][number]) => [
+  program.metadata.name,
+  program.spec.writes.join(', '),
+  firstLine(program.spec.run),
+  program.status?.phase ?? '',
+  program.status?.restarts ?? 0,
+];
+
+/**
+ * `list` as a table: `PROGRAM_COLUMNS`, and a row per program of the page.
+ * @param list The page of a template's programs, as the list answers it.
+ */
+export const programTable = (list: ProgramList) => tableOf(list, PROGRAM_COLUMNS, programCells) satisfies Table;

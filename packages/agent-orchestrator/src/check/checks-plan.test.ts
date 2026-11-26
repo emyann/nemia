@@ -73,6 +73,15 @@ describe("a step's checks resolve into the plan the pass files by", () => {
     assert.equal(read.checks, undefined);
   });
 
+  test('a check may wait on a condition in place of a command, and the render reads as the same plan', () => {
+    const read = parseWorkflow('implement', step('checks:\n  - name: a\n    run: one\n  - name: ci\n    condition: ci-green'));
+    assert.deepEqual(stepChecks(read), [
+      { name: 'a', run: 'one', after: [] },
+      { name: 'ci', condition: 'ci-green', after: ['a'] },
+    ]);
+    assert.deepEqual(parseWorkflow('implement', renderStep(read)).checks, read.checks);
+  });
+
   test('a step file renders its checks back, and the render reads as the same plan', () => {
     const read = parseWorkflow('implement', step('checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    after: []'));
     assert.deepEqual(parseWorkflow('implement', renderStep(read)).checks, read.checks);
@@ -92,6 +101,9 @@ describe('each shape of checks: the loader cannot take is refused at load', () =
     ['an enabled: that is no boolean', 'checks:\n  - name: a\n    run: one\n    enabled: maybe'],
     ['a usesCheckout: that is no boolean', 'checks:\n  - name: a\n    run: one\n    usesCheckout: maybe'],
     ['every check turned off', 'checks:\n  - name: a\n    run: one\n    enabled: false'],
+    ['a check with both run: and condition:', 'checks:\n  - name: a\n    run: one\n    condition: ready'],
+    ['a condition: that is no name', 'checks:\n  - name: a\n    condition: Not A Name'],
+    ['a usesCheckout: on a condition', 'checks:\n  - name: a\n    condition: ready\n    usesCheckout: false'],
     ['an item that is no map', 'checks:\n  - npm test'],
   ];
   for (const [what, lines] of refusals) {

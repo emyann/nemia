@@ -1231,6 +1231,34 @@ Its arguments:
 - step (<step> at a shell): The step's name.
 - route (<route> at a shell): The route the condition takes, one of its routes:.
 
+## condition
+
+```text
+  nemia condition <runId> <step> <name> --status True|False|Unknown [--message "<words>"] [--try <n>]
+    write a condition a check of the step waits on (condition: <name> in its checks:): True lets
+    the step go on, False refuses it as a failed check is (it counts against retries:, then waits
+    on you), Unknown leaves it waiting. It speaks of one try of the step: --try, else the try the
+    step is on now; a status for any other try is refused. The step's own session, and its checks,
+    are refused: a step never vouches for its own work. A template's program writes it with the
+    session token it is given.
+    --message: the words that go with the status; a False one is handed to the next try as the
+    check's output
+```
+
+Writes a condition a check of the step waits on, for the try the step is on: True lets the step go on, False refuses it as a failed check is, Unknown leaves it waiting. Refused to the step's own session (403), for a condition the step does not wait on (422) and for another try (409). Answers RunConditionWritten: the condition as it stands.
+
+Calls `PUT /api/namespaces/:namespace/runs/:name/steps/:step/conditions/:condition`.
+
+Its arguments:
+
+- namespace: The namespace, a run's factory (default for one that names none).
+- name: The run's name.
+- step (<step> at a shell): The step's name.
+- condition (<condition> at a shell): The condition's name, one a check of the step waits on in its condition:.
+- status (--status at a shell): True: it holds, the step goes on. False: it does not, the step is refused as a failed check is. Unknown: not decided yet.
+- try (--try at a shell): The try of the step the status speaks of, from 1; it must be the one the step is on.
+- message (--message at a shell): The writer's words with the status: what it saw, and what to do where it is False.
+
 ## refresh
 
 ```text

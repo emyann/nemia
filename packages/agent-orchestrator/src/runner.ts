@@ -402,6 +402,7 @@ export { TOKEN_LEAST, tokenFloor, type FloorRequest } from './admission/floor.ve
 export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type FloorRefusal } from './admission/index.ts';
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
+export { CONDITION } from './condition/condition.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
 export { ASSIGN } from './assignee/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
@@ -438,6 +439,7 @@ export {
   hireTable,
   libraryAddTable,
   mcpServerTable,
+  programTable,
   proposalTable,
   scheduleTable,
   skillTable,
@@ -462,9 +464,17 @@ export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts'
 export { triggerList, triggerObject } from './factory/object/trigger.verb.ts';
 export { hireList, hireObject } from './factory/object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
+export { programList, programObject } from './factory/object/program.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
-export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
+export {
+  templateList,
+  templateObject,
+  templatePrograms,
+  templateProgram,
+  templateTree,
+  TemplateRenders,
+} from './template/object/template.verb.ts';
 export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
 export {

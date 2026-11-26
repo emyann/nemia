@@ -114,8 +114,21 @@ const RouteRecord = Schema.Struct({
   by: Schema.Literals(['table', 'script', 'judge', 'person'] as const satisfies readonly RouteBy[]),
 });
 
+/** A condition written for a try of a step, as a read composes it onto the record (`ConditionWritten`, record.ts). */
+const ConditionWritten = Schema.Struct({
+  step: Schema.String,
+  name: Schema.String,
+  try: Schema.Number,
+  status: Schema.Literals(['True', 'False', 'Unknown']),
+  message: Schema.String,
+  at: Schema.String,
+  transitionedAt: Schema.String,
+  by: Schema.NullOr(Schema.String),
+});
+
 export const Step = Schema.Struct({
   taskId: Schema.NullOr(TaskId.OnRead),
+  conditions: Schema.optional(Schema.Record(Schema.String, ConditionWritten)),
   route: Schema.optional(RouteRecord),
   sent: Schema.optional(Schema.Struct({ card: Schema.String, at: Schema.String })),
   pinned: Schema.optional(Schema.Array(Pin)),

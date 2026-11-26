@@ -31,6 +31,7 @@ import { deliver } from '../subscription/deliver.verb.ts';
 import { DAEMON_STARTED, startedLine } from '../feed/index.ts';
 import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
+import { programs } from '../program/program.verb.ts';
 import { reconcile } from '../factory/applied/applied.verb.ts';
 import { free } from '../forget/prune/free.verb.ts';
 import { clones } from '../factory/clones/clones.verb.ts';
@@ -432,6 +433,7 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, m
     yield* Effect.forkScoped(modelsAskedEvery(models ?? ((name) => e.models(name)), home));
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
+    yield* Effect.forkScoped(over(e)(programs()));
     yield* Effect.forkScoped(reconcile());
     yield* Effect.forkScoped(clones());
     yield* Effect.forkScoped(compaction());

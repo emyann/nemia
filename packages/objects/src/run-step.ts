@@ -17,6 +17,7 @@ import {
   RUNS_IN_BY,
   SAID_AFTER,
   SPAN_AT,
+  WRITTEN_CONDITION_STATUSES,
 } from './words.ts';
 
 /** An array as the package's types hold one, mutable, so a page built off the object keeps their types. */
@@ -190,12 +191,35 @@ export const StepLog = Schema.Struct({
 });
 export type StepLog = typeof StepLog.Type;
 
+/**
+ * The condition a check of a step waits on, as it stands for the try the step is on: its name, the try, what was written for that try
+ * (`status`, null while nothing was), the writer's words and when.
+ */
+export const StepCondition = Schema.Struct({
+  name: Schema.String.annotate({ description: "The condition's name, as the check's condition: says it." }),
+  try: Schema.Finite.annotate({ description: 'The try of the step the condition speaks of, from 1: the one the step is on.' }),
+  status: Schema.NullOr(Schema.Literals(WRITTEN_CONDITION_STATUSES)).annotate({
+    description: 'What was written for this try: True, False or Unknown; null while nothing was.',
+  }),
+  message: NullString.annotate({ description: "The writer's words with it; null while nothing was written." }),
+  writtenAt: NullString.annotate({ description: 'When it was last written; null while nothing was.' }),
+  lastTransitionTime: NullString.annotate({ description: 'When its status last changed; null while nothing was written.' }),
+}).annotate({
+  identifier: 'StepCondition',
+  description:
+    'The condition a check waits on, as it stands for the try the step is on; present on a check that waits on a condition, absent on one that runs a command.',
+});
+export type StepCondition = typeof StepCondition.Type;
+
 /** A step's check: its command, its task, its verdict and, refused, what it said (`StepCheck`, checks.verb.ts). */
 export const StepCheck = Schema.Struct({
   name: Schema.String.annotate({
     description: "The check's name: check for a step's check: line, else its name in the step's checks: list.",
   }),
-  command: Schema.String.annotate({ description: "The check's command, as the step's check: line or its checks: entry's run: says it." }),
+  command: Schema.String.annotate({
+    description:
+      "The check's command, as the step's check: line or its checks: entry's run: says it; `condition: <name>` for one that waits on a condition.",
+  }),
   started: NullString.annotate({ description: 'When its latest attempt started; null while it has not.' }),
   ended: NullString.annotate({ description: 'When its latest attempt ended; null while it has not.' }),
   taskId: NullString.annotate({ description: "The check's task; null while none was filed." }),
@@ -211,6 +235,7 @@ export const StepCheck = Schema.Struct({
     description:
       'What a refused check said: its exit, the last lines of its output and its errors, and why they could not be read; null where it did not refuse.',
   }),
+  condition: Schema.optionalKey(StepCondition),
 }).annotate({ identifier: 'StepCheck' });
 export type StepCheck = typeof StepCheck.Type;
 

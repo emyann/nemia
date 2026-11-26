@@ -102,6 +102,8 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'libraryadds.get': BY_GET,
   'volumes.list': BY_GET,
   'volumes.get': BY_GET,
+  'programs.list': BY_GET,
+  'programs.get': BY_GET,
   'workflows.list': BY_GET,
   'workflows.get': BY_GET,
   'templates.listAll': BY_GET,
@@ -135,6 +137,8 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'templates.agent': TEMPLATE_PREVIEW,
   'templates.skills': TEMPLATE_PREVIEW,
   'templates.skill': TEMPLATE_PREVIEW,
+  'templates.programs': TEMPLATE_PREVIEW,
+  'templates.program': TEMPLATE_PREVIEW,
   'factories.export': 'read by `nemia factory move`, a write that carries a factory to another store',
   'files.content':
     "a kept file's bytes, which no tool answers: `nemia inbox files <card> --get <name>` writes a card's out, the board shows its pictures, and a card's own read lists each file",

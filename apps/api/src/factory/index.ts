@@ -12,4 +12,5 @@ export {
   schedulesHandlers,
   triggersHandlers,
   volumesHandlers,
+  programsHandlers,
 } from './parts/index.ts';

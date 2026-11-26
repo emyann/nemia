@@ -11,9 +11,9 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { app } from '../app.ts';
-import { COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
+import { COMMANDS, engine, parseArgv, RM, TokenDoor, tokenDoorAt, triesDir } from 'agent-orchestrator';
 import { forgottenOf } from '../objects/forgotten.ts';
 import { runWith } from '../../test/builtin-place.ts';
 import { approvalKey, askNames, markerText, plantMarker, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
@@ -428,5 +428,124 @@ describe('POST …/steps/:step/route routes a condition as `nemia route` does, w
     conditionRun('r-route-none');
     assert.equal((await post('/api/namespaces/default/runs/r-route-none/steps/triage/route', {})).status, 400);
     assert.deepEqual(asked('r-route-none'), []);
+  });
+});
+
+/** A run of `plan → ship`, `ship` judged by a check that waits on the condition `ci-green`, on its first try. */
+const waitingRun = (id: string) => {
+  runRecord(
+    id,
+    [
+      { name: 'plan', after: [], body: 'Plan it.' },
+      { name: 'ship', after: ['plan'], body: 'Ship it.', checks: [{ name: 'ci', condition: 'ci-green', after: [] }] },
+    ],
+    { plan: { taskId: `${id}-plan`, branch: `wf/${id}/plan` }, ship: { taskId: null } },
+  );
+  signedOff(`${id}-plan`, DONE);
+};
+
+const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers: BOARD, body: JSON.stringify(body) });
+
+describe('PUT …/steps/:step/conditions/:condition writes a condition a check of the step waits on, as `nemia condition` does; one the step does not wait on, another try and a run the store has not are refused, nothing written', () => {
+  const url = (run: string, condition = 'ci-green') => `/api/namespaces/default/runs/${run}/steps/ship/conditions/${condition}`;
+
+  test('a condition written for the try the step is on is kept, and answered as it stands', async () => {
+    waitingRun('r-cond-ok');
+    const res = await put(url('r-cond-ok'), { status: 'True', try: 1, message: 'green' });
+    assert.equal(res.status, 200, await res.clone().text());
+    const { condition } = (await res.json()) as { condition: { name: string; try: number; status: string; message: string } };
+    assert.deepEqual([condition.name, condition.try, condition.status, condition.message], ['ci-green', 1, 'True', 'green']);
+    assert.equal(asked('r-cond-ok').length, 1);
+  });
+  test('REFUSED: a condition no check of the step waits on is a 422, nothing written', async () => {
+    waitingRun('r-cond-undeclared');
+    assert.equal((await put(url('r-cond-undeclared', 'other'), { status: 'True', try: 1, message: '' })).status, 422);
+    assert.deepEqual(asked('r-cond-undeclared'), []);
+  });
+  test('REFUSED: a write for a try the step is not on is a 409, nothing written', async () => {
+    waitingRun('r-cond-try');
+    assert.equal((await put(url('r-cond-try'), { status: 'True', try: 2, message: '' })).status, 409);
+    assert.deepEqual(asked('r-cond-try'), []);
+  });
+  test('REFUSED: a run the store has not is a 404', async () => {
+    assert.equal((await put(url('r-cond-none'), { status: 'True', try: 1, message: '' })).status, 404);
+  });
+});
+
+/** A run of `plan`, `lint` and `ship` as `waitingRun` has it, with `lint` and `ship` each on a task still running. */
+const sessionsRun = (id: string) => {
+  runRecord(
+    id,
+    [
+      { name: 'plan', after: [], body: 'Plan it.' },
+      { name: 'lint', after: ['plan'], body: 'Lint it.' },
+      { name: 'ship', after: ['plan'], body: 'Ship it.', checks: [{ name: 'ci', condition: 'ci-green', after: [] }] },
+    ],
+    { plan: { taskId: `${id}-plan`, branch: `wf/${id}/plan` }, lint: { taskId: `${id}-lint` }, ship: { taskId: `${id}-ship` } },
+  );
+  signedOff(`${id}-plan`, DONE);
+  for (const step of ['lint', 'ship'])
+    write(
+      path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
+      jsonl([
+        { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+        { kind: 'starting', at: at(1), attempt: 1 },
+        { kind: 'spawned', at: at(1), attempt: 1 },
+      ]),
+    );
+};
+
+/** The headers of a session of `step` in `run`, its token minted for the task filed for it. */
+const sessionOf = (run: string, step: string) => ({
+  ...BOARD,
+  authorization: `Bearer ${Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).tokens.mint({ agent: 'implementer', factory: null, run, step, attempt: 1, task: `${run}-${step}` });
+    }).pipe(Effect.provide(tokenDoorAt(root))),
+  )}`,
+});
+
+describe('PUT …/conditions/:condition judged by the session that presents it: the step’s own is refused, another step’s writes', () => {
+  const url = (run: string) => `/api/namespaces/default/runs/${run}/steps/ship/conditions/ci-green`;
+  const body = JSON.stringify({ status: 'True', try: 1, message: '' });
+
+  test('REFUSED: the step’s own session is a 403 own-step, nothing written', async () => {
+    sessionsRun('r-cond-own');
+    const res = await app.request(url('r-cond-own'), { method: 'PUT', headers: sessionOf('r-cond-own', 'ship'), body });
+    assert.equal(res.status, 403);
+    assert.equal(((await res.json()) as { reason?: string }).reason, 'own-step');
+    assert.deepEqual(asked('r-cond-own'), []);
+  });
+  test('a program of the factory, whose token is no run’s, writes it', async () => {
+    sessionsRun('r-cond-program');
+    write(
+      path.join(root, 'engine', 'tasks', 'program-mill-ci-writer.jsonl'),
+      jsonl([
+        { kind: 'filed', at: at(0), brief: 'program', cwd: '/code/app', maxAttempts: 1, harness: 'command' },
+        { kind: 'starting', at: at(1), attempt: 1 },
+        { kind: 'spawned', at: at(1), attempt: 1 },
+      ]),
+    );
+    const token = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* TokenDoor).tokens.mint({
+          agent: 'ci-writer',
+          factory: 'mill',
+          run: null,
+          step: null,
+          attempt: 1,
+          task: 'program-mill-ci-writer',
+        });
+      }).pipe(Effect.provide(tokenDoorAt(root))),
+    );
+    const res = await app.request(url('r-cond-program'), { method: 'PUT', headers: { ...BOARD, authorization: `Bearer ${token}` }, body });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(asked('r-cond-program').length, 1);
+  });
+  test('another step’s session writes it', async () => {
+    sessionsRun('r-cond-other');
+    const res = await app.request(url('r-cond-other'), { method: 'PUT', headers: sessionOf('r-cond-other', 'lint'), body });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(asked('r-cond-other').length, 1);
   });
 });

@@ -36,7 +36,6 @@ export {
   RunApprove,
   RunApproved,
   RunAsked,
-  RunCancelPlan,
   RunCancelled,
   RunInput,
   RunPrune,
@@ -53,7 +52,7 @@ export {
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
-export { RunAssign, RunAssigned, RunHeld, RunHold } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -471,6 +470,7 @@ export {
   YourStore,
 } from './server-api.ts';
 export { HarnessModelList, HarnessModels, ListedModelRead } from './models.ts';
+export { Program, ProgramList } from './program.ts';
 export { SessionAnswer, SessionGroup } from './session.ts';
 export {
   FINISHING_KINDS,
@@ -598,7 +598,7 @@ export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGro
 export { FolderNames, FoldersGroup, RepositoryMade, RepositoryMake, RepositoryNew } from './folders.ts';
 export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
 export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
-export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';
+export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES, WRITTEN_CONDITION_STATUSES } from './words.ts';
 export type { HarnessCheckName, HarnessCheckState, Milestone, MilestoneState, TurnFailure } from './words.ts';
 export {
   LinkClaimed,
@@ -642,7 +642,6 @@ export {
   type ReadCommand,
   type RestCommand,
   type RunCommand,
-  type WriterCommand,
 } from './commands.ts';
 export {
   AGENTS_WRITE_WORDS,
@@ -675,6 +674,7 @@ export {
   ASSIGN_WORDS,
   BY_CAP,
   CANCEL_WORDS,
+  CONDITION_WORDS,
   HOLD_WORDS,
   PAUSE_TIMEOUT_WORDS,
   PAUSE_WORDS,

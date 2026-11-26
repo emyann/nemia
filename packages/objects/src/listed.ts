@@ -31,6 +31,7 @@ export const LISTED_WITHOUT: { readonly [K in Kind]: readonly string[] } = {
   Agent: ['spec.instructions', 'spec.output.text', 'status.source'],
   Skill: ['spec.body', 'spec.files[].text'],
   Template: ['spec.instruction', 'spec.rules'],
+  Program: [],
   Subscription: [],
   Event: [],
   Proposal: ['spec.objects[].spec', 'status.before[].spec'],

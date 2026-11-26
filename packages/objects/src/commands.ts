@@ -39,7 +39,6 @@ export const MOVED_COMMANDS: readonly MovedCommand[] = WORDS.map((words) => word
 export type RunCommand = (typeof RUN_WORDS)[number]['name'];
 export type InboxCommand = (typeof INBOX_WORDS)[number]['name'];
 export type FactoryCommand = (typeof FACTORY_WORDS)[number]['name'];
-export type WriterCommand = (typeof WRITER_WORDS)[number]['name'];
 export type DefinitionCommand = (typeof DEFINITION_WORDS)[number]['name'];
 export type ReadCommand = (typeof READ_WORDS)[number]['name'];
 export type RestCommand = (typeof REST_WORDS)[number]['name'];

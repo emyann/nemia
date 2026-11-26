@@ -18,6 +18,7 @@ import type {
   AskKey,
   AskOf,
   AskWritten,
+  ConditionWritten,
   Assignee,
   Hold,
   PersonRequest,
@@ -29,6 +30,7 @@ import type {
   Unheld,
 } from '../record/record.ts';
 import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
+import { conditionAsk, unconditioned, withConditions } from '../condition/condition.ts';
 import { askDoneKey, askKeyOf, askName, claimKey, forgettingKey, runKey, runMarksPrefix, saidKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
@@ -61,7 +63,7 @@ const COMPOSED = [
   'pause',
 ] as const;
 const recordOf = (run: Run) => {
-  const kept: Record<string, unknown> = { ...unrouted(run) };
+  const kept: Record<string, unknown> = { ...unconditioned(unrouted(run)) };
   for (const key of COMPOSED) delete kept[key];
   return structuredClone(kept) as Run;
 };
@@ -85,6 +87,7 @@ type State = {
   asks: Map<string, Map<string, Held>>;
   forgetting: Map<string, string[]>;
   routes: Map<string, Map<string, PersonRoute>>;
+  conditions: Map<string, Map<string, ConditionWritten>>;
   versions: Map<string, number>;
 };
 
@@ -104,6 +107,7 @@ const stateOf = () =>
     asks: new Map(),
     forgetting: new Map(),
     routes: new Map(),
+    conditions: new Map(),
     versions: new Map(),
   }) satisfies State;
 
@@ -129,7 +133,9 @@ function readOf(st: State, id: string) {
   const acceptances = waiting(st, id, 'loop');
   const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {
-    ...withRoutes(structuredClone(record), [...(st.routes.get(id)?.values() ?? [])]),
+    ...withConditions(withRoutes(structuredClone(record), [...(st.routes.get(id)?.values() ?? [])]), [
+      ...(st.conditions.get(id)?.values() ?? []),
+    ]),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
     ...(st.cancellers.has(id) ? { cancelledBy: structuredClone(st.cancellers.get(id)) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
@@ -158,8 +164,10 @@ function forgetOf(st: State, id: string) {
   }
   for (const [name, held] of asksOf(st, id)) removed.push(held.done ? askDoneKey(id, name) : askKeyOf(id, name));
   for (const name of st.routes.get(id)?.keys() ?? []) removed.push(askKeyOf(id, name));
+  for (const name of st.conditions.get(id)?.keys() ?? []) removed.push(askKeyOf(id, name));
   st.asks.delete(id);
   st.routes.delete(id);
+  st.conditions.delete(id);
   const named: Array<[Map<string, unknown>, string]> = [
     [st.cancelled, 'cancelled'],
     [st.pruned, 'pruned'],
@@ -213,7 +221,9 @@ function runsOf(st: State) {
     stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
     exists: (id) => st.records.has(id),
     taken: (id) =>
-      [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said, st.routes].some((m) => m.has(id)),
+      [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said, st.routes, st.conditions].some((m) =>
+        m.has(id),
+      ),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id, actor) => {
       const at = st.cancelled.get(id);
@@ -343,6 +353,16 @@ function asksGroup(st: State) {
       st.routes.set(id, held);
       touch(st, id);
       return askKeyOf(id, name);
+    },
+    condition: (id, written) => {
+      const name = conditionAsk(written.step, written.try, written.name);
+      const held = st.conditions.get(id) ?? new Map<string, ConditionWritten>();
+      const before = held.get(name);
+      const whole = { ...written, transitionedAt: before?.status === written.status ? before.transitionedAt : written.at };
+      held.set(name, whole);
+      st.conditions.set(id, held);
+      touch(st, id);
+      return whole;
     },
   } satisfies RunsLayer['asks'];
 }

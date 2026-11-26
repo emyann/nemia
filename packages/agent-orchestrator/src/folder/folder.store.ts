@@ -464,7 +464,10 @@ const frozenStepFields = {
   check: Schema.optionalKey(Schema.String),
   checks: Schema.optionalKey(
     Schema.Array(
-      Schema.StructWithRest(Schema.Struct({ name: Schema.String, run: Schema.String, after: Schema.Array(Schema.String) }), Rest),
+      Schema.Union([
+        Schema.StructWithRest(Schema.Struct({ name: Schema.String, run: Schema.String, after: Schema.Array(Schema.String) }), Rest),
+        Schema.StructWithRest(Schema.Struct({ name: Schema.String, condition: Schema.String, after: Schema.Array(Schema.String) }), Rest),
+      ]),
     ),
   ),
   run: Schema.optionalKey(Schema.String),

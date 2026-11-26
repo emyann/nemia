@@ -81,6 +81,12 @@ export type { RevisionsPolicy };
 export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
 
 /**
+ * A program of a factory's template (`programs/<name>/program.yaml`): the command the daemon keeps running for the factory, and the
+ * conditions it writes (`nemia condition`), by name.
+ */
+export type Program = { readonly run: string; readonly writes: readonly string[] };
+
+/**
  * A factory as its file says it: its name, the file's minus `.json`, its volumes, the folders and repositories it reaches, each read-only
  * or writable, none or several (`Volume`): its writable ones are the git repositories it works on (`workedOn`), in the order filed. The
  * workflows attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
@@ -99,6 +105,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * its file holds one; a file written before the counter reads as 1 (`generationOf`). `labelValues`: the values each label key it names
  * takes on its cards and runs, when it names any — its file's, or its tree's wiring's where it is made from a template, which renders
  * them from its manifest's `spec.labelValues`: a write that gives such a key another value is refused (`labelValuesJudged`).
+ * `programs`: the programs its template declares (`programs/<name>/program.yaml`), by name, read from its tree's wiring, which the
+ * daemon keeps running for it (`programs()`).
  * `radius`: the globs of the files a branch changes that its team wants shown at decide (`agentFacing`, `checkAffecting`, `lessons`),
  * kept as `labelValues` is, rendered from its manifest's `spec.radius`; none flags nothing. `firstWorkflow`: the workflow a first
  * card on it runs in, from its manifest's `spec.firstWorkflow`.
@@ -118,6 +126,7 @@ export type Factory = {
   workflowRepos?: Readonly<Record<string, string>>;
   triggers?: Readonly<Record<string, CardTrigger>>;
   labelValues?: Readonly<Record<string, readonly string[]>>;
+  programs?: Readonly<Record<string, Program>>;
   radius?: { readonly agentFacing: readonly string[]; readonly checkAffecting: readonly string[]; readonly lessons: readonly string[] };
   firstWorkflow?: string;
   generation?: number;

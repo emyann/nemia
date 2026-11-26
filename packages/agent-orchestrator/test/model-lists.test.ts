@@ -13,7 +13,6 @@ import { listedModels, modelsFile, recordedModels, recordModels } from '../src/h
 import { parseFolder } from '../src/folder/folder.ts';
 import { modelsRefusal } from '../src/start/models.ts';
 import { askedModels } from '../src/daemon/up.verb.ts';
-import type { Engine } from '../src/runtime-client.ts';
 import { WorkflowError } from '../src/step/step.ts';
 
 const OPUS: ListedModel = { id: 'claude-opus-5-5', aliases: ['opus'], name: 'Opus 5.5', keepsAuto: true, efforts: ['low', 'high'] };
@@ -65,7 +64,7 @@ describe("the daemon's ask: each harness's answer is recorded whole, and one tha
     };
     recordModels(home, 'broken', [HAIKU], '2026-11-26T09:00:00.000Z');
     await Effect.runPromise(
-      askedModels({} as Engine, home, '2026-11-26T10:00:00.000Z', ['claude', 'broken', 'died', 'codex'], (name) => answers[name] as never),
+      askedModels((name) => answers[name] as never, home, '2026-11-26T10:00:00.000Z', ['claude', 'broken', 'died', 'codex']),
     );
     assert.deepEqual(Object.keys(recordedModels(home)).sort(), ['broken', 'claude']);
     assert.deepEqual(listedModels(home).broken, [HAIKU], 'the failed ask kept its last');

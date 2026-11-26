@@ -239,7 +239,7 @@
     },
     {
       "term": "Recorded model list",
-      "meaning": "the models each harness lists, as the daemon last asked the runtime and wrote them (`models.json`, `recordedModels`): what a load, a start, a retry and the template lint judge a model by (`modelJudged`, `packages/agent-orchestrator/contracts/model-listed.contract.ts`); a harness with none recorded is not judged.",
+      "meaning": "the models each harness lists, as the daemon last asked the runtime and wrote them (`recordedModels`, `packages/agent-orchestrator/src/harness/models.store.ts`): what a load, a start, a retry and the template lint judge a model by (`modelJudged`, `packages/agent-orchestrator/contracts/model-listed.contract.ts`); a harness with none recorded is not judged.",
       "type": "RecordedModels"
     },
     {

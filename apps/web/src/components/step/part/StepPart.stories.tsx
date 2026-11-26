@@ -151,17 +151,23 @@ export const Done: StoryObj = {
   play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'done', 'none', 'Open the step')),
 };
 
-/** A step at work on another model than the one it was asked for: its Model fact says both ids. */
-export const RanOnAnotherModel: StoryObj = {
-  render: () => {
-    const working = RUNS.atWork.steps[0]!;
-    const latest = working.attempts.latest;
-    const ran = { ...working, attempts: { ...working.attempts, latest: latest && { ...latest, model: 'claude-opus-5-5' } } };
-    return <Sizes run={{ ...RUNS.atWork, steps: [ran] }} whole={false} />;
-  },
+/** The run at work whose session reports another model than the one its step asked for. */
+const ranElsewhere = (): RunDetail => {
+  const working = RUNS.atWork.steps[0];
+  const latest = working?.attempts.latest;
+  return {
+    ...RUNS.atWork,
+    steps: working ? [{ ...working, attempts: { ...working.attempts, latest: latest && { ...latest, model: 'the-long-model-id' } } }] : [],
+  };
+};
+
+/** A step at work on another model than the one it was asked for: its Model fact says both ids. Drawn from its args, the run. */
+export const RanOnAnotherModel: StoryObj<{ run: RunDetail }> = {
+  args: { run: ranElsewhere() },
+  render: ({ run }) => <Sizes run={run} whole={false} />,
   play: async ({ canvasElement }) => {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
-    await expect(card.querySelector('[data-step-facts]')?.textContent).toContain('claude-opus-5-5 · asked opus');
+    await expect(card.querySelector('[data-step-facts]')?.textContent).toContain('the-long-model-id · asked opus');
   },
 };
 

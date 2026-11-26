@@ -5,7 +5,7 @@
  */
 import type { StepSpec } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/model-words.ts';
+import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/index.ts';
 
 /** The model each step a run names runs on, by the step's name: every other step runs on its agent's. */
 export type RunModels = Readonly<Record<string, string>>;

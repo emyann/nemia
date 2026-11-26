@@ -19,6 +19,7 @@ export {
   type Fenced,
   type Overridable,
 } from './fence.ts';
+export { harnessModelJudged, listedFor, modelWords, stepModelJudged, stepModelRefusal, type ModelLists } from './model-words.ts';
 export { headedLayers } from './layers.ts';
 export type { ComposedLayer } from './layers.ts';
 export { unallowedRefusal } from './unallowed.ts';

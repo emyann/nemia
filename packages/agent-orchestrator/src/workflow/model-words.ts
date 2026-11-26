@@ -3,9 +3,13 @@
  * pieces the load, the start (`--model`, a card's `model:`) and the retry (`--model`) each put their own opening on.
  */
 import { fenceReach } from 'agent-runtime/vocabulary';
+import { modeOf } from '../former/former.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
 import { modelJudged, type ModelJudged, type ModelListed } from './models.ts';
+
+/** A step's fence word, as `modeOf` reads it. */
+type FenceWord = Parameters<typeof modeOf>[0];
 
 /** The models each harness lists as the store last recorded them, by the harness's name: a harness with no entry has no list. */
 export type ModelLists = Readonly<Record<string, readonly ModelListed[]>>;
@@ -21,24 +25,34 @@ export const listedFor = (harness: string | undefined, lists: ModelLists | undef
 };
 
 /**
- * How `model`, named for `step`, stands against the list its harness recorded in `lists`: judged on the step's harness, with the mode it
- * runs in (named, else the one it is filed in) and its effort. Pure.
+ * How `model`, named on `harness`, stands against the list that harness recorded in `lists`: judged with the mode the session runs in
+ * (the one named, else the one it is filed in) and its effort. Pure.
+ * @param model The model named.
+ * @param harness The harness the session runs on, or undefined for the default one.
+ * @param named The mode or sandbox named for the session, or undefined where none is.
+ * @param effort The effort named for the session, or undefined where none is.
+ * @param lists What each harness lists, as recorded; undefined where none is recorded.
+ */
+export function harnessModelJudged(
+  model: string,
+  harness: string | undefined,
+  named: string | undefined,
+  effort: string | undefined,
+  lists: ModelLists | undefined,
+) {
+  const reach = fenceReach(harness ?? DEFAULT_HARNESS);
+  return modelJudged(model, listedFor(harness, lists), { mode: named ?? reach?.given, effort, autoMode: reach?.autoMode });
+}
+
+/**
+ * How `model`, named for `step`, stands against the list its harness recorded in `lists`, as `harnessModelJudged` judges it with the
+ * step's own fence and effort. Pure.
  * @param model The model named for the step.
  * @param step The step, with its harness, fence word and effort.
  * @param lists What each harness lists, as recorded; undefined where none is recorded.
  */
-export function stepModelJudged(
-  model: string,
-  step: Pick<StepSpec, 'harness' | 'permissionMode' | 'sandbox' | 'effort'>,
-  lists: ModelLists | undefined,
-) {
-  const reach = fenceReach(step.harness ?? DEFAULT_HARNESS);
-  return modelJudged(model, listedFor(step.harness, lists), {
-    mode: step.sandbox ?? step.permissionMode ?? reach?.given,
-    effort: step.effort,
-    autoMode: reach?.autoMode,
-  });
-}
+export const stepModelJudged = (model: string, step: Pick<StepSpec, 'harness' | 'effort'> & FenceWord, lists: ModelLists | undefined) =>
+  harnessModelJudged(model, step.harness, modeOf(step), step.effort, lists);
 
 /**
  * The words that say why `model` is refused for a step as `judged` says, naming what to write instead; undefined where it is taken or not
@@ -58,7 +72,7 @@ export function modelWords(model: string, judged: ModelJudged, listed: readonly 
     case 'unlisted':
       return `\`${model}\` is no model its harness lists. The ids it lists: ${ids}.`;
     case 'mode-dropped':
-      return `\`${model}\` drops \`${judged.mode}\`: the session would run in \`default\`, and a job denies every call \`default\` would ask about. Name a mode it keeps (\`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules), or a model that keeps \`${judged.mode}\`: ${listed
+      return `\`${model}\` drops \`${judged.mode}\`: the session would run in \`default\`, and a job denies every call \`default\` would ask about. Name a mode it keeps in the step's fence, or a model that keeps \`${judged.mode}\`: ${listed
         .filter((m) => m.keepsAuto !== false)
         .map((m) => m.id)
         .join(', ')}.`;
@@ -72,10 +86,7 @@ export function modelWords(model: string, judged: ModelJudged, listed: readonly 
  * @param step The step as resolved, with its agent's model where it names none.
  * @param lists What each harness lists, as recorded; undefined where none is recorded.
  */
-export function stepModelRefusal(
-  step: Pick<StepSpec, 'name' | 'model' | 'harness' | 'permissionMode' | 'sandbox' | 'effort'>,
-  lists: ModelLists | undefined,
-) {
+export function stepModelRefusal(step: Pick<StepSpec, 'name' | 'model' | 'harness' | 'effort'> & FenceWord, lists: ModelLists | undefined) {
   if (step.model === undefined || step.model === 'inherit') return undefined;
   const words = modelWords(step.model, stepModelJudged(step.model, step, lists), listedFor(step.harness, lists));
   return words === undefined ? undefined : `${step.name}: \`model: ${step.model}\`: ${words}`;

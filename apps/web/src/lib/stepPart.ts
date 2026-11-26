@@ -214,7 +214,7 @@ const firstSet = (...values: Array<string | null | undefined>) => values.find((v
 
 /**
  * The model the session ran on, as its harness reported it, where its latest attempt did: with the model it was asked for beside it where
- * that differs (`claude-opus-5-5 · asked opus`); else the one it was filed with or its step sets, or `default`.
+ * that differs (`<id> · asked <word>`); else the one it was filed with or its step sets, or `default`.
  */
 function modelSaid(step: StepView) {
   const asked = firstSet(step.filed?.model, step.spec?.model);

@@ -91,21 +91,19 @@ const MODELS_EVERY_MS = 3_600_000;
 export type ModelsAsk = (harness: string) => Effect.Effect<readonly ListedModel[] | undefined, unknown>;
 
 /**
- * Each harness's models (`modelsHarnesses`) asked through `ask` — the engine's `models` of `e` unless given — and recorded in the store at
+ * Each harness's models (`modelsHarnesses`) asked through `ask` and recorded in the store at
  * `home` (`recordModels`) at `at`: a harness that answers a list replaces its own record whole; one that fails, dies or lists none leaves
  * the record as it was, so a failed ask never forgets what the harness last said.
- * @param e The engine to ask.
+ * @param ask How a harness is asked: the engine's `models`.
  * @param home The store's home folder, whose `models.json` the daemon alone writes.
  * @param at When the asks are made, as an ISO time.
  * @param names The harnesses to ask.
- * @param ask How a harness is asked.
  */
 export const askedModels = Effect.fn('askedModels')(function* (
-  e: Engine,
+  ask: ModelsAsk,
   home: string,
   at: string,
   names: readonly string[] = modelsHarnesses(),
-  ask: ModelsAsk = (name) => e.models(name),
 ) {
   for (const name of names) {
     const listed = yield* Effect.suspend(() => ask(name)).pipe(
@@ -119,15 +117,12 @@ export const askedModels = Effect.fn('askedModels')(function* (
 
 /**
  * `askedModels` of every harness at once and every `MODELS_EVERY_MS` after, for as long as its scope lasts.
- * @param e The engine to ask.
+ * @param ask How a harness is asked: the engine's `models`.
  * @param home The store's home folder, whose `models.json` the daemon alone writes.
- * @param ask How a harness is asked; the engine's own unless given.
  */
-const modelsAskedEvery = (e: Engine, home: string, ask?: ModelsAsk) =>
+const modelsAskedEvery = (ask: ModelsAsk, home: string) =>
   Effect.forever(
-    Effect.suspend(() => askedModels(e, home, new Date().toISOString(), modelsHarnesses(), ask)).pipe(
-      Effect.andThen(Effect.sleep(MODELS_EVERY_MS)),
-    ),
+    Effect.suspend(() => askedModels(ask, home, new Date().toISOString())).pipe(Effect.andThen(Effect.sleep(MODELS_EVERY_MS))),
   );
 
 /**
@@ -433,7 +428,7 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, m
         ),
       ),
     );
-    yield* Effect.forkScoped(modelsAskedEvery(e, home, models));
+    yield* Effect.forkScoped(modelsAskedEvery(models ?? ((name) => e.models(name)), home));
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());

@@ -5,7 +5,7 @@
  * (`exportTree`), read through the loader's own readers and checked before the door writes it. What a template is read from and
  * written to is the door's: nothing here writes the disk.
  */
-import type { ModelLists } from '../workflow/model-words.ts';
+import type { ModelLists } from '../workflow/index.ts';
 import { SHIPPED_PLACE_NEEDS } from '../place/place.ts';
 import fs from 'node:fs';
 import path from 'node:path';

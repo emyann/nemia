@@ -6,11 +6,10 @@
  * that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
-import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
-import { HARNESS_PROPERTIES, OVERRIDABLE } from '../workflow/index.ts';
-import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/model-words.ts';
+import { harnessModelJudged, HARNESS_PROPERTIES, listedFor, modelWords, OVERRIDABLE, type ModelLists } from '../workflow/index.ts';
 import { selectorsRefusal } from '../watch/selector.ts';
 import { labelValuesOf } from '../label-spelling/label-spelling.ts';
 import {
@@ -341,13 +340,10 @@ const modelRefusals = (held: Held, lists: ModelLists | undefined) =>
       const block = spec[harness];
       if (!isMap(block) || typeof block.model !== 'string') return [];
       const fence = isMap(block.fence) ? block.fence : {};
-      const mode = typeof fence.permissionMode === 'string' ? fence.permissionMode : undefined;
+      const key = fenceKeyOf(harness);
+      const word = key === undefined ? undefined : fence[key];
       const effort = typeof block.effort === 'string' ? block.effort : undefined;
-      const judged = stepModelJudged(
-        block.model,
-        { harness, ...(mode === undefined ? {} : { permissionMode: mode }), ...(effort === undefined ? {} : { effort }) },
-        lists,
-      );
+      const judged = harnessModelJudged(block.model, harness, typeof word === 'string' ? word : undefined, effort, lists);
       const words = modelWords(block.model, judged, listedFor(harness, lists));
       return words === undefined ? [] : [{ file: `agents/${name}/agent.yaml`, at: ['spec', harness, 'model'], message: words }];
     }),

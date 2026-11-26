@@ -7,7 +7,7 @@
  */
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { Effect } from 'effect';
-import type { ListedOf, ModelRow } from '../../../contracts/listed-models.contract.ts';
+import type { ListedOf, ModelRow, UniqueIdsOf } from '../../../contracts/listed-models.contract.ts';
 import { RunnerError } from '../error.ts';
 import { programIn } from '../harness-bin.ts';
 import { heldInput, quotaExecutable, usageOptions } from './quota.ts';
@@ -17,26 +17,37 @@ export type { ListedModel, ModelRow } from '../../../contracts/listed-models.con
 /** How long an ask may take before it is given up on, and its query closed. */
 const MODELS_TIMEOUT_MS = 15_000;
 
+/** The canonical id of `row`: what its `value` resolves to, else the value itself. */
+const idOf = (row: ModelRow) => row.resolvedModel ?? row.value;
+
+/**
+ * The ids in `ids`, each once, in the order they first stand. Pure.
+ * @param ids The canonical ids of the rows, in their order.
+ */
+export const uniqueIdsOf: UniqueIdsOf = (ids) => {
+  const placed = ids.map((id, at) => ({ id, at }));
+  return placed.filter((one) => placed.find((other) => other.id === one.id)?.at === one.at).map((one) => one.id);
+};
+
 /**
  * The models a harness lists, by canonical id, read off its rows: each row's `resolvedModel`, else its `value`, once, with the other
  * words that resolve to it as its aliases, and the facts of the first row that names it. Pure.
  * @param rows The rows the harness answered, each a `ModelInfo` of the SDK.
  */
-export const listedOf: ListedOf = (rows) =>
-  rows
-    .filter((row, i) => !rows.slice(0, i).some((before) => (before.resolvedModel ?? before.value) === (row.resolvedModel ?? row.value)))
-    .map((first) => ({
-      id: first.resolvedModel ?? first.value,
-      aliases: rows
-        .filter(
-          (row) =>
-            (row.resolvedModel ?? row.value) === (first.resolvedModel ?? first.value) && row.value !== (first.resolvedModel ?? first.value),
-        )
-        .map((row) => row.value),
-      name: first.displayName,
-      keepsAuto: first.supportsAutoMode,
-      efforts: first.supportedEffortLevels,
-    }));
+export const listedOf: ListedOf = (rows) => {
+  const ids = rows.map(idOf);
+  const words = rows.map((row) => row.value);
+  return uniqueIdsOf(ids).map((id) => {
+    const first = rows.find((row) => idOf(row) === id);
+    return {
+      id,
+      aliases: words.flatMap((word, at) => (ids.at(at) === id && word !== id ? [word] : [])),
+      name: first?.displayName ?? id,
+      keepsAuto: first?.supportsAutoMode,
+      efforts: first?.supportedEffortLevels,
+    };
+  });
+};
 
 /** One ask of Claude Code's models, as `claudeModels` puts it: `models` answers once, `close` lets the query go whatever came of it. */
 type ModelsAsk = {

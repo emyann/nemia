@@ -37,6 +37,7 @@ const CLAIMS: Record<string, string> = {
   '1284-1300': 'McpHttpServerConfig',
   '1332': 'McpServerConfigForProcessTransport',
   '1348-1403': 'McpServerStatus',
+  '1512': 'ModelInfo',
   '1791': 'env',
   '1993': 'includePartialMessages',
   '2059-2063': 'maxBudgetUsd',

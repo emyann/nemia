@@ -410,6 +410,7 @@ const PINNED: Record<string, string[]> = {
     'NEMIA_SKILLS',
     'keptRuns',
     'RECORD_CEILING',
+    'recordedModels',
     'RunDoor',
     'runFound',
     'lastCeilings',

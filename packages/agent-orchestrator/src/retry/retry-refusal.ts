@@ -39,7 +39,7 @@ import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } 
 import { carries, heard, pauseAskVoid, retriesDue, retryable, type CheckKillOf } from './retry.ts';
 import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';
-import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/model-words.ts';
+import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/index.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { checksPhase } from '../check/index.ts';
@@ -123,6 +123,7 @@ type Judged = Asked &
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
  * @param checkKillOf What the machine's OOM killer did to each step's current check: left out, it killed nothing.
  * @param tipOf Where each branch of the run is now (`blockedRecheck`): left out, no blocked step may be rechecked, each told why.
+ * @param lists The models each harness lists, as the store recorded them: left out, no `--model` is judged.
  */
 export function retryRefusal(
   steps: readonly StepSpec[],

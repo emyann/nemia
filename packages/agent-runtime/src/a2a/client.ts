@@ -153,6 +153,10 @@ export class InProcessTransport implements Transport {
     return this.handler.harnessQuota(params, new ServerCallContext());
   }
 
+  harnessModels(params: Record<string, never>) {
+    return this.handler.harnessModels(params, new ServerCallContext());
+  }
+
   forgetSession(params: ForgetRequest) {
     return this.handler.forgetSession(params, new ServerCallContext());
   }
@@ -241,6 +245,7 @@ const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessT
   ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
   ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
   ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
+  ...(offered.methods.includes('harnessModels') ? { models: call('models', () => transport.harnessModels({})) } : {}),
   ...(offered.methods.includes('forgetSession') ? { forget: forgetThrough(transport) } : {}),
   ...(offered.methods.includes('sessionKept') ? { kept: keptThrough(transport) } : {}),
   ...(offered.methods.includes('compactSessions')

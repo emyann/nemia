@@ -9,6 +9,7 @@ import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run, StepRecord, TaskPhase } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
+import type { ModelLists } from '../workflow/index.ts';
 import type { SpendOf } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
@@ -317,7 +318,16 @@ const refusalOf = (
   name = 'implement',
   verdict: Verdict | undefined = 'unfinished',
   steps: StepSpec[] = RETRIED,
-) => retryRefusal(steps, r, name, how, phases(p), signedDone, asked, () => verdict, asks);
+  lists?: ModelLists,
+) =>
+  retryRefusal(steps, r, name, how, phases(p), signedDone, asked, () => verdict, asks, undefined, undefined, undefined, undefined, lists);
+
+const LISTED: ModelLists = {
+  claude: [
+    { id: 'claude-opus-5-5', aliases: ['opus'], keepsAuto: true, efforts: undefined },
+    { id: 'claude-haiku-4-5', aliases: ['haiku'], keepsAuto: false, efforts: undefined },
+  ],
+};
 
 const remote: StepSpec[] = [{ ...step('implement'), harness: 'a2a:reviewer' }, step('review', ['implement'])];
 const failedRun = () => run({ implement: 't1', review: null });
@@ -437,16 +447,41 @@ describe('retryRefusal: what `nemia retry` refuses, and what it says to do inste
     const said = retryRefusal(RETRIED, failedRun(), 'implement', { mode: 'continue' }, phases({ t1: 'running' }), signedBlocked, asked);
     assert.match(said!, /signed off blocked and its session has not ended/);
   });
-  test('a `--model` an `auto` step would drop', () => {
+  test('a `--model` an `auto` step would drop, and one its harness lists by another id', () => {
     names(
-      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'claude-haiku-4-5' }, [], 'implement', 'unfinished', STEPS),
+      refusalOf(
+        failedRun(),
+        { t1: 'failed' },
+        { mode: 'continue', model: 'claude-haiku-4-5' },
+        [],
+        'implement',
+        'unfinished',
+        STEPS,
+        LISTED,
+      ),
       '`--model claude-haiku-4-5`',
-      'no `permissionMode:`',
-      'nemia retry r-1 implement --model sonnet',
-      '`permissionMode: acceptEdits`',
       '`permissionMode: dontAsk`',
-      '`allowedTools:`',
+      'claude-opus-5-5',
     );
+    names(
+      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'opus' }, [], 'implement', 'unfinished', STEPS, LISTED),
+      '`--model opus`',
+      'write `claude-opus-5-5`',
+    );
+    assert.equal(
+      refusalOf(
+        failedRun(),
+        { t1: 'failed' },
+        { mode: 'continue', model: 'claude-opus-5-5' },
+        [],
+        'implement',
+        'unfinished',
+        STEPS,
+        LISTED,
+      ),
+      null,
+    );
+    assert.equal(refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'opus' }, [], 'implement', 'unfinished', STEPS), null);
   });
   test('a `--model` or a `--budget` on a remote step', () => {
     names(

@@ -536,7 +536,7 @@ brief its one text part, the session it continues (`resumeFrom`) its `contextId`
 whole and unopened — its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the
 session's Task, in no context or the session's own. What A2A
 has no call for is the extension's methods: `findSession`, `sessionLogs`, `releaseSession`, `sessionTranscript` and `observeSessions` (an
-`observe` told the sessions the journal expects, below), and `harnessQuota`, the one that is no session's (`quota`, below). The harness's card lists
+`observe` told the sessions the journal expects, below), `harnessQuota` and `harnessModels`, the ones that are no session's (`quota`, below, and `models`). The harness's card lists
 the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
 What a harness says comes back in
 the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is

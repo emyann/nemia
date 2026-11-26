@@ -56,7 +56,7 @@ import {
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
 import { fenceKeyOf } from '../harness/harness.ts';
-import type { ModelLists } from '../workflow/model-words.ts';
+import type { ModelLists } from '../workflow/index.ts';
 import { entriesOf } from '../skills/read.store.ts';
 
 /**

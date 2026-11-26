@@ -32,6 +32,10 @@ const idOf = (row: ModelRow) => row.resolvedModel ?? row.value;
 /** Whether `list` holds no name twice. */
 const noneTwice = (list: readonly string[]) => list.every((name, i) => !list.slice(0, i).includes(name));
 
+/** Whether `a` and `b` hold the same words in the same order, or are both absent. */
+const sameList = (a: readonly string[] | undefined, b: readonly string[] | undefined) =>
+  a === undefined ? b === undefined : b !== undefined && a.length === b.length && a.every((w, i) => w === b.at(i));
+
 const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>({
   requires: ({ input: [rows] }) => rows.every((r) => r.value !== '' && r.resolvedModel !== ''),
   ensures: {
@@ -66,7 +70,7 @@ const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>
             first !== undefined &&
             m.name === first.displayName &&
             m.keepsAuto === first.supportsAutoMode &&
-            (m.efforts === undefined) === (first.supportedEffortLevels === undefined)
+            sameList(m.efforts, first.supportedEffortLevels)
           );
         }),
     },
@@ -75,3 +79,23 @@ const listedOfSpec = spec<(rows: readonly ModelRow[]) => readonly ListedModel[]>
 
 /** `listedOf`'s type, which src/harness/claude/models.ts takes. */
 export type ListedOf = Implementation<typeof listedOfSpec>;
+
+const uniqueIdsOfSpec = spec<(ids: readonly string[]) => readonly string[]>({
+  ensures: {
+    everyIdKept: {
+      description: 'Each id given is kept',
+      condition: ({ input: [ids], output }) => ids.every((id) => output.includes(id)),
+    },
+    onlyIdsGiven: {
+      description: 'An id is kept only where it was given',
+      condition: ({ input: [ids], output }) => output.every((id) => ids.includes(id)),
+    },
+    eachIdOnce: {
+      description: 'No id is kept twice',
+      condition: ({ output }) => noneTwice(output),
+    },
+  },
+});
+
+/** `uniqueIdsOf`'s type, which src/harness/claude/models.ts takes. */
+export type UniqueIdsOf = Implementation<typeof uniqueIdsOfSpec>;

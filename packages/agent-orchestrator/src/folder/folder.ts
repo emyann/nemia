@@ -4,8 +4,7 @@
  */
 import path from 'node:path';
 import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, refuse, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
-import { stepModelRefusal, type ModelLists } from '../workflow/model-words.ts';
-import { orderSteps, parseWorkflow, validate } from '../workflow/index.ts';
+import { orderSteps, parseWorkflow, stepModelRefusal, validate, type ModelLists } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
 import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';

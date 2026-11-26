@@ -1,19 +1,19 @@
 ---
 title: Install
-description: Install a released Nemia with one line, on a Mac, on Linux or on Windows through WSL, as a laptop's, a server or a client of one, and keep it up to date.
+description: Install Nemia with one line on a Mac, on Linux, or on Windows through WSL, as a laptop install, a server, or a client of a server, and keep it up to date.
 ---
 
-Nemia installs with one line, on:
+Install Nemia with one line, on:
 
-- **macOS** on Apple silicon, and on Intel, each at 13.5 or later;
+- **macOS** on Apple silicon or Intel, version 13.5 or later;
 - **Linux** on x64 or arm64;
 - **Windows through WSL**: run the line in a WSL terminal, which installs the Linux archive for that machine.
 
-A released Nemia is one archive per platform. It carries its own Node, the code, the production dependencies, the board's built pages
-and the templates; no harness, which you activate after ([Activate a harness](#activate-a-harness)). Nothing else is installed
-system-wide, and no root is needed. [Getting started](/getting-started/) follows a first install on a laptop to a first landed change;
-[On a server](#on-a-server) says what changes on a dedicated machine, and [Self-hosting](/self-hosting/) takes such a machine from
-fresh to a factory's first run, GitHub included.
+Each Nemia release is one archive per platform. It includes its own Node, the code, the production dependencies, the board's built
+pages, and the templates. It doesn't include a harness: you activate one afterwards ([Activate a harness](#activate-a-harness)).
+Nothing else is installed system-wide, and you don't need root. [Getting started](/getting-started/) takes a first laptop install
+through to a first landed change. [On a server](#on-a-server) explains what changes on a dedicated machine, and
+[Self-hosting](/self-hosting/) takes such a machine from fresh to a factory's first run, GitHub included.
 
 ## Install
 
@@ -21,97 +21,101 @@ fresh to a factory's first run, GitHub included.
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
 ```
 
-The installer checks the machine first: it needs git, tar, curl or wget, and sha256sum or shasum. On Linux it also looks for
-systemd's user manager and cgroup v2, which the service and per-session memory limits need, and warns where one is missing rather than
-stopping. Then it downloads the archive for this machine and the release's checksums, refuses an archive whose checksum differs, and
-lays the release down:
+The installer checks the machine first. It needs git, tar, curl or wget, and sha256sum or shasum. On Linux, it also looks for
+systemd's user manager and cgroup v2, which the service and per-session memory limits need. If one is missing, it warns you instead
+of stopping. It then downloads the archive for this machine and the release's checksums, rejects an archive whose checksum doesn't
+match, and installs the release:
 
-- the release folder in `~/.agent-workflows/releases/<tag>` (the store, `WF_ROOT` where you set it), unpacked beside it and renamed
-  into place, so it is there whole or not at all;
-- the release's pointer, the link `current` beside it, moved to it;
-- the command, `~/.local/bin/nemia`, a link to the release's own launcher. Put `~/.local/bin` on your PATH if the installer says it is
-  not.
-- the same link in the store's tools folder, `~/.agent-workflows/tools/bin/nemia`, which every session finds first on its PATH, so a
-  step runs the `nemia` its settings allow. Both name the launcher through `current`, so they follow every upgrade.
+- the release folder, in `~/.agent-workflows/releases/<tag>` (or in your store, if you set `WF_ROOT`). It is unpacked next to that
+  folder and then renamed into place, so it is either there in full or not at all;
+- the `current` link next to it, which points to the active release;
+- the command, `~/.local/bin/nemia`, a link to the release's own launcher. Add `~/.local/bin` to your PATH if the installer says it
+  isn't there;
+- the same link in the store's tools folder, `~/.agent-workflows/tools/bin/nemia`, which every session finds first on its PATH. This
+  way a step runs the `nemia` its settings allow. Both links go through `current`, so they follow every upgrade.
 
-On a laptop it then asks nothing. It starts Nemia now, on this machine alone (127.0.0.1), with no service that starts it at login,
-opens the board's welcome page in your browser, and prints a short summary of what it did, ending on the link to that page under
-`http://localhost:8787/welcome`: a first-visit link, which signs that browser in to the board once, within ten minutes. It opens the
-browser with `open` on macOS, and with `xdg-open` on Linux where a display is set; where no browser could be opened, open the printed link
-yourself (under WSL, in Windows' own browser). `nemia board link --base http://localhost:8787/welcome` makes another. `--no-open` opens
-nothing. To start Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or
-`NO_COLOR` is set.
+On a laptop, the installer asks no questions. It starts Nemia right away, listening only on this machine (127.0.0.1), without a
+service that starts it at login. It opens the board's welcome page in your browser and prints a short summary of what it did. The
+summary ends with a link to that page at `http://localhost:8787/welcome`. This first-visit link signs that browser in to the board.
+It works once, within ten minutes. The installer opens the browser with `open` on macOS, and with `xdg-open` on Linux when a display
+is set. If no browser opens, open the printed link yourself (under WSL, in your Windows browser).
+`nemia board link --base http://localhost:8787/welcome` creates a new link. `--no-open` opens nothing. To start Nemia at login later,
+run `nemia service install`. The summary is plain text when the output isn't a terminal or `NO_COLOR` is set.
 
-After that, `nemia open` opens the board in your browser signed in, at any time, with no token to see or type: it makes a first-visit
-link and opens it under `localhost`, or prints it where no browser can be opened. The board stays signed in while you use it, until
-thirty days after your last visit or until you forget it in Settings. `nemia board link` still prints a link without opening it.
+After that, `nemia open` opens the board in your browser, signed in, at any time, with no token to copy. It creates a first-visit
+link and opens it on `localhost`, or prints it if no browser can be opened. The board stays signed in while you use it, until thirty
+days after your last visit or until you sign the browser out in Settings. `nemia board link` still prints a link without opening it.
 
-Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
-as GitHub lays out a release, `--no-open` opens no browser on a laptop, and `--board-base <url>` is the address the first-visit link is
-printed under (below).
+Other options:
 
-The installer prints no token, and installs no harness and asks for no harness's credential: a release carries no Claude Code and no
-Codex. A laptop's summary names `nemia doctor` (below): what is in place, and the command that fixes each piece that is not. You
-activate the harness your factories run on when you need it ([Activate a harness](#activate-a-harness)); on a laptop, the welcome page
-asks it first.
+- `--version <tag>` installs that release instead of the latest.
+- `--base <url>` downloads from another location, laid out the way GitHub lays out a release.
+- `--no-open` opens no browser on a laptop.
+- `--board-base <url>` sets the address the first-visit link is printed with (see below).
+
+The installer prints no token, installs no harness, and asks for no harness credentials: a release includes neither Claude Code nor
+Codex. A laptop's summary points to `nemia doctor` (see below), which shows what is in place and the command that fixes each missing
+piece. You activate the harness your factories run on when you need it ([Activate a harness](#activate-a-harness)). On a laptop, the
+welcome page asks for it first.
 
 ## On a server
 
-On a dedicated machine, such as a small VPS running Ubuntu 24.04, say so to the installer by `--serve` or by a `--bind <address>`. It
-then asks two things instead of opening a browser, each of which you can also answer by a flag with `--yes`, for a machine you set up
-by script:
+On a dedicated machine, such as a small VPS running Ubuntu 24.04, tell the installer with `--serve` or `--bind <address>`. Instead of
+opening a browser, it then asks two questions. You can also answer each with a flag plus `--yes`, to set up a machine by script:
 
-- **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
-  with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
-  `loginctl enable-linger`, so Nemia keeps running after you log out. `--no-service` skips it; `nemia up` runs the daemon by hand.
-- **The address to bind** (below), picked by number from this machine's private addresses (`nemia service addresses` lists them with
-  their kind), or typed. Left at its default, the daemon listens on this machine alone.
+- **Start at login?** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS, with as
+  many concurrent sessions and as much memory per session as the machine's size allows. On Linux, it also runs
+  `loginctl enable-linger`, so Nemia keeps running after you log out. `--no-service` skips this, and `nemia up` runs the daemon by
+  hand.
+- **Which address to bind?** (See below.) Pick one by number from this machine's private addresses (`nemia service addresses` lists
+  them with their type), or type one. If you keep the default, the daemon listens only on this machine.
 
-A server's install ends on `nemia doctor` (below).
+A server install ends with `nemia doctor` (see below).
 
 ## Bind it to a private network
 
-By default the daemon listens on 127.0.0.1, and the board and the api are for this machine only. To use them from your laptop, bind
-the daemon to an address of a private network you trust, such as your Tailscale address:
+By default, the daemon listens on 127.0.0.1, so the board and the API are only available on this machine. To use them from your
+laptop, bind the daemon to an address on a private network you trust, such as your Tailscale address:
 
 ```bash
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind 100.64.0.1
 ```
 
-or pick that address at the question the installer asks with `--serve`. A public address, or every interface (`0.0.0.0`), is refused unless you acknowledge
-it with `--public`, which writes `NEMIA_BIND_PUBLIC=1` into the service: the daemon refuses to start on such an address without it.
+Or pick that address when the installer asks, with `--serve`. A public address, or every interface (`0.0.0.0`), is rejected unless
+you confirm it with `--public`. That writes `NEMIA_BIND_PUBLIC=1` into the service: without it, the daemon refuses to start on such an
+address.
 
-A store bound beyond this machine is marked exposed: every caller then needs a person token, the board included, and the server's own
-`nemia` too. The installer mints the server's own token straight into its local context, never printed, so `nemia ls` and the other
-verbs work there as before. In place of a token, it prints a first-visit link: open it within ten minutes and that browser is signed
-in to the board, once. `nemia board link` makes another (`--base <url>` prints it under the name your browser uses, a Tailscale name
-or a proxy's, since a browser keeps one cookie per host name). Where you bound the daemon by hand, keep a token for the server's own
-`nemia` in a file:
+A store bound beyond this machine is marked as exposed. Every caller then needs a personal token, including the board and the server's
+own `nemia`. The installer creates the server's own token directly in its local context, without printing it, so `nemia ls` and the
+other commands still work there. Instead of a token, it prints a first-visit link: open it within ten minutes, and that browser is
+signed in to the board. It works once. `nemia board link` creates another. Use `--base <url>` to print it with the name your browser
+uses, such as a Tailscale name or a proxy's, since a browser keeps one cookie per host name. If you bound the daemon by hand, keep a
+token for the server's own `nemia` in a file:
 
 ```bash
 nemia token add server
 nemia config set-context local --token-file ~/.nemia-token
 ```
 
-The board signs in by a first-visit link, by pairing (_Pair this browser_ on its sign-in shows a code you approve at the server), or by
-a pasted token, and keeps it in a cookie only the board's own origin is sent.
+The board signs in with a first-visit link, by pairing (_Pair this browser_ on its sign-in page shows a code you approve on the
+server), or with a pasted token. It keeps the session in a cookie sent only to the board's own origin.
 
-Nemia speaks plain HTTP. TLS stays outside it: a private network such as Tailscale, which encrypts the traffic between your machines,
-or a reverse proxy of your own in front of it.
+Nemia speaks plain HTTP. TLS is handled outside it: by a private network such as Tailscale, which encrypts traffic between your
+machines, or by your own reverse proxy in front of it.
 
 ## A client of another machine
 
-On your laptop, Nemia can be just the command that talks to the daemon of your server:
+On your laptop, Nemia can be just the command that talks to your server's daemon:
 
 ```bash
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.64.0.1:8787
 ```
 
-A client install starts no service. It pairs with the server: `nemia pair <url>` shows a short code, you approve it on the server
-(`nemia pairings approve <code>`, or the board's Setup page), and a person token named for your laptop lands in a context, a name for
-that server in `~/.config/nemia/config.yaml` (readable by you alone), made the current one. No token is shown or copied; `nemia token
-rm <name>` on the server revokes it. `--token-file <file>` still takes a token you minted by hand. A context is the same idea as
-kubectl's:
+A client install starts no service. Instead, it pairs with the server. `nemia pair <url>` shows a short code, and you approve it on
+the server (`nemia pairings approve <code>`, or the board's Setup page). A personal token named after your laptop is then saved in a
+context: a name for that server in `~/.config/nemia/config.yaml` (readable only by you), which becomes the current context. No token
+is shown or copied. `nemia token rm <name>` on the server revokes it. `--token-file <file>` still accepts a token you created by hand.
+A context works the same way as in kubectl:
 
 ```bash
 nemia config set-context vps --server http://100.64.0.1:8787 --token-file ~/.nemia-token
@@ -120,40 +124,41 @@ nemia config get-contexts
 nemia config current-context
 ```
 
-Setting `NEMIA_CONTEXT=<name>` picks another context for one command. Under a remote context, the reads and the client verbs (runs,
-proposals, the inbox, decisions) reach the server, and so does every other verb about the store: `nemia` parses it, checks it and
-prints its answer on your laptop as it always does, and the server does the work. The files a command names on your laptop, a card
-for `nemia inbox add -f`, a template folder or archive for `nemia factory apply --template`, a file for `nemia factory resolve
---file`, travel with the request. A volume's path (`--volume`) names a folder on the server's machine, not on
-yours; a volume's git URL is cloned on the server, with the server's own git credentials. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
-run it on.
+Set `NEMIA_CONTEXT=<name>` to use another context for a single command. With a remote context, reads and client commands (runs,
+proposals, the inbox, decisions) go to the server, and so does every other command about the store. `nemia` parses the command,
+checks it, and prints the answer on your laptop as usual, while the server does the work. Files a command names on your laptop travel
+with the request: a card for `nemia inbox add -f`, a template folder or archive for `nemia factory apply --template`, or a file for
+`nemia factory resolve --file`. A volume's path (`--volume`) refers to a folder on the server, not on your laptop. A volume's git URL
+is cloned on the server, with the server's own git credentials. A command the server doesn't support yet is rejected, with the
+context to switch to (`NEMIA_CONTEXT=local`) or the machine to run it on.
 
-The machine's own verbs always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`, `nemia tick`), the
-version, tokens and the Claude token, and the verbs that read and write files and no store (`nemia template`, `nemia frontmatter`,
-`nemia admit`). `nemia template export --factory` reads a factory of this machine's store, so under a remote context it is refused:
-run it on the server. `nemia upgrade` upgrades your laptop's install under a remote context too; the server is upgraded from your laptop
-by another verb (see [From another machine](#from-another-machine)).
+Commands about the machine itself always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`,
+`nemia tick`), the version, tokens and the Claude token, and the commands that read and write files without a store
+(`nemia template`, `nemia frontmatter`, `nemia admit`). `nemia template export --factory` reads a factory from this machine's store,
+so it is rejected with a remote context: run it on the server. With a remote context, `nemia upgrade` still upgrades your laptop's
+install. You upgrade the server from your laptop with a different command (see [From another machine](#from-another-machine)).
 
 ## Connect a coding agent
 
-A coding agent on your laptop operates the store through its MCP port, `/mcp`: each verb a tool, the port's instructions, and
-Nemia's skills, which say how to operate it. `nemia pair` prints the line that connects Claude Code to it, once for every project:
+A coding agent on your laptop can operate the store through its MCP port, `/mcp`. Every command is a tool, and the port also provides
+instructions and Nemia's skills, which explain how to operate it. `nemia pair` prints the command that connects Claude Code to it,
+once for all projects:
 
 ```bash
 claude mcp add-json --scope user nemia '{"type":"http","url":"http://<address>:8787/mcp","headersHelper":"nemia config headers"}'
 ```
 
-Claude Code runs `nemia config headers` at each connection for the token of the context in use, so no token is written in its
-settings and a token paired again is taken at the next connection.
+Claude Code runs `nemia config headers` on each connection to get the current context's token. So no token is stored in its
+settings, and a re-paired token is picked up at the next connection.
 
-The skills are listed as the server's own, each `nemia:<skill>`, and Claude Code loads one when it needs it. Start from
-`nemia:operate`, the role of the store's operator as you take it, as the port's instructions say; `nemia:write-a-card` says how a card
-is written and labelled. A host loads the skills of an MCP server only where it
-takes the Skills extension: Claude Code from 2.1.331, in an interactive session (none in `claude -p`, the Agent SDK, cloud sessions or
-GitHub Actions), on by default when you sign in on a Pro, Max or Ultra plan, off on a Team or Enterprise plan until the organisation
-turns it on, and off for now under an API key. Where they are off, the tools and the instructions are there all the same.
+The skills appear as the server's own, each named `nemia:<skill>`, and Claude Code loads one when it needs it. Start with
+`nemia:operate`, the store operator's role, as the port's instructions suggest. `nemia:write-a-card` explains how to write and label
+a card. A host loads an MCP server's skills only if it supports the Skills extension. Claude Code supports it from 2.1.331, in
+interactive sessions (not in `claude -p`, the Agent SDK, cloud sessions, or GitHub Actions). It is on by default when you sign in on
+a Pro, Max, or Ultra plan, off on a Team or Enterprise plan until the organization turns it on, and off for now with an API key. When
+skills are off, the tools and instructions are still available.
 
-Codex reads the same port as a server of its config, with the port's url and your bearer token, and is given its tools and its
+Codex connects to the same port as a server in its config, with the port's URL and your bearer token, and gets its tools and
 instructions:
 
 ```toml
@@ -168,57 +173,57 @@ nemia doctor
 nemia doctor fix <need>
 ```
 
-One read lists every piece a server needs to run its factories, each in place, missing, unknown or not activated, with the command or
-fix that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and `systemd --user`,
-the git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a factory, and a newer
-release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the same
-read, and a banner on every page while a run waits on a missing piece.
+A single check lists every piece a server needs to run its factories. Each piece is in place, missing, unknown, or not activated,
+with the command or fix that sets it up. The pieces are: each harness, installed and signed in; the service and its linger; the bind;
+cgroup v2 and `systemd --user`; the git identity; mise and each factory's repository toolchain; the needs each factory's workflows
+declare; a factory; and a newer release. On a laptop, it also checks whether the context reaches the server and its token is
+accepted. The board's Setup page shows the same check, and a banner appears on every page while a run waits on a missing piece.
 
-Each missing piece says what it costs. A run waits on the harness, a need, the tools folder and a factory, and on cgroup v2 and
-`systemd --user` where sessions run under a memory limit: while one of these is missing the server is not ready, and the banner says
-"before a factory's first run" only until one has started. Linger, the service, the bind and a newer release keep the server up or
-open: they are advised, listed on Setup with their fix, and `nemia doctor` still exits 0.
+Each missing piece says what happens without it. A run waits on the harness, a need, the tools folder, and a factory, and on cgroup v2 and
+`systemd --user` where sessions run under a memory limit. While one of these is missing, the server isn't ready, and the banner says
+"before a factory's first run" only until one has started. Linger, the service, the bind, and a newer release keep the server up or
+reachable. They are recommended, listed on Setup with their fix, and `nemia doctor` still exits 0 without them.
 
-A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
-the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need is missing,
-naming it and its fix, and starts by itself once the need is met. `nemia doctor fix <need>` (or its button on Setup) runs the fix on
-the server and shows its output as it runs, a sign-in's device code set apart: open the link it shows on any device and type the
-code. A fix installs a tool into `~/.agent-workflows/tools`, never as root, and the daemon puts its `bin` first on its PATH. A
-factory's fix runs only once you trusted its places (`nemia factory trust <factory>`), and so does its check: an untrusted factory's
-needs read unknown, with that command.
+A workflow declares the machine needs it has, with a fix for each. For example, sdlc's `build` and `quick`, when the factory lands on
+GitHub, need the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need
+is missing, showing it and its fix, and starts on its own once the need is met. `nemia doctor fix <need>` (or its button on Setup)
+runs the fix on the server and streams its output. A sign-in's device code is shown separately: open the link it shows on any device
+and type the code. A fix installs tools into `~/.agent-workflows/tools`, never as root, and the daemon puts its `bin` first on its
+PATH. A factory's fix, and its check, only run once you trust its locations (`nemia factory trust <factory>`). Until then, an untrusted
+factory's needs show as unknown, with that command.
 
-A repository says the tools it builds with in mise's own file, `.tool-versions` (or `mise.toml`), as `node 24.16.0`. The git place
-needs [mise](https://mise.jdx.dev), which its fix installs into the tools folder, and checks each factory's repository: where mise
-reads a tool that is not installed, the piece is missing and `nemia doctor fix repository-toolchain --factory <factory>` runs
-`mise install` there. Where mise reads no version file, the piece is in place and says `.tool-versions` is the file to add if the
-repository needs a toolchain. Nemia names no language.
+A repository lists the tools it builds with in mise's own file, `.tool-versions` (or `mise.toml`), as in `node 24.16.0`. The git
+place needs [mise](https://mise.jdx.dev), which its fix installs into the tools folder, and checks each factory's repository. If mise
+finds a tool that isn't installed, the piece is missing, and `nemia doctor fix repository-toolchain --factory <factory>` runs
+`mise install` there. If mise finds no version file, the piece is in place and suggests adding `.tool-versions` if the repository
+needs a toolchain. Nemia doesn't assume any language.
 
 ## Activate a harness
 
-A session runs on a harness, Claude Code or Codex, and a release installs none. Each is two pieces of the read, named by the harness:
-its install, by its own name (`claude`, `codex`), and its sign-in, by that name and -sign-in after it. On a first visit the board's Setup page asks which to activate,
-and you can skip it; or on the server:
+A session runs on a harness, Claude Code or Codex, and a release installs neither. Each harness is two pieces of the check: its
+install, under its own name (`claude`, `codex`), and its sign-in, under that name followed by -sign-in. On a first visit, the
+board's Setup page asks which one to activate, and you can skip it. Or, on the server:
 
 ```bash
 nemia doctor fix claude
 ```
 
-It installs the version this release was tested with into `~/.agent-workflows/tools/harnesses/<harness>/<version>`, its program linked
-into the tools folder's `bin`, which sessions find first, without root. Then sign it in, as the user the daemon runs as: the read names
-each way, and a sign-in that asks you for a code pasted back (`claude auth login`) is one you type on the server yourself; Codex's
-device sign-in runs from the board and shows its code set apart. A run that has filed nothing waits on whichever harness its steps
-run on, and starts by itself once it is installed and signed in. The read says a harness at another version untested: it still runs.
-A harness you never activated and no factory's workflow runs on reads not activated, with what activates it, and keeps the server
-from being ready no more than a piece in place does.
+This installs the version this release was tested with into `~/.agent-workflows/tools/harnesses/<harness>/<version>`, without root,
+and links its program into the tools folder's `bin`, which sessions find first. Then sign it in, as the user the daemon runs as. The
+check lists each way to do it. A sign-in that asks you to paste a code back (`claude auth login`) has to be typed on the server
+yourself. Codex's device sign-in runs from the board and shows its code separately. A run that hasn't started anything waits on
+whichever harness its steps run on, and starts on its own once it is installed and signed in. A harness at a different version shows
+as untested, but still runs. A harness you never activated, and that no factory's workflow runs on, shows as not activated, with how
+to activate it. It doesn't keep the server from being ready, any more than a piece in place does.
 
-A met harness's second fix takes it away (`nemia doctor fix claude --index 1`, Deactivate on Setup). It is refused while a run that has
-not finished needs it, naming `nemia cancel <run>` for each. `nemia upgrade` installs each activated harness at the new release's
-version before it switches, and the daemon of a new release adopts the Claude Code an older release carried, so nothing that ran stops.
-A harness you deactivated stays so: neither an upgrade nor the daemon's start brings it back, until you activate it again.
+To remove an activated harness, use its second fix (`nemia doctor fix claude --index 1`, or Deactivate on Setup). This is rejected
+while an unfinished run needs it, with a `nemia cancel <run>` for each. `nemia upgrade` installs each activated harness at the new
+release's version before switching, and a new release's daemon adopts the Claude Code an older release included, so nothing running
+stops. A harness you deactivate stays deactivated: neither an upgrade nor a daemon restart brings it back until you activate it again.
 
 ## Your Claude token
 
-The sessions run Claude Code on your Claude subscription. On a server with no browser, make a long-lived token on any machine where
+Sessions run Claude Code on your Claude subscription. On a server without a browser, create a long-lived token on any machine where
 you are signed in, and give it to the server:
 
 ```bash
@@ -226,53 +231,54 @@ claude setup-token
 nemia claude-token set
 ```
 
-`claude setup-token` opens the browser sign-in and prints a token valid for a year; paste it into `nemia claude-token set`, which reads
-it from standard input. The token is kept in `~/.agent-workflows/claude-token`, readable by you alone, and the daemon loads it when it
-starts, however it was started. `nemia claude-token status` says whether one is set, never the token itself, and
-`nemia claude-token rm` takes it away. Nemia never sends, logs or serves it, and the board never asks for it.
+`claude setup-token` opens the browser sign-in and prints a token valid for one year. Paste it into `nemia claude-token set`, which
+reads it from standard input. The token is stored in `~/.agent-workflows/claude-token`, readable only by you, and the daemon loads it
+when it starts, however it was started. `nemia claude-token status` tells you whether a token is set, never the token itself, and
+`nemia claude-token rm` removes it. Nemia never sends, logs, or serves it, and the board never asks for it.
 
-With no token set, and no sign-in of Claude Code's own, a Claude session does not start: it ends saying nothing started, and names
-`claude setup-token`. The daemon reads the token when it starts, so start it again after `nemia claude-token set`, then try the step
-again. The check sees only that a token is there: a token that has expired or been revoked still shows at the session's first request.
+Without a token, and without Claude Code's own sign-in, a Claude session doesn't start. It ends saying that nothing started, and
+points to `claude setup-token`. The daemon reads the token at startup, so restart it after `nemia claude-token set`, then retry the
+step. The check only sees that a token is present: an expired or revoked token only shows up at the session's first request.
 
-Each person uses their own token, on their own machine. A server that others use while it runs on one person's token makes that
-person's account available to them, which Anthropic's
-[Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section 2, _Account creation and access_, forbid: "You also
-may not make your Account available to anyone else."
+Each person uses their own token, on their own machine. If others use a server that runs on one person's token, that person's
+account is shared with them, which Anthropic's [Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section
+2, _Account creation and access_, forbid: "You also may not make your Account available to anyone else."
 
-A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
-connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
-itself still work. Nor can it read the plan's usage, so the board's quota shows no limits on such a server, and says why. For the
-quota, sign in on the server with the Claude Code the sessions run — the board names it by its path; activated, it is
-`~/.agent-workflows/tools/bin/claude` — then `/login`, and take the token away (`nemia claude-token rm`).
+A token made by `claude setup-token` can only make model requests. It can't open Remote Control sessions or reach claude.ai's
+connectors. Sessions on a server signed in this way run without Remote Control, and say so. MCP servers a factory configures itself
+still work. The token also can't read the plan's usage, so the board's quota shows no limits on such a server, and explains why. To
+see the quota, sign in on the server with the Claude Code the sessions run (the board shows its path; once activated, it is
+`~/.agent-workflows/tools/bin/claude`), run `/login`, and remove the token (`nemia claude-token rm`).
 
 ## A repository by its URL
 
-A factory's volume may be a repository's git URL rather than a folder of the machine:
+A factory's volume can be a repository's git URL instead of a folder on the machine:
 
 ```bash
 nemia factory add mill --volume git@github.com:you/mill.git:rw
 ```
 
-Nemia clones it under `~/.agent-workflows/clones/<host>/<path>` before it files the factory, and the daemon clones it again if that
-folder goes. The clone uses the machine's own git credentials, and Nemia holds none: for an SSH URL, an SSH key the host accepts, with
-the host's key in `~/.ssh/known_hosts`; for an HTTPS URL, a git credential helper for the host. On GitHub, `gh auth login` sets one up.
-A URL that carries a password is refused. A clone that fails is refused with git's own words and the setup to do, and nothing is filed.
+Nemia clones it into `~/.agent-workflows/clones/<host>/<path>` before creating the factory, and the daemon clones it again if that
+folder disappears. The clone uses the machine's own git credentials, and Nemia stores none. For an SSH URL, you need an SSH key the
+host accepts, with the host's key in `~/.ssh/known_hosts`. For an HTTPS URL, you need a git credential helper for the host. On
+GitHub, `gh auth login` sets one up. A URL that contains a password is rejected. If the clone fails, the command is rejected with
+git's own message and the setup to do, and no factory is created.
 
-The daemon installs the clone's npm dependencies when a run first cuts a worktree from it, and again whenever its `package-lock.json`
-has moved past its `node_modules`, with `npm install --no-save`: no `npm ci` is typed by hand, and each worktree hardlinks the clone's
-packages rather than installing its own. That costs about a minute of the cut after each lockfile change, and one `node_modules` on
-disk. A failed install is tried again at the next cut, and the step is told to run `npm ci` meanwhile. A repository whose install reads
-an environment variable (an install script that needs one) needs it set in the daemon's environment. A repository with no
-`package-lock.json` gets nothing installed.
+The daemon installs the clone's npm dependencies the first time a run creates a worktree from it, and again whenever its
+`package-lock.json` is newer than its `node_modules`, using `npm install --no-save`. You never run `npm ci` by hand, and each
+worktree hard-links the clone's packages instead of installing its own. This adds about a minute to the first worktree after each
+lockfile change, and takes one `node_modules` on disk. A failed install is retried at the next worktree, and meanwhile the step is
+told to run `npm ci`. If a repository's install needs an environment variable (for an install script), set it in the daemon's
+environment. A repository without a `package-lock.json` gets nothing installed.
 
-From a laptop under a remote context, the same line (and `nemia factory apply … --volume <url>:rw`, or `nemia factory volume add`) files the factory on the server: the
-server clones the repository with its own credentials, so the SSH key or the credential helper is set up there, not on the laptop.
+From a laptop with a remote context, the same command (and `nemia factory apply … --volume <url>:rw`, or `nemia factory volume add`)
+creates the factory on the server. The server clones the repository with its own credentials, so set up the SSH key or credential
+helper there, not on your laptop.
 
 ## Signing Codex in
 
-A Codex step does not start while Codex is signed out on the machine; its refusal says so. On a server with no browser, sign in with a
-code you enter on any device, as the user the daemon runs as, then try the step again:
+A Codex step doesn't start while Codex is signed out on the machine, and its error says so. On a server without a browser, sign in
+with a code you enter on any device, as the user the daemon runs as, then retry the step:
 
 ```bash
 codex login --device-auth
@@ -286,25 +292,27 @@ nemia upgrade
 nemia upgrade v1.3.0
 ```
 
-`nemia upgrade` installs the latest release, or the one you name, beside the current one, checks it starts, and moves the pointer to
-it. Moving forward, the store is read as it is and never rewritten. Going back is refused past the oldest release that can read the
-store as it now is, and the refusal names that release.
+`nemia upgrade` installs the latest release, or the one you name, next to the current one, checks that it starts, and switches the
+`current` link to it. Moving forward, the store is read as it is and never rewritten. You can't go back past the oldest release that
+can read the store as it is now, and the error names that release.
 
-`nemia version` says the release you run and, when there is one, the newer release. The board says it too. To know that, the daemon
-of an installed release reads the release list's newest entry every six hours, sending nothing about you or your store. Set
-`NEMIA_RELEASE_CHECK=off` in its environment to turn that off; a checkout of the repository never checks.
+`nemia version` shows the release you're running and, if there is one, the newer release. The board shows it too. To know about new
+releases, an installed daemon reads the newest entry of the release list every six hours, sending nothing about you or your store.
+Set `NEMIA_RELEASE_CHECK=off` in its environment to turn this off. A checkout of the repository never checks.
 
 ### From the board
 
-The board's _Settings_ opens on the server's release: the one it runs and, when the daemon has read a newer one, that release with a
-link to its notes and an _Upgrade_ button. Pressing it asks once, then runs `nemia upgrade <tag>` on the server, exactly as you would
-type it there. Its output shows as it runs. The daemon restarts onto the new release partway through, and the page says so and reads the
-output again once it is back. It then shows the release the server now runs, or the upgrade's refusal and its log, with the server
-still on the release it ran. Any piece the new release needs before runs can start shows beside it, with its fix.
+The board's _Settings_ page opens on the server's release: the one it runs and, once the daemon has found a newer one, that release
+with a link to its notes and an _Upgrade_ button. Clicking it asks for confirmation, then runs `nemia upgrade <tag>` on the server,
+exactly as if you typed it there. Its output streams as it runs. Partway through, the daemon restarts on the new release. The page
+says so, and reads the output again once the daemon is back. It then shows the release the server now runs, or the upgrade's error
+and its log, with the server still on its previous release. Anything the new release needs before runs can start is shown next to
+it, with its fix.
 
-_Back_ goes to the newest installed release older than the one the server runs, under the same rule as `nemia upgrade`: where the
-store's oldest readable release is newer, Back is shown refused and names it. Only a person may press either button. A session's token
-is refused, as for a fix on _Setup_. The MCP port offers the same upgrade as its `upgrade` tool, behind the person's token.
+_Back_ switches to the newest installed release older than the current one, under the same rule as `nemia upgrade`. If the store's
+oldest readable release is newer, Back is shown as unavailable and names that release. Only a person can click either button. A
+session's token is rejected, just as for a fix on _Setup_. The MCP port offers the same upgrade as its `upgrade` tool, behind the
+person's token.
 
 ### From another machine
 
@@ -314,33 +322,34 @@ nemia server upgrade v1.3.0
 nemia server upgrade --back
 ```
 
-Under a context that names a remote server, `nemia server upgrade` asks that server's api for the same upgrade the board's _Upgrade_
-button starts: to the release you name, or to the newer one the server has read. `--back` goes where the board's _Back_ goes, under the
-same rule. Its output prints as it runs; when the daemon restarts onto the new release it waits for it to answer again, then prints the
-rest. It ends saying the release the server now runs, or the upgrade's refusal, its log named in the output, with the server still on
-the release it ran. Any piece the new release needs before runs can start is in that output, with its fix.
+With a context that names a remote server, `nemia server upgrade` asks that server's API for the same upgrade the board's _Upgrade_
+button starts: to the release you name, or to the newer one the server has found. `--back` does what the board's _Back_ does, under
+the same rule. Its output streams as it runs. When the daemon restarts on the new release, the command waits for it to respond, then
+prints the rest. It ends with the release the server now runs, or the upgrade's error (with its log named in the output) and the
+server still on its previous release. Anything the new release needs before runs can start appears in that output, with its fix.
 
-Your laptop and the server must then be of one release for the other verbs to talk to it, so when they differ the command ends naming
-the `nemia upgrade <tag>` that brings your laptop level. `server` is the daemon a context names; `nemia service` is your own machine's
-login unit. A bare `nemia upgrade` typed under a remote context still upgrades your laptop, and then names `nemia server upgrade`.
+Your laptop and the server must then run the same release for the other commands to work. So when they differ, the command ends with
+the `nemia upgrade <tag>` that brings your laptop up to date. `server` is the daemon a context names, and `nemia service` is your own
+machine's login unit. A plain `nemia upgrade` with a remote context still upgrades your laptop, and then suggests
+`nemia server upgrade`.
 
 ## Signing in from a remote browser
 
-Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as a factory's MCP server
-signing in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser cannot reach.
+Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as when a factory's MCP server
+signs in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser can't reach.
 
-A factory's MCP server signs in from your own browser wherever the daemon runs. Press _Sign in_ on the server's row of the board,
-open the page it gives and approve. Your browser is then sent back to an address like
-`http://localhost:8791/callback?code=…&state=…`, which does not load, since nothing listens for it on your laptop. Copy that address
-from the browser's address bar, paste it into the field the board shows under the waiting sign-in, _the address your browser landed
-on_, and press _Complete_. The daemon hands it to the sign-in waiting for it, and the server reads `connected`. The address carries a
-code used once: Nemia never logs or keeps it.
+A factory's MCP server can sign in from your own browser wherever the daemon runs. Click _Sign in_ on the server's row in the board,
+open the page it gives you, and approve. Your browser is then sent to an address like
+`http://localhost:8791/callback?code=…&state=…`, which doesn't load, since nothing on your laptop is listening for it. Copy that
+address from the browser's address bar, paste it into the field the board shows under the waiting sign-in, _the address your browser
+landed on_, and click _Complete_. The daemon passes it to the waiting sign-in, and the server shows `connected`. The address contains
+a one-time code, and Nemia never logs or stores it.
 
-Or, instead, forward the port over SSH and open the page on your laptop, so the call back reaches the server itself:
+Alternatively, forward the port over SSH and open the page on your laptop, so the callback reaches the server itself:
 
 ```bash
 ssh -L 8787:127.0.0.1:8787 you@your-server
 ```
 
-Put the port the sign-in's address names in place of 8787 when it is another. With the tunnel open, the page's call back reaches the
-server.
+If the sign-in's address uses a port other than 8787, put that port in its place. With the tunnel open, the page's callback reaches
+the server.

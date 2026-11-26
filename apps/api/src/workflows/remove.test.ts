@@ -17,7 +17,7 @@ import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
 import { Effect } from 'effect';
 import { definitionRevisionNow, StoreRoot } from 'agent-orchestrator';
-import { addFactory, cardKey, dropRecord } from 'agent-orchestrator/testing';
+import { addFactory, cardKey, definitionsIndexed, dropRecord } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which the factory `remover`, filed on it, lets the api
  * read.
@@ -89,6 +89,7 @@ describe("a person removes a folder of theirs: refused while it is stale, unsaid
   });
   const s = story(test);
   s.test('REFUSED: a removal of a folder changed since it was read is a 409 naming both versions, and nothing is removed', async () => {
+    await definitionsIndexed(root);
     const read = await revisionOf('done');
     write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n');
     const before = snapshot(dir);

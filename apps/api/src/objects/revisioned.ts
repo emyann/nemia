@@ -1,11 +1,13 @@
 /**
- * A watched kind's objects served at their revision: every object of a kind the keyspace watches (`isWatchedKind`) leaves the api with
- * `metadata.resourceVersion` the keyspace revision of its last change — the highest among the records it is made of — and every list of
- * one with `metadata.resourceVersion` the keyspace head read before its items were, so a watch from it loses no change between the two.
- * A GET writes nothing here, and nothing is kept between two requests.
+ * What the api stamps with a revision of the keyspace: the objects it serves that no verb of the orchestrator stamps (`atRevisions`) — a
+ * Card, a Proposal, a Delegation and a Run's list, which the api pages itself, and an Agent, a Skill and a Workflow, which the api
+ * builds from the doors' listings. Each leaves with `metadata.resourceVersion` the keyspace revision of its last change, the highest
+ * among the records it is made of, and every list of one with the keyspace head read before its items were, so a watch from it loses no
+ * change between the two. A GET writes nothing here, in any process, and nothing is kept between two requests: the definition index is
+ * numbered with no write (`kindRevisions`).
  */
 import type { Context as RequestContext } from 'hono';
-import { definitionsRefreshed, isWatchedKind, keyspaceHead, kindRevisions, type WatchedKind } from 'agent-orchestrator';
+import { isWatchedKind, kindRevisions, type WatchedKind } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 import type { Listed } from '../watch/watch.ts';
 
@@ -15,30 +17,29 @@ const watchedListOf = (kind: string | undefined) => {
   return kind?.endsWith('List') === true && base !== undefined && isWatchedKind(base) ? base : undefined;
 };
 
-/** The kinds whose revisions are made of the definition index's records, which a write of one reads again. */
-const INDEXED = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire', 'Factory']);
+/** The kinds the api stamps itself: those no verb of the orchestrator stamps. */
+const API_STAMPED = new Set<string>(['Card', 'Proposal', 'Delegation', 'Run', 'Agent', 'Skill', 'Workflow']);
 
 /**
- * Those a read of reads the index again too where no daemon sweeps it: not the Factory, whose read writes nothing — the index holds its
- * rules and instruction as of the daemon's last sweep, or of the last write or proposal that read it.
+ * The kinds stamped in a list only: a Delegation read alone the orchestrator stamps, and a Run read alone is built per request from parts
+ * no revision covers.
  */
-const INDEXED_ON_READ = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire']);
+const LISTED_ONLY = new Set<string>(['Run', 'Delegation']);
 
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
 
-/** The kinds stamped in a list only: a Run read alone is built per request from parts no revision covers, so it keeps its own version. */
-const LISTED_ONLY = new Set<string>(['Run']);
-
 const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   if (typeof body !== 'object' || body === null || !('kind' in body) || typeof body.kind !== 'string') return undefined;
   if (body.kind === 'Table') {
-    const kind = asked.map(watchedListOf).find((k) => k !== undefined);
+    const kind = asked.map(watchedListOf).find((k) => k !== undefined && API_STAMPED.has(k));
     return kind === undefined ? undefined : { kind, list: true, table: true };
   }
   const list = watchedListOf(body.kind);
-  if (list !== undefined) return { kind: list, list: true, table: false };
-  return isWatchedKind(body.kind) && !LISTED_ONLY.has(body.kind) ? { kind: body.kind, list: false, table: false } : undefined;
+  if (list !== undefined) return API_STAMPED.has(list) ? { kind: list, list: true, table: false } : undefined;
+  return isWatchedKind(body.kind) && API_STAMPED.has(body.kind) && !LISTED_ONLY.has(body.kind)
+    ? { kind: body.kind, list: false, table: false }
+    : undefined;
 };
 
 /** `object` with the revision it stands at as its `metadata.resourceVersion`, where it is an object with metadata. */
@@ -84,9 +85,8 @@ const servedAt = (
 };
 
 /**
- * `list` answering objects of a watched kind at their revision: a list's items each, and its position the head read before it was read; a
- * single object read or written each. Any other answer as it is. The definition index is read again first where a read needs it exact,
- * and after a write of a definition.
+ * `list` answering objects of the kinds the api stamps at their revision: a list's items each, and its position the head read before it
+ * was read; a single object read or written each. Any other answer as it is.
  * @param list The handler that answers a request.
  * @param kindsAt The kinds a request's endpoint answers, from its method and its path: none where it answers no object of the api's.
  */
@@ -96,14 +96,10 @@ export const revisioned =
     const path = new URL(request.url).pathname;
     const kinds = kindsAt(request.method, path);
     if (!kinds.some((kind) => stampedOf({ kind }) !== undefined)) return list(c, request);
-    const base = kinds.map((kind) => kind.replace(/List$/, ''));
-    const indexed = base.some((kind) => INDEXED.has(kind));
     const reads = request.method === 'GET';
-    if (reads && base.some((kind) => INDEXED_ON_READ.has(kind))) await c.var.runtime.runPromise(definitionsRefreshed(false));
-    const head =
-      reads && kinds.some((kind) => watchedListOf(kind) !== undefined) ? await c.var.runtime.runPromise(keyspaceHead()) : undefined;
+    const listed = kinds.map(watchedListOf).find((of) => of !== undefined && API_STAMPED.has(of));
+    const head = reads && listed !== undefined ? (await c.var.runtime.runPromise(kindRevisions(listed))).head : undefined;
     const response = await list(c, request);
-    if (indexed && !reads) await c.var.runtime.runPromise(definitionsRefreshed(true));
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return response;
     const body: unknown = await response.clone().json();
     const stamped = stampedOf(body, kinds);

@@ -24,6 +24,7 @@ import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentSkillsFound, isRefusal, runWith as runEngine, StoreRoot } from '../src/runner.ts';
 import { addFactoryAt, knownAt } from '../testing.ts';
 import { removeAgent, writeAgent } from '../src/agents/agents.store.ts';
+import { definitionRevisionNow } from '../src/definition-index/definition-index.store.ts';
 import { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } from '../src/agents/library.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -242,6 +243,7 @@ describe("write, rename and remove an agent at its version, as the board's Agent
     fs.rmSync(path.join(AGENTS, 'linked.md'));
   });
   const board = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);
+  const revisionOf = async (name: string) => String(await board(definitionRevisionNow('Agent', undefined, name)));
   const read = async (name: string) => (await board(AGENTS_READ.handler({ from: 'user', name, dir: AGENTS, repo }))).agent;
   s.test(
     "the board's entries: an agent written from its form reads back for its page, renamed from the name on its path, and removed",
@@ -249,7 +251,7 @@ describe("write, rename and remove an agent at its version, as the board's Agent
       repo = scratch('wf-library-repo-');
       const made = await board(AGENTS_WRITE.handler({ from: 'user', repo, draft: form('clerk'), schema: null }));
       assert.deepEqual(made.written, ['clerk.md']);
-      assert.equal((await read('clerk'))?.version, made.version);
+      assert.equal(made.version, await revisionOf('clerk'), 'a write answers the revision the agent stands at');
       const renamed = await board(
         AGENTS_WRITE.handler({ from: 'user', name: 'clerk', repo, draft: form('archivist'), schema: null, version: made.version }),
       );
@@ -276,19 +278,19 @@ describe("write, rename and remove an agent at its version, as the board's Agent
       );
       const stale = (err: Error & { _tag?: string }, ...facts: string[]) => {
         assert.equal(err._tag, 'Conflict', err.message);
-        names(err.message, 'agents/archivist.md changed since it was read', `version ${made.version}, now ${edited.version}`, ...facts);
+        names(err.message, 'archivist', `revision ${edited.version}`, `not ${made.version}`, ...facts);
         return true;
       };
       await assert.rejects(
         board(
           AGENTS_WRITE.handler({ from: 'user', name: 'archivist', repo, draft: form('archivist'), schema: null, version: made.version }),
         ),
-        (err: Error) => stale(err, 'Read it again, and make the change on what it holds now'),
+        (err: Error) => stale(err, 'read it again'),
       );
       await assert.rejects(board(AGENTS_REMOVE.handler({ from: 'user', name: 'archivist', repo, version: made.version })), (err: Error) =>
-        stale(err, 'Read it again before removing it'),
+        stale(err, 'read it again'),
       );
-      assert.equal((await read('archivist'))?.version, edited.version);
+      assert.equal(await revisionOf('archivist'), edited.version);
     },
   );
 });

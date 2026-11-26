@@ -7,6 +7,7 @@
  * Each refusal asserts its status and the step it names, never its sentence.
  */
 import { root } from '../../test/harness.ts';
+import { definitionsIndexed } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -72,6 +73,7 @@ async function writtenBack(files: ReturnType<typeof filesOf>) {
   const read = await post(`/api/workflows/read?factory=${FACTORY}`, { name: 'hired', files });
   const drafted = (await read.json()) as WorkflowCreate;
   assert.equal(read.status, 200, JSON.stringify(drafted));
+  await definitionsIndexed(root);
   const now = (await (await app.request(`/api/namespaces/${FACTORY}/workflows/hired`)).json()) as Workflow;
   const ns = `/api/namespaces/${FACTORY}`;
   const made = await post(`${ns}/proposals`, {

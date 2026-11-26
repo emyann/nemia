@@ -23,12 +23,12 @@ import path from 'node:path';
 import { Effect, Predicate, Schema } from 'effect';
 import {
   AgentDoor,
+  definitionJudged,
   definitionRevisionNow,
   HARNESS_CHOICES,
   remoteAgents,
   SkillDoor,
   WORKFLOWS_WRITE,
-  workflowVersion,
 } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -383,7 +383,8 @@ function heldAt(at: string) {
 
 /**
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it (with none, as one in yours alone), through the
- * engine `e`: a change of the folder there (`changes`), handed the version it holds once its schemas are written, or a new one. The
+ * engine `e`: a change of the folder there, judged at the revision it was read at (`read`) before a byte is written and handed the
+ * revision it holds once its schemas are written, or a new one. The
  * agents and skills its schemas are judged with are read through the doors on the request's services (`inRequest`).
  */
 export type Writing = {
@@ -395,7 +396,7 @@ export type Writing = {
   dir: string;
   repo: string | undefined;
   home: string;
-  changes: boolean;
+  read: string | undefined;
   inRequest: Served['inRequest'];
 };
 
@@ -420,13 +421,14 @@ export type Writing = {
  * @param files The folder's other files, written whole with the schemas where given; undefined leaves them as they are.
  */
 export async function write(
-  { e, placeService, config, trace, name, dir, repo, home, changes, inRequest }: Writing,
+  { e, placeService, config, trace, name, dir, repo, home, read, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
   files?: readonly WorkflowFile[],
 ) {
   const places = placesOf(repo, home);
+  if (read !== undefined) await inRequest(definitionJudged('Workflow', undefined, name, read, 'write'));
   const refused = (message: string) => ({
     error: message,
     steps: stepsNamed(
@@ -466,7 +468,7 @@ export async function write(
       draft: [...steps],
       repo,
       ...(readme !== undefined && { readme }),
-      ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
+      ...(read !== undefined && { version: String(await inRequest(definitionRevisionNow('Workflow', undefined, name))) }),
       ...(files !== undefined && { files: [...files, ...writing.map(({ file, text }) => ({ path: file, text }))], whole: true }),
     };
     result = await inRequest(WORKFLOWS_WRITE.handler(input));

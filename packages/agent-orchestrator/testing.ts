@@ -49,6 +49,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { wfRoot } from './src/config/config.store.ts';
 import { StoreRoot } from './src/config/root.store.ts';
+import { indexSweep } from './src/definition-index/definition-index.store.ts';
 import { keyspaceAt, keyspaceFile } from './src/keyspace/keyspace.store.ts';
 import { runFilesOf, runsImported } from './src/runs/records.store.ts';
 import { askKey, askKeyOf, asksPrefix, runKey } from './src/runs/run-keys.ts';
@@ -614,6 +615,13 @@ export const plantRecord = (root: string, key: string, text: string) =>
       ),
     ),
   );
+
+/**
+ * The definition index of the store `root` swept once, as the daemon's sweep does: each definition file held numbered, so a test that
+ * reads a revision, writes by hand and reads again sees it move as it does in a daemon that has swept.
+ * @param root The store's root folder.
+ */
+export const definitionsIndexed = (root: string) => Effect.runPromise(Effect.provideService(indexSweep(), StoreRoot, root));
 
 /**
  * Every run's record, claim, ask and marker of the store `root` deleted: what a test that empties its store between stories runs beside

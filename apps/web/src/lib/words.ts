@@ -239,7 +239,7 @@ export const NOW_WORDS = {
   slot: 'a run slot',
   until: '· until',
   lands: 'lands',
-  calledOff: '(called off)',
+  calledOff: '(cancelled)',
   missing: '(not in the store)',
   gone: '(its branches gone)',
   noWhy: 'no reason given',
@@ -254,6 +254,15 @@ export const NOW_WORDS = {
   notTimed: 'not timed while nothing is asked',
   someone: 'someone',
 } as const;
+
+/**
+ * Where a run stands, in a word, as the start form, the run's header and the floor's run tag name it (`standingOf`): waiting on a
+ * person, running, or finished; a cancelled run says `ENDED.cancelled.word`.
+ */
+export const STANDING = { waiting: 'waiting', running: 'running', finished: 'finished' } as const;
+
+/** The tag over an ask of hers in the chat, while it is asked: a permission's `Asks to run` is an action, and says so. */
+export const ASKING = 'asking';
 
 /** The words of a wait the board has no kind for. */
 export const ANY_WAIT: WaitWords = { tag: () => GATE, sentence: () => 'It waits on you.', open: opens };

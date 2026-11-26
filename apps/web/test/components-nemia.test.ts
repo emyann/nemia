@@ -320,7 +320,7 @@ const CHOSE_AT = new Date(Date.UTC(2026, 9, 15, 22, 4, 0));
 test('her one question with its choices explained is drawn as the form: the choice, why, the Recommended tag, and the link in her words', () => {
   const html = renderToStaticMarkup(createElement(ChatAsk, { ask: askEvent('question', [askQuestion()]), onAnswer: () => undefined }));
   assert.match(html, /data-chat-ask="form"/);
-  assert.match(html, /data-chat-tag="asks you"/);
+  assert.match(html, /data-chat-tag="asking"/);
   assert.match(html, /1 of 1 · Summary/);
   assert.match(html, /data-chat-option="Cut it on read"/);
   assert.match(html, /The first line, cut at a word\./, 'a choice that explains itself says why on its row');

@@ -44,7 +44,7 @@ export default {
       const panel = await openChat(page);
       const ask = panel.locator('[data-chat-ask="form"]');
       await expectVisible(ask, 'her question is drawn as the form, its choices explaining themselves');
-      await expectVisible(ask.locator('[data-chat-tag="asks you"]'), 'and its tag says it waits on the person');
+      await expectVisible(ask.locator('[data-chat-tag="asking"]'), 'and its tag says it waits on the person');
       await expectVisible(ask.getByText('1 of 1 · Summary'), 'the fieldset names the question by its header');
       await expectVisible(ask.getByText('The first line, cut at a word to 120 characters.'), 'each choice says why it is one');
       await expectVisible(ask.locator('[data-chat-recommended]'), 'and the one her words recommended carries the tag');

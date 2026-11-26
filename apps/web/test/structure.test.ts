@@ -18,8 +18,9 @@
  * `HAND_TROUBLES`, empty). A story and the kit's files are let through both: their words are a stand-in's and another repository's.
  *
  * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: each state the board names is one word
- * (`stateWordBreaks`), no file spells a state's phrase from before it was one word (`retiredStateBreaks`), no file says a retired
- * phrasing (`retiredBreaks`), and no hover says a runtime word (`hoverRuntimeBreaks`). A person's words for an offer are written once,
+ * (`stateWordBreaks`), there and where a run's standing and the floor's tag draw one (`drawnStates`), no file spells a state's phrase
+ * from before it was one word (`retiredStateBreaks`), no file says a retired phrasing (`retiredBreaks`), and no hover says a runtime
+ * word (`hoverRuntimeBreaks`). A person's words for an offer are written once,
  * in its `OFFERS`: no other file spells a sentence of it (`offerWordBreaks`).
  *
  * No file of the board compares the runtime's `needs-human`: a question a session asks is read off its codes (`needsHumanBreaks`).
@@ -39,7 +40,7 @@ import path from 'node:path';
 import { specifiersIn, withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 import { KINDS } from 'objects';
-import { CARD_WORDS, ENDED, HELD_TO_COME, OFFERS, PAUSED, PERSON, PROPOSAL_WORDS } from '../src/lib/words.ts';
+import { ASKING, CARD_WORDS, ENDED, HELD_TO_COME, NOW_WORDS, OFFERS, PAUSED, PERSON, PROPOSAL_WORDS, STANDING } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
@@ -689,6 +690,7 @@ const RETIRED_STATES: Readonly<Record<string, string>> = {
   'called off': 'cancelled',
   'waits on the pause': 'paused',
   'waiting its turn': 'pending',
+  '(called off)': '(cancelled)',
 };
 
 /**
@@ -705,7 +707,10 @@ const retiredStateBreaks = (texts: ReadonlyMap<string, string>) =>
       ),
   ) satisfies string[];
 
-/** Each state word the board names, by where it is written: a step's rail, a run's end, a card's state, a proposal's phase. */
+/**
+ * Each state word the board names, by where it is written: a step's rail, a run's end, a card's state, a proposal's phase, where a run
+ * stands (its header, the start form and the floor's tag), the chat's tag over an ask, and a hold's run that was cancelled.
+ */
 const STATE_WORDS: ReadonlyArray<[where: string, word: string]> = [
   ...Object.entries(PERSON).map(([state, words]) => [`PERSON.${state}.rail`, words.rail] satisfies [string, string]),
   ['PAUSED.rail', PAUSED.rail],
@@ -713,13 +718,68 @@ const STATE_WORDS: ReadonlyArray<[where: string, word: string]> = [
   ...Object.entries(ENDED).map(([outcome, ended]) => [`ENDED.${outcome}.word`, ended.word] satisfies [string, string]),
   ...Object.entries(CARD_WORDS).map(([state, card]) => [`CARD_WORDS.${state}.word`, card.word] satisfies [string, string]),
   ...Object.entries(PROPOSAL_WORDS).map(([phase, proposal]) => [`PROPOSAL_WORDS.${phase}.word`, proposal.word] satisfies [string, string]),
+  ...Object.entries(STANDING).map(([standing, word]) => [`STANDING.${standing}`, word] satisfies [string, string]),
+  ['ASKING', ASKING],
+  ['NOW_WORDS.calledOff', NOW_WORDS.calledOff],
 ];
+
+/**
+ * The places outside `src/lib/words.ts` that draw a state, each by its file and what holds it there: where a run stands
+ * (`standingOf`), and the floor's tag of a run waiting on you (`data-waits-on-you`).
+ */
+const DRAWN_STATES: ReadonlyArray<[file: string, holder: string]> = [
+  ['src/lib/factory.ts', 'standingOf'],
+  ['src/components/run/RunNode.tsx', 'data-waits-on-you'],
+];
+
+/** A place that draws a state, as the scan found it: where it is, how many times its holder was found, and each text it says. */
+type Drawn = { where: string; found: number; said: string[] };
+
+/**
+ * Each place that draws a state, read through TypeScript's tree: the declaration named `holder`, or the JSX element that carries the
+ * attribute `holder`, and every text it says but a type's and an attribute's (a class name is no word of a person's).
+ * @param texts the files of `src`, by path
+ * @param places each place, by its file and its holder
+ */
+const drawnStates = (texts: ReadonlyMap<string, string>, places: ReadonlyArray<[file: string, holder: string]>) =>
+  places.map(([file, holder]) => {
+    const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const source = ts.createSourceFile(file, texts.get(file) ?? '', ts.ScriptTarget.Latest, true, kind);
+    const drawn: Drawn = { where: `${file}:${holder}`, found: 0, said: [] };
+    const say = (node: ts.Node) => {
+      if (ts.isTypeNode(node) || ts.isJsxAttributes(node)) return;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node))
+        drawn.said.push(node.text.trim());
+      ts.forEachChild(node, say);
+    };
+    const holds = (node: ts.Node) =>
+      (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === holder) ||
+      ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) &&
+        (ts.isJsxElement(node) ? node.openingElement : node).attributes.properties.some(
+          (attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText(source) === holder,
+        ));
+    const find = (node: ts.Node) => {
+      if (holds(node)) {
+        drawn.found += 1;
+        say(node);
+      } else ts.forEachChild(node, find);
+    };
+    find(source);
+    return { ...drawn, said: drawn.said.filter(Boolean) } satisfies Drawn;
+  });
 
 /** Each state word of more than one word: a state the board names is one word, and its sentence is its meaning, on hover. */
 const stateWordBreaks = (words: ReadonlyArray<[where: string, word: string]>) =>
   words
     .filter(([, word]) => !/^\S+$/.test(word))
-    .map(([where, word]) => `${WORDS}'s ${where} is '${word}': name the state in one word, and say the sentence in its meaning`);
+    .map(([where, word]) => `${where} is '${word}': name the state in one word, written in ${WORDS}, and say the sentence in its meaning`);
+
+/**
+ * Each text of a place that draws a state of more than one word.
+ * @param drawn the places, as `drawnStates` read them
+ */
+const breaksOf = (drawn: readonly Drawn[]) =>
+  stateWordBreaks(drawn.flatMap(({ where, said }) => said.map((word) => [where, word] satisfies [string, string])));
 
 /** The phrasings a person no longer reads, word-bounded: `waits for your approval` is not `waits for you`, nor `not signed off` the tag. */
 const RETIRED = /\b(?:waits for you\b|check refused\b|not signed\b(?! off))/i;
@@ -749,6 +809,13 @@ test(`a state's words for a person are written in ${WORDS} alone, each one word,
   assert.ok(STATE_WORDS.length >= 30, `the scan has the state words to read: ${STATE_WORDS.length}`);
   assert.deepEqual(stateWordBreaks(STATE_WORDS), []);
   assert.deepEqual(retiredStateBreaks(texts), []);
+  const drawn = drawnStates(texts, DRAWN_STATES);
+  assert.deepEqual(
+    drawn.map(({ found }) => found),
+    DRAWN_STATES.map(() => 1),
+    'each place that draws a state is found, once',
+  );
+  assert.deepEqual(breaksOf(drawn), []);
   assert.deepEqual(retiredBreaks(texts), []);
   assert.deepEqual(hoverRuntimeBreaks(texts), []);
 });
@@ -805,9 +872,38 @@ test('REFUSED: a state of more than one word, a retired state phrase or phrasing
     stateWordBreaks([
       ['PERSON.working.rail', 'working'],
       ['CARD_WORDS.pending.word', 'waiting its turn'],
-    ]).map((line) => line.split(' ')[1]),
+    ]).map((line) => line.split(' ')[0]),
     ['CARD_WORDS.pending.word'],
     'a state of more than one word refused, a word of its own passes',
+  );
+  const standing = (said: string) =>
+    drawnStates(
+      planted(
+        'src/lib/factory.ts',
+        `export const standingOf = (run: Pick<RunView, 'cancelledAt'>) => (run.cancelledAt ? ENDED.cancelled.word : ${said});\n`,
+      ),
+      [['src/lib/factory.ts', 'standingOf']],
+    );
+  assert.deepEqual(
+    [standing("'waiting on you'"), standing('STANDING.waiting')].map((drawn) => breaksOf(drawn).length),
+    [1, 0],
+    "a phrase planted in standingOf refused, its word read from the table passes, and its type's words are no state's",
+  );
+  const floor = (tag: string) =>
+    drawnStates(
+      planted(
+        'src/components/run/RunNode.tsx',
+        `export const x = <Tag data-waits-on-you className="bg-yours-container text-on-yours-container">${tag}</Tag>;\n`,
+      ),
+      [['src/components/run/RunNode.tsx', 'data-waits-on-you']],
+    );
+  assert.deepEqual(
+    [floor('waiting on you'), floor('{STANDING.waiting}')].map((drawn) => [drawn[0]?.found, breaksOf(drawn).length]),
+    [
+      [1, 1],
+      [1, 0],
+    ],
+    'the floor tag found by its attribute, its phrase refused and its class names read as no word of it',
   );
   const spelled = retiredStateBreaks(
     planted('src/components/X.tsx', "export const x = <span>{'waits on you'}</span>;\nconst g = 'At work';\nconst t = `${g} at work`;\n"),

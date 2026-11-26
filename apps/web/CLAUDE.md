@@ -383,8 +383,9 @@ here.
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`) sit beside it. Where the board's word differs from the code's, it is
   translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepPart.ts` compose.
   **A state the board names is one word** (`working`, `waiting`, `retry`, `pending`, `cancelled`), as a modern app names it, and the
-  sentence goes in its meaning, on hover: a step's rail, a run's end (`ENDED`), a card's state (`CARD_WORDS`) and a proposal's phase
-  (`PROPOSAL_WORDS`) alike. A yellow tag that says what to do (`approve <step>`, `past budget`, `try it again`) is an action, not a
+  sentence goes in its meaning, on hover: a step's rail, a run's end (`ENDED`), a card's state (`CARD_WORDS`), a proposal's phase
+  (`PROPOSAL_WORDS`), where a run stands (`STANDING`: the run's header, the start form and the floor's tag), the chat's tag over an ask
+  (`ASKING`) and a hold's run that was cancelled (`NOW_WORDS.calledOff`) alike; a count (`3 waiting on you`) is a line, not a state. A yellow tag that says what to do (`approve <step>`, `past budget`, `try it again`) is an action, not a
   state, and keeps its words. `test/structure.test.ts` refuses a state of more than one word, a state's phrase from before it was one
   word (`waits on you`, `called off`) spelled as a word of its own, a retired phrasing (`waits for you`, `check refused`, `not signed`)
   and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.

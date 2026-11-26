@@ -189,7 +189,7 @@
     },
     {
       "term": "Step part",
-      "meaning": "one step as every size of it is drawn — the graph's node, the preview card, and whole in the ledger, the bar and the step's page — from one model, `stepPartOf` (`apps/web/src/lib/stepPart.ts`): six slots in an order a size never changes, only leaves some out (head, asks of you, got, said, gave, detail), each `none` where it does not apply, of the try the address shows (`?try=<step>:<n>`, `tryShown`, `apps/web/src/lib/tryAddress.ts`, proved by `apps/web/contracts/try-shown.contract.ts`). Its head is the one writer of the words the step's card says (`headOf`).",
+      "meaning": "one step as every size of it is drawn — the graph's node, the waiting card's modal, and whole in the ledger, the bar and the step's page — from one model, `stepPartOf` (`apps/web/src/lib/stepPart.ts`): six slots in an order a size never changes, only leaves some out (head, asks of you, got, said, gave, detail), each `none` where it does not apply, of the try the address shows (`?try=<step>:<n>`, `tryShown`, `apps/web/src/lib/tryAddress.ts`, proved by `apps/web/contracts/try-shown.contract.ts`). Its head is the one writer of the words the step's card says (`headOf`).",
       "type": "StepPartModel"
     },
     {

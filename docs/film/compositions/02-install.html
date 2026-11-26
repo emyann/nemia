@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8" /><script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+#root{position:absolute;inset:0;width:1920px;height:1080px;background:#0a0a0b;color:#e4e5e1;font-family:'Barlow',sans-serif;overflow:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+.disp{font-family:'Michroma',sans-serif}
+.cap{position:absolute;left:360px;width:1200px;top:855px;font-size:44px;font-weight:500;line-height:1.25}
+.sub{position:absolute;left:360px;width:1200px;top:965px;font-size:28px;color:#c4c6cc;line-height:1.3}
+.frame{position:absolute;left:360px;top:90px;width:1200px;height:700px;overflow:hidden;border:2px solid #3a3d44;background:#0a0a0b}
+.frame img{position:absolute;left:0;top:0;width:1200px;display:block}
+.tag{position:absolute;left:360px;top:800px;font-size:28px;letter-spacing:.08em;text-transform:uppercase;color:#f0e31a}
+.y{color:#f0e31a}
+</style></head>
+<body>
+<div id="root" data-composition-id="s-install" data-width="1920" data-height="1080" data-start="0" data-duration="8">
+
+<div style="position:absolute;left:160px;top:380px;width:1600px;padding:48px 56px;background:#14151a;border:2px solid #3a3d44;font-size:28px;line-height:1.5;word-break:break-all" class="mono"><span class="y">$</span> <span id="line"></span><span id="cur" class="y">▌</span></div>
+<div class="cap" style="left:160px;top:640px">One line installs it.</div>
+<div class="sub" style="left:160px;top:730px">On macOS, on Linux, and on Windows in a WSL terminal.</div>
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#root", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0);
+tl.to("#root", { opacity: 0, duration: 0.5, ease: "power2.in" }, 7.5);
+const s="curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh";const o={n:0};tl.to(o,{n:s.length,duration:4.5,ease:"none",onUpdate(){document.getElementById("line").textContent=s.slice(0,Math.round(o.n))}},1);tl.fromTo("#cur",{opacity:1},{opacity:0,duration:.4,repeat:12,yoyo:true,ease:"none"},0);
+window.__timelines["s-install"] = tl;
+</script>
+</div>
+</body></html>

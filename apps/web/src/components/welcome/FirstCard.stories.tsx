@@ -33,7 +33,8 @@ const loaded = async (canvas: HTMLElement, kind?: string) => {
 
 /**
  * Quick offered, nothing measured yet: the cost line says the estimate. Picking a suggestion fills the card, and Start files it labelled
- * as the first card, in quick, then starts it gated at its landing and opens the run's page.
+ * as the first card, in quick, then starts it gated at its landing and opens the run's page. The estimate shows before the stats are read,
+ * so Start is pressed once its name says the gates its workflow's listing gives, the read that enables it.
  */
 export const Estimate: Story = {
   parameters: { msw: firstCardStore() },
@@ -46,6 +47,8 @@ export const Estimate: Story = {
     await expect(within(page).getByRole('textbox', { name: 'Your card' })).toHaveValue(
       'Add one line at the top of the README saying what this repository is for. Change nothing else.',
     );
+    await waitFor(() => expect(start).toHaveAccessibleName('Start, gated before it lands'));
+    await expect(start).toBeEnabled();
     filed.length = 0;
     await userEvent.click(start);
     const ground = canvasElement.querySelector('[data-story-ground]');

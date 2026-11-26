@@ -466,24 +466,28 @@ export function restoreRunKeys(before: Record<string, string>) {
 }
 
 /**
- * The run `id` taken out of the seeded store, its record and every ask of it, there or not: what a page that wrote a run takes back.
+ * The run `id` taken out of the seeded store, its record, every ask of it and every marker beside it, there or not: what a page that
+ * wrote a run takes back.
  * @param id The run's id.
  */
 export function dropStoredRun(id: string) {
-  inApi('for (const name of t.askNames(root, input)) t.dropAsk(root, input, name); t.dropRecord(root, t.runKey(input));', id);
+  inApi(
+    'for (const name of t.askNames(root, input)) t.dropAsk(root, input, name); for (const marker of t.markerKeys(root, input)) t.dropMarker(root, input, marker); t.dropRecord(root, t.runKey(input));',
+    id,
+  );
 }
 
 /**
- * The runs a page started since it read `before` (`storedRuns`) taken back by hand: each one's record, its asks, the claim of the card it
- * was started from where that claim names it, and each of its files under `runs/` (its folder and its marks): what `nemia rm` removes of
- * a run.
+ * The runs a page started since it read `before` (`storedRuns`) taken back by hand: each one's record, its asks, its markers, the claim
+ * of the card it was started from where that claim names it, and each of its files under `runs/` (its folder): what `nemia rm` removes
+ * of a run.
  * @param before The ids of the runs the store held before the page started any.
  */
 export function takeBackRuns(before: readonly string[]) {
   const made = storedRuns().filter((id) => !before.includes(id));
   if (!made.length) return;
   inApi(
-    "const ids = new Set(input); for (const key of t.keysUnder(root, t.claimKey(''))) { try { if (ids.has(JSON.parse(t.recordText(root, key) ?? '{}').run ?? '')) t.dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of t.askNames(root, id)) t.dropAsk(root, id, name); t.dropRecord(root, t.runKey(id)); }",
+    "const ids = new Set(input); for (const key of t.keysUnder(root, t.claimKey(''))) { try { if (ids.has(JSON.parse(t.recordText(root, key) ?? '{}').run ?? '')) t.dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of t.askNames(root, id)) t.dropAsk(root, id, name); t.dropRecord(root, t.runKey(id)); for (const marker of t.markerKeys(root, id)) t.dropMarker(root, id, marker); }",
     made,
   );
   const runsDir = path.join(store!, 'runs');

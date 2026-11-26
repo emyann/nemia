@@ -449,7 +449,7 @@ const FOR_A_SLOT = staged({
   status: { ...IN_FLIGHT_STATE, moving: false },
 });
 
-/** A run a person holds until 1sw7 lands. */
+/** A run a person holds until 1sw7 lands, saying why and who they are. */
 const HELD = staged({
   name: 'cli-the-rest-of-the-move-c7un',
   brief: 'cli: the rest of the move — every store verb left goes to the client',
@@ -464,9 +464,12 @@ const HELD = staged({
     holding: {
       at: before(30),
       runs: [{ run: AT_WORK.metadata.name, missing: false, cancelledAt: null, gone: [], landed: false }],
-      word: `held until ${AT_WORK.metadata.name} lands`,
+      word: `held until ${AT_WORK.metadata.name} lands (why: merge conflicts with 1sw7’s schema change; by ann)`,
       advice: '',
       waitingOnYou: false,
+      why: 'merge conflicts with 1sw7’s schema change',
+      by: 'ann',
+      actor: { kind: 'person', token: 'laptop' },
     },
   },
 });

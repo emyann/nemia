@@ -9,7 +9,6 @@ import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import type { Wait } from '../../contracts/hold.contract.ts';
 
 export type { Wait } from '../../contracts/hold.contract.ts';
-export type { WaitStanding } from '../../contracts/waited-run.contract.ts';
 
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has

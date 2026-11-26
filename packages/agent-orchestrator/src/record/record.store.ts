@@ -299,7 +299,7 @@ function unheldIn(text: string) {
  * releases them, at no moment known.
  * @param text What the released record holds.
  */
-export function releasedIn(text: string) {
+function releasedIn(text: string) {
   const json = jsonOr(text);
   const at = fieldOf(json, 'at');
   return { at: isText(at) ? at : '', ...actorIn(fieldOf(json, 'actor')) } satisfies Released as Released;

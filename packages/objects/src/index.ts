@@ -669,7 +669,6 @@ export {
 } from './commands-flags.ts';
 export { MACHINE_VERBS, type MachineVerb, STREAM_COMMANDS, type StreamCommand } from './commands-machine.ts';
 export {
-  ANSWER_HELP,
   APPROVE_WORDS,
   ASSIGN_WORDS,
   BY_CAP,
@@ -690,7 +689,6 @@ export {
   START_WORDS,
   WAIT_WORDS,
   WHY_CAP,
-  answerFlag,
   approveRefusal,
   holdRefusal,
   pauseRefusal,
@@ -797,15 +795,7 @@ export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';
 export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow, memoryBytesWord } from './stats-read.ts';
-export {
-  RUN_PHASE_OF,
-  runCodesLegal,
-  STEP_PHASE_OF,
-  stepCodesLegal,
-  tryCodesLegal,
-  type RunCodes,
-  type StepCodes,
-  type TryCodes,
-} from './codes.ts';
+export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
+export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
 export { refusedIn, type RefusedPlace } from './refused.ts';
 export { LISTED_WITHOUT, filesHeld, filesLeftOut } from './listed.ts';

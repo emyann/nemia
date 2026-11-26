@@ -38,6 +38,7 @@ type Held = {
   workflows: ReadonlyMap<string, ReadWorkflow>;
   agents: ReadonlyMap<string, Record<string, unknown>>;
   skills: ReadonlySet<string>;
+  programs: ReadonlyMap<string, Record<string, unknown>>;
   manifest: Record<string, unknown>;
   parameters: ReadonlySet<string>;
 };
@@ -74,6 +75,7 @@ function heldOf(folder: ReadFolder, packageSkills: readonly string[]) {
     workflows,
     agents,
     skills: new Set([...foldersOf(folder.files, 'skills'), ...packageSkills]),
+    programs: new Map(foldersOf(folder.files, 'programs').map((name) => [name, specOf(folder, `programs/${name}/program.yaml`)])),
     manifest,
     parameters: new Set(isMap(manifest.parameters) ? Object.keys(manifest.parameters) : []),
   };
@@ -170,6 +172,28 @@ function labelValuesRefusals(held: Held) {
   if (typeof written !== 'string' || written.includes('${{')) return [];
   const parsed = labelValuesOf(written);
   return 'refused' in parsed ? [{ file: 'nemia.yaml', at: ['spec', 'labelValues'], message: `labelValues ${parsed.refused}.` }] : [];
+}
+
+/** A condition's name: lower-case letters, digits and dashes, opening on a letter, as a check's `condition:` is written. */
+const CONDITION_NAME = /^[a-z][a-z0-9-]*$/;
+
+/** What a program declares that cannot run or write: a `run:` that is blank, and a condition it writes whose name no check could wait on. */
+function programRefusals(held: Held) {
+  return [...held.programs].flatMap(([name, spec]) => {
+    const file = `programs/${name}/program.yaml`;
+    const blank =
+      typeof spec.run === 'string' && !spec.run.includes('${{') && spec.run.trim() === ''
+        ? [{ file, at: ['spec', 'run'], message: `the program ${name} has no \`run:\` line, the command the daemon keeps running: write one.` }]
+        : [];
+    const names = stringsOf(spec.writes)
+      .filter(([written]) => !CONDITION_NAME.test(written))
+      .map(([written, i]) => ({
+        file,
+        at: ['spec', 'writes', i],
+        message: `the program ${name} writes \`${written}\`, which is no condition's name: lower-case letters, digits and dashes, opening on a letter.`,
+      }));
+    return [...blank, ...names] satisfies Refusal[];
+  });
 }
 
 /**
@@ -605,6 +629,7 @@ export function checkTemplate(
     ...hireRefusals(held),
     ...triggerRefusals(held),
     ...labelValuesRefusals(held),
+    ...programRefusals(held),
     ...originRefusals(held),
     ...agentRefusals(held),
     ...modelRefusals(held, lists),

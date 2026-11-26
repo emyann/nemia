@@ -27,6 +27,7 @@ import {
 } from './record.ts';
 import { workStands, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
+import { personConditions, unconditioned, withConditions } from '../condition/condition.ts';
 
 import { RETRY_MODES, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
@@ -397,7 +398,7 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
     marks.labels === undefined ? undefined : labelsIn(marks.labels),
     saidIn(marks.said ?? []),
   ];
-  const { approvals, acceptances, routes } = within('asks', () => ({
+  const { approvals, acceptances, routes, conditions } = within('asks', () => ({
     ...approvalsIn(asks),
     ...acceptancesIn(asks),
     routes: personRoutes(
@@ -405,10 +406,14 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
       asks.map((a) => a.name),
       (name) => heldText(asks.find((a) => `/${a.name}` === name)?.text ?? ''),
     ),
+    conditions: personConditions(
+      asks.map((a) => a.name),
+      (name) => heldText(asks.find((a) => a.name === name)?.text ?? ''),
+    ),
   }));
   const standing = approvals.filter((a) => workStands(run, a));
   return {
-    ...withRoutes(run, routes),
+    ...withConditions(withRoutes(run, routes), conditions),
     ...(labels ? { labels } : {}),
     ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
     ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
@@ -769,7 +774,7 @@ function takenBackIn(text: string) {
 
 /**
  * A record as the keyspace holds it: compact JSON, without what a person owns beside it (the approvals, acceptances, pruning, hold and a
- * person's routes a read composed onto it, `unrouted`), nor the pause, labels and words said before a step was filed the Run door did. It
+ * person's routes and the conditions written for its steps a read composed onto it, `unrouted`, `unconditioned`), nor the pause, labels and words said before a step was filed the Run door did. It
  * takes the run as a pass or `nemia start` writes it.
  */
 export const recordValue = ({
@@ -781,7 +786,7 @@ export const recordValue = ({
   pause: _____,
   saidBefore: _______,
   ...run
-}: Run) => JSON.stringify(unrouted(run));
+}: Run) => JSON.stringify(unconditioned(unrouted(run)));
 
 /**
  * The directory the run makes for a step's files: screenshots, logs, reports — for the steps after it

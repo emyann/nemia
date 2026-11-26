@@ -1,6 +1,6 @@
 /**
  * Whether a template's layout gives a file a place (agent-orchestrator, src/template/layout.ts, `inLayout`): `file` its path from the
- * template's root, `named` the files a `{ path }` of a document names. Beside the root files, `workflows/`, `agents/` and `skills/`, a
+ * template's root, `named` the files a `{ path }` of a document names. Beside the root files, `workflows/`, `agents/`, `skills/` and `programs/`, a
  * template holds one folder of carried files its workflows share, `carried/`, any file at any depth in it: the render copies it byte for
  * byte into the factory's tree and a run freezes it beside its workflow's folder; and the factory's home, `home/`, any file at any depth
  * in it, copied byte for byte into the tree's `home/`, where a run's sessions start. A file a `{ path }` names is in the layout wherever it
@@ -13,7 +13,7 @@ const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
  * Each holder the layout knows, by the prefix a path under it opens with: a path's holder is the part before its first `/`, and no
  * holder's name holds one.
  */
-const HOLDERS = ['workflows/', 'agents/', 'skills/', 'carried/', 'home/'];
+const HOLDERS = ['workflows/', 'agents/', 'skills/', 'programs/', 'carried/', 'home/'];
 
 /** Whether `file` has no part `..`, said without splitting it, which the verifier does not model. */
 const noParentPart = (file: string) => file !== '..' && !file.startsWith('../') && !file.endsWith('/..') && !file.includes('/../');

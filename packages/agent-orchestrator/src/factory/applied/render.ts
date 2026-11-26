@@ -45,6 +45,7 @@ export type Wiring = {
   revisions?: RevisionsPolicy;
   triggers?: Record<string, { selector: string; target: { kind: 'Workflow'; name: string }; since: string }>;
   labelValues?: Readonly<Record<string, readonly string[]>>;
+  programs?: Record<string, { run: string; writes: string[] }>;
 };
 
 /**
@@ -69,6 +70,29 @@ function renderedTriggers(triggers: unknown, written: unknown) {
     out[name] = { selector, target: { kind: 'Workflow', name: String(t.target.name) }, since: '' };
   }
   return { wiring: Object.keys(out).length ? { triggers: out } : {}, refused };
+}
+
+/**
+ * The programs a template carries (`programs/<name>/program.yaml`) as a tree's wiring holds them, their parameters rendered: each by its
+ * folder's name, its `run:` line and the conditions it writes. A program whose `run:` renders empty is refused by name, never kept to run
+ * nothing.
+ * @param read The template as read, its documents' parameters substituted.
+ * @param names The programs' names.
+ */
+function renderedPrograms(read: TemplateRead, names: readonly string[]) {
+  const out: NonNullable<Wiring['programs']> = {};
+  const refused: string[] = [];
+  for (const name of names) {
+    const file = `programs/${name}/program.yaml`;
+    const spec = (read.folder.documents.get(file) as { spec?: Spec } | null)?.spec ?? {};
+    const run = typeof spec.run === 'string' ? spec.run.trim() : '';
+    if (!run) {
+      refused.push(`${file}: the program ${name}'s run, as rendered, is empty: set the parameter it reads, or write a command, and apply again.`);
+      continue;
+    }
+    out[name] = { run, writes: Array.isArray(spec.writes) ? spec.writes.map(String) : [] };
+  }
+  return { wiring: Object.keys(out).length ? { programs: out } : {}, refused };
 }
 
 /** Why a template's trigger `name` is refused: its selector renders as `selector`, which no card's labels are read by. */
@@ -426,7 +450,7 @@ function renderRules(rules: string | undefined, out: Rendered) {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow, the manifest's hires, its revisions policy, its card triggers whose selector renders non-empty and its label values, the
+ * workflow, the manifest's hires, its revisions policy, its card triggers whose selector renders non-empty, its label values and its programs, the
  * template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`), `NEMIA.md` from the manifest's instruction or the template's
  * own, and `RULES.md` from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`,
  * `renderAgent` or `renderRules` refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
@@ -458,6 +482,9 @@ export function renderFactory(read: TemplateRead, params: Params) {
       documents: new Map([...read.folder.documents].map(([file, doc]) => [file, substitute(doc, params)])),
     },
   };
+  const programs = renderedPrograms(substituted, namesOf(read, 'programs', 'program.yaml'));
+  Object.assign(out.wiring, programs.wiring);
+  out.refusals.push(...programs.refused);
   if (workflows.includes(CARRIED_FOLDER))
     out.refusals.push(
       `${WORKFLOWS}/${CARRIED_FOLDER}/workflow.yaml: ${CARRIED_FOLDER}/ beside the workflows is the folder of carried files, the template's own ${CARRIED_FOLDER}/ rendered, and no workflow has its name. Rename the workflow's folder, and apply again.`,

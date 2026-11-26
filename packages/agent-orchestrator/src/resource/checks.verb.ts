@@ -4,7 +4,7 @@ import { attemptVerdict, checkVerdictOf, verdictWord, type CheckVerdict } from '
 import { phaseOfView } from '../views/views-words.ts';
 import type { Views } from '../summary/reads.verb.ts';
 import { checkTasksOf, type Run, type StepRecord } from '../record/record.ts';
-import { hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
+import { checkLine, hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
 import { asked, type Engine } from '../runtime-client.ts';
 
 /**
@@ -203,7 +203,7 @@ export async function checksOf(e: Engine, run: Run, steps: readonly StepSpec[], 
 export const checksIn = (step: StepSpec, check: StepRecord['check'], views: Views, stderr: CheckStderr) =>
   stepChecks(step).map((c) => {
     const taskId = check ? Object.fromEntries(checkTasksOf(check))[c.name] : undefined;
-    return checkIn(c.run, taskId, views, stderr, c.name);
+    return checkIn(checkLine(c), taskId, views, stderr, c.name);
   });
 
 /**

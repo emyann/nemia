@@ -24,8 +24,9 @@ import {
   stepChecksDue,
 } from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
-import { SHORTHAND_CHECK, stepChecks, type CheckSpec } from '../step/step.ts';
+import { checkLine, SHORTHAND_CHECK, stepChecks, type CheckSpec } from '../step/step.ts';
 import { holdsOpen } from '../gate/gate.ts';
+import { standingOfCondition, writtenFor } from '../condition/condition.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
   askingTry,
@@ -330,7 +331,7 @@ const checkRefusalsHanded = Effect.fnUntraced(function* (f: Filing, files: strin
   const plan = stepChecks(step);
   const only = plan.length === 1 ? plan[0] : undefined;
   if (!record.check) return {};
-  if (only) return { refusal: yield* refusalHanded(f, files, only.run, record.check.taskId) };
+  if (only) return { refusal: yield* refusalHanded(f, files, checkLine(only), record.check.taskId) };
   return { refusals: yield* refusalsHanded(f, files, plan, (name) => currentCheckTask(f.run, step.name, name)) };
 });
 
@@ -411,7 +412,7 @@ const refusalsHanded = Effect.fnUntraced(function* (
     const phase = f.reads.phaseOf(taskOf(check.name));
     if (phase === 'succeeded') passed.push(check.name);
     else if (phase === 'failed' || phase === 'stopped')
-      refused.push({ name: check.name, ...(yield* refusalHanded(f, files, check.run, taskOf(check.name))) });
+      refused.push({ name: check.name, ...(yield* refusalHanded(f, files, checkLine(check), taskOf(check.name))) });
   }
   return refused.length ? { refused, passed } : undefined;
 });
@@ -696,6 +697,7 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
   const workspace = record.workspace ?? run.workspace;
   const taskId = currentCheckTask(run, name, check.name);
   if ((yield* asked('view', e.view(taskId))).state.brief) return;
+  if (check.condition !== undefined) return yield* fileConditionCheck(f, name, check.condition, taskId);
   const command = check.run;
   fs.mkdirSync(path.dirname(checkCloseout(home, taskId)), { recursive: true });
   const files = artifactsDir(home, run, name);
@@ -729,6 +731,37 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
   );
   const { factory, workflow } = keysOf(run);
   noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
+});
+
+/**
+ * A check that waits on a condition, once its condition is decided for the try the step is on (`conditionStanding`): filed as a task of
+ * its own that prints the writer's message and exits 0 where it was written True, 1 where False, so every reader of a check's task (its
+ * verdict, its output handed to the next try, `retries:`) reads it as it reads any check. Filed nothing while it is not written, written
+ * Unknown, or written for another try: the step stays checking, and its row says what it waits on (`conditionWaitWords`).
+ */
+const fileConditionCheck = Effect.fnUntraced(function* (f: Filing, name: string, condition: string, taskId: string) {
+  const { e, run } = f;
+  const standing = standingOfCondition(run, name, condition);
+  if (standing === 'running') return;
+  const written = writtenFor(run, name, condition);
+  const step = stepNamed(f, name);
+  yield* asked(
+    'file',
+    e.file({
+      id: taskId,
+      harness: 'check',
+      priority: MOMENTUM,
+      brief: `condition: ${condition}`,
+      cwd: recordNamed(run, name).workspace ?? run.workspace,
+      deadlineSeconds: CHECK_DEADLINE_SECONDS,
+      ...checkRequestOf(step),
+      config: {
+        command: ['sh', '-c', `printf '%s\\n' "$WF_CONDITION_MESSAGE"; exit ${standing === 'passed' ? 0 : 1}`],
+        env: { WF_CONDITION: condition, WF_CONDITION_MESSAGE: written?.message ?? '' },
+        niceness: CHECK_NICENESS,
+      },
+    }),
+  );
 });
 
 /**

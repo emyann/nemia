@@ -12,21 +12,43 @@ import { refuse, type CheckSpec } from '../step/step.ts';
 /** What a check's name is: a word of lower-case letters, digits and dashes, opening on a letter, as a task id carries it. */
 const CHECK_NAME = /^[a-z][a-z0-9-]*$/;
 
-const ENTRY_KEYS = ['name', 'run', 'after', 'enabled', 'usesCheckout'] as const;
+const ENTRY_KEYS = ['name', 'run', 'condition', 'after', 'enabled', 'usesCheckout'] as const;
 
-const EXAMPLE = '`checks: [ { name: types, run: npm run typecheck }, { name: lint, run: npm run lint, after: [] } ]`';
+const EXAMPLE =
+  '`checks: [ { name: types, run: npm run typecheck }, { name: lint, run: npm run lint, after: [] }, { name: ready, condition: ready } ]`';
 
 /** A check as written, before the plan is resolved: its name, its line, its waits as written (absent: the one above), on or off. */
-type Written = { name: string; run: string; after: readonly string[] | undefined; enabled: boolean; usesCheckout: boolean };
+type Written = {
+  name: string;
+  after: readonly string[] | undefined;
+  enabled: boolean;
+  usesCheckout: boolean;
+} & ({ run: string; condition?: undefined } | { condition: string; run?: undefined });
 
 /** Whether a value is a map of YAML. */
 const isMap = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** What a check is, as written: its `run:` line or its `condition:` name, one of the two. */
+function whatOf(step: string, name: string, entry: Record<string, unknown>) {
+  if (entry.run !== undefined && entry.condition !== undefined)
+    refuse(
+      `${step}: the check \`${name}\` has both \`run:\` and \`condition:\`. Keep \`run: <command>\` to run a command, or \`condition: <name>\` to wait on a condition a program or a person writes.`,
+    );
+  if (entry.condition === undefined) return { run: runOf(step, name, entry.run) };
+  if (typeof entry.condition !== 'string' || !CHECK_NAME.test(entry.condition))
+    refuse(
+      `${step}: the check \`${name}\`'s \`condition:\` is a name of lower-case letters, digits and dashes, opening on a letter (${JSON.stringify(entry.condition)} is not): \`condition: ready\`.`,
+    );
+  if (entry.usesCheckout !== undefined)
+    refuse(`${step}: the check \`${name}\` waits on a condition and runs nothing, so \`usesCheckout:\` means nothing to it. Delete the line.`);
+  return { condition: entry.condition };
+}
 
 /** A check's `run:` as written, refused when empty or `none`, which the shell would run as a command it cannot find. */
 function runOf(step: string, name: string, run: unknown) {
   if (typeof run !== 'string' || ['', 'none', '""', "''"].includes(run.trim()))
     refuse(
-      `${step}: the check \`${name}\` has no \`run:\` line, the shell command it executes. Write one: \`- name: ${name}\` and \`run: <command>\`.`,
+      `${step}: the check \`${name}\` has no \`run:\` line, the shell command it executes, nor a \`condition:\` it waits on. Write one: \`- name: ${name}\` and \`run: <command>\`.`,
     );
   return run;
 }
@@ -76,7 +98,7 @@ function writtenOf(step: string, entry: unknown) {
     );
   return {
     name,
-    run: runOf(step, name, entry.run),
+    ...whatOf(step, name, entry),
     after: afterOf(step, name, entry.after),
     enabled: enabledOf(step, name, entry.enabled),
     usesCheckout: usesCheckoutOf(step, name, entry.usesCheckout),
@@ -151,9 +173,10 @@ function throughDisabled(checks: readonly (Written & { after: readonly string[] 
       (c) =>
         ({
           name: c.name,
-          run: c.run,
+          ...(c.condition === undefined
+            ? { run: c.run, ...(c.usesCheckout ? {} : { usesCheckout: false as const }) }
+            : { condition: c.condition }),
           after: [...new Set(resolve(c.after, new Set([c.name])))],
-          ...(c.usesCheckout ? {} : { usesCheckout: false as const }),
         }) satisfies CheckSpec,
     );
 }
@@ -197,7 +220,8 @@ export function checksOf(step: string, check: string | undefined, text: string |
  */
 export const checksWritten = (checks: readonly CheckSpec[]) =>
   checks.map((c) => {
-    const entry: Record<string, FrontmatterValue> = { name: c.name, run: c.run, after: [...c.after] };
+    const entry: Record<string, FrontmatterValue> =
+      c.condition === undefined ? { name: c.name, run: c.run, after: [...c.after] } : { name: c.name, condition: c.condition, after: [...c.after] };
     if (c.usesCheckout === false) entry.usesCheckout = 'false';
     return entry;
   });

@@ -192,13 +192,14 @@ function treeWiringOf(home: string, name: string) {
   const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
-  const { workflows, hires, revisions, workflowRepos, labelValues } = read.wiring;
+  const { workflows, hires, revisions, workflowRepos, labelValues, programs } = read.wiring;
   return {
     workflows,
     hires,
     ...(revisions === undefined ? {} : { revisions }),
     ...(workflowRepos === undefined ? {} : { workflowRepos }),
     ...(labelValues === undefined ? {} : { labelValues }),
+    ...(programs === undefined ? {} : { programs }),
   };
 }
 

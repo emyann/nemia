@@ -73,7 +73,7 @@ export type FactorySpec = {
 type TemplateTrigger = { selector: string; target: { kind: 'Workflow'; name: string } };
 
 /** What each of a template's YAML files is, and the name its document must carry: its folder's, or the template's for the manifest. */
-export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'Skill' | 'Lock'; name: string | undefined };
+export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'Skill' | 'Program' | 'Lock'; name: string | undefined };
 
 /**
  * The kind of document `file` holds and the name it must carry, or undefined for a file that is not one of the layout's documents.
@@ -93,6 +93,8 @@ export function documentFile(file: string, template: string) {
     return { kind: 'Agent', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
   if (holder === 'skills' && leaf === 'skill.yaml')
     return { kind: 'Skill', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
+  if (holder === 'programs' && leaf === 'program.yaml')
+    return { kind: 'Program', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
   return undefined;
 }
 
@@ -106,7 +108,7 @@ const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
 const LAYOUT =
   "A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root; workflows/<workflow>/workflow.yaml, its steps' <step>.md, " +
   'README.md and any file that is not .md or .yaml; agents/<agent>/agent.yaml, instructions.md and output.schema.json; ' +
-  'skills/<skill>/SKILL.md and anything beside it; carried/ and any file in it, the files its workflows share; home/ and any file in it, the home its sessions start in; and a file a {path:} names';
+  'skills/<skill>/SKILL.md and anything beside it; programs/<program>/program.yaml; carried/ and any file in it, the files its workflows share; home/ and any file in it, the home its sessions start in; and a file a {path:} names';
 
 /**
  * Whether `rest`, a file's path in a workflow's folder after the folder's name, is one the layout gives it: the workflow's document and a
@@ -149,11 +151,12 @@ export const inLayout: InLayout = (file, named) => {
     return rest !== undefined && !rest.includes('/') && AGENT_FILES.includes(rest);
   }
   if (file.startsWith('skills/')) return pastFolder(file.slice('skills/'.length)) !== undefined;
+  if (file.startsWith('programs/')) return pastFolder(file.slice('programs/'.length)) === 'program.yaml';
   return false;
 };
 
 /** The file each folder of a kind must hold, and what the folder is. */
-const HOLDS = { workflows: ['workflow.yaml', 'a workflow'], agents: ['agent.yaml', 'an agent'], skills: ['SKILL.md', 'a skill'] } as const;
+const HOLDS = { workflows: ['workflow.yaml', 'a workflow'], agents: ['agent.yaml', 'an agent'], skills: ['SKILL.md', 'a skill'], programs: ['program.yaml', 'a program'] } as const;
 
 /** What the folders of `files` lack or are misnamed: a folder of workflows/, agents/ or skills/ without its file, or not named a Name. */
 function folderRefusals(files: readonly string[]) {
@@ -362,6 +365,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
     required: ['role', 'description'],
   },
   Skill: { fields: { fetch: { fields: {}, rest: 'not-yet' } } },
+  Program: { fields: { run: 'words', writes: 'strings' }, required: ['run', 'writes'] },
 };
 
 /** The shape of a whole document of `kind`. */

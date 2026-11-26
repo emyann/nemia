@@ -22,7 +22,7 @@ export const runRecipe = tv({
     ground: 'bg-surface-container-low',
     head: 'flex min-w-0 items-center gap-3.5 font-medium text-on-surface-variant',
     id: 'font-mono text-on-surface-variant',
-    title: 'relative z-10 m-0 min-w-0 flex-1 font-medium text-on-surface',
+    title: 'relative z-10 m-0 min-w-0 font-medium text-on-surface',
     now: 'flex min-w-0 items-center gap-x-2.5 gap-y-1',
     agent: 'shrink-0 font-medium text-on-surface',
     end: 'ml-auto inline-flex shrink-0 items-center gap-2.5',
@@ -38,7 +38,7 @@ export const runRecipe = tv({
       xs: { base: 'inline-flex items-center align-baseline' },
       sm: {
         base: 'flex items-center gap-2.5 py-2 pr-4 pl-3',
-        title: 'block flex-1 truncate',
+        title: 'block truncate',
       },
       md: {},
       lg: {

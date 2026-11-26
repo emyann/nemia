@@ -2,9 +2,10 @@ import type { WorkflowPageAddress } from '@/lib/api/address';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { namespaceOf } from '@/lib/factories';
-import { Body, Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { workflowTarget } from '../workflow/WorkflowLink';
+import { HeldTooltip } from './HeldTooltip';
 import { CopyId } from './CopyId';
 import { TextLink } from './TextLink';
 
@@ -40,7 +41,7 @@ export function QuietLabels({ labels, keys = false }: { labels: Readonly<LabelMa
               {keys ? `${key}=${value}` : value}
             </Body>
           </TextLink>
-          <Tooltip>{`${key}=${value}`}</Tooltip>
+          <HeldTooltip>{`${key}=${value}`}</HeldTooltip>
         </TooltipTrigger>
       ))}
     </span>
@@ -93,7 +94,7 @@ function Where({
             {workflow}
           </TextLink>
         )}
-        <Tooltip>{workflowDir}</Tooltip>
+        <HeldTooltip>{workflowDir}</HeldTooltip>
       </TooltipTrigger>
     </span>
   );

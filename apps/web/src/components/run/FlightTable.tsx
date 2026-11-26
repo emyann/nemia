@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { Body, Cell, Column, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Label, Row, Table, TableBody, TableHeader, TooltipTrigger } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
@@ -7,13 +7,13 @@ import { ink } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { previewBar } from '../step/StepPreview';
 import { RunActions } from './RunActions';
-import { CopyId, CutFrame, FRAMED_ROW, FRAMED_TABLE, Run, TableAtCut, TextLink } from '../look';
+import { CopyId, CutFrame, FRAMED_ROW, FRAMED_TABLE, HeldTooltip, Run, TableAtCut, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'uppercase';
 
-/** A run's title in a row: one line, cut to the column's room, the whole of it in the kit's tooltip. */
-const TITLE = 'block truncate font-medium';
+/** A run's title in a row: one line as wide as its words, cut to the column's room, the whole of it in the kit's tooltip where cut. */
+const TITLE = 'block w-fit max-w-full truncate font-medium';
 
 /**
  * A run in flight the list could not judge, a task it reads having a journal that does not read: its id for its title, a link, with a
@@ -38,7 +38,7 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
                 {run.id}
               </Body>
             </TextLink>
-            <Tooltip>{run.id}</Tooltip>
+            <HeldTooltip repeats>{run.id}</HeldTooltip>
           </TooltipTrigger>
           <Body size="small" component="span" colorRole="on-surface-variant" className="flex items-center gap-3.5 font-medium">
             <CopyId id={run.id} short />

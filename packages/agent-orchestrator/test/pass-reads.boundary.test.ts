@@ -322,7 +322,7 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
         read: {
           runs: [run],
           slots,
-          parents: passParents(standingReader(NOTHING_READ)),
+          parents: passParents(),
           standing: NOTHING_READ,
           revisions: aPassRevisions(),
         },

@@ -877,7 +877,7 @@ test("`from:` names the runs a card's run is handed as context, in the order wri
 
 /** What the store and git say of the cards waited on: each card of `cards` known, with its runs, their landing and their hand-offs. */
 const waitingOver = (
-  cards: Readonly<Record<string, { runs?: { id: string; landed: boolean }[]; onward?: string[] }>>,
+  cards: Readonly<Record<string, { runs?: { id: string; released: boolean }[]; onward?: string[] }>>,
   phases: Readonly<Record<string, CardRun['phase']>> = {},
 ) =>
   ({
@@ -918,7 +918,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
   });
 
   test('once the named card has landed, it waits on nothing and takes its place', () => {
-    const landed = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', landed: true }] } }, { 'a-run': 'succeeded' });
+    const landed = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', released: true }] } }, { 'a-run': 'succeeded' });
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];
     const b = inboxListing(files, runs, new Map(), new Map(), undefined, landed).find((l) => l.name === 'b-3z4w');
     assert.equal(b?.waits, undefined);
@@ -945,7 +945,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
   });
 
   test('a wait on a card whose run ended unlanded, on a name the store does not know, and on a cycle, is stalled', () => {
-    const ended = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', landed: false }] } }, { 'a-run': 'failed' });
+    const ended = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', released: false }] } }, { 'a-run': 'failed' });
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'failed' }];
     const b = inboxListing(files, runs, new Map(), new Map(), undefined, ended).find((l) => l.name === 'b-3z4w');
     assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'failed', stalled: true }]);
@@ -969,7 +969,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
 
   test("a door-routed card waits at the card its run passed the work on to, with that card's state", () => {
     const routed = waitingOver(
-      { 'a-1x2y': { runs: [{ id: 'a-run', landed: false }], onward: ['a2-7q8r'] }, 'a2-7q8r': {} },
+      { 'a-1x2y': { runs: [{ id: 'a-run', released: false }], onward: ['a2-7q8r'] }, 'a2-7q8r': {} },
       { 'a-run': 'succeeded' },
     );
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];

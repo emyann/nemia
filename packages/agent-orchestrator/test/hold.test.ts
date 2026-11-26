@@ -922,7 +922,7 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
   await refused(
     ['hold', a.id, '--until', child.id],
     `--until ${child.id}:`,
-    `${child.id} already waits on ${a.id} to land (${child.id} --after ${a.id})`,
+    `${child.id} already waits on ${a.id} to succeed (${child.id} --after ${a.id})`,
   );
   const c = await aRunning(b, repo);
   const d = await aRunning(b, repo);
@@ -931,12 +931,17 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
   await refused(
     ['hold', a.id, '--until', c.id],
     `--until ${c.id}:`,
-    `${c.id} already waits on ${a.id} to land (${c.id} held until ${d.id}, ${d.id} held until ${a.id})`,
+    `${c.id} already waits on ${a.id} to succeed (${c.id} held until ${d.id}, ${d.id} held until ${a.id})`,
   );
   assert.ok(!(holdText(a.id) !== undefined));
   const others = [runRecord(ROOT, d.id), runRecord(ROOT, c.id), runRecord(ROOT, child.id)];
   assert.match(
-    holdRefusal(runRecord(ROOT, a.id), [c.id], () => ({ record: runRecord(ROOT, c.id), landed: false }), others) ?? '',
+    holdRefusal(
+      runRecord(ROOT, a.id),
+      [c.id],
+      () => ({ record: runRecord(ROOT, c.id), standing: { kind: 'waiting', on: 'running' } as const }),
+      others,
+    ) ?? '',
     /each would wait on the other for ever/,
     'pure, with the store in the opposite order: the circle is found whichever run is read first',
   );

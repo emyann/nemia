@@ -1117,12 +1117,12 @@ async function _viewProgramTypes() {
     >,
     v.checkReportsRead(run, [], failed, () => true) satisfies EffectOf<Map<string, CheckReport>, Refusal, EngineService>,
     v.refusalRead('x', 'y') satisfies EffectOf<CheckRefusal, Refusal, EngineService>,
-    v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, Refusal, EngineService>,
-    v.parentsRead(run, v.nothingRead()) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
+    v.parentRead('x') satisfies EffectOf<ParentRun, Refusal, EngineService>,
+    v.parentsRead(run) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
   ] satisfies Array<EffectOf<unknown, Refusal, EngineService>>);
   void [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-    v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, never, EngineService>,
+    v.parentRead('x') satisfies EffectOf<ParentRun, never, EngineService>,
   ];
   void [v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>];
   void [

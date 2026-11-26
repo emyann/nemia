@@ -220,7 +220,8 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
   const named = runList(waits.map(waitName));
   const one = waits.length === 1;
   const held = `held until ${named} ${one ? 'succeeds' : 'succeed'}${words}`;
-  if (waits.every((w) => w.released)) return `${held} — ${one ? 'it has' : 'they have'}, and the next tick lifts the hold`;
+  if (waits.every((w) => w.released))
+    return `${held} — ${one ? 'it has' : 'they have'} succeeded or been released, and the next tick lifts the hold`;
   return held;
 }
 

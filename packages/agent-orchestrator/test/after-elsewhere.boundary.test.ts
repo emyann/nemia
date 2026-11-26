@@ -1,7 +1,7 @@
 /**
- * What `nemia start --after` refuses before a run is written, one refusal of which is a parent on another base branch: the repository's
- * own checkout is switched to a branch a person made. The handle of the test place switches no checkout to another branch, so this
- * keeps the git place; the rest of `--after` is walked in store.test.ts.
+ * What `nemia start --after` refuses before a run is written, and what it accepts on real git: a parent that landed on another base
+ * branch than this run starts from. The repository's own checkout is switched to a branch a person made, which the handle of the test
+ * place does not do; the rest of `--after` is walked in store.test.ts.
  *
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
@@ -238,14 +238,12 @@ const aParent = async (
 const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async () => {
+test('REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, a cancelled one — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>, and accepts a parent of another base branch', async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'parent.txt' });
-  const other = await aParent(aRepo(), b, { work: 'other.txt' });
   const called = await aParent(repo, b, { work: 'called.txt' });
   markCancelled(ROOT, called.run.id);
-  const direct = await runPlaced(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
   const before = runsWritten();
   const starting =
     (...after: string[]) =>
@@ -258,25 +256,16 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   await assert.rejects(starting(p.run.id, p.run.id), refusedWith(new RegExp(`^--after ${escaped(p.run.id)} is given twice`)));
   await assert.rejects(
-    starting(other.run.id),
-    refusedWith(
-      new RegExp(
-        `^--after ${escaped(other.run.id)}: ${escaped(other.run.id)} works on ${escaped(other.run.repo)}, and this run on ${escaped(repo)}\\.`,
-      ),
-    ),
-  );
-  await assert.rejects(
     starting(called.run.id),
-    refusal('Invalid', `--after ${called.run.id}:`, 'was cancelled at', 'never lands', `without --after ${called.run.id}`),
+    refusal('Invalid', `--after ${called.run.id}:`, 'was cancelled at', 'never succeeds', `without --after ${called.run.id}`),
   );
-  await assert.rejects(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to land/));
-  gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
-  await assert.rejects(
-    starting(p.run.id),
-    refusedWith(new RegExp(`lands on ${escaped(p.run.branch)}, and this run would start from elsewhere`)),
-  );
-  gitIn(repo, 'checkout', '-q', p.run.branch);
   assert.equal(runsWritten(), before, 'no run written');
+
+  gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
+  const accepted = await runPlaced(startRun({ brief: 'a child from elsewhere', repo, workflowDir: folder(), after: [p.run.id] }));
+  assert.deepEqual(runRecord(ROOT, accepted.id).after, [p.run.id], 'waits on a run of another base branch: git is not read');
+  gitIn(repo, 'checkout', '-q', p.run.branch);
+  assert.equal(runsWritten(), before + 1, 'and only that run written');
 
   const typed = (...flags: string[]) =>
     onHandler(

@@ -20,23 +20,23 @@ const lookOver =
 describe('cardWaitsOf', () => {
   test('a card routed by a door, its own run not landed, has landed once the card it was routed as has', () => {
     const look = lookOver({
-      a: { runs: [{ id: 'a-run', landed: false }], onward: ['a2'] },
-      a2: { runs: [{ id: 'a2-run', landed: true }] },
+      a: { runs: [{ id: 'a-run', released: false }], onward: ['a2'] },
+      a2: { runs: [{ id: 'a2-run', released: true }] },
     });
     assert.deepEqual(cardWaitsOf(['a'], look), []);
   });
 
   test('while the card it was routed as has not landed, it waits at that card', () => {
     const look = lookOver({
-      a: { runs: [{ id: 'a-run', landed: false }], onward: ['a2'] },
-      a2: { runs: [{ id: 'a2-run', landed: false }] },
+      a: { runs: [{ id: 'a-run', released: false }], onward: ['a2'] },
+      a2: { runs: [{ id: 'a2-run', released: false }] },
     });
     assert.deepEqual(cardWaitsOf(['a'], look), [{ card: 'a', landing: { kind: 'waiting', card: 'a2' } }]);
   });
 
   test('a card sent on (`<run>-resent`) is followed the same way', () => {
     const look = lookOver({
-      a: { runs: [{ id: 'a-run', landed: false }], onward: ['a-run-resent'] },
+      a: { runs: [{ id: 'a-run', released: false }], onward: ['a-run-resent'] },
       'a-run-resent': { runs: [] },
     });
     assert.deepEqual(cardWaitsOf(['a'], look), [{ card: 'a', landing: { kind: 'waiting', card: 'a-run-resent' } }]);
@@ -53,7 +53,7 @@ describe('cardWaitsOf', () => {
   });
 
   test('a name the store knows nothing of is missing; a card landed is left out', () => {
-    const look = lookOver({ done: { runs: [{ id: 'd', landed: true }] } });
+    const look = lookOver({ done: { runs: [{ id: 'd', released: true }] } });
     assert.deepEqual(cardWaitsOf(['done', 'typo'], look), [{ card: 'typo', landing: { kind: 'missing', card: 'typo' } }]);
   });
 });

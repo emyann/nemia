@@ -232,7 +232,7 @@ test('a folder team starts from a directory that is no repository, and its recor
   assert.deepEqual(gitAsked(), []);
 });
 
-test('a folder team refuses --repo, --no-worktree and --after, before anything is written', async () => {
+test('a folder team refuses --repo, --no-worktree and --after a run that is not there, before anything is written', async () => {
   const before = [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
   const named = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM })));
   assert.equal(named.exitCode, 2);
@@ -246,8 +246,7 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   const waiting = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] })));
   assert.equal(waiting.exitCode, 2);
   assert.ok(waiting.message.startsWith('--after some-run-a1b2: '), waiting.message);
-  assert.ok(waiting.message.includes('(place: folder)'), waiting.message);
-  assert.ok(waiting.message.includes('Start it without --after'), 'and names the flag to drop');
+  assert.ok(waiting.message.includes('no run some-run-a1b2'), waiting.message);
 
   assert.deepEqual([...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort(), before, 'nothing was written');
   assert.deepEqual(gitAsked(), []);

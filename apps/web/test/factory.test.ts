@@ -988,11 +988,11 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
     assert.equal(standingOf(run([], { status: 'cancelled', cancelledAt })), ENDED.cancelled.word);
     assert.equal(
       standingOf(run(['waiting on p (cancelled)'], { after: ['p'], waiting: waitingOn(true) })),
-      'waiting on you',
+      'waiting',
       'a run that never filed a step, and never will without a person, is not finished, whatever `inFlight` says',
     );
-    assert.equal(standingOf(run(['succeeded · BLOCKED'], { status: 'failed', waitingOnYou: ['step-0'] })), 'waiting on you');
-    assert.equal(standingOf(run(['waiting on p'], { moving: true, after: ['p'], waiting: waitingOn(false) })), 'in flight');
+    assert.equal(standingOf(run(['succeeded · BLOCKED'], { status: 'failed', waitingOnYou: ['step-0'] })), 'waiting');
+    assert.equal(standingOf(run(['waiting on p'], { moving: true, after: ['p'], waiting: waitingOn(false) })), 'running');
     assert.equal(standingOf(run(['verified ✓'], { status: 'succeeded' })), 'finished');
   });
   test("who a run waits on, on the Runs row, is `wf ls`'s words where the api gives them — `approve plan` — and the steps by name from an api that gives none, never a throw", () => {
@@ -1039,7 +1039,7 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
     assert.deepEqual([inFlight(off), waitsOnYou(off)], [false, false], 'a run called off waits on nobody, held or not');
     assert.deepEqual(
       [standingOf(lifts), standingOf(yours)],
-      ['in flight', 'waiting on you'],
+      ['running', 'waiting'],
       'the start form says where it stands in the same words',
     );
   });
@@ -1056,7 +1056,7 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
     const assignee = { at: cancelledAt, forMs: 3_600_000, comesBackAt: null, word: 'ann has it in hand', name: 'ann' };
     const asks = run(['succeeded · BLOCKED', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] });
     const inHand = { ...asks, assignee };
-    assert.deepEqual([inFlight(inHand), waitsOnYou(inHand), standingOf(inHand)], [true, false, 'in flight']);
+    assert.deepEqual([inFlight(inHand), waitsOnYou(inHand), standingOf(inHand)], [true, false, 'running']);
     assert.deepEqual([inFlight(asks), waitsOnYou(asks)], [false, true], 'given back, it waits on you');
     const held = run(['awaiting approval', 'waiting'], {
       status: 'running',
@@ -1246,7 +1246,7 @@ describe('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and fin
       ['gated', 'blocked', 'called-off', 'refused'],
     );
     assert.equal(waitsOnYou(runs[2]), false, 'a cancelled run waits on nobody');
-    assert.equal(standingOf(runs[0]), 'waiting on you');
+    assert.equal(standingOf(runs[0]), 'waiting');
     const approved = { ...runs[0], status: 'running' as const, moving: true, waitingOnYou: [], waitingOnYouWords: [] };
     assert.deepEqual(
       floorRuns([approved], false).map((r) => r.id),

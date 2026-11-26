@@ -745,7 +745,7 @@ test("the header: the brief's first line for a title, where the run stands, its 
   const { RunHeader } = await import('../src/components/run/RunHeader.tsx');
   const html = await routedWith(createElement(RunHeader, { run: atGate({}, { brief: '# Make the floor clear\n\nMore.' }) }));
   assert.match(html, /<h1 [^>]*data-run-title="true"[^>]*>Make the floor clear<\/h1>/);
-  assert.match(html, /data-run-state="waiting on you"/);
+  assert.match(html, /data-run-state="waiting"/);
   assert.deepEqual(
     [...html.matchAll(/data-stat-tile="(\w+)"/g)].map((m) => m[1]),
     ['took', 'cost', 'rounds'],

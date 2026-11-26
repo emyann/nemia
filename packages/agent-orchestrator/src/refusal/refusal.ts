@@ -6,7 +6,7 @@
  * and `test/refusal.test.ts` pins how many modules they load. A reader of `exitCode === 2` needs no change, since each class carries it.
  */
 import { TaggedError } from 'effect/Data';
-import type { ProposalRefusal } from 'objects';
+import type { ConditionWriteRefusalWord, ProposalRefusal } from 'objects';
 
 /** What is asked of is not there: no run by that id. */
 export class Missing extends TaggedError('Missing')<{ readonly message: string }> {
@@ -29,9 +29,13 @@ export class Invalid extends TaggedError('Invalid')<{ readonly message: string }
 /**
  * Who asks may not do what it asks of a proposal or a delegation: a session proposing in another factory, an agent approving what the
  * machinery does not let it (`proposalApproval`'s reason), an agent declining or writing a delegation, which are the person's alone
- * (`person-only`). Its `reason` is the one `objects`' `Forbidden` answers with.
+ * (`person-only`), or a step's own session writing a condition its step waits on (`own-step`). Its `reason` is the one `objects`'
+ * `Forbidden` answers with.
  */
-export class Forbidden extends TaggedError('Forbidden')<{ readonly message: string; readonly reason: ProposalRefusal }> {
+export class Forbidden extends TaggedError('Forbidden')<{
+  readonly message: string;
+  readonly reason: ProposalRefusal | Extract<ConditionWriteRefusalWord, 'own-step'>;
+}> {
   readonly exitCode = 2;
 }
 

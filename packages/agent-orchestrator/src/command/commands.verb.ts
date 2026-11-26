@@ -7,6 +7,7 @@ import { ROUTE } from '../gate/route.verb.ts';
 import { RETRY } from '../retry/commands.verb.ts';
 import { REFRESH } from '../revisions/commands.verb.ts';
 import { SAY } from '../say/commands.verb.ts';
+import { CONDITION } from '../condition/condition.verb.ts';
 import { LS } from '../list/commands.verb.ts';
 import { CEILINGS } from '../cap/commands.verb.ts';
 import { AGENTS, AGENT_CARD } from '../roster/commands.verb.ts';
@@ -75,6 +76,7 @@ export const COMMANDS: readonly (Command | Served)[] = [
   tableEntry(RETRY),
   tableEntry(APPROVE),
   tableEntry(ROUTE),
+  tableEntry(CONDITION),
   tableEntry(REFRESH),
   tableEntry(SAY),
   tableEntry(LS),

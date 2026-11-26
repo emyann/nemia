@@ -243,8 +243,10 @@ async function keepsTheStart(page: Page) {
 
 /**
  * The conversation of the step whose session is on disk, opened from its bar's menu while each read is held (`slowConversations`), and
- * left by Back while its read is still out, then opened again and left by Close: no conversation is read before it is opened, and the
- * board leaves each read to answer, the watch counting any it abandons.
+ * left by Back while its read is still out; opened again, and left by its closeout's Read what it said for the part at its Said; opened
+ * again and left by a switch to another step, whose bar shows its card, and back, which shows the first step's card and reads nothing;
+ * then opened and left by Close. No conversation is read before it is opened, and the board leaves each read to answer, the watch counting
+ * any it abandons.
  */
 async function talks(page: Page) {
   const asked: string[] = [];
@@ -266,7 +268,29 @@ async function talks(page: Page) {
     );
     const talk = await openConversation(page, bar);
     await expectVisible(talk.locator('[data-session-closeout]'), `${SESSION.step}'s conversation is drawn once read`);
-    await bar.getByRole('button', { name: 'Close', exact: true }).click();
+    await talk.getByRole('button', { name: 'Read what it said', exact: true }).click();
+    await expectCount(talk, 0, "its closeout's Read what it said leaves the conversation");
+    await expectVisible(
+      bar.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"] [data-part-said]`),
+      'for the part, at what it said',
+    );
+
+    await openConversation(page, bar);
+    await idle(page);
+    const read = asked.length;
+    await nodeOf(page, OTHER).click();
+    const other = await expectShows(page, OTHER, `a click on ${OTHER} switches the bar on ${SESSION.step}'s conversation to it`);
+    await expectVisible(other.locator(`article[data-step-part="L"][data-step-name="${OTHER}"]`), `${OTHER}'s card is drawn`);
+    await expectCount(other.locator('section[aria-label="Its conversation"]'), 0, 'and no conversation: the choice was the other step’s');
+    await nodeOf(page, SESSION.step).click();
+    const again = await expectShows(page, SESSION.step, `a click on ${SESSION.step} switches the bar back`);
+    await expectVisible(again.locator(`article[data-step-part="L"][data-step-name="${SESSION.step}"]`), `${SESSION.step}'s card again`);
+    await expectCount(again.locator('section[aria-label="Its conversation"]'), 0, 'not its conversation, which was left with the switch');
+    await idle(page);
+    if (asked.length !== read)
+      throw new Refused(`no conversation is read once the bar moved off it — asked ${asked.slice(read).join(', ')}`);
+    await openConversation(page, again);
+    await again.getByRole('button', { name: 'Close', exact: true }).click();
     await expectClosed(page, 'Close closes the bar on its conversation');
     await idle(page);
   } finally {

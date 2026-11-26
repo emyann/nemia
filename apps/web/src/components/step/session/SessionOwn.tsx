@@ -7,6 +7,7 @@
  * It lives in the step session's own folder, not the family's: a brief, a told turn and a closeout are one conversation's alone, and
  * the family folder holds what both conversations draw. Every data mark is written under the prefix its caller names (`mark`).
  */
+import { createContext, use } from 'react';
 import { FlagIcon, ScrollTextIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/look';
@@ -99,10 +100,18 @@ function toSaid(from: Element, step: string) {
 const SAID_MARGIN = 16;
 
 /**
- * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part above the talk (`Said`);
- * in any other shape, the statement as given; a harness that refused it says so beneath.
+ * What shows the step's part, and its Said, where the talk stands in the part's place: given by what draws the talk there (the step's
+ * bar); null where the part stands above the talk (the session's page).
+ */
+export const SaidAway = createContext<(() => void) | null>(null);
+
+/**
+ * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part (`Said`) — above the talk,
+ * or, where the talk stands in the part's place (`SaidAway`), shown again in its place; in any other shape, the statement as given; a
+ * harness that refused it says so beneath.
  */
 function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: string }) {
+  const away = use(SaidAway);
   const closeout = closeoutOf(call);
   const refused = call.result?.isError === true ? call.result.text : null;
   return (
@@ -119,8 +128,13 @@ function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: 
           </span>
         )}
         {closeout && (
-          <Button variant="outlined" size="xsmall" {...mark(marks, 'to-said')} onPress={(event) => toSaid(event.target, step)}>
-            Read what it said, above
+          <Button
+            variant="outlined"
+            size="xsmall"
+            {...mark(marks, 'to-said')}
+            onPress={(event) => (away ? away() : toSaid(event.target, step))}
+          >
+            {away ? 'Read what it said' : 'Read what it said, above'}
           </Button>
         )}
       </p>

@@ -165,7 +165,9 @@ export function BarPanel({
         )}
         <IconButton variant="standard" size="xsmall" icon={XIcon} aria-label="Close" onPress={close} className="shrink-0" />
       </div>
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">{children}</div>
+      <div data-bar-body className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        {children}
+      </div>
     </aside>
   );
   if (!hue) return panel;

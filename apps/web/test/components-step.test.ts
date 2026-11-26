@@ -2597,13 +2597,17 @@ test('what the run did not accept of a closeout is drawn under its words, each u
 test("the step bar draws the step's card and no conversation, until its conversation is shown in the card's place", async () => {
   const { StepInspector } = await import('../src/components/step/StepInspector.tsx');
   const run = gatedRun(planCloseout);
-  const card = await routedWith(createElement(StepInspector, { run, step: run.steps[0], talk: false, onBack: () => undefined }));
+  const card = await routedWith(
+    createElement(StepInspector, { run, step: run.steps[0], talk: false, said: false, onBack: () => undefined, onSaid: () => undefined }),
+  );
   assert.doesNotMatch(card, /role="tab"/, 'no tabs');
   assert.equal(card.match(/data-step-part="L"/g)?.length, 1, 'the part, whole');
   assert.doesNotMatch(card, /^<div[^>]*data-cut-frame/, "drawn on the bar's frame, with no frame of its own");
   assert.doesNotMatch(card, /aria-label="Its conversation"/, 'no conversation');
   assert.match(card, /data-field="approach"/, 'what it gave is there without a press');
-  const talk = await routedWith(createElement(StepInspector, { run, step: run.steps[0], talk: true, onBack: () => undefined }));
+  const talk = await routedWith(
+    createElement(StepInspector, { run, step: run.steps[0], talk: true, said: false, onBack: () => undefined, onSaid: () => undefined }),
+  );
   assert.match(talk, /aria-label="Its conversation"/, 'its conversation, once shown');
   assert.doesNotMatch(talk, /data-step-part=/, "in the card's place");
 });

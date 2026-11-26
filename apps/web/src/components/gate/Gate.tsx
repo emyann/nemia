@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { decisionQuery } from '../../lib/api/decision.ts';
 import { type Question } from '../../lib/api/tries.ts';
@@ -22,6 +22,12 @@ import { Body, Button, Label, Radio, RadioGroup, TextField } from '@/components/
 import { Actor } from '../actor/Actor';
 import { Pending, Reading, ReadingLines, CutPress } from '@/components/look';
 import { troubleOf } from '@/lib/api/read';
+
+/**
+ * What a surface that holds a gate in a view of its own (the waiting card's modal) gives it to call once the api has taken an
+ * approval or a send-back, so that the view closes on the answer; none where the gate stands on a page.
+ */
+export const GateAnswered = createContext<(() => void) | null>(null);
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -90,12 +96,17 @@ export function Gate({
   const [amounts, setAmounts] = useState<Amounts>({});
   const [to, setTo] = useState(back[0] ?? step);
   const field = useId();
+  const answered = useContext(GateAnswered);
   const forget = () => {
     setDraft({});
     setAmounts({});
+    answered?.();
   };
   const approval = useApprove(runId, step, { onApproved: forget });
-  const sendBack = useAsk(runId, step, () => setDraft({}));
+  const sendBack = useAsk(runId, step, () => {
+    setDraft({});
+    answered?.();
+  });
   const busy = approval.isPending || sendBack.isPending;
   const answering = { questions, draft, left: unanswered(questions, draft) };
   const budgeting = budgetsGiven(budgets, amounts);

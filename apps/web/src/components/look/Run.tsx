@@ -42,6 +42,7 @@ export type RunProps = {
   wrap?: GraphWrap;
   read?: PanelRead | null;
   titleEnd?: ReactNode;
+  action?: ReactNode;
   pick?: StepPick;
   ringed?: 'focus' | 'yours';
   still?: string;
@@ -115,7 +116,8 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  *
  * `asOf` is the instant its clock is said at. `pick` makes each node of the panel's graph a button that shows its step (`data-tile`,
  * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd`
- * stands after the title (the floor's chevron), `children` under what the part says (the floor's lines), and `still` is the class of every
+ * stands after the title (the floor's chevron), `action` before Open the run at lg (the waiting card's Approve), `children` under
+ * what the part says (the floor's lines), and `still` is the class of every
  * control the part draws (`nodrag` on the floor). A finished run is drawn at rest, by its last step and how it ended.
  * @param props The run, the size to draw it at, and what the surface gives it (`RunProps`).
  */
@@ -416,7 +418,7 @@ function RunCard({
 
 /** The run as a card at lg or a panel at xl: its meta line, its title, its step now, then its graph and Open run, or the panel's parts. */
 function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
-  const { run, size, asOf, among, wrap, titleEnd, ringed, still, children, className, look } = props;
+  const { run, size, asOf, among, wrap, titleEnd, action, ringed, still, children, className, look } = props;
   const { s, now } = look;
   const xl = size === 'xl';
   const waiters = waitersOf(among, run.id).length;
@@ -451,7 +453,8 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
             <StepGraph run={run} wrap={wrap} className={still} />
           </span>
           <CostSaid run={run} size="small" />
-          <span {...saying('action')} className="ml-auto inline-flex">
+          <span {...saying('action')} className="ml-auto inline-flex items-center gap-2">
+            {action}
             <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className={still}>
               {OPENS}
             </CutButton>

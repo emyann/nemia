@@ -17,7 +17,8 @@ const approveStepSpec = spec<(wait: CardWait | null) => string | null>({
       condition: ({ input: [wait], output }) => !(wait !== null && wait.kind === 'approve' && wait.step !== null) || output === wait.step,
     },
     noButtonWithoutAnApproval: {
-      description: 'A run that waits on nobody, or on a person for anything but an approval, names no step: its card keeps Open the run alone',
+      description:
+        'A run that waits on nobody, or on a person for anything but an approval, names no step: its card keeps Open the run alone',
       condition: ({ input: [wait], output }) => !(wait === null || wait.kind !== 'approve') || output === null,
     },
     noButtonForAnApprovalOfNoStep: {

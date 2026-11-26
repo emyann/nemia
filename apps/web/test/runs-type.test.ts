@@ -49,6 +49,8 @@ const FILES = [
   'components/look/MeaningTag.tsx',
   'components/look/Trace.tsx',
   'components/step/StepPreview.tsx',
+  'components/step/StepGlance.tsx',
+  'components/run/ApproveModal.tsx',
   'components/field/SelectorField.tsx',
   'components/actor/Actor.tsx',
   'components/agent/AgentParts.tsx',

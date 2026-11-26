@@ -9,7 +9,8 @@ import { skippedHeadings } from '../../../../.storybook/play';
 import { Unread } from '../../../../.storybook/unread';
 
 /**
- * A step's part at each of its three sizes — the graph's node (S), the preview card (M) and whole (L) — in each of the five places a
+ * A step's part at each of its three sizes — the graph's node (S), the waiting card's modal (M) and whole (L) — in each of the
+ * five places a
  * step stands: to come, at work, waiting on you, done, and tried again after its check failed it.
  */
 const meta: Meta = { title: 'Run/StepPart' };

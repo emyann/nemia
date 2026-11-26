@@ -2,8 +2,9 @@
  * What a step's card says, read from the run's own answer (`RunDetail`), the run's row on the list and the agents: the card's kind and
  * the hue of its frame, its tag, its agent, its tries and rounds, its time, its session's five facts, its spend, a note and its one
  * action, `Read and approve` at an approval's gate. Its words are the step part's head (`headOf`, stepPart.ts), their one writer, said
- * here as the card reads them, null in place of `none`. `StepPart` draws that head at M, as the preview card; the e2e's preview page
- * (`059-runs-preview.ts`) reads what it expects here.
+ * here as the card reads them, null in place of `none`. `StepPart` draws that head at M, in the waiting card's modal; the e2e's
+ * preview page
+ * (`059-runs-preview.ts`) reads what the diamond's glance (`StepGlance`) is expected to say here.
  */
 import {
   headOf,
@@ -25,6 +26,7 @@ export type StepCardFacts = {
   hue: PartHead['hue'];
   tag: PartHead['tag'];
   agent: { name: string; initial: string; role: string } | null;
+  model: string | null;
   step: string;
   place: string | null;
   time: CardTime | null;
@@ -52,6 +54,7 @@ export function stepCardOf(input: StepCardInput) {
     hue: head.hue,
     tag: head.tag,
     agent: orNull(head.who),
+    model: orNull(head.model),
     step: head.step,
     place: orNull(head.round),
     time: orNull(head.time),

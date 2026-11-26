@@ -1,8 +1,9 @@
 /**
- * A step's part: the one model every size of a step is drawn from — the graph's node (S), the preview card (M), and the ledger, the bar
+ * A step's part: the one model every size of a step is drawn from — the graph's node (S), the waiting card's modal (M), and the
+ * ledger, the bar
  * and the step's page (L) — six slots in an order that never changes (`PART_SLOTS`), a size leaving slots out and never reordering
  * them (`slotsOf`). The head says who, what and where the step stands (the words the step's card said, written here once:
- * `headOf`, which the preview card draws too); then what it asks of a person, what it got, by source, what it said, what it gave — its
+ * `headOf`, which the glance draws too); then what it asks of a person, what it got, by source, what it said, what it gave — its
  * declared fields drawn by their widgets, its files, its values and how many files it left unnamed — and the detail of the try shown.
  * A slot that does not apply to the step says `none`. Pure, so each state is proven without a browser.
  */
@@ -26,7 +27,7 @@ export const PART_SLOTS = ['head', 'asks', 'got', 'said', 'gave', 'detail'] as c
 /** One of `PART_SLOTS`. */
 type PartSlot = (typeof PART_SLOTS)[number];
 
-/** The sizes a part is drawn at: on the graph's node, as the preview card, and whole (the ledger, the bar, the step's page). */
+/** The sizes a part is drawn at: on the graph's node, in the waiting card's modal, and whole (the ledger, the bar, the step's page). */
 export type PartSize = 'S' | 'M' | 'L';
 
 /**

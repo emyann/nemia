@@ -41,6 +41,12 @@ export interface PersonWords {
 /** What a waiting card's button says where the card names nothing to read: it opens the run's page. */
 export const OPENS = 'Open the run';
 
+/**
+ * What a waiting card's button says at an approval's gate: it approves the step that waits.
+ * @param step The gated step's name.
+ */
+export const approves = (step: string) => `Approve ${step}`;
+
 /** A count up to twelve in a word, capitalised; in digits past it. */
 const COUNTED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
 

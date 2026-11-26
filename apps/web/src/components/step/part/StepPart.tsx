@@ -1,5 +1,6 @@
 /**
- * A step's part: one model (`stepPartOf`, lib/stepPart.ts) drawn at three sizes — on the graph's node (S), as the preview card (M), and
+ * A step's part: one model (`stepPartOf`, lib/stepPart.ts) drawn at three sizes — on the graph's node (S), in the waiting card's
+ * modal (M), and
  * whole in the ledger, the step bar and the step's page (L) — by leaving slots out, never by reordering them (`slotsOf`): its head, what
  * it asks of you, what it got, what it said, what it gave, and its detail. So the node, the card, the ledger's row, the bar and the step's
  * page cannot disagree. Each step keeps its own try picker, the address keeping the choice (`?try=`), and every slot is of that try.
@@ -87,7 +88,7 @@ export function StepPart({
         {slotsOf(part, size).map(({ slot }) =>
           slot === 'head' ? (
             <div key={slot} className="flex flex-col gap-2">
-              <PartHead head={part.head} size={size} action={size === 'M' || (size === 'L' && !here)} />
+              <PartHead head={part.head} size={size} action={size === 'L' && !here} />
               {size === 'L' && own && <TryPicker step={step} tries={own.tries} shown={own.shown} />}
             </div>
           ) : (

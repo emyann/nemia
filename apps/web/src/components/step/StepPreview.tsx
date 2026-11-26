@@ -1,7 +1,7 @@
-import { useContext, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { PopoverContext } from 'react-aria-components';
+import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BottomSheet, PreviewCard, PreviewTrigger, Pressable } from '@/components/ui/ds';
+import { Pressable, TooltipTrigger } from '@/components/ui/ds';
+import { HeldTooltip } from '@/components/look';
 import { agentsQuery } from '@/lib/api/agents';
 import type { RunView } from '@/lib/api/judged';
 import { type WaitOn } from 'objects';
@@ -9,10 +9,8 @@ import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { headOf } from '@/lib/stepPart';
-import { cardOpened, previewSide, useACardOpen, useSheetPreview, type PreviewSide } from '@/lib/useSheetPreview';
-import { CutFrame } from '../look';
-import { PartHead } from './part/PartHead';
-import { StepPart } from './part/StepPart';
+import { useBar } from '@/lib/useBar';
+import { StepGlance } from './StepGlance';
 
 /** The run a rail belongs to, as its row on the list gives it. */
 type RailRun = Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
@@ -24,124 +22,48 @@ type RailStep = { name: string; state: StepState; on: WaitOn | null };
 const BAR_BUTTON = 'grid size-full place-items-center rounded-none';
 
 /**
- * The card of a step, its part at M, read once it opens: the run's own answer (one read a run, held by the query's cache) and the agents,
+ * The glance of a step, read once its tooltip opens: the run's own answer (one read a run, held by the query's cache) and the agents,
  * at the instant the run was read; while they are read, the head of what the row already knows.
  */
-function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Date }) {
+function Glanced({ run, step, asOf }: { run: RailRun; step: string; asOf: Date }) {
   const detail = useRunRead(run.id);
   const agents = useQuery(agentsQuery);
-  if (detail.view) return <StepPart view={detail.view} step={step} size="M" agents={agents.data} now={asOf} />;
-  return (
-    <CutFrame size={24} className="w-[416px] max-w-full">
-      <div className="p-4">
-        <PartHead head={headOf({ run, step, agents: agents.data, now: asOf })} size="M" />
-      </div>
-    </CutFrame>
-  );
+  return <StepGlance head={headOf({ run, step, detail: detail.view, agents: agents.data, now: asOf })} />;
 }
 
 /**
- * Ends a Tab on the bar that the preview has already moved into its card, so the grid the bar stands in (the table in flight), which
- * takes Tab as leaving the grid, does not move the focus back out of the card.
+ * A bar of the rail: the kit's pressable under the kit's rich tooltip, which holds the step's glance on hover and on focus, and a press,
+ * or Enter, opens the step in the frame's side sheet (`useBar`).
  */
-const intoTheCard = (event: KeyboardEvent) => {
-  if (event.key === 'Tab' && document.activeElement?.closest('[data-slot="preview-card"]')) event.stopPropagation();
-};
-
-/** The rail a bar stands in, or null outside one. */
-const railOf = (bar: Element | null | undefined) => bar?.closest<HTMLElement>('[data-run-steps]') ?? null;
-
-/** A ref that reads the rail of the bar `bar` holds, or the bar outside a rail, each time it is read. */
-const railRefOf = (bar: { current: Element | null } | undefined) =>
-  Object.defineProperty<{ readonly current: Element | null }>({ current: null }, 'current', {
-    get: () => railOf(bar?.current) ?? bar?.current ?? null,
-  });
-
-/**
- * Gives the kit's preview card its trigger's popover, positioned by the bar's whole rail rather than the bar, so that the card stands
- * clear of every bar of the rail and the pointer slides from one bar to the next; and with no entering animation, during which a card
- * that grows as its run is read is not placed again by its new height, and stays capped to the height its first answer took.
- */
-function ByTheRail({ children }: { children: ReactNode }) {
-  const context = useContext(PopoverContext) as { triggerRef?: { current: Element | null } } | null;
-  const bar = context?.triggerRef;
-  const rail = useMemo(() => railRefOf(bar), [bar]);
-  return <PopoverContext.Provider value={{ ...context, triggerRef: rail, shouldSkipAnimation: true }}>{children}</PopoverContext.Provider>;
-}
-
-/**
- * A bar where a pointer hovers and the window has room: the trigger of the kit's preview, whose card stands by the bar's rail
- * (`previewSide`, read as it opens), clear of its bars, and beside it where the window has room, so that it keeps the window's whole
- * height and shows its action unscrolled; it gives up its surface to the frame, keeps 12 pixels around it for its glow, and scrolls
- * only in a window shorter than itself. While another bar's card is open it opens at once (`useACardOpen`), so that a pointer sliding
- * along a rail opens each card in turn.
- */
-function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
-  const id = useId();
-  const [side, setSide] = useState<PreviewSide>('end top');
-  const warm = useACardOpen();
+function Bar({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
+  const bar = useBar();
   const said = barSaid(step.name, step.state, step.on, run.holding != null);
-  useEffect(() => () => cardOpened(id, false), [id]);
-  const opened = (open: boolean) => {
-    cardOpened(id, open);
-    const rail = railOf(document.querySelector(`[data-bar-of="${CSS.escape(id)}"]`));
-    if (open && rail) setSide(previewSide(rail.getBoundingClientRect(), innerWidth));
-  };
   return (
-    <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
+    <TooltipTrigger delay={300}>
       <Pressable
-        data-bar-of={id}
         aria-label={said}
         data-step-bar={step.name}
-        data-step-preview="card"
         className={BAR_BUTTON}
-        onKeyDown={intoTheCard}
+        onPress={() => bar.toggle({ kind: 'step', run: run.id, step: step.name })}
       >
         {children}
       </Pressable>
-      <ByTheRail>
-        <PreviewCard
-          aria-label={said}
-          placement={side}
-          offset={0}
-          className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-3 shadow-none"
-        >
-          <OpenedCard run={run} step={step.name} asOf={asOf} />
-        </PreviewCard>
-      </ByTheRail>
-    </PreviewTrigger>
+      <HeldTooltip variant="rich" placement="bottom start">
+        <Glanced run={run} step={step.name} asOf={asOf} />
+      </HeldTooltip>
+    </TooltipTrigger>
   );
-}
-
-/** A bar where no pointer hovers or the window is compact: a press opens the same card in the kit's modal bottom sheet. */
-function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const said = barSaid(step.name, step.state, step.on, run.holding != null);
-  return (
-    <>
-      <Pressable aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>
-        {children}
-      </Pressable>
-      <BottomSheet variant="modal" isOpen={open} onClose={() => setOpen(false)} aria-label={said} heights={['partial', 'expanded']}>
-        <OpenedCard run={run} step={step.name} asOf={asOf} />
-      </BottomSheet>
-    </>
-  );
-}
-
-/** A bar of the rail as a button that opens its step's card: by the kit's preview, or as a sheet where it cannot hover. */
-function BarPreview(props: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
-  return useSheetPreview() ? <SheetPreview {...props} /> : <HoverPreview {...props} />;
 }
 
 /**
- * What wraps each node of `run`'s graph (`StepGraph`'s `wrap`): a button that opens its step's card, its times said at `asOf`.
+ * What wraps each node of `run`'s graph (`StepGraph`'s `wrap`): a button that shows its step's glance and opens its step in the side
+ * sheet, its times said at `asOf`.
  *
  * @param run the run whose rail it is
  * @param asOf the instant its times are said at
  */
 export const previewBar = (run: RailRun, asOf: Date) => (bar: ReactNode, step: RailStep) => (
-  <BarPreview run={run} step={step} asOf={asOf}>
+  <Bar run={run} step={step} asOf={asOf}>
     {bar}
-  </BarPreview>
+  </Bar>
 );

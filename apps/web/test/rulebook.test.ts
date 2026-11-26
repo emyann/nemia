@@ -114,7 +114,7 @@ export const READ_PAGES = [
  */
 export const OVER: Readonly<Record<string, string>> = {
   [`${BOARD}src/components/run/RunMenu.tsx`]: 'its menu opens the questions that remove, hold, lift and prune a run, each in a popover',
-  [`${BOARD}src/components/step/StepPreview.tsx`]: "it opens a step's card over the runs table, read once it opens",
+  [`${BOARD}src/components/run/ApproveModal.tsx`]: "it opens a step's part at M in a modal over the runs page, read once it opens",
 };
 
 /** A file whose text a page draws: under the board's components or routes, outside the vendored ones. */

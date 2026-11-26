@@ -20,7 +20,12 @@ import type { AgentSidecar, AgentWritten } from './agents.store.ts';
 import { AgentDoor, type AgentRemoved } from './agent-door.store.ts';
 import { AgentName } from './agents.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { definitionActed, definitionRevisionNow, definitionsSwept } from '../definition-index/definition-index.store.ts';
+import {
+  definitionDoorSaid,
+  definitionJudged,
+  definitionRevisionNow,
+  definitionsSwept,
+} from '../definition-index/definition-index.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -124,11 +129,17 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
       const judged = AgentName.read(name ?? draft.name);
       const there = yield* door.agents.there(judged, at);
       const namespace = from === 'factory' ? factory : undefined;
-      yield* definitionActed('agent', namespace, judged, 'write', there, version);
+      if (there.kind === 'held') yield* definitionJudged('Agent', namespace, judged, version, 'write');
       const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
-      const written = yield* door.agents.write(judged, draft, held, { ...at, ...(sidecar !== undefined && { schema: sidecar }) });
+      const written = yield* definitionDoorSaid(
+        'Agent',
+        namespace,
+        judged,
+        there,
+        door.agents.write(judged, draft, held, { ...at, ...(sidecar !== undefined && { schema: sidecar }) }),
+      );
       yield* definitionsSwept();
-      return { ...written, version: String(yield* definitionRevisionNow('Agent', namespace, judged)) };
+      return { ...written, version: String(yield* definitionRevisionNow('Agent', namespace, AgentName.read(draft.name))) };
     }),
   print: () => [],
 };
@@ -144,9 +155,9 @@ export const AGENTS_REMOVE: Served<AgentRemoved, AgentRemoveInput> = {
       const door = yield* AgentDoor;
       const at = { dir, ...(repo !== undefined && { repo }) };
       const there = yield* door.agents.there(AgentName.read(name), at);
-      yield* definitionActed('agent', undefined, name, 'remove', there, version);
+      if (there.kind === 'held') yield* definitionJudged('Agent', undefined, name, version, 'remove');
       const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
-      const removed = yield* door.agents.remove(AgentName.read(name), held, at);
+      const removed = yield* definitionDoorSaid('Agent', undefined, name, there, door.agents.remove(AgentName.read(name), held, at));
       yield* definitionsSwept();
       return removed;
     }),

@@ -14,7 +14,12 @@ import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedOf } from '../factory/door/factories.store.ts';
-import { definitionActed, definitionRevisionNow, definitionsSwept } from '../definition-index/definition-index.store.ts';
+import {
+  definitionDoorSaid,
+  definitionJudged,
+  definitionRevisionNow,
+  definitionsSwept,
+} from '../definition-index/definition-index.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
@@ -155,11 +160,17 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
       const judged = SkillName.read(name ?? change.name);
       const there = yield* door.skills.there(SkillName.read(change.name), library);
       const namespace = from === 'factory' ? factory : undefined;
-      yield* definitionActed('skill', namespace, judged, 'write', there, version);
+      if (there.kind === 'held') yield* definitionJudged('Skill', namespace, judged, version, 'write');
       const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
-      const written = yield* door.skills.write(SkillName.read(change.name), change, held, library);
+      const written = yield* definitionDoorSaid(
+        'Skill',
+        namespace,
+        judged,
+        there,
+        door.skills.write(SkillName.read(change.name), change, held, library),
+      );
       yield* definitionsSwept();
-      return { ...written, version: String(yield* definitionRevisionNow('Skill', namespace, judged)) };
+      return { ...written, version: String(yield* definitionRevisionNow('Skill', namespace, SkillName.read(change.name))) };
     }),
   print: () => [],
 };
@@ -174,9 +185,9 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
 export const skillRemoved = Effect.fn('skillRemoved')(function* (library: string, name: string, version: string | undefined) {
   const door = yield* SkillDoor;
   const there = yield* door.skills.there(SkillName.read(name), library);
-  yield* definitionActed('skill', undefined, name, 'remove', there, version);
+  if (there.kind === 'held') yield* definitionJudged('Skill', undefined, name, version, 'remove');
   const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
-  yield* door.skills.remove(SkillName.read(name), library, held);
+  yield* definitionDoorSaid('Skill', undefined, name, there, door.skills.remove(SkillName.read(name), library, held));
   yield* definitionsSwept();
 });
 

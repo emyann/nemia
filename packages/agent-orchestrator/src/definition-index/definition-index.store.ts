@@ -17,13 +17,13 @@ import { workedOn } from '../factory/factory.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
-import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
+import type { DefinitionThere } from '../agents/agents.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/index.ts';
-import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict } from '../refusal/refusal.ts';
 import { recordDue } from '../observed/observed.ts';
 import { indexedRevision } from './definition-index.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
@@ -378,37 +378,30 @@ export const definitionJudged = Effect.fn('definitionJudged')(function* (
 export const definitionsSwept = () => Effect.ignore(indexSweep());
 
 /**
- * An act on the agent or skill `name` (`does`), given the revision `given` it was read at, judged by the one law of the doors
- * (`definitionVersionRefusal`) against what the door says is at its name (`there`), the revision it stands at now
- * (`definitionRevisionNow`) in place of the door's own version, so a refusal names revisions and `Missing` is said before any revision
- * is judged. Refused as the law chooses: `Missing`, `Conflict` or `Invalid`.
- * @param what What the definition is: an agent or a skill.
+ * The door's act on a definition (`act`) with each mention of the version the door holds at the name (`there`) said as the revision
+ * the definition stands at now, so a refusal that tells the writer which version to give names the one it is judged at
+ * (`definitionJudged`), never the door's own content version.
+ * @param kind What the definition is.
  * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
- * @param does The act asked: a write or a removal.
  * @param there What the door says is at the name now.
- * @param given The revision the writer read it at, none for a new write or a removal given none.
+ * @param act The door's write or removal.
  */
-export const definitionActed = Effect.fn('definitionActed')(function* (
-  what: 'agent' | 'skill',
+export const definitionDoorSaid = <A, E extends { readonly message: string }, R>(
+  kind: 'Agent' | 'Skill',
   namespace: string | undefined,
   name: string,
-  does: 'write' | 'remove',
   there: DefinitionThere,
-  given: string | undefined,
-) {
-  const at: DefinitionThere =
-    there.kind === 'held'
-      ? { kind: 'held', version: String(yield* definitionRevisionNow(what === 'agent' ? 'Agent' : 'Skill', namespace, name)) }
-      : there;
-  const refused = definitionVersionRefusal(what, name, does, at, given);
-  if (refused === null) return;
-  const message = refused.message;
-  return yield* Effect.fail(
-    refused.kind === 'Missing'
-      ? new Missing({ message })
-      : refused.kind === 'Conflict'
-        ? new Conflict({ message })
-        : new Invalid({ message }),
-  );
-});
+  act: Effect.Effect<A, E, R>,
+) =>
+  there.kind !== 'held'
+    ? act
+    : Effect.catch(act, (err) =>
+        Effect.flatMap(definitionRevisionNow(kind, namespace, name), (revision) =>
+          Effect.fail(
+            Object.assign(Object.create(Object.getPrototypeOf(err)), err, {
+              message: err.message.replaceAll(there.version, String(revision)),
+            }) as E,
+          ),
+        ),
+      );

@@ -278,17 +278,17 @@ describe("write, rename and remove an agent at its version, as the board's Agent
       );
       const stale = (err: Error & { _tag?: string }, ...facts: string[]) => {
         assert.equal(err._tag, 'Conflict', err.message);
-        names(err.message, 'agents/archivist.md changed since it was read', `version ${made.version}, now ${edited.version}`, ...facts);
+        names(err.message, 'archivist', `revision ${edited.version}`, `not ${made.version}`, ...facts);
         return true;
       };
       await assert.rejects(
         board(
           AGENTS_WRITE.handler({ from: 'user', name: 'archivist', repo, draft: form('archivist'), schema: null, version: made.version }),
         ),
-        (err: Error) => stale(err, 'Read it again, and make the change on what it holds now'),
+        (err: Error) => stale(err, 'read it again'),
       );
       await assert.rejects(board(AGENTS_REMOVE.handler({ from: 'user', name: 'archivist', repo, version: made.version })), (err: Error) =>
-        stale(err, 'Read it again before removing it'),
+        stale(err, 'read it again'),
       );
       assert.equal(await revisionOf('archivist'), edited.version);
     },

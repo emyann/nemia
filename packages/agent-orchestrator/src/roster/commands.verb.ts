@@ -7,7 +7,6 @@ import { Effect } from 'effect';
 import { AGENTS_CARD_WORDS, AGENTS_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { agentCardRead, agentsRead } from './roster.store.ts';
-import { definitionRevisionNow } from '../definition-index/definition-index.store.ts';
 import type { AgentsRead, CardRead } from './roster.ts';
 import type { Served } from '../command/entry.verb.ts';
 import { AgentCardInput, AgentsInput } from '../agents/library.verb.ts';
@@ -26,11 +25,5 @@ export const AGENT_CARD: Served<CardRead, AgentCardInput> = {
   input: AgentCardInput,
   /** None given, no repository's read: the api gives the repository the request is served on. */
   handler: ({ name, repo, from }) =>
-    Effect.gen(function* () {
-      const root = yield* StoreRoot;
-      const read = yield* agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) });
-      if (read.from !== 'user') return read;
-      const version = String(yield* definitionRevisionNow('Agent', undefined, name));
-      return { ...read, card: { ...read.card, version } } satisfies CardRead;
-    }),
+    Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
 };

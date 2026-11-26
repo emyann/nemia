@@ -215,7 +215,7 @@ export function verdictWords({ result, exit }: CheckVerdict) {
  * lands without a person, and a check that did not finish, which refused nothing.
  */
 export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
-  hold: { tag: () => 'held by you', sentence: () => 'You hold this run. It moves once you lift the hold.', open: opens },
+  hold: { tag: () => 'held', sentence: () => 'It is held until a run that never lands on its own: lift the hold.', open: opens },
   after: { tag: () => 'waits on a run', sentence: () => 'It waits on a run that will not finish without you.', open: opens },
   unfinished: {
     tag: () => 'check unfinished',
@@ -227,8 +227,9 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
 /**
  * The words a runs-page row says beside its chip of what its step waits on, where it waits on no person: the run it waits on (`waits
  * on` before its id), the checkout (`waits on` the id of the run that has it and `· the checkout`, or the checkout alone where no run
- * is named), a run slot, a hold until a run lands (`until` and `lands` around its id), a step past its cap; and
- * on hover, its round of its rounds, its budget's ring and how many runs wait on it.
+ * is named), a run slot, a hold until a run lands (`until` and `lands` around its id, and after it why it never lands where it will not:
+ * called off, not in the store, its branches gone), a step past its cap; a held row's hold line (`noWhy` where its person said no why, `by`
+ * before who they said they are); and on hover, its round of its rounds, its budget's ring and how many runs wait on it.
  */
 export const NOW_WORDS = {
   waitsOn: 'waits on',
@@ -237,6 +238,11 @@ export const NOW_WORDS = {
   slot: 'a run slot',
   until: '· until',
   lands: 'lands',
+  calledOff: '(called off)',
+  missing: '(not in the store)',
+  gone: '(its branches gone)',
+  noWhy: 'no reason given',
+  by: 'by',
   over: (cap: string) => `over its ${cap}`,
   round: (at: number, of: number) => `round ${at} of ${of}`,
   ring: (spent: string, cap: string) => `its step: ${spent} of its ${cap} cap`,

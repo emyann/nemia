@@ -77,7 +77,7 @@ const ROWS: Record<WaitKind, { row: RunView; says: string; opens: string }> = {
   },
   hold: {
     row: summary([['design', 'waiting']], { moving: false, holding }),
-    says: 'You hold this run. It moves once you lift the hold.',
+    says: 'It is held until a run that never lands on its own: lift the hold.',
     opens: 'Open the run',
   },
   after: {
@@ -166,7 +166,8 @@ describe("waitOf, waitSentence, openWord, waitTag: the one sentence and the butt
   test("REFUSED: a held run at its gate, as the api lists it with no step waiting, says the hold's sentence, not an approval's", () => {
     const atGate = summary([...DONE, ['land', 'awaiting approval']], { status: 'running', moving: false, holding, waitingOnYou: [] });
     assert.deepEqual(waitOf(atGate), { kind: 'hold', step: null, done: 3 });
-    assert.equal(waitSentence(atGate), 'You hold this run. It moves once you lift the hold.');
+    assert.equal(waitSentence(atGate), ROWS.hold.says);
+    assert.doesNotMatch(waitSentence(atGate), /you hold/i, "the hold is said, never as the reader's");
     const liftsItself = { ...atGate, holding: { ...holding, waitingOnYou: false } };
     assert.equal(waitOf(liftsItself), null, 'a hold the tick lifts waits on nobody');
     assert.equal(waitOf({ ...liftsItself, waiting })?.kind, 'after', 'and such a run that waits on a run nobody will ship says that');
@@ -394,6 +395,23 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
       holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: true }] },
     });
     assert.deepEqual(nowOf(landed)?.words, [PERSON.held.rail], 'a hold whose run landed names none');
+    const never = (run: Partial<{ missing: boolean; cancelledAt: string | null; gone: string[] }>) =>
+      summary([['design', 'waiting']], {
+        holding: {
+          ...hold,
+          waitingOnYou: true,
+          runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: false, ...run }],
+        },
+      });
+    const calledOff = never({ cancelledAt: '2026-11-02T00:00:00.000Z' });
+    assert.equal(nowOf(calledOff)?.tone, 'yours', 'a hold that waits on you is yellow');
+    assert.deepEqual(
+      nowOf(calledOff)?.words,
+      [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.calledOff, NOW_WORDS.lands],
+      'it names the run and why it never lands, never the reader as the holder',
+    );
+    assert.deepEqual(nowOf(never({ missing: true }))?.words.at(3), NOW_WORDS.missing, 'a run not in the store');
+    assert.deepEqual(nowOf(never({ gone: ['wf/r-9/run'] }))?.words.at(3), NOW_WORDS.gone, 'a run whose branches are gone');
   });
   test('a row that waits on you says its wait, in the yellow tone, and a failure its word, in red', () => {
     assert.deepEqual(nowOf(ROWS.check.row)?.words, [waitTag(ROWS.check.row)]);

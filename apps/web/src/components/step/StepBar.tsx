@@ -38,7 +38,8 @@ const CARD: View = { shown: null, talk: false, said: false };
  * The bar of the step `name` of the run `id`, as `run` was last read and `error` its read's failure, if any: the whole bar is a cut frame
  * in the step's hue, and its ⋯ menu holds Open and, where the step is drawn, Open conversation, which shows the step's conversation in
  * place of its card until Back, or until its closeout's Read what it said goes back to the card's Said. What the bar shows is the choice
- * of one step: the bar moved to another step, or back, shows that step's card, and the conversation, unmounted, is followed no more.
+ * of one step, dropped as the bar moves to another: the bar moved to another step, or back, shows that step's card, and the conversation,
+ * unmounted, is followed no more.
  * @param props.id The run's id.
  * @param props.name The step's name.
  * @param props.run The run, as it was last read; undefined while it is read.
@@ -47,6 +48,7 @@ const CARD: View = { shown: null, talk: false, said: false };
 export function StepPanel({ id, name, run, error }: { id: string; name: string; run: RunDetail | undefined; error: unknown }) {
   const shown = `${id}/${name}`;
   const [chosen, choose] = useState<View>(CARD);
+  if (chosen.shown !== null && chosen.shown !== shown) choose(CARD);
   const view = chosen.shown === shown ? chosen : CARD;
   const step = run?.steps.find((s) => s.name === name);
   const more =

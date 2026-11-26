@@ -9,7 +9,7 @@ import { foldTranscript, sessionToRead } from '../../lib/transcript';
 import { useStepTranscript, type Following } from '../../lib/useStepTranscript';
 import { Button } from '@/components/ui/ds';
 import { StepPart } from './part/StepPart';
-import { SaidAway } from './session/SessionOwn';
+import { SaidAway } from './session/saidAway';
 import { SessionReading } from './session/SessionReading';
 
 /** A step's talk, loaded once the bar draws it: the family's talk and the step's own parts are not needed to read the canvas. */

@@ -7,7 +7,7 @@
  * It lives in the step session's own folder, not the family's: a brief, a told turn and a closeout are one conversation's alone, and
  * the family folder holds what both conversations draw. Every data mark is written under the prefix its caller names (`mark`).
  */
-import { createContext, use } from 'react';
+import { use } from 'react';
 import { FlagIcon, ScrollTextIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/look';
@@ -18,6 +18,7 @@ import { closeoutOf, type ToolCall } from '@/lib/transcript';
 import { Button } from '@/components/ui/ds';
 import type { SessionOwn as Own } from '@/lib/sessionItems';
 import { cn } from '@/lib/utils';
+import { SaidAway } from './saidAway';
 
 /** How tall the brief grows before it scrolls inside itself. */
 const BRIEF_CAP = 'max-h-96 overflow-y-auto';
@@ -98,12 +99,6 @@ function toSaid(from: Element, step: string) {
 
 /** The room left above the Said slot once it is scrolled to: the slot's own `scroll-mt-4`. */
 const SAID_MARGIN = 16;
-
-/**
- * What shows the step's part, and its Said, where the talk stands in the part's place: given by what draws the talk there (the step's
- * bar); null where the part stands above the talk (the session's page).
- */
-export const SaidAway = createContext<(() => void) | null>(null);
 
 /**
  * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part (`Said`) — above the talk,

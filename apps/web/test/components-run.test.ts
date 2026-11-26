@@ -375,7 +375,7 @@ async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = 
     onStep() {},
   };
   const props = { id: run.id, type: 'run' as const, data, dragging: false, zIndex: 0, isConnectable: false, positionAbsoluteX: 0 };
-  return routedWith(createElement(ReactFlowProvider, null, createElement(RunNode, { ...props, positionAbsoluteY: 0 } as never)));
+  return pagedWith(createElement(ReactFlowProvider, null, createElement(RunNode, { ...props, positionAbsoluteY: 0 } as never)));
 }
 
 test('the card the bar shows is banded in the cut and marked as inspected, and a card it does not show is not', async () => {

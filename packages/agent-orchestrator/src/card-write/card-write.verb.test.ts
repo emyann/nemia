@@ -9,7 +9,7 @@ import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import type { CardWrite } from 'objects';
-import { replaceCard, cardVersion } from './card-write.verb.ts';
+import { replaceCard } from './card-write.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
@@ -23,6 +23,9 @@ import { factoryDoorMemory } from '../factory/door/memory.store.ts';
 const QUEUED = '2026-11-01T10:00:00.000Z';
 
 /** The card planted: queued, labelled, handed a run, in the factory `alpha`. */
+/** The revision a card filed first stands at in a keyspace of its own: its record's, the first row written. */
+const FILED_AT = '1';
+
 const PLANTED = [
   '---',
   'workflow: build',
@@ -115,7 +118,7 @@ test('a write keeping every key leaves the file byte-equal', () => {
   const { exit, text } = over(replaceCard('cache-a1', 'alpha', asIs()));
   assert.equal(Exit.isSuccess(exit), true, String(exit));
   assert.equal(text, PLANTED);
-  const versioned = over(replaceCard('cache-a1', 'alpha', { ...asIs(), metadata: { resourceVersion: cardVersion(PLANTED) } }));
+  const versioned = over(replaceCard('cache-a1', 'alpha', { ...asIs(), metadata: { resourceVersion: FILED_AT } }));
   assert.equal(Exit.isSuccess(versioned.exit), true, 'the version the card has is no stale one');
   assert.equal(versioned.text, PLANTED);
 });

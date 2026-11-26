@@ -75,6 +75,20 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { time: true, kept: true },
     },
   ],
+  'cards.revision': [
+    { name: 'no card is null', walk: ({ door }) => done(door.cards.revision(nameOf('gone-idea'))), says: null },
+    {
+      name: 'a number, which a write back moves ahead',
+      walk: ({ door }) => {
+        filed(door, 'an-idea');
+        const before = done(door.cards.revision(nameOf('an-idea')));
+        done(door.cards.rewrite(nameOf('an-idea'), aCard('Rewritten')));
+        const after = done(door.cards.revision(nameOf('an-idea')));
+        return { number: typeof before === 'number', ahead: before !== null && after !== null && after > before };
+      },
+      says: { number: true, ahead: true },
+    },
+  ],
   'cards.entryAt': [
     { name: 'an entry not there is null', walk: ({ door }) => done(door.cards.entryAt({ file: 'gone-idea.md' })), says: null },
     {

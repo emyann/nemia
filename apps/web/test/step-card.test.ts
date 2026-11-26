@@ -1,7 +1,6 @@
 /**
  * A step's card (src/lib/stepCard.ts): each of its five states read from a run's row and its own answer, the hue of its frame, its
- * tag, its tries and rounds, its time, its five facts, its spend, its note and its action; and the query that opens it as a sheet
- * (src/lib/useSheetPreview.ts).
+ * tag, its tries and rounds, its time, its five facts, its spend and its note.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -10,7 +9,6 @@ import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/li
 import type { StepPhase } from 'objects';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
-import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';
 import { coded, detail, givenAgent, step, summary, triedAs, type Word } from './run.fixture.ts';
 
 type Step = RunDetail['steps'][number];
@@ -109,7 +107,6 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.match(card.time?.note ?? '', /^since /);
     assert.deepEqual(card.spend, { kind: 'words', label: 'Spent', said: 'not measured yet', note: 'of $10' });
     assert.deepEqual(card.note, { text: '1 call denied: Bash(cd)', icon: 'shield' });
-    assert.deepEqual(card.action, { words: 'Open the step', runId: 'r-1', step: 'implement' });
   });
   test('a step at work is drawn with no meter, even where a spend was measured before its try', () => {
     const card = cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(2)] })]);
@@ -140,7 +137,6 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.equal(card.time?.value, '17m');
     assert.deepEqual(card.spend, { kind: 'meter', label: 'Spent', value: 2.39, max: 10, said: '$2.39 of $10' });
     assert.deepEqual(card.note, { text: 'Nine questions for you, each with a recommendation.', icon: 'info' });
-    assert.equal(card.action.words, 'Read and approve');
   });
   test('a step done: no hue, its tries counted, when it ended and how long it ran, its spend on a meter', () => {
     const card = cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1), aTry(2)] })]);
@@ -265,27 +261,5 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.equal(card.facts, null);
     assert.equal(card.spend, null);
     assert.equal(card.time, null);
-  });
-});
-
-describe("useSheetPreview: where a step's card opens, and which stays open", () => {
-  test("a step's card stands beside its rail where the window has room for it on a side, and under the rail where it has none", () => {
-    assert.equal(previewSide({ left: 671, right: 799 }, 1280), 'end top', 'room after a rail in the table in flight');
-    assert.equal(previewSide({ left: 783, right: 1223 }, 1280), 'end top', 'room before the rail of a waiting card at the right');
-    assert.equal(previewSide({ left: CARD_REACH, right: 1000 }, 1000), 'end top', 'room before, just');
-    assert.equal(previewSide({ left: 0, right: 1000 - CARD_REACH }, 1000), 'end top', 'room after, just');
-    assert.equal(previewSide({ left: 278, right: 830 }, 1100), 'bottom start', 'a wide rail in a narrower window leaves room on no side');
-  });
-  test('a card stays the open one when the card a pointer slid away from closes after it opened', () => {
-    assert.equal(aCardOpen(), false, 'no card open at first');
-    cardOpened('review', true);
-    assert.equal(aCardOpen(), true, 'a card opened');
-    cardOpened('ship', true);
-    cardOpened('review', false);
-    assert.equal(aCardOpen(), true, 'the card slid away from closes after the next opened: the next stays open');
-    cardOpened('ship', false);
-    assert.equal(aCardOpen(), false, 'the open card closed: none is open');
-    cardOpened('ship', false);
-    assert.equal(aCardOpen(), false, 'a close said twice changes nothing');
   });
 });

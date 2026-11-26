@@ -36,6 +36,7 @@ const stuckTries = () => {
       entries: () => Effect.succeed([]),
       read: () => Effect.succeed(null),
       filedAt: () => Effect.succeed(null),
+      revision: () => Effect.succeed(null),
       entryAt: () => Effect.succeed(null),
       entryText: () => Effect.succeed(null),
       add: () => Effect.succeed('/registry/cards/never'),

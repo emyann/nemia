@@ -78,6 +78,14 @@ export const KEYSPACE_MIGRATIONS = {
 )`;
     yield* sql`CREATE INDEX IF NOT EXISTS kine_pointers_target_index ON kine_pointers (target)`;
   }),
+  '0003_sweeps': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS kine_sweeps
+(
+	head INTEGER NOT NULL,
+	at INTEGER NOT NULL
+)`;
+  }),
 } satisfies Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>>;
 
 /** The highest migration the code knows: the id of the last of `KEYSPACE_MIGRATIONS`. */
@@ -129,11 +137,13 @@ export type Keyspace = {
   readonly list: (prefix: string) => Effect.Effect<{ readonly records: readonly KeyRecord[]; readonly revision: number }>;
   readonly keys: (prefix: string) => Effect.Effect<readonly string[]>;
   readonly revisions: (prefix: string) => Effect.Effect<ReadonlyMap<string, number>>;
+  readonly touched: (prefix: string) => Effect.Effect<ReadonlyMap<string, number>>;
   readonly write: (key: string, write: KeyWriteOf) => Effect.Effect<KeyRecord, KeyRefused>;
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly within: <A, E>(body: (tx: KeyTxn) => Effect.Effect<A, E>) => Effect.Effect<A, E | KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
-  readonly compact: (retain: number) => Effect.Effect<number>;
+  readonly before: (revision: number, prefix: string) => Effect.Effect<ReadonlyMap<string, string>>;
+  readonly compact: (windowMs: number, now: number) => Effect.Effect<number>;
   readonly settings: Effect.Effect<{ readonly journal: string; readonly synchronous: number }>;
 };
 
@@ -253,16 +263,49 @@ const keysUnder = (prefix: string) =>
     return rows.map((row) => row.name);
   });
 
-/** The live keys that begin with `prefix`, each with its latest revision, no value read. */
-const revisionsUnder = (prefix: string) =>
+/**
+ * The keys that begin with `prefix`, each with its latest revision, no value read: the live ones, or with `deleted` every key a row of
+ * which compaction has left, so a record removed is counted at the revision that removed it.
+ * @param prefix The prefix of the keys.
+ * @param deleted Whether a key whose latest row deletes it is counted.
+ */
+const revisionsUnder = (prefix: string, deleted = false) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<{ readonly name: string; readonly id: number }>`SELECT kv.name, kv.id FROM kine AS kv
       JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
       ON maxkv.id = kv.id
-      WHERE kv.deleted = 0`;
+      WHERE kv.deleted = 0 OR ${deleted ? 1 : 0} = 1`;
     return new Map(rows.map((row) => [row.name, row.id]));
   });
+
+/**
+ * The value each key under `prefix` that changed after `revision` held as of it: its latest row at or before `revision`, left out where
+ * that row deletes it or the key had none, so a key made after `revision` is no entry. A row stays until compaction, as Kine keeps it.
+ * @param revision The revision the values are read as of.
+ * @param prefix The prefix of the keys.
+ */
+const valuesBefore = (revision: number, prefix: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      readonly name: string;
+      readonly deleted: number;
+      readonly value: Row['value'];
+    }>`SELECT kv.name, kv.deleted, kv.value FROM kine AS kv
+      JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.id <= ${revision} AND mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
+      ON maxkv.id = kv.id
+      WHERE kv.name IN (SELECT ckv.name FROM kine AS ckv WHERE ckv.id > ${revision} AND ckv.name >= ${prefix} AND ckv.name < ${pastPrefix(prefix)})`;
+    return new Map(rows.filter((row) => row.deleted === 0).map((row) => [row.name, textOf(row.value)]));
+  });
+
+/** The connection's journal mode and synchronous level, as SQLite says them. */
+const settingsNow = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA journal_mode`;
+  const [synchronous] = yield* sql<{ synchronous: number }>`PRAGMA synchronous`;
+  return { journal: journal?.journal_mode ?? '', synchronous: synchronous?.synchronous ?? -1 };
+});
 
 /** The live records whose key begins with `prefix`, by key, each its latest row that deletes nothing. */
 const liveUnder = (prefix: string) =>
@@ -341,6 +384,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
     list: (prefix) => Effect.withTracerEnabled(Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))), false),
     keys: (prefix) => read(keysUnder(prefix)),
     revisions: (prefix) => read(revisionsUnder(prefix)),
+    touched: (prefix) => read(revisionsUnder(prefix, true)),
     write: (key, write) => refusing(committed(inTxn(writeOne(key, write)))),
     txn: (writes) => refusing(committed(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write))))),
     within: (body) =>
@@ -374,26 +418,27 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
           }),
         ),
       ),
-    compact: (retain) =>
+    before: (revision, prefix) => read(valuesBefore(revision, prefix)),
+    compact: (windowMs, now) =>
       Effect.orDie(
         inTxn(
           Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
             const head = yield* headNow;
             const compacted = yield* compactedNow;
-            const to = compactTo(head, compacted, retain);
+            const [seen] = yield* sql<{
+              head: number;
+              at: number;
+            }>`SELECT head, at FROM kine_sweeps WHERE at <= ${now - windowMs} ORDER BY at DESC, head DESC LIMIT 1`;
+            const to = compactTo(head, compacted, seen?.head ?? 0);
             if (to > compacted) yield* compactRange(compacted, to);
+            yield* sql`INSERT INTO kine_sweeps (head, at) VALUES (${head}, ${now})`;
+            if (seen !== undefined) yield* sql`DELETE FROM kine_sweeps WHERE at < ${seen.at}`;
             return to;
           }),
         ),
       ),
-    settings: read(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA journal_mode`;
-        const [synchronous] = yield* sql<{ synchronous: number }>`PRAGMA synchronous`;
-        return { journal: journal?.journal_mode ?? '', synchronous: synchronous?.synchronous ?? -1 };
-      }),
-    ),
+    settings: read(settingsNow),
   } satisfies Keyspace;
 }
 

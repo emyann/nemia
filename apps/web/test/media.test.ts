@@ -10,7 +10,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const { useMedia } = await import('../src/lib/useMedia.ts');
 const { useIsMobile } = await import('../src/hooks/use-mobile.ts');
-const { useSheetPreview } = await import('../src/lib/useSheetPreview.ts');
 const { useReducedMotion } = await import('../src/lib/useReducedMotion.ts');
 
 /** What `hook` answers in a render. */
@@ -52,22 +51,16 @@ describe('useMedia: whether a media query matches, and its fallback where there 
       'false',
     );
     assert.equal(answer(useReducedMotion), 'true');
-    assert.equal(answer(useSheetPreview), 'false');
     assert.equal(answer(useIsMobile), 'false');
   });
   test('a browser: each hook says what its own query matches', (t) => {
     const asked = withMedia(t, () => true);
-    assert.deepEqual([answer(useReducedMotion), answer(useSheetPreview), answer(useIsMobile)], ['true', 'true', 'true']);
+    assert.deepEqual([answer(useReducedMotion), answer(useIsMobile)], ['true', 'true']);
     assert.match(asked.find((query) => query.includes('reduced-motion')) ?? '', /prefers-reduced-motion: reduce/);
-    assert.match(
-      asked.find((query) => query.includes('hover')) ?? '',
-      /\(hover: none\), \(max-width: 599px\)/,
-      'a sheet under 600 pixels or with no hover',
-    );
     assert.ok(asked.includes('(max-width: 767px)'), 'narrow under a tablet, 768 pixels');
   });
   test('a browser where nothing matches: none of them, the fallback of motion included', (t) => {
     withMedia(t, () => false);
-    assert.deepEqual([answer(useReducedMotion), answer(useSheetPreview), answer(useIsMobile)], ['false', 'false', 'false']);
+    assert.deepEqual([answer(useReducedMotion), answer(useIsMobile)], ['false', 'false']);
   });
 });

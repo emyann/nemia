@@ -16,7 +16,7 @@ import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
 import { Effect } from 'effect';
-import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
+import { definitionRevisionNow, StoreRoot } from 'agent-orchestrator';
 import { addFactory, cardKey, dropRecord } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which the factory `remover`, filed on it, lets the api
@@ -33,7 +33,9 @@ const STORE = path.join(root, 'workflows');
 const json = { 'content-type': 'application/json' };
 
 /** A folder's version as the board reads it, its agents and skills looked for in the repository and in yours. */
-const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+/** The revision the api serves the workflow `name` of the library at now (the index read again), as a write is held to it. */
+const revisionOf = async (name: string) =>
+  String(await Effect.runPromise(definitionRevisionNow('Workflow', undefined, name).pipe(Effect.provideService(StoreRoot, root))));
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -59,9 +61,9 @@ const snapshot = (dir: string) =>
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
   );
 
-/** A DELETE at `version`: the folder's version as it is on disk now unless one is given, as a board that has just read it sends it. */
-const remove = (name: string, version?: string | null, from = 'user', headers: Record<string, string> = json) => {
-  const read = version === undefined ? versionOf(path.join(from === 'user' ? STORE : path.join(repo, 'workflows'), name)) : version;
+/** A DELETE at `version`: the revision the folder is served at now unless one is given, as a board that has just read it sends it. */
+const remove = async (name: string, version?: string | null, from = 'user', headers: Record<string, string> = json) => {
+  const read = version === undefined ? await revisionOf(name) : version;
   return app.request(`/api/workflows/${name}?${ON_REPO}${read === null ? '' : `&resourceVersion=${encodeURIComponent(read)}`}`, {
     method: 'DELETE',
     headers,
@@ -87,13 +89,13 @@ describe("a person removes a folder of theirs: refused while it is stale, unsaid
   });
   const s = story(test);
   s.test('REFUSED: a removal of a folder changed since it was read is a 409 naming both versions, and nothing is removed', async () => {
-    const read = versionOf(dir);
+    const read = await revisionOf('done');
     write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n');
     const before = snapshot(dir);
     const res = await remove('done', read);
     assert.equal(res.status, 409);
     const error = await errorOf(res);
-    for (const fact of [dir, read, versionOf(dir)]) assert.ok(error.includes(fact), `${fact}: ${error}`);
+    for (const fact of ['done', read, await revisionOf('done')]) assert.ok(error.includes(fact), `${fact}: ${error}`);
     assert.deepEqual(snapshot(dir), before);
     fs.rmSync(path.join(dir, 'ship.md'));
   });
@@ -126,7 +128,7 @@ describe("a person removes a folder of theirs: refused while it is stale, unsaid
       const theirs = path.join(repo, 'workflows', 'theirs');
       write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
       const before = snapshot(theirs);
-      const res = await remove('theirs', versionOf(theirs), 'repo');
+      const res = await remove('theirs', await revisionOf('theirs'), 'repo');
       assert.equal(res.status, 404, "the repository's workflow is no workflow of the library, which a removal is sent to");
       assert.deepEqual(snapshot(theirs), before);
       assert.equal(fs.existsSync(dir), true, 'yours of the same name');

@@ -274,7 +274,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(inside.entry?.description, 'Kept inside.');
     const page = await detail('repo', 'inside');
     assert.equal(page.skill.entry?.description, 'Kept inside.');
-    assert.match(page.version, /^[0-9a-f]{16}$/);
+    assert.match(page.version, /^[1-9][0-9]*$/);
 
     assert.equal(rowOf(places, 'user', 'apart'), undefined, 'listed where its folder is');
     const apart = rowOf(places, 'repo', 'apart')!;
@@ -470,7 +470,7 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
       preload: false,
       body: '# Mine\n\nWrite it down.',
     });
-    assert.match(mine.version, /^[0-9a-f]{16}$/);
+    assert.match(mine.version, /^[1-9][0-9]*$/);
     assert.deepEqual(mine.users, [
       { from: 'repo', name: 'theirs' },
       { from: 'user', name: 'clerk' },
@@ -619,7 +619,11 @@ test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash 
 test('REFUSED at shipped defaults: a change at a version the skill has moved on from, of a skill not there, or under another name', async () => {
   const { version } = await detail('user', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
-  await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
+  await refused(
+    put('/api/skills/yours/always', { version, preload: false }),
+    409,
+    /^the Skill always changed since it was read \(it is at revision /,
+  );
   await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^Nothing is at that name/);
   const now = (await detail('user', 'always')).version;
   await refused(

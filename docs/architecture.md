@@ -657,6 +657,14 @@ written before the record and removed after it, and named by objects' `FilePoint
 go of a File through the keyspace, so one a live record points to is kept, and removes bytes no record names once they are a day old. A
 store's File records of before it are imported once, each hashed, and moved aside under `<root>/imported/files/`.
 
+A watch from a revision is served from the keyspace (`Keyspace.since`): each kind the api lists is made of records (`WATCHED_KINDS`,
+`src/list-watch/kind-watch.ts`), an object's `resourceVersion` the highest revision among them and a list's the head it was read at, a
+watch asked after revision R sent the objects whose records moved after R (`objectChange`, proved by `contracts/kind-watch.contract.ts`),
+refused 410 below the compacted revision and 400 above the head. A definition stays a file and has a record in the definition index
+(`/registry/definitions/<scope>/<kind>/<name>`, `src/definition-index/`), which the daemon's sweep writes only where the file's digest
+moved (`recordDue`, `contracts/observed.contract.ts`). Compaction keeps the last 5 minutes at least: each sweep's head and time are rows
+of `kine_sweeps` (migration `0003_sweeps`), and a compaction reaches the head of the latest sweep at least 5 minutes old (`compactTo`).
+
 The other kinds of record followed it into the keyspace: delegations (`/registry/delegations/`), subscriptions and their deliveries,
 the revision ledger, session and standing tokens (`/registry/tokens/`, `/registry/persontokens/`, a standing token's name checked and
 taken in the transaction that writes it) and the inbox's cards and the tick's tries. Each kind's door is one real engine over the

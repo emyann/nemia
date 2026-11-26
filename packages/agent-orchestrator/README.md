@@ -2350,12 +2350,29 @@ spec:
 ## A command node: `run:`
 
 A node with `run:` and no session runs its shell line as a workload of its own on the `command` harness, in its first parent's
-workspace, told its parent's closeout (`WF_CLOSEOUT`) and the file it may answer in (`WF_ANSWER`). Every node signs off with a closeout:
-a session's own, a condition's answer, a command's exit. Exit 0 signs it off `done`, its output the JSON object it left in `WF_ANSWER`
+workspace, told its parent's closeout (`WF_CLOSEOUT`) and the file it may answer in (`WF_ANSWER`). Every node that runs signs off with a
+closeout: a session's own, a condition's answer, a command's exit. Exit 0 signs it off `done`, its output the JSON object it left in `WF_ANSWER`
 (decoded by `output:`); any other exit fails it, and an answer that is not one JSON object leaves it unsigned. It takes `retries:`
 (each try runs the line afresh), a failure policy by exit code, `nemia retry` and `gate:` as a step does, and nothing a session or a
 check needs (`check:`, `checks:`, `workspace:`, `resume:`, a route, an instruction). It acts as the agent it names, under a token
 bound to its try, and load refuses one that names none.
+
+## A wait node: `waitsFor:`
+
+A node with `waitsFor: [ready, approved]` runs no session and no command: it passes once every condition it names is written True for
+the try it is on, by a program of the factory or by a person (`nemia condition`). It follows Kubernetes' `readinessGates`, a list of
+condition names in the spec that an outside controller writes, and the pod is ready only when all are True; where Kubernetes reads a
+condition nobody wrote as False, this reads it as undecided, so the node waits and says who writes it. A GitHub Actions environment's
+protection rules gate a job in the same way. The loader lays each name as a condition check that waits on none, so everything that
+reads a step's checks reads these: its row says `checking`, names each undecided condition and the program that writes it (or that none
+does), and the same words reach `nemia ls`, the board and the MCP port.
+
+The node files no task. When its parents have passed, the pass lays its record with its checks and no task (`taskId` is null), in its
+first parent's workspace, and stands on its checks alone: `pending`, `checking`, `verified`, or `failed (check)` where a condition is
+written False. A False refuses it as any failed check does and the run waits on a person: `retries:` is refused at load, and
+`nemia retry --recheck` is a new try, whose conditions are written afresh, since a condition belongs to the try it was written for.
+It takes `after:`, `when:`, `gate:` and `place:`; load refuses any other key, an instruction, an empty or repeated list, `check:`
+beside it, and a place inside a loop's span. A factory hires no agent into it.
 
 ## Files a person gives the run: `wf start --input`
 

@@ -975,6 +975,7 @@ const unset: WorkflowStepSpec = {
   workflow: null,
   card: null,
   relabel: null,
+  waitsFor: null,
 };
 
 test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no session", async () => {

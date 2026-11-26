@@ -189,7 +189,8 @@ const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} 
  * @param verify Whether an object served from memory is built afresh too and compared.
  * @param git Where branches stand.
  */
-export const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
+export const objectsOf = (e: Engine, how: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
+  const { home, memo } = how;
   const folders = folderReader(home);
   const built = (run: Run, one: JudgedOrWhy) =>
     Effect.gen(function* () {

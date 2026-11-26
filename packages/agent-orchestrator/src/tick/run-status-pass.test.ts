@@ -39,7 +39,7 @@ const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
-const e = () => engineOf(engine().layer);
+const e = () => Object.assign(engineOf(engine().layer), { tallied: undefined });
 
 beforeEach(() => {
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });

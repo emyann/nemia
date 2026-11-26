@@ -6,9 +6,9 @@ layout gives a place sits inside a template's folder: the workspace's own files 
 `released.json`, `released.ts`, `contracts/`, `test/`) sit beside it, since a render would carry anything inside.
 
 - `sdlc/` — the team that builds Nemia, with this repository's words taken out: six agents and five workflows, the role skills they
-  name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, `needs.ts` — what build's and quick's needs check and
+  name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, `ci-watch.ts`, `needs.ts` — what build's and quick's needs check and
   fix — with
-  `ci-log.ts`, `exec.ts` and `rerun.ts`, which `landing.ts` and `pull-request.ts` import, `refresh.ts`, the landing refresh `landing.ts` imports, and `local-check.ts`, the default `localCheck`), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
+  `ci-log.ts`, `exec.ts` and `rerun.ts`, which `landing.ts`, `pull-request.ts` and `ci-watch.ts` import, `ci-write.ts`, the pure decisions `ci-watch.ts` writes by (proved by `contracts/ci-write.contract.ts`), and the program that keeps `ci-watch.ts` running per factory, `programs/ci-watch/program.yaml`, whose `run:` line carries the `ciCheck` and `landingWaitsOnCi` parameters as flags, since a carried script is never rendered, `refresh.ts`, the landing refresh `landing.ts` imports, and `local-check.ts`, the default `localCheck`), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
   `change.ts` in `quick/` and `cards.ts` and `groom.ts` in `janitor/`, read as `$WF_WORKFLOW_FILES/<script>.ts`. quick's land step is told build's
   `land.md` (`instruction: { path }`). What the repository a factory is applied to decides is a parameter of `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried
   script is never rendered, so a script takes what it needs as a flag (`--check <name>`).
@@ -24,8 +24,8 @@ layout gives a place sits inside a template's folder: the workspace's own files 
   the version is what a factory pins and upgrades by, and a digest no version names would let a change ship unnoticed. The version a
   branch writes is cut again at its landing, from the base as it is then (`released.ts cut`, which the factory's `landingRefresh`
   names; `landedVersion`, proved by `contracts/version.contract.ts`), so the second of two such runs takes the next version on its own.
-  `contracts/second-run.contract.ts` proves `ci-log.ts`'s `toldOf` and `rerunDue`, whether the implement wait re-runs a red CI context
-  once or reports it at once; `ci-log.ts` takes its types by a whole `import type`, which the run's type stripping erases from the frozen
+  `contracts/second-run.contract.ts` proves `ci-log.ts`'s `toldOf` and `rerunDue`, whether the watcher re-runs a red CI context
+  once or reports it at once; `ci-log.ts` and `ci-write.ts` take their types by a whole `import type`, which the run's type stripping erases from the frozen
   copy, where no `contracts/` sits.
 
 ## Traps

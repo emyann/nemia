@@ -52,27 +52,27 @@ function builtins() {
 }
 
 /** `program` run with the store's root, the builtin folder `folder` and the renders under `renders`: its exit. */
-const exitOf = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: string) =>
+const exitOf = <A, E>(program: Effect.Effect<A, E, StoreRoot>, folder: string, renders: string) =>
   Effect.runSyncExit(
     Effect.provideService(Effect.provideService(withBuiltins(program, folder), StoreRoot, ROOT), TemplateRenders, renders),
   );
 
 /** The tag `program` failed with, run as `uid` over the renders under `renders`. */
-const failedAs = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: string, uid: number) => {
+const failedAs = <A, E>(program: Effect.Effect<A, E, StoreRoot>, folder: string, renders: string, uid: number) => {
   const exit = exitOf(Effect.provideService(program, RenderOwner, uid), folder, renders);
   if (Exit.isSuccess(exit)) return undefined;
   return (Cause.squash(exit.cause) as { _tag?: string })._tag;
 };
 
 /** What `program` answers, or a throw of what it failed with. */
-const run = <A, E>(program: Effect.Effect<A, E>, folder: string, renders = scratch('wf-template-renders-')) => {
+const run = <A, E>(program: Effect.Effect<A, E, StoreRoot>, folder: string, renders = scratch('wf-template-renders-')) => {
   const exit = exitOf(program, folder, renders);
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 };
 
 /** The tag `program` failed with. */
-const failedWith = <A, E>(program: Effect.Effect<A, E>, folder: string) => {
+const failedWith = <A, E>(program: Effect.Effect<A, E, StoreRoot>, folder: string) => {
   const exit = exitOf(program, folder, scratch('wf-template-renders-'));
   if (Exit.isSuccess(exit)) return undefined;
   return (Cause.squash(exit.cause) as { _tag?: string })._tag;
@@ -98,7 +98,8 @@ describe('the builtin templates as objects, and their renders', () => {
     assert.equal(mill.status.problems, undefined);
     assert.equal(mill.status.source, path.join(folder, 'mill'));
     assert.equal(typeof mill.status.digest, 'string');
-    assert.equal(mill.metadata.resourceVersion, mill.status.digest);
+    assert.match(mill.metadata.resourceVersion, /^\d+$/);
+    assert.notEqual(mill.metadata.resourceVersion, mill.status.digest, 'a revision, never the content digest');
     assert.deepEqual(mill.spec.parameters, {});
     assert.equal(mill.spec.hires['dev/review'], 'reviewer');
   });

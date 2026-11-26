@@ -67,7 +67,6 @@ import {
   servedOf,
   thereOf,
   namespacedWriteRefused,
-  readAtRevision,
   writeGoes,
   writtenAt,
   type Held,
@@ -377,8 +376,7 @@ async function libraryCreated(s: Served, payload: AgentWrite) {
 async function libraryReplaced(s: Served, name: string, payload: AgentWrite) {
   const route = `PUT /api/agents/${name}`;
   writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
-  await readAtRevision(s, 'Agent', name, versioned(route, payload.metadata.resourceVersion), 'write');
-  const version = (await libraryAt(s, name, 'user')).metadata.resourceVersion;
+  const version = versioned(route, payload.metadata.resourceVersion);
   const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
   const given = agentDraftOf(draftBodyOf(payload.spec), to);
   await saved(s, { ...given, version, name });
@@ -394,10 +392,8 @@ async function libraryRemoved(
   const route = `DELETE /api/agents/${name}`;
   const read = versioned(route, query.resourceVersion);
   writeGoes('library', 'remove', thereOf(await libraryHeld(s), name), await s.inRequest(libraryUsers(s.home, { kind: 'Agent', name })));
-  await readAtRevision(s, 'Agent', name, read, 'remove');
   const before = await libraryAt(s, name, 'user');
-  const version = before.metadata.resourceVersion;
-  const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
+  const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version: read, repo: query.repo }));
   return { ...before, status: { ...before.status, removed } };
 }
 

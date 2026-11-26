@@ -570,7 +570,8 @@ function cliBreaks(sources: Sources) {
  * through the Feed door and its hub alone; and the listing of objects (`src/object/listed.verb.ts`),
  * which reads no store and no runtime, only a page of the objects its caller read and the time a file was made; and the machine's
  * needs read (`src/needs/needs.verb.ts`), which runs each declared check as a short shell command of its own,
- * beside the engine and never on it, and reads the factories and folders. Named one by one, so any
+ * beside the engine and never on it, and reads the factories and folders; and the revisions of a kind's objects
+ * (`src/list-watch/kind-revisions.verb.ts`), read off the keyspace and the definition index alone. Named one by one, so any
  * other controller that stops reaching the client is still refused.
  */
 const DOORED_ONLY: readonly string[] = [
@@ -579,6 +580,7 @@ const DOORED_ONLY: readonly string[] = [
   'src/event-object/event.verb.ts',
   'src/subscription-object/subscription.verb.ts',
   'src/object/listed.verb.ts',
+  'src/list-watch/kind-revisions.verb.ts',
   'src/await/await.verb.ts',
   'src/needs/needs.verb.ts',
 ];

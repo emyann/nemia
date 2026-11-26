@@ -110,10 +110,11 @@ test("each writer's route hands its handler only the keys its one spec gives a h
     sent('PUT', `/api/skills/tidy-notes`, { metadata: { resourceVersion: versionOf(made2) }, spec: { ...skill, body: 'Tidy them.' } }),
   );
 
-  const dev = (await (await app.request(`${D}/workflows/dev?origin=user`)).json()) as Workflow;
+  const first = (await (await app.request(`${D}/workflows/dev?origin=user`)).json()) as Workflow;
   await heldToSpec(t, 'workflows write', 201, () =>
-    sent('POST', `/api/workflows`, { metadata: { name: 'dev-2' }, spec: { steps: [dev.spec.steps[0]] } }),
+    sent('POST', `/api/workflows`, { metadata: { name: 'dev-2' }, spec: { steps: [first.spec.steps[0]] } }),
   );
+  const dev = (await (await app.request(`${D}/workflows/dev?origin=user`)).json()) as Workflow;
   const changed = await heldToSpec(t, 'workflows write', 200, () =>
     sent('PUT', `/api/workflows/dev`, { metadata: { resourceVersion: dev.metadata.resourceVersion }, spec: { steps: dev.spec.steps } }),
   );

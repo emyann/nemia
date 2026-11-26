@@ -126,12 +126,15 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   or an api served `--no-tick`) is judged on demand and may change without a revision. `WATCH_RESYNC` stays for the plain lists, which are
   read again on a feed line and on `Beats.watch`. The Event lists follow the feed (`eventsFollowed`,
   `src/feed-objects/events-watch.ts`) and resume from a byte of it (a page's `metadata.resourceVersion`, the feed's end, or the last
-  event's), a byte the feed cannot be read from 410. A write of a library definition names the revision it was read at (`readAtRevision`,
-  the definition index read again first, so a hand edit since counts). A GET writes nothing where this process ticks the sweep that keeps
-  the definition index (`sweepBegun`, called by `main.ts` for `ticks`); **the exception is an api served `--no-tick`**, whose GET of an
-  indexed kind reads the index again (`definitionsRefreshed(false)`) and so may write it: with no sweep a read-only GET serves revision
-  0 for a definition no sweep has numbered, and every write of one answers 409 (as CI showed in run 45865052443). The person accepted
-  the exception; card `store-the-orchestrator-s-obj-o3mx` makes every GET read-only. A watch resumed from a revision sends DELETED for an
+  event's), a byte the feed cannot be read from 410. A write of a library definition names the `resourceVersion` it was read at, and the orchestrator's writer refuses it `Conflict` where
+  the definition has moved (`definitionJudged`): the api judges nothing, but a builder's schemas, written before its folder, are judged first
+  (`write`, `workflows/builder.ts`). No GET writes the keyspace in any process, a `--no-tick` api included: a definition no sweep has
+  numbered is served at the next revision, worked out with no write (`kindRevisions`, `definitionsNumbered`), and a writer sweeps once it
+  has written. Three edges of that number: a definition read before any sweep is served at the next revision, which a hand edit before the next sweep leaves the same, so a save at that read passes and writes over the edit (the tests number the index first, `definitionsIndexed`); a restore to exactly the
+  record's text returns a definition to the record's own revision (no update is lost, the files being the same), and under a daemon, in the ~2 s before a sweep, a
+  reader that saw a hand edit is not sent its undo. Each object's revision is the orchestrator's (`atRevisions`); the api stamps only what no verb of its stamps — a Card,
+  Proposal and Delegation list, an Agent, a Skill and a Workflow, and a template's documents at the Template's revision
+  (`src/objects/revisioned.ts`). A watch resumed from a revision sends DELETED for an
   object the watcher held as of it (`was`, the own record's value read by `Keyspace.before`, matched against the path's namespace and the
   label selectors: `watchFilterOf`), and for none it could not hold. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`

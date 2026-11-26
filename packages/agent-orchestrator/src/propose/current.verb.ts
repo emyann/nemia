@@ -34,8 +34,8 @@ import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { indexSweep } from '../definition-index/definition-index.store.ts';
-import { kindRevisions } from '../list-watch/kind-watch.store.ts';
+import { kindRevisions } from '../list-watch/kind-revisions.verb.ts';
+import { definitionsSwept } from '../definition-index/definition-index.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
 export type ProposalPlace = { readonly home: string };
@@ -250,21 +250,22 @@ export const contentNow = (place: ProposalPlace, factory: string, kind: Proposab
 };
 
 /**
- * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision the api serves it at (the keyspace's,
- * the definition index read again first, so a hand edit since a read counts), and its spec: what a proposal's stale check and an apply
- * compare the version a proposal read to. Refused as `contentNow` refuses.
+ * The object of `kind` named `name` in the factory `factory` as it is now, its version the revision it is served at (the keyspace's), the
+ * definitions numbered first (`definitionsSwept`) so what a proposal read stays the revision it holds until a file moves, and its spec:
+ * what a proposal's stale check and an apply compare the version a proposal read to. Refused as `contentNow` refuses.
  * @param place Where the proposal is read: the store's root.
  * @param factory The factory's name.
  * @param kind The kind of the object.
  * @param name The object's name; for a Factory, the factory's own.
  */
 export const currentOf = (place: ProposalPlace, factory: string, kind: ProposableKind, name: string) =>
-  contentNow(place, factory, kind, name).pipe(
+  definitionsSwept().pipe(
+    Effect.provideService(StoreRoot, place.home),
+    Effect.andThen(contentNow(place, factory, kind, name)),
     Effect.flatMap((now) =>
       now.version === null
         ? Effect.succeed(now)
         : Effect.gen(function* () {
-            yield* indexSweep();
             const { of, specOf } = yield* kindRevisions(kind);
             const space = kind === 'Factory' ? undefined : factory;
             return { ...now, version: String(of(space, name)), specVersion: specOf(space, name) } satisfies Current;

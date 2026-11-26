@@ -13,7 +13,7 @@ import { wiredRepo, type Factory } from '../factory.ts';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { schedulesOf } from './schedule.verb.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { atRevisions, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 import type { ScheduleRuns } from '../schedule/listed.store.ts';
 import { cardTriggersOf, type TriggerDefined } from '../applied/applied.store.ts';
 import { quotaSettledBy, reachedWorkflows, triggerQuota, type ReachStep } from '../trigger/quota.ts';
@@ -76,8 +76,14 @@ const quotaOf = (target: string, steps: ReadonlyMap<string, readonly ReachStep[]
  * @param t The trigger as defined.
  * @param cards The inbox's cards as the queue lists them.
  * @param quota Whether it can spend quota, and what settles it.
+ * @param at The revisions of the Trigger kind.
  */
-const cardTriggerOf = (t: TriggerDefined, cards: readonly CardListing[], quota: Pick<Trigger['status'], 'quota' | 'quotaBy'>) => {
+const cardTriggerOf = (
+  t: TriggerDefined,
+  cards: readonly CardListing[],
+  quota: Pick<Trigger['status'], 'quota' | 'quotaBy'>,
+  at: AtRevisions,
+) => {
   const own = cards.filter((c) => c.factory === t.factory);
   const queued = own.filter((c) => c.queued?.by?.includes(t.name) && !c.startedAs.length).map((c) => c.name);
   const clashes = own.flatMap((c) => (c.clash?.includes(t.name) ? [{ card: c.name, with: [...c.clash] }] : []));
@@ -86,7 +92,7 @@ const cardTriggerOf = (t: TriggerDefined, cards: readonly CardListing[], quota: 
   return {
     apiVersion: API_VERSION,
     kind: 'Trigger',
-    metadata: { name: t.name, namespace: t.factory, creationTimestamp: t.since, resourceVersion: versionOf(spec, status) },
+    metadata: { name: t.name, namespace: t.factory, creationTimestamp: t.since, resourceVersion: at.stamp(t.factory, t.name) },
     spec,
     status,
   } satisfies Trigger;
@@ -96,11 +102,11 @@ const cardTriggerOf = (t: TriggerDefined, cards: readonly CardListing[], quota: 
  * The triggers of the factory `namespace`, read now: none for the default factory or a file that does not read; `Missing` where no
  * factory has the name (`factoryFiled`).
  */
-const triggersOf = Effect.fn('triggersOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined) {
+const triggersOf = Effect.fn('triggersOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined, at: AtRevisions) {
   const { listing } = yield* factoryFiled(home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const steps = yield* offeredSteps(listing);
-  const timed = (yield* schedulesOf(home, namespace, memo)).map((s) => {
+  const timed = (yield* schedulesOf(home, namespace, memo, at)).map((s) => {
     const spec: Trigger['spec'] = {
       when: { kind: 'time', cron: s.spec.cron, brief: s.spec.brief, ...(s.spec.tz === undefined ? {} : { tz: s.spec.tz }) },
       target: { kind: 'Workflow', name: s.metadata.name },
@@ -109,14 +115,14 @@ const triggersOf = Effect.fn('triggersOf')(function* (home: string, namespace: s
     return {
       apiVersion: API_VERSION,
       kind: 'Trigger',
-      metadata: { ...s.metadata, resourceVersion: versionOf(spec, status) },
+      metadata: { ...s.metadata },
       spec,
       status,
     } satisfies Trigger;
   });
   const defined = cardTriggersOf(home, listing);
   const cards = defined.length ? yield* readInbox() : [];
-  const onCards = defined.map((t) => cardTriggerOf(t, cards, quotaOf(t.target.name, steps)));
+  const onCards = defined.map((t) => cardTriggerOf(t, cards, quotaOf(t.target.name, steps), at));
   return [...timed, ...onCards];
 });
 
@@ -133,7 +139,8 @@ export const triggerList = Effect.fn('triggerList')(function* (
   query: ObjectQuery,
   memo: ScheduleRuns | undefined,
 ) {
-  const listed: TriggerList = yield* objectsListed('Trigger', yield* triggersOf(home, namespace, memo), query, 'trigger');
+  const at = yield* atRevisions('Trigger', home);
+  const listed: TriggerList = yield* objectsListed('Trigger', yield* triggersOf(home, namespace, memo, at), query, 'trigger', at.head);
   return listed;
 });
 
@@ -150,7 +157,7 @@ export const triggerObject = Effect.fn('triggerObject')(function* (
   name: string,
   memo: ScheduleRuns | undefined,
 ) {
-  const found = (yield* triggersOf(home, namespace, memo)).find((t) => t.metadata.name === name);
+  const found = (yield* triggersOf(home, namespace, memo, yield* atRevisions('Trigger', home))).find((t) => t.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

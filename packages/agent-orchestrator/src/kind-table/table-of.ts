@@ -37,20 +37,24 @@ export const firstLine = (text: string | null | undefined) => {
 const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
 
 /**
- * A page as a table: its place (`continue`), its columns, and a row per item, its cells by `cells`, its metadata beside them.
+ * A page as a table: its place (`continue`, and the `resourceVersion` it was read at, where it has one), its columns, and a row per
+ * item, its cells by `cells`, its metadata beside them.
  * @param page The page, its items and where it stands.
  * @param columns The table's columns, in the order the cells are.
  * @param cells An item's cells, in the columns' order.
  */
 export const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
-  page: { readonly metadata: { readonly continue?: string }; readonly items: readonly Item[] },
+  page: { readonly metadata: { readonly continue?: string; readonly resourceVersion?: string }; readonly items: readonly Item[] },
   columns: readonly TableColumnDefinition[],
   cells: (item: Item) => readonly unknown[],
 ) =>
   ({
     kind: 'Table',
     apiVersion: 'meta.k8s.io/v1',
-    metadata: page.metadata.continue === undefined ? {} : { continue: page.metadata.continue },
+    metadata: {
+      ...(page.metadata.continue === undefined ? {} : { continue: page.metadata.continue }),
+      ...(page.metadata.resourceVersion === undefined ? {} : { resourceVersion: page.metadata.resourceVersion }),
+    },
     columnDefinitions: columns,
     rows: page.items.map((item) => ({ cells: cells(item), object: partialOf(item.metadata) })),
   }) satisfies Table as Table;

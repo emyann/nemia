@@ -7,13 +7,14 @@
  * them, which name no secret, so the board records it as offered.
  */
 import { Effect } from 'effect';
+import { StoreRoot } from '../../config/root.store.ts';
 import { API_VERSION, type McpServer, type McpServerList } from 'objects';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import { BUILTIN_SERVERS, builtinServers } from '../servers/servers.store.ts';
 import { maskedHeaders, type FactoryServer } from '../servers/index.ts';
 import { FACTORY_SERVERS, type ServerListed, type ServersListing } from '../servers/servers.verb.ts';
 import { factoryFiled } from './factory.verb.ts';
-import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { atRevisions, bornAt, objectsListed, type AtRevisions, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /**
  * A server's spec, as its record holds it, each header masked where `masked`.
@@ -33,8 +34,9 @@ export const specOf = (server: FactoryServer, masked = true) => ({
  * @param namespace The factory's name.
  * @param filedAt When the server was filed, its object's creation time.
  * @param unread Why the servers' states were not read, or null where they were.
+ * @param at The revisions of the McpServer kind.
  */
-export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string, unread: string | null) => {
+export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string, unread: string | null, at: AtRevisions) => {
   const spec = specOf(s);
   const error = s.error ?? unread ?? undefined;
   const status: NonNullable<McpServer['status']> = {
@@ -45,7 +47,7 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
   return {
     apiVersion: API_VERSION,
     kind: 'McpServer',
-    metadata: { name: s.name, namespace, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+    metadata: { name: s.name, namespace, creationTimestamp: filedAt, resourceVersion: at.stamp(namespace, s.name) },
     spec,
     status,
   } satisfies McpServer;
@@ -55,22 +57,23 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
  * The servers of the factory `namespace`, read now at `home`; none for the default factory, which the door answers with no listing;
  * `Missing` where no factory has the name.
  */
-const serversOf = Effect.fn('serversOf')(function* (home: string, namespace: string) {
+const serversOf = Effect.fn('serversOf')(function* (home: string, namespace: string, at: AtRevisions) {
   const { factory, listing: filed } = yield* factoryFiled(home, namespace);
   if (filed === undefined) return [];
   const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace });
-  return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread));
+  return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread, at));
 });
 
 /** A page of the servers of the factory `namespace` (`McpServerList`), read now at the store `home`. */
 export const mcpServerList = Effect.fn('mcpServerList')(function* (home: string, namespace: string, query: ObjectQuery) {
-  const listed: McpServerList = yield* objectsListed('McpServer', yield* serversOf(home, namespace), query, 'server');
+  const at = yield* atRevisions('McpServer', home);
+  const listed: McpServerList = yield* objectsListed('McpServer', yield* serversOf(home, namespace, at), query, 'server', at.head);
   return listed;
 });
 
 /** The server `name` of the factory `namespace` as an object; `Missing` where it records none of that name. */
 export const mcpServerObject = Effect.fn('mcpServerObject')(function* (home: string, namespace: string, name: string) {
-  const found = (yield* serversOf(home, namespace)).find((s) => s.metadata.name === name);
+  const found = (yield* serversOf(home, namespace, yield* atRevisions('McpServer', home))).find((s) => s.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({
@@ -87,15 +90,16 @@ export const mcpServerObject = Effect.fn('mcpServerObject')(function* (home: str
  */
 export const builtinServerList = Effect.fn('builtinServerList')(function* (query: ObjectQuery, dir: string = BUILTIN_SERVERS) {
   const filedAt = bornAt(dir);
+  const at = yield* atRevisions('McpServer', yield* StoreRoot);
   const servers: McpServer[] = builtinServers(dir).map(({ name, ...server }) => {
     const spec = specOf(server, false);
     return {
       apiVersion: API_VERSION,
       kind: 'McpServer',
-      metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, undefined) },
+      metadata: { name, creationTimestamp: filedAt, resourceVersion: at.stamp(undefined, name) },
       spec,
     };
   });
-  const listed: McpServerList = yield* objectsListed('McpServer', servers, query, 'builtin server');
+  const listed: McpServerList = yield* objectsListed('McpServer', servers, query, 'builtin server', at.head);
   return listed;
 });

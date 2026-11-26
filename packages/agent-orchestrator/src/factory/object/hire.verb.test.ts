@@ -11,6 +11,7 @@ import { Effect, Exit, Schema } from 'effect';
 import { Hire } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { StoreRoot } from '../../config/root.store.ts';
+import { atRevisions } from '../../object/listed.verb.ts';
 import { hireNamedIn, hiresOf, type HiringFactory } from './hire.verb.ts';
 
 const home = scratch('nemia-hire-object-');
@@ -37,7 +38,11 @@ const acme: HiringFactory = {
   repo,
 };
 
-const hires = await Effect.runPromise(hiresOf(acme, home, '2026-11-01T00:00:00.000Z').pipe(Effect.provide(StoreRoot.layer(home))));
+const hires = await Effect.runPromise(
+  Effect.flatMap(atRevisions('Hire', home), (at) => hiresOf(acme, home, '2026-11-01T00:00:00.000Z', at)).pipe(
+    Effect.provide(StoreRoot.layer(home)),
+  ),
+);
 const named = (name: string) => hires.find((h) => h.metadata.name === name);
 
 test('one Hire per step of each workflow the factory offers, named <workflow>.<step>, each a Hire of objects', () => {

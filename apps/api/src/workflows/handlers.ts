@@ -80,7 +80,6 @@ import {
   servedOf,
   thereOf,
   namespacedWriteRefused,
-  readAtRevision,
   writeGoes,
   writtenAt,
   type Origin,
@@ -311,7 +310,7 @@ const draftsOf = (steps: readonly WorkflowStep[], route: string) =>
   });
 
 /** The writing of yours' folder `name`, on the request's services. */
-const writing = (s: Served, name: string, changes: boolean) => ({
+const writing = (s: Served, name: string, read: string | undefined) => ({
   e: s.e,
   placeService: s.placeService,
   config: s.config,
@@ -320,7 +319,7 @@ const writing = (s: Served, name: string, changes: boolean) => ({
   dir: path.join(s.home, 'workflows', name),
   repo: repoLayer(s),
   home: s.home,
-  changes,
+  read,
   inRequest: s.inRequest,
 });
 
@@ -340,7 +339,7 @@ async function libraryCreated(s: Served, payload: WorkflowCreate) {
   if (payload.spec.steps.length === 0)
     throw new Invalid({ error: `${route}: a workflow is made with its first step. Send ${SHAPE}, with one step at least.` });
   const steps = draftsOf(payload.spec.steps, route);
-  const at = writing(s, name, false);
+  const at = writing(s, name, undefined);
   if (there === 'user')
     throw new Conflict({
       error: workflowTaken(at.dir, String(await s.inRequest(definitionRevisionNow('Workflow', undefined, name)))),
@@ -363,8 +362,7 @@ async function libraryReplaced(s: Served, name: string, payload: WorkflowWrite) 
     throw new Invalid({
       error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
     });
-  const at = writing(s, name, true);
-  await readAtRevision(s, 'Workflow', name, given, 'write');
+  const at = writing(s, name, given);
   builderRefused(await write(at, steps, workflowSpecReadme(at.dir, payload.spec), schemas, files));
   return libraryAt(s, name, 'user');
 }
@@ -420,11 +418,8 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
         writeGoes('library', 'remove', thereOf(libraryHeld(s), name), await s.inRequest(libraryUsers(s.home, { kind: 'Workflow', name })));
-        await readAtRevision(s, 'Workflow', name, version, 'remove');
         const before = await libraryAt(s, name, 'user');
-        const { removed } = await s.inRequest(
-          WORKFLOWS_REMOVE.handler({ from: 'user', name, version: before.metadata.resourceVersion, repo: query.repo }),
-        );
+        const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
         return { ...before, status: { ...before.status, removed } };
       }),
     )

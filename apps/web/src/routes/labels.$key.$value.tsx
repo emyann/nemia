@@ -24,7 +24,10 @@ const BUCKETS: ReadonlyArray<{ bucket: Bucket; hue: Hue }> = [
   { bucket: 'stopped', hue: 'grey' },
 ];
 
-/** The bucket of `run`: a person's first (`waitsOnYou`, so not a run someone has in hand), then its phase; `running` for a run the list could not judge, as the tick counts it. */
+/**
+ * The bucket of `run`: a person's first (`waitsOnYou`, so not a run someone has in hand), then its phase; `running` for a run the list
+ * could not judge, as the tick counts it.
+ */
 const bucketOf = (run: RunRow) => {
   if (!judged(run)) return 'running';
   if (waitsOnYou(run)) return 'needs a person';

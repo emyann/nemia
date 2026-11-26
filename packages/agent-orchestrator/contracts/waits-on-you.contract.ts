@@ -2,8 +2,8 @@
  * The one decider of whether a run waits on a person, and the list's state built on it (agent-orchestrator, src/phase/phase.ts and
  * src/run-state/run-state.ts): `asksOfAPerson`, whether anything of the run is a person's to answer; `waitsOnYou`, whether that is the
  * person's own move — something is asked and nobody has the run in hand (`assignee`); and `kindOf`, the state the board's list, `nemia
- * ls` and the bell read. An ask someone has in hand leaves "waiting on you" and is listed in flight; it is still asked, and anyone who could
- * answer it still can.
+ * ls` and the bell read. An ask someone has in hand leaves "waiting on you" and is listed in flight; it is still asked, and anyone who
+ * could answer it still can.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { RunState } from 'objects';
@@ -26,8 +26,7 @@ export type StateFacts = WaitFacts & { readonly status: string; readonly moving:
 
 /** Something of the run is a person's to answer, whoever has it in hand: a step, a run waited on that never lands, a hold. */
 const asks = (run: WaitFacts) =>
-  !run.cancelledAt &&
-  (run.waitingOnYou.length > 0 || run.waiting?.waitingOnYou === true || run.holding?.waitingOnYou === true);
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || run.waiting?.waitingOnYou === true || run.holding?.waitingOnYou === true);
 
 /** The run's ask is the person's own move: asked, and nobody has the run in hand. */
 const yours = (run: WaitFacts) => asks(run) && run.assignee === null;

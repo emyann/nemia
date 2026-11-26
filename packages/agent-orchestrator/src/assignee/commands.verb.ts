@@ -3,14 +3,14 @@ import type { Assignee } from '../record/record.ts';
 import { assign, unassign } from './assignee.verb.ts';
 import { timeoutOf } from '../pause/pause.ts';
 import { Effect, Schema } from 'effect';
-import { Actor, ASSIGN_WORDS, assignRefusal, RunAssign } from 'objects';
+import { Actor, ASSIGN_WORDS, RunAssign } from 'objects';
 import { checked, type Served } from '../command/entry.verb.ts';
 import { saidOf } from '../command/command.ts';
 
 /**
  * What `nemia assign` takes: the run, the assignee as the api is sent it (`objects`' `RunAssign`: `to`, `why`, `for`), and `off`, its
- * giving back — the api's `DELETE …/assignee`, never its `POST`; and who puts it or gives it back (`actor`, objects' `Actor`), which the api
- * hands of its caller — none from the command line.
+ * giving back — the api's `DELETE …/assignee`, never its `POST`; and who puts it or gives it back (`actor`, objects' `Actor`), which
+ * the api hands of its caller — none from the command line.
  */
 export const AssignInput = Schema.Struct({
   runId: Schema.String,
@@ -30,7 +30,7 @@ export const ASSIGN: Served<{ id: string; ended: boolean; assignee: Assignee }, 
   input: AssignInput,
   handler: Effect.fnUntraced(function* (input: AssignInput) {
     const { actor, runId, ...flags } = input;
-    yield* checked(assignRefusal(flags));
+    yield* checked(ASSIGN_WORDS.check(flags));
     if (input.off === true) {
       const { run, assignee } = yield* unassign(runId, actor);
       return { id: run.id, ended: true, assignee };

@@ -560,7 +560,8 @@ export const RunAssign = Schema.Struct({
   why: Schema.optionalKey(Schema.String.annotate({ description: 'The words for why they have it, one line.' })),
   for: Schema.optionalKey(
     Schema.String.annotate({
-      description: 'How long an ask may wait on them before the run is the person’s move again, as 90s, 10m or 2h (1s to 23h); left out, 1h.',
+      description:
+        'How long an ask may wait on them before the run is the person’s move again, as 90s, 10m or 2h (1s to 23h); left out, 1h.',
     }),
   ),
 }).annotate({ identifier: 'RunAssign' });

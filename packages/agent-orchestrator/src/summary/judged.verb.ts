@@ -294,6 +294,29 @@ export function runAssigneeOf(assignee: Assignee | undefined, standing: Assignee
 }
 
 /**
+ * Who has run `run` in hand as it is judged now (`runAssigneeOf`): its assignee's standing read at the clock's now, timed from when its
+ * present ask began (`waitingSinceOf`) where it asks anything of a person (`asksOfAPerson`); null for a run nobody has in hand.
+ * @param run The run, with its assignee's file as the record reads it.
+ * @param views The engine's views of its tasks, which date the end of a waiting step's last try.
+ * @param steps The run's steps, in its workflow's order.
+ * @param asked What the run asks of a person now: the steps waiting on you, the runs it waits on and its hold.
+ * @param inPlay Whether the run's phase is still in play.
+ */
+const assigneeJudged = Effect.fnUntraced(function* (
+  run: Run,
+  views: Views,
+  steps: readonly StepSpec[],
+  asked: Pick<Parameters<typeof asksOfAPerson>[0], 'waitingOnYou' | 'waiting' | 'holding'> & { holding: { at: string } | null },
+  inPlay: boolean,
+) {
+  if (!run.assignee) return null;
+  const asks = asksOfAPerson({ ...asked, cancelledAt: run.cancelledAt, assignee: null });
+  const since = asks ? waitingSinceOf(run, views, steps, asked.waitingOnYou, asked.holding?.waitingOnYou ? asked.holding.at : null) : null;
+  const now = yield* Clock.currentTimeMillis;
+  return runAssigneeOf(run.assignee, assigneeStandingOf(run.assignee, asks, since, inPlay, now));
+});
+
+/**
  * The engine's own word for a task — `working`, `needs-human`, `succeeded` — as `nemia ls` shows it (`wordOfView`): `unknown`
  * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
  * and `succeeded` for a task held open that was closed after it signed, which it calls `between-attempts` until its next pass settles it.
@@ -599,16 +622,7 @@ export const judge = Effect.fn('judge')(function* (
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   const codes = runCodes(status, holding?.runs ?? null, read.steps);
-  const asks = asksOfAPerson({ cancelledAt: run.cancelledAt, waitingOnYou, waiting, holding, assignee: null });
-  const standing = run.assignee
-    ? assigneeStandingOf(
-        run.assignee,
-        asks,
-        asks ? waitingSinceOf(run, views, steps, waitingOnYou, holding?.waitingOnYou ? holding.at : null) : null,
-        RUN_PHASE_IN_PLAY[codes.phase],
-        yield* Clock.currentTimeMillis,
-      )
-    : null;
+  const assignee = yield* assigneeJudged(run, views, steps, { waitingOnYou, waiting, holding }, RUN_PHASE_IN_PLAY[codes.phase]);
   return {
     words: new Map(read.steps.map((s) => [s.name, s.message])),
     codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
@@ -626,7 +640,7 @@ export const judge = Effect.fn('judge')(function* (
         ((due.ready.length > 0 && !waiting?.waitingOnYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
-    assignee: runAssigneeOf(run.assignee, standing),
+    assignee,
     asked: new Map(read.assessed.due.retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers: read.answers,
     spendOf: read.spendOf,

@@ -69,6 +69,16 @@ export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
 export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
 /**
+ * The files a person keeps beside a run that keep it out of the memo while it is not called off: a hold, whose runs land on their own,
+ * and an assignee, who lapses with time. Pure.
+ * @param run The run's record: its hold, its assignee and whether it was called off.
+ */
+const personFilesOut = (run: RestFacts['run']) => [
+  ...(holdKeepsOut({ held: Boolean(run.hold), cancelled: Boolean(run.cancelledAt) }) ? ['hold'] : []),
+  ...(run.assignee && !run.cancelledAt ? ['assignee'] : []),
+];
+
+/**
  * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
  * none for a run at rest. What the tick's check of its memo names when a full pass finds a run not at rest, and what a count of a store's
  * runs by clause is made of. Pure.
@@ -78,8 +88,7 @@ export function restBlockers(f: RestFacts) {
   const out: string[] = [];
   if (f.status === 'running' && !f.run.pruned) out.push('status');
   if (!f.run.workflow) out.push('workflow');
-  if (holdKeepsOut({ held: Boolean(f.run.hold), cancelled: Boolean(f.run.cancelledAt) })) out.push('hold');
-  if (f.run.assignee && !f.run.cancelledAt) out.push('assignee');
+  out.push(...personFilesOut(f.run));
   if (!f.settled) out.push('settled');
   if (f.acted) out.push('acted');
   for (const key of ['ready', 'check', 'retry', 'round', 'waitingOnCheckout'] as const) if (f.due[key].length) out.push(`due.${key}`);

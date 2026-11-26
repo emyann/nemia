@@ -63,10 +63,10 @@ type Held = {
 export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => run.toDecide ?? null;
 
 /**
- * Whether anything of the run is asked of a person, whoever has it in hand: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
- * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
- * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
- * nobody, whatever its steps last said.
+ * Whether anything of the run is asked of a person, whoever has it in hand: a step does (`waitingOnYou`) — at its gate anywhere in
+ * the run, or signed off blocked — or a run it waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for,
+ * either way — or a hold on it only a person lifts (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there).
+ * Not once it is cancelled: a cancelled run waits on nobody, whatever its steps last said.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
 export const asksOfAPerson = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>

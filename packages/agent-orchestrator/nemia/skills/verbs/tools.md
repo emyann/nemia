@@ -2117,6 +2117,61 @@ Its arguments:
 - namespace: The namespace, a run's factory (default for one that names none).
 - name: The run's name.
 
+## assign
+
+```text
+  nemia assign <runId> [--to <name>] [--why "<words>"] [--for <d>]
+    say who has a run in hand: what it asks of a person — an approval, a
+    question, a retry, a budget, a hold only a person ends — is theirs to
+    answer, and leaves waiting on you, the bell and the counts, until they
+    give it back (--off), the run is over, or an ask waits on them past
+    their time, when it is yours again. Nothing is refused because of it:
+    anyone may still answer. nemia ls says assigned to <name>. Refused of a
+    run cancelled, pruned or over, and of one someone already has in hand.
+    --to: who has it (default: your OS user); --why: the reason;
+    --for: how long an ask may wait on them (90s, 10m, 2h; from 1s to 23h;
+    default 1h).
+    nemia assign <runId> --off: give the run back now
+```
+
+Puts the run in the hand the body names, or the caller’s: what it asks of a person is theirs to answer until given back, the run is over, or an ask waits past their time. Answers RunAssigned.
+
+Calls `POST /api/namespaces/:namespace/runs/:name/assignee`.
+
+Its arguments:
+
+- namespace: The namespace, a run's factory (default for one that names none).
+- name: The run's name.
+- to (--to at a shell): Who has the run in hand, one line; left out, the OS user of the client that asks.
+- why (--why at a shell): The words for why they have it, one line.
+- for (--for at a shell): How long an ask may wait on them before the run is the person’s move again, as 90s, 10m or 2h (1s to 23h); left out, 1h.
+
+## unassign
+
+```text
+  nemia assign <runId> [--to <name>] [--why "<words>"] [--for <d>]
+    say who has a run in hand: what it asks of a person — an approval, a
+    question, a retry, a budget, a hold only a person ends — is theirs to
+    answer, and leaves waiting on you, the bell and the counts, until they
+    give it back (--off), the run is over, or an ask waits on them past
+    their time, when it is yours again. Nothing is refused because of it:
+    anyone may still answer. nemia ls says assigned to <name>. Refused of a
+    run cancelled, pruned or over, and of one someone already has in hand.
+    --to: who has it (default: your OS user); --why: the reason;
+    --for: how long an ask may wait on them (90s, 10m, 2h; from 1s to 23h;
+    default 1h).
+    nemia assign <runId> --off: give the run back now
+```
+
+Gives the run back now, recording who gave it back. Answers RunAssigned, ended.
+
+Calls `DELETE /api/namespaces/:namespace/runs/:name/assignee`.
+
+Its arguments:
+
+- namespace: The namespace, a run's factory (default for one that names none).
+- name: The run's name.
+
 ## wait
 
 ```text

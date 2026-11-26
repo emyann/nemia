@@ -55,7 +55,7 @@ export const assign = Effect.fn('assign')(function* (id: string, said: Partial<O
   if (run.assignee) yield* door.assignees.end(RunId.read(id), run.assignee.at, 'lapsed');
   const put = yield* door.assignees.put(RunId.read(id), {
     forMs: said.forMs ?? DEFAULT_FOR_MS,
-    ...(said.name ?? osUser() ? { name: said.name ?? osUser() } : {}),
+    ...((said.name ?? osUser()) ? { name: said.name ?? osUser() } : {}),
     ...(said.why ? { why: said.why } : {}),
     ...(said.actor ? { actor: said.actor } : {}),
   });

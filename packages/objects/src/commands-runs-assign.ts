@@ -63,7 +63,13 @@ export const ASSIGN_WORDS = {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [
       ...saidFlags(ASSIGN_SAID, 'nemia assign', 'an assignee', ASSIGN_TAKES, ASSIGN_SHAPE),
-      { flag: '--for', kind: 'text', key: 'for', takes: FOR_TAKES, twice: `nemia assign takes --for once: an assignee has one time. ${ASSIGN_SHAPE}.` },
+      {
+        flag: '--for',
+        kind: 'text',
+        key: 'for',
+        takes: FOR_TAKES,
+        twice: `nemia assign takes --for once: an assignee has one time. ${ASSIGN_SHAPE}.`,
+      },
       { flag: '--off', kind: 'switch', key: 'off' },
     ],
     unknown: (arg) => `nemia assign does not take ${arg}. It takes the run, then who has it or --off: ${ASSIGN_SHAPE}.`,

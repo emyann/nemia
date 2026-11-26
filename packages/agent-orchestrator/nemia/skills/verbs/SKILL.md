@@ -542,6 +542,20 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                if it had never been put
                                each tool's words: tools.md#hold, tools.md#unhold
                                on the port: hold, unhold
+  nemia assign <runId> [--to <name>] [--why "<words>"] [--for <d>]
+                               say who has a run in hand: what it asks of a person — an approval, a
+                               question, a retry, a budget, a hold only a person ends — is theirs to
+                               answer, and leaves waiting on you, the bell and the counts, until they
+                               give it back (--off), the run is over, or an ask waits on them past
+                               their time, when it is yours again. Nothing is refused because of it:
+                               anyone may still answer. nemia ls says assigned to <name>. Refused of a
+                               run cancelled, pruned or over, and of one someone already has in hand.
+                               --to: who has it (default: your OS user); --why: the reason;
+                               --for: how long an ask may wait on them (90s, 10m, 2h; from 1s to 23h;
+                               default 1h).
+                               nemia assign <runId> --off: give the run back now
+                               each tool's words: tools.md#assign, tools.md#unassign
+                               on the port: assign, unassign
   nemia pause [--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]
                                pause the store: no pass starts new work — no step, try, round or
                                check filed, no queued task admitted, no queued card started — and

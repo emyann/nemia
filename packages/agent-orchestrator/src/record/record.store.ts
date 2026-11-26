@@ -464,9 +464,9 @@ function readUnassigned(home: string, id: string) {
   if (!marker) return undefined satisfies Unassigned | undefined as Unassigned | undefined;
   const [since, how] = [fieldOf(marker.json, 'since'), fieldOf(marker.json, 'how')];
   const end = ENDS.find((e) => e === how);
-  return (
-    isText(since) && end ? { since, how: end, ...actorIn(fieldOf(marker.json, 'actor')) } : undefined
-  ) satisfies Unassigned | undefined;
+  return (isText(since) && end ? { since, how: end, ...actorIn(fieldOf(marker.json, 'actor')) } : undefined) satisfies
+    | Unassigned
+    | undefined;
 }
 
 /**
@@ -558,7 +558,19 @@ export const recordIn = (id: string, text: string, where: string) =>
     }
     if (!isRunRecord(raw)) throw new UnreadableRecord(where, id, recordRefusal(raw));
     const read = { ...raw };
-    for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'saidBefore', 'pause', 'cordon'])
+    for (const key of [
+      'approvals',
+      'acceptances',
+      'pruned',
+      'hold',
+      'unheld',
+      'assignee',
+      'unassigned',
+      'labels',
+      'saidBefore',
+      'pause',
+      'cordon',
+    ])
       delete read[key];
     const { workflow, ...unfrozen } = read;
     return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;

@@ -25,8 +25,9 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
  * The frame's parts of the run `summary` says, measured to `now` (epoch ms): its state (`kindOf`); its wall time until `now`, or until its
  * work stopped for a finished run (`wallMsOf`), and its clock read at that same instant (`clockUntilOf`), so the clock's five parts add up
  * to it; for a waiting run, what each of its steps cost in the summary's order, every try's session together; for a run that asks
- * anything of a person (`asksOfAPerson`), whoever has it in hand, when its present wait on a person began (`waitingSinceOf`): the end of the waiting step's last try or the placing of a hold only a person lifts, the earliest
- * where several are open, null where the record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
+ * anything of a person (`asksOfAPerson`), whoever has it in hand, when its present wait on a person began (`waitingSinceOf`): the end
+ * of the waiting step's last try or the placing of a hold only a person lifts, the earliest where several are open, null where the
+ * record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
  * ended (`outcomeOf`). Off `judgement`'s own run, views and steps.
  * @param summary The run's summary, as the whole list summarizes it.
  * @param judgement The run's judgement on this read: its record, its tasks' views and its steps.

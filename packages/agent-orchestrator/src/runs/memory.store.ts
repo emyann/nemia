@@ -49,7 +49,18 @@ const keyOf = (person: PersonRequest) =>
 const nameOf = (key: AskKey) => askName(key);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'saidBefore', 'pause'] as const;
+const COMPOSED = [
+  'approvals',
+  'acceptances',
+  'pruned',
+  'hold',
+  'unheld',
+  'assignee',
+  'unassigned',
+  'labels',
+  'saidBefore',
+  'pause',
+] as const;
 const recordOf = (run: Run) => {
   const kept: Record<string, unknown> = { ...unrouted(run) };
   for (const key of COMPOSED) delete kept[key];

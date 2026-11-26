@@ -1,8 +1,8 @@
 /**
- * The words of the run's verbs: start, retry, approve, route, refresh, say, cancel, hold, assign, wait, rm, prune and the store's pause. The
- * group is cut by concept into files beside this one (`commands-runs-<concept>.ts`): what acts on one run as it stands, what answers
- * what waits on a person, what lets go of runs that are over, the pause, and the start. This file lists them, and is the group's one
- * door to `index.ts`. Pure.
+ * The words of the run's verbs: start, retry, approve, route, refresh, say, cancel, hold, assign, wait, rm, prune and the store's pause.
+ * The group is cut by concept into files beside this one (`commands-runs-<concept>.ts`): what acts on one run as it stands, what answers
+ * what waits on a person, what lets go of runs that are over, the pause, and the start. This file lists them, and is the group's one door
+ * to `index.ts`. Pure.
  */
 import type { CommandWords } from './command.ts';
 import {

@@ -26,7 +26,13 @@ export function AssigneeLine({ assignee }: { assignee: NonNullable<RunView['assi
       className={cn('flex w-full max-w-80 flex-col gap-0.5 px-2 py-1', container.grey)}
       style={{ clipPath: cutShape(CUT, 'top-right') }}
     >
-      <Body component="span" size="small" data-assignee-who className="break-words text-on-surface" title={assignee.comesBackAt ?? undefined}>
+      <Body
+        component="span"
+        size="small"
+        data-assignee-who
+        className="break-words text-on-surface"
+        title={assignee.comesBackAt ?? undefined}
+      >
         {`${NOW_WORDS.hasIt(assigneeName(assignee))} · ${back}`}
       </Body>
       {assignee.why !== undefined && (

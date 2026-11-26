@@ -73,10 +73,7 @@ export type AssigneeClock = { at: number; forMs: number; asksSince: number | nul
  * Where an assignee stands: it `stands`, and comes back to the person at `comesBackAt` if the ask is not answered by then (null while the
  * run asks nothing, so nothing is timed); it `lapsed` at `at`, the instant its time ran out; or it `ended` with its run.
  */
-export type AssigneeStanding =
-  | { kind: 'stands'; comesBackAt: number | null }
-  | { kind: 'lapsed'; at: number }
-  | { kind: 'ended' };
+export type AssigneeStanding = { kind: 'stands'; comesBackAt: number | null } | { kind: 'lapsed'; at: number } | { kind: 'ended' };
 
 /** The instant an ask unanswered takes the run back to the person: its time, counted from the later of the ask and the assignment. */
 const dueOf = (c: AssigneeClock, asksSince: number) => (c.at > asksSince ? c.at : asksSince) + c.forMs;
@@ -96,8 +93,7 @@ const assigneeStandingSpec = spec<(c: AssigneeClock) => AssigneeStanding>({
     },
     aRunThatAsksNothingIsNeverTimed: {
       description: 'While its run asks nothing of a person, at work or waiting on a thing, an assignee stands and is not timed',
-      condition: ({ input: [c], output }) =>
-        !c.inPlay || c.asksSince !== null || (output.kind === 'stands' && output.comesBackAt === null),
+      condition: ({ input: [c], output }) => !c.inPlay || c.asksSince !== null || (output.kind === 'stands' && output.comesBackAt === null),
     },
     standsUntilItsTimeIsOut: {
       description:

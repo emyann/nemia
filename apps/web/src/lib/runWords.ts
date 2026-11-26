@@ -248,6 +248,15 @@ export const assigneeName = (assignee: NonNullable<RunView['assignee']>) =>
   assignee.name ?? (assignee.actor ? actorWords(assignee.actor) : NOW_WORDS.someone);
 
 /**
+ * What a row says of a step that asks a person: its ask (`yoursWords`), then, where someone has the run in hand, who has it.
+ * @param row The run: its steps, what it waits on, its hold and its assignee.
+ * @param wait What it waits on a person for, if anything (`waitOf`).
+ * @param drawn The step the row draws, as the rail says it.
+ */
+const askedWords = (row: NowRow, wait: Parameters<typeof yoursWords>[1], drawn: Parameters<typeof yoursWords>[2]) =>
+  row.assignee ? [...yoursWords(row, wait, drawn), NOW_WORDS.inHand(assigneeName(row.assignee))] : yoursWords(row, wait, drawn);
+
+/**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
  * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or
  * waits on a person, its round of its rounds, its budget and what it spent, and the few words of its wait: on a person, the wait's tag
@@ -267,8 +276,8 @@ export function nowOf(row: NowRow) {
   const drawn = states[at];
   const step = row.steps[at];
   if (!drawn || !step) return null;
-  const assigned = row.assignee != null && !held;
   const asked = wait !== null || waitsOnPerson(drawn.state, cancelled);
+  const assigned = row.assignee != null && !held;
   const yours = asked && !assigned;
   const stands = nowStandsOf(drawn.state, drawn.on, held, assigned);
   const rounds = step.spec?.rounds ?? null;
@@ -278,12 +287,7 @@ export function nowOf(row: NowRow) {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words:
-      asked && row.assignee
-        ? [...yoursWords(row, wait, drawn), NOW_WORDS.inHand(assigneeName(row.assignee))]
-        : yours
-          ? yoursWords(row, wait, drawn)
-          : waitWords(row, stands, drawn.state, drawn.on, step),
+    words: asked ? askedWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
   };
 }
 

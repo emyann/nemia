@@ -1,9 +1,9 @@
 /**
- * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Assignee`, `Approval`,
- * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `LandingRecord`), the
- * try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares
- * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
- * Pure: `record.store.ts` reads and writes the record.
+ * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Assignee`,
+ * `Approval`, `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`,
+ * `LandingRecord`), the try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's
+ * judgement shares (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through
+ * (`RunStore`). Pure: `record.store.ts` reads and writes the record.
  */
 import type { PictureHeld } from '../filed/pictures/pictures.ts';
 import type { Verdict } from '../check/index.ts';

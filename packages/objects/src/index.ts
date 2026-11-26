@@ -36,13 +36,8 @@ export {
   RunApprove,
   RunApproved,
   RunAsked,
-  RunAssign,
-  RunAssigned,
-  RunAssigneeWritten,
   RunCancelPlan,
   RunCancelled,
-  RunHeld,
-  RunHold,
   RunInput,
   RunPrune,
   RunPruned,
@@ -58,6 +53,7 @@ export {
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunHeld, RunHold } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -694,7 +690,6 @@ export {
   WHY_CAP,
   answerFlag,
   approveRefusal,
-  assignRefusal,
   holdRefusal,
   pauseRefusal,
   pauseTimeoutCheck,

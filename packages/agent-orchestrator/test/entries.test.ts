@@ -693,7 +693,6 @@ const PINNED: Record<string, string[]> = {
     'kindReplay',
     'kindRevisions',
     'definitionRevisionNow',
-    'LIBRARY_SCOPE',
     'runWatchVersion',
     'factoryCommandsOf',
     'factoryList',

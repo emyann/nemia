@@ -25,10 +25,10 @@ import { BUILTIN_SKILLS, entriesOf, skillVersion } from '../skills/read.store.ts
 import { BuiltinTemplates, builtinTemplatesIn } from '../template/door/templates.store.ts';
 
 /** The kinds the index holds: the definitions, and the builtin templates. */
-export type DefinitionKind = 'agent' | 'skill' | 'workflow' | 'template';
+type DefinitionKind = 'agent' | 'skill' | 'workflow' | 'template';
 
 /** A definition found in a file: where it is held (`scope`), what it is, its name, its path and a digest of what it holds. */
-export type DefinitionFound = {
+type DefinitionFound = {
   readonly scope: string;
   readonly kind: DefinitionKind;
   readonly name: string;
@@ -37,8 +37,8 @@ export type DefinitionFound = {
 };
 
 /** The scope of the person's library, and of Nemia's builtin definitions. */
-export const LIBRARY_SCOPE = '_library';
-export const BUILTIN_SCOPE = '_builtin';
+const LIBRARY_SCOPE = '_library';
+const BUILTIN_SCOPE = '_builtin';
 
 /**
  * The key of the index's record of a definition.
@@ -87,7 +87,7 @@ const digestOf = (read: () => string | null) => {
  * @param scope Where they are held.
  * @param folder The folder of workflows: a tree's `workflows`, the library's, or the builtin's.
  */
-export const definitionsIn = (scope: string, folder: string) => {
+const definitionsIn = (scope: string, folder: string) => {
   const found: DefinitionFound[] = [];
   const agents = path.join(folder, AGENTS_FOLDER);
   for (const file of stepFiles(entriesOf(agents))) {
@@ -111,6 +111,27 @@ export const definitionsIn = (scope: string, folder: string) => {
 /** The record's text: the JSON of its keys in order. */
 const textOf = (found: DefinitionFound) => JSON.stringify({ digest: found.digest, path: found.path });
 
+/** What Nemia ships — its skills and its builtin templates — read once by the process: it changes with a release, which restarts the daemon. */
+const BUILTIN = new Map<string, readonly DefinitionFound[]>();
+
+/** The definitions Nemia ships, found once per folder of builtin templates. */
+const builtinFound = (templates: string) => {
+  const kept = BUILTIN.get(templates);
+  if (kept !== undefined) return kept;
+  const found: DefinitionFound[] = [];
+  for (const name of entriesOf(BUILTIN_SKILLS)) {
+    const dir = path.join(BUILTIN_SKILLS, name);
+    const digest = digestOf(() => skillVersion(dir));
+    if (digest !== null) found.push({ scope: BUILTIN_SCOPE, kind: 'skill', name, path: dir, digest });
+  }
+  for (const name of builtinTemplatesIn(templates)) {
+    const dir = path.join(templates, name);
+    found.push({ scope: BUILTIN_SCOPE, kind: 'template', name, path: dir, digest: treeDigest(dir) });
+  }
+  BUILTIN.set(templates, found);
+  return found;
+};
+
 /**
  * Every definition of the store `home` and where it is held: each factory's tree and the repositories it works on, the person's library,
  * and what Nemia ships (its skills and its builtin templates).
@@ -118,7 +139,7 @@ const textOf = (found: DefinitionFound) => JSON.stringify({ digest: found.digest
  * @param factories Each factory with the folder of its tree, and the repositories it works on.
  * @param templates The folder of builtin templates.
  */
-export const definitionsFound = (
+const definitionsFound = (
   home: string,
   factories: readonly { readonly name: string; readonly tree?: string | undefined; readonly repos: readonly string[] }[],
   templates: string,
@@ -129,15 +150,7 @@ export const definitionsFound = (
     for (const repo of f.repos) found.push(...definitionsIn(f.name, path.join(repo, 'workflows')));
   }
   found.push(...definitionsIn(LIBRARY_SCOPE, path.join(path.resolve(home), 'workflows')));
-  for (const name of entriesOf(BUILTIN_SKILLS)) {
-    const dir = path.join(BUILTIN_SKILLS, name);
-    const digest = digestOf(() => skillVersion(dir));
-    if (digest !== null) found.push({ scope: BUILTIN_SCOPE, kind: 'skill', name, path: dir, digest });
-  }
-  for (const name of builtinTemplatesIn(templates)) {
-    const dir = path.join(templates, name);
-    found.push({ scope: BUILTIN_SCOPE, kind: 'template', name, path: dir, digest: treeDigest(dir) });
-  }
+  found.push(...builtinFound(templates));
   const seen = new Set<string>();
   return found.filter((d) => {
     const key = definitionKey(d.scope, d.kind, d.name);

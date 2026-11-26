@@ -9,7 +9,7 @@ import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { changesOf, revisionTable, WATCHED_KINDS, type KindChange, type RowSeen, type WatchedKind } from './kind-watch.ts';
 
 /** What a replay answers: why a watch cannot start there, or the changes after it and the head it holds to. */
-export type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
+type KindReplay = { readonly refused: 'gone' | 'ahead' } | { readonly changes: readonly KindChange[]; readonly head: number };
 
 /** The prefixes of the keyspace a kind is made of, each once. */
 const prefixesOf = (kind: WatchedKind) => [...new Set(WATCHED_KINDS[kind].map((s) => s.prefix))];

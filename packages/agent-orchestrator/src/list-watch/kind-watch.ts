@@ -23,7 +23,7 @@ export const objectChange: ObjectChangeOf = (after, own) => {
  * The object a record names: its namespace (none where it names the object in every namespace) and its name (none where it names
  * every object of the namespace).
  */
-export type Target = { readonly namespace: string | null; readonly name: string | null };
+type Target = { readonly namespace: string | null; readonly name: string | null };
 
 /** A prefix of the keyspace a kind's objects read, whether its records are the objects' own, and the object a key under it names. */
 type Source = { readonly prefix: string; readonly own: boolean; readonly target: (rest: string) => Target | null };

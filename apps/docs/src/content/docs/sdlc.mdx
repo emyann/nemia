@@ -56,15 +56,15 @@ In build and quick:
 Anything your repository decides is a parameter, set with `--set` when you apply the template. Any parameter you don't set takes its
 default.
 
-| Parameter      | What it sets                                                                                                          | Its default                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| github         | whether the factory checks and lands its work on GitHub (`true`) or in your checkout                                  | false                                                                                    |
-| localCheck     | in your checkout: the command that checks each round, and the merged code at landing                                  | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
-| ciCheck        | on GitHub: the name of the CI status check a pull request waits on                                                    | ci                                                                                       |
-| roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                             | npm run --if-present lint && npm run --if-present typecheck                              |
+| Parameter      | What it sets                                                                                                           | Its default                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| github         | whether the factory checks and lands its work on GitHub (`true`) or in your checkout                                   | false                                                                                    |
+| localCheck     | in your checkout: the command that checks each round, and the merged code at landing                                   | npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test |
+| ciCheck        | on GitHub: the name of the CI status check a pull request waits on                                                     | ci                                                                                       |
+| roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                              | npm run --if-present lint && npm run --if-present typecheck                              |
 | implementCheck | in both modes: your own command, which implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
-| areas          | the areas of the repository a card names, in the factory's rules                                                      | the top-level folders of the repository                                                  |
-| storeRoot      | the store the agents' fences keep them out of                                                                         | ~/.agent-workflows                                                                       |
+| areas          | the areas of the repository a card names, in the factory's rules                                                       | the top-level folders of the repository                                                  |
+| storeRoot      | the store the agents' fences keep them out of                                                                          | ~/.agent-workflows                                                                       |
 
 github is a boolean: applying the template fails unless it is `true` or `false`. A factory uses localCheck when github is false, and
 ciCheck and roundCheck when it is true. It uses implementCheck in both cases. Set implementCheck to add your own check to implement's

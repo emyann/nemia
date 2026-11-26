@@ -15,9 +15,8 @@ Every piece of work goes through these stages:
    (`packages/agent-orchestrator/README.md`, _The format_).
 3. **The steps.** An agent does each step. An agent is a session on a harness, such as Claude Code or Codex. It has its own
    instructions, tools, and fence, plus the skills you give it (folders of instructions and files for one kind of work). When a step
-   finishes, it signs off with a closeout: its outcome, a summary, and any fields its workflow asks for.
-
-   Steps run in order. A step whose work can be judged has a check: a command the run executes after the step signs off. The check's
+   finishes, it signs off with a closeout: its outcome, a summary, and any fields its workflow asks for. Steps
+   run in order. A step whose work can be judged has a check: a command the run executes after the step signs off. The check's
    exit code decides whether the run continues, not the agent. When a review step asks for changes, the steps of its loop run again.
    Each pass is a round.
 4. **Gates.** When a step has a gate, nothing after it starts until a person approves.

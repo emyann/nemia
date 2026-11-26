@@ -2,7 +2,7 @@ import type * as RunObject from 'objects';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, reachClock, themeOf, rowsAnswered, stepBar } from '../board.ts';
-import { expectCount, expectNone, expectVisible, Refused } from '../checks.ts';
+import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
 import type { RunLines } from '../../../src/lib/api/run.ts';
 import { agentRowOf } from '../../../src/lib/api/agents.ts';
 import { agentOf } from '../../../src/lib/api/judged.ts';
@@ -124,12 +124,16 @@ async function glanceReads(page: Page, want: StepCardFacts, where: string) {
   }, `${where}: the glance reads the step's agent, model, word, since, round, spend and last line as the api answers them`);
 }
 
-/** That the step's bar of the run is open in the frame's side sheet, and shut by its Close button. */
+/**
+ * That the step's bar of the run is open in the frame's side sheet. The bar follows a live step's conversation, a stream the watch
+ * lets go only with the window's navigation, so the page leaves it by a navigation to the runs page, which has no bar open: Close and
+ * Escape are the bar's own pages' (`066-run-bar.ts`).
+ */
 async function sheetOpens(page: Page, run: string, step: string, where: string) {
-  const sheet = stepBar(page, run, step);
-  await expectVisible(sheet, `${where}: the step opens in the side sheet`);
-  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
-  await expectCount(sheet, 0, `${where}: Close shuts the sheet`);
+  await expectVisible(stepBar(page, run, step), `${where}: the step opens in the side sheet`);
+  await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+  await expectCount(stepBar(page, run, step), 0, `${where}: the runs page has no sheet open`);
 }
 
 /**
@@ -233,7 +237,7 @@ export default {
   /**
    * A step's diamond on the runs page: each is a button named by its step and word. Hovered or focused it shows a small card of a few
    * lines that never scrolls — the agent and model, the word and since, the round and spend, the last line — as the api answers them,
-   * with none of the session's static facts. A click, or Enter, opens that step in the frame's side sheet, which Close shuts. The Clock
+   * with none of the session's static facts. A click, or Enter, opens that step in the frame's side sheet, left by a navigation to the runs page. The Clock
    * cell's own preview opens beside it, by the pointer and by the keyboard, at both widths, and the two do not fight. Writes nothing.
    */
   name: 'runs-preview',

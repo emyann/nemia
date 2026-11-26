@@ -153,9 +153,9 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
           }),
         );
       const judged = SkillName.read(name ?? change.name);
-      yield* definitionJudged('Skill', from === 'factory' ? factory : undefined, judged, version, 'write');
-      const held =
-        version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(change.name), library)) ?? version);
+      const there = heldVersion(yield* door.skills.there(SkillName.read(change.name), library));
+      yield* definitionJudged('Skill', from === 'factory' ? factory : undefined, judged, version, 'write', there);
+      const held = version === undefined ? undefined : (there ?? version);
       const written = yield* door.skills.write(SkillName.read(change.name), change, held, library);
       yield* definitionsSwept();
       return written;
@@ -172,8 +172,9 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
  */
 export const skillRemoved = Effect.fn('skillRemoved')(function* (library: string, name: string, version: string | undefined) {
   const door = yield* SkillDoor;
-  yield* definitionJudged('Skill', undefined, name, version, 'remove');
-  const held = version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(name), library)) ?? version);
+  const there = heldVersion(yield* door.skills.there(SkillName.read(name), library));
+  yield* definitionJudged('Skill', undefined, name, version, 'remove', there);
+  const held = version === undefined ? undefined : (there ?? version);
   yield* door.skills.remove(SkillName.read(name), library, held);
   yield* definitionsSwept();
 });

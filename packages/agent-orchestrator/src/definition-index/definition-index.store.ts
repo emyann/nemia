@@ -353,6 +353,8 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
  * @param name The definition's name.
  * @param read The `resourceVersion` the writer read it at, none for a definition made.
  * @param what What the writer does, as the refusal says it: `write` or `remove`.
+ * @param held The version the definition's door holds at the name now, null where nothing is there (the door's own refusal says so,
+ * `Missing`, and none is judged here): a command line whose read serves the door's version names that one, and it is judged by the door.
  */
 export const definitionJudged = Effect.fn('definitionJudged')(function* (
   kind: 'Agent' | 'Skill' | 'Workflow',
@@ -360,8 +362,9 @@ export const definitionJudged = Effect.fn('definitionJudged')(function* (
   name: string,
   read: string | undefined,
   what: 'write' | 'remove',
+  held?: string | null,
 ) {
-  if (read === undefined) return;
+  if (read === undefined || held === null || read === held) return;
   const now = String(yield* definitionRevisionNow(kind, namespace, name));
   if (now !== read)
     return yield* Effect.fail(

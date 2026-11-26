@@ -122,8 +122,9 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
       const door = yield* AgentDoor;
       const at = { dir, ...(repo !== undefined && { repo }) };
       const judged = AgentName.read(name ?? draft.name);
-      yield* definitionJudged('Agent', from === 'factory' ? factory : undefined, judged, version, 'write');
-      const held = version === undefined ? undefined : (heldVersion(yield* door.agents.there(judged, at)) ?? version);
+      const there = heldVersion(yield* door.agents.there(judged, at));
+      yield* definitionJudged('Agent', from === 'factory' ? factory : undefined, judged, version, 'write', there);
+      const held = version === undefined ? undefined : (there ?? version);
       const written = yield* door.agents.write(judged, draft, held, { ...at, ...(sidecar !== undefined && { schema: sidecar }) });
       yield* definitionsSwept();
       return written;
@@ -141,8 +142,9 @@ export const AGENTS_REMOVE: Served<AgentRemoved, AgentRemoveInput> = {
       const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', from, name, repo ?? '', root));
       const door = yield* AgentDoor;
       const at = { dir, ...(repo !== undefined && { repo }) };
-      yield* definitionJudged('Agent', undefined, name, version, 'remove');
-      const held = version === undefined ? undefined : (heldVersion(yield* door.agents.there(AgentName.read(name), at)) ?? version);
+      const there = heldVersion(yield* door.agents.there(AgentName.read(name), at));
+      yield* definitionJudged('Agent', undefined, name, version, 'remove', there);
+      const held = version === undefined ? undefined : (there ?? version);
       const removed = yield* door.agents.remove(AgentName.read(name), held, at);
       yield* definitionsSwept();
       return removed;

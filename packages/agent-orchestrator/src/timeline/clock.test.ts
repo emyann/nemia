@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { clockOf, clockReadingOf, waitingSinceOf, type RunClock } from './clock.ts';
-import { clockNow } from '../run-status/run-status.ts';
+import { clockNow } from '../run-status/index.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
 import { filedViews } from '../../test/filed.ts';
 

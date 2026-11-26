@@ -13,13 +13,11 @@ import { RUN_STATES, type Run as RunObject, type RunClock } from 'objects';
 import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts';
 import type { ClockNow, ClockPart } from '../../contracts/run-clock.contract.ts';
 
-export type { ClockPart };
-
 /**
  * A going run's clock as measured at `at` (epoch ms), and the part of it that grows while nothing else of the status moves: what a read
  * lays to its own instant.
  */
-export type ClockAnchor = { readonly at: number; readonly growing: ClockPart };
+type ClockAnchor = { readonly at: number; readonly growing: ClockPart };
 
 /** A run's observed status as the keyspace holds it: its spec and status, and the anchor of a run whose clock is measured to the read. */
 export type StatusRecord = {

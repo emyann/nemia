@@ -561,7 +561,7 @@
     },
     {
       "term": "Observed record",
-      "meaning": "a record the daemon keeps of a world it does not hold, written only when what it observes differs from what the record holds (`recordDue`, proved by `packages/agent-orchestrator/contracts/observed.contract.ts`): the definition index's today, a run's observed status when it moves into the keyspace.",
+      "meaning": "a record the daemon keeps of a world it does not hold, written only when what it observes differs from what the record holds (`recordDue`, proved by `packages/agent-orchestrator/contracts/observed.contract.ts`): the definition index's (`/registry/definitions/`) and a run's observed status (`/registry/runstatus/<id>`, its spec, its status and the anchor of its clock, written by the daemon's pass with the times measured to the read left out of what is compared, `packages/agent-orchestrator/src/run-status/run-status.store.ts`).",
       "type": "RecordDue"
     },
     {

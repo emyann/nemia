@@ -4,7 +4,8 @@
  * given), then those its label selectors take off the record's whole map (`selectedRuns`), sorts them by name and cuts its page
  * (`pageOf`) — all before any run is judged — and only then judges the runs of the page into their objects (`runList`), so a page
  * of `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in
- * `unjudged` with why, never dropped with no word.
+ * `unjudged` with why, never dropped with no word. A run the daemon's pass has recorded (`/registry/runstatus/<id>`, `run-status/`) is
+ * served from its record and not judged at all; one with no record yet is judged on demand and nothing is written.
  *
  * A list asked by a field (`?fieldSelector=status.state…`, `runStateSelector`, or `status.outcome…`, `runOutcomeSelector`) is the board's:
  * it judges every run its namespace and labels keep, to count them by state (`metadata.counts`) before it selects (`selectorTakes`) and
@@ -39,7 +40,7 @@ import {
 export { runNamespace };
 import { diskPartsOf, type RunObjectAnswer, runMetadataOf, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
 import { runStatusesHeld, type StatusHeld } from '../run-status/run-status.store.ts';
-import { servedStatus, stateOfRecord } from '../run-status/run-status.ts';
+import { servedStatus, stateOfRecord } from '../run-status/index.ts';
 import { readFailed, runReadingOf, stepsReadingOf } from '../object/read.verb.ts';
 import { informedJudgements, keepObject, keptObject } from '../rest/informer.verb.ts';
 import { folderReader } from '../summary/reads.verb.ts';

@@ -982,6 +982,7 @@ const PINNED: Record<string, string[]> = {
     'runKey',
     'runMarkKey',
     'runMarksPrefix',
+    'runStatusKey',
     'saidKey',
     'plantMarker',
     'markCancelled',

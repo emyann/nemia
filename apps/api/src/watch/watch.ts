@@ -11,10 +11,10 @@
  * BOOKMARK at the head read before them; with one, the objects changed after it (`kindReplay`), refused 410 past the compaction window
  * and 400 past the head. It reads the head on every beat and replays what was written since, so a change is lost to no beat. A DELETED
  * carries the object's name, namespace and the revision that removed it, and is sent only on a list asked whole (no namespace, no
- * selector). The runs list keeps the state-whole watch below and answers 400 to a `resourceVersion`: the list is read again on a feed line
+ * selector). The runs lists are such a kind: a run is at the highest revision of its record, markers, asks and observed status (the
+ * daemon's pass writes the last only where it moved, the time measured to the read left out). Any other list is read again on a feed line
  * (`followFeed`, the app's `Beats.feed`) and on a resync every `Beats.watch` (`WATCH_RESYNC`), what changed between two reads being the
- * package's `watchChanges` (`versionOf`: a run's leaves out its frame's time measured to the read, `runWatchVersion`). A BOOKMARK is sent
- * every `BOOKMARK_EVERY`.
+ * package's `watchChanges`. A BOOKMARK is sent every `BOOKMARK_EVERY`.
  *
  * Level-triggered: a watch keeps nothing between connections. A revision compacted away under a watch, a read again that is no 2xx or a
  * feed truncated under the reader ends the stream, and the reader opens it again. A watch of the Event lists asked a `resourceVersion`
@@ -27,6 +27,7 @@ import { Context, Data, type Duration, Effect, Schema, Stream } from 'effect';
 import {
   BOOKMARK_EVERY,
   cardHeld,
+  runHeld,
   feedCursorRefusal,
   feedSize,
   followFeed,
@@ -116,9 +117,6 @@ type Read = { readonly kind: string; readonly versions: Versioned[]; readonly ob
 /** The key an object is watched by: its namespace and its name. */
 const keyOf = (o: WatchedObject) => `${o.metadata.namespace ?? ''}/${o.metadata.name}`;
 
-/** The version a list's objects are compared at between two reads: its JSON as served where its route hands none. */
-export type ChangeVersionOf = (o: WatchedObject) => string;
-
 /**
  * How many objects each page a watch reads its list by asks (`limit`): the most a list answers (`LIST_PAGE`), unless the app's layer gives
  * another, as a test does to see a watch read past one page.
@@ -134,10 +132,10 @@ const continueOf = (list: AnyObjectList) => {
 
 /**
  * The list at `url`, read whole through its pages: each asked of `list` with `limit` = `page` and the `continue` the last answered, until
- * none is, so a watch sees every object however many pages the list is; its objects each keyed and versioned by `versionOf`. The first
+ * none is, so a watch sees every object however many pages the list is; its objects each keyed and versioned as served. The first
  * answer that is no 2xx is answered as it is.
  */
-async function readAll(list: Listed, c: RequestContext<ApiEnv>, url: URL, page: number, at: number, versionOf: ChangeVersionOf) {
+async function readAll(list: Listed, c: RequestContext<ApiEnv>, url: URL, page: number, at: number) {
   const items: WatchedObject[] = [];
   let kind = '';
   let token: string | undefined;
@@ -154,7 +152,7 @@ async function readAll(list: Listed, c: RequestContext<ApiEnv>, url: URL, page: 
   } while (token !== undefined);
   return {
     kind: kind.replace(/List$/, ''),
-    versions: items.map((o) => ({ key: keyOf(o), version: versionOf(o) })),
+    versions: items.map((o) => ({ key: keyOf(o), version: JSON.stringify(o) })),
     objects: new Map(items.map((o) => [keyOf(o), o] as const)),
     at,
   } satisfies Read;
@@ -213,7 +211,7 @@ async function firstPage(list: Listed, c: RequestContext<ApiEnv>, url: URL, at: 
  * Where a watch of `list` starts and what it holds there (`watchStartOf`): the state read whole, or a list that follows the feed's first
  * page from the byte asked; or the answer that refuses it before any stream (400, 410, or the list's own).
  */
-async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: ChangeVersionOf, follows: boolean) {
+async function openedAt(c: RequestContext<ApiEnv>, list: Listed, follows: boolean) {
   const resourceVersion = c.req.query('resourceVersion');
   const start = watchStartOf(resourceVersion, follows, versionAsked(resourceVersion));
   if (start.kind === 'refused') return c.json({ error: startRefusal(resourceVersion ?? '') }, 400);
@@ -230,8 +228,7 @@ async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: Chan
       );
   }
   const page = await c.var.runtime.runPromise(WatchPage);
-  const initial =
-    start.kind === 'from' ? await firstPage(list, c, url, start.cursor) : await readAll(list, c, url, page, feedSize(home), versionOf);
+  const initial = start.kind === 'from' ? await firstPage(list, c, url, start.cursor) : await readAll(list, c, url, page, feedSize(home));
   if (initial instanceof Response) return initial;
   return { start, initial, home, url, page, end: feedSize(home) };
 }
@@ -322,9 +319,13 @@ const framesOfChanges = (
  */
 type WatchFilter = { readonly whole: boolean; readonly heldBefore: (change: KindChange) => string | null };
 
+/** A run as its record held it: its namespace, and no labels, which its record does not say. */
+const unlabelled = (held: { readonly namespace: string } | null) => (held === null ? null : { namespace: held.namespace, labels: {} });
+
 /**
  * The filter of the watch of `kind` on `url`: the namespace its path names, the label selectors of its query, and how an object of the kind
- * reads as of an earlier revision (a card by its record's text, `cardHeld`; any other by the namespace its change names and no labels).
+ * reads as of an earlier revision (a card by its record's text, `cardHeld`, a run by its record's, `runHeld`, its labels unknown; any
+ * other by the namespace its change names and no labels).
  * @param kind The kind watched.
  * @param url The list's URL, `watch` and `resourceVersion` taken out.
  */
@@ -337,7 +338,12 @@ const watchFilterOf = (kind: WatchedKind, url: URL) => {
     whole,
     heldBefore: (change) => {
       if (change.was === null || change.name === null || url.searchParams.has('fieldSelector')) return null;
-      const described = kind === 'Card' ? cardHeld(change.name, change.was) : { namespace: change.namespace, labels: {} };
+      const described =
+        kind === 'Card'
+          ? cardHeld(change.name, change.was)
+          : kind === 'Run'
+            ? unlabelled(runHeld(change.was))
+            : { namespace: change.namespace, labels: {} };
       if (described === null || described.namespace === null) return null;
       if (inPath !== undefined && described.namespace !== inPath) return null;
       return selectsLabels(parsed, described.labels) ? described.namespace : null;
@@ -376,7 +382,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
   url.searchParams.delete('watch');
   url.searchParams.delete('resourceVersion');
   const page = await c.var.runtime.runPromise(WatchPage);
-  const readNow = () => readAll(list, c, url, page, 0, JSON.stringify);
+  const readNow = () => readAll(list, c, url, page, 0);
   const known = new Set<string>();
   let first: { frames: string[]; at: number };
   if (start.kind === 'since') {
@@ -437,8 +443,8 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
  * The watch of a list that is read again: the state whole, or a list that follows the feed from the byte asked, then each change sent as
  * the list's reads and the feed's lines say it.
  */
-async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, versionOf: ChangeVersionOf, follow: Follow | undefined) {
-  const opened = await openedAt(c, list, versionOf, follow !== undefined);
+async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, follow: Follow | undefined) {
+  const opened = await openedAt(c, list, follow !== undefined);
   if (opened instanceof Response) return opened;
   const { start, initial, home, url, page, end } = opened;
   return streamSSE(c, async (stream: SSEStreamingApi) => {
@@ -454,7 +460,7 @@ async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, versionOf
     const caughtUp = { due: start.kind === 'from' && initial.at < end };
     if (start.kind === 'from' && !caughtUp.due) await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
     const again = Effect.gen(function* () {
-      const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
+      const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home)));
       if (now instanceof Response) return yield* new ListRefused({ status: now.status });
       const frames = changedFrames(state.sent, now);
       state.sent = now;
@@ -512,30 +518,22 @@ async function readAgainWatch(c: RequestContext<ApiEnv>, list: Listed, versionOf
  * `list` watched: without `watch` (or with `watch=false`) the request handed on as it is; with `watch=true` the stream above; any other
  * `watch`, or `limit` or `continue` beside it, refused 400 `{ error }` before anything is read. Given `follow`, a list whose objects are
  * the feed's own lines: after the initial state each line the list keeps is sent ADDED as it is followed, once, and the list is never
- * read again. Given `versionOf`, the list's objects are compared at it between reads rather than as served: a list whose objects carry
- * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read. A `resourceVersion` asked is read by
+ * read again. A `resourceVersion` asked is read by
  * `watchStartOf`: of a list that follows the feed, the watch starts at that byte and sends no state (a byte the feed cannot be read from,
  * inside a line or past its end, refused 410, Kubernetes' expired one; the list's own refusals answered from a first page of one); of
- * a kind the keyspace watches, a revision (`revisionWatch`: 410 past the compaction window, 400 past the head); of any other list
- * (the runs'), or a word that is no number, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
+ * a kind the keyspace watches, a revision (`revisionWatch`: 410 past the compaction window, 400 past the head); of any other list, or a
+ * word that is no number, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
  * opened (at once where none was), as the initial state's BOOKMARK ends what a reader was sent of what was there already: a reader
  * that resumes counts what it missed by it.
  * @param list The list's handler, which answers a request that is no watch and gives each read of one.
  */
 export const watchable =
-  (
-    list: Listed,
-    {
-      follow,
-      versionOf = JSON.stringify,
-      kind,
-    }: { readonly follow?: Follow; readonly versionOf?: ChangeVersionOf; readonly kind?: WatchedKind } = {},
-  ) =>
+  (list: Listed, { follow, kind }: { readonly follow?: Follow; readonly kind?: WatchedKind } = {}) =>
   async (c: RequestContext<ApiEnv>) => {
     const asked = c.req.query('watch');
     if (asked === undefined || asked === 'false') return list(c);
     const refused = refusalOf(c);
     if (refused !== null) return c.json({ error: refused.error }, refused.status);
     if (kind !== undefined) return revisionWatch(c, list, kind);
-    return readAgainWatch(c, list, versionOf, follow);
+    return readAgainWatch(c, list, follow);
   };

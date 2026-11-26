@@ -5,7 +5,8 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { comparedText, recordIn, servedStatus, type StatusRecord } from './run-status.ts';
+import { comparedText, servedStatus, type StatusRecord } from './run-status.ts';
+import { recordIn } from './run-status.store.ts';
 
 const clock = (wallMs: number) => ({ wallMs, sessionsMs: wallMs - 10, checksMs: 0, personMs: 0, slotMs: 0, restMs: 10 });
 

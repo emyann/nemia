@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { keyspaceAt, keyspaceFile, RECORD_CEILING } from '../keyspace/keyspace.store.ts';
-import { recordIn, type StatusRecord } from './run-status.ts';
-import { runStatusesHeld, runStatusesWritten } from './run-status.store.ts';
+import type { StatusRecord } from './run-status.ts';
+import { recordIn, runStatusesHeld, runStatusesWritten } from './run-status.store.ts';
 
 /** A store of its own, and the programs run in it. */
 const stored = () => {

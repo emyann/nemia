@@ -27,6 +27,9 @@ const INDEXED_ON_READ = new Set(['Agent', 'Skill', 'Workflow', 'Template', 'Hire
 /** The template a request names (`/api/templates/<name>/…`), whose documents are served at the template's own revision. */
 const TEMPLATE_PATH = /^\/api\/templates\/([^/]+)\//;
 
+/** The kinds stamped in a list only: a Run read alone is built per request from parts no revision covers, so it keeps its own version. */
+const LISTED_ONLY = new Set<string>(['Run']);
+
 const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   if (typeof body !== 'object' || body === null || !('kind' in body) || typeof body.kind !== 'string') return undefined;
   if (body.kind === 'Table') {
@@ -35,7 +38,7 @@ const stampedOf = (body: unknown, asked: readonly string[] = []) => {
   }
   const list = watchedListOf(body.kind);
   if (list !== undefined) return { kind: list, list: true, table: false };
-  return isWatchedKind(body.kind) ? { kind: body.kind, list: false, table: false } : undefined;
+  return isWatchedKind(body.kind) && !LISTED_ONLY.has(body.kind) ? { kind: body.kind, list: false, table: false } : undefined;
 };
 
 /** `object` with the revision it stands at as its `metadata.resourceVersion`, where it is an object with metadata. */

@@ -301,7 +301,11 @@ const framesOfChanges = (
         (change.name === null || object.metadata.name === change.name) &&
         (change.namespace === null || object.metadata.namespace === change.namespace),
     );
-    if (found.length === 0 && change.name !== null && change.standing && change.change === 'MODIFIED') return gone(change);
+    const sentBefore = [...known].some((key) => {
+      const at = key.indexOf('/');
+      return key.slice(at + 1) === change.name && (change.namespace === null || key.slice(0, at) === change.namespace);
+    });
+    if (found.length === 0 && change.name !== null && (change.standing || sentBefore) && change.change === 'MODIFIED') return gone(change);
     return found.flatMap((object) => {
       if (revisionOf(object) <= after || sent.has(keyOf(object))) return [];
       sent.add(keyOf(object));

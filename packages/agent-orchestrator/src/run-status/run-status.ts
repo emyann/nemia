@@ -7,7 +7,6 @@
  * leaves the frame off the status (`servedStatus`), the list asked by state lays it. Pure; the pieces of the record's life are
  * `run-status.store.ts` (kept) and `run-status.verb.ts` (observed).
  */
-import { Option, Schema } from 'effect';
 import { isObject } from 'effect/Predicate';
 import { RUN_STATES, type Run as RunObject, type RunClock } from 'objects';
 import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts';
@@ -97,19 +96,6 @@ export const comparedText = (record: unknown) => {
   return sortedText({ ...rest, anchor: kept, status: still });
 };
 
-/** A value as the JSON it is, or none where it is no JSON. */
-const unknownIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
-
-/**
- * The record `value` is, or null where it is no record this pass wrote.
- * @param value The text of a record of `/registry/runstatus/`.
- */
-export const recordIn = (value: string) => {
-  const read = unknownIn(value);
-  if (Option.isNone(read) || !isObject(read.value) || !isObject(read.value['spec']) || !isObject(read.value['status'])) return null;
-  return read.value as StatusRecord;
-};
-
 /**
  * The status a record serves. A plain list leaves the frame's seven parts off (`asOf` undefined); a list asked by state lays them, a
  * going run's wall time and clock laid to `asOf` (`clockNow`), every other as the pass measured it.
@@ -137,4 +123,8 @@ export const servedStatus = (record: StatusRecord, asOf: number | undefined) => 
 };
 
 /** The state of a record's run, as its status says it. */
+/**
+ * The state a record's run is in, as its status says it, or undefined where it says none.
+ * @param record The run's observed status.
+ */
 export const stateOfRecord = (record: StatusRecord) => runStateOf(record.status.state);

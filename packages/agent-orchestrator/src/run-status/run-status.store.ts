@@ -4,12 +4,26 @@
  * where it differs from what the keyspace holds (`recordDue`, the times measured to the read left out of what is compared), one that no
  * run stands for is deleted, all in one transaction, so a revision moves exactly when a run's status does. A GET writes nothing here.
  */
-import { Effect } from 'effect';
+import { Effect, Option, Schema } from 'effect';
+import { isObject } from 'effect/Predicate';
 import { StoreRoot } from '../config/root.store.ts';
 import { keyspaceAt, keyspaceFile, RECORD_CEILING } from '../keyspace/keyspace.store.ts';
 import { recordDue } from '../observed/observed.ts';
 import { RUNSTATUS_PREFIX, runStatusKey } from '../runs/run-keys.ts';
-import { comparedText, recordIn, type StatusRecord } from './run-status.ts';
+import { comparedText, type StatusRecord } from './run-status.ts';
+
+/** A value as the JSON it is, or none where it is no JSON. */
+const unknownIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+/**
+ * The record `value` is, or null where it is no record this pass wrote.
+ * @param value The text of a record of `/registry/runstatus/`.
+ */
+export const recordIn = (value: string) => {
+  const read = unknownIn(value);
+  if (Option.isNone(read) || !isObject(read.value) || !isObject(read.value['spec']) || !isObject(read.value['status'])) return null;
+  return read.value as StatusRecord;
+};
 
 /** The text two records are compared by, of a value the keyspace holds: its compared text where it reads, else the text itself. */
 const heldCompared = (value: string) => {

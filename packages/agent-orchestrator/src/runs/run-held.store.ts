@@ -1,9 +1,9 @@
 /**
  * What a watch resumed from a revision asks of a run removed since: the namespace its record held, as a card's record says its own
- * (`cardHeld`). Pure.
+ * (`cardHeld`).
  */
 import { Option, Schema } from 'effect';
-import { runNamespace } from '../run-list/run-list.ts';
+import { runNamespace } from '../run-list/index.ts';
 
 /** A run's record as its value reads, its factory alone. */
 const factoryIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ factory: Schema.optional(Schema.String) })));

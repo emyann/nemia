@@ -389,6 +389,11 @@ test('a step finishing moves the run: a watch of the runs from before it is sent
       [`MODIFIED ${id}`],
       'the run once, and no other',
     );
+    plantRecord(root, runStatusKey(id), recorded({ anchor: { at: 1, growing: 'sessionsMs' } }));
+    const sentinel = 'r-watch-sentinel';
+    gatedRun(t, sentinel);
+    await waitFor(t, () => changes(w.events, sentinel).includes('ADDED'), `${sentinel} ADDED, written after`);
+    assert.deepEqual(changes(w.events, id), ['MODIFIED'], 'a record written again that changes nothing the run shows is sent no more');
   } finally {
     await w.stop();
   }

@@ -49,7 +49,8 @@ export const runStatusesWritten = Effect.fn('runStatusesWritten')(function* (obs
       );
       continue;
     }
-    wanted.set(runStatusKey(id), { text, compared: comparedText(record) });
+    const stored = recordIn(text);
+    wanted.set(runStatusKey(id), { text, compared: comparedText(stored ?? record) });
   }
   return yield* keyspace
     .within((tx) =>

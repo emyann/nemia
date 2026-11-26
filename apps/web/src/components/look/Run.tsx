@@ -18,6 +18,7 @@ import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
 import { runRecipe, runType, type RunTone, type RunType } from './run.recipe.ts';
 import { RunClock, RunCost } from './RunFigures';
 import { HoldLine } from './RunHold';
+import { AssigneeLine } from './RunAssignee';
 import { Chip, Fan, Pips, Ring, RunMark, Words } from './RunMarks';
 import { RunMeta } from './RunMeta';
 import { Facts, NamedGraph, PanelFoot, pickWrap, RunsWaiting, type PanelRead } from './RunPanel';
@@ -106,7 +107,7 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  * - **md**, a row of the runs table (`layout="row"`, the kit's `Row` with its Run, Now, Clock and Cost cells) or a card of the floor: and
  *   factory / workflow, the agent, the round as pips, the words of its wait (a run named a mark), the step graph (each node inside `wrap`),
  *   the step's budget ring, its cost and how many of `among` wait on it; a row its labels too, and a held run's row its hold line
- *   (`HoldLine`: why it is held and who holds it).
+ *   (`HoldLine`: why it is held and who holds it), and under it who has the run in hand (`AssigneeLine`).
  * - **lg**, a card: and its labels and Open run; a card that waits on you glows.
  * - **xl**, a panel: and each step named under the graph, the facts, the runs it waits on and that wait on it, and the step's last line
  *   from `read`, the run read alone.
@@ -290,6 +291,7 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
             </span>
           </span>
           {run.holding && <HoldLine holding={run.holding} />}
+          {run.assignee && <AssigneeLine assignee={run.assignee} />}
           <span {...saying('graph')} className={look.s.steps()}>
             <StepGraph run={run} wrap={wrap} />
           </span>

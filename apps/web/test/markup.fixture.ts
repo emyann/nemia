@@ -65,6 +65,7 @@ export function runWith(note: string | null) {
     context: [],
     holdUntil: [],
     holding: null,
+    assignee: null,
     status: 'failed',
     phase: 'failed',
     reason: 'Failed',

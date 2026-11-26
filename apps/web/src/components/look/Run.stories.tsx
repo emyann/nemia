@@ -260,6 +260,54 @@ export const HeldRows: Story = {
   },
 };
 
+/** Who has a run in hand, as the api serves it: the operator, at a gate, back to the person in an hour. */
+const ASSIGNEE: NonNullable<RunObject['status']['assignee']> = {
+  at: '2026-11-15T17:30:00.000Z',
+  forMs: 3_600_000,
+  comesBackAt: '2026-11-15T18:30:00.000Z',
+  word: 'operator has it in hand — back to you at 2026-11-15T18:30:00.000Z if unanswered',
+  name: 'operator',
+  why: 'reading the plan first',
+  actor: { kind: 'agent', agent: 'operator', token: 'ops' },
+};
+
+/** A run of the targets someone has in hand, its id ending in `four`: listed in flight, its ask still asked. */
+const assignedAs = (four: string, from: keyof typeof TARGET_RUNS) => {
+  const run = TARGET_RUNS[from];
+  return listed({
+    ...run,
+    metadata: { ...run.metadata, name: run.metadata.name.replace(/.{4}$/, four) },
+    status: { ...run.status, state: 'inFlight', assignee: ASSIGNEE },
+  });
+};
+
+/** A run that asks at a gate, the same run in the operator's hand, and a held run in their hand too. */
+const ASSIGNED_ROWS = [RUN('72wy'), assignedAs('a5sg', '72wy'), assignedAs('h4sg', 'c7un')];
+
+/**
+ * Runs someone has in hand as rows of the runs table, under one that waits on you: an assigned row's chip is outlined, never yellow, its
+ * words name who has it, and its assignee line says who and when it comes back; a held run in someone's hand draws both lines, the hold's
+ * first.
+ */
+export const AssignedRows: Story = {
+  render: () => (
+    <div style={BOARD}>
+      <InTable run={ASSIGNED_ROWS[0]} runs={ASSIGNED_ROWS} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const row = (one: WaitingRun) => canvasElement.querySelector<HTMLElement>(`tr[data-run="${one.id}"]`)!;
+    const [yours, assigned, both] = ASSIGNED_ROWS.map(row);
+    await expect(yours.querySelector('[data-now]')).toHaveAttribute('data-now', 'yours');
+    await expect(yours.querySelector('[data-assignee]'), 'a run nobody has in hand has no assignee line').toBeNull();
+    await expect(assigned.querySelector('[data-now]')).toHaveAttribute('data-now', 'waits');
+    await expect(assigned.querySelector('[data-now-words]')).toHaveTextContent(NOW_WORDS.inHand('operator'));
+    await expect(assigned.querySelector('[data-assignee-who]')).toHaveTextContent(NOW_WORDS.hasIt('operator'));
+    const lines = [...both.querySelectorAll('[data-hold], [data-assignee]')].map((line) => line.hasAttribute('data-hold'));
+    await expect(lines, 'the hold line, then the assignee line').toEqual([true, false]);
+  },
+};
+
 /** The panel at work, waiting for answers, and waiting for a decision. */
 export const Panels: Story = {
   render: (args) => (

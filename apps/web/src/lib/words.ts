@@ -247,6 +247,11 @@ export const NOW_WORDS = {
   round: (at: number, of: number) => `round ${at} of ${of}`,
   ring: (spent: string, cap: string) => `its step: ${spent} of its ${cap} cap`,
   waitedBy: (count: number) => (count === 1 ? 'a run waits on it' : `${count} runs wait on it`),
+  inHand: (who: string) => `· ${who} has it`,
+  hasIt: (who: string) => `${who} has it in hand`,
+  backAt: (at: string) => `back to you at ${at}`,
+  notTimed: 'not timed while nothing is asked',
+  someone: 'someone',
 } as const;
 
 /** The words of a wait the board has no kind for. */

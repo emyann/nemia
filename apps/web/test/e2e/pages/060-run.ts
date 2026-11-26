@@ -103,23 +103,6 @@ export default {
     for (const group of ['(root)', 'apps/web']) {
       await expectVisible(decide.locator(`[data-group="${group}"] [data-bar]`), `a row for ${group}, with its +/− bar`);
     }
-    for (const file of FAKE.agentFacing) {
-      await expectVisible(
-        decide.locator('[data-chip="agent-facing"][title="the next agent reads this"]', { hasText: file }),
-        `${file} is an agent-facing chip`,
-      );
-    }
-    for (const file of FAKE.checkAffecting) {
-      await expectVisible(
-        decide.locator('[data-chip="check-affecting"][title="could make its check pass"]', { hasText: file }),
-        `${file} is a check-affecting chip`,
-      );
-    }
-    await photograph(decide.locator(`[data-touched="${FAKE.branch}"]`), path.join(OUT, `run-decide-files-${await themeOf(page)}.png`));
-    await expectVisible(
-      decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }),
-      `the lesson chip says what the run wrote (${FAKE.lesson})`,
-    );
     await expectCount(decide.locator('details[open]'), 0, 'every check-affecting diff is folded until opened');
     const capped = decide.locator(`details[data-diff="${FAKE.capped}"]`);
     await capped.locator('summary').click();

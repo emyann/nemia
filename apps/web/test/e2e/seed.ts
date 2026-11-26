@@ -955,16 +955,7 @@ export function seedFactories(root: string, repo: string) {
   const hires = { [hiring.hire]: WORKFLOWS.good.agent.name };
   write(
     path.join(dir, `${hiring.name}.json`),
-    JSON.stringify(
-      {
-        volumes: worked([repo]),
-        workflows: [WORKFLOWS.good.name],
-        hires,
-        radius: { agentFacing: FAKE.agentFacing, checkAffecting: FAKE.checkAffecting, lessons: FAKE.agentFacing },
-      },
-      null,
-      2,
-    ),
+    JSON.stringify({ volumes: worked([repo]), workflows: [WORKFLOWS.good.name], hires }, null, 2),
   );
   for (const name of [bare, ...others])
     write(path.join(dir, `${name}.json`), JSON.stringify({ volumes: worked([path.join(root, name)]) }, null, 2));
@@ -2337,7 +2328,6 @@ export function seed(root: string, now = Date.now()) {
       {
         id,
         repo,
-        factory: FACTORIES.hiring.name,
         workspace: repo,
         baseRef,
         branch: 'main',

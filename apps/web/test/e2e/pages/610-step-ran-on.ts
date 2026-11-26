@@ -12,16 +12,14 @@ const STEP = 'implement';
  * What a step's session ran on, in its inspector's facts: the DIAMOND's running step, whose attempt recorded an image under the store's
  * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another; its
  * top, whose attempt recorded neither, says `not recorded` there too: each in its part's Detail fold, opened, the mode in its spec fold.
- * The running step's bar follows its live conversation, so it is opened from the page, never as the route the runner idles on, and its
- * stream is awaited.
+ * The running step's bar follows none of its live conversation until a person opens it, so the page idles once the bar is drawn.
  */
 export default {
   name: 'step-ran-on',
   route: `/runs/${running.id}`,
   expect: async (page) => {
-    const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
     await page.goto(new URL(`/runs/${running.id}?bar=step:${running.id}/${STEP}`, page.url()).href, { waitUntil: 'load' });
-    await streaming;
+    await idle(page);
     const bar = stepBar(page, running.id, STEP);
     await expectVisible(bar, `the address opens ${STEP}'s inspector on ${running.id}`);
     const detail = await openFold(bar.locator('[data-part-detail]'), 'detail');

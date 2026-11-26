@@ -229,6 +229,30 @@ export const cancelledAt = () => (storedMarker(DIAMOND.cancelled.id, 'cancelled'
 export const stepBar = (page: Page, run: string, step: string) => page.locator(`aside[data-bar="step:${run}/${step}"]`) satisfies Locator;
 
 /**
+ * The step's conversation in its bar, opened from the bar's ⋯ menu, in place of the step's card.
+ * @param page The page the bar is open on, where the menu opens.
+ * @param bar The step's bar (`stepBar`).
+ */
+export async function openConversation(page: Page, bar: Locator) {
+  await bar.locator('button[data-bar-menu]').click();
+  await page.getByRole('menuitem', { name: 'Open conversation', exact: true }).click();
+  const talk = bar.locator('section[aria-label="Its conversation"]');
+  await expectVisible(talk, "the bar's menu opens the step's conversation in place of its card");
+  await expectCount(bar.locator('article[data-step-part]'), 0, "and the step's card is no longer drawn");
+  return talk;
+}
+
+/**
+ * The page a bar shows, opened by its ⋯ menu's Open.
+ * @param page The page the bar is open on, where the menu opens.
+ * @param bar The bar.
+ */
+export async function openFromBar(page: Page, bar: Locator) {
+  await bar.locator('button[data-bar-menu]').click();
+  await page.getByRole('menuitem', { name: 'Open', exact: true }).click();
+}
+
+/**
  * The Clock cell's button of `row` — or the Cost cell's, by `cell` — reached by the table's own arrow keys from the row: the keyboard
  * alone, which is what makes the focus a visible one and so opens the preview — React Aria opens a tooltip on focus only where the focus
  * came from the keyboard. `where` names the table the row is in, for the refusal.

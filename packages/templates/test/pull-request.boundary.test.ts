@@ -164,6 +164,17 @@ test("branch pushes the run's branch, never forced, with no gh on the PATH, and 
     assert.ok(ran.stdout.includes(`nemia pr: ${line}`), ran.stdout);
 });
 
+test("branch prints `owner/repo` of a GitHub-shaped origin address, as the server's tools take them", () => {
+  const at = withMain(placed());
+  const shaped = path.join(scratch('wf-origin-named-'), 'o', 'r.git');
+  fs.mkdirSync(path.dirname(shaped), { recursive: true });
+  fs.renameSync(at.bare!, shaped);
+  gitIn(at.repo, 'remote', 'set-url', 'origin', shaped);
+  const r = pr(at, 'branch');
+  assert.equal(r.code, 0, r.err);
+  assert.ok(r.out.includes('nemia pr: repository o/r\n'), r.out);
+});
+
 test('REFUSED: branch given an argument, on the remote default branch, or on no run branch, and a verb the script has not; nothing is pushed', () => {
   const at = withMain(placed());
   const given = pr(at, 'branch', ['--title', 'x']);

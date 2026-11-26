@@ -1,6 +1,7 @@
 /**
- * The orchestrator and the api answer one `resourceVersion` for one object: the orchestrator's own read in process (`definitionRevisionNow`
- * for a library agent, `hireObject` for a Hire) and the api's GET of it, read with nothing written between, carry the same revision.
+ * The orchestrator and the api answer one `resourceVersion` for one object: the orchestrator's own read in process
+ * (`definitionRevisionNow` for a library agent, `hireObject` for a Hire) and the api's GET of it, read with nothing written between,
+ * carry the same revision; so does a library agent's card, whose version is the orchestrator's verb's (`AGENT_CARD`).
  */
 import { root } from './harness.ts';
 import { definitionRevisionNow, hireObject } from 'agent-orchestrator';
@@ -26,6 +27,14 @@ test('a library agent has one resourceVersion, in process and through the api', 
   const inProcess = String(await runtime.runPromise(definitionRevisionNow('Agent', undefined, 'implementer')));
   const served = (await (await app.request('/api/agents/implementer?origin=user')).json()) as Agent;
   assert.equal(served.metadata.resourceVersion, inProcess);
+});
+
+test("a library agent's card, whose version the orchestrator's verb (`AGENT_CARD`) serves, carries the resourceVersion the agent is served at", async () => {
+  const card = (await (await app.request('/api/namespaces/default/agents/implementer/card?origin=user')).json()) as {
+    card: { version: string };
+  };
+  const served = (await (await app.request('/api/agents/implementer?origin=user')).json()) as Agent;
+  assert.equal(card.card.version, served.metadata.resourceVersion);
 });
 
 test('a Hire has one resourceVersion, in process and through the api', async () => {

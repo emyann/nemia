@@ -31,7 +31,6 @@ import {
   customInstructionsFile,
   customOf,
   definitionRevision,
-  definitionRevisionNow,
   factoriesFilling,
   inFactory,
   listedAt,
@@ -326,8 +325,7 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
     });
   const from: 'user' | 'repo' = served.origin === 'user' ? 'user' : 'repo';
   const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }));
-  const version = String(await s.inRequest(definitionRevisionNow('Agent', undefined, name)));
-  return { card: { ...card, version }, servedOverA2A: false as const, why: A2A_WHY(name), from };
+  return { card, servedOverA2A: false as const, why: A2A_WHY(name), from };
 }
 
 const READ_ROUTE = 'POST /api/agents/read';

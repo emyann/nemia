@@ -1498,7 +1498,10 @@ describe('PUT /api/workflows/yours/:name: a save the package refuses, or of a fo
       tells(error, 'the Workflow edited changed since it was read', [`(it is at revision ${now}, not ${read})`, 'read it again']);
       assert.deepEqual(snapshot(dir), edited, `${what}: the hand edit is kept, and nothing else written`);
       undo();
-      assert.notEqual(await revisionOf('edited'), read, `${what}: undone, the revision is still ahead: a revision never goes back`);
+      assert.ok(
+        Number(await revisionOf('edited')) >= Number(read),
+        `${what}: undone, the revision is the record's again (files restored to the text it holds are the same files, so no update is lost and a GET writes nothing to remember the edit: the person chose this) or ahead of it`,
+      );
     }
 
     const settled = await revisionOf('edited');

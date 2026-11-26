@@ -376,8 +376,7 @@ describe('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming 
       () => [
         'Conflict',
         handler(AGENTS_WRITE.handler({ from: 'user', name: 'archivist', draft: archivist, schema: null, version: '0000000000000000' })),
-        '0000000000000000',
-        'revision',
+        `version 0000000000000000, now ${agentAt}`,
       ],
     ],
     [

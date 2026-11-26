@@ -17,13 +17,13 @@ import { workedOn } from '../factory/factory.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
-import type { DefinitionThere } from '../agents/agents.ts';
+import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { workflowsIn } from '../folder/folder.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/index.ts';
-import { Conflict } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { recordDue } from '../observed/observed.ts';
 import { indexedRevision } from './definition-index.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
@@ -353,8 +353,6 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
  * @param name The definition's name.
  * @param read The `resourceVersion` the writer read it at, none for a definition made.
  * @param what What the writer does, as the refusal says it: `write` or `remove`.
- * @param held The version the definition's door holds at the name now, null where nothing is there (the door's own refusal says so,
- * `Missing`, and none is judged here): a command line whose read serves the door's version names that one, and it is judged by the door.
  */
 export const definitionJudged = Effect.fn('definitionJudged')(function* (
   kind: 'Agent' | 'Skill' | 'Workflow',
@@ -362,9 +360,8 @@ export const definitionJudged = Effect.fn('definitionJudged')(function* (
   name: string,
   read: string | undefined,
   what: 'write' | 'remove',
-  held?: string | null,
 ) {
-  if (read === undefined || held === null || read === held) return;
+  if (read === undefined) return;
   const now = String(yield* definitionRevisionNow(kind, namespace, name));
   if (now !== read)
     return yield* Effect.fail(
@@ -379,3 +376,39 @@ export const definitionJudged = Effect.fn('definitionJudged')(function* (
  * sweep that cannot read leaves the write standing: the daemon's next sweep numbers it.
  */
 export const definitionsSwept = () => Effect.ignore(indexSweep());
+
+/**
+ * An act on the agent or skill `name` (`does`), given the revision `given` it was read at, judged by the one law of the doors
+ * (`definitionVersionRefusal`) against what the door says is at its name (`there`), the revision it stands at now
+ * (`definitionRevisionNow`) in place of the door's own version, so a refusal names revisions and `Missing` is said before any revision
+ * is judged. Refused as the law chooses: `Missing`, `Conflict` or `Invalid`.
+ * @param what What the definition is: an agent or a skill.
+ * @param namespace The namespace it is served in, none for the library's.
+ * @param name The definition's name.
+ * @param does The act asked: a write or a removal.
+ * @param there What the door says is at the name now.
+ * @param given The revision the writer read it at, none for a new write or a removal given none.
+ */
+export const definitionActed = Effect.fn('definitionActed')(function* (
+  what: 'agent' | 'skill',
+  namespace: string | undefined,
+  name: string,
+  does: 'write' | 'remove',
+  there: DefinitionThere,
+  given: string | undefined,
+) {
+  const at: DefinitionThere =
+    there.kind === 'held'
+      ? { kind: 'held', version: String(yield* definitionRevisionNow(what === 'agent' ? 'Agent' : 'Skill', namespace, name)) }
+      : there;
+  const refused = definitionVersionRefusal(what, name, does, at, given);
+  if (refused === null) return;
+  const message = refused.message;
+  return yield* Effect.fail(
+    refused.kind === 'Missing'
+      ? new Missing({ message })
+      : refused.kind === 'Conflict'
+        ? new Conflict({ message })
+        : new Invalid({ message }),
+  );
+});

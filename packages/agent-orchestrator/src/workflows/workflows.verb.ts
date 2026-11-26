@@ -9,7 +9,7 @@
 import { WORKFLOWS_RM_WORDS, WORKFLOWS_WRITE_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
-import { definitionJudged, definitionsSwept } from '../definition-index/definition-index.store.ts';
+import { definitionJudged, definitionRevisionNow, definitionsSwept } from '../definition-index/definition-index.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -198,7 +198,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
         const door = yield* WorkflowDoor;
         const named = path.basename(dir);
         const held = version === undefined ? undefined : yield* workflowVersion(dir, places);
-        yield* definitionJudged('Workflow', where.from === 'factory' ? where.factory : undefined, named, version, 'write', held);
+        yield* definitionJudged('Workflow', where.from === 'factory' ? where.factory : undefined, named, version, 'write');
         const written = yield* door.workflows.write(
           dir,
           {
@@ -212,7 +212,10 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
           fills,
         );
         yield* definitionsSwept();
-        return written;
+        return {
+          ...written,
+          version: String(yield* definitionRevisionNow('Workflow', where.from === 'factory' ? where.factory : undefined, named)),
+        };
       }),
     ),
   print: () => [],
@@ -264,7 +267,7 @@ export const WORKFLOWS_REMOVE: Served<WorkflowRemoved, WorkflowRemoveInput> = {
         const { places } = yield* writeJudgedOf(where, home);
         const door = yield* WorkflowDoor;
         const held = version === undefined ? undefined : yield* workflowVersion(dir, places);
-        yield* definitionJudged('Workflow', undefined, path.basename(dir), version, 'remove', held);
+        yield* definitionJudged('Workflow', undefined, path.basename(dir), version, 'remove');
         const removed = yield* door.workflows.remove(dir, held, users, places);
         yield* definitionsSwept();
         return removed;

@@ -294,12 +294,12 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
 });
 
-/** Whether a sweep keeps the index for this process's reads, the daemon's or another process's: where one does, a read writes nothing. */
+/** Whether a sweep keeps the index for this process's reads, the one this process ticks: where one does, a read writes nothing. */
 const SWEEPING = { running: false };
 
 /**
- * A sweep keeps the index for this process's reads, the daemon's in it or another process's (the api served alone): a read of a definition
- * no longer reads the index again (`definitionsRefreshed`), so a GET writes nothing. A program with no sweep, a test, reads it again.
+ * This process ticks, so its sweep keeps the index: a read of a definition no longer reads the index again (`definitionsRefreshed`), so a
+ * GET writes nothing. A program that ticks no sweep (an api served with `--no-tick`, a test) reads the index again: nothing keeps it.
  */
 export const sweepBegun = () => {
   SWEEPING.running = true;

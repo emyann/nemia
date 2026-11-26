@@ -255,25 +255,36 @@ const revisionOf = (o: WatchedObject) => Number(o.metadata.resourceVersion);
 /**
  * The frames of `changes`, each object they name sent once as it stands in `read`, in the order of the changes: an object changed after
  * `after` and still in the list as its change says (MODIFIED for each of a namespace's), DELETED the object that is gone. An object the
- * list no longer holds, or holds at a revision the watcher was sent, is sent nothing. DELETED is sent only where the list is `whole`: asked
- * with no namespace and no selector, so an object the list lacks is gone and not merely outside the watcher's filter.
+ * list no longer holds, or holds at a revision the watcher was sent, is sent nothing. DELETED is sent for an object this watch sent
+ * (`known`, which it keeps up), or on any list asked `whole` (no namespace, no selector), never for one the watcher's filter never held.
  */
-const framesOfChanges = (kind: WatchedKind, after: number, changes: readonly KindChange[], read: Read | undefined, whole: boolean) => {
+const framesOfChanges = (
+  kind: WatchedKind,
+  after: number,
+  changes: readonly KindChange[],
+  read: Read | undefined,
+  known: Set<string>,
+  whole: boolean,
+) => {
   const sent = new Set<string>();
+  const gone = (change: KindChange) => {
+    const key = `${change.namespace ?? ''}/${change.name ?? ''}`;
+    if (!whole && !known.has(key)) return [];
+    known.delete(key);
+    return [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+  };
   return changes.flatMap((change) => {
-    if (change.change === 'DELETED') {
-      return change.name === null || !whole ? [] : [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
-    }
+    if (change.change === 'DELETED') return change.name === null ? [] : gone(change);
     const found = [...(read?.objects.values() ?? [])].filter(
       (object) =>
         (change.name === null || object.metadata.name === change.name) &&
         (change.namespace === null || object.metadata.namespace === change.namespace),
     );
-    if (found.length === 0 && whole && change.name !== null && change.standing && change.change === 'MODIFIED')
-      return [frameOf({ type: 'DELETED', object: goneObject(kind, change) })];
+    if (found.length === 0 && change.name !== null && change.standing && change.change === 'MODIFIED') return gone(change);
     return found.flatMap((object) => {
       if (revisionOf(object) <= after || sent.has(keyOf(object))) return [];
       sent.add(keyOf(object));
+      known.add(keyOf(object));
       return [frameOf({ type: change.change, object })];
     });
   });
@@ -315,6 +326,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
   url.searchParams.delete('resourceVersion');
   const page = await c.var.runtime.runPromise(WatchPage);
   const readNow = () => readAll(list, c, url, page, 0, JSON.stringify);
+  const known = new Set<string>();
   let first: { frames: string[]; at: number };
   if (start.kind === 'since') {
     const replay = await c.var.runtime.runPromise(kindReplay(kind, start.revision));
@@ -322,13 +334,14 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
     const read = replay.changes.length === 0 ? undefined : await readNow();
     if (read instanceof Response) return read;
     first = {
-      frames: framesOfChanges(kind, start.revision, replay.changes, read, wholeList(url)).map((f) => f.data),
+      frames: framesOfChanges(kind, start.revision, replay.changes, read, known, wholeList(url)).map((f) => f.data),
       at: replay.head,
     };
   } else {
     const at = await c.var.runtime.runPromise(keyspaceHead());
     const read = await readNow();
     if (read instanceof Response) return read;
+    for (const object of read.objects.values()) known.add(keyOf(object));
     first = { frames: [...read.objects.values()].map((object) => frameOf({ type: 'ADDED', object }).data), at };
   }
   const opened = first;
@@ -349,7 +362,7 @@ async function revisionWatch(c: RequestContext<ApiEnv>, list: Listed, kind: Watc
         if (!('changes' in replay)) return yield* new ListRefused({ status: replay.refused === 'gone' ? 410 : 400 });
         const read = replay.changes.length === 0 ? undefined : yield* Effect.promise(readNow);
         if (read instanceof Response) return yield* new ListRefused({ status: read.status });
-        const frames = framesOfChanges(kind, state.at, replay.changes, read, wholeList(url));
+        const frames = framesOfChanges(kind, state.at, replay.changes, read, known, wholeList(url));
         state.at = replay.head;
         for (const frame of frames) yield* write(frame);
       });

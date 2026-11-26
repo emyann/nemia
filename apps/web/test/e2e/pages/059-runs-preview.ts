@@ -1,6 +1,6 @@
 import type * as RunObject from 'objects';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Request } from 'playwright';
 import { photograph, reachClock, themeOf, rowsAnswered, stepBar } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
 import type { RunLines } from '../../../src/lib/api/run.ts';
@@ -124,16 +124,33 @@ async function glanceReads(page: Page, want: StepCardFacts, where: string) {
   }, `${where}: the glance reads the step's agent, model, word, since, round, spend and last line as the api answers them`);
 }
 
+/** The api's reads of a step's conversation: once, and followed. */
+const TRANSCRIPT = /^\/api\/runs\/[^/]+\/steps\/[^/]+\/transcript(\/stream)?$/;
+
 /**
- * That the step's bar of the run is open in the frame's side sheet. The bar follows a live step's conversation, a stream the watch
- * lets go only with the window's navigation, so the page leaves it by a navigation to the runs page, which has no bar open: Close and
- * Escape are the bar's own pages' (`066-run-bar.ts`).
+ * That `open` opens the step's bar of the run in the frame's side sheet, which draws the step's card and reads none of its conversation,
+ * live or not, until a person opens it — so its Close aborts nothing the watch would count — and that Close closes it.
  */
-async function sheetOpens(page: Page, run: string, step: string, where: string) {
-  await expectVisible(stepBar(page, run, step), `${where}: the step opens in the side sheet`);
-  await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
-  await idle(page);
-  await expectCount(stepBar(page, run, step), 0, `${where}: the runs page has no sheet open`);
+async function sheetOpens(page: Page, run: string, step: string, where: string, open: () => Promise<void>) {
+  const asked: string[] = [];
+  const ask = (request: Request) => {
+    if (TRANSCRIPT.test(new URL(request.url()).pathname)) asked.push(request.url());
+  };
+  page.on('request', ask);
+  try {
+    await open();
+    const sheet = stepBar(page, run, step);
+    await expectVisible(
+      sheet.locator(`article[data-step-part="L"][data-step-name="${step}"]`),
+      `${where}: the step opens in the side sheet`,
+    );
+    await idle(page);
+    await sheet.getByRole('button', { name: 'Close', exact: true }).click();
+    await expectCount(stepBar(page, run, step), 0, `${where}: Close closes the sheet`);
+  } finally {
+    page.off('request', ask);
+  }
+  if (asked.length) throw new Refused(`${where}: the step's bar reads no conversation until it is opened — asked ${asked.join(', ')}`);
 }
 
 /**
@@ -147,8 +164,7 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
   await photograph(page, path.join(OUT, `runs-preview-glance-${await themeOf(page)}.png`));
   await page.mouse.move(0, 0);
   await expectCount(glanceOf(page), 0, 'the pointer gone, the glance closes');
-  await bar.click();
-  await sheetOpens(page, run, step, 'by the pointer');
+  await sheetOpens(page, run, step, 'by the pointer', () => bar.click());
   await page.mouse.move(0, 0);
 }
 
@@ -159,8 +175,7 @@ async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string
   for (let at = 0; at < 12 && !(await focusedOn(bar)); at += 1) await page.keyboard.press('ArrowRight');
   if (!(await focusedOn(bar))) throw new Refused("the table's arrows reach the diamond along its row");
   await glanceReads(page, want, 'by the keyboard');
-  await page.keyboard.press('Enter');
-  await sheetOpens(page, run, step, 'by the keyboard');
+  await sheetOpens(page, run, step, 'by the keyboard', () => page.keyboard.press('Enter'));
   await bar.evaluate((found) => (found as HTMLElement).blur());
 }
 
@@ -174,8 +189,7 @@ async function atAGate(page: Page) {
   await bar.hover();
   await expectVisible(glanceOf(page), 'a diamond at its gate shows its glance');
   await page.mouse.move(0, 0);
-  await bar.click();
-  await sheetOpens(page, run, step, 'at a gate');
+  await sheetOpens(page, run, step, 'at a gate', () => bar.click());
   await page.mouse.move(0, 0);
 }
 

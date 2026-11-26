@@ -1,4 +1,5 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useMemo, type ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { agentsQuery } from '../../lib/api/agents';
@@ -6,7 +7,7 @@ import type { RunDetail, StepView } from '../../lib/runView';
 import { waitsAtGate, stepState } from '../../lib/status';
 import { foldTranscript, sessionToRead } from '../../lib/transcript';
 import { useStepTranscript, type Following } from '../../lib/useStepTranscript';
-import { cn } from '../../lib/utils';
+import { Button } from '@/components/ui/ds';
 import { StepPart } from './part/StepPart';
 import { SessionReading } from './session/SessionReading';
 
@@ -15,21 +16,29 @@ const SessionTalk = lazy(() => import('./session/SessionTalk').then((m) => ({ de
 
 type Step = StepView;
 
+/** The part's body as the bar draws it: on the bar's own frame, over the padding of the bar's body, the part's body having its own. */
+const onTheBar = (body: ReactNode) => <div className="-m-4">{body}</div>;
+
 /**
- * What is going on in one step, in one scroll: its part whole (`StepPart` at L) — what it asks of you, what it got, said and gave, and
- * its detail, of the try the address shows — then the tail of its conversation under it. The conversation is keyed by run and step, so
- * one never stands in for another step's while that one is read. `className` places it in what holds it.
+ * What the step bar holds of one step: its part whole (`StepPart` at L) — what it asks of you, what it got, said and gave, and its detail,
+ * of the try the address shows — drawn on the bar's own cut frame, its head linking to no page, the bar's menu holding Open; or, while
+ * `talk`, the tail of its conversation in its place, under a Back that calls `onBack`. The conversation is read and followed only while it
+ * is shown, and keyed by run and step, so one never stands in for another step's while that one is read.
+ * @param props.run The run the step is of.
+ * @param props.step The step.
+ * @param props.talk Whether its conversation is shown, in place of its part.
+ * @param props.onBack What Back does: shows its part again.
  */
-export function StepInspector({ run, step, className }: { run: RunDetail; step: Step; className?: string }) {
+export function StepInspector({ run, step, talk, onBack }: { run: RunDetail; step: Step; talk: boolean; onBack: () => void }) {
   const agents = useQuery(agentsQuery);
+  if (!talk) return <StepPart view={run} step={step.name} size="L" agents={agents.data} here frame={onTheBar} />;
   return (
-    <div data-step-scope={step.name} className={cn('flex flex-col gap-4 overflow-auto p-3', className)}>
-      <StepPart view={run} step={step.name} size="L" agents={agents.data} />
-      <section aria-label="Its conversation" className="flex flex-col gap-2">
-        <h3 className="text-label-medium text-on-surface-variant uppercase">Its conversation</h3>
-        <Activity key={`${run.id}/${step.name}`} run={run} step={step} />
-      </section>
-    </div>
+    <section data-step-scope={step.name} aria-label="Its conversation" className="flex flex-col gap-2">
+      <Button variant="text" size="xsmall" icon={ArrowLeft} onPress={onBack} className="self-start">
+        Back to the step
+      </Button>
+      <Activity key={`${run.id}/${step.name}`} run={run} step={step} />
+    </section>
   );
 }
 

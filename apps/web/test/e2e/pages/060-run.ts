@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { openFold, partOf, photograph, sidebar, stepBar, themeOf } from '../board.ts';
+import { openConversation, openFold, partOf, photograph, sidebar, stepBar, themeOf } from '../board.ts';
 import { OUT } from '../world.ts';
 import { expectCount, expectDrawn, expectInside, expectTwoDeep, expectUncut, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
@@ -230,12 +230,22 @@ export default {
 
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
     const inspector = stepBar(page, FAKE.id, SESSION.step);
-    const talk = inspector.locator('section[aria-label="Its conversation"]');
-    await expectVisible(partOf(inspector, SESSION.step).locator('[data-part-said]'), `${SESSION.step}'s bar draws its part whole first`);
+    await expectVisible(partOf(inspector, SESSION.step).locator('[data-part-said]'), `${SESSION.step}'s bar draws its part whole`);
     await expectCount(inspector.getByRole('tab'), 0, 'in one scroll, with no tabs');
+    await expectCount(
+      inspector.locator('section[aria-label="Its conversation"]'),
+      0,
+      `${SESSION.step}'s bar draws no conversation until a person opens it`,
+    );
+    await expectCount(
+      partOf(inspector, SESSION.step).locator('[data-step-action]'),
+      0,
+      "the part's head links to no page: the bar's menu holds Open",
+    );
+    const talk = await openConversation(page, inspector);
     await expectVisible(
       talk.locator('[data-session-turn="folded"]', { hasText: SESSION.folded }),
-      `${SESSION.step}'s conversation, under its part, is drawn by the family, the calls folded into one line (${SESSION.folded})`,
+      `${SESSION.step}'s conversation, opened from the bar's menu, is drawn by the family, the calls folded into one line (${SESSION.folded})`,
     );
     await expectVisible(
       talk.locator('[data-session-talk].gap-2'),
@@ -248,6 +258,9 @@ export default {
     );
     await settled(page);
     await photograph(page, path.join(OUT, `run-activity-${await themeOf(page)}.png`), { fullPage: true });
+    await talk.getByRole('button', { name: 'Back to the step', exact: true }).click();
+    await expectVisible(partOf(inspector, SESSION.step).locator('[data-part-said]'), `Back shows ${SESSION.step}'s part again`);
+    await expectCount(talk, 0, 'and its conversation is gone');
 
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = stepBar(page, FAKE.id, FAKE.unverified);

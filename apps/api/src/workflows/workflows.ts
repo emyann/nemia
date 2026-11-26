@@ -135,13 +135,7 @@ export type ListedStep = {
 /**
  * What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it).
  */
-export type StepOwn = { keys: StepKey[]; body: string };
-
-/**
- * One key of a file, as a card's or a step's page lays them out: the key, its value as the package read it — null where the file does not
- * set it — and one line of what it means, the package's (`STEP_KEY_MEANINGS`, `INBOX_KEY_MEANINGS`).
- */
-export type KeyRow = { key: string; value: string | null; meaning: string };
+type StepOwn = { keys: StepKey[]; body: string };
 
 /**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
@@ -179,7 +173,7 @@ export const stepSourceOf = (dir: string, name: string) => fs.readFileSync(path.
  * @param home The store's root folder, whose workflows/ is yours.
  * @param tree The factory's tree folder, or undefined where it was made from no template.
  */
-export const sourcesOf = (repo: string, home: string, tree?: string) =>
+const sourcesOf = (repo: string, home: string, tree?: string) =>
   [
     ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
     { from: 'repo', dir: path.join(repo, 'workflows') },
@@ -326,7 +320,7 @@ export function listed(name: string, from: WorkflowSource, dir: string, loaded: 
  * an agent gives it the rest, and the agent hired into it.
  * @param hires The agent hired into each step, by step.
  */
-export const listedStep = (hires: ReadonlyMap<string, string>) => (step: StepSpec) => ({
+const listedStep = (hires: ReadonlyMap<string, string>) => (step: StepSpec) => ({
   name: step.name,
   spec: specOf(step),
   body: step.body,

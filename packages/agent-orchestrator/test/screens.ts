@@ -19,7 +19,7 @@ import type { Stage } from './story.ts';
 export type DecisionOver = { readonly place: Place; readonly env?: Env; readonly sensitive?: readonly string[] };
 
 /** Run `id`'s decision, or why it is not judged, read over the engine `e` as the api reads it; a refusal (`Missing`) thrown as it is. */
-export const decisionOrWhy = (e: Engine, id: string, over: DecisionOver) =>
+const decisionOrWhy = (e: Engine, id: string, over: DecisionOver) =>
   runWith(
     e,
     placedIn(over.env ?? process.env, over.place, decisionRead(id, over.sensitive ? { sensitive: [...over.sensitive] } : {})),

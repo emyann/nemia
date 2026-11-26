@@ -24,7 +24,7 @@ import { readStanding, writeStanding, type StandingFile, type StoodRead } from '
 import { StoreRoot } from '../config/root.store.ts';
 
 /** How long a pass waits for one `standing`: past it, the repository reads unread on this pass, and is asked again on the next. */
-export const STANDING_DEADLINE_MS = 15_000;
+const STANDING_DEADLINE_MS = 15_000;
 
 /**
  * What was read of where repositories stand: each repository and base branch asked, when it was read (`at`, absent where nothing was: no
@@ -231,14 +231,14 @@ export const NOTHING_READ: PassStanding = { read: new Map() };
 export const headsOver = (git: BranchReader) => (run: RepositoryRun) => Object.fromEntries(git.heads(run.repo));
 
 /** What a read off the tick says of a question no pass asked, with no `standing.json`: no pass has read it yet. */
-export const NO_SNAPSHOT = 'no pass has read where it stands yet: nemia up reads it';
+const NO_SNAPSHOT = 'no pass has read where it stands yet: nemia up reads it';
 
 /**
  * `standing.json` as the tick's last pass wrote it (`file`), as a `PassStanding`, with no process: undefined, nothing read, and every
  * question unread in the words `NO_SNAPSHOT` says.
  * @param file `standing.json` as read (`readStanding`), or undefined where no pass wrote it.
  */
-export const snapshotStanding = (file: StandingFile | undefined) =>
+const snapshotStanding = (file: StandingFile | undefined) =>
   (file
     ? { read: byKey(file.places), at: file.at, unasked: 'the last pass did not ask it' }
     : { read: new Map(), unasked: NO_SNAPSHOT }) satisfies PassStanding as PassStanding;
@@ -279,7 +279,7 @@ export const standingLive = Effect.fn('standingLive')(function* (runs: readonly 
  * What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of.
  * @param ids The runs the verb names, by id.
  */
-export const asksOwnOr = (ids: readonly string[]) => {
+const asksOwnOr = (ids: readonly string[]) => {
   const asked = new Set(ids);
   return ((run) => asked.has(run.id) || asksOwn(run)) satisfies (run: RepositoryRun) => boolean;
 };

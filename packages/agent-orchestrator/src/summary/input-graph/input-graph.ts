@@ -20,7 +20,10 @@ export type GraphEdge =
 /** One node of a routed graph: its kind (`nodeKind`), the routes a condition ends the run on, the workflow a workflow node files for. */
 export type GraphNode = { name: string; kind: NodeKind; ends?: string[]; workflow?: string };
 
-/** `input`: `to` is handed `from`'s declared output (its `input:`). Drawn on the run object's graph alone until the board draws it. */
+/**
+ * `input`: `to` is handed `from`'s declared output (its `input:`). Drawn on the run object's graph alone until the board draws it.
+ * @public
+ */
 export type InputEdge = { from: string; to: string; kind: Extract<EdgeKind, 'input'> };
 
 /**

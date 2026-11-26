@@ -15,7 +15,7 @@ import { storeEnv } from './template.ts';
 import { cardNames, cardText } from 'agent-orchestrator/testing';
 
 /** The client's bin (`apps/cli`), the `nemia` a factory's steps type, and the api it asks (`apps/api`), from the repository's root. */
-export const CLIENT = path.join(REPO, 'apps', 'cli', 'bin', 'nemia.ts');
+const CLIENT = path.join(REPO, 'apps', 'cli', 'bin', 'nemia.ts');
 const API = path.join(REPO, 'apps', 'api');
 
 /**
@@ -87,10 +87,10 @@ export async function world(t: TestContext) {
 }
 
 /** The factories the cards are filed in, each with the workflows it attaches: a card names its factory, which offers its workflow. */
-export const FACTORIES: Readonly<Record<string, readonly string[]>> = { acme: ['build'], pipao: ['intake'] };
+const FACTORIES: Readonly<Record<string, readonly string[]>> = { acme: ['build'], pipao: ['intake'] };
 
 /** `nemia` typed in the world `env`, as a person sets the factory up: refused, the test fails with what it said. */
-export function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]) {
+function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]) {
   const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
   assert.equal(ran.status, 0, `nemia ${argv.join(' ')}: ${ran.stdout}${ran.stderr}`);
 }

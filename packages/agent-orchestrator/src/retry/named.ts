@@ -6,7 +6,7 @@
 import type { RetryHow } from './retry-ask.ts';
 
 /** A `nemia retry` a text names: the step, and how it asks for its try. */
-export type RetryNamed = { step: string; how: RetryHow };
+type RetryNamed = { step: string; how: RetryHow };
 
 /** `nemia retry <run> <step>`, and the rest of its line, up to a backtick or the line's end. */
 const COMMAND = /\bnemia retry ([\w.-]+) ([\w-]+)([^\n`]*)/g;

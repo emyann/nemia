@@ -13,7 +13,7 @@ import ts from 'typescript';
 import { files, REPO } from 'test-kit/repo';
 
 /** The string methods that take a state apart. */
-export const PARSING = new Set(['startsWith', 'endsWith', 'split', 'match', 'replace', 'includes']);
+const PARSING = new Set(['startsWith', 'endsWith', 'split', 'match', 'replace', 'includes']);
 
 /**
  * Whether `name` names a state: it is status, phase, verdict or word in any case, or ends in one at a word's edge — rowStatus,
@@ -75,7 +75,7 @@ export const counted = (file: string) =>
   !file.endsWith('.stories.tsx');
 
 /** Each file of `listed` the count reads that parses a state, by its path from `root`, with how many times it does. */
-export const measure = (listed: readonly string[], root = REPO) => {
+const measure = (listed: readonly string[], root = REPO) => {
   const counts: Record<string, number> = {};
   for (const file of listed.filter(counted).sort()) {
     const at = path.join(root, file);

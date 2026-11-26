@@ -10,7 +10,7 @@ import type { RunFact, RunKeys, TryFact } from '../stats/index.ts';
 export const RECENT_RUNS = 20;
 
 /** The middle of a set of numbers and its 90th percentile, nearest rank; each null over nothing. */
-export type Spread = { median: number | null; p90: number | null };
+type Spread = { median: number | null; p90: number | null };
 
 /**
  * One step over the window: `runs`, how many runs measured some cost of it; the median and p90 of what it cost one of those runs, its

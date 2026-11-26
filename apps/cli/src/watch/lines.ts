@@ -12,7 +12,7 @@ export type Watched = { json?: boolean };
  * What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's.
  * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedSaidWords = (l: FeedStreamLine) => {
+const feedSaidWords = (l: FeedStreamLine) => {
   const store = l.store !== undefined ? l : undefined;
   const who = store?.by ? ` by ${store.by}` : '';
   const notes = [store?.why, l.note].filter((n) => n);
@@ -31,7 +31,7 @@ export const feedSaidWords = (l: FeedStreamLine) => {
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`.
  * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedLineWords = (l: FeedStreamLine) => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
+const feedLineWords = (l: FeedStreamLine) => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
 /**
  * A line as the watch prints it, `line` as the stream's event decoded it and `cursor` the byte just after it: in words, or the line whole

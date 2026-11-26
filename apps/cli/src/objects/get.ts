@@ -32,7 +32,7 @@ type GetAsked = {
   output: Output;
 };
 
-export const GET_HELP = `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]
+const GET_HELP = `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]
 
 Read the objects of a resource the api serves, or one by its name. The resources are those \`nemia explain\` names.
 
@@ -95,7 +95,7 @@ function parsed(args: readonly string[]) {
  * @param at The moment, an ISO date; one that does not parse is `<unknown>`.
  * @param now The moment the age is counted to, in ms since the epoch: now where it is left out.
  */
-export const ageOf = (at: string, now: number = Date.now()) => {
+const ageOf = (at: string, now: number = Date.now()) => {
   const ms = now - Date.parse(at);
   if (!Number.isFinite(ms)) return '<unknown>';
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -119,7 +119,7 @@ const stateOf = (object: Served) => {
  * @param all Whether the list is across every namespace, which puts NAMESPACE first.
  * @param now The moment each AGE is counted to, in ms since the epoch: now where it is left out.
  */
-export function tableOf(objects: readonly Served[], all: boolean, now: number = Date.now()) {
+function tableOf(objects: readonly Served[], all: boolean, now: number = Date.now()) {
   const rows = [
     [...(all ? ['NAMESPACE'] : []), 'NAME', 'STATE', 'AGE'],
     ...objects.map((o) => [

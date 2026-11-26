@@ -59,7 +59,7 @@ import type { ConflictsDue } from '../../contracts/conflicts-said.contract.ts';
 import type { AddsMissingDue } from '../../contracts/adds-missing-said.contract.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
-export type { InvolvedKind, Reason, LineSource, LineType };
+export type { InvolvedKind, Reason };
 
 /** The version every line this `nemia` writes is stamped with; a line with none is upgraded on read (`upgraded`). */
 export const FEED_VERSION = 'nemia/v1';
@@ -755,6 +755,7 @@ export type FeedConflicts = readonly { factory: string; pending: boolean; messag
  * pending and the feed did not last say so, `ConflictsSettled` where they are not and it did, else nothing. Pure.
  * @param said What the feed last said of the factory's conflicts, or undefined where it has said nothing of them.
  * @param pending Whether the factory's `ConflictsPending` condition is `True` now.
+ * @public
  */
 export const conflictsDue: ConflictsDue = (said, pending) =>
   pending ? (said === 'ConflictsPending' ? undefined : 'ConflictsPending') : said === 'ConflictsPending' ? 'ConflictsSettled' : undefined;
@@ -796,6 +797,7 @@ export type FeedMissing = readonly { factory: string; missing: boolean; message?
  * and the feed did not last say so, `AddsResolved` where none is and it did, else nothing. Pure.
  * @param said What the feed last said of the factory's adds, or undefined where it has said nothing of them.
  * @param missing Whether an add of the factory's record is missing now.
+ * @public
  */
 export const addsMissingDue: AddsMissingDue = (said, missing) =>
   missing ? (said === 'AddsMissing' ? undefined : 'AddsMissing') : said === 'AddsMissing' ? 'AddsResolved' : undefined;

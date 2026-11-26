@@ -5,7 +5,7 @@
  */
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
-import { runKeys, stepKeys, type StepKeys } from '../meter/index.ts';
+import { runKeys, stepKeys } from '../meter/index.ts';
 
 /**
  * Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, the service they are filed under, and
@@ -100,9 +100,6 @@ export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, ste
   run: run.id,
   ...stepKeys(run, step),
 });
-
-/** What `stepLabels` answers: a run's id beside the step's own labels. */
-export type StepLabels = StepKeys & { run: string };
 
 /**
  * The labels a run is known by whatever the step, from the same source as a step's (`runKeys`): its id, its factory and its workflow.

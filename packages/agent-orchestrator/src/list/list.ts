@@ -284,7 +284,7 @@ export const queuedForOf = (wait: HeldBack | undefined) => {
  * @param wait What the task waits for: memory, with the bytes it needs, the bytes free and the bytes kept, a session slot, with its
  * pool and its ceiling, or the engine unschedulable.
  */
-export const admissionWords = (wait: HeldBack) =>
+const admissionWords = (wait: HeldBack) =>
   wait.for === 'unschedulable'
     ? 'waits for the store to resume: paused (nemia resume)'
     : wait.for === 'memory'

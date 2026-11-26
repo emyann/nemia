@@ -6,8 +6,6 @@
 import { PROPOSAL_PHASES } from 'objects';
 import type { PhaseTakes, ProposalPhaseSelectorOf } from '../../contracts/proposal-phase-selector.contract.ts';
 
-export type { ProposalPhaseSelector } from '../../contracts/proposal-phase-selector.contract.ts';
-
 /** The field a proposal's list is selected by. */
 const FIELD = 'status.phase';
 

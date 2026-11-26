@@ -51,22 +51,6 @@ export function doorOf<T extends Record<string, Record<string, (...args: never[]
   ) as DoorOf<T, I>;
 }
 
-/**
- * A door as a layer's plain value again: each method runs the door's Effect at once, its refusal thrown and a defect thrown as it was.
- * What a synchronous caller that no program yields yet reads a door through, its writes checked as the door checks them.
- * @param door The door to read and write through.
- */
-export function atOnce<T, I extends string>(door: DoorOf<T, I>) {
-  return Object.fromEntries(
-    Object.entries(door as Record<string, Record<string, (...args: never[]) => Effect.Effect<unknown, Refusal>>>).map(
-      ([group, methods]) => [
-        group,
-        Object.fromEntries(Object.entries(methods).map(([name, method]) => [name, (...args: never[]) => Effect.runSync(method(...args))])),
-      ],
-    ),
-  ) as T;
-}
-
 const shownValue = (value: unknown) => {
   const json = JSON.stringify(value) ?? 'undefined';
   return json.length > 60 ? `${json.slice(0, 60)}…` : json;

@@ -13,7 +13,7 @@ type WorkflowListed = WorkflowList['items'][number];
 type TemplateListed = TemplateList['items'][number];
 
 /** The columns of a workflow's row, in the order its cells are. */
-export const WORKFLOW_COLUMNS: readonly TableColumnDefinition[] = [
+const WORKFLOW_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The workflow's name.", 0),
   column('Origin', 'Where the workflow is defined: factory, repo, yours or builtin.', 0),
   column('Steps', 'How many steps it has.', 0, 'integer'),
@@ -47,7 +47,7 @@ const workflowCells = (workflow: WorkflowListed) => [
 export const workflowTable = (list: WorkflowList) => tableOf(list, WORKFLOW_COLUMNS, workflowCells) satisfies Table;
 
 /** The columns of a template's row, in the order its cells are. */
-export const TEMPLATE_COLUMNS: readonly TableColumnDefinition[] = [
+const TEMPLATE_COLUMNS: readonly TableColumnDefinition[] = [
   column('Name', "The template's name.", 0),
   column('Version', "Its content's version.", 0),
   column('Description', 'The first line of what the template is.', 0),

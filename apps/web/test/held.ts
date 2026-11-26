@@ -22,7 +22,7 @@ export const against = (found: readonly string[], listed: readonly string[]) => 
  * The entries the tree's baseline lists on `list`, every file's lines together.
  * @param list The list read.
  */
-export const listed = (list: BaselineList) => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
+const listed = (list: BaselineList) => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
 
 /**
  * Asserts `found` is the baseline's `list` exactly, naming what to mend, and for each mended entry the file it is cut from: the line,

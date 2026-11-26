@@ -27,7 +27,7 @@ import { type GitAsked, judge, standingsOf } from './judged.verb.ts';
 import { unjudgedWord } from '../views/views.verb.ts';
 
 /** What the run is judged as (`judge`), when it is. */
-export type JudgedRun = Extract<Effect.Success<ReturnType<typeof judge>>, object>;
+type JudgedRun = Extract<Effect.Success<ReturnType<typeof judge>>, object>;
 
 /**
  * A run judged: the run as it was read, its steps by name in the order the run started with them (`stepNames`), the steps it is judged by

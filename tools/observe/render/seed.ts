@@ -14,13 +14,13 @@ import { asked, awaited } from './stack.ts';
 import { quota, type Sampled } from './quota-week.ts';
 
 /** The attributes of a seeded span: each a word, or a number where the code sends one. */
-export type SpanAttributes = Record<string, string | number>;
+type SpanAttributes = Record<string, string | number>;
 
 /** A span of the seed: how long before the stamp it began and how long it took, in milliseconds, and the spans under it. */
 export type SpanSeed = { name: string; ago: number; took: number; attributes: SpanAttributes; children?: SpanSeed[] };
 
 /** A log record of the seed: its body, how long before the stamp it was said, and its attributes. */
-export type LogSeed = { body: string; ago: number; attributes: Record<string, string> };
+type LogSeed = { body: string; ago: number; attributes: Record<string, string> };
 
 /**
  * A metric of the seed, by the name the code gives it: a `histogram`, a `gauge` (no unit, as the code's), a `total` (a sum that only
@@ -48,7 +48,7 @@ export type ServiceSeed = {
 };
 
 /** The service a step's session files what it says under. */
-export const SESSIONS = 'claude-code';
+const SESSIONS = 'claude-code';
 
 /** The seeded run a one-run panel is opened on, and a second one beside it. */
 export const RUN = 'seeded-run-1';
@@ -505,7 +505,7 @@ function metricOf(metric: MetricSeed, now: number): object {
 }
 
 /** The seed as the three OTLP/HTTP JSON bodies a collector takes, every time in it counted back from `now`, milliseconds. */
-export function stamped(seed: readonly ServiceSeed[], now: number): { traces: object; logs: object; metrics: object } {
+function stamped(seed: readonly ServiceSeed[], now: number): { traces: object; logs: object; metrics: object } {
   const id = ids(now);
   const scope = { name: 'seed' };
   return {
@@ -573,7 +573,7 @@ export const picks = (seededAt: number, now: number): Picks => ({
 });
 
 /** How long `arrived` waits for each store, in seconds. */
-export const ARRIVAL_SECONDS = 180;
+const ARRIVAL_SECONDS = 180;
 
 /** One store's question through Grafana's datasource proxy, answered once the seed is in it. */
 type Arrival = { what: string; path: () => string; there: (answer: unknown) => boolean };

@@ -25,7 +25,7 @@ import { wantsTable } from '../objects/table.ts';
  * Where a proposal is judged and applied: the store's root, whose factories say their own repositories.
  * @param s The request's services, its caller and the place it is answered in.
  */
-export const placeOf = (s: Served) => ({ home: s.home });
+const placeOf = (s: Served) => ({ home: s.home });
 
 export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>
   handlers

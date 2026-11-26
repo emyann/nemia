@@ -49,19 +49,13 @@ export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine)
  * @param run The run whose tasks were read.
  * @param unreadable Why each task whose journal did not read did not, by task id.
  */
-export function unreadableOf(run: Run, unreadable: Unreadable) {
+function unreadableOf(run: Run, unreadable: Unreadable) {
   for (const taskId of runTasks(run)) {
     const why = unreadable.get(taskId);
     if (why !== undefined) return { taskId, why };
   }
   return undefined;
 }
-
-/**
- * What `judgedUnlessUnreadable` answers: the judgement, or why there is none, in the board's words (`unreadable`) and in a reader's own
- * (`saidBy`, the reader named: `nemia decide`).
- */
-export type JudgedOrNot<T> = { judged: T } | { unreadable: string; saidBy: (by: string) => string };
 
 /**
  * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): its unfrozen

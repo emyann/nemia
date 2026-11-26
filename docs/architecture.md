@@ -13,7 +13,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | `packages/objects` | The objects' shapes: what every kind Nemia serves is, as a `nemia/v1` object (`apiVersion`, `kind`, `metadata`, and its spec and status), the metadata every object carries and the envelope of a list of it (`src/meta.ts`), and the HttpApi definition that serves them. The commands' words and the parser that reads a command line by them (`src/command.ts`, `src/commands.ts`), which the client, the api and the orchestrator read alike. It imports `effect` alone (`packages/objects/CLAUDE.md`). | `objects` → `src/index.ts`, the Schemas and constants, re-exported by name. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages but `objects`, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
-| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: every store verb is the client's, its words `objects`' (`COMMAND_WORDS`, the names `MOVED_COMMANDS`), parsed, helped, run and printed here through the api serving the store over HTTP under every context, the person's files read here, a daemon started on demand where none serves; its reads (`doctor`, `daemon`, `READ_VERBS` in `apps/cli/src/route.ts`) and its own verbs (`CLIENT_VERBS`) ask the api too; a verb about this machine (`MACHINE_VERBS`) and a help of one run on the orchestrator's own CLI, spawned with the same words. `--local` is refused, naming the command without it, and a daemon of another release than the client's is refused, naming `nemia version`. A context of the client's own config (`apps/cli/src/context.ts`, kubectl's way, `nemia config …`, `NEMIA_CONTEXT`) names a remote daemon and a person's token for it: every command asks that daemon, a verb about the machine still runs here, and a word that is neither is refused, naming `nemia --help` and `NEMIA_CONTEXT=local`: nothing is forwarded. It imports no package of ours but `objects`, and from the api only its client door's types. | Its commands. |
+| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: every store verb is the client's, its words `objects`' (`COMMAND_WORDS`, the names `MOVED_COMMANDS`), parsed, helped, run and printed here through the api serving the store over HTTP under every context, the person's files read here, a daemon started on demand where none serves; its reads (`doctor`, `daemon`, `READ_VERBS` in `apps/cli/src/route.ts`) and its own verbs (`CLIENT_VERBS`) ask the api too; a verb about this machine (`MACHINE_VERBS`) and a help of one run on the orchestrator's own CLI, spawned with the same words. `--local` is refused, naming the command without it, and a daemon of another release than the client's is refused, naming `nemia version`. A context of the client's own config (`apps/cli/src/context.ts`, kubectl's way, `nemia config …`, `NEMIA_CONTEXT`) names a remote daemon and a person's token for it: every command asks that daemon, a verb about the machine still runs here, and a word that is neither is refused, naming `nemia --help` and `NEMIA_CONTEXT=local`: nothing is forwarded. It imports no package of ours but `objects`, and nothing of the api. | Its commands. |
 
 `apps/docs`, the documentation site, sits beside the layers and is none of them: it imports no workspace package and depends on
 none (`apps/docs/test/structure.test.ts`), and reads the repository's text at build, by path from its root. Its pages draw each state
@@ -27,7 +27,7 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
 
 - the web reaches the api over HTTP alone, and the shapes of what it serves by `objects` (`apps/web/test/structure.test.ts`, and the
   web's lint block);
-- the cli reaches the api over HTTP alone, the shapes of its answers by `objects`' Schemas and the error body by `import type` from `apps/api/src/client/client.ts`, the store's
+- the cli reaches the api over HTTP alone, the shapes of its answers by `objects`' Schemas, the store's
   daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
   `packages/agent-orchestrator/test/contract.test.ts`). That path runs the verbs about this machine alone; every store verb is the
@@ -548,8 +548,8 @@ writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store
 invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
 proves). What once called the folder's stores around the door is paid, and its store test refuses any use; `write.store.ts`'s
-functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), and the one
-old spelling left, `removeWorkflow`, is a plain alias of `removeWorkflowAt` in that module, the root first all the same. A read and a
+functions each take the store's root first (`writeWorkflowAt`, `removeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`,
+`placesAroundAt`). A read and a
 write parse the steps against the agents and skills the door finds through the Agent and Skill doors (`agents.found`, `skills.found`),
 at the places its layer says (`around`), and hand them to the layer: those of `workflowDoorOver`'s `defs` where given, else those the
 program is given, so a program given `agentDoorMemory()` and a store's root reads a workflow on the files whose step names an agent the
@@ -633,7 +633,7 @@ wrote is refused by the Migrator's loader inside the Migrator's transaction, nam
 Proposal door (`src/proposal/proposal.store.ts`) holds each under `/registry/proposals/<factory>/<name>`, its `resourceVersion` the
 record's revision, a write back refused `Conflict` from a revision it is no longer at. Unlike the doors above, it has no synchronous
 layer: its shape's Effects are the keyspace's, its stand-in (`proposalDoorMemory`) the same code over a keyspace in memory, and no
-`doorOf` or `atOnce` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
+`doorOf` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
 moved aside under `<root>/imported/proposals/`, never deleted.
 
 A record stays under 1.5 MiB (`RECORD_CEILING`, etcd's) and names what is larger by a pointer: a write says the keys its record points
@@ -710,8 +710,7 @@ a function that answers a Promise (`packages/agent-runtime/test/plain-faces.test
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
 source. The web's imports no workspace package but `objects`, no harness SDK and no path into `packages/`; the cli's (`apps/cli/src` and
-`apps/cli/bin`) imports none of them either but `objects`, and from the api only `import type` (`allowTypeImports`), of its client door
-alone; the api's imports the orchestrator through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no
+`apps/cli/bin`) imports none of them either but `objects`, and nothing of the api, not even a type; the api's imports the orchestrator through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no
 harness SDK; the runtime's imports no layer above it, and not `objects`; and the objects' (`packages/objects/src`) imports `effect` and
 its own files alone. Each block above the runtime refuses a path into the objects (`objects/**`): they are reached by their entry. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 

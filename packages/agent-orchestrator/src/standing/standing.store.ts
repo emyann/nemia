@@ -46,7 +46,7 @@ const StandingFileFields = Schema.Struct({ v: Schema.Literal(1), at: Schema.Stri
 export type StandingFile = Omit<typeof StandingFileFields.Type, 'places'> & { readonly places: readonly StoodRead[] };
 
 /** `standing.json`, decoded: a newer tick's keys kept where it wrote any. */
-export const StandingFileSchema = Schema.StructWithRest(StandingFileFields, Rest);
+const StandingFileSchema = Schema.StructWithRest(StandingFileFields, Rest);
 
 /** What to do about a `standing.json` that does not read. */
 const REWRITTEN =

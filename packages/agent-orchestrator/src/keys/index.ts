@@ -26,7 +26,6 @@ export {
   writableNamesOf,
   readsNamesOf,
   STORE_READS,
-  MOUNTED_READS,
   slotOf,
   SLOTS,
   tokensOf,
@@ -41,6 +40,6 @@ export { bareSkillOf, givenSkillOf, ONE_BARE_NAME, SKILL_NAME, sameBareIn } from
 export type { GivenSkill } from './given-skill.ts';
 export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, EDITING_TOOLS, rulesOf, TOOLS_EXAMPLE, toolsOf } from './tools.ts';
 export type { DeniedAt } from './tools.ts';
-export { FILED_AS, filedRefusal, lineOf } from './filed-as.ts';
+export { filedRefusal, lineOf } from './filed-as.ts';
 export type { FiledFlags, FiledStep } from './filed-as.ts';
 export { mergedOutput } from './merged-output.ts';

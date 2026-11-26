@@ -20,10 +20,10 @@ import { importAct, type FileRead } from './import.ts';
 import { keyspaceAt, keyspaceFile, RECORD_CEILING, type Keyspace } from './keyspace.store.ts';
 
 /** How one file of a kind reads: its record's value and the keys it points to, or why it is no record of its kind. */
-export type KindRead = { readonly value: string; readonly points?: readonly string[] } | { readonly unreadable: string };
+type KindRead = { readonly value: string; readonly points?: readonly string[] } | { readonly unreadable: string };
 
 /** One file of a kind: where it is, the key its record goes to, where it is moved once imported, and how its text reads. */
-export type KindFile = {
+type KindFile = {
   readonly file: string;
   readonly key: string;
   readonly aside: string;
@@ -119,7 +119,7 @@ const looked = (one: KindFile) => {
  * @param kind The kind imported.
  * @param keyspace The store's keyspace.
  */
-export const kindImported = Effect.fnUntraced(function* (home: string, kind: ImportKind, keyspace: Keyspace) {
+const kindImported = Effect.fnUntraced(function* (home: string, kind: ImportKind, keyspace: Keyspace) {
   for (const stray of yield* fromThrow(() => kind.strays?.(home) ?? []))
     yield* Effect.logWarning(`${stray.entry} was not imported: ${stray.why}; move it aside, or remove it`);
   const files = yield* fromThrow(() => kind.files(home).map(looked));

@@ -15,7 +15,7 @@ export type Dashboard = { uid: string; title: string; panels: DashboardPanel[] }
 type DashboardPanel = { type: string; gridPos?: { y: number; h: number }; panels?: DashboardPanel[] };
 
 /** A bar of a bar gauge: the name drawn beside it, empty when none is, and its value as drawn. */
-export type Bar = { name: string; value: string };
+type Bar = { name: string; value: string };
 
 /** A panel as the page shows it: what each kind of panel draws, and the error its queries answered. */
 export type Seen = {
@@ -32,7 +32,7 @@ export type Seen = {
 };
 
 /** How wide the window is, and how tall one unit of a dashboard's grid is drawn with its gap, in pixels. */
-export const WIDTH = 1600;
+const WIDTH = 1600;
 const UNIT = 38;
 
 /** How long a dashboard is given to load and to settle, in milliseconds. */
@@ -63,7 +63,7 @@ export function addressOf(base: string, uid: string, picks: Picks, now?: number)
 }
 
 /** Every panel of `panels` that draws, a row's own among them and no row. */
-export const drawing = (panels: readonly DashboardPanel[]): DashboardPanel[] =>
+const drawing = (panels: readonly DashboardPanel[]): DashboardPanel[] =>
   panels.flatMap((panel) => (panel.type === 'row' ? drawing(panel.panels ?? []) : [panel]));
 
 /**

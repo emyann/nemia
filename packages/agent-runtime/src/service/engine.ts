@@ -68,7 +68,7 @@ import {
   BodyRefused,
 } from '../core/engine/index.ts';
 import { DrainRefused, drainChecked, drainSessionsChecked, passReadsOf } from './drain.ts';
-export { DrainRefused, drainChecked, drainSessionsChecked, drainSessionsRefusalOf, drainRefusalOf } from './drain.ts';
+export { DrainRefused, drainChecked, drainSessionsChecked } from './drain.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';

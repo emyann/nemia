@@ -118,7 +118,7 @@ const unread = (o: Factory): o is Factory & { status: { error: string } } => o.s
  * @param beside What was read beside each factory, its schedules and its instruction, by the factory's name.
  * @param now The time the schedules' fires are measured from, in ms since the epoch.
  */
-export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<string, Beside>, now: number) {
+function listingLines(factories: readonly Factory[], beside: ReadonlyMap<string, Beside>, now: number) {
   const sorted = factories
     .filter((o) => o.metadata.name !== DEFAULT_NAMESPACE)
     .sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));

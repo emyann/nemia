@@ -28,7 +28,7 @@ const UnifiedWindow = Schema.Struct({
 });
 
 /** The fields of an event's `rate_limit_info` the runtime reads: its windows, by Claude Code's key (`five_hour`, `seven_day`, …). */
-export const RateLimitInfoSchema = Schema.Struct({
+const RateLimitInfoSchema = Schema.Struct({
   unifiedWindows: Schema.optional(Schema.Record(Schema.String, UnifiedWindow)),
 });
 

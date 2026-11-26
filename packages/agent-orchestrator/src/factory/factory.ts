@@ -285,7 +285,7 @@ export type { FactoryConditionReason };
 export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const satisfies readonly ConditionStatus[];
 
 /** One of `FACTORY_CONDITION_STATUSES`. */
-export type FactoryConditionStatus = ConditionStatus;
+type FactoryConditionStatus = ConditionStatus;
 
 /**
  * A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence, and when its
@@ -509,7 +509,7 @@ export function factoryRepo(factory: Pick<Factory, 'volumes'> | undefined, named
 }
 
 /** A workflow's repository in a factory, as `contracts/workflow-repo.contract.ts` words it. */
-export type { NamedRepo, WorkflowRepoOf, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
+export type { WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
 
 /**
  * The repository a run of `workflow` works on in a factory of `worked`, each with its folder name: the one named `wired[workflow]`,
@@ -571,7 +571,7 @@ const repoNames = (factory: Pick<Factory, 'volumes'>) => [...new Set(namedRepos(
  * @param refused Why the factory gives the workflow no repository (`workflowRepo`).
  * @param notDone What was not done, said last; `Nothing was started.` by default.
  */
-export function workflowRepoRefusal(
+function workflowRepoRefusal(
   factory: Pick<Factory, 'name' | 'volumes'>,
   workflow: string,
   refused: WorkflowRepoRefusal,
@@ -599,7 +599,7 @@ export function wiredRepo(factory: Pick<Factory, 'name' | 'volumes' | 'workflowR
 }
 
 /** Why a schedule's write is refused for its repository, as `contracts/schedule-repo.contract.ts` words it. */
-export type { ScheduleRepoAsk, ScheduleRepoRefusal } from '../../contracts/schedule-repo.contract.ts';
+export type { ScheduleRepoRefusal } from '../../contracts/schedule-repo.contract.ts';
 
 /**
  * Whether a schedule may be written for what it says of its runs' repository, and why not: a `repo` it had none of, or another than

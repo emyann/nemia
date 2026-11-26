@@ -64,15 +64,6 @@ export const namespaceOfCard = async (command: string, name: string) =>
   (await asked(command, (c) => c.cards.getAll({ params: { name } }))).metadata.namespace ?? DEFAULT_NAMESPACE;
 
 /**
- * The namespace a command reads or writes in, of the place it names under `from` and the factory `--factory` names: `yours` or `repo`,
- * the default namespace's unless a factory is named; any other word, that factory's.
- * @param from The place typed: `yours`, `repo`, a factory's name, or undefined where none was typed.
- * @param factory The factory `--factory` names, or undefined (or empty) where none is named.
- */
-export const namespaceOfPlace = (from: string | undefined, factory: string | undefined) =>
-  from !== undefined && from !== 'user' && from !== 'repo' ? from : factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
-
-/**
  * The `-l` selectors a command line took one by one, as the one label selector a query takes: joined by commas; none where none given.
  * @param args The words parsed against the command's words, whose `selector` holds each `-l` typed.
  */

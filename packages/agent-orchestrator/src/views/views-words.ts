@@ -3,11 +3,11 @@
  * attempt ended (`endWords`), and the engine's word for it (`engineWord`, `wordOfView`). Over a view shape written out here (`WordView`),
  * since a pure file imports no runtime.
  */
-import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
-import type { AttemptMemory, OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
+import { signedAndHeld, type AttemptClock, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
+import type { AttemptMemory } from '../../contracts/out-of-memory.contract.ts';
 import type { AttemptEnd, EnginePhase } from 'objects';
 
-export type { AttemptMemory, AttemptReason, EngineOutcome, OutOfMemoryKill };
+export type { AttemptMemory, EngineOutcome };
 
 /**
  * How an attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (`AttemptReason`), or the orchestrator's

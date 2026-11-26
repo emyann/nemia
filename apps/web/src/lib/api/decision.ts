@@ -6,19 +6,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { RunDecision, type Collisions, type DecisionTouched } from 'objects';
 import { call, read } from './objects.ts';
 
-export type {
-  BaseHold,
-  Collisions,
-  Decidable,
-  DecideCommand,
-  DiffFile,
-  Lesson,
-  RunDecision,
-  RunSlot,
-  SensitiveDiff,
-  Standing,
-  StandingMerge,
-} from 'objects';
+export type { Collisions, Decidable, DecideCommand, DiffFile, Lesson, RunDecision, SensitiveDiff } from 'objects';
 
 /** What a branch touched, or the sentence saying what it changed is not known. */
 export type Touched = DecisionTouched;

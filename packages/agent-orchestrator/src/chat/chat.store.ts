@@ -58,13 +58,13 @@ export const asksFile = (dir: string) => path.join(chatDir(dir), 'asks.jsonl');
  * The person's answers to them, one a line.
  * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
-export const answersFile = (dir: string) => path.join(chatDir(dir), 'answers.jsonl');
+const answersFile = (dir: string) => path.join(chatDir(dir), 'answers.jsonl');
 
 /**
  * The keeper's marks of the answers owed no longer, one a line.
  * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
-export const answersDoneFile = (dir: string) => path.join(chatDir(dir), 'answers-done.jsonl');
+const answersDoneFile = (dir: string) => path.join(chatDir(dir), 'answers-done.jsonl');
 
 /**
  * The keeper's marks of an ask whose call is no longer waiting on the person (`cut`), and of one whose words a call of hers is
@@ -72,7 +72,7 @@ export const answersDoneFile = (dir: string) => path.join(chatDir(dir), 'answers
  * its call is a mark of its own.
  * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
-export const asksClosedFile = (dir: string) => path.join(chatDir(dir), 'asks-closed.jsonl');
+const asksClosedFile = (dir: string) => path.join(chatDir(dir), 'asks-closed.jsonl');
 
 const Moment = Schema.String.check(Schema.isNonEmpty());
 
@@ -119,7 +119,7 @@ const AnswerDoneSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['retu
 const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment, call: Schema.optionalKey(Moment) });
 
 /** One turn the person stopped: when they stopped it, which attempt was answering, and of which task (absent on an older line). */
-export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite, task: Schema.optionalKey(Schema.String) });
+const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite, task: Schema.optionalKey(Schema.String) });
 
 /** The text of `file`, or undefined where there is none. */
 const textOf = (file: string) => {

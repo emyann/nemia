@@ -127,7 +127,7 @@ export const yourSkillsRead = (repo: string | undefined, home: string, builtin: 
  * A factory's tree's folder of workflows (`<tree>/workflows`), whose `agents/` and `skills/` are the factory's own.
  * @param tree The factory's tree folder.
  */
-export const treeWorkflows = (tree: string) => path.join(path.resolve(tree), 'workflows');
+const treeWorkflows = (tree: string) => path.join(path.resolve(tree), 'workflows');
 
 /** Whether the skill folder `dir` is one of the factory's own, in the `skills/` of its tree `tree`; never where there is no tree. */
 const inTree = (dir: string, tree: string | undefined) =>
@@ -202,7 +202,7 @@ export function readAt(reads: Record<string, SkillRead>, dir: string) {
  * @param usedBy The agents of yours that give it; none by default.
  * @param found Where it was found when no page of the board's lists it, its folder from the repository's root; null by default.
  */
-export function skillRow(
+function skillRow(
   name: string,
   dir: string,
   from: SkillSource,
@@ -217,7 +217,7 @@ export function skillRow(
  * The agents of yours (`agents`, `yourAgentsFound`), by name, each with the skills its `skills:` gives: the ones that read.
  * @param agents The agents of yours, by name, each read or the error it did not read with.
  */
-export function yourAgentsSkills(agents: Agents) {
+function yourAgentsSkills(agents: Agents) {
   return [...agents].flatMap(([name, agent]) => (agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]]));
 }
 
@@ -342,7 +342,7 @@ const SKILL_KEYS = {
 const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
 
 /** An agent that gives a skill: its place — the factory's own, in its tree, besides the two — and its name. */
-export type SkillUser = { from: AgentPlace | 'factory'; name: string };
+type SkillUser = { from: AgentPlace | 'factory'; name: string };
 
 /**
  * The agents of both places, yours in the store `home`, that give the skill whose folder is `dir`, read through the Agent and Skill doors,

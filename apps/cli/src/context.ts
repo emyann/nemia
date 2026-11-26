@@ -17,7 +17,7 @@ import type { Chosen, ClientConfig, ContextOf } from '../contracts/context.contr
 import { LOCAL_CONTEXT } from './local-context.ts';
 import { Refused } from './refused.ts';
 
-export type { Chosen, ClientConfig, Context } from '../contracts/context.contract.ts';
+export type { Chosen, ClientConfig } from '../contracts/context.contract.ts';
 export { LOCAL_CONTEXT } from './local-context.ts';
 
 /** The variable that names a context for a single command, over the file's. */
@@ -167,7 +167,7 @@ const USAGE = [
 ];
 
 /** The variable whose token `nemia config headers` prints over every context's, as a host's static header of the port read it before. */
-export const TOKEN_VARIABLE = 'NEMIA_TOKEN';
+const TOKEN_VARIABLE = 'NEMIA_TOKEN';
 
 /** A `nemia config` typed otherwise than its usage: refused, naming it. */
 const misused = (said: string) => new Refused(`nemia config: ${said}. Type one of:\n${USAGE.join('\n')}`);
@@ -279,7 +279,7 @@ function currentContext(env: NodeJS.ProcessEnv) {
  * @param args The words typed after `headers`, where `--context <name>` may be.
  * @param env The environment read for `NEMIA_TOKEN`, the config file and `NEMIA_CONTEXT`.
  */
-export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv) {
+function headersToken(args: readonly string[], env: NodeJS.ProcessEnv) {
   const given = env[TOKEN_VARIABLE];
   if (given !== undefined && given.trim() !== '') return given.trim();
   if (args.includes('--context') && flagOf(args, '--context') === undefined) throw misused('--context takes a context’s name');

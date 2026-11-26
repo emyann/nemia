@@ -29,7 +29,7 @@ export async function settled(root: HTMLElement) {
 }
 
 /** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
-export const focused = () => {
+const focused = () => {
   const at = document.activeElement as HTMLElement | null;
   return { marks: at && at !== document.body ? Object.keys(at.dataset) : [], text: at?.textContent ?? '' };
 };

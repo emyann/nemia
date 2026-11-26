@@ -10,10 +10,6 @@ import type { SaidAfter } from 'objects';
 import type { SaidBy } from '../../contracts/step-speaker.contract.ts';
 import { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';
 
-export { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';
-
-export type { SaidFrom } from '../../contracts/step-speaker.contract.ts';
-
 /**
  * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
  * step's task, the words as given, and the last event of the session's transcript before they went (`after`, `{ kind, id }`, null when

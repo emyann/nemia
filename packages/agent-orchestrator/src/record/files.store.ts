@@ -129,7 +129,7 @@ export function labelled(home: string, run: Run) {
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const refreshFile = (home: string, id: string) => path.join(runsDir(home), `${id}.refresh`);
+const refreshFile = (home: string, id: string) => path.join(runsDir(home), `${id}.refresh`);
 
 /**
  * Write down that a person asked this run to take the new revisions, and answer with the ask written — or null, when one already stands.

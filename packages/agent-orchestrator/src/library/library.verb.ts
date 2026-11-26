@@ -98,7 +98,7 @@ const filledFiles = (home: string, name: string) =>
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function derivedAdds(home: string, name: string) {
+function derivedAdds(home: string, name: string) {
   const files = filledFiles(home, name);
   const agentsDir = path.join(libraryDir(home), AGENTS_FOLDER);
   const adds: LibraryRef[] = [];
@@ -132,7 +132,7 @@ export function factoryAdds(home: string, name: string) {
  * @param home The store's root.
  * @param ref The item, by its kind and its name.
  */
-export function libraryOrigin(home: string, ref: LibraryRef) {
+function libraryOrigin(home: string, ref: LibraryRef) {
   if (ref.kind === 'Skill') return librarySkill(home, ref.name) satisfies DefinitionOrigin | undefined as DefinitionOrigin | undefined;
   if (ref.kind === 'Agent')
     return (fs.statSync(path.join(libraryDir(home), AGENTS_FOLDER, `${ref.name}.md`), { throwIfNoEntry: false })?.isFile()

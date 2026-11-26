@@ -20,7 +20,7 @@ export const CONDITIONS = ['recommends', 'checked', 'accepted', 'withinBudget', 
 export type Condition = (typeof CONDITIONS)[number];
 
 /** The answers a rule may give unasked (`RULE_ANSWERS`, objects' words): a step approved at its gate, and a step tried again. */
-export { RULE_ANSWERS, type RuleAnswer };
+export { RULE_ANSWERS };
 
 /**
  * A rule at a gate: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it
@@ -43,7 +43,7 @@ export const APPROVE_PROPOSAL = 'approve-proposal';
 export const PROPOSAL_VERBS = CHANGE_VERBS;
 
 /** A verb of a proposal's change. */
-export type ProposalVerb = ChangeVerb;
+type ProposalVerb = ChangeVerb;
 
 /**
  * A rule under which the agent approves a proposal of one factory unasked at auto: the `factory`; what it covers, as a delegation's grant

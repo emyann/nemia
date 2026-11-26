@@ -23,13 +23,13 @@ const hash = Schema.NonEmptyString;
  * One entry of a kind and name's ledger (`Revision`): its number, a whole one from 1, the digest of the content it was given for, and
  * when it was first seen.
  */
-export const Revision = Schema.Struct({
+const Revision = Schema.Struct({
   ...RevisionOf.fields,
   n: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
   hash,
   at: Instant,
 }).annotate({ identifier: 'Revision' });
-export type Revision = typeof Revision.Type;
+type Revision = typeof Revision.Type;
 
 /** What an append is given, before the ledger numbers it: an entry of `Revision` but its `n`. */
 export const RevisionAppended = Schema.Struct({ ...RevisionOf.fields, hash, at: Instant });

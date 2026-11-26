@@ -35,7 +35,7 @@ export const fixesDir = (home: string) => path.join(home, 'fixes');
  * @param home The store's root folder.
  * @param id The fix's id.
  */
-export const fixFile = (home: string, id: string) => path.join(fixesDir(home), `${id}.json`);
+const fixFile = (home: string, id: string) => path.join(fixesDir(home), `${id}.json`);
 
 /**
  * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.

@@ -593,7 +593,7 @@ export const inboxCard = (extra: Record<string, unknown> = {}) =>
   }) as never;
 
 /** A factory as the api lists it, working on `repos`. */
-export const listedFactory = (name: string, repos: string[], error: string | null = null) => ({
+const listedFactory = (name: string, repos: string[], error: string | null = null) => ({
   name,
   default: name === 'default',
   worksOn: repos,

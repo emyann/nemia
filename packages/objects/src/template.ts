@@ -92,14 +92,14 @@ export const Template = Schema.Struct({
 export type Template = typeof Template.Type;
 
 /** A template as a list serves it: its object without its instruction or its rules, which a read of the template answers. */
-export const TemplateListed = Schema.Struct({
+const TemplateListed = Schema.Struct({
   ...Template.fields,
   spec: TemplateSpec.mapFields(Struct.omit(['instruction', 'rules'])).annotate({
     description:
       "The template's manifest without its instruction or rules, which a read of the template answers: its version, description, parameters, hires and revisions policy.",
   }),
 }).annotate({ description: "A template as a list serves it, without its files' content (LISTED_WITHOUT)." });
-export type TemplateListed = typeof TemplateListed.Type;
+type TemplateListed = typeof TemplateListed.Type;
 
 /** A page of the templates, each without its files' content. */
 export const TemplateList = listOf('Template', TemplateListed);

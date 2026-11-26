@@ -16,5 +16,3 @@ export {
   type Presence,
   type Speaker,
 } from './chat.ts';
-export { framedFor } from './framed.ts';
-export { speakerNameRefusal } from './speaker-name.ts';

@@ -13,7 +13,7 @@ const IMPORT = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g
  * @param text the file's source.
  * @param file the file's path, for the refusal.
  */
-export const iconsIn = (text: string, file: string) => {
+const iconsIn = (text: string, file: string) => {
   const names = [...text.matchAll(IMPORT)].flatMap(([, list]) =>
     (list ?? '')
       .split(',')

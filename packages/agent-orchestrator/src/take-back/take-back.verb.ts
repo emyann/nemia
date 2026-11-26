@@ -17,7 +17,7 @@ import { askTakeBackJudged, askTakenAt, takeBackCommand, type AskTakenOf } from 
  * What a take-back did: the run as it was read, the key set aside and the step it is of, where it was set aside, whether it was a stray,
  * when and by whom; and the ask as it was read before it was moved, a try's or a round's (a merge is a round's), where one was.
  */
-export type TakenBackAsk = {
+type TakenBackAsk = {
   run: Run;
   key: AskKey;
   step: string;

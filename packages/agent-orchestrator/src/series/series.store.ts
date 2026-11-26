@@ -195,7 +195,7 @@ export const readDay = (home: string, tier: Tier, day: string) => {
  * @param tier The tier read.
  * @param day The UTC day, `YYYY-MM-DD`.
  */
-export const dayStamp = (home: string, tier: Tier, day: string) => {
+const dayStamp = (home: string, tier: Tier, day: string) => {
   try {
     const st = fs.statSync(dayFile(home, tier, day));
     return `${st.size}:${st.mtimeMs}`;
@@ -270,7 +270,7 @@ const linesOf = (
 };
 
 /** What `--range` takes, as its refusal says it. */
-export const RANGE_TAKES = `--range takes ${Object.keys(RANGES).join(', ')}: nemia series --range 7d`;
+const RANGE_TAKES = `--range takes ${Object.keys(RANGES).join(', ')}: nemia series --range 7d`;
 
 /**
  * The range `text` names, `24h` when none is given. Refuses as `Invalid` a range that is not one of `RANGES`.

@@ -16,7 +16,7 @@ const writtenPosition = (record: DelegationRecord) => record.since;
  * A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written.
  * @param record The delegation as the store holds it: its factory, its agent, when it was written and its grants.
  */
-export const delegationObject = (record: DelegationRecord) =>
+const delegationObject = (record: DelegationRecord) =>
   ({
     apiVersion: API_VERSION,
     kind: 'Delegation',
@@ -50,7 +50,7 @@ export const delegationGet = Effect.fn('delegationGet')(function* (factory: stri
 
 /** `agent`'s delegation in `factory` written whole by `caller`, the person: the object written. */
 /** The resources a delegation may grant: the plural of each kind a proposal carries (`workflows`, `agents`, …). */
-export const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOURCE_PLURALS[kind]);
+const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOURCE_PLURALS[kind]);
 
 /**
  * The resources of `spec` no proposal changes, refused where the delegation is written. Kubernetes' PolicyRule reads `*` as every

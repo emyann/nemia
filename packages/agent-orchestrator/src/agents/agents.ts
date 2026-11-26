@@ -167,7 +167,7 @@ export function skillTurnCost(id: string, text: string) {
 }
 
 /** A skill asked by the name a `skills:` line gives it: the folder it is, why it cannot be used, or nothing where no place has it. */
-export type SkillLookup = { get(name: string): string | WorkflowError | undefined };
+type SkillLookup = { get(name: string): string | WorkflowError | undefined };
 
 /**
  * Where the skills a workflow's agents name were found. `at` answers a name as a `skills:` line writes it: the folder the skill is

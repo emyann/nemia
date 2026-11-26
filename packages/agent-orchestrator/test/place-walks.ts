@@ -65,7 +65,7 @@ function toldOf(value: unknown, telling: Telling): unknown {
 }
 
 /** What a walk answered in `area`, as both sides say it. */
-export const told = (value: unknown, area: string) => toldOf(value, { area: fs.realpathSync(area), commits: new Map() }) satisfies unknown;
+const told = (value: unknown, area: string) => toldOf(value, { area: fs.realpathSync(area), commits: new Map() }) satisfies unknown;
 
 /** A repository at `<area>/repo` holding `files`, and its first commit. */
 function repoIn({ world }: Side, area: string, files: Record<string, string> = { 'a.txt': 'one\n' }) {
@@ -1552,7 +1552,7 @@ export const unwalked = (verbs: readonly string[], walks: Readonly<Record<string
   verbs.filter((verb) => !walks[verb]?.length) satisfies string[];
 
 /** What `walk` answers on `side`, in an area of its own, as both sides say it. */
-export function walked(walk: Walk, side: Side) {
+function walked(walk: Walk, side: Side) {
   const area = scratch('wf-place-walk-');
   return told(walk.walk(side, area), area) satisfies unknown;
 }

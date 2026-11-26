@@ -63,7 +63,7 @@ export const servers: Array<{ name: string; child: ChildProcess; output: () => s
  * Each line written to the say file `file`, kept as JSON where it parses and handed to `onLine` once kept, as the session's holder reads
  * the words said to it: polled, and unreferenced, so it keeps nothing alive; it goes with the store.
  */
-export function heardOn(file: string, onLine: (line: unknown) => void = () => {}) {
+function heardOn(file: string, onLine: (line: unknown) => void = () => {}) {
   let read = 0;
   fs.watchFile(file, { interval: 50, persistent: false }, () => {
     const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
@@ -112,7 +112,7 @@ export function stopOnTheWayOut(who: string) {
  * Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. Rejects when the server exits or
  * cannot start before that, or says nothing within `START_MS`; a server that dies after is seen as failed requests.
  */
-export function startServer(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, listening: RegExp) {
+function startServer(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, listening: RegExp) {
   const child = spawn(process.execPath, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let raw = '';
   const output = () => plain(raw);
@@ -205,7 +205,7 @@ export const bearer = () => {
  * opening with the filing the api reads off its task's view; and last a token of the person's (`SEAT_TOKEN`), kept for the browsers.
  * Refuses a directory that is not empty: it may be another worker's store, or a person's.
  */
-export function seedStore(root: string) {
+function seedStore(root: string) {
   if (!fs.existsSync(root) || fs.readdirSync(root).length)
     throw new Error(`a store is seeded in an empty directory of its own, and ${root} is not one: whoever serves it makes one`);
   setStore(root);
@@ -233,7 +233,7 @@ export function seedStore(root: string) {
  * as a claude that cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word, and ends well
  * having said nothing. Returns the directory it is in.
  */
-export function fakeClaude(root: string) {
+function fakeClaude(root: string) {
   const bin = path.join(root, 'bin');
   fs.mkdirSync(bin);
   const answer = path.join(root, QUOTA.file);
@@ -260,7 +260,7 @@ export function fakeClaude(root: string) {
 }
 
 /** `pathValue` (a PATH) without each folder that holds `program`, every other folder kept in its order. */
-export const withoutProgram = (pathValue: string, program: string) =>
+const withoutProgram = (pathValue: string, program: string) =>
   pathValue
     .split(path.delimiter)
     .filter((dir) => dir === '' || !fs.existsSync(path.join(dir, program)))
@@ -271,7 +271,7 @@ export const withoutProgram = (pathValue: string, program: string) =>
  * volume step lists what a page plants there.
  * @param root The worker's store.
  */
-export const folderRootOf = (root: string) => `${root}-folders`;
+const folderRootOf = (root: string) => `${root}-folders`;
 
 /**
  * The api's environment over `root`: Claude Code's transcripts are in the store (CLAUDE_CONFIG_DIR), where the engine reads a session's

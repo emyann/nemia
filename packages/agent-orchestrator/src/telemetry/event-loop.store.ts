@@ -21,7 +21,7 @@ export const EVENT_LOOP_DELAY = Metric.histogram('nodejs.eventloop.delay', {
 export type LoopWatch = { stallMs: number; everyMs: number };
 
 /** The daemon's watch: a stall past a second is logged, and the histogram filled every 10 s, as the process exports its series. */
-export const DAEMON_WATCH: LoopWatch = { stallMs: 1_000, everyMs: 10_000 };
+const DAEMON_WATCH: LoopWatch = { stallMs: 1_000, everyMs: 10_000 };
 
 /** How often the watch's own timer is due, in ms: the stall it sees ends no later than this past the loop's coming back. */
 const BEAT_MS = 100;
@@ -47,9 +47,6 @@ export const delaysOf = (percentiles: ReadonlyMap<number, number>, count: number
   return out;
 };
 
-/** A span of the daemon's, as the watch names it: its name and its parents' names, innermost first. */
-export type NamedSpan = { name: string; chain: string[] };
-
 /** The span's name and its parents' names, innermost first. */
 const namedOf = (span: Tracer.Span) => {
   const chain: string[] = [];
@@ -67,7 +64,7 @@ const namedOf = (span: Tracer.Span) => {
  * @param inner The tracer the process gave, which still makes and exports every span.
  * @param open The spans open, kept in the order started.
  */
-export const openSpans = (inner: Tracer.Tracer, open: Set<Tracer.Span>) =>
+const openSpans = (inner: Tracer.Tracer, open: Set<Tracer.Span>) =>
   Tracer.make({
     span(options) {
       const span = inner.span(options);

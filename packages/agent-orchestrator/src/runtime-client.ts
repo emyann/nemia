@@ -65,33 +65,45 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 /**
  * The orchestrator's copy of the runtime's phases (`EnginePhase`, written out in a pure file that imports no runtime) held equal to the
  * runtime's `TaskPhase`: a word added to or dropped from either fails the typecheck here, never a reader at run time.
+ * @public
  */
 export const enginePhaseHeld: Same<EnginePhase, TaskPhase> = true;
 
 /**
  * The orchestrator's copy of the kinds a said message may follow (`SaidAfterKind`), held equal to the runtime's `TranscriptEvent['kind']`.
+ * @public
  */
 export const saidAfterKindHeld: Same<SaidAfterKind, TranscriptEvent['kind']> = true;
 
-/** The orchestrator's copy of A2A's session states (`StepSessionState`), held equal to the runtime's `SessionState`. */
+/**
+ * The orchestrator's copy of A2A's session states (`StepSessionState`), held equal to the runtime's `SessionState`.
+ * @public
+ */
 export const stepSessionStateHeld: Same<StepSessionState, SessionState> = true;
 
-/** The orchestrator's copy of why an attempt ended (`AttemptReason`), held equal to the runtime's `EndReason`. */
+/**
+ * The orchestrator's copy of why an attempt ended (`AttemptReason`), held equal to the runtime's `EndReason`.
+ * @public
+ */
 export const attemptReasonHeld: Same<AttemptReason, EndReason> = true;
 
-/** The orchestrator's copy of an attempt's memory record (`AttemptMemory`), held equal to the runtime's `MemoryUse`. */
+/**
+ * The orchestrator's copy of an attempt's memory record (`AttemptMemory`), held equal to the runtime's `MemoryUse`.
+ * @public
+ */
 export const attemptMemoryHeld: Same<AttemptMemory, NonNullable<TaskView['state']['attempts'][number]['memory']>> = true;
 
-/** The orchestrator's copy of why a queued task waits (`HeldBack`, which `nemia ls` words), held equal to the runtime's `AdmissionWait`. */
+/**
+ * The orchestrator's copy of why a queued task waits (`HeldBack`, which `nemia ls` words), held equal to the runtime's `AdmissionWait`.
+ * @public
+ */
 export const heldBackHeld: Same<HeldBack, AdmissionWait> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
 export type {
-  AdmissionWait,
   ClaudeFlags,
   CodexArgs,
-  Denial,
   HarnessQuota,
   HeardQuota,
   QuotaLimit,
@@ -102,8 +114,6 @@ export type {
 } from 'agent-runtime';
 /** What the engine's `forget` removed, or would, and its refusal by task (`engineForgetting`). */
 export { ForgetRefused, type ForgetReport, type KeptReport } from 'agent-runtime';
-export { codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from 'agent-runtime';
-export { claudeSignIn, CLAUDE_SIGN_IN_MS, type ClaudeSignIn } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 
@@ -113,7 +123,7 @@ export { scopeRefusal } from 'agent-runtime';
  * This user's processes with the variables asked for, and their end by pid and start: what the free sweep reads a finished run's left
  * by.
  */
-export { endProcesses, processesNow, type ProcessNow, type ProcessToEnd } from 'agent-runtime';
+export { endProcesses, processesNow, type ProcessNow } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api carries on a step's path (`StepPath`'s `lifecycle`). */
 export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */
@@ -132,31 +142,25 @@ export { trustedFolder } from 'agent-runtime';
  * under the repository the place answered for the folder; and taken back from a run's home and every folder inside it as the run is
  * removed (`untrustFolder`); each `undefined` for a harness that keeps no trust.
  */
-export { folderTrust, trustFolder, untrustFolder, type FolderTrust, type FolderTrusted, type FolderUntrusted } from 'agent-runtime';
+export { folderTrust, trustFolder, untrustFolder } from 'agent-runtime';
 /** Where each harness keeps its user's own agent files, listed as the sources' `harness` place. */
 export { userAgentFolders } from 'agent-runtime';
 /**
  * One MCP server a factory records and a harness is handed (`RemoteMcpServer`), and the one producer of its bytes (`mcpServerOf`): the
  * record carries the server's wire facts, and the runtime spells them in the one key order a sign-in is filed under.
  */
-export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-runtime';
+export { mcpServerOf } from 'agent-runtime';
 /**
  * An MCP server's transport in the Agent SDK's words (`MCP_TRANSPORTS`, `McpTransport`), and a written `type` read as one, or as
  * `unknown` for any other word (`transportOf`).
  */
 export { MCP_TRANSPORTS, transportOf, type McpTransport } from 'agent-runtime';
 /**
- * What a harness says of the servers it was handed, carried here whole and never worded again: the five state words it has
- * (`MCP_STATES`), one server's state as it says it, and what a whole read answers — the states, or that the look failed and why,
- * never an empty list. Asked of the engine's `mcpState`, and refused by `McpStateRefused`.
+ * What a harness says of the servers it was handed, carried here whole and never worded again: one server's state as it says it, and
+ * what a whole read answers — the states, or that the look failed and why, never an empty list. Asked of the engine's `mcpState`, and
+ * refused by `McpStateRefused`.
  */
-export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
-/**
- * A server's sign-in as the engine holds it: what a sign-in answers at once (`McpSignInStarted`), the words of its state
- * (`SIGN_IN_STATES`, `McpSignInState`), and what the four verbs are refused with (`McpSignInRefused`, `held` where a sign-in waits,
- * `callback` why a pasted callback was refused).
- */
-export { McpSignInRefused, SIGN_IN_STATES, type McpSignInStarted, type McpSignInState } from 'agent-runtime';
+export { type McpServerState, type McpServersRead } from 'agent-runtime';
 /**
  * Whether a harness files a sign-in for a remote MCP server, read off its name: the runtime's judgement, carried, for the pass that
  * will not start a step whose server needs one. A harness it answers false for is shown its servers and never refused them.
@@ -490,7 +494,7 @@ export function readRemote(root: string) {
  * Every refusal a read of the file came to: the file's own, or each entry's.
  * @param read The file's read (`readRemote`).
  */
-export const refusalsOf = (read: RemoteRead) => (read.unread ? [read.unread] : [...read.refused.values()]);
+const refusalsOf = (read: RemoteRead) => (read.unread ? [read.unread] : [...read.refused.values()]);
 
 /**
  * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step

@@ -6,7 +6,7 @@
 import { sizeOf } from '../../artifacts/artifacts.ts';
 
 /** A task the engine forgot, or would: its journal's bytes, its lines in the feed, and what its harness keeps that the runtime leaves. */
-export type TaskForgotten = { taskId: string; journalBytes: number; feedLines: number; left: string[] };
+type TaskForgotten = { taskId: string; journalBytes: number; feedLines: number; left: string[] };
 
 /** A task the engine has not forgotten, and why, in the runtime's words. */
 export type TaskKept = { taskId: string; why: string };

@@ -7,22 +7,12 @@
  * (`memoryFit`), and whether the slice its sessions run under holds them to what the machine allocates (`ceilingFit`), each of which
  * `nemia doctor` says. Pure: the verbs read the machine (`os.totalmem()`, `os.availableParallelism()`).
  */
-import type {
-  CeilingFit,
-  CeilingFitOf,
-  Configured,
-  Machine,
-  MemoryFit,
-  MemoryFitOf,
-  Sized,
-  SizedFor,
-  SliceCeiling,
-} from '../../contracts/sizing.contract.ts';
+import type { CeilingFitOf, Machine, MemoryFit, MemoryFitOf, SizedFor } from '../../contracts/sizing.contract.ts';
 
-export type { CeilingFit, Configured, Machine as MachineSize, MemoryFit, Sized, SliceCeiling };
+export type { Machine as MachineSize, MemoryFit };
 
 /** The machine's memory each session asks on average, in MiB: the contract's own number, which a law reads. */
-export const MIB_PER_SESSION = 2560;
+const MIB_PER_SESSION = 2560;
 
 /**
  * The floor kept for the daemon and the machine on a machine of `memoryMiB`, in MiB: an eighth of it, and 1 GiB at least.

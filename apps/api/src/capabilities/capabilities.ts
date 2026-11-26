@@ -53,7 +53,7 @@ const isFolder = (at: string) => {
 };
 
 /** How long a server has to start and list its tools before it is reported as not answering. */
-export const ASK_MS = 15_000;
+const ASK_MS = 15_000;
 
 export const SETTINGS = '.claude/settings.json';
 const MCP_JSON = '.mcp.json';
@@ -350,7 +350,7 @@ export type AskServer = (repo: string, server: Started, launch: Launch, deadline
  * An MCP asker that has asked nothing yet, and keeps every answer it has for as long as it lives. Keyed by the repository, the server and
  * all it is started with, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
  */
-export function makeMcpAsker() {
+function makeMcpAsker() {
   const answers = new Map<string, Promise<Answer>>();
   return ((repo, server, launch, deadlineMs) => {
     const key = JSON.stringify([repo, server.name, launch]);

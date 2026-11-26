@@ -7,7 +7,7 @@
 import type { CardState } from 'objects';
 import type { CardLanded, CardLanding, WaitedRun, WaitStalled } from '../../contracts/card-landing.contract.ts';
 
-export type { CardLanding, ListedWait, WaitedCard, WaitedRun } from '../../contracts/card-landing.contract.ts';
+export type { CardLanding } from '../../contracts/card-landing.contract.ts';
 
 /**
  * Where the work of one card another waits on stands: missing where the store knows nothing of it; landed where a run of its own, or a
@@ -15,6 +15,7 @@ export type { CardLanding, ListedWait, WaitedCard, WaitedRun } from '../../contr
  * the first that is gone, else at itself.
  * @param card The card: its name, whether the store knows it, and the runs started from it, each with whether it landed.
  * @param onward Where each card its runs passed its work on to stands, already judged by this same decision.
+ * @public
  */
 export const cardLanded: CardLanded = (card, onward) => {
   if (!card.known) return { kind: 'missing', card: card.name };
@@ -40,7 +41,7 @@ export const waitStalled: WaitStalled = (wait) => wait.kind !== 'waiting' || (wa
 export type CardLook = { readonly known: boolean; readonly runs: readonly WaitedRun[]; readonly onward: readonly string[] };
 
 /** A card named in an `after:` that has not landed, and where its work stands (`cardLanded`'s waiting or missing). */
-export type CardWaitOn = { readonly card: string; readonly landing: Exclude<CardLanding, { kind: 'landed' }> };
+type CardWaitOn = { readonly card: string; readonly landing: Exclude<CardLanding, { kind: 'landed' }> };
 
 /**
  * The cards of `after` that have not landed, in the order written, each with where its work stands: `cardLanded` asked of each card, and

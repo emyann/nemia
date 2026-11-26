@@ -47,7 +47,7 @@ async function packed(folder: string, command: string, env: NodeJS.ProcessEnv) {
  * @param command The command's name, said in a refusal.
  * @param env The environment whose chosen context says whether the daemon is this machine's; this process's by default.
  */
-export async function templateSent(given: string, command: string, env: NodeJS.ProcessEnv = process.env) {
+async function templateSent(given: string, command: string, env: NodeJS.ProcessEnv = process.env) {
   if (TEMPLATE_NAME.test(given)) return { name: given };
   if (chosenOf(env).kind !== 'remote') return { path: path.resolve(given) };
   const at = fs.statSync(given, { throwIfNoEntry: false });

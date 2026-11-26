@@ -7,20 +7,15 @@
  * the `continue` token that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
 import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_OUTCOMES, RUN_STATES } from 'objects';
-import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';
+import type { FinishedBefore } from '../../contracts/finished-order.contract.ts';
 import type { RunNamespace } from '../../contracts/run-namespace.contract.ts';
-import type {
-  RunOutcomeSelector,
-  RunOutcomeSelectorOf,
-  RunSelector,
-  SelectorTakes,
-} from '../../contracts/run-outcome-selector.contract.ts';
-import type { RunStateSelector, RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
+import type { RunOutcomeSelectorOf, RunSelector, SelectorTakes } from '../../contracts/run-outcome-selector.contract.ts';
+import type { RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
 import { badLimit, listPage, type PageAsked } from '../object/page.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { nameFirst } from './name-order.ts';
 
-export type { FinishedKey, RunOutcomeSelector, RunSelector, RunStateSelector };
+export type { RunSelector };
 
 /**
  * The namespace of a run whose record names `factory`: that factory, or `default` for none.
@@ -80,6 +75,7 @@ export const selectorTakes: SelectorTakes = (selector, run) =>
  * Whether the finished run at `a` comes before the one at `b`: newest first by when its work stopped, two together by name.
  * @param a The first run's place: its name, and when its work stopped, in epoch ms.
  * @param b The run it is compared with, in the same terms.
+ * @public
  */
 export const finishedBefore: FinishedBefore = (a, b) =>
   a.finishedMs !== b.finishedMs ? a.finishedMs > b.finishedMs : nameFirst(a.name, b.name);

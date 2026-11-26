@@ -124,9 +124,6 @@ function afterOf(file: string, after: string | undefined) {
   return names;
 }
 
-/** A card `nemia start` is given as its brief: its `workflow:` when it names one, the cards its `after:` names, and its body. */
-export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
-
 /**
  * A file `nemia start` is given, read as a plan's card when it opens with a frontmatter block of keys — a block that reads as YAML
  * (`frontmatterOrNull`) as a map of at least one key, each a word (`KEY_WORD`) — or null when it does not: no

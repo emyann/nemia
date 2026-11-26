@@ -12,8 +12,6 @@ import { ruleReaches } from './rule-reaches.ts';
 
 export { ruleReaches } from './rule-reaches.ts';
 
-export { neverHolds } from './never-holds.ts';
-
 export type { Unmet } from '../../contracts/reach.contract.ts';
 
 export type { GateSite, NeverWhy } from '../../contracts/never-holds.contract.ts';
@@ -29,6 +27,7 @@ function slugOf(step: string) {
  * The rule that approves the step gated at `site` and no other, needing every condition that can hold there and no dollar line, which
  * is the person's to add; its id `approve-<step>`, the step's name slugged so that `ruleRefusal` takes it. Pure.
  * @param site The gate the rule is suggested for.
+ * @public
  */
 export const suggestedFor: SuggestedFor = (site) => ({
   id: `approve-${slugOf(site.step)}`,
@@ -41,6 +40,7 @@ export const suggestedFor: SuggestedFor = (site) => ({
  * What keeps `rule` from letting its answer through in `facts`: each condition it needs that does not hold, and its dollar line. Pure.
  * @param rule The rule in force.
  * @param facts The run's facts at the gate: which conditions hold, and what it has cost.
+ * @public
  */
 export const unmetNow: UnmetNow = (rule, facts) => ({
   conditions: CONDITIONS.filter((c) => rule.when.includes(c) && !facts[c]),

@@ -205,7 +205,7 @@ const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1
  * journal it finds as it left it costs a `stat` and is not counted. Counted off the engine's running totals before and after the handler,
  * so about: a pass or another request reading at the same time is counted here too.
  */
-export const POLL_READS = Metric.histogram('api.poll.reads', {
+const POLL_READS = Metric.histogram('api.poll.reads', {
   description: 'the files the runtime read for a request',
   boundaries: READ_BOUNDS,
 });

@@ -11,10 +11,10 @@
 export type Tree = Readonly<Record<string, string>>;
 
 /** One commit: its id, its files, the commits it follows, and its message. */
-export type Commit = { readonly id: string; readonly tree: Tree; readonly parents: readonly string[]; readonly message: string };
+type Commit = { readonly id: string; readonly tree: Tree; readonly parents: readonly string[]; readonly message: string };
 
 /** A merge staged in a checkout and not committed: the commits it merges, the paths left conflicted, and the files it gives. */
-export type Staged = { readonly heads: readonly string[]; readonly conflicts: readonly string[]; readonly tree: Tree };
+type Staged = { readonly heads: readonly string[]; readonly conflicts: readonly string[]; readonly tree: Tree };
 
 /** A directory that holds a branch's files: the repository's own, at its root, or a workspace cut from it. */
 export type Checkout = { readonly dir: string; readonly branch: string; staged?: Staged };
@@ -91,7 +91,7 @@ export function commitOf(repo: Repository, id: string) {
 }
 
 /** Every commit `id` follows in `repo`, itself among them. */
-export function ancestors(repo: Repository, id: string) {
+function ancestors(repo: Repository, id: string) {
   const seen = new Set<string>();
   const next = [id];
   for (let at = next.pop(); at !== undefined; at = next.pop()) {
@@ -143,13 +143,13 @@ export function merged(base: Tree, ours: Tree, theirs: Tree) {
 }
 
 /** A text's lines, its last one counted whether or not it ends in a line break. */
-export const linesOf = (text: string) => (text === '' ? [] : text.replace(/\n$/, '').split('\n'));
+const linesOf = (text: string) => (text === '' ? [] : text.replace(/\n$/, '').split('\n'));
 
 /**
  * What turns the lines `from` into `to`, in order: each line kept (` `), taken away (`-`) or added (`+`), the lines taken away at one
  * spot before those added there, found on the longest run of lines both keep.
  */
-export function lineChanges(from: readonly string[], to: readonly string[]) {
+function lineChanges(from: readonly string[], to: readonly string[]) {
   const kept = Array.from({ length: from.length + 1 }, () => Array.from({ length: to.length + 1 }, () => 0));
   const at = (i: number, j: number) => kept[i]?.[j] ?? 0;
   for (const [i, row] of [...kept.entries()].reverse().slice(1))
@@ -168,7 +168,7 @@ export function lineChanges(from: readonly string[], to: readonly string[]) {
 }
 
 /** One file a change touched: its path, how (the place's `added`, `modified` or `removed`), its lines added and removed, and its diff. */
-export type Change = {
+type Change = {
   readonly path: string;
   readonly status: 'added' | 'modified' | 'removed';
   readonly added: number;

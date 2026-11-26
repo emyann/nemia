@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** The text of the fake, its shebang this process's node. */
-export const gatedJobScript = (gates: string, head = '') => `#!${process.execPath}
+const gatedJobScript = (gates: string, head = '') => `#!${process.execPath}
 const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');

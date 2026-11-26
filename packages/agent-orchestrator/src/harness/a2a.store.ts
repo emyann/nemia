@@ -18,7 +18,7 @@ import { REMOTE_NAME, REMOTE_PREFIX } from './harness.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** The file, in the store's root (`$WF_ROOT`). */
-export const A2A_AGENTS_FILE = 'a2a-agents.json';
+const A2A_AGENTS_FILE = 'a2a-agents.json';
 
 /**
  * Where the file is, in the store at `home`.
@@ -30,7 +30,7 @@ export const remoteAgentsFile = (home: string) => path.join(home, A2A_AGENTS_FIL
 export type RemoteEntry = Record<string, unknown>;
 
 /** Every agent the file declares, by name, in the file's order. */
-export type RemoteAgents = ReadonlyMap<string, RemoteEntry>;
+type RemoteAgents = ReadonlyMap<string, RemoteEntry>;
 
 /** A word of a variable's name: upper case, and anything but a letter or a digit an underscore. */
 const envWord = (word: string) => word.toUpperCase().replace(/[^A-Z0-9]/g, '_');

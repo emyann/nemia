@@ -13,15 +13,8 @@ import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { FactoryWritten } from './written.ts';
 import { ScheduleFired } from './schedule.ts';
 
-/** When a trigger fires: at each fire of a cron, or on each card its `labelSelector` matches. */
-export const TRIGGER_WHEN_KINDS = ['time', 'cards'] as const;
-/** One of `TRIGGER_WHEN_KINDS`. */
-export type TriggerWhenKind = (typeof TRIGGER_WHEN_KINDS)[number];
-
 /** The kinds of thing a trigger may send what it matches to: a workflow its factory offers, open for a later kind. */
-export const TRIGGER_TARGET_KINDS = ['Workflow'] as const;
-/** One of `TRIGGER_TARGET_KINDS`. */
-export type TriggerTargetKind = (typeof TRIGGER_TARGET_KINDS)[number];
+const TRIGGER_TARGET_KINDS = ['Workflow'] as const;
 
 /**
  * Whether a trigger can spend quota: `spends` where something its target can reach runs an agent (a session or a judge), `free` where all
@@ -29,25 +22,26 @@ export type TriggerTargetKind = (typeof TRIGGER_TARGET_KINDS)[number];
  * workflow it reaches cannot be read and nothing else settles it.
  */
 export const TRIGGER_QUOTAS = ['spends', 'free', 'unknown'] as const;
-/** One of `TRIGGER_QUOTAS`. */
+/**
+ * One of `TRIGGER_QUOTAS`.
+ * @public
+ */
 export type TriggerQuota = (typeof TRIGGER_QUOTAS)[number];
 
 /** Where a trigger is defined: the factory's own file, or its template's rendered wiring. */
-export const TRIGGER_ORIGINS = ['factory', 'template'] as const;
-/** One of `TRIGGER_ORIGINS`. */
-export type TriggerOrigin = (typeof TRIGGER_ORIGINS)[number];
+const TRIGGER_ORIGINS = ['factory', 'template'] as const;
 
 /** A trigger of the time kind: a cron, the brief each run is asked, the zone. */
-export const TriggerAtTime = Schema.Struct({
+const TriggerAtTime = Schema.Struct({
   kind: Schema.Literal('time').annotate({ description: 'The time kind: the trigger fires at each fire of its cron, a Schedule.' }),
   cron: Schema.String.annotate({ description: 'The cron, five or six fields, its runs start at.' }),
   brief: Schema.String.annotate({ description: 'The brief each run is asked.' }),
   tz: Schema.optionalKey(Schema.String.annotate({ description: 'The time zone the cron is read in.' })),
 }).annotate({ description: 'A trigger that fires at each fire of a cron: a Schedule.' });
-export type TriggerAtTime = typeof TriggerAtTime.Type;
+type TriggerAtTime = typeof TriggerAtTime.Type;
 
 /** A trigger of the cards kind: a `labelSelector` in Kubernetes' spelling, over a card's labels. */
-export const TriggerOnCards = Schema.Struct({
+const TriggerOnCards = Schema.Struct({
   kind: Schema.Literal('cards').annotate({
     description: 'The cards kind: the trigger queues each card of its factory whose labels its labelSelector matches.',
   }),
@@ -55,7 +49,7 @@ export const TriggerOnCards = Schema.Struct({
     description: "A labelSelector in Kubernetes' spelling (`ready=yes`, `area in (cli,api)`), over a card's labels.",
   }),
 }).annotate({ description: 'A trigger that queues each card of its factory whose labels its labelSelector matches, in the order filed.' });
-export type TriggerOnCards = typeof TriggerOnCards.Type;
+type TriggerOnCards = typeof TriggerOnCards.Type;
 
 /** What a trigger sends what it matches to: a kind and a name of that kind. */
 export const TriggerTarget = Schema.Struct({
@@ -74,17 +68,17 @@ export const TriggerSpec = Schema.Struct({
 export type TriggerSpec = typeof TriggerSpec.Type;
 
 /** A card two or more of a factory's triggers would send to two workflows: it waits until a labelSelector or its labels change. */
-export const TriggerClash = Schema.Struct({
+const TriggerClash = Schema.Struct({
   card: Schema.String.annotate({ description: 'The name of the card left waiting.' }),
   with: Schema.Array(Schema.String).annotate({ description: 'Every trigger of the factory that selects it, this one among them.' }),
 }).annotate({ description: 'A card the triggers of its factory would send to two workflows, left waiting.' });
-export type TriggerClash = typeof TriggerClash.Type;
+type TriggerClash = typeof TriggerClash.Type;
 
 /**
  * What Nemia read of the trigger now: since when it holds, where it is defined, whether it can spend quota and which workflow settles it;
  * and apart from that what it is doing — a cards trigger's queued cards and clashes, a time trigger's next fire, last run and refusal.
  */
-export const TriggerStatus = Schema.Struct({
+const TriggerStatus = Schema.Struct({
   since: Schema.String.annotate({ description: 'When the trigger was set, as an ISO 8601 time; empty for one its template defines.' }),
   from: Schema.Literals(TRIGGER_ORIGINS).annotate({
     description: "Where the trigger is defined: the factory's own file, or its template's rendered wiring.",
@@ -113,7 +107,7 @@ export const TriggerStatus = Schema.Struct({
   description:
     'What Nemia read of the trigger: since when, where it is defined, whether it can spend quota, and what it does now: the cards it queues and clashes on, or its next fire.',
 });
-export type TriggerStatus = typeof TriggerStatus.Type;
+type TriggerStatus = typeof TriggerStatus.Type;
 
 /** A trigger, as an object; a write's answer says what it wrote (`written`). */
 export const Trigger = Schema.Struct({

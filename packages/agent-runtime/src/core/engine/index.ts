@@ -23,7 +23,6 @@ export {
 } from './engine.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './engine.ts';
 export {
-  CEILING_INSTEAD,
   AdmitRefused,
   FileRefused,
   InputRefused,
@@ -43,11 +42,10 @@ export { Journal, JournalError } from './journal.ts';
 export { APPEND_REFUSALS, type AppendRefusalReason } from './append-refusal.ts';
 export type { BodiedJournalOps, Cursor, FeedEntry, FeedRefusal, JournalOps, PlainJournalOps, StoreOps, SweepReport } from './journal.ts';
 export { FEED_LOCK_WAIT_MS } from './feed.ts';
-export type { ForgottenFeed } from './feed.ts';
 export { diskBytesOf, journalsKept } from './kept.ts';
 export type { JournalKept } from './kept.ts';
 export { BodyRefused } from './bodies.ts';
 export type { BodyEntry, BodyOps, BodyRef } from './bodies.ts';
 export { tickMemoLayer } from './memo.ts';
 export { countsHere, ioCounts, noCounts, tallied, talliesHere } from './tally.ts';
-export type { IoCounts, ObserveCount, Tally } from './tally.ts';
+export type { IoCounts, ObserveCount } from './tally.ts';

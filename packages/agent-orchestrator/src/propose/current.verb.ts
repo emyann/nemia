@@ -10,8 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { ProposableKind } from 'objects';
-import { tried, type EngineService } from '../runtime-client.ts';
-import type { PlaceService } from '../place/place.store.ts';
+import { tried } from '../runtime-client.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { factoryAdds, libraryAddObject, refOf } from '../library/library.verb.ts';
 import { sameAdd } from '../library/library.ts';
@@ -34,17 +33,9 @@ import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
-import type { StoreRoot } from '../config/root.store.ts';
-import type { StoreConfig } from '../config/config.store.ts';
 
 /** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
 export type ProposalPlace = { readonly home: string };
-
-/**
- * What reading a proposal's objects needs: the engine and the place, which the served Hires and McpServers read through, and the store's
- * root and settings their handlers are given (`StoreRoot`, `StoreConfig`).
- */
-export type ProposalNeeds = EngineService | PlaceService | StoreRoot | StoreConfig;
 
 /** An object as it is now: the version it is served at, null where nothing is at its name, and its spec where something is. */
 export type Current = { readonly version: string | null; readonly spec?: unknown };

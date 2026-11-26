@@ -106,6 +106,7 @@ export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
 /**
  * The first of `names` given before it in `names`, or undefined where each is given once. Pure.
  * @param names The names given, in their order.
+ * @public
  */
 export const namedTwice: NamedTwice = (names) => names.find((name, at) => names.slice(0, at).includes(name));
 

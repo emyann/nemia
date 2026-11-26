@@ -16,7 +16,7 @@ import type { Fetching } from './port.ts';
 import { type FeedView, pathOf, readAnswer } from './resources.ts';
 
 /** How long a view waits before it asks again for a watch that ended by itself: a beat, so a watch that ends at once never spins. */
-export const RESTART_AFTER_MS = 1_000;
+const RESTART_AFTER_MS = 1_000;
 
 /** One event of an Event list's watch, as `objects` says it. */
 const WatchEvent = watchEventOf(Event);
@@ -24,7 +24,7 @@ const WatchEvent = watchEventOf(Event);
 const decodeEvent = Schema.decodeUnknownOption(Schema.fromJsonString(WatchEvent));
 
 /** What holding a view answers: its release, or the api's refusal of the holder, in its words. */
-export type Held = { readonly kind: 'held'; readonly release: () => void } | { readonly kind: 'refused'; readonly message: string };
+type Held = { readonly kind: 'held'; readonly release: () => void } | { readonly kind: 'refused'; readonly message: string };
 
 /** A view followed: its holders (each told when the view closes), the newest events, and where the feed was read to. */
 type Followed = {

@@ -11,19 +11,8 @@ import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';
 import { memoryBytesOf } from './memory.ts';
 
-export type {
-  AdmissionPass,
-  OneWaiter,
-  AdmissionWait,
-  Admit,
-  Admitted,
-  Holder,
-  KeptRoom,
-  MachineMemory,
-  PassWait,
-  Waiter,
-} from '../../contracts/admission.contract.ts';
-export type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
+export type { AdmissionPass, AdmissionWait, Admitted, Holder, MachineMemory, Waiter } from '../../contracts/admission.contract.ts';
+export type { RunsUnder } from '../../contracts/runs-under.contract.ts';
 
 /**
  * The room the machine has for newcomers before a pass admits any, in bytes: the lesser of its total less the floor and what every
@@ -72,6 +61,7 @@ const keptLeft = (kept: number, need: number) => (need >= kept ? 0 : kept - need
  * Proved by `contracts/admission.contract.ts`.
  * @param one The waiter: its pool, need and whether it may take kept room, the ceiling, its pool's count under the ceiling and kept
  * places free, the room left (null with no reading) and the kept memory free.
+ * @public
  */
 export const admitOne: AdmitOne = (one) => {
   const keptPlace = one.kept && one.keptSlots > 0;
@@ -216,7 +206,7 @@ const needOf = (view: AdmissionView, rule: AdmissionRule) =>
  * limit, which stands for its request as Kubernetes gives a container that names a limit and no request, else nothing.
  * @param resources What the task runs under, or undefined where it runs under none.
  */
-export const needBytesOf = (resources: TaskResources | undefined) => {
+const needBytesOf = (resources: TaskResources | undefined) => {
   const quantity = resources?.requests?.memory ?? resources?.limits?.memory;
   return (quantity === undefined ? undefined : memoryBytesOf(quantity)) ?? 0;
 };
@@ -269,7 +259,7 @@ const filedMs = (view: AdmissionView) => {
  * Exported only for the tests that import it.
  * @param view The task's filed priority and its answers.
  */
-export const turnPriority = (view: Pick<AdmissionView, 'state'>) => view.state.inputs?.at(-1)?.priority ?? view.state.priority ?? 0;
+const turnPriority = (view: Pick<AdmissionView, 'state'>) => view.state.inputs?.at(-1)?.priority ?? view.state.priority ?? 0;
 
 /** Two waiting tasks in the order a free slot goes to them: the higher turn's priority, then the earlier filing, then the lower id. */
 const byTurn = (a: AdmissionView, b: AdmissionView) => {

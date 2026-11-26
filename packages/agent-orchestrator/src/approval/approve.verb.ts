@@ -77,7 +77,7 @@ export const proposalGet = Effect.fn('proposalGet')(function* (factory: string, 
  * otherwise — so a run-end proposal approved now waits for the pass that judges its run (`pass.verb.ts`).
  * @param run The run's id.
  */
-export const recordedRunState: RunStateOf = (run) =>
+const recordedRunState: RunStateOf = (run) =>
   Effect.gen(function* () {
     const read = yield* Effect.result((yield* RunDoor).runs.read(RunId.read(run)));
     if (read._tag === 'Success') return read.success.cancelledAt === undefined ? undefined : 'cancelled';

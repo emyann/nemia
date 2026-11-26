@@ -97,7 +97,7 @@ of its kind, never from an older file that looks alike:
 - **A folder is read with its places** (`lookupRoots`): a version is checked with the places it was listed with (`skillsAt`), and who
   names an agent is read in every place that falls back to it (`repoUsers`).
 - **A team is whole with its `agents/` and `skills/`**: a test that copies a workflow folder copies both, as `teamCopy` copies the
-  tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.
+  tests' team (`test/fixtures/team/`).
 - **A Claude Code step's instructions are in `runs/<id>/agents/<step>/prompt.md`** and its brief is its own note (`briefBody`); a step
   whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `toldOf`).
 - **A step's `body` opens with the heading of its agent's instructions** (`LAYER_HEADINGS`, one per layer `headedLayers` composes): a

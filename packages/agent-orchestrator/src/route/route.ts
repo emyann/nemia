@@ -10,9 +10,7 @@ import { stopsFollowers } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { NodeKind } from 'objects';
 
-export type { Fate } from '../../contracts/join.contract.ts';
-export type { ScriptAnswer, ScriptRead, ScriptVerdict } from '../../contracts/route-answer.contract.ts';
-export type { RouteTable, TablePick } from '../../contracts/route-table.contract.ts';
+export type { ScriptAnswer } from '../../contracts/route-answer.contract.ts';
 
 /**
  * The route the table holds for the producer's value, when the value is a string with a row of the table's own naming a declared route;
@@ -77,7 +75,7 @@ export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card' | '
  * Whether a step is a node that files a card and runs nothing: a `workflow:` node, or a `card: backlog` node, which names no workflow.
  * @param step The step read: its `workflow` and its `card`.
  */
-export const isCardNode = (step: Pick<StepSpec, 'workflow' | 'card'>) => step.workflow !== undefined || step.card !== undefined;
+const isCardNode = (step: Pick<StepSpec, 'workflow' | 'card'>) => step.workflow !== undefined || step.card !== undefined;
 
 /**
  * The one condition among a `when:` node's parents (load holds there is exactly one); undefined on a node with no `when:`.

@@ -27,9 +27,6 @@ const CARD_KEYS = ['workflow', 'after'] as const;
 /** A frontmatter key: a word of letters, digits, `_` and `-`. A sentence before a colon is none. */
 const KEY_WORD = /^[A-Za-z][\w-]*$/;
 
-/** A plan's card read off a file: its body, its `workflow:` where it names one, and the cards its `after:` waits on. */
-export type PlanCard = { body: string; workflow?: string; after: string[] };
-
 /**
  * The plan card `text`, the file `file` holds, opens with: its body and keys; null for a file with no frontmatter block of keys, whose
  * text is the whole brief. Refused, exit 2: a key a plan's card lacks, naming the inbox that reads it, and an `after:` with no `--after`.

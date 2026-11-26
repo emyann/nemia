@@ -43,7 +43,7 @@ export type ProposalDoorShape = {
  * Why `name` is no proposal's name, or undefined where it is one: lowercase letters, digits and dashes, as the machinery mints them.
  * @param name The name judged.
  */
-export const proposalNameRefusal = (name: string) =>
+const proposalNameRefusal = (name: string) =>
   /^[a-z0-9][a-z0-9-]*$/.test(name)
     ? undefined
     : `${JSON.stringify(name)} is no proposal's name: a proposal is named <proposer>-<five letters or digits>, as nemia get proposals -n <factory> lists them.`;
@@ -53,7 +53,7 @@ export const proposalNameRefusal = (name: string) =>
  * @param factory The factory's name.
  * @param name The proposal's name.
  */
-export function proposalNamed(factory: string, name: string) {
+function proposalNamed(factory: string, name: string) {
   const bad = factoryNameRefusal(factory) ?? proposalNameRefusal(name);
   if (bad !== undefined) throw new Invalid({ message: bad });
 }
@@ -62,7 +62,7 @@ export function proposalNamed(factory: string, name: string) {
  * The factory a proposal is in: its namespace, refused (`Invalid`) where it names none.
  * @param proposal The proposal, whose `metadata.namespace` names its factory.
  */
-export function factoryOf(proposal: Proposal) {
+function factoryOf(proposal: Proposal) {
   const factory = proposal.metadata.namespace;
   if (factory === undefined)
     throw new Invalid({ message: `the proposal ${proposal.metadata.name} names no namespace: give it its factory's.` });
@@ -75,7 +75,7 @@ export function factoryOf(proposal: Proposal) {
  * @param factory The factory the proposal was made in.
  * @param name The name already taken there.
  */
-export const takenProposal = (factory: string, name: string) =>
+const takenProposal = (factory: string, name: string) =>
   new Conflict({ message: `${factory} has a proposal ${name} already: propose again, and the machinery names it anew.` });
 
 /**
@@ -83,7 +83,7 @@ export const takenProposal = (factory: string, name: string) =>
  * @param factory The factory the proposal was written back in.
  * @param name The name of the proposal it does not have.
  */
-export const noProposal = (factory: string, name: string) =>
+const noProposal = (factory: string, name: string) =>
   new Missing({ message: `${factory} has no proposal ${name}: list them with nemia get proposals -n ${factory}.` });
 
 /** The keyspace's prefix of every proposal, and of the factory `factory`'s. */
@@ -255,7 +255,7 @@ const proposalFilesOf = (home: string) =>
  * read.
  * @param file The proposal's file.
  */
-export function readProposal(file: string) {
+function readProposal(file: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');

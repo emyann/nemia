@@ -20,13 +20,13 @@ import type { ReleasePlatform } from './release.ts';
 import { ranInto, releasesDir, type Building } from './release.store.ts';
 
 /** The name every request for a release says it comes from, and nothing else of the machine or the person. */
-export const CLIENT_NAME = 'nemia';
+const CLIENT_NAME = 'nemia';
 
 /** The file of checksums a release publishes beside its archives, one `<sha256>  <asset>` line each. */
-export const SUMS = 'SHA256SUMS';
+const SUMS = 'SHA256SUMS';
 
 /** The file that names the newest release, `{ tag, version }`, published with each release and read through `latest/download/`. */
-export const LATEST = 'latest.json';
+const LATEST = 'latest.json';
 
 /**
  * The archive of `tag` for `platform`.
@@ -44,13 +44,13 @@ const based = (source: string) => source.replace(/\/+$/, '');
  * @param tag The release's tag.
  * @param name The asset's file name.
  */
-export const assetUrl = (source: string, tag: string, name: string) => `${based(source)}/download/${tag}/${name}`;
+const assetUrl = (source: string, tag: string, name: string) => `${based(source)}/download/${tag}/${name}`;
 
 /**
  * Where the newest release's `latest.json` is read from.
  * @param source The download base, as the running release's `release.json` carries it.
  */
-export const latestUrl = (source: string) => `${based(source)}/latest/download/${LATEST}`;
+const latestUrl = (source: string) => `${based(source)}/latest/download/${LATEST}`;
 
 /**
  * The bytes at `url`: a `file:` URL read from the disk, any other fetched, sending only `CLIENT_NAME`. Refused, led by `by`: nothing
@@ -58,7 +58,7 @@ export const latestUrl = (source: string) => `${based(source)}/latest/download/$
  * @param url The address to read: a `file:` URL, or one fetched over the network.
  * @param by The words that lead a refusal: the command or the work that asked.
  */
-export async function fetched(url: string, by: string) {
+async function fetched(url: string, by: string) {
   if (url.startsWith('file:')) {
     try {
       return fs.readFileSync(fileURLToPath(url));
@@ -106,7 +106,7 @@ const ReleaseSchema = Schema.Struct({ assets: Schema.Array(Schema.Struct({ name:
  * @param source The download base, `<host>/<owner>/<repo>/releases`.
  * @param tag The release's tag.
  */
-export async function releaseAssets(source: string, tag: string) {
+async function releaseAssets(source: string, tag: string) {
   const url = releaseApiUrl(source, tag);
   if (url === undefined) return undefined;
   try {
@@ -142,7 +142,7 @@ async function awaitedAsset(source: string, tag: string, name: string, by: strin
  * @param sums The text of a `SHA256SUMS` file.
  * @param name The asset's file name.
  */
-export function sumOf(sums: string, name: string) {
+function sumOf(sums: string, name: string) {
   for (const line of sums.split('\n')) {
     const read = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(line.trim());
     if (read?.[2] === name) return read[1]?.toLowerCase();
@@ -173,7 +173,7 @@ function notesOf(notes: unknown) {
  * `text` read as a `latest.json` whose tag is a version, its notes kept where they are an http(s) address (`notesOf`), or undefined.
  * @param text The text of a `latest.json`.
  */
-export function latestOf(text: string) {
+function latestOf(text: string) {
   try {
     const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(LatestSchema))(text);
     if (Result.isFailure(decoded) || parseVersion(decoded.success.tag) === null) return undefined;

@@ -38,7 +38,7 @@ const highlighterOf = () =>
  * @param code the source text to highlight
  * @param language the language the code is written in, any but plain text
  */
-export async function highlightCode(code: string, language: Exclude<CodeLanguage, 'text'>) {
+async function highlightCode(code: string, language: Exclude<CodeLanguage, 'text'>) {
   const shiki = await highlighterOf();
   return [
     shiki.codeToHtml(code, { lang: language, theme: 'github-light-high-contrast' }),

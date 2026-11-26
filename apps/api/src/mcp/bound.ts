@@ -8,7 +8,6 @@
  */
 import type { AnswerFitOf } from '../../contracts/answer-fit.contract.ts';
 
-export type { AnswerFit } from '../../contracts/answer-fit.contract.ts';
 export { PAGE_MOST } from './page.ts';
 export { PORT_PAGE } from 'objects';
 

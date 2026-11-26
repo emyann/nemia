@@ -52,7 +52,7 @@ const adoptLine = (name: string, source: string, sets: readonly string[], digest
  * @param source The template's source as the person named it.
  * @param sets The `--set` words given, each `name=value`.
  */
-export const diffLine = (name: string, source: string, sets: readonly string[]) =>
+const diffLine = (name: string, source: string, sets: readonly string[]) =>
   `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellArg).join(' ')}`;
 
 /** What a takeover is asked of: the factory as it is, the template's source and `--set` words, and its render. */

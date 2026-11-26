@@ -13,7 +13,7 @@ import { archiveInstall, type Running } from './release.ts';
 import { fetchLatest, writeLatest, type LatestFile } from './archive.store.ts';
 
 /** How often the daemon of an archive install asks for the newest release. */
-export const RELEASE_CHECK_EVERY = '6 hours';
+const RELEASE_CHECK_EVERY = '6 hours';
 
 /** The command a release check's lines name. */
 const BY = 'release check';

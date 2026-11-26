@@ -529,7 +529,7 @@ export const RunHold = Schema.Struct({
 export type RunHold = typeof RunHold.Type;
 
 /** A person's hold on a run, as written: when, the runs it waits on to land, why and by whom. */
-export const RunHoldWritten = Schema.Struct({
+const RunHoldWritten = Schema.Struct({
   at: Schema.String.annotate({ description: 'When the hold was put.' }),
   until: Strings.annotate({ description: 'The runs it waits on to land, in the order they were named.' }),
   why: Schema.optionalKey(Schema.String.annotate({ description: "The person's words for why; absent where none were given." })),
@@ -539,7 +539,7 @@ export const RunHoldWritten = Schema.Struct({
   identifier: 'RunHoldWritten',
   description: 'A hold on a run, as written: when, the runs it waits on to land, why and by whom.',
 });
-export type RunHoldWritten = typeof RunHoldWritten.Type;
+type RunHoldWritten = typeof RunHoldWritten.Type;
 
 /** What a hold put or lifted answers: the run, whether it was lifted, and the hold. */
 export const RunHeld = Schema.Struct({

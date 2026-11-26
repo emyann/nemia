@@ -38,7 +38,7 @@ import type { SkillRule } from '../skills/skills.ts';
 import { tallyIn, tallyRowsOf, type TallyFact, type TallyRow } from '../tally/tally.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
-export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
+const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
 
 /** One of `BY_KEYS`. */
 export type ByKey = (typeof BY_KEYS)[number];
@@ -110,7 +110,7 @@ export type CheckFact = { name: string; ms: number | null; verdict: CheckVerdict
  * One check of a step over the facts kept (`checkRowsOf`): its workflow, step and name, how many tries ran it to a verdict, the median and
  * p90 of the ms those ran (nearest rank, null where none was measured), and the share of them it refused.
  */
-export type CheckRow = {
+type CheckRow = {
   workflow: string;
   step: string;
   check: string;
@@ -154,7 +154,7 @@ export function checkRowsOf(tries: readonly TryFact[]) {
  * of them was counted at by admission (`askedBytes`, null where it does not say), and how many peaked above what they were counted at
  * (`aboveAsked`). A read, never a setting: Nemia applies nothing from it.
  */
-export type MemoryRow = {
+type MemoryRow = {
   workflow: string;
   step: string;
   tries: number;
@@ -415,7 +415,7 @@ export const factsOf = (r: RunRead) => ({ tries: tryFactsOf(r), runs: runFactOf(
  * wait at a gate. `deniedPerTry` is the mean count of calls refused per try, over the tries whose harness records them, and `skillsPerTry`
  * the mean count of skills loaded per try, over the tries whose sessions' ends say. Each mean over nothing is null.
  */
-export type Headline = {
+type Headline = {
   runs: number;
   landed: number | null;
   rounds: number | null;
@@ -438,7 +438,7 @@ export type Headline = {
  * its skills declare, kept or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or
  * measured.
  */
-export type StepRow = {
+type StepRow = {
   step: string;
   agent: string | null;
   tries: number;
@@ -463,7 +463,7 @@ export type StepRow = {
  * A landing check that passed in more than half the deadline its task was filed with: the try's run, day, step and number, its check's run
  * time, that deadline, and the share of it the check took.
  */
-export type SlowLanding = RunKeys & { day: string; step: string; try: number; checkMs: number; deadlineMs: number; share: number };
+type SlowLanding = RunKeys & { day: string; step: string; try: number; checkMs: number; deadlineMs: number; share: number };
 
 /**
  * Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries.
@@ -477,7 +477,7 @@ export const slowLandingsOf = (tries: readonly TryFact[]) =>
   );
 
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
-export type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
+type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
 
 /**
  * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; the changes to what its runs
@@ -485,7 +485,7 @@ export type Tiles = { last: Headline & { from: string; to: string }; before: Hea
  * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured; and each landing check
  * of the range that passed in more than half its filed deadline (`SlowLanding`).
  */
-export type Group = {
+type Group = {
   total: Headline;
   days: Array<Headline & { day: string }>;
   steps: StepRow[];

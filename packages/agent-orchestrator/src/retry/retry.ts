@@ -224,6 +224,7 @@ const landingAborted = (step: StepSpec, run: Run) => {
  * round's, for a looping step over its budget or out of rounds whose loop has a step over its cap — above the most any of them has cost,
  * as `roundAsk` refuses less. None on a run called off. Pure; its laws are `contracts/raise.contract.ts`'s.
  * @param i What the step's gatherer read (`stepRaise`).
+ * @public
  */
 export const raiseVerdict: RaiseVerdictOf = (i) => {
   if (i.called) return null;
@@ -235,6 +236,7 @@ export const raiseVerdict: RaiseVerdictOf = (i) => {
 /**
  * The most any step of a loop over its cap has cost (`loopOver`), or 0 where none is: `Math.max(0, ...over)`, which the verifier reads.
  * @param over What each step of the loop over its cap has cost, in dollars.
+ * @public
  */
 export const mostSpent: MostSpent = (over) => {
   let most = 0;
@@ -270,20 +272,13 @@ export type RaiseReads = {
 export type StepRaise = { by: RaiseBy; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /**
- * A step's raise (`StepRaise`, null for none), and what `nemia decide` words it with: `retry`, the try's raise behind a raise by retry —
- * what its tries cost and the cap, beside `above` — and `round`, each step of its loop over its cap (`roundOver`), which a looping step's
- * OVER BUDGET line names whether a raise is offered or not.
- */
-export type RaiseGrounds = { raise: StepRaise | null; retry: Raise | undefined; round: ReturnType<typeof loopOver> };
-
-/**
  * The steps of a looping step's loop over their cap (`loopOver`), which hold its round; none for a step that does not loop. Pure.
  * @param steps The run's steps.
  * @param step The step, its loop read.
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf) =>
+const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf) =>
   step.loop ? loopOver(steps, step, run, spendOf) : [];
 
 /**
@@ -297,7 +292,7 @@ export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, 
  * @param spendOf What each task's sessions cost (`taskSpend`).
  * @param tried What `retryable` says of the step, read with `reads`: given where a caller has read it already.
  */
-export function raiseGrounds(
+function raiseGrounds(
   step: StepSpec,
   run: Run,
   steps: readonly StepSpec[],

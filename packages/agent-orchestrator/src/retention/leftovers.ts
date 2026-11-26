@@ -9,9 +9,9 @@ import type { UpgradeLeftovers } from '../../contracts/leftovers.contract.ts';
 import type { Leftovers } from '../../contracts/leftovers.contract.ts';
 import { LOGS_KEPT_DAYS, LOGS_KEPT_MS } from './kept.ts';
 
-export { LOGS_KEPT_DAYS, LOGS_KEPT_MS, LAST_DATE_MS } from './kept.ts';
+export { LOGS_KEPT_MS } from './kept.ts';
 
-export type { PidEntry, BuildLog, Leftovers } from '../../contracts/leftovers.contract.ts';
+export type { Leftovers } from '../../contracts/leftovers.contract.ts';
 
 /**
  * The leftovers to remove: each entry whose process is gone, each log older than `LOGS_KEPT_MS` at `nowMs`.

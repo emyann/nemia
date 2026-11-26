@@ -73,7 +73,7 @@ export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: st
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's folder.
  */
-export const agentPlaces = (repo: string | undefined, home: string) =>
+const agentPlaces = (repo: string | undefined, home: string) =>
   [
     ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
     { from: 'user', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
@@ -96,7 +96,7 @@ export const listAgents = Effect.fn('listAgents')(function* (repo: string | unde
  * fix, when no place has it, when both do and nothing says which, or when the file is there and does not read — that last in the door's
  * own words.
  */
-export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: string | undefined, home: string, from?: AgentPlace) {
+const findAgent = Effect.fn('findAgent')(function* (name: string, repo: string | undefined, home: string, from?: AgentPlace) {
   const all = agentPlaces(repo, home);
   const found: Array<{ from: AgentPlace; dir: string; agent: Read }> = [];
   const held: string[] = [];

@@ -23,10 +23,10 @@ import { downstreamOf } from '../workspace/workspace.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import type { StepBudget } from '../../contracts/budget.contract.ts';
 
-export type { StepBudget, CapInput } from '../../contracts/budget.contract.ts';
+export type { StepBudget } from '../../contracts/budget.contract.ts';
 
 /** A budget a gated step proposes: the step, the dollars, and which figures the amount went by (`why`). */
-export type ProposedBudget = StepBudget & { why: string };
+type ProposedBudget = StepBudget & { why: string };
 
 /** The shape a field of budgets is, as its schema; strict, as every schema handed to a harness is. */
 export const BUDGETS_SCHEMA = {
@@ -150,6 +150,7 @@ const anAmount = (usd: number) => usd > 0 && Number.isFinite(usd);
  * amount of dollars above zero, and two for one step. Each in words that say what to give instead.
  * @param budgets The budgets proposed or given, each a step and dollars.
  * @param later The names of the steps after the gate.
+ * @public
  */
 export const proposalRefusal: ProposalRefusal = (budgets, later) => {
   const stray = budgets.find((b) => !later.includes(b.step));
@@ -169,6 +170,7 @@ export const proposalRefusal: ProposalRefusal = (budgets, later) => {
  * What stands of a proposal once a person gave amounts: each budget it made for a step they gave none, in its order.
  * @param proposed The budgets the gated step proposed.
  * @param given The budgets the person gave.
+ * @public
  */
 export const unchanged: Unchanged = (proposed, given) => {
   const kept: StepBudget[] = [];
@@ -193,6 +195,7 @@ export const approvedCaps: ApprovedCaps = (proposed, given, later) => {
  * The cap a step is filed and judged under: a raise of its own try, else the last approval given, else its own `budget:`, or none.
  * @param i The step's caps: the raise of its own try (`raised`), the caps approvals in force set (`approved`, the last wins) and
  * its own `budget:` (`workflow`), each undefined or empty where there is none.
+ * @public
  */
 export const capInForce: CapInForce = (i) => i.raised ?? i.approved.at(-1) ?? i.workflow;
 
@@ -236,7 +239,7 @@ export const budgetArgs = (budgets: readonly StepBudget[]) => budgets.map((b) =>
  * @param run The run's record, its approvals and its steps' tries.
  * @param step The name of the step.
  */
-export const approvedCapsOf = (run: Run, step: string) => {
+const approvedCapsOf = (run: Run, step: string) => {
   let last: { at: string; usd: number } | undefined;
   for (const a of run.approvals ?? []) {
     const usd = a.budgets?.[step];

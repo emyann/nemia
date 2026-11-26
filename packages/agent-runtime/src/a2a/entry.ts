@@ -71,31 +71,30 @@ const SightingOnDisk: Schema.Decoder<Omit<Sighting, 'state'> & { state: string }
 );
 
 /** An entry as a runtime wrote it to `remote/<name>.json`: an `Entry`, but how it was last seen in any runtime's words. */
-export const EntrySchema: Schema.Decoder<Omit<Entry, 'seen'> & { seen?: Schema.Schema.Type<typeof SightingOnDisk> }> =
-  Schema.StructWithRest(
-    Schema.Struct({
-      name: Schema.String,
-      agent: Schema.String,
-      messageId: Schema.String,
-      contextId: Schema.optional(Schema.String),
-      sentAt: Schema.String,
-      taskId: Schema.optional(Schema.String),
-      seen: Schema.optional(SightingOnDisk),
-      ended: Schema.optional(Schema.Literal(true)),
-      reply: Schema.optional(Schema.String),
-      sending: Schema.optional(
-        Schema.Struct({
-          pid: Schema.Finite,
-          until: Schema.String,
-          mono: Schema.optional(Schema.Struct({ boot: Schema.String, ms: Schema.Finite })),
-        }),
-      ),
-      refused: Schema.optional(Schema.String),
-      doubt: Schema.optional(Schema.String),
-      whole: Schema.optional(Schema.Finite),
-    }),
-    Rest,
-  );
+const EntrySchema: Schema.Decoder<Omit<Entry, 'seen'> & { seen?: Schema.Schema.Type<typeof SightingOnDisk> }> = Schema.StructWithRest(
+  Schema.Struct({
+    name: Schema.String,
+    agent: Schema.String,
+    messageId: Schema.String,
+    contextId: Schema.optional(Schema.String),
+    sentAt: Schema.String,
+    taskId: Schema.optional(Schema.String),
+    seen: Schema.optional(SightingOnDisk),
+    ended: Schema.optional(Schema.Literal(true)),
+    reply: Schema.optional(Schema.String),
+    sending: Schema.optional(
+      Schema.Struct({
+        pid: Schema.Finite,
+        until: Schema.String,
+        mono: Schema.optional(Schema.Struct({ boot: Schema.String, ms: Schema.Finite })),
+      }),
+    ),
+    refused: Schema.optional(Schema.String),
+    doubt: Schema.optional(Schema.String),
+    whole: Schema.optional(Schema.Finite),
+  }),
+  Rest,
+);
 
 /** An entry as a runtime wrote it, read. */
 type EntryOnDisk = typeof EntrySchema.Type;

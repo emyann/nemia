@@ -542,7 +542,7 @@ const ListedStepStatus = WorkflowStepStatus.mapFields((fields) => ({
 }));
 
 /** A workflow as a list serves it: its object without its README, its steps' notes or its files' text, which a read of it answers. */
-export const WorkflowListed = Schema.Struct({
+const WorkflowListed = Schema.Struct({
   ...Workflow.fields,
   spec: WorkflowSpec.mapFields(() => ({
     steps: Schema.Array(ListedStep).annotate({
@@ -567,7 +567,7 @@ export const WorkflowListed = Schema.Struct({
       'What Nemia reads of the workflow, without its README or what its steps are told: where it was found, its folder, its graph, its steps, why it does not load or cannot start in the factory, and its revision.',
   }),
 }).annotate({ description: "A workflow as a list serves it, without its files' content (LISTED_WITHOUT)." });
-export type WorkflowListed = typeof WorkflowListed.Type;
+type WorkflowListed = typeof WorkflowListed.Type;
 
 /** A page of a namespace's workflows, each without its files' content. */
 export const WorkflowList = listOf('Workflow', WorkflowListed);

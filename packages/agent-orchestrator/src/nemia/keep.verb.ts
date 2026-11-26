@@ -81,7 +81,7 @@ import {
 } from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
-export const NEMIA_ACTS = Metric.counter('nemia.acts', {
+const NEMIA_ACTS = Metric.counter('nemia.acts', {
   description:
     "the keeper's acts on Nemia's session: her folder trusted, filed, subscribed, put to rest, dropped, marked, her custom words said, the outbox said",
 });
@@ -93,7 +93,7 @@ export const NEMIA_ACTS = Metric.counter('nemia.acts', {
 export type KeepOptions = { every: Duration.Input; restAfter: Duration.Input };
 
 /** The keeper's pace and her rest when it is given none. */
-export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds', restAfter: NEMIA_REST_AFTER };
+const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds', restAfter: NEMIA_REST_AFTER };
 
 /**
  * Her priority among the tasks waiting for a slot: above every step and above a person's turn (`ASKED_PRIORITY`), so the person's agent

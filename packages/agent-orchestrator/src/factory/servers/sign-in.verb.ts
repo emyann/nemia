@@ -8,7 +8,7 @@
  * it (`docs/features.md`).
  */
 import { Effect } from 'effect';
-import { EngineService, mcpServerOf, tried, type McpSignInStarted, type McpSignInState } from '../../runtime-client.ts';
+import { EngineService, mcpServerOf, tried } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { shippedSecretOf } from './clients.ts';
 import { factoryThere } from './servers.verb.ts';
@@ -89,5 +89,3 @@ export const serverSignOut = Effect.fn('serverSignOut')(function* (factory: stri
   const e = yield* EngineService;
   return yield* e.mcpSignOut(server, found).pipe(Effect.mapError(kindOf));
 });
-
-export type { McpSignInStarted as ServerSignInStarted, McpSignInState as ServerSignInState };

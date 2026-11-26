@@ -9,7 +9,7 @@ import type { OwnSession } from './own-session.ts';
 import { Refused } from '../refused.ts';
 
 /** The program a person's session runs: Claude Code's command, found on PATH. */
-export const SESSION_PROGRAM = 'claude';
+const SESSION_PROGRAM = 'claude';
 
 /**
  * Runs the person's session `start` with their terminal, and answers its exit code — 128 and the signal's number when a signal ended it.

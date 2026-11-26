@@ -11,6 +11,7 @@ import type { FillOriginOf, SettingOriginOf } from '../../../contracts/hire-orig
  * Who fills a step: its own file's `agent:` (`written`), the factory's hire (`hired`), neither, or both, which a start refuses.
  * @param written Whether the step's own file names an agent.
  * @param hired Whether the factory hires an agent into the step.
+ * @public
  */
 export const fillOrigin: FillOriginOf = (written, hired) => {
   if (written && hired) return 'refused';
@@ -22,6 +23,7 @@ export const fillOrigin: FillOriginOf = (written, hired) => {
  * Where a setting came from: the step's own file where it writes it, else its agent's where it gives it, else the harness's default.
  * @param stepSets Whether the step's own file writes the setting.
  * @param agentGives Whether the step's agent gives the setting.
+ * @public
  */
 export const settingOrigin: SettingOriginOf = (stepSets, agentGives) => {
   if (stepSets) return 'step';
@@ -50,7 +52,7 @@ export function hiresCollided(steps: readonly HiredStep[]) {
 }
 
 /** A setting's value as the resolved step carries it. */
-export type HireSettingValue = string | number | boolean | readonly string[];
+type HireSettingValue = string | number | boolean | readonly string[];
 
 /**
  * What a read of a factory's step says of its hire: the agent its own file names (`written`), the one the factory hires into it

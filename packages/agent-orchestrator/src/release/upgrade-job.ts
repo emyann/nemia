@@ -6,8 +6,6 @@
 import type { NewestOlder, PreviousRelease, UpgradeStartRefused } from '../../contracts/upgrade-start.contract.ts';
 import { goingBackRefused } from './floor.ts';
 
-export type { InstalledVersion, UpgradeStartRefusal } from '../../contracts/upgrade-start.contract.ts';
-
 /**
  * Why a start of an upgrade to `target` on a store whose floor is `floor` is refused: one is still at work (`in-flight`), whatever it
  * asks for; else the tag goes back past the floor (`below-floor`, `goingBackRefused`); else null. A tag that is no version (`target`
@@ -28,6 +26,7 @@ export const upgradeStartRefusal: UpgradeStartRefused = (target, floor, inFlight
  * the verifier guesses the loop's invariants from the laws (a call in the loop's condition left them unguessed).
  * @param installed The releases installed, each its tag and its version, null where its tag is no version.
  * @param running The version of the release the server runs, or null where it runs none.
+ * @public
  */
 export const newestOlder: NewestOlder = (installed, running) => {
   let best = { found: false, tag: '', major: 0, minor: 0, patch: 0 };

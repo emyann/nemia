@@ -5,8 +5,6 @@
  */
 import type { CardPlaySelectorOf } from '../../contracts/card-play-selector.contract.ts';
 
-export type { CardPlaySelector } from '../../contracts/card-play-selector.contract.ts';
-
 /** The field a card's list is selected by. */
 const FIELD = 'status.inPlay';
 

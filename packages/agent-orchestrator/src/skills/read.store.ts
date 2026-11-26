@@ -78,7 +78,7 @@ export function lookupRoots(workflowDir: string, places: Places = {}) {
  * the one that runs.
  * @param root A folder looked in (`lookupRoots`).
  */
-export const repositoryOf = (root: string) =>
+const repositoryOf = (root: string) =>
   path.basename(root) === 'workflows' || path.basename(root) === REPOSITORY_HOLDER ? path.dirname(root) : undefined;
 
 /**

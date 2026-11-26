@@ -62,6 +62,7 @@ export type WorkerSeen = 'running' | 'gone' | 'unknown';
  * @param beatAgeMs How long ago its last beat was, in milliseconds; `NaN` where it cannot be read.
  * @param leaseMs How long a beat holds the lease, in milliseconds.
  * @param worker Whether the worker is seen running (`workerSeen`).
+ * @public
  */
 export const leaseWord: LeaseWord = (state, beatAgeMs, leaseMs, worker) =>
   state !== 'working' || beatAgeMs <= leaseMs || worker === 'running' ? state : 'failed';
@@ -187,7 +188,7 @@ const RunFileSchema = Schema.StructWithRest(
      * from a run file spawned before it was written, whose record is never read for a spend so far.
      */
     capUsd: Schema.optional(Schema.Finite),
-    /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
+    /** For a spec with `input`: what the worker writes on the harness's stdin. Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({
         first: Schema.String,

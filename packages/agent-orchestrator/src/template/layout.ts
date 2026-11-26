@@ -10,7 +10,7 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import type { TemplateParameterType } from 'objects';
 import type { InLayout } from '../../contracts/template-layout.contract.ts';
-import { checkFailurePolicyOf, type CheckFailurePolicy } from '../check/index.ts';
+import { checkFailurePolicyOf } from '../check/index.ts';
 
 /** The version of the template layout, the schema every document of a template is written in: no `apiVersion` objects serve. */
 export const TEMPLATE_LAYOUT_VERSION = 'nemia.dev/v1alpha1';
@@ -30,11 +30,8 @@ export type ReadFolder = { name: string; files: readonly string[]; documents: Re
 /** A value given when the template is applied. */
 export type ParamRef = { param: string };
 
-/** A value written, or the parameter that gives it. */
-export type Value<T> = T | ParamRef;
-
 /** Text: the words themselves, a file of the folder (`{ path }`), or a parameter's value. A git or url source is not read yet. */
-export type Text = string | { path: string } | ParamRef;
+type Text = string | { path: string } | ParamRef;
 
 /**
  * A value the person gives when the template is applied: its type, what it is for, the value taken when they give none, and, for a
@@ -48,27 +45,6 @@ export type Parameter = {
   whenOrigin?: string;
   ask?: boolean;
 };
-
-/**
- * What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them, a `{ path }` in one naming
- * a file of the template whose lines it takes (`withSharedLines`).
- */
-export type Fence = Readonly<Record<string, string | ReadonlyArray<string | { path: string }>>>;
-
-/** One harness's block, in its own words: its model, effort, context window, fence, and the flags handed to it as they are. */
-export type Profile = {
-  model?: Value<string>;
-  effort?: Value<string>;
-  context?: Value<string>;
-  fence?: Fence;
-  options?: Readonly<Record<string, string | number | true | readonly string[]>>;
-};
-
-/** A document's name, and what a person reads of it. */
-export type Metadata = { name: string; description?: string };
-
-/** Every YAML file of a template but its lock: one document. */
-export type Document<K extends string, S> = { apiVersion: typeof TEMPLATE_LAYOUT_VERSION; kind: K; metadata: Metadata; spec: S };
 
 /**
  * The manifest's spec: the content's version, the factory's instruction and its rules, its parameters, who fills each
@@ -94,82 +70,7 @@ export type FactorySpec = {
 };
 
 /** A template's card trigger (`FactorySpec.triggers`): its selector, and its target, a workflow of the template. */
-export type TemplateTrigger = { selector: string; target: { kind: 'Workflow'; name: string } };
-
-/** An agent's spec: its portable part, and one block per harness under the harness's name (`Profile`). */
-export type AgentSpec = {
-  role: string;
-  description: string;
-  instructions?: Text;
-  skills?: readonly string[];
-  /** The MCP servers of the checkout its sessions load, by name. */
-  mcp?: readonly string[];
-  /** What a step may override of it beyond the harness's properties, which it always may, each one of `OVERRIDABLE`; absent, everything. */
-  overridable?: readonly string[];
-  output?: { path: string };
-  harness?: string;
-} & { readonly [harness: string]: unknown };
-
-/** What a step changes of the agent it hires: its harness, skills and MCP servers added, and one block per harness (`Profile`). */
-export type Overrides = { harness?: string; skills?: readonly string[]; mcp?: readonly string[] } & { readonly [harness: string]: unknown };
-
-/**
- * A step of a workflow, in order: its wiring, what it reads of the store, its own closeout schema, what is tallied of its closeout, and its
- * overrides.
- */
-export type Step = {
-  name: string;
-  instruction?: Text;
-  after?: readonly string[];
-  input?: readonly string[];
-  place?: string;
-  workspace?: string;
-  gate?: boolean;
-  budget?: Value<number>;
-  check?: Value<string>;
-  /**
-   * The step's named checks (`checks:`), each a name, its shell line, the checks it waits on, whether it is on, and whether it uses the
-   * checkout.
-   */
-  checks?: readonly { name: string; run: Value<string>; after?: readonly string[]; enabled?: boolean; usesCheckout?: boolean }[];
-  /** A command node's shell line (`run:`). */
-  run?: Value<string>;
-  /**
-   * The memory the step's check asks of the machine, a Kubernetes quantity (`256Mi`), as its line writes it: often a parameter's value,
-   * whose empty value writes no line, so the check asks the daemon's default.
-   */
-  checkMemory?: string;
-  /**
-   * The memory the step's sessions ask of the machine, a Kubernetes quantity (`1Gi`), as its line writes it: often a parameter's value,
-   * whose empty value writes no line, so the sessions ask the daemon's default.
-   */
-  memoryRequest?: string;
-  loop?: string;
-  rounds?: number;
-  /** A condition's routes, how it answers them, and those on which the run ends; a node's routes; a workflow node's workflow. */
-  routes?: readonly string[];
-  route?: TemplateRoute;
-  ends?: readonly string[];
-  when?: readonly string[];
-  workflow?: string;
-  /** What card a node files (`routed`, `given`, `backlog`), and the label edits a `backlog` node files it back with. */
-  card?: string;
-  relabel?: readonly string[];
-  retries?: number;
-  /** Which exit codes of its check a person answers, as the step's line reads it (`CheckFailurePolicy`, src/check/check-policy.ts). */
-  checkFailurePolicy?: CheckFailurePolicy;
-  deadlineSeconds?: number;
-  /** The most memory each session of the step may use, a Kubernetes quantity (`4Gi`), as its line writes it. */
-  memory?: string;
-  reads?: readonly string[];
-  /** The step's own closeout schema, a file of its workflow's folder, by its path from the template's root. */
-  output?: { path: string };
-  tally?: readonly string[];
-  overrides?: Overrides;
-};
-
-/** A condition's `route:` as a template writes it: a table over a producer's field, a script, or `judge`. */
-export type TemplateRoute = { from: string; table: Readonly<Record<string, string>> } | { script: string } | 'judge';
+type TemplateTrigger = { selector: string; target: { kind: 'Workflow'; name: string } };
 
 /** What each of a template's YAML files is, and the name its document must carry: its folder's, or the template's for the manifest. */
 export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'Skill' | 'Lock'; name: string | undefined };
@@ -232,6 +133,7 @@ const pastFolder = (inHolder: string) => {
  * names. Read by the holder's prefix rather than by splitting the path, which the verifier does not model.
  * @param file The file's path in the template's folder.
  * @param named The files a `{ path }` of a document names.
+ * @public
  */
 export const inLayout: InLayout = (file, named) => {
   if (named.has(file) || ROOT_FILES.includes(file)) return true;
@@ -317,7 +219,7 @@ type Shape =
   | { readonly fields: Readonly<Record<string, Shape>>; readonly required?: readonly string[]; readonly rest?: Shape };
 
 /** The fence keys of every harness, the package's one list of them (`harness/harness.ts`), read by the template's shape. */
-export { fenceKeysOf, HARNESS_FENCE_KEYS } from '../harness/harness.ts';
+export { HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 
 /** The keys a harness's block holds. */
 export const PROFILE_KEYS = ['model', 'effort', 'context', 'fence', 'options'] as const;
@@ -538,7 +440,7 @@ export const isPathItem = (value: unknown): value is { path: string } =>
 /** Whether `value` is a harness's tool list: lines, each a string or a `{ path }` naming a file of the template that holds more. */
 const isLines = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === 'string' || isPathItem(item));
 
-/** Whether `value` is a `route:` (`TemplateRoute`). */
+/** Whether `value` is a `route:`. */
 const isRoute = (value: unknown) => {
   if (value === 'judge') return true;
   if (!isMap(value)) return false;

@@ -35,13 +35,13 @@ export type DescribedApi = {
 };
 
 /** The methods a tool calls by: every one but those that answer no body to read. */
-export type ToolMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type ToolMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** A JSON Schema, as `Schema.toJsonSchemaDocument` writes it. */
 type JsonSchema = Readonly<Record<string, unknown>>;
 
 /** A tool's input: a JSON Schema object, its keys, those it requires, and the definitions its keys refer to. */
-export type ToolInput = {
+type ToolInput = {
   readonly type: 'object';
   readonly properties: Readonly<Record<string, JsonSchema>>;
   readonly required?: readonly string[];
@@ -50,13 +50,13 @@ export type ToolInput = {
 };
 
 /** A key of a tool's input that says what it takes, with its words. */
-export type KeySaid = { readonly key: string; readonly words: string };
+type KeySaid = { readonly key: string; readonly words: string };
 
 /**
  * How a tool answers as an MCP task, as its link says it (`LinkTask`): a followed task carries, besides, the path of its read and the one
  * key of that path its id fills.
  */
-export type ToolTask = AskedAgainTask | (FollowedTask & { readonly path: string; readonly pathKey: string });
+type ToolTask = AskedAgainTask | (FollowedTask & { readonly path: string; readonly pathKey: string });
 
 /**
  * A tool's words: its name, the entry whose link it is, the endpoint it calls, its method and path, the keys that fill the path and the

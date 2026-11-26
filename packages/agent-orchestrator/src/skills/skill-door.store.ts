@@ -70,7 +70,7 @@ export type SkillLayer = {
 };
 
 /** A skill removed: its folder, gone whole. */
-export type SkillRemoved = { readonly dir: string; readonly name: string };
+type SkillRemoved = { readonly dir: string; readonly name: string };
 
 type Methods = DoorOf<SkillLayer, SkillName>['skills'];
 
@@ -97,7 +97,7 @@ const skillChecked = checked(Skill, (skill: { name: string }) => `skills/${skill
  * @param name The skill's name.
  * @param draft The whole draft, as the board's form gives it.
  */
-export const draftedSkill = (name: string, draft: SkillDraft) => ({
+const draftedSkill = (name: string, draft: SkillDraft) => ({
   name,
   ...(draft.title !== undefined && { title: draft.title }),
   description: draft.description == null ? '' : String(draft.description).trim(),

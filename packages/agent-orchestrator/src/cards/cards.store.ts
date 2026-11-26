@@ -68,7 +68,7 @@ export type CardDoorShape = {
  * @param name The new card's name, which the fix's command names.
  * @param file How a message names the card filed already (`where`), the command that shows it.
  */
-export const cardTaken = (name: string, file: string) =>
+const cardTaken = (name: string, file: string) =>
   new Conflict({
     message: `a card ${name} is filed already (${file}): file the new one under another name, or drop that one with nemia inbox rm ${name}`,
   });
@@ -77,7 +77,7 @@ export const cardTaken = (name: string, file: string) =>
  * No card at the name a write back names, as a refusal.
  * @param name The card's name the write back names.
  */
-export const noCardToRewrite = (name: string) =>
+const noCardToRewrite = (name: string) =>
   new Missing({
     message: `there is no card ${name} to write back: file it with nemia inbox add, or name a card nemia inbox lists. Nothing was written.`,
   });
@@ -128,7 +128,7 @@ export function cardDoorOver(door: CardDoorShape) {
  * The inbox of the store `home`: where its cards are filed.
  * @param home The store's root folder.
  */
-export const inboxAt = (home: string) => path.join(home, 'inbox');
+const inboxAt = (home: string) => path.join(home, 'inbox');
 
 /** The tick's tries of the store `home` before the keyspace: outside the inbox, which is a person's. */
 const queueAt = (home: string) => path.join(home, 'queue');

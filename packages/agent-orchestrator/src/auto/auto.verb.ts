@@ -28,7 +28,7 @@ import { DelegationDoor } from '../delegation/delegation.store.ts';
 import { proposalRuleReach } from '../approval/index.ts';
 
 /** A rule with its words, as the person reads it. */
-export type WordedRule<R extends PolicyRule = GateRule> = R & { words: string };
+type WordedRule<R extends PolicyRule = GateRule> = R & { words: string };
 
 /**
  * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),

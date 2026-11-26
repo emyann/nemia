@@ -14,8 +14,6 @@ import { Invalid } from '../refusal/refusal.ts';
 import { skillCopyCommand } from '../try/try.ts';
 import type { Args } from '../command/command.ts';
 
-export { cliPath, factoryFlag, FROM, versionFlag, writerSpec } from 'objects';
-
 /** What a writer writes: an agent, a workflow, or a skill. */
 export type YoursKind = 'agents' | 'workflows' | 'skills';
 
@@ -23,7 +21,7 @@ export type YoursKind = 'agents' | 'workflows' | 'skills';
  * Your workflows, in the store `home`: where a workflow of yours is a folder.
  * @param home The store's root folder.
  */
-export const yourWorkflowsDir = (home: string) => path.join(home, 'workflows');
+const yourWorkflowsDir = (home: string) => path.join(home, 'workflows');
 
 /**
  * Your library of skills, in the store `home`: where a skill of yours is a folder.
@@ -72,7 +70,7 @@ function copyWords(kind: YoursKind, name: string | null, yours: string, theirs: 
  * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
  * @param home The store's root folder.
  */
-export function repoWriteRefusal(who: string, kind: YoursKind, name: string | null, repo: string, home: string) {
+function repoWriteRefusal(who: string, kind: YoursKind, name: string | null, repo: string, home: string) {
   const yours = yoursOf(kind, home);
   const theirs = theirsOf(kind, repo);
   const noun = kind === 'skills' ? 'your library' : 'yours';

@@ -62,6 +62,9 @@ export const mcpStateVerbOf = (
     const found = claudeExecutableOf(executable, harnessBin);
     return yield* Effect.promise(async () => {
       const tokens = await tokensOf(cwd, servers);
-      return mcpServersRead(withTokens(servers, tokens), cwd, { ...(found === undefined ? {} : { executable: found }), ...(ask === undefined ? {} : { ask }) });
+      return mcpServersRead(withTokens(servers, tokens), cwd, {
+        ...(found === undefined ? {} : { executable: found }),
+        ...(ask === undefined ? {} : { ask }),
+      });
     }).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));
   }) satisfies (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;

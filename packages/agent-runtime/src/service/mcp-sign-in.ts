@@ -219,6 +219,56 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
 export const noSignInHarness = (declared: readonly HarnessDeclared[]) =>
   `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
 
+/** The `claude mcp` CLI a sign-out runs: a test's own, else the Claude Code found at this ask, or why none was found. */
+const cliFor = (seams: SignInSeams, executable: string | undefined, harnessBin: string | undefined) => {
+  if (seams.cli) return seams.cli satisfies McpCli | string;
+  const claude = claudeExecutableOf(executable, harnessBin);
+  return (
+    claude === undefined
+      ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
+      : claudeCli(claude)
+  ) satisfies McpCli | string;
+};
+
+/**
+ * The sign-ins by a code this engine holds, by server name: `start` asks the provider for a code and polls for the token in the
+ * background (`pollDevice`), `has` says whether one waits, and `cancel` ends it, its state forgotten.
+ */
+const devicesHeld = (states: Map<string, McpSignInState>, root: string, pace: number) => {
+  const holds = new Map<string, DeviceHold>();
+  const start = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, route: DeviceRoute, clientId: string) {
+    const code = yield* Effect.tryPromise({
+      try: () => deviceCodeOf(route.deviceAuthorizationEndpoint, clientId),
+      catch: (e) =>
+        new McpSignInRefused({ message: `no code was given to sign in to \`${name}\` with: ${(e as Error).message}`, held: false }),
+    });
+    const until = new Date(Date.now() + code.expiresInSeconds * 1000).toISOString();
+    const started = { route: 'device', userCode: code.userCode, verificationUri: code.verificationUri, until } satisfies McpSignInStarted;
+    const hold: DeviceHold = { abort: new AbortController(), started };
+    holds.set(name, hold);
+    states.set(name, { state: 'waiting', until, started });
+    const settle = (state: McpSignInState) => {
+      if (holds.get(name) !== hold) return;
+      holds.delete(name);
+      states.set(name, state);
+    };
+    void pollDevice({ ...code, ...route, clientId, server, root, name, signal: hold.abort.signal, pace }).then(
+      (ended) => (ended === 'cancelled' ? undefined : settle(ended)),
+      (e: unknown) => settle({ state: 'failed', why: (e as Error).message }),
+    );
+    return started;
+  });
+  const cancel = (name: string) => {
+    const hold = holds.get(name);
+    if (hold === undefined) return false;
+    holds.delete(name);
+    hold.abort.abort();
+    states.delete(name);
+    return true;
+  };
+  return { start, cancel, has: (name: string) => holds.has(name) };
+};
+
 /**
  * The four verbs over the harnesses this engine has, the hold of each waiting browser sign-in kept here by its callback port
  * (`portsHeld`) and of each waiting sign-in by a code by its server's name. Each is refused, with nothing spawned, where no harness of
@@ -238,22 +288,14 @@ export const mcpSignInVerbsOf = (
   harnessBin?: string,
 ) => {
   const states = new Map<string, McpSignInState>();
-  const devices = new Map<string, DeviceHold>();
+  const devices = devicesHeld(states, root, seams.pace ?? 1);
   const { byPort, claimed, waitsOn, portOf, settle, cancel } = portsHeld(states);
   const cwd = path.join(root, SIGN_IN_FOLDER);
   const withinMs = seams.withinMs ?? SIGN_IN_MS;
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
   const declared = declaredOf(harnesses);
   const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
-  const cliOf = () => {
-    if (seams.cli) return seams.cli satisfies McpCli | string;
-    const claude = claudeExecutableOf(executable, harnessBin);
-    return (
-      claude === undefined
-        ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
-        : claudeCli(claude)
-    ) satisfies McpCli | string;
-  };
+  const cliOf = () => cliFor(seams, executable, harnessBin);
   const browser = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const port = server.oauth?.callbackPort;
     if (port === undefined) return yield* refuse(noCallbackPort(name));
@@ -282,28 +324,6 @@ export const mcpSignInVerbsOf = (
     }).pipe(Effect.ensuring(Effect.sync(() => claimed.delete(port))));
   });
 
-  const device = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, route: DeviceRoute, clientId: string) {
-    const code = yield* Effect.tryPromise({
-      try: () => deviceCodeOf(route.deviceAuthorizationEndpoint, clientId),
-      catch: (e) => new McpSignInRefused({ message: `no code was given to sign in to \`${name}\` with: ${(e as Error).message}`, held: false }),
-    });
-    const until = new Date(Date.now() + code.expiresInSeconds * 1000).toISOString();
-    const started = { route: 'device', userCode: code.userCode, verificationUri: code.verificationUri, until } satisfies McpSignInStarted;
-    const hold: DeviceHold = { abort: new AbortController(), started };
-    devices.set(name, hold);
-    states.set(name, { state: 'waiting', until, started });
-    const settleDevice = (state: McpSignInState) => {
-      if (devices.get(name) !== hold) return;
-      devices.delete(name);
-      states.set(name, state);
-    };
-    void pollDevice({ ...code, ...route, clientId, server, root, name, signal: hold.abort.signal, pace: seams.pace ?? 1 }).then(
-      (ended) => (ended === 'cancelled' ? undefined : settleDevice(ended)),
-      (e: unknown) => settleDevice({ state: 'failed', why: (e as Error).message }),
-    );
-    return started;
-  });
-
   const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const refused = signInRefusal(name, server) ?? noClaude();
     const clientId = server.oauth?.clientId;
@@ -313,9 +333,13 @@ export const mcpSignInVerbsOf = (
     }
     const route = yield* Effect.tryPromise({
       try: () => (seams.route ?? routeOf)(server),
-      catch: (e) => new McpSignInRefused({ message: `the provider of \`${name}\` could not be asked how to sign in: ${(e as Error).message}`, held: false }),
+      catch: (e) =>
+        new McpSignInRefused({
+          message: `the provider of \`${name}\` could not be asked how to sign in: ${(e as Error).message}`,
+          held: false,
+        }),
     });
-    return route.route === 'device' ? yield* device(name, server, route, clientId) : yield* browser(name, server);
+    return route.route === 'device' ? yield* devices.start(name, server, route, clientId) : yield* browser(name, server);
   });
 
   const mcpSignInState = (name: string) => Effect.sync(() => states.get(name) ?? { state: 'none' }) satisfies Effect.Effect<McpSignInState>;
@@ -323,13 +347,7 @@ export const mcpSignInVerbsOf = (
   const mcpSignOut = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const refused = signInRefusal(name, server) ?? noClaude();
     if (refused) return yield* refuse(refused);
-    const hold = devices.get(name);
-    if (hold !== undefined) {
-      devices.delete(name);
-      hold.abort.abort();
-      states.delete(name);
-      return { ended: 'cancelled' as const } satisfies McpSignedOut;
-    }
+    if (devices.cancel(name)) return { ended: 'cancelled' as const } satisfies McpSignedOut;
     const port = portOf(name);
     if (port !== undefined) {
       if (byPort.has(port)) {
@@ -361,8 +379,9 @@ type DeviceRoute = Extract<SignInRoute, { readonly route: 'device' }>;
  * `pace` times its length, 1 outside a test. No state it answers quotes a code or a token.
  */
 const pollDevice = async (
-  p: DeviceCode & DeviceRoute & { clientId: string; server: RemoteMcpServer; root: string; name: string; signal: AbortSignal; pace: number },
-): Promise<McpSignInState | 'cancelled'> => {
+  p: DeviceCode &
+    DeviceRoute & { clientId: string; server: RemoteMcpServer; root: string; name: string; signal: AbortSignal; pace: number },
+) => {
   let waitMs = p.intervalSeconds * 1000 * p.pace;
   const endsAt = Date.now() + p.expiresInSeconds * 1000 * p.pace;
   while (!p.signal.aborted) {
@@ -370,30 +389,35 @@ const pollDevice = async (
       const timer = setTimeout(resolve, waitMs);
       p.signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
     });
-    if (p.signal.aborted) return 'cancelled';
-    if (Date.now() >= endsAt) return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' };
+    if (p.signal.aborted) return 'cancelled' as const;
+    if (Date.now() >= endsAt)
+      return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' } satisfies McpSignInState;
     const polled = await pollOnce(p.tokenEndpoint, p.clientId, p.deviceCode).catch(() => undefined);
-    if (p.signal.aborted) return 'cancelled';
+    if (p.signal.aborted) return 'cancelled' as const;
     if (polled === undefined) continue;
     switch (polled.outcome) {
       case 'token':
-        if (polled.grant === undefined) return { state: 'failed', why: 'the provider gave no token. Sign in again.' };
+        if (polled.grant === undefined)
+          return { state: 'failed', why: 'the provider gave no token. Sign in again.' } satisfies McpSignInState;
         holdToken(p.root, p.name, p.server, polled.grant, { tokenEndpoint: p.tokenEndpoint, clientId: p.clientId });
-        return { state: 'connected' };
+        return { state: 'connected' } satisfies McpSignInState;
       case 'slow-down':
         waitMs += 5000 * p.pace;
         break;
       case 'expired':
-        return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' };
+        return { state: 'expired', why: 'the code expired before it was typed. Sign in again for a new code.' } satisfies McpSignInState;
       case 'denied':
-        return { state: 'failed', why: 'the sign-in was refused at the provider. Sign in again, and approve the app there.' };
+        return {
+          state: 'failed',
+          why: 'the sign-in was refused at the provider. Sign in again, and approve the app there.',
+        } satisfies McpSignInState;
       case 'failed':
-        return { state: 'failed', why: 'the provider ended the sign-in. Sign in again.' };
+        return { state: 'failed', why: 'the provider ended the sign-in. Sign in again.' } satisfies McpSignInState;
       case 'wait':
         break;
     }
   }
-  return 'cancelled';
+  return 'cancelled' as const;
 };
 
 /**

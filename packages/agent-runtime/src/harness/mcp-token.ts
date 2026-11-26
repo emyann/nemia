@@ -17,7 +17,7 @@ import path from 'node:path';
 import { Effect, Option, Schema } from 'effect';
 import { refreshOnce, tokenDueOf, type TokenGrant } from './mcp-device.ts';
 import { mcpServerOf } from './mcp.ts';
-import type { RemoteMcpServer, RunnerOps } from './seam.ts';
+import type { RemoteMcpServer, RunnerOps, SpawnRequest } from './seam.ts';
 
 /** How long before its expiry a held token counts as due, so a session is never handed one that lapses as it starts. */
 export const REFRESH_MARGIN_MS = 5 * 60_000;
@@ -44,7 +44,9 @@ const readFile = Schema.decodeUnknownOption(Schema.fromJsonString(HeldFile));
  */
 export const tokenFileOf = (root: string, name: string, server: RemoteMcpServer) => {
   const { type, url, headers } = mcpServerOf(server);
-  const hash = createHash('sha256').update(JSON.stringify({ type, url, ...(headers === undefined ? {} : { headers }) })).digest('hex');
+  const hash = createHash('sha256')
+    .update(JSON.stringify({ type, url, ...(headers === undefined ? {} : { headers }) }))
+    .digest('hex');
   return path.join(root, TOKENS_FOLDER, `${name}-${hash.slice(0, 16)}.json`);
 };
 
@@ -149,7 +151,11 @@ export const heldToken = async (root: string, name: string, server: RemoteMcpSer
   if (Option.isNone(read)) return undefined;
   const held = read.value;
   const due = tokenDueOf(
-    { expiresAt: held.expiresAt === null ? null : Math.round(held.expiresAt), refreshToken: held.refreshToken !== null, refreshExpiresAt: held.refreshExpiresAt },
+    {
+      expiresAt: held.expiresAt === null ? null : Math.round(held.expiresAt),
+      refreshToken: held.refreshToken !== null,
+      refreshExpiresAt: held.refreshExpiresAt,
+    },
     Math.round(now),
     REFRESH_MARGIN_MS,
   );
@@ -190,15 +196,14 @@ export const tokensOf = async (root: string, mcp: Record<string, unknown> | unde
  * @param ops The runner of a harness.
  * @param root The engine's store root, where the tokens are held.
  */
-export const tokened = (ops: RunnerOps, root: string) =>
-  ({
-    ...ops,
-    spawn: (r) =>
-      Effect.flatMap(
-        Effect.promise(() => tokensOf(root, r.config?.mcp)),
-        (mcpTokens) => ops.spawn(mcpTokens === undefined ? r : { ...r, mcpTokens }),
-      ),
-  }) satisfies RunnerOps;
+export const tokened = <O extends Pick<RunnerOps, 'spawn'>>(ops: O, root: string) => ({
+  ...ops,
+  spawn: (r: SpawnRequest) =>
+    Effect.flatMap(
+      Effect.promise(() => tokensOf(root, r.config?.mcp)),
+      (mcpTokens) => ops.spawn(mcpTokens === undefined ? r : { ...r, mcpTokens }),
+    ),
+});
 
 /**
  * `servers`, as a harness is handed them, with each server named in `tokens` given `Authorization: Bearer <token>` beside its own

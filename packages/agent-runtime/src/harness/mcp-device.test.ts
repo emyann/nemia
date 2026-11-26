@@ -12,7 +12,7 @@ import { deviceCodeOf, DEVICE_GRANT, pollOnce, refreshOnce, routeOf } from './mc
 import type { RemoteMcpServer } from './seam.ts';
 
 const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -134,7 +134,10 @@ describe('pollOnce: a poll sends the device grant and no secret, and reads JSON 
   });
 
   test('a form-encoded answer reads like a JSON one', async () => {
-    received(TOKEN, () => new HttpResponse('access_token=at-2&expires_in=60&token_type=bearer', { headers: { 'content-type': 'text/plain' } }));
+    received(
+      TOKEN,
+      () => new HttpResponse('access_token=at-2&expires_in=60&token_type=bearer', { headers: { 'content-type': 'text/plain' } }),
+    );
     const polled = await pollOnce(TOKEN, 'cid', 'dc-1');
     assert.equal(polled.outcome, 'token');
     assert.equal(polled.grant?.accessToken, 'at-2');

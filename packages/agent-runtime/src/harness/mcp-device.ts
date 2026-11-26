@@ -9,6 +9,7 @@
  *
  * What a person or a log reads of these functions' failures names the address asked and the status it answered, never a code or a token.
  */
+import { Option, Schema } from 'effect';
 import type {
   AuthServerMetadata,
   HeldToken,
@@ -102,15 +103,13 @@ const secondsOf = (value: unknown) => {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null;
 };
 
+const JsonObject = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
+
 /** A body read as an object: JSON where it parses to one, else form-encoded as GitHub answers where not asked for JSON. */
-const bodyOf = (text: string): Record<string, unknown> => {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return Object.fromEntries(Object.entries(parsed));
-  } catch {
-    return Object.fromEntries(new URLSearchParams(text));
-  }
-  return {};
+const bodyOf = (text: string) => {
+  const json = JsonObject(text);
+  const body: Record<string, unknown> = Option.isSome(json) ? json.value : Object.fromEntries(new URLSearchParams(text));
+  return body;
 };
 
 /** One request to `url`, answered as an object with the status; the network failing throws, naming the address and not the body. */
@@ -119,7 +118,7 @@ const asked = async (url: string, init: RequestInit) => {
   try {
     response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_MS), redirect: 'error' });
   } catch (e) {
-    throw new Error(`${url} could not be reached: ${(e as Error).message}. Try again.`);
+    throw new Error(`${url} could not be reached: ${(e as Error).message}. Try again.`, { cause: e });
   }
   return { status: response.status, body: bodyOf(await response.text()) };
 };
@@ -183,7 +182,7 @@ const formOf = (fields: Record<string, string>) => ({
  * @param endpoint The provider's device authorization endpoint.
  * @param clientId The server's OAuth client id.
  */
-export const deviceCodeOf = async (endpoint: string, clientId: string): Promise<DeviceCode> => {
+export const deviceCodeOf = async (endpoint: string, clientId: string) => {
   const answer = await asked(endpoint, formOf({ client_id: clientId }));
   const deviceCode = textOf(answer.body.device_code);
   const userCode = textOf(answer.body.user_code);
@@ -194,7 +193,7 @@ export const deviceCodeOf = async (endpoint: string, clientId: string): Promise<
       `${endpoint} gave no code (status ${answer.status}${error === null ? '' : `, ${error}`}). ${
         error === 'device_flow_disabled'
           ? "The provider's app has the device flow switched off: its owner enables it in the app's settings."
-          : 'Sign in again; if it keeps failing, read the provider\'s answer in its documentation.'
+          : "Sign in again; if it keeps failing, read the provider's answer in its documentation."
       }`,
     );
   }
@@ -204,7 +203,7 @@ export const deviceCodeOf = async (endpoint: string, clientId: string): Promise<
     verificationUri,
     expiresInSeconds: secondsOf(answer.body.expires_in) ?? DEFAULT_EXPIRES_S,
     intervalSeconds: secondsOf(answer.body.interval) ?? DEFAULT_INTERVAL_S,
-  };
+  } satisfies DeviceCode;
 };
 
 /** The token a provider granted: both tokens, and how long each lives in seconds, null where it said none. */

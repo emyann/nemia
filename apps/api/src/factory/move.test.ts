@@ -278,9 +278,9 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     );
     plantCard(source.home, 'pressed', '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n', SINCE);
     runFrom(source, 'run-pressed', 'pressed', clone);
+    key = fileOf(source, 'mill').volumes?.find((v) => v.readOnly)?.name ?? other;
     before = digestsOf(source.home);
     exp = await answered<FactoryExport>(send(source, 'GET', '/api/factories/mill/export'));
-    key = fileOf(source, 'mill').volumes?.find((v) => v.readOnly)?.name ?? other;
     return t.end;
   });
   const s = story(test);

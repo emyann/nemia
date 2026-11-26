@@ -288,15 +288,17 @@ function workflowFiles(home: string) {
         return stat.isDirectory() ? { kind: 'folder', version: versionDigest(versionNamed(dir).files, gathered) } : { kind: 'file' };
       },
       write: (dir, draft, found, places, fills) =>
-        Effect.map(knownIn(home), (known) =>
-          writeWorkflowAt(home, dir, draft.steps, draft.readme, {
-            found,
-            known,
-            ...(fills !== undefined && { fills }),
-            ...(places !== undefined && { places }),
-            ...(draft.files !== undefined && { files: draft.files }),
-            ...(draft.whole !== undefined && { whole: draft.whole }),
-          }),
+        Effect.flatMap(knownIn(home), (known) =>
+          fromThrow(() =>
+            writeWorkflowAt(home, dir, draft.steps, draft.readme, {
+              found,
+              known,
+              ...(fills !== undefined && { fills }),
+              ...(places !== undefined && { places }),
+              ...(draft.files !== undefined && { files: draft.files }),
+              ...(draft.whole !== undefined && { whole: draft.whole }),
+            }),
+          ),
         ),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),

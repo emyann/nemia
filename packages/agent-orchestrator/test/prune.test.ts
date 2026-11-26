@@ -1190,7 +1190,7 @@ test(
       vi.advanceTimersByTime(1000);
       const other = runWith(b.e, freeing([ready]));
       await until(t, () => held.waiting() >= 2, 'the second removal asked', { bell: held.bell });
-      assert.ok(under('runs', `${run.id}.pruned`), 'marked while its removals are asked');
+      assert.ok(markerText(ROOT, run.id, 'pruned') !== undefined, 'marked while its removals are asked');
       held.letGo(ends);
       await (ends === 'first' ? one : other);
       held.letGo();

@@ -206,17 +206,21 @@ export function agentFiles(home: string) {
         return version === null ? { kind: 'none' } : { kind: 'held', version };
       },
       write: (name, draft, version, at) =>
-        Effect.map(knownIn(home), (known) =>
-          writeAgent(home, at.dir, draft, {
-            version: version ?? null,
-            ...(version !== undefined || draft.name !== name ? { from: name } : {}),
-            ...(at.schema !== undefined && { schema: at.schema }),
-            ...placed(at),
-            known,
-          }),
+        Effect.flatMap(knownIn(home), (known) =>
+          fromThrow(() =>
+            writeAgent(home, at.dir, draft, {
+              version: version ?? null,
+              ...(version !== undefined || draft.name !== name ? { from: name } : {}),
+              ...(at.schema !== undefined && { schema: at.schema }),
+              ...placed(at),
+              known,
+            }),
+          ),
         ),
       remove: (name, version, at) =>
-        Effect.map(knownIn(home), (known) => removeAgent(home, at.dir, name, { version: version ?? null, ...placed(at), known })),
+        Effect.flatMap(knownIn(home), (known) =>
+          fromThrow(() => removeAgent(home, at.dir, name, { version: version ?? null, ...placed(at), known })),
+        ),
     },
     custom: {
       read: (name, repo) => (repo === undefined ? readCustomInstructions(home, name) : customInstructionsFor(home, name, repo)),

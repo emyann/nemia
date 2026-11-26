@@ -5,7 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { recordText, runKey, runRecord, markCancelled } from '../testing.ts';
+import { recordText, runKey, runRecord, markCancelled, markerText } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -233,7 +233,6 @@ const worktreesOf = (repo: string) =>
     .filter((l) => l.startsWith('worktree '))
     .map((l) => l.slice('worktree '.length));
 const hasBranch = (repo: string, branch: string) => gitIn(repo, 'branch', '--list', branch) !== '';
-const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 /** `nemia rm`, as the client runs it over the api, a run at a time on the entry's handler: the lines it printed, and its error. */
 const rmTyped = (_t: TestContext, e: Engine, ...args: string[]) => forgetTyped((effect) => runWith(e, effect), ROOT, ['rm', ...args]);
 
@@ -257,7 +256,9 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
 
   gitIn(repo, 'worktree', 'unlock', locked.wt);
   assert.equal((await runWith(b.e, forgetRun(locked.run.id))).kind, 'forgotten');
-  assert.ok(!worktreesOf(repo).includes(locked.wt) && !under('runs', `${locked.run.id}.cancelled`) && hasBranch(repo, locked.branch));
+  assert.ok(
+    !worktreesOf(repo).includes(locked.wt) && markerText(ROOT, locked.run.id, 'cancelled') === undefined && hasBranch(repo, locked.branch),
+  );
 
   const stray = await aParent(repo, b, { work: 'stray.txt' });
   const odd = path.join(ROOT, 'worktrees', stray.run.id, 'notes');

@@ -11,6 +11,7 @@ import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddLis
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory, type FactoryListing, workedOn } from '../factory/factory.ts';
 import { listedAt } from '../factory/door/factories.store.ts';
+import { fromThrow } from '../door/door.store.ts';
 import { stepSkillsNamed, stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
@@ -139,7 +140,8 @@ function addsIn(listing: readonly FactoryListing[], home: string, name: string) 
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export const factoryAdds = (home: string, name: string) => Effect.map(listedAt(home), (listing) => addsIn(listing, home, name));
+export const factoryAdds = (home: string, name: string) =>
+  Effect.flatMap(listedAt(home), (listing) => fromThrow(() => addsIn(listing, home, name)));
 
 /**
  * Where the library holds the item `ref`: the person's (`user`), a builtin, or undefined where it holds none.
@@ -224,7 +226,7 @@ function addObjectIn(listing: readonly FactoryListing[], home: string, name: str
  * @param recorded Whether the factory's adds are its record's.
  */
 export const libraryAddObject = (home: string, name: string, ref: LibraryRef, recorded: boolean) =>
-  Effect.map(listedAt(home), (listing) => addObjectIn(listing, home, name, ref, recorded));
+  Effect.flatMap(listedAt(home), (listing) => fromThrow(() => addObjectIn(listing, home, name, ref, recorded)));
 
 /**
  * The add named `addname`, `<kind>.<name>`, read as a reference; undefined where it names no kind of the library.
@@ -254,13 +256,13 @@ export const writeLibraryAdd = Effect.fn('writeLibraryAdd')(function* (
   ref: LibraryRef,
 ) {
   const listing = yield* listedAt(home);
-  const { adds } = addsIn(listing, home, name);
+  const { adds } = yield* tried(() => addsIn(listing, home, name));
   const added = adds.some((a) => sameAdd(a, ref));
   const refused = libraryAddRefusal(does, libraryOrigin(home, ref) !== undefined, added);
   if (refused !== null) return yield* Effect.fail(new Missing({ message: refused.message }));
   const now = does === 'add' ? (added ? adds : [...adds, ref]) : adds.filter((a) => !sameAdd(a, ref));
   yield* tried(() => writeLibraryAdds(home, name, now));
-  return addObjectIn(listing, home, name, ref, true) satisfies LibraryAdd;
+  return yield* tried(() => addObjectIn(listing, home, name, ref, true) satisfies LibraryAdd);
 });
 
 /**

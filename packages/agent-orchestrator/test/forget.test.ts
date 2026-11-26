@@ -301,7 +301,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.ok(left.includes(kept), "another run's task is the engine's still");
       assert.ok(!stands(markerOf(id)), 'no marker is left');
       assert.ok(
-        recordText(ROOT, runKey(id)) === undefined && !under('runs', id) && !under('runs', `${id}.pruned`),
+        recordText(ROOT, runKey(id)) === undefined && !under('runs', id) && markerText(ROOT, id, 'pruned') === undefined,
         'its record, files and mark are gone',
       );
       assert.ok(hasBranch(repo, branch), 'its branch is kept');

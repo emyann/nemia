@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
 import { knownIn } from '../folder/known.store.ts';
-import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
+import { checked, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { definitionVersionRefusal, type DefinitionThere, type SkillsFound } from '../agents/agents.ts';
 import { Skill, SkillName } from '../agents/agents.model.ts';
@@ -185,10 +185,11 @@ export function skillFiles(home: string) {
       others: (name, at) => skillOthers(path.join(at, name)),
       there: (name, at) => skillThere(path.join(at, name)),
       write: (name, change, version, at, where) =>
-        Effect.map(knownIn(home), (known) =>
-          writeSkill(home, at, { ...change, name }, { version: version ?? null, anywhere: where?.anywhere, known }),
+        Effect.flatMap(knownIn(home), (known) =>
+          fromThrow(() => writeSkill(home, at, { ...change, name }, { version: version ?? null, anywhere: where?.anywhere, known })),
         ),
-      copy: (name, from, to, where) => Effect.map(knownIn(home), (known) => copySkill(home, from, to, name, { ...where, known })),
+      copy: (name, from, to, where) =>
+        Effect.flatMap(knownIn(home), (known) => fromThrow(() => copySkill(home, from, to, name, { ...where, known }))),
       remove: (name, at) => {
         const dir = path.join(at, name);
         fs.rmSync(dir, { recursive: true, force: true });

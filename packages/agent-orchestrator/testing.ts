@@ -11,6 +11,7 @@ export { agentDoorMemory, MEMORY_AGENTS } from './src/agents/agent-memory.store.
 export { skillDoorMemory } from './src/skills/skill-memory.store.ts';
 export { BuiltinTemplates } from './src/template/door/templates.store.ts';
 
+import { knownIn } from './src/folder/known.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import { Cause, Effect, Exit } from 'effect';
 import { FactoryName, isDefaultFactory } from './src/factory/factory.model.ts';
@@ -77,6 +78,12 @@ export const factoriesNow = <A, E>(home: string, program: Effect.Effect<A, E, St
   if (Exit.isFailure(exit)) throw Cause.squash(exit.cause);
   return exit.value;
 };
+
+/**
+ * What the store `home` knows of where workflows, agents and skills are kept besides its own folders: its factories' repositories.
+ * @param home The store's root folder.
+ */
+export const knownAt = (home: string) => factoriesNow(home, knownIn(home));
 
 /** The program `use` of the Factory door. */
 const throughDoor = <A, E>(use: (door: FactoryDoorShape) => Effect.Effect<A, E>) => Effect.flatMap(FactoryDoor, use);

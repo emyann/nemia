@@ -2297,6 +2297,51 @@ checks:
   the step is judged by; `nemia check-output <run> <step> --check <name>` reads one's output; `nemia stats` gives each check's tries,
   median and p90 time, and how often it refused.
 
+## A step waits on a condition: `condition:` and `nemia condition`
+
+A check may name a **condition** in place of a command, and a step then goes on when something outside it says so — a CI run, a
+person's review — which the step does not run itself:
+
+```yaml
+checks:
+  - name: ci
+    condition: ci-green
+```
+
+- **A condition is a status a token holder writes**: `nemia condition <run> <step> <name> --status True|False|Unknown --message "<words>"`,
+  or `PUT /api/namespaces/<ns>/runs/<run>/steps/<step>/conditions/<name>`, for the try the step is on (`--try`, which the page of the
+  step says). `True` passes the check, `False` refuses it as a failed check does (and counts against `retries:`), `Unknown`, nothing
+  written, or a write for another try leaves the step `checking`: the verdict of an earlier try is never the new try's
+  (`conditionStanding`, proved by `contracts/condition-standing.contract.ts`).
+- **The step's own session never writes it**: the api refuses it `Forbidden` (`own-step`), and a condition no check of the step waits on,
+  or a try the step is not on (`Conflict`), likewise (`conditionWriteRefusal`, proved by `contracts/condition-write.contract.ts`).
+  There is no deadline on the wait: a step that waits is not hung, and says what it waits on in its note in `nemia ls`.
+- **A decided condition is filed as a check's task of its own**, which prints the message and exits 0 or 1, so the verdict, the output
+  handed to the next try and `retries:` read it as they read any check.
+- **A condition is kept as a file of the run's asks** (`condition-<step>~<try>~<name>`), read on every pass and laid on the step's record
+  as a person's route is, never in the record itself.
+
+### A template's programs: `programs/<name>/program.yaml`
+
+A template declares the long-lived programs that write its conditions, a document kind of its own beside workflows, agents and skills:
+
+```yaml
+apiVersion: nemia/v1
+kind: Program
+metadata:
+  name: ci-writer
+spec:
+  run: node "$WF_CARRIED_FILES/ci-writer.ts"
+  writes: [ci-green]
+```
+
+- **The daemon keeps each program running per factory** (`programs()`, `src/program/program.verb.ts`): one task of the runtime's command
+  harness, long-lived (`restartPolicy: 'Always'`), run in the factory's tree with `WF_CARRIED_FILES`, `WF_FACTORY` and its own session
+  token, which writes through the api as any token holder does. The runtime restarts a program whose process ends, with its back-off;
+  the controller files what a factory declares and stops what it no longer does (`programsDue`, proved by
+  `contracts/programs-due.contract.ts`), so a factory taken away stops its programs. A task the runtime settled is said in the daemon's
+  log, with what to do.
+
 ## A command node: `run:`
 
 A node with `run:` and no session runs its shell line as a workload of its own on the `command` harness, in its first parent's

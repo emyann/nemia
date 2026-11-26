@@ -148,6 +148,10 @@
       "type": "CheckSpec"
     },
     {
+      "term": "Condition",
+      "meaning": "what a check waits on in place of running a command (`checks: [{name, condition}]`): a named status a token holder writes for a step's try, `True` (the check passes), `False` (it refuses, as a failed check does) or `Unknown`, with a message. Not written, `Unknown` or written for another try, the step stays checking and says what it waits on. The step's own session never writes it."
+    },
+    {
       "term": "Command node",
       "meaning": "a node with `run:` and no session: its shell line run on the `command` harness, signed off by its exit and the answer it leaves in `WF_ANSWER` (`commandCloseout`, `packages/agent-orchestrator/src/command-node/command-node.ts`), acting as the agent it names. Its kind is `command`."
     },
@@ -899,6 +903,10 @@
       "term": "WorkflowName",
       "meaning": "a workflow's name: its folder's.",
       "type": "WorkflowName"
+    },
+    {
+      "term": "Program",
+      "meaning": "a long-lived command a template declares (`programs/<name>/program.yaml`), which the daemon keeps running for each factory made from it, as a task of the runtime's command harness restarted by the runtime when it ends; it writes the conditions its `writes:` names."
     },
     {
       "term": "Proposal",

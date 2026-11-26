@@ -24,7 +24,17 @@ import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, parseWorkflow, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
-import { addFactory, attachWorkflow, hireAgent, keysUnder, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import {
+  addFactory,
+  attachWorkflow,
+  hireAgent,
+  keysUnder,
+  plantRecord,
+  recordText,
+  runKey,
+  runsNow,
+  plantMarker,
+} from 'agent-orchestrator/testing';
 /**
  * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
  * `bench`, filed on it, lets the api read (`placeFor`); a start there runs in `bench`, the one factory that holds it, which offers `good`
@@ -931,7 +941,7 @@ function parentRun(id: string, cancelledAt?: string) {
       createdAt: '2026-09-14T00:00:00.000Z',
     }),
   );
-  if (cancelledAt) write(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
+  if (cancelledAt) plantMarker(root, id, 'cancelled', cancelledAt);
 }
 
 /** The runs a start below waits on: written by the first test that needs them, since the tests above count the store's files from empty. */

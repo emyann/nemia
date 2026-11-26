@@ -1,9 +1,9 @@
 /**
  * What `startRun` copies of a person's labels, once, at creation: the `--after` and `--from` runs' labels where they agree, the card's
  * over them, the typed `--label` edits over those; a key two runs disagree on left out and said by `nemia start`; a malformed or reserved
- * edit refused before any file is written; and no `.labels` file for a run started with none. On the files, with the test place.
+ * edit refused before any file is written; and no labels record for a run started with none. On the files, with the test place.
  */
-import { recordText, runKey, runsNow } from '../../testing.ts';
+import { markerText, recordText, runKey, runsNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -46,8 +46,6 @@ const aRepo = () => {
   return repo;
 };
 
-const labelsFile = (id: string) => path.join(RUNS_DIR, `${id}.labels`);
-
 test("a start copies the labels its --after and --from runs agree on, the card's over them and its own edits over those", async () => {
   const repo = aRepo();
   const a = await parent(repo, { team: 'core', area: 'inbox', tier: 'one' });
@@ -65,7 +63,7 @@ test("a start copies the labels its --after and --from runs agree on, the card's
   const want = { team: 'core', tier: 'two', kind2: 'x' };
   assert.deepEqual(run.labels, want, "the card's tier beats the runs', and area- drops an inherited one");
   assert.equal(run.labelsLeftOut, undefined, 'nothing left out');
-  assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile(run.id), 'utf8')), want, 'written beside the record');
+  assert.deepEqual(JSON.parse(markerText(ROOT, run.id, 'labels') ?? 'null'), want, 'written beside the record, as a record of its own');
   assert.equal('labels' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? ''), false, 'never in it');
 });
 
@@ -94,7 +92,7 @@ test('a key two named runs disagree on is left out, and `nemia start` answers it
 
 test('a run started with no labels writes no .labels file, and its start answers no label', async () => {
   const run = await runPlaced(startRun({ brief: 'bare', repo: aRepo(), workflowDir: folder() }));
-  assert.equal(fs.existsSync(labelsFile(run.id)), false);
+  assert.equal(markerText(ROOT, run.id, 'labels'), undefined);
   assert.equal(run.labels, undefined);
   const facts = startedFacts({ home: ROOT, run });
   assert.deepEqual([facts.labels, facts.labelsLeftOut], [undefined, undefined], 'nor a key of them in what the api answers');

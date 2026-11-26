@@ -18,7 +18,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { TOKEN_COOKIE } from 'objects';
 import { appOf, liveOf } from '../src/app.ts';
 import { withHer } from './her.ts';
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, markerText } from 'agent-orchestrator/testing';
 
 /** The app of the upgraded release over the harness's store, marked exposed as a server bound to a shared address is. */
 const { app: exposed } = appOf(liveOf({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' }));
@@ -58,7 +58,7 @@ function planted(id: string) {
 }
 
 /** Who the hold on run `id` says put it, as its file keeps it. */
-const holder = (id: string) => (JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.hold`), 'utf8')) as { actor?: unknown }).actor;
+const holder = (id: string) => (JSON.parse(markerText(root, id, 'hold') ?? '') as { actor?: unknown }).actor;
 
 /** The board's request, as a browser sends it over plain http from the shared address: no Sec-Fetch-Site, the cookie its only token. */
 const fromTheBoard = (cookie: string, method: string, url: string, body: unknown) =>

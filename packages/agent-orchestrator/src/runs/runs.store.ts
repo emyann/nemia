@@ -1,11 +1,13 @@
 /**
  * The Run door: the one way a program reads and writes a run — its record, its claim on the card it was started from, a person's asks of
- * it, and the files a person keeps beside it (holds, refresh asks, the markers of what `nemia rm` forgets) — an Effect service, `RunDoor`,
+ * it, and the markers a person keeps beside it (holds, refresh asks, the markers of what `nemia rm` forgets) — an Effect service,
+ * `RunDoor`,
  * whose methods take a run's id as `RunId` and answer an Effect failing with a refusal. Its shape is the run store's (`RunStore`,
  * `record/record.ts`); the inbox is the Card door's (`src/cards/cards.store.ts`).
  *
  * Two layers: the keyspace (`runRecords`, `records.store.ts`), each method an Effect over the store's SQLite file (`<root>/db/state.db`)
- * with a person's markers as files beside it, which the default gives a program at the root it is given (`StoreRoot`); and the memory
+ * with a person's markers records beside the run's (`/registry/runmarks/`), which the default gives a program at the root it is given
+ * (`StoreRoot`); and the memory
  * stand-in (`runDoorMemory`, `memory.store.ts`), plain synchronous methods made a door by `doorOf`, which a test gives its program. No
  * synchronous spelling of the door is left: a caller yields it. Both are checked by `runDoorOver`, so each write is checked the one way on
  * both: a new run decodes through the model's `Run` (`record/record.model.ts`) with its id as `RunId.OnCreate` checks it, and a run written
@@ -19,7 +21,7 @@ import { Context, Effect, Layer } from 'effect';
 import { doorOf, checked, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
-import { runKeyspace, runKeyspaceHeld, runRecords } from './records.store.ts';
+import { markedKeyspace, markedKeyspaceHeld, runRecords } from './records.store.ts';
 
 export { cardStartedTwice, runTaken } from './records.store.ts';
 
@@ -74,7 +76,7 @@ export const runDoorOver = (layer: RunsLayer) => runDoorChecked(doorOf<RunsLayer
  * The Run door over the keyspace of the store `home`, a person's markers files beside it.
  * @param home The store's root folder.
  */
-const keyspaceDoor = (home: string) => runDoorChecked(runRecords(home, runKeyspace(home), runKeyspaceHeld(home)));
+const keyspaceDoor = (home: string) => runDoorChecked(runRecords(home, markedKeyspace(home), markedKeyspaceHeld(home)));
 
 /**
  * The Run door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the keyspace of the

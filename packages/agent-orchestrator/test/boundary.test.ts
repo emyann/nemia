@@ -190,12 +190,22 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/standing/standing.store.ts': ['src/record/record.store.ts', 'src/place/place.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/door/door.store.ts': ['src/config/root.store.ts'],
   'src/keyspace/import.store.ts': ['src/door/door.store.ts', 'src/keyspace/keyspace.store.ts'],
-  'src/runs/records.store.ts': [
+  'src/runs/marks.store.ts': [
     'src/door/door.store.ts',
+    'src/keyspace/import.store.ts',
     'src/keyspace/keyspace.store.ts',
     'src/pause/pause.store.ts',
     'src/record/files.store.ts',
     'src/record/record.store.ts',
+  ],
+  'src/runs/records.store.ts': [
+    'src/door/door.store.ts',
+    'src/keyspace/import.store.ts',
+    'src/keyspace/keyspace.store.ts',
+    'src/pause/pause.store.ts',
+    'src/record/files.store.ts',
+    'src/record/record.store.ts',
+    'src/runs/marks.store.ts',
   ],
   'src/runs/runs.store.ts': ['src/door/door.store.ts', 'src/runs/records.store.ts'],
   'src/level/level.store.ts': ['src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],

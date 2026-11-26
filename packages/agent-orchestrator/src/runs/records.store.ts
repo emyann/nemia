@@ -2,13 +2,15 @@
  * The Run door's records in the keyspace (`src/keyspace/keyspace.store.ts`): a run's record, the claim it holds on the card it was started
  * from and a person's asks of it, each a record at its key (`run-keys.ts`), each write given a revision. What belongs together is one
  * transaction: a run and its claim (`create`); the pass's record and the asks it answers (`settle`); a run's removal with its claim and
- * asks (`forget`); an approval taken back (`takeBack`). A person's markers beside a run (its cancellation, pruning, hold, labels, what was
- * said before a step was filed, a refresh ask, `nemia rm`'s marker) stay files (`src/record/files.store.ts`), read and written through
- * `fromThrow`, and composed onto each run read.
+ * asks and markers (`forget`); an approval taken back (`takeBack`). A person's markers beside a run (its cancellation, pruning, hold,
+ * labels, what was said before a step was filed, a refresh ask) are records under `/registry/runmarks/<id>/` (`run-keys.ts`), each guarded
+ * write one transaction asking the marks' machine (`runMarkMove`), composed onto each run read; `nemia rm`'s marker is at
+ * `/registry/forgetting/<id>`, outside them, since it outlives the run's record.
  *
  * A store kept before its runs were records has its run files, ask files and claims imported the first time a process opens it
  * (`runsImported`, `runKeyspace`): each run's in one transaction, a key already held never written over, every file read then moved
- * aside under `<root>/imported/`, never deleted. Level-triggered: an import cut short by a crash is taken up by the next open.
+ * aside under `<root>/imported/`, never deleted. Level-triggered: an import cut short by a crash is taken up by the next open. The
+ * markers' files are imported by their own kind (`RUN_MARK_FILES`), taken up on each open after the run files.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,31 +26,27 @@ import {
   type KeyTxn,
 } from '../keyspace/keyspace.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
-import { pauseStands, readPause } from '../pause/pause.store.ts';
+import { readPause } from '../pause/pause.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { routeAsk } from '../route/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { paused } from '../record/files.store.ts';
 import {
-  calledOffByMarker,
-  dropFiles,
-  filesAt,
-  labelled,
-  markerRunIds,
-  paused,
-  readForgetting,
-  removeMarkerFiles,
-  removeRefresh,
-  refreshStands,
-  forgettingRuns,
-  forgettingWhere,
-  liftForgetting,
-  writeForgetting,
-  writeLabels,
-  writePruned,
-  writeRefresh,
-} from '../record/files.store.ts';
+  create,
+  markerMethods,
+  marksFrom,
+  overwrite,
+  ownKey,
+  raced,
+  racedOn,
+  remove,
+  RUN_MARK_FILES,
+  type Held,
+  type Opened,
+} from './marks.store.ts';
+import { kindKeyspace, kindKeyspaceHeld } from '../keyspace/import.store.ts';
 import {
   acceptanceIn,
   answersIn,
@@ -61,28 +59,36 @@ import {
   asksIn,
   composedRun,
   heldText,
-  holdStands,
-  keepSaid,
-  markCancelled,
   readAs,
-  readCancelled,
-  readPruned,
   recordIn,
   recordValue,
-  removeHold,
-  restStamps,
   runFile,
+  lstatOf,
   runsDir,
   sayOnce,
   UnreadableRecord,
   When,
-  writeHold,
   type AskEntry,
 } from '../record/record.store.ts';
 import type { AskKey, AskWritten, PersonRequest, Run, RunStore } from '../record/record.ts';
 import type { AskHeld } from '../../contracts/ask-take-back.contract.ts';
 import type { RunId } from '../record/record.model.ts';
-import { ASK_WORDS, askDoneKey, askKey, askKeyOf, askName, asksPrefix, ASKS_PREFIX, claimKey, runKey, RUNS_PREFIX } from './run-keys.ts';
+import {
+  ASK_WORDS,
+  askDoneKey,
+  askKey,
+  askKeyOf,
+  askName,
+  asksPrefix,
+  ASKS_PREFIX,
+  claimKey,
+  forgettingKey,
+  runKey,
+  runMarkKey,
+  runMarksPrefix,
+  RUNMARKS_PREFIX,
+  RUNS_PREFIX,
+} from './run-keys.ts';
 
 /** The Run door's shape: each method of the run store answering an Effect, a run's id taken as `RunId`. */
 type Shape = DoorOf<RunStore, RunId>;
@@ -112,19 +118,6 @@ const claimedBy = (text: string) => Option.getOrUndefined(claimIn(text))?.run;
 
 /** The card a record's text says its run was started from, or undefined. */
 const cardIn = (text: string) => Option.getOrUndefined(fromCardIn(text))?.from.inbox;
-
-/** A write that makes its key. */
-const create = (value: string) => ({ verb: 'create', expected: null, value }) as const;
-
-/** A write that overwrites its key, naming no revision. */
-const overwrite = (value: string) => ({ verb: 'update', expected: null, value }) as const;
-
-/** A write that deletes its key, naming no revision. */
-const remove = { verb: 'delete', expected: null, value: '' } as const;
-
-/** A keyspace's refusal of a write the door did not foresee, as a refusal naming its key. */
-const raced = (err: { readonly key: string }) =>
-  new Conflict({ message: `${err.key} changed while it was written: run the command again.` }) satisfies Refusal as Refusal;
 
 /** The waiting asks among a run's records: those directly under its prefix, a spent one's `done/` left out. */
 const waitingOf = (id: string, records: readonly KeyRecord[]) =>
@@ -272,20 +265,6 @@ function givenOf(given: Set<Run>, run: Run | undefined) {
   return run;
 }
 
-/** The keyspace a write writes, opened and its files imported. */
-type Opened = Effect.Effect<Keyspace, Refusal>;
-
-/** The keyspace a read reads, or undefined where there is none. */
-type Held = Effect.Effect<Keyspace | undefined, Refusal>;
-
-/** A keyspace's refusal inside a transaction, as the door's `raced` refusal. */
-const racedOn = <A, E, R>(effect: Effect.Effect<A, E | KeyRefused, R>) =>
-  Effect.catchIf(
-    effect,
-    (err): err is KeyRefused => err instanceof KeyRefused,
-    (err) => Effect.fail(raced(err)),
-  );
-
 /**
  * The run at `record` with its asks, composed with its markers and the pause: undefined where its record cannot be read, which `said`
  * says.
@@ -294,23 +273,30 @@ const composedOf = (
   home: string,
   record: KeyRecord,
   asks: readonly KeyRecord[],
+  marks: readonly KeyRecord[],
   said: (line: string) => void,
   pause: ReturnType<typeof readPause>,
 ) =>
   Effect.gen(function* () {
     const id = record.key.slice(RUNS_PREFIX.length);
-    const run = yield* Effect.result(fromThrow(() => composedRun(home, recordIn(id, record.value, record.key), waitingOf(id, asks))));
-    if (run._tag === 'Success') return yield* fromThrow(() => paused(home, labelled(home, run.success), pause));
+    const run = yield* Effect.result(
+      fromThrow(() => composedRun(recordIn(id, record.value, record.key), waitingOf(id, asks), marksFrom(id, marks))),
+    );
+    if (run._tag === 'Success') return yield* fromThrow(() => paused(home, run.success, pause));
     if (!(run.failure instanceof UnreadableRecord)) return yield* Effect.fail(run.failure);
     said(`left out: ${run.failure.message}`);
     return undefined;
   });
 
-/** Whether `id` names a key of its own under the prefix: one holding a `/` would name another's, or an ask's, so names no run. */
-const ownKey = (id: string) => id !== '' && !id.includes('/');
-
-/** What one run's reads read from `held`: its record and its asks, each none where the store has no keyspace or `id` names no key. */
+/**
+ * What one run's reads read from `held`: its record, its asks and its markers, each none where the store has no keyspace or `id` names no
+ * key.
+ */
 const keyReads = (held: Held) => ({
+  marksOf: (id: string) =>
+    Effect.flatMap(held, (ks) =>
+      ks === undefined || !ownKey(id) ? Effect.succeed([]) : Effect.map(ks.list(runMarksPrefix(id)), (l) => l.records),
+    ),
   asksOf: (id: string) =>
     Effect.flatMap(held, (ks) =>
       ks === undefined || !ownKey(id) ? Effect.succeed([]) : Effect.map(ks.list(asksPrefix(id)), (l) => l.records),
@@ -324,7 +310,8 @@ const dueRecords = (ks: Keyspace, ids: readonly string[], due: readonly string[]
   Effect.gen(function* () {
     const records = new Map<string, KeyRecord>();
     const asks = new Map<string, KeyRecord[]>();
-    if (due.length === 0) return { records, asks };
+    const marks = new Map<string, KeyRecord[]>();
+    if (due.length === 0) return { records, asks, marks };
     const all = due.length === ids.length;
     const listed = all
       ? (yield* ks.list(RUNS_PREFIX)).records
@@ -337,7 +324,14 @@ const dueRecords = (ks: Keyspace, ids: readonly string[], due: readonly string[]
       const id = r.key.slice(ASKS_PREFIX.length).split('/')[0] ?? '';
       asks.set(id, [...(asks.get(id) ?? []), r]);
     }
-    return { records, asks };
+    const markRecords = all
+      ? (yield* ks.list(RUNMARKS_PREFIX)).records
+      : (yield* Effect.forEach(due, (id) => ks.list(runMarksPrefix(id)))).flatMap((l) => l.records);
+    for (const r of markRecords) {
+      const id = r.key.slice(RUNMARKS_PREFIX.length).split('/')[0] ?? '';
+      marks.set(id, [...(marks.get(id) ?? []), r]);
+    }
+    return { records, asks, marks };
   });
 
 /** Every run of the store `home`, a run a memo kept (`kept`) taken as kept, one whose record cannot be read said and left out. */
@@ -350,10 +344,10 @@ function listedRuns(home: string, held: Held) {
       const given = new Set<Run>();
       const ids = (yield* ks.keys(RUNS_PREFIX)).map((key) => key.slice(RUNS_PREFIX.length));
       const due = ids.filter((id) => givenOf(given, kept?.(id)) === undefined);
-      const { records, asks } = yield* dueRecords(ks, ids, due);
+      const { records, asks, marks } = yield* dueRecords(ks, ids, due);
       const out: Run[] = [...given].map((run) => paused(home, run, pause));
       for (const [id, record] of records) {
-        const run = yield* composedOf(home, record, asks.get(id) ?? [], said, pause);
+        const run = yield* composedOf(home, record, asks.get(id) ?? [], marks.get(id) ?? [], said, pause);
         if (run !== undefined) out.push(run);
       }
       return out.sort((a, b) => a.id.localeCompare(b.id));
@@ -361,30 +355,32 @@ function listedRuns(home: string, held: Held) {
   return method;
 }
 
-/** The Run door's reads of one run and of every run in `held`, its markers read in `home`. */
+/** The Run door's reads of one run and of every run in `held`, the store's pause read in `home`. */
 function runReads(home: string, held: Held) {
-  const { asksOf, recordOf } = keyReads(held);
+  const { asksOf, marksOf, recordOf } = keyReads(held);
   const reads: Pick<Shape['runs'], 'read' | 'find' | 'list' | 'exists' | 'taken' | 'ids'> = {
     read: (id) =>
       Effect.gen(function* () {
         const record = yield* recordOf(id);
         if (record === undefined) return yield* new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-        const asks = yield* asksOf(id);
-        const run = yield* fromThrow(() => composedRun(home, recordIn(id, record.value, record.key), waitingOf(id, asks)));
-        return yield* fromThrow(() => paused(home, labelled(home, run)));
+        const [asks, marks] = [yield* asksOf(id), yield* marksOf(id)];
+        const run = yield* fromThrow(() => composedRun(recordIn(id, record.value, record.key), waitingOf(id, asks), marksFrom(id, marks)));
+        return yield* fromThrow(() => paused(home, run));
       }),
     find: (id, said = sayOnce) =>
       Effect.gen(function* () {
         const pause = yield* fromThrow(() => readPause(home));
         const record = yield* recordOf(id);
-        return record === undefined ? undefined : yield* composedOf(home, record, yield* asksOf(id), said, pause);
+        return record === undefined ? undefined : yield* composedOf(home, record, yield* asksOf(id), yield* marksOf(id), said, pause);
       }),
     list: listedRuns(home, held),
     exists: (id) => Effect.map(recordOf(id), (record) => record !== undefined),
     taken: (id) =>
       Effect.gen(function* () {
-        if ((yield* recordOf(id)) !== undefined || (yield* asksOf(id)).length > 0) return true;
-        return yield* fromThrow(() => markerRunIds(home).includes(id));
+        if ((yield* recordOf(id)) !== undefined || (yield* asksOf(id)).length > 0 || (yield* marksOf(id)).length > 0) return true;
+        const ks = yield* held;
+        if (ks !== undefined && ownKey(id) && (yield* ks.get(forgettingKey(id))) !== undefined) return true;
+        return yield* fromThrow(() => ownKey(id) && fs.existsSync(path.join(runsDir(home), id)));
       }),
     ids: () =>
       Effect.gen(function* () {
@@ -417,7 +413,7 @@ function createdRun(open: Opened) {
   return method;
 }
 
-/** The keys of a run's record, the claim it holds and its asks, removed in one transaction of `ks`. */
+/** The keys of a run's record, the claim it holds, its asks and its markers, removed in one transaction of `ks`. */
 const forgottenKeys = (ks: Keyspace, id: string) =>
   racedOn(
     ks.within((tx) =>
@@ -430,6 +426,7 @@ const forgottenKeys = (ks: Keyspace, id: string) =>
           ...(record === undefined ? [] : [runKey(id)]),
           ...(card !== undefined && claim !== undefined && claimedBy(claim.value) === id ? [claimKey(card)] : []),
           ...(yield* tx.list(asksPrefix(id))).map((ask) => ask.key),
+          ...(yield* tx.list(runMarksPrefix(id))).map((mark) => mark.key),
         ];
         for (const key of keys) {
           yield* tx.write(key, remove);
@@ -440,11 +437,10 @@ const forgottenKeys = (ks: Keyspace, id: string) =>
     ),
   );
 
-/** The revision of each run's record and asks in `ks`, and the stamps of its markers in `home`, joined by run. */
-const stampsOf = (home: string, held: Held) =>
+/** The revision of each run's record, asks and markers in `held`, joined by run. */
+const stampsOf = (held: Held) =>
   Effect.gen(function* () {
     const ks = yield* held;
-    const markers = yield* fromThrow(() => restStamps(home));
     const parts = new Map<string, string[]>();
     const add = (id: string, part: string) => parts.set(id, [...(parts.get(id) ?? []), part]);
     if (ks !== undefined) {
@@ -454,37 +450,62 @@ const stampsOf = (home: string, held: Held) =>
         const slash = rest.indexOf('/');
         add(rest.slice(0, slash), `${rest.slice(slash + 1)}=${revision}`);
       }
+      for (const [key, revision] of [...(yield* ks.revisions(RUNMARKS_PREFIX))].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+        const rest = key.slice(RUNMARKS_PREFIX.length);
+        const slash = rest.indexOf('/');
+        add(rest.slice(0, slash), `mark:${rest.slice(slash + 1)}=${revision}`);
+      }
     }
-    for (const [id, stamp] of markers) add(id, stamp);
     return new Map([...parts].map(([id, p]) => [id, p.join(';')]));
   });
 
-/** What `run` writes as its record: its cancellation left out where a person's marker in `home` holds it, as it is composed on read. */
-const bareValue = (home: string, run: Run) =>
-  fromThrow(() => {
-    if (readCancelled(home, run.id) === undefined) return recordValue(run);
-    const { cancelledAt: _, cancelledBy: __, ...bare } = run;
-    return recordValue(bare);
-  });
+/** What `run` writes as its record: its cancellation left out where a person's marker holds it, as it is composed on read. */
+const bareValue = (run: Run, cancelled: boolean) => {
+  if (!cancelled) return recordValue(run);
+  const { cancelledAt: _, cancelledBy: __, ...bare } = run;
+  return recordValue(bare);
+};
 
-/** The Run door's writes of a run's record in `open`, and its removal from `held` with its markers in `home`. */
+/** Remove a run's own directory, and a folder of words said that an import left empty: answers each path removed from the store's root. */
+const removeRunFiles = (home: string, id: string) => {
+  const removed: string[] = [];
+  for (const at of [path.join(runsDir(home), `${id}.said`), path.join(runsDir(home), id)]) {
+    const st = lstatOf(at);
+    if (!st) continue;
+    fs.rmSync(at, { recursive: true, force: true });
+    if (at.endsWith(id)) removed.push(`${path.relative(home, at)}/`);
+  }
+  return removed;
+};
+
+/** The Run door's writes of a run's record in `open`, and its removal from `held` with its markers, and its own directory in `home`. */
 function runWrites(home: string, open: Opened, held: Held) {
   const writes: Pick<Shape['runs'], 'create' | 'rewrite' | 'settle' | 'stamps' | 'forget'> = {
     create: createdRun(open),
     rewrite: (run) =>
-      Effect.flatMap(Effect.all([open, bareValue(home, run)]), ([ks, value]) =>
-        ks.write(runKey(run.id), overwrite(value)).pipe(
-          Effect.as(true),
-          Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
+      Effect.flatMap(open, (ks) =>
+        racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              const value = bareValue(run, (yield* tx.get(runMarkKey(run.id, 'cancelled'))) !== undefined);
+              return yield* tx.write(runKey(run.id), overwrite(value)).pipe(
+                Effect.as(true),
+                Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(err))),
+              );
+            }),
+          ),
         ),
       ),
     settle: (run, spent) =>
-      Effect.flatMap(Effect.all([open, bareValue(home, run)]), ([ks, value]) =>
+      Effect.flatMap(open, (ks) =>
         racedOn(
           ks.within((tx) =>
             Effect.gen(function* () {
               if ((yield* tx.get(runKey(run.id))) === undefined) return false;
-              if (spent.write) yield* tx.write(runKey(run.id), overwrite(value));
+              if (spent.write) {
+                const value = bareValue(run, (yield* tx.get(runMarkKey(run.id, 'cancelled'))) !== undefined);
+                yield* tx.write(runKey(run.id), overwrite(value));
+              }
               const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
               yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
               return true;
@@ -492,12 +513,12 @@ function runWrites(home: string, open: Opened, held: Held) {
           ),
         ),
       ),
-    stamps: () => stampsOf(home, held),
+    stamps: () => stampsOf(held),
     forget: (id) =>
       Effect.gen(function* () {
         const ks = yield* held;
         const keys = ks === undefined ? [] : yield* forgottenKeys(ks, id);
-        return [...keys, ...(yield* fromThrow(() => removeMarkerFiles(home, id)))];
+        return [...keys, ...(yield* fromThrow(() => removeRunFiles(home, id)))];
       }),
   };
   return writes;
@@ -573,39 +594,6 @@ function askMethods(open: Opened, held: Held) {
   return asks;
 }
 
-/** The Run door's markers beside a run, files in the store's root `home`. */
-function markerMethods(home: string) {
-  const markers: Pick<Shape, 'holds' | 'said' | 'labels' | 'refresh' | 'forgetting'> &
-    Pick<Shape['runs'], 'calledOff' | 'cancel' | 'filesAt' | 'dropFiles' | 'prune' | 'pruned'> = {
-    calledOff: (id) => fromThrow(() => calledOffByMarker(home, id) || pauseStands(home)),
-    cancel: (id, actor) => fromThrow(() => markCancelled(home, id, actor)),
-    filesAt: (id) => fromThrow(() => filesAt(home, id)),
-    dropFiles: (id) => fromThrow(() => dropFiles(home, id)),
-    prune: (id, marker) => fromThrow(() => writePruned(home, id, marker)),
-    pruned: (id) => fromThrow(() => readPruned(home, id)),
-    holds: {
-      lift: (id, at, actor) => fromThrow(() => removeHold(home, id, at, actor)),
-      put: (id, until, said) => fromThrow(() => writeHold(home, id, until, said)),
-      stands: (id) => fromThrow(() => holdStands(home, id)),
-    },
-    said: { put: (id, step, text) => fromThrow(() => keepSaid(home, id, step, text)) },
-    labels: { put: (id, labels) => fromThrow(() => writeLabels(home, id, labels)) },
-    refresh: {
-      lift: (id) => fromThrow(() => removeRefresh(home, id)),
-      put: (id) => fromThrow(() => writeRefresh(home, id)),
-      stands: (id) => fromThrow(() => refreshStands(home, id)),
-    },
-    forgetting: {
-      write: (id, taskIds) => fromThrow(() => writeForgetting(home, id, taskIds)),
-      read: (id) => fromThrow(() => readForgetting(home, id)),
-      list: () => fromThrow(() => forgettingRuns(home)),
-      lift: (id) => fromThrow(() => liftForgetting(home, id)),
-      where: (id) => fromThrow(() => forgettingWhere(home, id)),
-    },
-  };
-  return markers;
-}
-
 /**
  * The run store over the keyspace `open` opens at the store's root `home`, a person's markers read and written as files there: the Run
  * door's layer, each method an Effect. `held` is the keyspace a read reads, undefined where the store has none and nothing to import, so a
@@ -615,7 +603,7 @@ function markerMethods(home: string) {
  * @param held The keyspace a read reads, or undefined where there is none.
  */
 export function runRecords(home: string, open: Opened, held: Held) {
-  const { holds, said, labels, refresh, forgetting, ...markers } = markerMethods(home);
+  const { holds, said, labels, refresh, forgetting, ...markers } = markerMethods(home, open, held);
   return {
     runs: { ...runReads(home, held), ...runWrites(home, open, held), ...markers },
     asks: askMethods(open, held),
@@ -894,3 +882,18 @@ const runFilesPlanted = (home: string) => {
  */
 export const runKeyspaceHeld = (home: string) =>
   Effect.suspend(() => (!fs.existsSync(keyspaceFile(home)) && !runFilesPlanted(home) ? Effect.succeed(undefined) : runKeyspace(home)));
+
+/**
+ * The keyspace of the store `home` with its run files and then its run's marker files imported (`runKeyspace`, `RUN_MARK_FILES`).
+ * @param home The store's root folder.
+ */
+export const markedKeyspace = (home: string) => Effect.flatMap(runKeyspace(home), () => kindKeyspace(home, RUN_MARK_FILES));
+
+/**
+ * The keyspace of the store `home` a read reads: undefined where the store has no keyspace file and no run or marker file to import.
+ * @param home The store's root folder.
+ */
+export const markedKeyspaceHeld = (home: string) =>
+  Effect.flatMap(runKeyspaceHeld(home), (ks) =>
+    ks === undefined ? kindKeyspaceHeld(home, RUN_MARK_FILES) : kindKeyspace(home, RUN_MARK_FILES),
+  );

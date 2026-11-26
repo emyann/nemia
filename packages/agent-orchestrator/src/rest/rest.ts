@@ -11,6 +11,7 @@
  * Nothing is written for it, and no verb, `nemia ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.
  */
 import type { Run } from '../record/record.ts';
+import { asksPrefix, runKey, runMarkKey, saidPrefix } from '../runs/run-keys.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Informed } from '../../contracts/informed.contract.ts';
 import type { HoldKeepsOut } from '../../contracts/rest-hold.contract.ts';
@@ -120,7 +121,8 @@ export const informedOf: Informed = ({ stampHeld, quiet, tipsHeld, atRest, sameP
   stampHeld && quiet && tipsHeld && (atRest || samePass) ? 'serve' : 'judge';
 
 /**
- * How an input of a run's judgement is watched: `stamp`, a file named for the run in the store, stamped (`restStamps`, record.store.ts);
+ * How an input of a run's judgement is watched: `stamp`, a record of the run in the keyspace, stamped by its revision (`stamps`, the Run
+ * door);
  * `feed`, a task's journal, by its line on the engine's feed (`followedFeed`); `tips`, a branch's tip as git reads it
  * (`BranchReader.heads`); `request`, read again on every request and never kept (`diskPartsOf`, object/run.verb.ts).
  */
@@ -155,17 +157,17 @@ export type RunInput = keyof typeof RUN_INPUTS;
 export type InputsWatchedBy<W extends Watch> = { [K in RunInput]: (typeof RUN_INPUTS)[K] extends W ? K : never }[RunInput];
 
 /**
- * The file each stamped input is, named for the run in the store's `runs/`: `<id>.<suffix>`. `restStamps` stamps these, and any other
- * file so named, a marker nobody has named yet included.
+ * The key each stamped input sits at in the keyspace, a run's id written `<id>`: its record, its asks and each marker a person keeps
+ * beside it (`run-keys.ts`). The store's stamp is the revisions of these keys, so a marker written or removed moves its run's stamp.
  */
-export const STAMPED_FILES: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = {
-  record: 'json',
-  cancelled: 'cancelled',
-  pruned: 'pruned',
-  hold: 'hold',
-  unheld: 'unheld',
-  labels: 'labels',
-  said: 'said',
-  refresh: 'refresh',
-  asks: 'asks',
+export const STAMPED_KEYS: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = {
+  record: runKey('<id>'),
+  cancelled: runMarkKey('<id>', 'cancelled'),
+  pruned: runMarkKey('<id>', 'pruned'),
+  hold: runMarkKey('<id>', 'hold'),
+  unheld: runMarkKey('<id>', 'unheld'),
+  labels: runMarkKey('<id>', 'labels'),
+  said: saidPrefix('<id>'),
+  refresh: runMarkKey('<id>', 'refresh'),
+  asks: asksPrefix('<id>'),
 };

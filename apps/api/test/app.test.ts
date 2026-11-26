@@ -38,7 +38,7 @@ import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
-import { plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import { plantAsk, plantRecord, recordText, runKey, runsNow, plantMarker, dropMarker } from 'agent-orchestrator/testing';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
 
@@ -352,7 +352,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
       createdAt: '2026-09-12T00:00:00.000Z',
       steps: { implement: { taskId: 't-1', branch: 'wf/r-1/implement' }, review: { taskId: null } },
     });
-    fs.writeFileSync(path.join(root, 'runs', 'r-1.cancelled'), '2026-09-12T01:00:00.000Z');
+    plantMarker(root, 'r-1', 'cancelled', '2026-09-12T01:00:00.000Z');
 
     const [run, ...others] = await listedRuns(app);
     assert.deepEqual(others, [], 'the one run');
@@ -894,8 +894,8 @@ describe('a run whose workflow folder changes or vanishes after it starts is rea
       assert.deepEqual(withFolder.waitingOnYou, ['implement']);
       await unjudged('the list says it as the tick leaves it, unjudged and in flight');
 
-      fs.writeFileSync(path.join(root, 'runs', 'r-2.cancelled'), '2026-09-12T03:00:00.000Z');
-      fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
+      plantMarker(root, 'r-2', 'cancelled', '2026-09-12T03:00:00.000Z');
+      plantMarker(root, 'r-3', 'cancelled', '2026-09-12T03:00:00.000Z');
       withFolder = await listed('r-2');
       assert.deepEqual(withFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
       assert.equal(withFolder.steps[0].message, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
@@ -1750,7 +1750,7 @@ describe("what a run established, read as the tick and `nemia ls` have it: each 
     });
 
     writeRun({ ...r2, id: 'r-23', steps: { implement: { taskId: 't-7', branch: 'wf/r-23/implement' }, review: { taskId: null } } });
-    fs.writeFileSync(path.join(root, 'runs', 'r-23.cancelled'), '2026-09-12T03:00:00.000Z');
+    plantMarker(root, 'r-23', 'cancelled', '2026-09-12T03:00:00.000Z');
 
     writeRun({ ...r2, id: 'r-26', workflowDir: gone });
 
@@ -2752,9 +2752,8 @@ describe("a step's files: a closeout's files with where they are served, each se
     "once `nemia prune --artifacts` removed a run's files, each file a closeout named there reads pruned, the route answers 410 saying so — not a 404 that reads as missing — and the run's page and its decision still answer",
     async () => {
       const { dir, named } = seedFiles();
-      const marker = path.join(root, 'runs', 'r-52.pruned');
       const files = { at: '2026-09-28T09:00:00.000Z', bytes: 3 * 1024 * 1024 };
-      fs.writeFileSync(marker, JSON.stringify({ at: files.at, worktrees: [], artifacts: files }));
+      plantMarker(root, 'r-52', 'pruned', JSON.stringify({ at: files.at, worktrees: [], artifacts: files }));
       fs.rmSync(path.join(root, 'runs', 'r-52', 'artifacts'), { recursive: true });
       try {
         const run = await objectOf(app, 'r-52');
@@ -2797,7 +2796,7 @@ describe("a step's files: a closeout's files with where they are served, each se
         const decision = await app.request('/api/runs/r-52/decision');
         assert.equal(decision.status, 200, await decision.clone().text());
       } finally {
-        fs.rmSync(marker, { force: true });
+        dropMarker(root, 'r-52', 'pruned');
       }
       seedFiles();
       const missing = await app.request('/api/runs/r-52/steps/shoot/artifacts/gone.png');

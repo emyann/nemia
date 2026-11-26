@@ -29,18 +29,23 @@ import { RUN_WALKS, aRun } from './run-walks.ts';
 import { RunId } from '../src/record/record.model.ts';
 import { mayFileOf } from '../src/tick/advance.verb.ts';
 import { resumePause, putPause } from '../src/pause/pause.store.ts';
+import { acceptanceIn, approvalIn, askIn, roundAskIn, runsDir } from '../src/record/record.store.ts';
 import {
-  acceptanceIn,
-  approvalIn,
-  askIn,
-  holdFile,
+  askKey,
+  asksPrefix,
+  claimKey,
+  keysUnder,
+  plantRecord,
+  recordText,
+  runFilesImported,
+  runKey,
+  runsNow,
   markCancelled,
-  pruneFile,
-  roundAskIn,
-  runsDir,
-  writeHold,
-} from '../src/record/record.store.ts';
-import { askKey, asksPrefix, claimKey, keysUnder, plantRecord, recordText, runFilesImported, runKey, runsNow } from '../testing.ts';
+  plantMarker,
+  dropMarker,
+  runMarkKey,
+  runMarksPrefix,
+} from '../testing.ts';
 
 const ROOT = scratch('wf-run-store-');
 const store = runsNow(ROOT);
@@ -55,7 +60,7 @@ const made = (id: string) => {
 };
 
 /** A prune marker, as `nemia prune` writes one. */
-const pruned = (id: string) => fs.writeFileSync(pruneFile(ROOT, id), JSON.stringify({ at, worktrees: [] }, null, 2));
+const pruned = (id: string) => plantMarker(ROOT, id, 'pruned', JSON.stringify({ at, worktrees: [] }, null, 2));
 
 /** The record at the run's key, read as JSON. */
 const stored = (id: string) => JSON.parse(recordText(ROOT, runKey(id)) ?? 'null') as Record<string, unknown> | null;
@@ -131,7 +136,7 @@ describe('a record in the store, read and written back through the door: what it
   });
   test("a person's files are composed onto the run read, and never written into its record", () => {
     const run = made('r-composed');
-    writeHold(ROOT, run.id, ['other-run']);
+    store.holds.put(run.id, ['other-run'], {});
     markCancelled(ROOT, run.id);
     const read = store.runs.read(run.id);
     assert.ok(read.cancelledAt && read.hold);
@@ -170,7 +175,7 @@ describe('whether a person called a run off: a pause, a hold and a record gone, 
     const run = made('r-may-file');
     const mayFile = mayFileOf(run);
     assert.equal(atRoot(mayFile), true);
-    const hold = writeHold(ROOT, run.id, ['other-run']);
+    const hold = store.holds.put(run.id, ['other-run'], {});
     assert.ok(hold);
     assert.equal(atRoot(mayFile), false);
     assert.equal(store.holds.lift(run.id, hold.at), true);
@@ -266,12 +271,12 @@ test('a record at an ask key that reads as no ask is held as a stray, and a take
   }
 });
 
-test('a hold file stands while it is there, read as a hold or not, and not once it is gone', () => {
+test('a hold stands while its record is there, read as a hold or not, and not once it is gone', () => {
   const run = made('r-stands');
   assert.equal(store.holds.stands(run.id), false);
-  fs.writeFileSync(holdFile(ROOT, run.id), 'not json');
+  plantMarker(ROOT, run.id, 'hold', 'not json');
   assert.equal(store.holds.stands(run.id), true);
-  fs.rmSync(holdFile(ROOT, run.id));
+  dropMarker(ROOT, run.id, 'hold');
   assert.equal(store.holds.stands(run.id), false);
 });
 
@@ -291,12 +296,13 @@ test("a run forgotten loses its record, its claim and its asks, key by key, then
     runKey(run.id),
     claimKey('c-forget'),
     askKey(run.id, { of: 'gate', step: 'implement', n: 1 }),
-    `runs/${run.id}.cancelled`,
-    `runs/${run.id}.pruned`,
-    `runs/${run.id}.hold`,
+    runMarkKey(run.id, 'cancelled'),
+    runMarkKey(run.id, 'hold'),
+    runMarkKey(run.id, 'pruned'),
     `runs/${run.id}/`,
   ]);
   assert.deepEqual(keysUnder(ROOT, asksPrefix(run.id)), []);
+  assert.deepEqual(keysUnder(ROOT, runMarksPrefix(run.id)), [], 'no marker is left');
   assert.deepEqual(
     fs.readdirSync(runsDir(ROOT)).filter((name) => name === run.id || name.startsWith(`${run.id}.`)),
     [],
@@ -544,22 +550,14 @@ const GUARDED = [
   'listRuns',
   'writeRun',
   'rewriteRun',
-  'restStamps',
   'composedRun',
   'recordValue',
   'recordIn',
   'readAsks',
   'readAnswers',
   'consumeAsks',
-  'removeHold',
-  'markCancelled',
-  'writeHold',
   'writeAsk',
   'runFile',
-  'cancelFile',
-  'holdFile',
-  'pruneFile',
-  'readPruned',
 ];
 
 /** The files the interface is built from, which alone may import them for good. */
@@ -631,8 +629,8 @@ test('a file that imports a run function from record.store.ts is refused, naming
 });
 
 test('an import spread over lines is refused, as is a re-export, a namespace and a dynamic import', () => {
-  const spread = "import {\n  artifactsDir,\n  cancelFile,\n  holdFile as held,\n  stepsOf,\n} from '../record/record.store.ts';\n";
-  assert.deepEqual(directImports(spread), ['cancelFile', 'holdFile']);
+  const spread = "import {\n  artifactsDir,\n  recordValue,\n  recordIn as read,\n  stepsOf,\n} from '../record/record.store.ts';\n";
+  assert.deepEqual(directImports(spread), ['recordIn', 'recordValue']);
   assert.deepEqual(directImports("export {\n  listRuns,\n} from './record/record.store.ts';\n"), ['listRuns']);
   assert.deepEqual(directImports("import * as store from '../record/record.store.ts';\n"), ['*']);
   assert.deepEqual(directImports("const store = await import('../record/record.store.ts');\n"), ['*']);

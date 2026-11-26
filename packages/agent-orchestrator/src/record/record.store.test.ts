@@ -9,12 +9,23 @@ import fs from 'node:fs';
 import { scratch } from 'test-kit/scratch';
 import * as store from './record.store.ts';
 import { routeAsk } from '../route/index.ts';
-import { dropRecord, listRuns, plantAsk, plantRecord, recordText, rewriteRun, runKey, runRecord } from '../../testing.ts';
+import {
+  dropRecord,
+  listRuns,
+  markCancelled,
+  plantMarker,
+  plantAsk,
+  plantRecord,
+  recordText,
+  rewriteRun,
+  runKey,
+  runRecord,
+} from '../../testing.ts';
 
 const ROOT = scratch('wf-record-read-');
 /** A person's route for a condition's try, planted where `nemia route` writes it. */
 const plantRoute = (id: string, step: string, n: number, text: string) => plantAsk(ROOT, id, routeAsk(step, n), text);
-const { UnreadableRecord, acceptanceIn, approvalIn, askIn, roundAskIn, runsDir, pruneFile, holdFile } = store;
+const { UnreadableRecord, acceptanceIn, approvalIn, askIn, roundAskIn, runsDir } = store;
 
 fs.mkdirSync(runsDir(ROOT), { recursive: true });
 
@@ -275,8 +286,10 @@ test("a person's route is read onto its condition's record for the try it names,
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {
   put('r-marked', aRecord('r-marked'));
-  fs.writeFileSync(
-    pruneFile(ROOT, 'r-marked'),
+  plantMarker(
+    ROOT,
+    'r-marked',
+    'pruned',
     JSON.stringify({
       at: 7,
       worktrees: [
@@ -286,7 +299,7 @@ test('a marker that does not read still holds its run: a prune marker is pruned,
       artifacts: {},
     }),
   );
-  fs.writeFileSync(holdFile(ROOT, 'r-marked'), 'not json');
+  plantMarker(ROOT, 'r-marked', 'hold', 'not json');
   const run = runRecord(ROOT, 'r-marked');
   assert.deepEqual(run.pruned, { at: '', worktrees: [{ path: '/v', bytes: 2 }], artifacts: { at: '', bytes: 0 } });
   assert.deepEqual(run.hold, { at: '', until: [] });
@@ -412,24 +425,24 @@ describe('who acted reads off each file a person writes where it says, and a fil
   });
   test('a hold reads its actor beside its `by`; a hold file written before actors reads with none', () => {
     put('r-held-by', aRecord('r-held-by'));
-    fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann', actor: person }));
+    plantMarker(ROOT, 'r-held-by', 'hold', JSON.stringify({ at: AT, until: [], by: 'ann', actor: person }));
     assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann', actor: person });
-    fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann' }));
+    plantMarker(ROOT, 'r-held-by', 'hold', JSON.stringify({ at: AT, until: [], by: 'ann' }));
     assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann' });
   });
   test('a cancellation reads its time from the plain text a former nemia wrote, and its time and actor from the JSON one writes now', () => {
     put('r-called', aRecord('r-called'));
-    fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), `${AT}\n`);
+    plantMarker(ROOT, 'r-called', 'cancelled', `${AT}\n`);
     const old = runRecord(ROOT, 'r-called');
     assert.deepEqual([old.cancelledAt, 'cancelledBy' in old], [AT, false]);
-    fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), JSON.stringify({ at: AT, actor: agent }));
+    plantMarker(ROOT, 'r-called', 'cancelled', JSON.stringify({ at: AT, actor: agent }));
     const now = runRecord(ROOT, 'r-called');
     assert.deepEqual([now.cancelledAt, now.cancelledBy], [AT, agent]);
   });
   test('a cancellation written with an actor keeps the first: a second neither moves its time nor its actor', () => {
     put('r-called-twice', aRecord('r-called-twice'));
-    const first = store.markCancelled(ROOT, 'r-called-twice', person);
-    assert.equal(store.markCancelled(ROOT, 'r-called-twice', agent), first);
+    const first = markCancelled(ROOT, 'r-called-twice', person);
+    assert.equal(markCancelled(ROOT, 'r-called-twice', agent), first);
     assert.deepEqual(runRecord(ROOT, 'r-called-twice').cancelledBy, person);
   });
 });

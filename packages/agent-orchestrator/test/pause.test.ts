@@ -32,6 +32,7 @@ import {
   retryAskKey,
   runKey,
   runRecord,
+  markCancelled,
 } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { heldDate, teardowns } from 'test-kit/checkpoints';
@@ -47,7 +48,7 @@ import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { pauseFile, readPause } from '../src/pause/pause.store.ts';
 import { nowRead } from '../src/pause/pause.verb.ts';
 import { pausedRead } from '../src/list/list.verb.ts';

@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf, runPath } from '../board.ts';
@@ -8,7 +7,7 @@ import { dollars } from '../../../src/lib/money.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredCard, OUT, store, storeCard, storedCard } from '../world.ts';
+import { dropStoredCard, dropStoredMarker, OUT, storeCard, storedCard } from '../world.ts';
 
 /** The card this page files with a label, and the label it and a seeded run carry. */
 const CARD = 'label-the-card-e2e0';
@@ -29,13 +28,12 @@ export default {
   /**
    * A card filed with `team: core` and a landed run labelled `team=core`: the Inbox and Runs filters keep them alone, a label added on the
    * card's page is written to its frontmatter and removed again, one added on the run's page is shown and removed with no reload, and
-   * the label's page counts the card not started and the run landed. The card, and the run's labels file, are taken back.
+   * the label's page counts the card not started and the run landed. The card, and the run's labels record, are taken back.
    */
   name: 'labels',
   route: '/inbox',
   expect: async (page) => {
     const cardFile = `nemia get card ${CARD}`;
-    const labelsFile = path.join(store!, 'runs', `${LANDED.id}.labels`);
     const theme = await themeOf(page);
     try {
       storeCard(CARD, `---\nlabels:\n  team: core\n---\nLabel the card\n\nA card the label filter keeps.\n`);
@@ -110,7 +108,7 @@ export default {
     } finally {
       dropStoredCard(CARD);
       await labelRun(page, LANDED.id, ['team-']).catch(() => undefined);
-      fs.rmSync(labelsFile, { force: true });
+      dropStoredMarker(LANDED.id, 'labels');
     }
   },
 } satisfies PageSpec;

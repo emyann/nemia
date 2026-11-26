@@ -33,9 +33,7 @@ import { inputsRoot } from './places.store.ts';
 import type { AsksRead, SaidBefore } from './record.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
-import { countRead, countRecord, readText, within, withinEffect } from '../meter/tally.store.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
-import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
+import { countRead, countRecord, within, withinEffect } from '../meter/tally.store.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -208,15 +206,6 @@ export const actorIn = (value: unknown) => {
   return read === undefined ? {} : { actor: read };
 };
 
-/** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
-const markerOf = (file: string) => {
-  try {
-    return { json: jsonOr(readText(file)) };
-  } catch {
-    return undefined;
-  }
-};
-
 /**
  * The folder of every run's record and the files beside it: `runs/` under the store's root.
  * @param home The store's root folder.
@@ -237,185 +226,150 @@ export const runFile = (home: string, id: string) => path.join(runsDir(home), `$
  */
 export const asksDir = (home: string, id: string) => path.join(runsDir(home), `${id}.asks`);
 
-/**
- * A cancellation, in a file of its own.
- *
- * The run's json has one writer that rewrites it constantly — a tick reads the record, spends
- * seconds observing sessions and cutting worktrees, then writes back what it filed. `nemia cancel` is
- * used while that daemon runs, and a second read-modify-write of the one file would lose an update:
- * a cancel landing mid-pass overwritten by the tick's stale copy, and the run filing steps on.
- * Re-reading before writing only narrows that window; it does not close it.
- *
- * So the two writers are given two files and never touch each other's. The tick owns the run's
- * steps, a person owns the cancellation, and `runRecord` composes them. No lock, and nothing to get
- * wrong under a crash: the file exists or it does not.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const cancelFile = (home: string, id: string) => path.join(runsDir(home), `${id}.cancelled`);
+/** An ask as the Run door hands it to a reader: its name (`retry-<step>-<n>`, …), what it holds, and where a person finds it, its key. */
+export type AskEntry = { readonly name: string; readonly text: string; readonly where: string };
 
 /**
- * That `nemia prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its
- * files directory went and what that freed — a person's fact, in a file of its own
- * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
- * go files nothing more (`advance`), and composed onto the run on read (`runRecord`) as `pruned`. `nemia rm` removes it with the run.
- * @param home The store's root folder.
- * @param id The run's id.
+ * A cancellation as its record's text reads: the time as text, or JSON of the time and the actor (`{ at, actor }`); a text that is neither
+ * is read as the time.
+ * @param text What the cancelled record holds.
  */
-export const pruneFile = (home: string, id: string) => path.join(runsDir(home), `${id}.pruned`);
-
-/**
- * The prune marker, read: undefined for a run never pruned. A marker that does not read as one still says the run is pruned, and each
- * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or
- * none.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export function readPruned(home: string, id: string) {
-  const marker = markerOf(pruneFile(home, id));
-  if (!marker) return undefined satisfies Pruned | undefined as Pruned | undefined;
-  const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
-  const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
-  const pruned = { at: isText(at) ? at : '', worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [] };
-  if (artifacts === undefined) return pruned satisfies Pruned | undefined as Pruned | undefined;
-  return {
-    ...pruned,
-    artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 },
-  } satisfies Pruned | undefined as Pruned | undefined;
+export function cancelledIn(text: string) {
+  const trimmed = text.trim();
+  const json = trimmed.startsWith('{') ? jsonOr(trimmed) : undefined;
+  const at = fieldOf(json, 'at');
+  if (!isText(at)) return { at: trimmed } satisfies { at: string; by?: Actor } as { at: string; by?: Actor };
+  const { actor } = actorIn(fieldOf(json, 'actor'));
+  return { at: at.trim(), ...(actor ? { by: actor } : {}) } satisfies { at: string; by?: Actor };
 }
 
 /**
- * The marks the run carries now, read from which of its three files are there (`runMarkOf`): what each writer of one asks the machine
- * with before it writes (`runMarkMove`, run-marks.ts), keeping its own guard against another hand beside it.
- * @param home The store's root folder.
- * @param id The run's id.
+ * The prune marker as its record's text reads. A text that does not read as one still says the run is pruned, and each field that does
+ * not read is empty.
+ * @param text What the pruned record holds.
  */
-export const marksAt = (home: string, id: string) =>
-  runMarkOf({
-    cancelled: fs.existsSync(cancelFile(home, id)),
-    pruned: fs.existsSync(pruneFile(home, id)),
-    held: fs.existsSync(holdFile(home, id)),
-  });
+export function prunedIn(text: string) {
+  const json = jsonOr(text);
+  const [at, worktrees, artifacts] = [fieldOf(json, 'at'), fieldOf(json, 'worktrees'), fieldOf(json, 'artifacts')];
+  const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
+  const pruned = { at: isText(at) ? at : '', worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [] };
+  if (artifacts === undefined) return pruned satisfies Pruned as Pruned;
+  return {
+    ...pruned,
+    artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 },
+  } satisfies Pruned as Pruned;
+}
 
 /**
- * That a person holds the run until other runs land (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
- * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
- * landed (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
- * its cap.
- * @param home The store's root folder.
- * @param id The run's id.
+ * The hold as its record's text reads. A text that does not read as a hold still holds the run, on no run named: the tick never lifts a
+ * hold that names nothing, so only `nemia hold --off` lifts it.
+ * @param text What the hold record holds.
  */
-export const holdFile = (home: string, id: string) => path.join(runsDir(home), `${id}.hold`);
-
-/**
- * Whether a person holds the run: its hold's file is there, whether or not it reads as a hold (`holdFile`).
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const holdStands = (home: string, id: string) => fs.existsSync(holdFile(home, id));
-
-/**
- * The hold, read: undefined for a run nobody holds. A file that does not read as a hold still holds the run, on no run named: the tick
- * never lifts a hold that names nothing, so only `nemia hold --off` lifts it, and the run files nothing while the file is there
- * (`advance`).
- */
-function readHold(home: string, id: string) {
-  const marker = markerOf(holdFile(home, id));
-  if (!marker) return undefined satisfies Hold | undefined as Hold | undefined;
-  const [at, until] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'until')];
-  const [why, by] = [wordsOf(fieldOf(marker.json, 'why'), WHY_CAP), wordsOf(fieldOf(marker.json, 'by'), BY_CAP)];
+export function holdIn(text: string) {
+  const json = jsonOr(text);
+  const [at, until] = [fieldOf(json, 'at'), fieldOf(json, 'until')];
+  const [why, by] = [wordsOf(fieldOf(json, 'why'), WHY_CAP), wordsOf(fieldOf(json, 'by'), BY_CAP)];
   return {
     at: isText(at) ? at : '',
     until: isList(until) ? until.filter(isText) : [],
     ...(why ? { why } : {}),
     ...(by ? { by } : {}),
-    ...actorIn(fieldOf(marker.json, 'actor')),
-  } satisfies Hold | undefined as Hold | undefined;
+    ...actorIn(fieldOf(json, 'actor')),
+  } satisfies Hold as Hold;
 }
 
 /**
- * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and the caller who put
- * it (`actor`) where it is known, and answer with the hold written — or null, when a hold already stands. `wx`, so a hold two people put
- * at once is the first one's, whole, and a hold is never edited: changing what it names or says is `--off` and a new hold.
- * @param home The store's root folder.
- * @param id The run's id.
- * @param until The ids of the runs that must land before the hold lifts.
+ * Who lifted the run's last hold by hand, as its record's text reads: undefined where it does not read as one.
+ * @param text What the unheld record holds.
  */
-export const writeHold = (
-  home: string,
-  id: string,
-  until: readonly string[],
-  { why, by, actor }: Pick<Hold, 'why' | 'by' | 'actor'> = {},
-) => {
-  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null satisfies Hold | null as Hold | null;
-  fs.mkdirSync(runsDir(home), { recursive: true });
-  const hold: Hold = {
-    at: new Date().toISOString(),
-    until: [...until],
-    ...(why ? { why } : {}),
-    ...(by ? { by } : {}),
-    ...(actor ? { actor } : {}),
-  };
-  try {
-    fs.writeFileSync(holdFile(home, id), JSON.stringify(hold, null, 2), { flag: 'wx' });
-    return hold satisfies Hold | null as Hold | null;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null satisfies Hold | null as Hold | null;
-    throw err;
-  }
-};
-
-/**
- * Who lifted the run's last hold lifted by hand (`Unheld`): `{ since, actor }`, a file of its own beside the hold's, written by the lift
- * whole before the hold's file is taken away (`removeHold`), so a pass that reads the hold gone reads who took it; overwritten by the next
- * such lift, and removed by `nemia rm` with the run. Composed onto the run on read as `unheld`.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const unheldFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unheld`);
-
-/** Who lifted the run's last hold by hand, read: undefined where no file is there, or it does not read as one. */
-function readUnheld(home: string, id: string) {
-  const marker = markerOf(unheldFile(home, id));
-  if (!marker) return undefined satisfies Unheld | undefined as Unheld | undefined;
-  const since = fieldOf(marker.json, 'since');
-  const { actor } = actorIn(fieldOf(marker.json, 'actor'));
+export function unheldIn(text: string) {
+  const json = jsonOr(text);
+  const since = fieldOf(json, 'since');
+  const { actor } = actorIn(fieldOf(json, 'actor'));
   return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined;
 }
 
 /**
- * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
- * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
- * in those seconds put a hold the tick never read, and it stays. Given who lifts it (`actor`), that is written first (`unheldFile`).
- * @param home The store's root folder.
- * @param id The run's id.
- * @param at When the hold to lift was put, as its file says.
- * @param actor Who lifts it; absent where the tick lifts it, or the caller is not known.
+ * A run's labels as their record's text reads: undefined for none.
+ * @param text What the labels record holds.
  */
-export const removeHold = (home: string, id: string, at: string, actor?: Actor) => {
-  if (runMarkMove(marksAt(home, id), 'lift').kind !== 'edge') return false;
-  if (readHold(home, id)?.at !== at) return false;
-  if (actor) writeWhole(unheldFile(home, id), JSON.stringify({ since: at, actor } satisfies Unheld, null, 2));
-  try {
-    fs.rmSync(holdFile(home, id));
-    return true;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw err;
+export function labelsIn(text: string) {
+  const json = Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)))(text));
+  return json && !Array.isArray(json) && Object.keys(json).length ? json : undefined;
+}
+
+/** A word said to a step before it was filed, as its record holds it. */
+const keptSaidIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String })),
+);
+
+/**
+ * Whether the text is a word kept for a step before it was filed, `{ step, at, text }`: what an import takes as one.
+ * @param text What the file holds.
+ */
+export const isSaid = (text: string) => Option.isSome(keptSaidIn(text));
+
+/**
+ * What was said to each of the run's steps before it was filed, by step, in the order kept: undefined where nothing was.
+ * @param words The texts of the run's said records, in the order kept.
+ */
+export function saidIn(words: readonly string[]) {
+  const byStep: Record<string, SaidBefore[]> = {};
+  for (const text of words) {
+    const kept = keptSaidIn(text);
+    if (Option.isNone(kept)) continue;
+    (byStep[kept.value.step] ??= []).push({ at: kept.value.at, text: kept.value.text });
   }
+  return Object.keys(byStep).length ? byStep : undefined;
+}
+
+/**
+ * A run's markers as its records hold them: each marker's text where the run has it, and the words said to its steps in the order kept.
+ */
+export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'labels']?: string } & {
+  readonly said?: readonly string[];
 };
 
-/** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
-const heldOf = (home: string, id: string) => {
-  const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
-  return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) } satisfies Pick<Run, 'hold' | 'unheld'> as Pick<
-    Run,
-    'hold' | 'unheld'
-  >;
+/**
+ * A run: its bare record (`recordIn`), with what people own beside it composed on read — the cancellation, its pruning, its hold, its
+ * labels, what was said to its steps before each was filed (the markers, `RunMarks`), each approval at a gate and each loop a person ended
+ * as it stands, and each person's route, off its asks. None of them is ever written into the record.
+ * @param run The run's bare record.
+ * @param asks The run's waiting asks.
+ * @param marks The run's markers.
+ */
+export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks) => {
+  const [cancelled, pruned, hold, unheld, labels, saidBefore] = [
+    marks.cancelled === undefined ? undefined : cancelledIn(marks.cancelled),
+    marks.pruned === undefined ? undefined : prunedIn(marks.pruned),
+    marks.hold === undefined ? undefined : holdIn(marks.hold),
+    marks.unheld === undefined ? undefined : unheldIn(marks.unheld),
+    marks.labels === undefined ? undefined : labelsIn(marks.labels),
+    saidIn(marks.said ?? []),
+  ];
+  const { approvals, acceptances, routes } = within('asks', () => ({
+    ...approvalsIn(asks),
+    ...acceptancesIn(asks),
+    routes: personRoutes(
+      '',
+      asks.map((a) => a.name),
+      (name) => heldText(asks.find((a) => `/${a.name}` === name)?.text ?? ''),
+    ),
+  }));
+  const standing = approvals.filter((a) => workStands(run, a));
+  return {
+    ...withRoutes(run, routes),
+    ...(labels ? { labels } : {}),
+    ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
+    ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
+    ...(pruned ? { pruned } : {}),
+    ...(hold ? { hold } : {}),
+    ...(unheld ? { unheld } : {}),
+    ...(saidBefore ? { saidBefore } : {}),
+    ...(standing.length ? { approvals: standing } : {}),
+    ...(acceptances.length ? { acceptances } : {}),
+  } satisfies Run;
 };
-
-/** An ask as the Run door hands it to a reader: its name (`retry-<step>-<n>`, …), what it holds, and where a person finds it, its key. */
-export type AskEntry = { readonly name: string; readonly text: string; readonly where: string };
 
 /**
  * A run's record as its text reads, bare: nothing a person owns beside it, and whatever it carries under their keys dropped, the store's
@@ -445,161 +399,6 @@ export const recordIn = (id: string, text: string, where: string) =>
     const { workflow, ...unfrozen } = read;
     return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;
   });
-
-/**
- * A run: its bare record (`recordIn`), with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning
- * (`pruneFile`), its hold (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate and each
- * loop a person ended as it stands, and each person's route, off its asks. None of them is ever written into the record.
- * @param home The store's root folder.
- * @param run The run's bare record.
- * @param asks The run's waiting asks.
- */
-export const composedRun = (home: string, run: Run, asks: readonly AskEntry[]) => {
-  const id = run.id;
-  const [cancelled, pruned, saidBefore] = [readCancelled(home, id), readPruned(home, id), readSaidBefore(home, id)];
-  const { approvals, acceptances, routes } = within('asks', () => ({
-    ...approvalsIn(asks),
-    ...acceptancesIn(asks),
-    routes: personRoutes(
-      '',
-      asks.map((a) => a.name),
-      (name) => heldText(asks.find((a) => `/${a.name}` === name)?.text ?? ''),
-    ),
-  }));
-  const standing = approvals.filter((a) => workStands(run, a));
-  return {
-    ...withRoutes(run, routes),
-    ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
-    ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
-    ...(pruned ? { pruned } : {}),
-    ...heldOf(home, id),
-    ...(saidBefore ? { saidBefore } : {}),
-    ...(standing.length ? { approvals: standing } : {}),
-    ...(acceptances.length ? { acceptances } : {}),
-  } satisfies Run;
-};
-
-/**
- * What was said to the run's steps before each was filed (`nemia say` to a step with no task and no try): a folder of its own, a person's
- * fact beside the record for the reason `cancelFile` is, each word a file `<n>.json` of `{ step, at, text }`, numbered from 1 in the
- * order kept. Written by `keepSaid` alone, exclusively; never edited; removed by `nemia rm` with the run. Composed onto the run as
- * `saidBefore` by every read of a record (`runRecord`), and never written into the record.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const saidDir = (home: string, id: string) => path.join(runsDir(home), `${id}.said`);
-
-const keptSaidIn = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String })),
-);
-
-/** The number of each word kept in `dir`, in the order kept: none where the folder is not there. */
-function keptNumbers(dir: string) {
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw err;
-  }
-  return names
-    .map((name) => /^(\d+)\.json$/.exec(name)?.[1])
-    .filter((n): n is string => n !== undefined)
-    .map(Number)
-    .sort((a, b) => a - b);
-}
-
-/**
- * Keep words said to `step` before it was filed: the next number's file, written `wx`, so two people saying at once each keep their own
- * word, the later taking the number after; the word kept, with when.
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The name of the step the words were said to.
- * @param text The words said.
- */
-export function keepSaid(home: string, id: string, step: string, text: string) {
-  const dir = saidDir(home, id);
-  fs.mkdirSync(dir, { recursive: true });
-  const kept = { at: new Date().toISOString(), text };
-  for (;;) {
-    const n = (keptNumbers(dir).at(-1) ?? 0) + 1;
-    try {
-      fs.writeFileSync(path.join(dir, `${n}.json`), JSON.stringify({ step, ...kept }, null, 2), { flag: 'wx' });
-      return kept;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    }
-  }
-}
-
-/**
- * What was said to each of the run's steps before it was filed, by step, in the order kept: undefined where nothing was. A file that does
- * not read as a word kept is left out, and said once on stderr, naming it.
- */
-function readSaidBefore(home: string, id: string) {
-  const dir = saidDir(home, id);
-  const byStep: Record<string, SaidBefore[]> = {};
-  for (const n of keptNumbers(dir)) {
-    const file = path.join(dir, `${n}.json`);
-    let text = '';
-    try {
-      text = fs.readFileSync(file, 'utf8');
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
-    }
-    const kept = keptSaidIn(text);
-    if (Option.isNone(kept)) {
-      sayOnce(
-        `run ${id}: ${file} is no word kept for a step ({ step, at, text }), and is left out: remove the file, or say the words again with nemia say`,
-      );
-      continue;
-    }
-    const { step, at, text: words } = kept.value;
-    (byStep[step] ??= []).push({ at, text: words });
-  }
-  return Object.keys(byStep).length ? byStep : undefined;
-}
-
-/**
- * Write down that this run is cancelled, and by whom where the caller is known (`actor`), and answer with the time that now stands.
- *
- * `wx` so the FIRST cancellation is the one kept, its actor with it: two people calling the same run off should not
- * leave the record saying it happened at whichever moment the second one typed it. A cancellation with no actor is the time alone, as
- * the file always held; one with an actor is JSON of both (`{ at, actor }`), in the one file, so the time and who are written at once.
- * @param home The store's root folder.
- * @param id The run's id.
- * @param actor Who calls the run off; absent where the caller is not known.
- */
-export const markCancelled = (home: string, id: string, actor?: Actor) => {
-  fs.mkdirSync(runsDir(home), { recursive: true });
-  const at = new Date().toISOString();
-  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return readCancelled(home, id)?.at || at;
-  try {
-    fs.writeFileSync(cancelFile(home, id), actor ? JSON.stringify({ at, actor }) : at, { flag: 'wx' });
-    return at;
-  } catch {
-    return readCancelled(home, id)?.at || at;
-  }
-};
-
-/**
- * The cancellation, read: when, and who where the file says (`by`) — undefined for a run nobody cancelled. The file holds the time as
- * text, as it always did, or JSON of the time and the actor (`markCancelled`); a file that is neither is its text, read as the time.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export function readCancelled(home: string, id: string) {
-  const file = cancelFile(home, id);
-  if (!fs.existsSync(file)) return undefined satisfies { at: string; by?: Actor } | undefined as { at: string; by?: Actor } | undefined;
-  const text = readText(file).trim();
-  const json = text.startsWith('{') ? jsonOr(text) : undefined;
-  const at = fieldOf(json, 'at');
-  if (!isText(at)) return { at: text } satisfies { at: string; by?: Actor } | undefined as { at: string; by?: Actor } | undefined;
-  const { actor } = actorIn(fieldOf(json, 'actor'));
-  return { at: at.trim(), ...(actor ? { by: actor } : {}) } satisfies { at: string; by?: Actor } | undefined as
-    | { at: string; by?: Actor }
-    | undefined;
-}
 
 /**
  * A person's asks of a run, each a record of the keyspace under the run's asks (`askKey`, `src/runs/run-keys.ts`), named as its file was:
@@ -903,50 +702,6 @@ function takenBackIn(text: string) {
   const held = heldText(text);
   return 'read' in held && held.read !== null && typeof held.read === 'object' && 'takenBack' in held.read;
 }
-
-/**
- * Each run's markers in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares beside the revisions of its record
- * and asks, so that a run whose inputs are as they were is not read again off the engine or git. One `readdir` of the store, and a `stat`
- * of every file named `<id>.<anything>` — `.cancelled`, `.pruned`, `.hold`, `.labels`, and any other marker, as every name of that form
- * is stamped — and of every entry of a directory so named and of the directories in it. Its inode, size and modification time to the
- * nanosecond, so a file written in place, moved, or removed and made again moves its run's stamp. The run's own directory (`<id>/`: its
- * files and inputs) is no input of a pass, and is left out; so are the files a store kept before its records were in the keyspace
- * (`<id>.json`, `<id>.asks`), which the Run door imports. The files so named that a run's judgement reads are `STAMPED_FILES`
- * (rest/rest.ts).
- * @param home The store's root folder.
- */
-export const restStamps = (home: string) =>
-  within('records', () => {
-    const stamps = new Map<string, string[]>();
-    let names: string[];
-    try {
-      names = fs.readdirSync(runsDir(home));
-    } catch {
-      return new Map();
-    }
-    // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-    const stat = (at: string, depth: number): string => {
-      const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
-      if (!s) return 'gone';
-      const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
-      if (!s.isDirectory() || depth > 1) return own;
-      let inside: string[];
-      try {
-        inside = fs.readdirSync(at).sort();
-      } catch {
-        return `${own}:gone`;
-      }
-      return `${own}[${inside.map((n) => `${n}=${stat(path.join(at, n), depth + 1)}`).join(',')}]`;
-    };
-    for (const name of names.sort()) {
-      const dot = name.indexOf('.');
-      if (dot <= 0 || name.endsWith('.json') || name.endsWith('.asks')) continue;
-      const id = name.slice(0, dot);
-      const parts = stamps.get(id) ?? [];
-      stamps.set(id, [...parts, `${name}=${stat(path.join(runsDir(home), name), 0)}`]);
-    }
-    return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
-  }) satisfies Map<string, string> as Map<string, string>;
 
 /**
  * A record as the keyspace holds it: compact JSON, without what a person owns beside it (the approvals, acceptances, pruning, hold and a

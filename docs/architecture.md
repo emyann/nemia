@@ -484,10 +484,13 @@ methods take a `RunId` and answer Effects failing with a refusal. It has two lay
 (`runDoorKeyspace`, over `runRecords` in `src/runs/records.store.ts`) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`,
 which no file of `src` imports: `STAND_INS` in `test/boundary.test.ts`). On the keyspace a run's record is the record at
 `/registry/runs/<id>`, its card's claim the one at `/registry/claims/<card>` naming it, and each ask a person writes the one at
-`/registry/asks/<id>/<name>`, spent under `done/<name>` (`src/runs/run-keys.ts`); a person's markers stay files beside them under
-`runs/` until they become records too, and every read composes them onto the run. Writes that belong together are one transaction
+`/registry/asks/<id>/<name>`, spent under `done/<name>` (`src/runs/run-keys.ts`); a person's markers are records beside them under
+`/registry/runmarks/<id>/` (`cancelled`, `pruned`, `hold`, `unheld`, `labels`, `refresh`, each word said at `said/<n>`; `src/runs/marks.store.ts`),
+and `nemia rm`'s marker at `/registry/forgetting/<id>`, outside them, since it outlives the run's record; every read composes the markers
+onto the run, and the run's stamp is the revisions of its record, asks and markers. Writes that belong together are one transaction
 (`within`, `src/keyspace/keyspace.store.ts`): a run created with its card's claim, a pass's record written with the asks it spent
-(`runs.settle`), a run forgotten with its claim and its asks. Each write is checked first, on both layers: a new run decodes through
+(`runs.settle`), a guarded marker write asking the marks' machine first (`runMarkMove`), a run forgotten with its claim, its asks and its
+markers. Each write is checked first, on both layers: a new run decodes through
 the model's `Run` (`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a
 break of an invariant is `Invalid`; a new run at an id with a record is `Conflict`. One table of walks holds the layers to each other
 (`test/run-walks.ts`, run on the keyspace by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's
@@ -653,7 +656,7 @@ keyspace (`<kind>Records`), its memory stand-in the same code over a keyspace in
 imported by one decision (`src/keyspace/import.store.ts`, an `ImportKind` per kind: its folders, and for each file its key, where it is
 moved aside and how its text reads), each file the first time a process opens the keyspace after it, moved under `<root>/imported/` and
 never deleted; a file that does not read is left where it was. The keyspace is its owner's alone: `db/` is 0700 and `state.db` 0600. A
-run's markers and the factory's record stay files until a card of their own moves them.
+run's markers are imported by their own kind (`RUN_MARK_FILES`); the factory's record stays files until a card of its own moves it.
 
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the

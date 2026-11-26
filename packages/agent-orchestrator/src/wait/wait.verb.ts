@@ -34,7 +34,7 @@ export type Holding = { run: Run; hold: Hold };
  * pruned, landed (as `--after` reads it, where the branches stand now: `standingLiveOf`) or succeeded with nothing left but a person's
  * merge, asked of the engine only for a run nothing else refuses, a run already held, a folder run named `--until`; and of each run named:
  * twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch gone,
- * already landed — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`, exclusively: a hold two
+ * already landed — and one that already waits on this run, through `--after` or a hold. Writes the record `/registry/runmarks/<id>/hold`, once: a hold two
  * people put at once is the first one's, and the second is refused as already held. Dies of anything else the store, git or the engine
  * throws.
  *

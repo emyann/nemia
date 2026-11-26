@@ -9,7 +9,7 @@
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
-import { cardNames, cardText, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardNames, cardText, plantRecord, runKey, markerText, plantMarker } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -242,7 +242,7 @@ test('`nemia label run` edits a run of the store, a line per key, then its label
   const set = await store.nemia(['label', 'run', 'r-ctx', 'team=core']);
   ok(set, 'label run');
   assert.deepEqual(set.out.split('\n'), ['run r-ctx  team=core set', 'run r-ctx  labels: team=core', '']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(store.root, 'runs', 'r-ctx.labels'), 'utf8')), { team: 'core' });
+  assert.deepEqual(JSON.parse(markerText(store.root, 'r-ctx', 'labels') ?? ''), { team: 'core' });
   const refused = await store.nemia(['label', 'run', 'r-ctx', 'team=infra']);
   assert.equal(refused.code, 2, refused.err);
   assert.ok(refused.err.includes('--overwrite'), refused.err);
@@ -254,7 +254,7 @@ test('`nemia label run` edits a run of the store, a line per key, then its label
 test('`nemia inbox resend` files a started card again as <run>-resent, queued on the workflow named and handed its run', async () => {
   write(path.join(store.root, 'inbox', 'sent-card.md'), 'Cache the engine views\n');
   plantRecord(store.root, runKey('r-sent'), JSON.stringify({ ...JSON.parse(RUN), id: 'r-sent', from: { inbox: 'sent-card' } }));
-  write(path.join(store.root, 'runs', 'r-sent.cancelled'), '2026-11-05T01:00:00.000Z');
+  plantMarker(store.root, 'r-sent', 'cancelled', '2026-11-05T01:00:00.000Z');
   const sent = await store.nemia(['inbox', 'resend', 'sent-card', '--workflow', 'dev']);
   ok(sent, 'inbox resend');
   assert.match(sent.out, /^r-sent-resent {2}filed from sent-card, handed run r-sent$/m);

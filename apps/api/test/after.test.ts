@@ -39,7 +39,7 @@ import {
 import { Effect } from 'effect';
 import { listedRuns as runList, objectOf } from './run-reads.ts';
 import type { Run } from 'objects';
-import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, runsNow, plantMarker } from 'agent-orchestrator/testing';
 
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
@@ -131,7 +131,7 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
       ...rest,
     }),
   );
-  if (cancelledAt) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
+  if (cancelledAt) plantMarker(root, id, 'cancelled', cancelledAt);
 }
 
 const cancelledAt = '2026-09-14T00:20:00.000Z';

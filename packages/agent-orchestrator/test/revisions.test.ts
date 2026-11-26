@@ -11,7 +11,7 @@
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
  */
-import { askKeyOf, askNames, plantRecord, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, plantRecord, recordText, rewriteRun, runKey, runRecord, markerText } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -298,7 +298,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       assert.equal(after.steps.build?.pinned?.[0].n, 2, 'and the retry is filed on it');
       assert.match(promptOf(run.id, 'build'), /You follow the files/, 'its prompt rendered again');
       assert.deepEqual(Object.keys(after.steps), ['build'], 'the step added to the folder is not added to the run');
-      assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.refresh`)), false, 'and no refresh ask was written');
+      assert.equal(markerText(ROOT, run.id, 'refresh') !== undefined, false, 'and no refresh ask was written');
     },
   );
   s.test(
@@ -383,7 +383,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'the pass takes the new revisions');
     assert.match(promptOf(run.id, 'build'), /You build it differently/, 'and renders the prompt again');
-    assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.refresh`)), false, 'the ask is spent, its file taken off');
+    assert.equal(markerText(ROOT, run.id, 'refresh') !== undefined, false, 'the ask is spent, its file taken off');
     assert.equal(runRecord(ROOT, run.id).steps.build?.pinned?.[0].n, 1, 'the try that already ran keeps the revision it ran on');
 
     await runWith(b.e, retryRun(run.id, 'build', { mode: 'fresh' }));

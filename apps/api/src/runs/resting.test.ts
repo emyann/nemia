@@ -36,7 +36,7 @@ import type { RunList } from 'objects';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
-import { dropRecord, plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import { dropRecord, plantAsk, plantRecord, recordText, runKey, runsNow, dropMarker, plantMarker } from 'agent-orchestrator/testing';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
@@ -653,7 +653,7 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
     async () => {
       running('r-held-implement');
       writeRun('r-held', 'Held while it runs');
-      write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at, until: ['r-nowhere'] }));
+      plantMarker(root, 'r-held', 'hold', JSON.stringify({ at, until: ['r-nowhere'] }));
       try {
         const reads = Effect.runSync(e.io()).reads;
         const res = await app.request('/api/runs/r-held/decision');
@@ -667,7 +667,7 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
         );
       } finally {
         dropRecord(root, runKey('r-held'));
-        fs.rmSync(path.join(root, 'runs', 'r-held.hold'));
+        dropMarker(root, 'r-held', 'hold');
       }
     },
   );

@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantAsk, plantRecord, runKey, runsNow } from '../../testing.ts';
+import { plantAsk, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -656,7 +656,7 @@ describe('a decision with nothing to try, nothing to decide, or no run: pruned, 
       'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
     );
     const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
-    fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
+    plantMarker(root, 'r-d10', 'pruned', JSON.stringify(pruned));
 
     const body = await decidable('r-d10');
     assert.deepEqual(body.commands, []);
@@ -668,7 +668,7 @@ describe('a decision with nothing to try, nothing to decide, or no run: pruned, 
       baseRef: base,
       steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } },
     });
-    fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
+    plantMarker(root, 'r-d4', 'cancelled', '2026-09-13T01:00:00.000Z');
     const before = gitCount();
     const body = await decisionOf('r-d4');
     assert.deepEqual(body, { nothing: 'cancelled at 2026-09-13T01:00:00.000Z — nothing to decide' }, 'the one key: no commands, no steps');

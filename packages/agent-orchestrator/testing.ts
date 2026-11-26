@@ -32,9 +32,12 @@ import { StoreRoot } from './src/config/root.store.ts';
 import { keyspaceAt, keyspaceFile } from './src/keyspace/keyspace.store.ts';
 import { runFilesOf, runsImported } from './src/runs/records.store.ts';
 import { askKey, askKeyOf, asksPrefix, runKey } from './src/runs/run-keys.ts';
-import { recordValue } from './src/record/record.store.ts';
+import { cancelledIn, recordValue } from './src/record/record.store.ts';
 import type { Run } from './src/record/record.ts';
 import { RunDoor, type RunDoorShape, type RunsLayer } from './src/runs/runs.store.ts';
+import type { Actor } from 'objects';
+import { FORGETTING_PREFIX, RUNMARKS_PREFIX, runMarkKey, runMarksPrefix, type RunMarker } from './src/runs/run-keys.ts';
+import { RUN_MARK_FILES } from './src/runs/marks.store.ts';
 import { CARD_FILES, CardDoor, cardDoorAt, cardKey, cardTryKey } from './src/cards/cards.store.ts';
 import { DELEGATION_FILES } from './src/delegation/delegation.store.ts';
 import { kindKeyspaceHeld } from './src/keyspace/import.store.ts';
@@ -225,14 +228,15 @@ export const plantRecord = (root: string, key: string, text: string) =>
   );
 
 /**
- * Every run's record, claim and ask of the store `root` deleted: what a test that empties its store between stories runs beside removing
+ * Every run's record, claim, ask and marker of the store `root` deleted: what a test that empties its store between stories runs beside
+ * removing
  * `runs/`, since the keyspace keeps them.
  * @param root The store's root folder.
  */
 export const emptyRuns = (root: string) => {
   const keyspace = keyspaceRead(root);
   if (keyspace === undefined) return;
-  for (const prefix of ['/registry/runs/', '/registry/claims/', '/registry/asks/'])
+  for (const prefix of ['/registry/runs/', '/registry/claims/', '/registry/asks/', RUNMARKS_PREFIX, FORGETTING_PREFIX])
     for (const key of Effect.runSync(keyspace.keys(prefix))) dropRecord(root, key);
 };
 
@@ -248,7 +252,70 @@ export const dropRecord = (root: string, key: string) =>
       .pipe(Effect.catchTag('KeyRefused', () => Effect.void)),
   );
 
-export { askDoneKey, askKey, askKeyOf, asksPrefix, claimKey, runKey } from './src/runs/run-keys.ts';
+export {
+  askDoneKey,
+  askKey,
+  askKeyOf,
+  asksPrefix,
+  claimKey,
+  forgettingKey,
+  runKey,
+  runMarkKey,
+  runMarksPrefix,
+  saidKey,
+} from './src/runs/run-keys.ts';
+
+/**
+ * Text planted as one of the run's markers at the store `root`, over what is there: a test's marker, written as no verb would write it. A
+ * word said to a step is `said/<n>`.
+ * @param root The store's root folder.
+ * @param id The run's id.
+ * @param marker The marker's name under the run's marks: `cancelled`, `pruned`, `hold`, `unheld`, `labels`, `refresh`, or `said/<n>`.
+ * @param text What it holds.
+ */
+export const plantMarker = (root: string, id: string, marker: RunMarker | `said/${number}`, text: string) =>
+  plantRecord(root, `${runMarksPrefix(id)}${marker}`, text);
+
+/**
+ * Mark the run cancelled at the store `root`, as `nemia cancel` does where none stands: the first cancellation is kept, its actor with it.
+ * Answers the time that stands.
+ * @param root The store's root folder.
+ * @param id The run's id.
+ * @param actor Who calls the run off, where known.
+ */
+export const markCancelled = (root: string, id: string, actor?: Actor) => {
+  const there = recordText(root, runMarkKey(id, 'cancelled'));
+  if (there !== undefined) return cancelledIn(there).at;
+  const at = new Date().toISOString();
+  plantMarker(root, id, 'cancelled', actor ? JSON.stringify({ at, actor }) : at);
+  return at;
+};
+
+/**
+ * The text of one of the run's markers at the store `root`, or undefined where it has none.
+ * @param root The store's root folder.
+ * @param id The run's id.
+ * @param marker The marker's name under the run's marks (`plantMarker`).
+ */
+export const markerText = (root: string, id: string, marker: RunMarker | `said/${number}`) =>
+  recordText(root, `${runMarksPrefix(id)}${marker}`);
+
+/**
+ * The names of the markers the run has at the store `root`, sorted: `cancelled`, `hold`, `said/1`, …
+ * @param root The store's root folder.
+ * @param id The run's id.
+ */
+export const markerKeys = (root: string, id: string) =>
+  keysUnder(root, runMarksPrefix(id)).map((key) => key.slice(runMarksPrefix(id).length));
+
+/**
+ * One of the run's markers at the store `root` taken away, there or not.
+ * @param root The store's root folder.
+ * @param id The run's id.
+ * @param marker The marker's name under the run's marks (`plantMarker`).
+ */
+export const dropMarker = (root: string, id: string, marker: RunMarker | `said/${number}`) =>
+  dropRecord(root, `${runMarksPrefix(id)}${marker}`);
 
 /**
  * The key a retry ask of the step's try `n` is written at, as `nemia retry` answers it.
@@ -376,6 +443,6 @@ export const emptyCards = (root: string) => {
  * @param root The store's root folder.
  */
 export const kindsTakenUp = (root: string) => {
-  for (const kind of [DELEGATION_FILES, SUBSCRIPTION_FILES, LEDGER_FILES, TOKEN_FILES, CARD_FILES])
+  for (const kind of [DELEGATION_FILES, SUBSCRIPTION_FILES, LEDGER_FILES, TOKEN_FILES, CARD_FILES, RUN_MARK_FILES])
     void Effect.runSync(kindKeyspaceHeld(root, kind));
 };

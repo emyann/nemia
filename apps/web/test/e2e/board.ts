@@ -10,7 +10,7 @@ import { factoryViewOf } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
-import { API, measuring, photographing, store } from './world.ts';
+import { API, measuring, photographing, store, storedMarker } from './world.ts';
 
 /** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none for the store's. */
 export const pickedIn = (url: URL) => {
@@ -223,7 +223,7 @@ export function fedDaemon(pid: number = process.pid) {
 }
 
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
-export const cancelledAt = () => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
+export const cancelledAt = () => (storedMarker(DIAMOND.cancelled.id, 'cancelled') ?? '').trim();
 
 /** The frame's bar, in its side sheet, while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
 export const stepBar = (page: Page, run: string, step: string) => page.locator(`aside[data-bar="step:${run}/${step}"]`) satisfies Locator;

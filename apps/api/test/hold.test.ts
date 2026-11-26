@@ -40,7 +40,20 @@ import {
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { listedRuns, objectOf } from './run-reads.ts';
-import { askNames, asksPrefix, dropAsk, keysUnder, plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import {
+  askNames,
+  asksPrefix,
+  dropAsk,
+  keysUnder,
+  plantAsk,
+  plantRecord,
+  recordText,
+  runKey,
+  runsNow,
+  markerText,
+  plantMarker,
+  dropMarker,
+} from 'agent-orchestrator/testing';
 
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
@@ -131,17 +144,17 @@ function writeRun(id: string, workflow: object[], steps: object, more: { after?:
       ...rest,
     }),
   );
-  if (cancelledAt) write(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
+  if (cancelledAt) plantMarker(root, id, 'cancelled', cancelledAt);
 }
 
-const holdFile = (id: string) => path.join(root, 'runs', `${id}.hold`);
+const holdText = (id: string) => markerText(root, id, 'hold');
 const HELD_AT = at(30);
 /**
  * Held as `nemia hold` writes it: a file of its own beside the record, which the tick lifts — with no `why` and no `by` unless `said` gives
  * them, as code older than `nemia hold --why` wrote it.
  */
 const holdOn = (id: string, until: string[], said: { why?: string; by?: string } = {}) =>
-  write(holdFile(id), JSON.stringify({ at: HELD_AT, until, ...said }));
+  plantMarker(root, id, 'hold', JSON.stringify({ at: HELD_AT, until, ...said }));
 
 const implement = { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' };
 const review = { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex' };
@@ -354,8 +367,8 @@ describe('a person holds a run until another lands: the list, the page and the d
         [BLOCKS]: ['implement'],
       };
       for (const [id, onYou] of Object.entries(unheld)) {
-        const hold = fs.readFileSync(holdFile(id), 'utf8');
-        fs.rmSync(holdFile(id));
+        const hold = holdText(id) ?? '';
+        dropMarker(root, id, 'hold');
         try {
           const run = (await listed()).get(id)!;
           assert.deepEqual(
@@ -364,7 +377,7 @@ describe('a person holds a run until another lands: the list, the page and the d
             `${id}: the rule, not the fixture: it waits on you once the hold is lifted`,
           );
         } finally {
-          write(holdFile(id), hold);
+          plantMarker(root, id, 'hold', hold);
         }
       }
       const status = await detail(BUDGET);
@@ -391,8 +404,8 @@ describe('a person holds a run until another lands: the list, the page and the d
         [BLOCKS]: /^nemia retry h-blocked implement$/,
       };
       for (const [id, command] of Object.entries(offered)) {
-        const hold = fs.readFileSync(holdFile(id), 'utf8');
-        fs.rmSync(holdFile(id));
+        const hold = holdText(id) ?? '';
+        dropMarker(root, id, 'hold');
         try {
           const decided = await decisionOf(id);
           assert.ok('commands' in decided, `${id}: ${JSON.stringify(decided)}`);
@@ -402,7 +415,7 @@ describe('a person holds a run until another lands: the list, the page and the d
             `${id}, lifted, is offered the verb the hold refused: the decision reads the hold, not the run's steps: ${JSON.stringify(commands)}`,
           );
         } finally {
-          write(holdFile(id), hold);
+          plantMarker(root, id, 'hold', hold);
         }
       }
       const back = await decisionOf(GATE);
@@ -567,7 +580,7 @@ const PRUNED = { at: at(50), worktrees: [] };
 for (const id of ['h-pruned-held', 'h-pruned']) {
   writeRun(id, [implement, review], { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, review: { taskId: null } });
   signedOff(`${id}-implement`, DONE);
-  write(path.join(root, 'runs', `${id}.pruned`), JSON.stringify(PRUNED));
+  plantMarker(root, id, 'pruned', JSON.stringify(PRUNED));
 }
 
 describe('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a hand-written one on a pruned run as well', () => {
@@ -580,7 +593,7 @@ describe('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a
       const res = await lift(LIFT);
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { id: LIFT, lifted: true, hold: { at: HELD_AT, until: ['p-live'] } });
-      assert.equal(fs.existsSync(holdFile(LIFT)), false);
+      assert.equal(holdText(LIFT) !== undefined, false);
       const run = (await listed()).get(LIFT)!;
       assert.deepEqual([run.holdUntil, run.holding, run.waitingOnYouWords], [[], null, ['approve plan']]);
       const status = await detail(LIFT);
@@ -601,8 +614,8 @@ describe('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a
       assert.ok((await listed()).get('h-pruned-held')!.holding, 'the board says the hold, so it offers the lift');
       const res = await lift('h-pruned-held');
       assert.equal(res.status, 200);
-      assert.equal(fs.existsSync(holdFile('h-pruned-held')), false);
-      assert.ok(fs.existsSync(path.join(root, 'runs', 'h-pruned-held.pruned')), 'still pruned');
+      assert.equal(holdText('h-pruned-held') !== undefined, false);
+      assert.ok(markerText(root, 'h-pruned-held', 'pruned') !== undefined, 'still pruned');
     },
   );
 });
@@ -620,7 +633,7 @@ describe('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing no
     }
   });
   test('REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written', async () => {
-    write(holdFile('h-removed'), JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
+    plantMarker(root, 'h-removed', 'hold', JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
     for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
       const before = [...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort();
       const res = await lift(id);
@@ -629,7 +642,7 @@ describe('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing no
       assert.deepEqual([...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort(), before, id);
     }
     assert.ok(
-      fs.existsSync(holdFile('h-removed')),
+      holdText('h-removed') !== undefined,
       'the stray hold file, standing where nemia rm took the record, is left for `nemia hold --off` or a person',
     );
   });
@@ -709,16 +722,16 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
         { id: PUT, lifted: false, hold: { at: answer.hold.at, until: ['p-live'], why: 'merge conflicts', by, actor: SEATED } },
         'the free-text `by` beside the caller who put it',
       );
-      assert.deepEqual(JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')), answer.hold, 'the file is the hold the answer says');
+      assert.deepEqual(JSON.parse(holdText(PUT) ?? ''), answer.hold, 'the file is the hold the answer says');
       const words = `held until p-live lands (why: merge conflicts; by ${by})`;
       const run = runsNow(root).runs.read(PUT);
       assert.equal(holdWord((await runWith(engine(ENV), list(engine(ENV), run))).holding!, run.hold), words, "nemia ls's line");
       assert.equal((await listed()).get(PUT)!.holding?.word, words);
       assert.equal((await detail(PUT)).holding?.word, words);
       assert.equal((await lift(PUT)).status, 200);
-      assert.equal(fs.existsSync(holdFile(PUT)), false);
+      assert.equal(holdText(PUT) !== undefined, false);
       assert.deepEqual(
-        JSON.parse(fs.readFileSync(path.join(root, 'runs', `${PUT}.unheld`), 'utf8')),
+        JSON.parse(markerText(root, PUT, 'unheld') ?? ''),
         { since: answer.hold.at, actor: SEATED },
         'who lifted it kept beside the run, paired by the moment of the hold it lifted',
       );
@@ -729,7 +742,7 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
     for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
       const res = await put(PUT, body);
       assert.equal(res.status, 200, JSON.stringify(body));
-      assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
+      assert.deepEqual((JSON.parse(holdText(PUT) ?? '') as { until: unknown }).until, []);
       const row = (await listed()).get(PUT)!;
       assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
       assert.equal(row.holding?.waitingOnYou, false);
@@ -737,7 +750,7 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
       assert.deepEqual(row.waitingOnYou, []);
       assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
       assert.equal((await lift(PUT)).status, 200);
-      assert.equal(fs.existsSync(holdFile(PUT)), false);
+      assert.equal(holdText(PUT) !== undefined, false);
     }
   });
   s.test('a hold put on the board takes its `by` where the body gives one, as `nemia hold --by` does', async () => {

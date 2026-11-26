@@ -7,7 +7,7 @@ import { cardOf, expectClearOfEachOther, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecord } from '../world.ts';
+import { dropStoredMarker, OUT, store, storedMarker, storedRecord } from '../world.ts';
 
 export default {
   /**
@@ -29,12 +29,11 @@ export default {
     };
     const lane = record.steps.implement.workspace;
     const files = path.join(store!, 'runs', id, 'artifacts');
-    const marker = path.join(store!, 'runs', `${id}.pruned`);
     const git = (...args: string[]) => execFileSync('git', args, { cwd: record.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     const theme = await themeOf(page);
 
     try {
-      if (fs.existsSync(marker) || fs.existsSync(lane) || fs.existsSync(files))
+      if (storedMarker(id, 'pruned') !== null || fs.existsSync(lane) || fs.existsSync(files))
         throw new Refused(`${id} is seeded unpruned, with no worktree and no files`);
       git('worktree', 'add', '-q', lane, branch);
       fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
@@ -70,7 +69,7 @@ export default {
         'said plainly as leaving its branch the only copy of its work',
       );
       await expectCount(third.and(page.locator('[data-selected]')), 1, 'and it is chosen: the one choice the api takes');
-      if (fs.existsSync(marker)) throw new Refused('opening the choice prunes nothing');
+      if (storedMarker(id, 'pruned') !== null) throw new Refused('opening the choice prunes nothing');
       await settled(page);
       await photograph(page, path.join(OUT, `prune-choices-${theme}.png`), { fullPage: true });
 
@@ -82,7 +81,7 @@ export default {
         }),
         'the second ask says what goes, and the warning again',
       );
-      if (fs.existsSync(marker) || !fs.existsSync(lane)) throw new Refused('the first Prune… asks, and prunes nothing');
+      if (storedMarker(id, 'pruned') !== null || !fs.existsSync(lane)) throw new Refused('the first Prune… asks, and prunes nothing');
       await settled(page);
       await photograph(page, path.join(OUT, `prune-asking-${theme}.png`), { fullPage: true });
 
@@ -91,7 +90,7 @@ export default {
       await snackbarSaying(page, id, "and the frame's snackbar names the run pruned");
       await photograph(page, path.join(OUT, `prune-said-${theme}.png`));
       await expectCount(page.locator('[role="alert"][data-prune-refused]'), 0, 'with no refusal said');
-      if (!fs.existsSync(marker)) throw new Refused(`the prune marks ${id} pruned — ${marker} is not there`);
+      if (storedMarker(id, 'pruned') === null) throw new Refused(`the prune marks ${id} pruned — its pruned record is not there`);
       if (fs.existsSync(lane)) throw new Refused(`the prune removes the worktree — ${lane} is still there`);
       if (fs.existsSync(files)) throw new Refused(`the prune removes its files — ${files} is still there`);
       if (!git('branch', '--list', branch).trim()) throw new Refused(`the prune deletes no branch — ${branch} is gone`);
@@ -125,7 +124,7 @@ export default {
       await expectClearOfEachOther(page);
       await photographCard(page, card, path.join(OUT, `prune-card-${theme}.png`));
     } finally {
-      await takeBack(page, { id, repo: record.repo, lane, files, marker });
+      await takeBack(page, { id, repo: record.repo, lane, files });
     }
   },
 } satisfies PageSpec;
@@ -134,16 +133,13 @@ export default {
  * The run as seeded again: no marker, no worktree, no files, and the worktree forgotten by git — and its branch, which a prune never
  * touches, as it was. Said on the feed, so every page after reads the store as seeded; each theme's visit prunes it again.
  */
-async function takeBack(
-  page: Page,
-  { id, repo, lane, files, marker }: { id: string; repo: string; lane: string; files: string; marker: string },
-) {
+async function takeBack(page: Page, { id, repo, lane, files }: { id: string; repo: string; lane: string; files: string }) {
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   if (fs.existsSync(lane)) git('worktree', 'remove', '--force', lane);
   git('worktree', 'prune');
   fs.rmSync(path.dirname(lane), { recursive: true, force: true });
   fs.rmSync(files, { recursive: true, force: true });
-  fs.rmSync(marker, { force: true });
+  dropStoredMarker(id, 'pruned');
   fed(id, 'implement', 'done');
   await idle(page);
 }

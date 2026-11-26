@@ -131,7 +131,7 @@ of its kind, never from an older file that looks alike:
 - **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
   compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
   reads as no drift and a reverted one as behind.
-- **A run's labels are a person's file, `runs/<id>.labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
+- **A run's labels are a person's record, `/registry/runmarks/<id>/labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.
@@ -242,7 +242,7 @@ of its kind, never from an older file that looks alike:
 - **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine(env)`
   hands the runtime the ceiling and the pools. A new engine verb is a row of `ENGINE_VERBS`, its phase and what it changes of a task
   (`src/engine-verbs/engine-verbs.verb.ts`), which the typecheck demands; an admitted task starts on the runtime's next pass.
-- **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
+- **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into the run's stamp (`stampsOf`, `src/runs/records.store.ts`) (and
   into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
   missed for good. The informer beside it (`src/rest/`) holds every
   run's judgement for a daemon, filled by the pass and read by the api's run object, list and sub-resources, checked against the same

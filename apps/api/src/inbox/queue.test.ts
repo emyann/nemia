@@ -47,6 +47,7 @@ import {
   plantRecord,
   runKey,
   runsNow,
+  plantMarker,
 } from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
@@ -458,7 +459,7 @@ function writeRun(id: string, minute: number, fields: { after?: string[]; taskId
       ...(fields.after ? { after: fields.after } : {}),
     }),
   );
-  if (fields.cancelled) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), at(minute + 1));
+  if (fields.cancelled) plantMarker(root, id, 'cancelled', at(minute + 1));
 }
 
 /** The daemon's last pass's ceilings, as the tick writes them. */

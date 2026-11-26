@@ -13,7 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
+import { asksPrefix, dropMarker, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow, markerText } from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -51,7 +51,6 @@ import {
 } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
 import { isRepositoryRun } from '../src/run.ts';
-import { cancelFile } from '../src/record/record.store.ts';
 import { EngineService as Service, engineOf } from '../src/runtime-client.ts';
 import { Invalid, isRefusal } from '../src/refusal/refusal.ts';
 import { inputsDir, runsDir } from '../src/record/record.store.ts';
@@ -373,7 +372,7 @@ describe("each verb's program, given its services, answers what its plain face a
       'nemia cancel',
       async () => {
         const cancelled = await over(b.e, cancelRun(running.id));
-        fs.rmSync(cancelFile(ROOT, running.id));
+        dropMarker(ROOT, running.id, 'cancelled');
         b.tasks.get(taskId)!.stopRequested = false;
         return cancelled;
       },
@@ -416,7 +415,7 @@ describe("each verb's program, given its services, answers what its plain face a
       ];
       for (const [what, program] of programs) assert.match(await recovered(e, program, 'Invalid'), /is not JSON/, what);
       assert.ok(
-        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')),
+        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && markerText(ROOT, 'garbled', 'cancelled') === undefined,
         'nothing written',
       );
     } finally {

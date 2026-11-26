@@ -60,3 +60,56 @@ export const askName = ({ of, step, n }: AskKey) => `${ASK_WORDS[of]}-${step}-${
  * @param key Which ask: its kind, its step and its number.
  */
 export const askKey = (id: string, key: AskKey) => askKeyOf(id, askName(key));
+
+/**
+ * Where every run's markers are, each run's under its id: its cancellation, pruning, hold, labels, refresh ask and the words said to its
+ * steps.
+ */
+export const RUNMARKS_PREFIX = '/registry/runmarks/';
+
+/**
+ * Where the markers `nemia rm` keeps of the runs it forgets are: outside a run's own marks, since they outlive its record
+ * (`forget.verb.ts`).
+ */
+export const FORGETTING_PREFIX = '/registry/forgetting/';
+
+/**
+ * The markers a run carries by a key of their own, each the text its file held: called off, pruned, held, who lifted a hold, labelled,
+ * asked to refresh.
+ */
+export const RUN_MARKERS = ['cancelled', 'pruned', 'hold', 'unheld', 'labels', 'refresh'] as const;
+
+/** One of a run's markers. */
+export type RunMarker = (typeof RUN_MARKERS)[number];
+
+/**
+ * Where a run's markers are.
+ * @param id The run's id.
+ */
+export const runMarksPrefix = (id: string) => `${RUNMARKS_PREFIX}${id}/`;
+
+/**
+ * The key of one of a run's markers.
+ * @param id The run's id.
+ * @param marker Which marker.
+ */
+export const runMarkKey = (id: string, marker: RunMarker) => `${runMarksPrefix(id)}${marker}`;
+
+/**
+ * Where the words said to a run's steps before each was filed are, one record each.
+ * @param id The run's id.
+ */
+export const saidPrefix = (id: string) => `${runMarksPrefix(id)}said/`;
+
+/**
+ * The key of the `n`th word said to a run's steps before it was filed.
+ * @param id The run's id.
+ * @param n The word's number, from 1 in the order kept.
+ */
+export const saidKey = (id: string, n: number) => `${saidPrefix(id)}${n}`;
+
+/**
+ * The key of the marker `nemia rm` wrote for a run it forgets.
+ * @param id The run's id.
+ */
+export const forgettingKey = (id: string) => `${FORGETTING_PREFIX}${id}`;

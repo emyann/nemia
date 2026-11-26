@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
@@ -7,7 +6,7 @@ import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { NEIGHBOUR } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredMarker, OUT, storedMarker } from '../world.ts';
 
 /** The why the page gives the hold. */
 const WHY = 'held from the runs page';
@@ -24,9 +23,8 @@ export default {
   route: '/runs',
   expect: async (page) => {
     const { id } = NEIGHBOUR;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
     const row = page.locator(`[role="row"][data-run="${id}"]`);
-    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
+    if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page puts one — the hold record is there`);
     try {
       await expectVisible(row, `${id} is a row of the runs in flight`);
       await row.click({ button: 'right' });
@@ -53,7 +51,7 @@ export default {
       if (answered.status() !== 200)
         throw new Refused(`the api puts the hold — it answered ${answered.status()}: ${await answered.text()}`);
       await expectCount(dialog, 0, 'the popover closes once the hold is put');
-      const written = JSON.parse(fs.readFileSync(hold, 'utf8')) as { until?: string[]; why?: string; by?: string };
+      const written = JSON.parse(storedMarker(id, 'hold') ?? '') as { until?: string[]; why?: string; by?: string };
       if (JSON.stringify([written.why, written.by]) !== JSON.stringify([WHY, os.userInfo().username]))
         throw new Refused(`the hold's file says the why and the api's user — it says ${JSON.stringify(written)}`);
       await idle(page);
@@ -65,7 +63,7 @@ export default {
       await expectVisible(lift.getByRole('button', { name: 'Lift', exact: true }), "Lift… asks the lift's own question");
       await lift.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(lift, 0, 'the lift closes the popover');
-      if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`the lift removed the hold record — it is still there`);
 
       await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);
@@ -78,16 +76,16 @@ export default {
       await page.keyboard.press('Escape');
       await expectCount(menu, 0, 'Escape closes the menu');
     } finally {
-      await takeBack(page, hold, id);
+      await takeBack(page, id);
     }
   },
 } satisfies PageSpec;
 
 /** Whatever hold the page left, taken back as `nemia hold --off` does and said on the feed: every page after reads the store as seeded. */
-async function takeBack(page: Page, hold: string, id: string) {
-  const left = fs.existsSync(hold);
-  fs.rmSync(hold, { force: true });
-  fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+async function takeBack(page: Page, id: string) {
+  const left = storedMarker(id, 'hold') !== null;
+  dropStoredMarker(id, 'hold');
+  dropStoredMarker(id, 'unheld');
   fed(id, 'running');
   if (left) await idle(page);
 }

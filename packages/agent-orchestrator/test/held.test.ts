@@ -12,7 +12,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.verb.ts).
  */
-import { readAsks, rewriteRun, runRecord } from '../testing.ts';
+import { readAsks, rewriteRun, runRecord, plantMarker } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -500,7 +500,7 @@ test('`nemia cancel` closes a task that waits for a word — nothing runs, so no
   assert.equal((await stateOf(e, `${run.id}-plan`)).state.settled, 'succeeded', 'settled as it signed');
 
   const other = await signedPlan({}, SIGNED, ['plan']);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${other.run.id}.cancelled`), `${new Date().toISOString()}\n`);
+  plantMarker(ROOT, other.run.id, 'cancelled', `${new Date().toISOString()}\n`);
   await other.pass(other.run.id);
   assert.equal(
     (await stateOf(other.e, `${other.run.id}-plan`)).state.closed,

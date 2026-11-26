@@ -208,6 +208,37 @@ export function storeRecordAt(root: string, key: string, text: string) {
   inApi('t.plantRecord(input.root, input.key, input.text);', { root, key, text });
 }
 
+/** A marker a person keeps beside a run (`plantMarker`, the orchestrator's testing entry). */
+export type StoredMarker = 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'labels' | 'refresh';
+
+/**
+ * The text of the run `id`'s marker in the seeded store, or null where it has none.
+ * @param id The run's id.
+ * @param marker Which marker.
+ */
+export function storedMarker(id: string, marker: StoredMarker) {
+  return JSON.parse(inApi('return JSON.stringify(t.markerText(root, input.id, input.marker) ?? null);', { id, marker })) as string | null;
+}
+
+/**
+ * `text` planted as the run `id`'s marker in the seeded store, over what is there: a marker a page writes as no verb would, and takes back.
+ * @param id The run's id.
+ * @param marker Which marker.
+ * @param text What it holds.
+ */
+export function plantStoredMarker(id: string, marker: StoredMarker, text: string) {
+  inApi('t.plantMarker(root, input.id, input.marker, input.text);', { id, marker, text });
+}
+
+/**
+ * The run `id`'s marker taken out of the seeded store, there or not.
+ * @param id The run's id.
+ * @param marker Which marker.
+ */
+export function dropStoredMarker(id: string, marker: StoredMarker) {
+  inApi('t.dropMarker(root, input.id, input.marker);', { id, marker });
+}
+
 /**
  * The record at `key` taken out of the seeded store, there or not.
  * @param key The record's key.

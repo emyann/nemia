@@ -16,10 +16,10 @@ import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import { startRun } from '../src/start/start.verb.ts';
 import { gitPlaceLayer } from '../src/place/builtin.store.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { LINE_NAME } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { recordText, runKey } from '../testing.ts';
+import { recordText, runKey, markCancelled } from '../testing.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');

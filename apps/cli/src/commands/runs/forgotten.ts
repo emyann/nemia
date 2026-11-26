@@ -37,7 +37,10 @@ const waitWords = (f: Engine, marker: string) => {
   return `${tasksWord(f.waiting.length)} of it ${one ? 'waits' : 'wait'} — ${f.why.join('; ')} — and the daemon's passes forget ${one ? 'it once it settles' : 'them once they settle'}, from ${marker}`;
 };
 
-/** The engine's refusals, of tasks by name and of the whole call, and the marker they leave, which only a person removes; empty without. */
+/**
+ * The engine's refusals, of tasks by name and of the whole call, and the marker they leave, which a pass lifts once the engine forgets
+ * them; empty without.
+ */
 const refusalWords = (f: Engine, marker: string) => {
   if (!f.refused.length && f.refusal === undefined) return '';
   const said = [
@@ -46,7 +49,7 @@ const refusalWords = (f: Engine, marker: string) => {
   ]
     .filter(Boolean)
     .join('; ');
-  return `${said} ${marker} keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm ${marker}`;
+  return `${said} ${marker} keeps their ids and the daemon asks again each pass; settle what the engine refused on it, and the next pass lifts it`;
 };
 
 /**

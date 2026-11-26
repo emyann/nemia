@@ -23,6 +23,7 @@ import {
   runKey,
   runRecord,
   runsNow,
+  markCancelled,
 } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -58,7 +59,7 @@ import {
   runWith,
 } from '../src/runner.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
-import { artifactsDir, markCancelled } from '../src/record/record.store.ts';
+import { artifactsDir } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
 import { readToken } from '../src/token/token.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';

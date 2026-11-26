@@ -30,6 +30,7 @@ import {
   removeFactory,
   runKey,
   runsNow,
+  markerText,
 } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
@@ -938,11 +939,7 @@ describe("a card's labels: filed with them, listed with them, selected by them w
     const res = await startCard({ workflow: 'dev', from: 'repo', card: core, label: ['tier=2'] });
     assert.equal(res.status, 201, await res.clone().text());
     const { id } = (await res.json()) as CardStarted;
-    assert.deepEqual(
-      JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.labels`), 'utf8')),
-      { team: 'core', tier: '2' },
-      "the card's labels, and the one sent",
-    );
+    assert.deepEqual(JSON.parse(markerText(root, id, 'labels') ?? ''), { team: 'core', tier: '2' }, "the card's labels, and the one sent");
     const refused = await startCard({ workflow: 'dev', from: 'repo', card: docs, label: 'tier=2' });
     assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
     names(((await refused.json()) as { error: string }).error, '`payload.label`');

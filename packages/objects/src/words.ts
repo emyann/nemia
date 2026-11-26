@@ -305,6 +305,35 @@ export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
 /** One of `FACTORY_CONDITION_STATUSES`. */
 export type ConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
 
+/**
+ * The status a condition is written with: Kubernetes' two a factory's conditions take, and `Unknown`, the writer's word for "not decided
+ * yet", which leaves what waits on it waiting.
+ */
+export const WRITTEN_CONDITION_STATUSES = [...FACTORY_CONDITION_STATUSES, 'Unknown'] as const;
+
+/** One of `WRITTEN_CONDITION_STATUSES`. */
+export type WrittenConditionStatus = (typeof WRITTEN_CONDITION_STATUSES)[number];
+
+/**
+ * Why a condition's write is refused: the writer is a session of the step it writes for (`own-step`, a 403: a step never vouches for its
+ * own work), the step waits on no condition of that name (`undeclared`, a 422), or the write speaks of a try the step is not on
+ * (`other-try`, a 409).
+ */
+export const CONDITION_WRITE_REFUSALS = ['own-step', 'undeclared', 'other-try'] as const;
+
+/** One of `CONDITION_WRITE_REFUSALS`. */
+export type ConditionWriteRefusalWord = (typeof CONDITION_WRITE_REFUSALS)[number];
+
+/**
+ * Where a template's program stands for a factory: `Pending`, its task not filed or not started yet; `Running`, its process is up;
+ * `Restarting`, it ended and the runtime starts it again after its back-off; `Down`, its task settled (its spawn refused, or stopped)
+ * and stays so until its declaration changes.
+ */
+export const PROGRAM_PHASES = ['Pending', 'Running', 'Restarting', 'Down'] as const;
+
+/** One of `PROGRAM_PHASES`. */
+export type ProgramPhase = (typeof PROGRAM_PHASES)[number];
+
 /** What an MCP server's header value is served as: never a value a header is sent with. Sent back, it keeps the stored value. */
 export const HEADER_MASK = '********';
 

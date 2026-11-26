@@ -15,7 +15,7 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
-export { CheckOutput, Spent, StepAttempts, StepCheck, StepLog, StepUsed } from './run-step.ts';
+export { CheckOutput, Spent, StepAttempts, StepCheck, StepCondition, StepConditionWriter, StepLog, StepUsed } from './run-step.ts';
 export {
   StepCloseout,
   type BodyPage,
@@ -47,6 +47,8 @@ export {
   RunRetry,
   RunRoute,
   RunRouted,
+  RunConditionWrite,
+  RunConditionWritten,
   RunSaid,
   RunSay,
   RunStart,
@@ -125,11 +127,17 @@ export {
   type ToldVia,
   TRY_CAUSES,
   WAIT_ON,
+  WRITTEN_CONDITION_STATUSES,
+  PROGRAM_PHASES,
+  CONDITION_WRITE_REFUSALS,
 } from './words.ts';
 export type {
   AnswerVia,
   CheckResult,
   ConditionStatus,
+  ConditionWriteRefusalWord,
+  ProgramPhase,
+  WrittenConditionStatus,
   DefinitionOrigin,
   EdgeKind,
   EventReason,
@@ -202,6 +210,7 @@ export {
   FactoryTemplate,
   FactoryTrusted,
   FactoryUntrusted,
+  FactoryProgram,
   FactoryUpgrade,
   FactoryVolume,
   HarnessSettings,

@@ -16,7 +16,8 @@ import { describedNumber } from './meta.ts';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { Paused } from './server-api.ts';
-import { RETRY_MODES, SAID_AFTER } from './words.ts';
+import { StepCondition } from './run-step.ts';
+import { RETRY_MODES, SAID_AFTER, WRITTEN_CONDITION_STATUSES } from './words.ts';
 
 /** Strings, given many times. */
 const Strings = Schema.Array(Schema.String);
@@ -648,6 +649,25 @@ export const RunRouted = Schema.Struct({
   file: Schema.String.annotate({ description: 'The file it is in.' }),
 }).annotate({ identifier: 'RunRouted' });
 export type RunRouted = typeof RunRouted.Type;
+
+/**
+ * A condition written for a step: its status, the try of the step it speaks of (a write for any other try is refused, so a verdict for an
+ * older push is never read as the new one's) and the writer's words.
+ */
+export const RunConditionWrite = Schema.Struct({
+  status: Schema.Literals(WRITTEN_CONDITION_STATUSES).annotate({
+    description: 'True: it holds, the step goes on. False: it does not, the step is refused as a failed check is. Unknown: not decided yet.',
+  }),
+  try: Schema.Finite.annotate({ description: 'The try of the step the status speaks of, from 1; it must be the one the step is on.' }),
+  message: Schema.String.annotate({ description: "The writer's words with the status: what it saw, and what to do where it is False." }),
+}).annotate({ identifier: 'RunConditionWrite' });
+export type RunConditionWrite = typeof RunConditionWrite.Type;
+
+/** What a condition's write answers: the condition as it stands for the step's try now. */
+export const RunConditionWritten = Schema.Struct({
+  condition: StepCondition,
+}).annotate({ identifier: 'RunConditionWritten' });
+export type RunConditionWritten = typeof RunConditionWritten.Type;
 
 /** What the engine forgot of a removed run's tasks, and what waits to be forgotten until it settles (`EngineForgetting`). */
 const EngineForgetting = Schema.Struct({

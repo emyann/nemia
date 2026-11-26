@@ -5,6 +5,7 @@
  */
 import { Schema } from 'effect';
 import {
+  CONDITION_WRITE_REFUSALS,
   FLOOR_REFUSALS,
   GUARD_REFUSALS,
   PROPOSAL_REFUSALS,
@@ -18,6 +19,9 @@ import {
 const FLOOR_ONLY = FLOOR_REFUSALS.filter(
   (r): r is Exclude<FloorRefusalWord, ProposalRefusal> => !(PROPOSAL_REFUSALS as readonly string[]).includes(r),
 );
+
+/** The condition write's refusals that are a 403: a step's own session writing for its step (`own-step`). */
+const CONDITION_FORBIDDEN = CONDITION_WRITE_REFUSALS.filter((r) => r === 'own-step');
 
 /** The sentence every refusal carries under `error`. */
 const ErrorSentence = Schema.String.annotate({
@@ -70,9 +74,9 @@ export class Forbidden extends Schema.Class<Forbidden>('Forbidden')(
   {
     error: ErrorSentence,
     reason: Schema.optionalKey(
-      Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS, ...FLOOR_ONLY]).annotate({
+      Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS, ...FLOOR_ONLY, ...CONDITION_FORBIDDEN]).annotate({
         description:
-          "Why, as a code: a proposal's refusal, the api's guard refusing a write from another host or site, or a standing token asking past its floor.",
+          "Why, as a code: a proposal's refusal, the api's guard refusing a write from another host or site, a standing token asking past its floor, or a step's own session writing a condition its step waits on.",
       }),
     ),
   },

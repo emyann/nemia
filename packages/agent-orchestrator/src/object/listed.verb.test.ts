@@ -12,7 +12,7 @@ import { FactoryList } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory/factory.ts';
 import { factoryObjectsOf, type FactoryListed } from '../factory/object/factory.verb.ts';
-import { objectsListed } from './listed.verb.ts';
+import { atRevisions, objectsListed } from './listed.verb.ts';
 
 const home = scratch('nemia-object-listed-');
 const repo = scratch('nemia-object-listed-repo-');
@@ -34,7 +34,10 @@ fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
 fs.writeFileSync(acme.file, JSON.stringify(filed));
 const stray: FactoryListing = { name: 'broken', file: path.join(home, 'factories', 'broken.json'), error: 'does not read as JSON' };
 const listed: FactoryListed = { factories: [acme, stray], untrusted: [] };
-const objects = factoriesNow(home, factoryObjectsOf(listed, home));
+const objects = factoriesNow(
+  home,
+  Effect.flatMap(atRevisions('Factory', home), (at) => factoryObjectsOf(listed, home, at)),
+);
 
 test('a page is cut by limit and continue, sorted by name, and counts what remains', async () => {
   const first = await Effect.runPromise(objectsListed('Factory', objects, { limit: 2 }, 'factory'));

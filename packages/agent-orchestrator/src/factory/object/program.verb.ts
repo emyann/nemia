@@ -2,13 +2,15 @@
  * A factory's programs as objects (`Program`, `ProgramList`, from `objects`), in the factory's namespace, each by the name its template
  * declares: its spec the line it runs and the conditions it writes, its status where its task runs now (`programStatus`, read off the
  * engine's task under the id the controller files it by, `programTaskId`): Pending, Running with its restarts and since when, or Down
- * with what to type. The default factory declares none.
+ * with what to type. The default factory declares none. A program is no record of the keyspace, its status the engine's task as read now,
+ * so its `resourceVersion` is a digest of both (`valueVersion`).
  */
 import { Effect } from 'effect';
 import { API_VERSION, type Program as ProgramObject, type ProgramList } from 'objects';
 import { asked, type Engine } from '../../runtime-client.ts';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
+import { objectsListed, type ObjectQuery } from '../../object/listed.verb.ts';
+import { valueVersion } from '../../digest/digest.ts';
 import { declaredPrograms } from '../../program/program.verb.ts';
 import { programStatus } from '../../program/program.ts';
 import { factoryFiled } from './factory.verb.ts';
@@ -29,7 +31,7 @@ const programsNow = Effect.fn('programsNow')(function* (e: Engine, home: string,
         name: d.name,
         namespace,
         creationTimestamp: factory.metadata.creationTimestamp,
-        resourceVersion: versionOf(spec, status),
+        resourceVersion: valueVersion({ spec, status }),
       },
       spec,
       status,

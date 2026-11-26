@@ -23,7 +23,9 @@ import { workflowsIn } from '../folder/folder.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/index.ts';
+import { Conflict } from '../refusal/refusal.ts';
 import { recordDue } from '../observed/observed.ts';
+import { indexedRevision } from './definition-index.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { BUILTIN_SKILLS, entriesOf, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { BuiltinTemplates, builtinTemplatesIn } from '../template/door/templates.store.ts';
@@ -92,8 +94,11 @@ const together = (versions: readonly (string | null)[]) => {
   return held.length === 1 ? (held[0] ?? null) : createHash('sha256').update(held.join('\0')).digest('hex').slice(0, 16);
 };
 
-/** What `there` of a door says is held: its version, none where nothing is at the name. */
-const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
+/**
+ * What `there` of a door says is held: its version, none where nothing is at the name.
+ * @param there What the door says is at the name.
+ */
+export const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
 
 /**
  * The skills a folder of skills holds, each digested as the Skill door versions it, found in `scope`.
@@ -215,7 +220,6 @@ const definitionsFound = Effect.fn('definitionsFound')(function* (
       found.push(...(yield* skillsIn(scope, path.join(repo, REPOSITORY_HOLDER, 'skills'))));
     }
   }
-  for (const f of factories) found.push(...(yield* factoryWordsOf(f)));
   const everyRepo = [...new Set(factories.flatMap((f) => f.repos))];
   found.push(...(yield* definitionsIn(LIBRARY_SCOPE, path.join(path.resolve(home), 'workflows'), everyRepo)));
   found.push(...(yield* builtinFound(templates)));
@@ -253,11 +257,10 @@ const rootsPrint = (roots: readonly string[]) => {
 const DERIVED = new Map<string, { readonly print: string; readonly wanted: ReadonlyMap<string, string> }>();
 
 /**
- * One pass of the index of the store `StoreRoot` names: each definition found read, and its record written where it differs from the
- * record the index holds (`recordDue`), each record whose definition is gone deleted, all in one transaction of the keyspace. A pass
- * that finds nothing new writes nothing, so the head stands. A write another hand raced is left to the next pass.
+ * The text of each definition the files of the store `StoreRoot` names hold now, by the key of its record: the files read again only
+ * where their print moved. It writes nothing, so a read and a sweep see the same definitions.
  */
-export const indexSweep = Effect.fn('indexSweep')(function* () {
+const definitionsWanted = Effect.fn('definitionsWanted')(function* () {
   const home = yield* StoreRoot;
   const templates = yield* BuiltinTemplates;
   const listings = yield* listedAt(home);
@@ -270,12 +273,43 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     ]),
   ]);
   const derived = DERIVED.get(home);
-  const wanted =
+  const wanted: ReadonlyMap<string, string> =
     derived?.print === print
       ? derived.wanted
       : new Map((yield* definitionsFound(home, factories, templates)).map((d) => [definitionKey(d.scope, d.kind, d.name), textOf(d)]));
   DERIVED.set(home, { print, wanted });
-  const keyspace = yield* keyspaceAt(keyspaceFile(home));
+  const words = new Map(wanted);
+  for (const f of factories) for (const d of yield* factoryWordsOf(f)) words.set(definitionKey(d.scope, d.kind, d.name), textOf(d));
+  return words;
+});
+
+/**
+ * The revision each definition the files hold stands at now, worked out with no write (`indexedRevision`): the index's record where it
+ * still holds the files, otherwise the revision a sweep would give it, one past the head the records were read at.
+ */
+export const definitionsNumbered = Effect.fn('definitionsNumbered')(function* () {
+  const wanted = yield* definitionsWanted();
+  const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot)).pipe(Effect.orDie);
+  const { records, revision: head } = yield* keyspace.list(DEFINITIONS_PREFIX);
+  const held = new Map(records.map((r) => [r.key, r] as const));
+  const numbered = new Map<string, number>();
+  for (const [key, text] of wanted) {
+    const record = held.get(key);
+    const at = indexedRevision(record === undefined ? null : { value: record.value, revision: record.revision }, text, head);
+    if (at !== null) numbered.set(key, at);
+  }
+  return { head, held: numbered };
+});
+
+/**
+ * One pass of the index of the store `StoreRoot` names: each definition found read, and its record written where it differs from the
+ * record the index holds (`recordDue`), each record whose definition is gone deleted, all in one transaction of the keyspace. A pass
+ * that finds nothing new writes nothing, so the head stands. A write another hand raced is left to the next pass. Only a sweep writes
+ * the index: the daemon's loop, and a writer of a definition after its write.
+ */
+export const indexSweep = Effect.fn('indexSweep')(function* () {
+  const wanted = yield* definitionsWanted();
+  const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot));
   return yield* keyspace
     .within((tx) =>
       Effect.gen(function* () {
@@ -294,29 +328,9 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
 });
 
-/** Whether a sweep keeps the index for this process's reads, the one this process ticks: where one does, a read writes nothing. */
-const SWEEPING = { running: false };
-
 /**
- * This process ticks, so its sweep keeps the index: a read of a definition no longer reads the index again (`definitionsRefreshed`), so a
- * GET writes nothing. A program that ticks no sweep (an api served with `--no-tick`, a test) reads the index again: nothing keeps it.
- */
-export const sweepBegun = () => {
-  SWEEPING.running = true;
-};
-
-/**
- * The index read again where a read or a write of a definition needs it exact: after a write of one always, and before a read where no
- * sweep of the daemon runs in this process (the api served alone), so a revision a reader holds is the one a write compares.
- * @param afterWrite Whether a write of a definition was just answered.
- */
-export const definitionsRefreshed = Effect.fn('definitionsRefreshed')(function* (afterWrite: boolean) {
-  if (afterWrite || !SWEEPING.running) yield* indexSweep();
-});
-
-/**
- * The revision a library definition stands at once its files are read again: what a write of it compares the revision its writer read to,
- * the revision the api serves (`revisionTable`), the highest among the records that name it.
+ * The revision a library definition stands at now, worked out with no write (`definitionsNumbered`): what a write of it compares the
+ * revision its writer read to, the revision a reader is served (`revisionTable`), the highest among the records that name it.
  * @param kind What the definition is.
  * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
@@ -326,8 +340,68 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
   namespace: string | undefined,
   name: string,
 ) {
-  yield* indexSweep();
-  const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot)).pipe(Effect.orDie);
-  const held = new Map([[DEFINITIONS_PREFIX, yield* keyspace.touched(DEFINITIONS_PREFIX)]]);
+  const held = new Map([[DEFINITIONS_PREFIX, (yield* definitionsNumbered()).held]]);
   return revisionTable(kind, held)(namespace, name);
 });
+
+/**
+ * Refuses `Conflict` a write of a definition whose writer read it at another revision than it stands at now: the revision a reader is
+ * served is the one the writer names (`definitionRevisionNow`, worked out with no write), so a hand edit since the read counts and a
+ * lost update is never possible. Nothing is judged where no revision is named: a definition made.
+ * @param kind What the definition is.
+ * @param namespace The namespace it is served in, none for the library's.
+ * @param name The definition's name.
+ * @param read The `resourceVersion` the writer read it at, none for a definition made.
+ * @param what What the writer does, as the refusal says it: `write` or `remove`.
+ */
+export const definitionJudged = Effect.fn('definitionJudged')(function* (
+  kind: 'Agent' | 'Skill' | 'Workflow',
+  namespace: string | undefined,
+  name: string,
+  read: string | undefined,
+  what: 'write' | 'remove',
+) {
+  if (read === undefined) return;
+  const now = String(yield* definitionRevisionNow(kind, namespace, name));
+  if (now !== read)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `the ${kind} ${name} changed since it was read (it is at revision ${now}, not ${read}), and a ${what} would lose what changed: read it again, make the change on what it holds now, and ${what} that`,
+      }),
+    );
+});
+
+/**
+ * The index read again once a writer has changed a definition, so what the writer answers stands at a revision the keyspace holds. A
+ * sweep that cannot read leaves the write standing: the daemon's next sweep numbers it.
+ */
+export const definitionsSwept = () => Effect.ignore(indexSweep());
+
+/**
+ * The door's act on a definition (`act`) with each mention of the version the door holds at the name (`there`) said as the revision
+ * the definition stands at now, so a refusal that tells the writer which version to give names the one it is judged at
+ * (`definitionJudged`), never the door's own content version.
+ * @param kind What the definition is.
+ * @param namespace The namespace it is served in, none for the library's.
+ * @param name The definition's name.
+ * @param there What the door says is at the name now.
+ * @param act The door's write or removal.
+ */
+export const definitionDoorSaid = <A, E extends { readonly message: string }, R>(
+  kind: 'Agent' | 'Skill',
+  namespace: string | undefined,
+  name: string,
+  there: DefinitionThere,
+  act: Effect.Effect<A, E, R>,
+) =>
+  there.kind !== 'held'
+    ? act
+    : Effect.catch(act, (err) =>
+        Effect.flatMap(definitionRevisionNow(kind, namespace, name), (revision) =>
+          Effect.fail(
+            Object.assign(Object.create(Object.getPrototypeOf(err)), err, {
+              message: err.message.replaceAll(there.version, String(revision)),
+            }) as E,
+          ),
+        ),
+      );

@@ -14,6 +14,12 @@ import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedOf } from '../factory/door/factories.store.ts';
+import {
+  definitionDoorSaid,
+  definitionJudged,
+  definitionRevisionNow,
+  definitionsSwept,
+} from '../definition-index/definition-index.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
@@ -114,7 +120,8 @@ const SkillChangeValue = Schema.declare(
 
 /**
  * What `nemia skills write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the skill's
- * name on the path where it changes one (`name`), the `version` it was read at, and either its `change` or the builtin skill to `copy`
+ * name on the path where it changes one (`name`), the `version` it was read at (the `resourceVersion` the skill was served at), and
+ * either its `change` or the builtin skill to `copy`
  * from the folder of builtin skills (`builtin`).
  */
 export const SkillWriteInput = Schema.Struct({
@@ -139,17 +146,50 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
         yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, { factory, treeOf: () => tree }),
       );
       const door = yield* SkillDoor;
-      if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);
+      if (copy !== undefined) {
+        const copied = yield* door.skills.copy(SkillName.read(copy), builtin, library);
+        yield* definitionsSwept();
+        return copied;
+      }
       if (change === undefined)
         return yield* Effect.fail(
           new Invalid({
             message: 'nemia skills write takes the skill to write, its SKILL.md: nemia skills write yours --file <SKILL.md>.',
           }),
         );
-      return yield* door.skills.write(SkillName.read(change.name), change, version, library);
+      const judged = SkillName.read(name ?? change.name);
+      const there = yield* door.skills.there(SkillName.read(change.name), library);
+      const namespace = from === 'factory' ? factory : undefined;
+      if (there.kind === 'held') yield* definitionJudged('Skill', namespace, judged, version, 'write');
+      const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
+      const written = yield* definitionDoorSaid(
+        'Skill',
+        namespace,
+        judged,
+        there,
+        door.skills.write(SkillName.read(change.name), change, held, library),
+      );
+      yield* definitionsSwept();
+      return { ...written, version: String(yield* definitionRevisionNow('Skill', namespace, SkillName.read(change.name))) };
     }),
   print: () => [],
 };
+
+/**
+ * The library's skill `name` removed from the folder of skills `library`, at the `version` it was read at where one is given: judged
+ * against the revision it stands at now (`definitionJudged`), and the index swept once it is gone.
+ * @param library The folder of skills the skill is removed from.
+ * @param name The skill's name.
+ * @param version The `resourceVersion` the skill was read at, none to remove it unseen.
+ */
+export const skillRemoved = Effect.fn('skillRemoved')(function* (library: string, name: string, version: string | undefined) {
+  const door = yield* SkillDoor;
+  const there = yield* door.skills.there(SkillName.read(name), library);
+  if (there.kind === 'held') yield* definitionJudged('Skill', undefined, name, version, 'remove');
+  const held = version === undefined ? undefined : there.kind === 'held' ? there.version : version;
+  yield* definitionDoorSaid('Skill', undefined, name, there, door.skills.remove(SkillName.read(name), library, held));
+  yield* definitionsSwept();
+});
 
 /** The board's skill entries, in the order the table lists them. */
 export const SKILL_ENTRIES: readonly Command[] = [SKILLS_LIST, SKILLS_READ, SKILLS_WRITE] as readonly Command[];

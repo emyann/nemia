@@ -1,18 +1,19 @@
 ---
 title: Factories
-description: A factory names the repositories a body of work is on, the workflows it offers, the agents it hires into their steps, its rules and its instruction.
+description: A factory names the repositories a body of work uses, the workflows it offers, the agents it hires into their steps, its rules, and its instruction file.
 ---
 
-A factory is a body of work, named. It says which repositories the work is on, which workflows it offers, which agent does each step,
-what every agent at work in it is told, and what Nemia is to know about it. Every run is started in a factory.
+A factory is a named body of work. It sets which repositories the work happens in, which workflows it offers, which agent does each
+step, what every agent working in it is told, and what Nemia should know about it. Every run starts in a factory.
 
-**It owns** its repositories, the workflows attached to it, its hires, its rules and its instruction.
+**It owns** its repositories, the workflows attached to it, its hires, its rules, and its instruction file.
 
-**It never touches** a run already started. A run reads its factory once, when it starts, and freezes what it read: a hire or a detach
-afterwards reaches only the runs started after it.
+**It never touches** a run that has already started. A run reads its factory once, when it starts, and freezes what it read. A hire
+or a detach made later only affects runs started after it.
 
-**It is reached through** one record in your store (`/registry/factories/<name>`, in the store's database under `WF_ROOT`), written by the `nemia factory`
-verbs and by the board. Its name is the record's; a `factories/<name>.json` file of an earlier release is taken up once and moved aside. The code is in `packages/agent-orchestrator/src/factory/`.
+**Its entry point** is one record in your store (`/registry/factories/<name>`, in the store's database under `WF_ROOT`). The
+`nemia factory` commands and the board write it. The factory's name is the record's name. A `factories/<name>.json` file from an
+earlier release is imported once and moved aside. The code is in `packages/agent-orchestrator/src/factory/`.
 
 ```bash
 nemia factory add pipao --volume ~/code/pipao:rw     # a factory that works on one repository
@@ -21,15 +22,15 @@ nemia factory hire pipao ada --step build/implement   # ada does build's impleme
 nemia start "add a flag" --workflows build --factory pipao
 ```
 
-A factory can be made from a template too, its workflows, agents and hires given at once: Nemia has one built in,
-[sdlc](/sdlc/), the team that builds Nemia, which `nemia factory apply` finds by its name.
+You can also create a factory from a template, which gives it workflows, agents, and hires all at once. Nemia has one built in:
+[sdlc](/sdlc/), the team that builds Nemia. `nemia factory apply` finds it by name.
 
 ## Its volumes
 
-A factory's file holds its volumes (`"volumes"`, each `{ "path", "readOnly" }`), as a container is given volumes: each a folder of the
-machine the store is on, or a git URL that machine clones under the store (its `origin` kept beside it). Each is marked as docker compose
-marks one, read-only (`:ro`) or writable (`:rw`), and the mark is required: a volume left unmarked would be writable without anyone
-having said so.
+A factory's file lists its volumes (`"volumes"`, each `{ "path", "readOnly" }`), the way a container is given volumes. Each one is a
+folder on the machine the store runs on, or a git URL that machine clones into the store (keeping its `origin` alongside). Each is
+marked the way docker compose marks one: read-only (`:ro`) or writable (`:rw`). The mark is required, so that no volume is ever
+writable without someone saying so.
 
 ```sh
 nemia factory add pipao                                      # a factory with no volume yet
@@ -39,275 +40,287 @@ nemia factory volume add pipao /home/me/notes:ro             # every local step 
 nemia factory volume rm pipao /home/me/notes
 ```
 
-- **A writable volume is a repository the factory works on.** A run works in one of them, in a worktree of its own; every other one
-  is mounted for each step read-only (`factoryMounts`), so a step can read the code it does not change. A step that must write one of
-  them says so with `writable`, naming the folder; that widens where its writes reach, never what it may do. A writable volume must be
-  a git repository, or inside one.
-- **A read-only volume** is a folder every local step of a run in the factory reads, beside its repositories. It never makes the
-  factory work on its folder: which factory a start, a card or a schedule lands in does not change. Refused: a folder that is no
-  directory, one of the factory's repositories, and a folder at or inside Nemia's store but a clone of its own.
-- **A factory may have no volume.** It is filed, and every start in it is refused until it works on a repository, naming
-  `nemia factory volume add <factory> <path|url>:rw`.
-- A run copies the volumes at its start, so a later change reaches only the runs started after it. A start is refused, before anything
-  is written, where a step's harness cannot hold a volume's mount.
-- Volumes are yours: they live in the factory's own file, never in a template, and `nemia factory adopt` and `nemia factory upgrade`
-  keep them. `nemia factory` says what the factory works on and lists the read-only ones under it; the board's Settings page of the
-  factory lists each with its mark, adds one from a path or a URL and its mode, and takes one back with Remove.
-- **Each volume has two switches**, yours, for the sessions that start in the factory's home: `--claude-md on` loads the volume's
-  `CLAUDE.md` files (off by default), and `--skills off` hides the skills of its `.claude/skills` (on by default). Give them as you add
-  the volume, or set one later without giving the volume again, by its name (`nemia get volumes -n <factory>` lists the names):
-  `nemia factory volume set pipao notes --claude-md on`. A switch you do not name keeps its value. The Settings page shows both switches
-  on each volume, with what each does, and flips one when you press it. Like every volume, they reach the runs started after the
-  change, and no proposal changes them.
-- A store an earlier release wrote, whose files said `"repos"` and `"origins"`, is moved once, when its daemon starts: each repository
-  becomes a writable volume with its origin, and those keys are read no more.
+- **A writable volume is a repository the factory works on.** A run works in one of them, in its own worktree. Every other volume is
+  mounted read-only for each step (`factoryMounts`), so a step can read code it doesn't change. A step that must write to one of them
+  says so with `writable`, naming the folder. That widens where its writes can go, never what it is allowed to do. A writable volume
+  must be a git repository, or inside one.
+- **A read-only volume** is a folder that every local step of a run in the factory can read, alongside its repositories. It never
+  makes the factory work on that folder: it doesn't change which factory a start, card, or schedule lands in. Rejected: a path that
+  isn't a directory, one of the factory's repositories, and a folder at or inside Nemia's store (except this volume's own clone, when you add it by URL).
+- **A factory can have no volume.** It is created, but every start in it is rejected, with a pointer to
+  `nemia factory volume add <factory> <path|url>:rw`, until it has a repository to work on.
+- A run copies the volumes when it starts, so a later change only affects runs started after it. If a step's harness can't mount a
+  volume, the start is rejected before anything is written.
+- Volumes are yours. They live in the factory's own file, never in a template, and `nemia factory adopt` and
+  `nemia factory upgrade` keep them. `nemia factory` shows what the factory works on and lists the read-only volumes under it. The
+  factory's Settings page on the board lists each volume with its mark, adds one from a path or URL with its mode, and removes one with
+  Remove.
+- **Each volume has two switches**, for the sessions that start in the factory's home. `--claude-md on` loads the volume's `CLAUDE.md`
+  files (off by default), and `--skills off` hides the skills in its `.claude/skills` (on by default). Set them when you add the
+  volume, or later by the volume's name, without adding it again (`nemia get volumes -n <factory>` lists the names):
+  `nemia factory volume set pipao notes --claude-md on`. A switch you don't set keeps its value. The Settings page shows both switches
+  on each volume, explains what each does, and flips one when you click it. Like every volume setting, they affect runs started after
+  the change, and no proposal changes them.
+- A store written by an earlier release, whose files used `"repos"` and `"origins"`, is migrated once, when its daemon starts. Each
+  repository becomes a writable volume with its origin, and those keys are no longer read.
 
-When you give a factory a writable volume (`nemia factory add`, `nemia factory apply`, `nemia factory volume add`), Nemia trusts it for
-the harness its steps run on, at that moment: for Claude Code, the folder's entry in Claude Code's own configuration file, on the
-repository's root. Without that trust the harness drops the allow rules of the folder's own project settings, and a step is refused
-commands the repository meant to allow. The command prints the place, what the trust grants and how to take it back; `--no-trust`
-gives the volume without it. A place that is not trusted — added before, opted out, or taken back — is said by `nemia factory` and on
-the factory's page, with the line that trusts it: `nemia factory trust <name>`. A run's denied calls on such a place name it as the
-likely cause.
+When you give a factory a writable volume (`nemia factory add`, `nemia factory apply`, `nemia factory volume add`), Nemia trusts it
+for the harness its steps run on, right then. For Claude Code, that is the folder's entry in Claude Code's own configuration file, at
+the repository's root. Without that trust, the harness ignores the allow rules in the folder's own project settings, and a step is
+denied commands the repository meant to allow. The command prints the location, what the trust grants, and how to revoke it.
+`--no-trust` adds the volume without it. If a location isn't trusted (because it was added earlier, opted out, or revoked),
+`nemia factory` and the factory's page say so, with the command that trusts it: `nemia factory trust <name>`. When a run's calls are
+denied in such a location, the message points to it as the likely cause.
 
 ## Its harness settings
 
-A factory can name settings of a harness that every session of its runs' steps on that harness is given, on top of the repository's
-own settings, as a container is given its configuration by its Pod. Say a preference once, and every repository the factory works on
-has it: no file is written into a repository, and for Claude Code the settings reach the session through the Agent SDK's settings
-option. The value is JSON:
+A factory can set harness settings that every session of its runs' steps receives, on top of the repository's own settings, the way
+a Pod gives a container its configuration. Set a preference once, and every repository the factory works on gets it. Nothing is
+written into a repository: for Claude Code, the settings reach the session through the Agent SDK's settings option. The value is
+JSON:
 
 ```sh
 nemia factory setting set pipao claude.attribution '{"commit":"","pr":""}'  # no Co-Authored-By trailer, no pull request line
 nemia factory setting rm pipao claude.attribution
 ```
 
-- A factory sets `claude.attribution`, `claude.includeGitInstructions` and `claude.language` alone. Each changes what a session writes
-  or says, and none what it may reach or run.
-- Every other key is refused, naming where it is owned instead: permissions are a step's `allowedTools:` and `disallowedTools:`, hooks
-  the repository's `.claude/settings.json`, MCP servers an agent's `mcp:` and `nemia factory server add`, and a key that runs a program
-  (`apiKeyHelper`, `statusLine`, …) is no factory's. Claude Code's settings keep growing, so the list says what is allowed: a new key is
-  a decision someone makes, never one let through unjudged.
-- A step's own agent's settings win a key both name. A step on Codex, or on a remote agent, is given none.
-- A run copies the settings at its start, so a later change reaches only the runs started after it. A key a factory may not set,
-  written into its file by hand, refuses every start in the factory until it is removed.
-- Settings are yours: they live in the factory's own file (`"harnessSettings": { "claude": { … } }`), never in a template, and
-  `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory; the board shows none yet.
-- The default factory holds none, as it holds no volume: a run that names no factory is given no factory setting.
+- A factory can set only `claude.attribution`, `claude.includeGitInstructions`, and `claude.language`. Each changes what a session
+  writes or says, never what it can reach or run.
+- Every other key is rejected, with a pointer to where it belongs instead. Permissions are a step's `allowedTools:` and
+  `disallowedTools:`. Hooks go in the repository's `.claude/settings.json`. MCP servers go in an agent's `mcp:` and
+  `nemia factory server add`. A key that runs a program (`apiKeyHelper`, `statusLine`, …) belongs to no factory. Claude Code keeps
+  adding settings, so the list says what is allowed: each new key is a deliberate decision, never let through by default.
+- When a step's own agent sets the same key, the agent's value wins. A step on Codex, or on a remote agent, gets none of these
+  settings.
+- A run copies the settings when it starts, so a later change only affects runs started after it. If a disallowed key is added to the
+  factory's file by hand, every start in the factory is rejected until it is removed.
+- Settings are yours. They live in the factory's own file (`"harnessSettings": { "claude": { … } }`), never in a template, and
+  `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory. The board doesn't show
+  them yet.
+- The default factory has none, just as it has no volume: a run that names no factory gets no factory settings.
 
 ## Its cost lines
 
-A factory can set, per workflow it offers, the dollars a run of that workflow should stay under, all tries and rounds included:
+For each workflow it offers, a factory can set a dollar amount that a run of that workflow should stay under, including all tries and
+rounds:
 
 ```sh
 nemia factory cost-line set pipao build 80
 nemia factory cost-line rm pipao build
 ```
 
-- A gate whose caps would let the run pass its line says so, and Nemia at `auto` never approves that gate unasked
-  ([What a step may spend](/workflows/#what-a-step-may-spend)). The line cuts nothing.
-- A run keeps the line it was started with: a later change reaches only the runs started after it.
-- Lines are yours: they live in the factory's own file (`"costLines": { "build": 80 }`), never in a template, and `nemia factory adopt`
-  and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory, and the board's factory settings page sets and
-  clears them.
-- Refused: a workflow the factory does not offer, an amount that is not dollars above zero, and the default factory. A workflow with a
-  line is not detached until its line is taken back.
+- If a gate's caps would let the run exceed its line, the gate says so, and Nemia at `auto` never approves that gate on her own
+  ([What a step may spend](/workflows/#what-a-step-may-spend)). The line doesn't cut anything.
+- A run keeps the line it started with: a later change only affects runs started after it.
+- Lines are yours. They live in the factory's own file (`"costLines": { "build": 80 }`), never in a template, and
+  `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory, and the board's factory
+  settings page sets and clears them.
+- Rejected: a workflow the factory doesn't offer, an amount that isn't a dollar amount above zero, and the default factory. A workflow
+  with a line can't be detached until its line is removed.
 
 ## Attached workflows
 
-A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the
-factory's file (`"workflows"`); detaching takes it back. Starting a workflow a factory has not attached is refused, naming the attach that
-would add it (`unattachedRefusal`).
+A factory offers only the workflows attached to it, and none until you attach one. Attaching records the workflow's folder name in
+the factory's file (`"workflows"`), and detaching removes it. Starting a workflow the factory hasn't attached is rejected, with the
+attach command that would add it (`unattachedRefusal`).
 
-Each workflow it attaches works on one of its repositories, named by the repository's folder name: `nemia factory attach pipao build
---repo pipao`. A factory of one repository needs no name: its workflows work on that one. A factory of several refuses to start a
-workflow it names none for, and says the attach that names one (`workflowRepo`). Attaching an attached workflow again with `--repo`
-changes its repository. The name is kept in the factory's own file, or in its tree's wiring where it was applied from a template, so an
-upgrade keeps it.
+Each attached workflow works on one of the factory's repositories, named by the repository's folder name:
+`nemia factory attach pipao build --repo pipao`. A factory with one repository doesn't need the name: its workflows work on that one.
+A factory with several repositories rejects starting a workflow that has none named, and gives the attach command that names one
+(`workflowRepo`). Attaching an already attached workflow again with `--repo` changes its repository. The name is kept in the
+factory's own file, or, if it was applied from a template, in the file of its tree that records its attached workflows
+and hires, so an upgrade keeps it.
 
-A card names its factory and its workflow, never a repository: its run, and a brief's, works on the repository the factory names for the
-workflow, whatever folder the start is typed in. A brief's `--repo` only finds the factory, and the start says so when the run works on
-another. A card's `repo:` is retired: a card filed with one is refused, and an older card that has one keeps it, read and never used.
+A card names its factory and its workflow, never a repository. Its run (and a brief's) works on the repository the factory names for
+that workflow, whatever folder you start it from. A brief's `--repo` only selects the factory, and the start tells you when the run
+works on a different repository. A card's `repo:` field is retired: a new card with one is rejected, and an older card that has one
+keeps it, but it is never used.
 
 ## Hires
 
-A step need not name its agent: a factory hires one into it. A hire maps a step, written `<workflow>/<step>`, to an agent
-(`"hires": { "build/implement": "ada" }` in the file). So two factories can run the same workflow with different agents.
+A step doesn't have to name its agent: a factory can hire one into it. A hire maps a step, written `<workflow>/<step>`, to an agent
+(`"hires": { "build/implement": "ada" }` in the file). This way, two factories can run the same workflow with different agents.
 
-- A step whose own file names its agent is filled already, in every factory, and takes no hire.
-- When a run starts, each hired step is read exactly as if its file named the agent, and frozen so on the run.
-- A start that would leave a step with no agent is refused, naming each such step and the hire that would fill it (`unfilledRefusal`).
+- A step whose own file names its agent is already filled, in every factory, and takes no hire.
+- When a run starts, each hired step is read exactly as if its file named the agent, and frozen that way on the run.
+- A start that would leave a step without an agent is rejected, listing each such step and the hire that would fill it
+  (`unfilledRefusal`).
 
 ## The default factory
 
-Runs and cards written before every run had a factory are in the default factory. It is no file: it holds that history, offers every
-workflow, hires no one, and starts nothing. A start that names it is refused (`defaultStartRefusal`). A start that names no factory
-runs in the one whose repository it is typed in; typed in a folder of no repository it is refused, naming the factory to file on it.
-Under a [remote context](/self-hosting/), which has no folder of the daemon's to be typed in, it runs in the one whose repository is the
-daemon's own.
+Runs and cards created before every run had a factory belong to the default factory. It isn't a file: it holds that history, offers
+every workflow, hires no one, and starts nothing. A start that names it is rejected (`defaultStartRefusal`). A start that names no
+factory runs in the factory whose repository you run it from. Run from a folder outside any repository, it is rejected, with the
+factory to create for that folder. With a [remote context](/self-hosting/), which has no folder on the daemon's machine to run from,
+it runs in the factory whose repository is the daemon's own.
 
 ## Its rules
 
-A factory has rules of its own: its rules and policies, in markdown, told to every agent hired into it. They are one file, kept in your
-store with the factory and never in a repository, `~/.agent-workflows/factories/<name>/RULES.md` (`WF_ROOT`); a factory made from a
-template keeps it in its tree, where a template carries it and an upgrade merges it as text.
+A factory has its own rules: its rules and policies, in Markdown, given to every agent hired into it. They are one file, kept in your
+store with the factory and never in a repository: `~/.agent-workflows/factories/<name>/RULES.md` (`WF_ROOT`). A factory created from
+a template keeps the file in its tree, where a template can ship it and an upgrade merges it as text.
 
 - `nemia factory rules <name> --file <path>` writes them, `nemia factory rules <name>` prints them, and `--clear` removes them. The
-  board's page of the factory's settings reads, writes and clears them too.
-- Every step of every run started in the factory is told them, after the agent's custom instructions and before the step's own policy:
-  the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers), which the step's own policy outranks. A
-  step on a remote agent is told none.
-- A run reads them when it starts and keeps them (`StepAgent.factoryRules`), as it keeps every revision it resolved: an edit reaches the
-  runs started after it, and a run in flight only where the factory follows revisions or a person refreshes it ([its
-  revisions](#its-revisions)).
-- They only add words. A frontmatter block is refused (`factoryRulesRefusal`): they set no key, give no tool and widen no fence.
-- A factory with none tells nothing, and the default factory keeps none.
+  factory's settings page on the board also reads, writes, and clears them.
+- Every step of every run started in the factory receives them, after the agent's custom instructions and before the step's own
+  policy. They are the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers), and the step's own
+  policy outranks them. A step on a remote agent receives none.
+- A run reads them when it starts and keeps them (`StepAgent.factoryRules`), like every revision it resolved. An edit affects runs
+  started after it. A run already in progress gets it only if the factory follows revisions or a person refreshes the run
+  ([its revisions](#its-revisions)).
+- They only add text. A frontmatter block is rejected (`factoryRulesRefusal`): rules set no key, grant no tool, and widen no fence.
+- A factory without rules adds nothing, and the default factory has none.
 
 ## Its instruction
 
-A factory has one instruction: what Nemia is to know about this body of work, in markdown. By default it is `NEMIA.md` at the root of
-the factory's first repository, edited with the code it speaks of. The factory's file may point at another file of that repository,
-or keep the words in your store instead, for a repository you would rather not write into.
+A factory has one instruction file: what Nemia should know about this body of work, in Markdown. By default it is `NEMIA.md` at the
+root of the factory's first repository, edited alongside the code it describes. The factory's file can point to another file in that
+repository instead, or keep the text in your store, for a repository you'd rather not write to.
 
 - [Nemia](/nemia/) reads it before she acts in the factory.
-- The board shows it on the factory's settings page, and the api serves it (`packages/agent-orchestrator/src/factory/instruction.store.ts`).
-- It is not told to a step. What every agent hired into the factory must know belongs in [its rules](#its-rules), and what holds in
-  one repository in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`: the fourth and the third of an agent's
-  [instruction layers](/agents/#what-an-agent-is-told-five-layers).
+- The board shows it on the factory's settings page, and the API serves it
+  (`packages/agent-orchestrator/src/factory/instruction.store.ts`).
+- Steps don't receive it. What every agent hired into the factory must know belongs in [its rules](#its-rules). What applies in one
+  repository belongs in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`. Those are the fourth and the third of an
+  agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers).
 
 ## Its revisions
 
-A run keeps the workflow, agents, skills and rules it resolved: a fix merged while it runs does not reach it by itself. A factory says
-whether it should, with one key, `revisions`, in its file, as a Pod's `imagePullPolicy` says whether a container takes a newer image:
+A run keeps the workflow, agents, skills, and rules it resolved: a fix merged while it runs doesn't reach it on its own. A factory
+decides whether it should, with one key in its file, `revisions`. It works like a Pod's `imagePullPolicy`, which decides whether a
+container picks up a newer image:
 
-- `pinned`, the default, as `IfNotPresent`: a run keeps what it resolved at its first filing until a person refreshes it, with
-  `nemia refresh <run>`.
-- `follow`, as `Always`: every new filing of a run, a step, a retry or a round, is filed on the revisions the files hold then, as
-  `nemia refresh` would take them. What was already filed is not run again, and the run's steps are neither added nor removed.
-  `nemia refresh` is refused of such a run, since there is nothing to ask for. A step already filed is judged by what it was filed
-  with: a field its agent's output schema gains later is owed by that step's next filing, a retry or a round, never by a try that has
-  ended, so following a revision never turns a step that signed off unsigned.
+- `pinned`, the default, like `IfNotPresent`: a run keeps what it resolved the first time it started a step, until a person refreshes
+  it with `nemia refresh <run>`.
+- `follow`, like `Always`: every new step start, retry, or round uses the revisions the files hold at that moment, as
+  `nemia refresh` would. Nothing already started runs again, and no steps are added to or removed from the run. `nemia refresh` is
+  rejected for such a run, since there is nothing to request. A step already started is judged by what it started with. If its
+  agent's output schema gains a field later, the step only owes that field on its next start (a retry or a round), never on a try
+  that has ended. So following a revision never turns a signed-off step back into an unsigned one.
 
-A run that has filed nothing takes the files afresh at its first filing either way.
+Either way, a run that hasn't started any step yet picks up the current files when it starts its first one.
 
-- `nemia factory revisions <name> follow` (or `pinned`) writes it, and `nemia factory ls` prints it under the factory.
-- A factory made from a template says it in its manifest, as `spec.revisions`, which the render writes into its tree's wiring;
-  `nemia factory revisions` writes the wiring after.
-- Every pass of the daemon reads it, so a run in flight takes a change of it at its next filing.
+- `nemia factory revisions <name> follow` (or `pinned`) sets it, and `nemia factory ls` shows it under the factory.
+- A factory created from a template sets it in its manifest, as `spec.revisions`, which the render writes into the file of its tree
+  that records its attached workflows and hires. `nemia factory revisions` writes that file afterwards.
+- The daemon reads it on every pass, so a run in progress picks up a change at its next step start.
 
 ## Change a template's parameter
 
-A factory made from a template keeps the parameters it was applied with in its file (`template.params`). To change one without a new
-version of the template, preview it at the version the factory is applied at, then type the line the preview prints last:
+A factory created from a template keeps the parameters it was applied with in its file (`template.params`). To change one without a
+new template version, preview the change at the version the factory is on, then run the command the preview prints last:
 
 ```bash
 nemia factory diff pipao --to 2.5.0 --set ciCheck=build          # 2.5.0, the version applied
 nemia factory upgrade pipao --to 2.5.0 --set ciCheck=build --plan sha256:…
 ```
 
-The preview merges three ways, as an upgrade does: the base is the template at that version rendered with the parameters the factory
-was applied with, ours is its tree, and theirs is the template rendered with the new ones. The upgrade writes the parameters into the
-factory's file, held to the plan you previewed, and the daemon merges on its next pass, waiting on `nemia factory resolve` where your
-tree changed the same line. A parameter changed in the file by hand is merged the same way. A template whose files changed under the
-version the factory was applied at is still refused: give it a new version, and upgrade to that.
+The preview does a three-way merge, like an upgrade. The base is the template at that version, rendered with the factory's original
+parameters. Ours is the factory's tree. Theirs is the template rendered with the new parameters. The upgrade writes the parameters
+into the factory's file, bound to the plan you previewed, and the daemon merges on its next pass. Where your tree changed the same
+line, it waits for `nemia factory resolve`. A parameter changed by hand in the file is merged the same way. If the template's files
+changed without a new version number, the change is still rejected: publish a new version, and upgrade to that.
 
-A conflict in a file an object of the tree holds is resolved by a proposal of that object, its owner:
+A conflict in a file that belongs to an object of the tree is resolved by a proposal of that object, its owner:
 
-| The conflicted file                                                                   | Its owner                                      |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| A text file directly in a workflow's folder: a step, its README, a script beside them | that Workflow, its other files in `spec.files` |
-| An agent's file, or the result schema beside it                                       | that Agent, its schema in `spec.output`        |
-| A text file of a skill's folder, at any depth                                         | that Skill, its other files in `spec.files`    |
-| A step's hire in the factory's file (`hires`)                                         | the Hire named `<workflow>.<step>`             |
-| The rules and the instruction, RULES.md and NEMIA.md                                  | the Factory itself                             |
+| The conflicted file                                                                    | Its owner                                      |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| A text file directly in a workflow's folder: a step, its README, a script next to them | that Workflow, its other files in `spec.files` |
+| An agent's file, or the result schema next to it                                       | that Agent, its schema in `spec.output`        |
+| A text file in a skill's folder, at any depth                                          | that Skill, its other files in `spec.files`    |
+| A step's hire in the factory's file (`hires`)                                          | the Hire named `<workflow>.<step>`             |
+| The rules and the instruction file, RULES.md and NEMIA.md                              | the Factory itself                             |
 
-`nemia factory resolve` records each choice, and once every conflict of an owner has one it proposes that object as the choices compose
-it, at the version it is at now, and prints the line that approves it, `nemia proposals approve <proposal> -n <factory>`. The daemon
-merges once each such proposal has applied; declined, or gone stale, the factory's status says to resolve again. A choice that would
-remove a skill, the rules or the instruction, which no proposal removes, is refused, and the choice kept: keep it with `--ours`, or give
-a file.
+`nemia factory resolve` records each choice. Once every conflict of an owner has a choice, it proposes that object as the choices
+make it, at its current version, and prints the command that approves it: `nemia proposals approve <proposal> -n <factory>`. The
+daemon merges once each such proposal has been applied. If one is declined or goes stale, the factory's status tells you to resolve
+again. A choice that would remove a skill, the rules, or the instruction file (which no proposal can remove) is rejected, and the
+choice is kept: keep the existing version with `--ours`, or provide a file.
 
-Every other conflict is settled by its choice alone: the factory file's other keys (its revisions policy is your setting) or that file
-whole, a file nested deeper in a workflow's folder, and a file that is not text. A carried file, in the tree's carried folder, a script a
-check runs, stays your choice too: every workflow shares it, so no object holds it, and a proposal's access judgement reads what an
-agent may do, not what a script does. Giving carried files a kind of their own waits on a way to judge that code.
+Every other conflict is settled by your choice alone. That covers the factory file's other keys (its revisions policy is your
+setting) or the whole file, a file nested deeper in a workflow's folder, and a file that isn't text. A carried file, in the tree's
+carried folder (a script that a check runs), also stays your choice. Every workflow shares it, so no object owns it, and a proposal's
+access review judges what an agent may do, not what a script does. Giving carried files their own kind waits on a way to review that
+code.
 
 ## Move it to another store
 
-A factory moves from one store to another, from your laptop's to a server's say, with no shell on either machine. Each store is a
-[context](/install/#a-client-of-another-machine) of `nemia config`: `--to` names the store it moves to, and `--from` the store it is in,
-the context in use when left out.
+You can move a factory from one store to another, such as from your laptop to a server, without a shell on either machine. Each store
+is a [context](/install/#a-client-of-another-machine) in `nemia config`. `--to` names the destination store, and `--from` the store
+the factory is in now (by default, the current context).
 
 ```bash
 nemia factory move shop --to vps
 nemia factory move shop --from local --to vps --repo /home/me/code/shop=https://example.com/me/shop.git --volume notes=/srv/notes
 ```
 
-What follows the factory:
+What moves with the factory:
 
-- Its file, with the template, version and parameters it was applied with, so a later `nemia factory upgrade` on the target still
-  merges three ways against the base it was applied at.
-- Its folder: its tree with every edit made to it, its level, its MCP servers, its harness settings, its schedules, its cost lines and
-  its revisions policy.
-- Its cards in play that no run has started. Each is filed on the target without `repo:`, `from:` and `queued:`, so none starts before
-  you trust the factory there, and its text ends with a line naming the card it was on the source. `--cards stay` leaves them all.
+- Its file, with the template, version, and parameters it was applied with. So a later `nemia factory upgrade` on the target still
+  does a three-way merge against the original base.
+- Its folder: its tree with every edit made to it, its level, its MCP servers, its harness settings, its schedules, its cost lines,
+  and its revisions policy.
+- Its open cards that no run has started. Each is created on the target without `repo:`, `from:`, and `queued:`, so none starts until
+  you trust the factory there. Each card's text ends with a line naming the card it was on the source. `--cards stay` leaves them all
+  behind.
 
-What stays on the source: its runs, the cards a run was started from, and its folder's proposals and delegations, which name the
+What stays on the source: its runs, the cards runs were started from, and its folder's proposals and delegations, which refer to the
 source's runs and callers.
 
-- **Repositories** are cloned on the target from their origins. One with no origin, or one you would rather take from elsewhere, is
-  given with `--repo <source>=<url|path>`, its path in the source's file on the left; one with neither is refused, naming the flag.
-- **Volumes** keep their path where the target takes it, judged as `nemia factory volume add` judges one there. Where it does not, the
-  move is refused, naming the `--volume <name>=<path>` to give: the volume's name, or its path on the source where it has none.
-  A folder inside the target's store is refused as `nemia factory volume add` refuses one there, a clone another factory works on
-  included: mount a folder outside the store.
-- **Nothing is written on the target** when the move is refused or fails partway: no file, no folder, no card. A repository already
-  cloned may remain on its disk, and a second try reuses it.
-- **The move never trusts the factory.** Type `nemia factory trust <name>` under the target's context once you have read what it
+- **Repositories** are cloned on the target from their origins. For one with no origin, or one you'd rather take from elsewhere, use
+  `--repo <source>=<url|path>`, with its path in the source's file on the left. A repository with neither is rejected, with the flag
+  to use.
+- **Volumes** keep their path if the target accepts it, judged the way `nemia factory volume add` judges one there. If it doesn't,
+  the move is rejected, with the `--volume <name>=<path>` to use: the volume's name, or its source path if it has no name. A folder
+  inside the target's store is rejected just as `nemia factory volume add` would reject it there, including a clone another factory
+  works on: mount a folder outside the store.
+- **Nothing is written on the target** if the move is rejected or fails partway: no file, no folder, no card. A repository already
+  cloned may stay on disk, and a second try reuses it.
+- **The move never trusts the factory.** Run `nemia factory trust <name>` in the target's context once you have reviewed what it
   trusts.
-- **An MCP server's sign-in does not follow.** Its token is kept in the runtime's or the harness's own store on the machine whose daemon signed in, not
-  in the factory's folder: on the target, press _Sign in_ on the server's row again ([from a remote
-  browser](/install/#signing-in-from-a-remote-browser) where the daemon runs on a server).
-- **The source keeps its factory**, untouched, until you type `nemia factory rm <name>` under the source's context. Until then both
-  stores have it, and both may fire its schedules.
+- **MCP server sign-ins don't move.** A server's token is kept in the runtime's or the harness's own store, on the machine whose
+  daemon signed in, not in the factory's folder. On the target, click _Sign in_ on the server's row again
+  ([from a remote browser](/install/#signing-in-from-a-remote-browser) if the daemon runs on a server).
+- **The source keeps its factory**, untouched, until you run `nemia factory rm <name>` in the source's context. Until then, both
+  stores have it, and both may run its schedules.
 
-Both daemons must run your client's release: upgrade an older one first.
+Both daemons must run the same release as your client: upgrade an older one first.
 
 ## Open its home yourself
 
-A factory made from a template may have a home: the folder its steps' sessions start in, with its `CLAUDE.md`, its skills under
-`.claude/`, its settings and its `.mcp.json`. To see what its agents see, open a Claude Code session of your own there:
+A factory created from a template can have a home: the folder its steps' sessions start in, with its `CLAUDE.md`, its skills under
+`.claude/`, its settings, and its `.mcp.json`. To see what its agents see, open your own Claude Code session there:
 
 ```bash
 nemia factory home shop                       # this folder added beside the home
 nemia factory home shop ~/code/shop --claude-md on
 ```
 
-- **The home is a copy, read-only.** `nemia` asks the daemon of the context in use for the home and writes it under your cache,
-  `${XDG_CACHE_HOME:-~/.cache}/nemia/homes/<context>/<factory>/<digest>/`, named as a run names its copy. No file of it is writable and
-  the session is denied editing it: a home changes only by a proposal. Opening it again after the home changed writes a new copy and
-  removes the older ones; the copies of a factory you removed stay until you delete that folder.
-- **Your repository is added beside it**, the folder you typed the command in unless you name one, writable as usual. Its own
-  `CLAUDE.md` is loaded only with `--claude-md on`, as a volume's switch says for a step. A repository inside the copy, or one holding
-  it, is refused.
-- **The factory's Settings page gives the line**, `nemia factory home <factory>`, in its Home card with a button that copies it, where
-  the factory has a home.
-- **Only the home's settings are read** (`--setting-sources project`), as a step's session reads them: your own settings, hooks and
-  user `CLAUDE.md` do not apply. For your own, open a plain session instead.
-- **Claude Code asks what a step is never asked**: to trust the copy's folder, and to approve the home's `.mcp.json` servers, once for
-  each new copy. A run's own copy is trusted for its sessions by Nemia as the run starts, so the allow rules of the home's settings
-  apply to its steps, and that trust is taken back when you remove the run (`nemia rm`). Where Claude Code's own settings file cannot
-  take the trust (it does not read as JSON, or the store's user cannot write it), `nemia start` is refused, naming the file.
+- **The home is a read-only copy.** `nemia` asks the current context's daemon for the home and writes it to your cache,
+  `${XDG_CACHE_HOME:-~/.cache}/nemia/homes/<context>/<factory>/<digest>/`, named the same way a run names its copy. None of its files
+  are writable, and the session is denied edits to it: a home only changes through a proposal. Opening it again after the home
+  changed writes a new copy and removes older ones. Copies of a factory you removed stay until you delete that folder.
+- **Your repository is added next to it**: the folder you ran the command in, unless you name another, writable as usual. Its own
+  `CLAUDE.md` is loaded only with `--claude-md on`, matching a volume's switch for a step. A repository inside the copy, or one
+  containing it, is rejected.
+- **The factory's Settings page shows the command**, `nemia factory home <factory>`, in its Home card, with a button that copies it,
+  when the factory has a home.
+- **Only the home's settings are read** (`--setting-sources project`), the same as for a step's session. Your own settings, hooks, and
+  user `CLAUDE.md` don't apply. To use yours, open a regular session instead.
+- **Claude Code asks you things a step is never asked**: to trust the copy's folder, and to approve the home's `.mcp.json` servers,
+  once for each new copy. Nemia trusts a run's own copy for its sessions when the run starts, so the allow rules in the home's
+  settings apply to its steps. That trust is revoked when you remove the run (`nemia rm`). If Claude Code's own settings file can't
+  record the trust (it isn't valid JSON, or the store's user can't write to it), `nemia start` is rejected, naming the file.
 
-It needs `claude` on your PATH, and a factory with a home: one made by hand has none, and is refused naming how to take it over by a
-template.
+You need `claude` on your PATH, and a factory with a home. A factory created by hand has none, and is rejected with instructions for
+adopting a template.
 
 ## Sources
 
-This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
-_A factory's instruction_, and _Five layers_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
+This page is based on `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
+_A factory's instruction_, and _Five layers_), and on `packages/agent-orchestrator/src/factory/factory.ts`,
 `packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts`,
 `packages/agent-orchestrator/src/revisions/pin.verb.ts`, `packages/agent-orchestrator/src/factory/rules/rules.store.ts`,
 `packages/agent-orchestrator/src/factory/upgrade/upgrade.verb.ts`, `packages/agent-orchestrator/src/factory/applied/applied.verb.ts`,
 `packages/objects/src/commands-factories-move.ts`, `packages/objects/src/factory-move.ts`,
-`packages/agent-orchestrator/src/factory/servers/sign-in.verb.ts` and `packages/agent-orchestrator/src/trust/home.verb.ts`.
+`packages/agent-orchestrator/src/factory/servers/sign-in.verb.ts`, and `packages/agent-orchestrator/src/trust/home.verb.ts`.

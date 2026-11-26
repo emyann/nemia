@@ -215,6 +215,8 @@ describe('a person reads the agents: both places listed, one read by name, the c
         '---\ndescription: Carries notes.\nskills: pass-a-note\ntools: Read, Skill\n---\nCarry it.\n',
       );
       try {
+        const numbered = await send('POST', '/api/agents/user', { ...scribe, name: 'numberer' });
+        assert.equal(numbered.status, 201, 'a write sweeps the index, so the courier stands at a revision a hand edit then moves');
         const courier = (await listed()).find((a) => a.name === 'courier')!;
         assert.deepEqual(courier.card, [
           { id: 'pass-a-note', name: 'Pass a note', description: 'Hands a note on.', tags: ['pass-a-note'] },
@@ -229,7 +231,7 @@ describe('a person reads the agents: both places listed, one read by name, the c
           edited.card?.map((s) => [s.name, s.tags]),
           [['Pass a note on', ['note']]],
         );
-        assert.notEqual(edited.version, courier.version, 'the SKILL.md is digested with the agent');
+        assert.notEqual(edited.version, courier.version, 'the SKILL.md moves the agent: a hand edit reads as the next revision');
         await refused(
           send('PUT', '/api/agents/user/courier', {
             name: 'courier',
@@ -281,6 +283,7 @@ describe('a person reads the agents: both places listed, one read by name, the c
       } finally {
         fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
         fs.rmSync(path.join(AGENTS, 'courier.md'), { force: true });
+        fs.rmSync(path.join(AGENTS, 'numberer.md'), { force: true });
       }
     },
   );

@@ -10,7 +10,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk';
-import { mcpServersRead, MCP_STATE_MS, type McpStatusAsk } from './mcp-state.ts';
+import { mcpServersRead, MCP_SETTLE_MS, MCP_STATE_MS, settledStatus, type McpStatusAsk } from './mcp-state.ts';
 import { mcpStateRefusal } from '../service/options.ts';
 import { mcpServerOf } from './mcp.ts';
 import type { RemoteMcpServer } from './seam.ts';
@@ -137,6 +137,43 @@ describe('mcpServersRead: one session for a record, a failed look answered as a 
     assert.equal(read.read, false, 'the bound answers that the look failed');
     await waited;
     assert.equal(stopped, 'the ask was stopped by the bound', 'and the ask is aborted: losing the race does not stop what lost it');
+  });
+});
+
+describe('settledStatus: a session is asked again while a server says pending, and its last answer is carried', () => {
+  /** A session's status that answers each of `answers` in turn, the last one for ever, counting the asks. */
+  const answering = (...answers: (readonly McpServerStatus[])[]) => {
+    let asked = 0;
+    const status = async () => answers[Math.min(asked++, answers.length - 1)];
+    return { status, asked: () => asked };
+  };
+  test('pending, then needs-auth: the settled word, from the same session, as the hosted GitHub server answers with no token', async () => {
+    const { status, asked } = answering([statusOf('github', 'pending')], [statusOf('github', 'needs-auth')]);
+    assert.deepEqual(await settledStatus(status, new AbortController().signal, 1_000, 1), [statusOf('github', 'needs-auth')]);
+    assert.equal(asked(), 2, 'asked once more, and no more once nothing was pending');
+  });
+  test('an answer with nothing pending is carried at once: one ask', async () => {
+    const { status, asked } = answering([statusOf('github', 'connected'), statusOf('docs', 'failed')]);
+    await settledStatus(status, new AbortController().signal, 1_000, 1);
+    assert.equal(asked(), 1);
+  });
+  test('a server that never settles is carried pending once the window is past, not failed', async () => {
+    const { status, asked } = answering([statusOf('github', 'connected'), statusOf('docs', 'pending')]);
+    const said = await settledStatus(status, new AbortController().signal, 20, 1);
+    assert.deepEqual(
+      said.map((s) => s.status),
+      ['connected', 'pending'],
+    );
+    assert.ok(asked() > 1, 'it was asked again inside the window');
+    assert.ok(MCP_SETTLE_MS < MCP_STATE_MS, "and the shipped window ends inside the read's bound, so a slow server is carried, not a failed look");
+  });
+  test("the caller's bound stops the asking: no ask follows once it fired", async () => {
+    const stop = new AbortController();
+    const { status, asked } = answering([statusOf('github', 'pending')]);
+    const settling = settledStatus(status, stop.signal, 60_000, 60_000);
+    stop.abort();
+    assert.deepEqual(await settling, [statusOf('github', 'pending')]);
+    assert.equal(asked(), 1);
   });
 });
 

@@ -6083,7 +6083,9 @@ harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disable
 page lists a factory's servers with a chip each, read when the page opens and again on a **Check again** press, never on the board's
 minute poll (the owner, at the design gate of 2026-10-21); Capabilities shows the same chip for a server the default factory records. A
 pass refuses to start a Claude Code step whose named server reports `needs-auth`, once per pass for the whole factory, and says what to
-do; a look that failed refuses nothing, since an absence read off a failed look is not an absence.
+do; a look that failed refuses nothing, since an absence read off a failed look is not an absence. Since 2026-11-26 the read asks its
+session again while a server says `pending`, up to `MCP_SETTLE_MS`, and a server whose record has `oauth` holds its steps back, and is
+offered Sign in on the settings page, at `pending` and `failed` too: a GitHub with no token read `pending` on every first ask.
 
 The package's `servers/<name>.json` (`workflows/servers/` until 2026-10-31) is the shipped list; card 2 put GitHub's in it.
 

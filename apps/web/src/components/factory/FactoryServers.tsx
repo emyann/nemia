@@ -334,7 +334,7 @@ function ServerList({
             pending={pending}
             removing={server.name === removing}
             onRemove={onRemove}
-            signIn={server.oauth && <ServerSignIn factory={factory} server={server.name} state={server.state} />}
+            signIn={<ServerSignIn factory={factory} server={server.name} state={server.state} oauth={server.oauth !== undefined} />}
           />
         ))}
       </ul>

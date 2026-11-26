@@ -41,7 +41,7 @@ type Rendered = { tree: string; store: string };
  * A step's checks as one shell line, each joined to the one before it by `&&`: the order the pass runs sdlc's chained checks in, each
  * filed only once the one above it passed, so the line refuses where the first refusing check would; the step's `check:` where it has one.
  */
-const chainOf = (step: { check?: string; checks?: readonly { run: string }[] } | undefined) =>
+const chainOf = (step: { check?: string; checks?: readonly { run?: string | undefined }[] } | undefined) =>
   step?.checks ? step.checks.map((c) => c.run).join(' && ') : step?.check;
 
 function stepsOf(at: Rendered, workflow: string) {

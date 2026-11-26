@@ -624,7 +624,7 @@ describe("an upgrade onto a version whose step writes named checks: the tree's o
     const keys = readKeys('implement', splitFrontmatter('implement', text).block ?? '', () => undefined, MAP_KEYS).meta;
     assert.equal(keys.check, undefined, "the tree's `check:` gone");
     assert.deepEqual(
-      checksOf('implement', keys.check, keys.checks)?.map((c) => [c.name, c.run, c.after]),
+      checksOf('implement', keys.check, keys.checks)?.map((c) => [c.name, 'run' in c ? c.run : c.condition, c.after]),
       [
         ['test', 'npm test', []],
         ['lint', 'npm run lint', ['test']],

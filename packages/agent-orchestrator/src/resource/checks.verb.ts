@@ -42,7 +42,7 @@ export type StepCheck = {
     message: string | null;
     writtenAt: string | null;
     lastTransitionTime: string | null;
-    writer: null;
+    writer: { factory: string; program: string; phase: 'Pending' | 'Running' | 'Restarting' | 'Down'; message: string } | null;
   };
   refused: {
     exit: string;

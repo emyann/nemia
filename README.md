@@ -7,6 +7,10 @@
 Nemia runs teams of agents. You give it a piece of work, written as a card; a team of agents does it in steps, and a person decides
 where it matters. What comes out is a landing: the work merged on your base branch, after a check has passed on the merged tree.
 
+[![A one-minute film of Nemia: the install line, the board's welcome, a card as a run of agent steps, a gate and a landing](docs/film/poster.png)](docs/film/nemia.mp4)
+
+A film of a minute, silent, with captions. It shows the board as its tests draw it.
+
 ## Install
 
 ```bash

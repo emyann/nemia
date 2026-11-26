@@ -89,8 +89,8 @@ runs the tests of what she changed, the types and the lint, as the repository's 
 repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through the
 carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its checks are the receipt that the merge happened, then
 `base-ci`, which runs once the checkout is given back to the next run's ending —
-`build`'s land step to the letter but its `after:` and its gate (check, fence and budget, and its note, which is `build`'s own
-`land.md`, which the step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
+`build`'s land step to the letter (check, fence, budget, no gate, and its note, which is `build`'s own `land.md`, which the
+step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
 `landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, installs the merged tree's
 dependencies where the factory names its `landingInstall`, derives those files again and pushes,
 and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
@@ -134,7 +134,7 @@ records the commit on its check's exit 0.
 
 A person who wants to read the change themselves before it lands puts the gate back for that run: `nemia start "<the card>"
 --workflows quick --gate land`, or `gate: land` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
-landing then waits for `nemia approve <run> land` exactly as build's does. Implement and review are told so, each under
+landing then waits for `nemia approve <run> land`. Implement and review are told so, each under
 `## Gates after you` in its brief, which names every gate after the step and is left out where there is none: review's note says
 both cases, and a review of a gated run passes a card that waits on the person at its land, since that gate meets it.
 

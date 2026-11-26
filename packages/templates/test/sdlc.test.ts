@@ -740,19 +740,24 @@ const quickReviewBrief = (gates: string[]) => {
   return composeBrief(steps[1], run, steps);
 };
 
-describe("quick's review note says both cases of its land, and the run tells review which by the heading the note names", () => {
-  for (const name of ['set', 'plain'])
-    test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
-      const note = stepIn(treeOf(name), 'quick', 'review').body;
-      assert.ok(note.includes(`With no \`${GATES_AFTER}\`, your pass lands the change`), 'the case with no gate: the pass lands');
-      assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
-      assert.ok(note.includes('no reason to sign off `blocked`'), 'a card that waits on the person at its land is met by the gate');
-      assert.ok(!/^\*\*Your pass lands the change\.\*\*/m.test(note), 'no paragraph says the pass lands, whatever the gates');
-      const pages = note.slice(note.indexOf('**A claim on a page you cannot read'));
-      assert.ok(pages.includes(`With no \`${GATES_AFTER}\`, it stops the landing`), 'a page claim blocks where no gate follows');
-      assert.ok(pages.includes('With `land` named there, it goes at the top of your sign-off'), 'and goes to the person at land');
-      assert.ok(!/^\*\*A claim on a page you cannot read stops the landing\.\*\*/m.test(note), 'never stops it whatever the gates');
-    });
+/** Where each review note's paragraph on a page claim opens, by workflow. */
+const PAGES_AT = { build: '**Check the outside pages the spec rests on.**', quick: '**A claim on a page you cannot read' } as const;
+
+describe("build's and quick's review notes say both cases of their land, and the run tells review which by the heading the notes name", () => {
+  for (const workflow of ['build', 'quick'] as const)
+    for (const name of ['set', 'plain'])
+      test(`${workflow}, rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
+        const note = stepIn(treeOf(name), workflow, 'review').body;
+        assert.ok(note.includes(`With no \`${GATES_AFTER}\`, your pass lands the change`), 'the case with no gate: the pass lands');
+        assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
+        assert.ok(note.includes('no reason to sign off `blocked`'), 'a card that waits on the person at its land is met by the gate');
+        assert.ok(!/^\*\*Your pass lands the change\.\*\*/m.test(note), 'no paragraph says the pass lands, whatever the gates');
+        assert.ok(note.includes(PAGES_AT[workflow]), 'the page claim paragraph opens where the test slices it');
+        const pages = note.slice(note.indexOf(PAGES_AT[workflow]));
+        assert.ok(pages.includes(`With no \`${GATES_AFTER}\`, it stops the landing`), 'a page claim blocks where no gate follows');
+        assert.ok(pages.includes('With `land` named there, it goes at the top of your sign-off'), 'and goes to the person at land');
+        assert.ok(!/^\*\*A claim on a page you cannot read stops the landing\.\*\*/m.test(note), 'never stops it whatever the gates');
+      });
   test('a run started with `--gate land` tells review so under that heading, naming land', () => {
     const gated = quickReviewBrief(['land']);
     const section = gated.slice(gated.indexOf(GATES_AFTER));

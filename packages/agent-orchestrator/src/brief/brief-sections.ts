@@ -104,11 +104,26 @@ export function headingOf(heading: TaskHeading, ...fills: readonly (string | num
 }
 
 /**
+ * What a try that continues the session of a loop's target past round 1 is told, inside its `## Try <n>`: its sign-off owes `replies`
+ * again, in full. The session replied in an earlier try of the round, and, handed a check's refusal alone, reads the refusal as all that is
+ * asked of it and signs with an empty list, which reads as unsigned (`declaredOutput`). Nothing is carried forward from that earlier try.
+ */
+export const REPLIES_OWED = [
+  `Your sign-off owes \`${LOOP_REPLIES}\` again, in full: one for each finding of this round, as true now, those your earlier try in this`,
+  `round answered included. The run reads only this sign-off's \`${LOOP_REPLIES}\`, and an empty list reads as unsigned: nothing that`,
+  'waits on this step starts.',
+].join('\n');
+
+/** `REPLIES_OWED`, as `retrySection` places it, where a continued try owes `replies`; nothing where it does not. */
+const repliesOwed = (owed: boolean) => (owed ? ['', REPLIES_OWED] : []);
+
+/**
  * For a new session of a loop's target within a round past the first — a fresh try, or a continue with no session left to continue — the
  * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
- * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`). The
- * section is given as continuing (`resumed: true`), since `retrySection` has said the session is new.
+ * already, and `retrySection` tells it only that its sign-off owes them again (`REPLIES_OWED`). `closeoutOf` answers for the looping
+ * step with its try that asked (`askingTry`, in `advance`). The section is given as continuing (`resumed: true`), since `retrySection`
+ * has said the session is new.
  * @param step The loop's target.
  * @param run The run.
  * @param steps The run's steps.
@@ -334,13 +349,17 @@ const refusedSections = (r: RetryBriefing) => [
  * @param step The step tried again.
  * @param r The try, and what became of the one before it.
  * @param inFolder Whether the step is of a folder run, told of its folder rather than a branch; false where absent.
+ * @param owed Whether the try continues the session of a loop's target that owes `replies` (`owesReplies`): told so (`REPLIES_OWED`),
+ * before what the check said; false where absent.
  */
-export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false) {
+export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false, owed = false) {
+  const replies = repliesOwed(owed);
   const pastBudget =
     r.pastCap && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
       : [];
-  if (r.by === 'signoff' && r.resumed) return ['', headingOf('Try <n>', r.try), '', signoffSaid(r), ...saidSection(r.said)].join('\n');
+  if (r.by === 'signoff' && r.resumed)
+    return ['', headingOf('Try <n>', r.try), '', signoffSaid(r), ...replies, ...saidSection(r.said)].join('\n');
   const who = whoOf(step, r);
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
@@ -367,6 +386,7 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
     who,
     '',
     where,
+    ...replies,
     ...told,
     ...answer,
     ...denied,

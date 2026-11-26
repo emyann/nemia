@@ -13,7 +13,7 @@
  * - `query().mcpSubmitOAuthCallbackUrl(name, callbackUrl)` hands the child the address the browser was sent back to, for a browser
  *   that runs on another machine than the child, whose redirect never reaches that port (`sdk.mjs` 0.3.322, 0.3.323 and 0.3.325).
  *
- * This file is the browser road: a server whose provider offers a code signs in by `mcp-device.ts` instead, and Nemia holds its token.
+ * This file is the browser road: a server whose provider offers a code signs in by `mcp-device.ts`, and the runtime holds its token.
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';

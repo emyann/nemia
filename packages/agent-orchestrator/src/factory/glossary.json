@@ -339,8 +339,7 @@
     },
     {
       "term": "Sign-in road",
-      "meaning": "how a server of a factory's record is signed in to from the board, chosen by the runtime from what the server's provider advertises (its OAuth metadata, RFCs 9728 and 8414): by a code the person types at the provider's page (`device`, RFC 8628), which Nemia polls for and then holds the token of, handing it to each session as the server's `Authorization` header and refreshing it with no person present; or by the browser (`browser`), Claude Code's own sign-in, whose redirect the person pastes back (`SignInRoute`, `packages/objects/src/words.ts`; `packages/agent-runtime/src/harness/mcp-device.ts`).",
-      "type": "SignInRoute"
+      "meaning": "how a server of a factory's record is signed in to from the board, chosen by the runtime from what the server's provider advertises (its OAuth metadata, RFCs 9728 and 8414): by a code the person types at the provider's page (`device`, RFC 8628), which Nemia polls for and then holds the token of, handing it to each session as the server's `Authorization` header and refreshing it with no person present; or by the browser (`browser`), Claude Code's own sign-in, whose redirect the person pastes back (`SIGN_IN_ROUTES`, `packages/objects/src/words.ts`; `packages/agent-runtime/src/harness/mcp-device.ts`)."
     }
   ]
 }

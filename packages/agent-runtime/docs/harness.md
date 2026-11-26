@@ -490,7 +490,7 @@ by `harness/mcp-device.ts` instead, and no longer stores a client secret through
 
 **A sign-in by a code, and the token the runtime holds (2026-11-26, Agent SDK 0.3.325).** The SDK runs no OAuth flow itself: its MCP page
 (`code.claude.com/docs/en/agent-sdk/mcp`) says a host that completes the flow passes the access token in the server's `headers`
-(`McpHttpServerConfig.headers`, `sdk.d.ts:1284`), and a server with no usable token reads `needs-auth`. So for a server whose provider
+(`McpHttpServerConfig.headers`, `sdk.d.ts:1284-1300`), and a server with no usable token reads `needs-auth`. So for a server whose provider
 advertises the device grant (RFC 8628) — read from its protected resource metadata (RFC 9728) then its authorization server's (RFC 8414),
 GitHub's at `https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/` and
 `https://github.com/.well-known/oauth-authorization-server/login/oauth` — the runtime asks the provider's device endpoint for a code with

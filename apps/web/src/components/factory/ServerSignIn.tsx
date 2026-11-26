@@ -15,7 +15,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, TextField } from '@/components/ui/ds';
+import { Body, Button, TextField } from '@/components/ui/ds';
 import { Pending, TEXT_LINK } from '@/components/look';
 import { Instant } from '../time/Instant';
 import {
@@ -125,9 +125,9 @@ function Waiting({
           </a>{' '}
           and approve {name} there:
         </p>
-        <p data-sign-in-code className="font-mono text-headline-medium tracking-widest text-on-surface select-all">
+        <Body size="large" component="p" data-sign-in-code className="font-mono tracking-widest text-on-surface select-all">
           {started.userCode}
-        </p>
+        </Body>
         <div className="flex flex-wrap items-center gap-3">
           {cancel}
           <span className="text-body-small text-on-surface-variant">

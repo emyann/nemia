@@ -9,7 +9,7 @@
  * the device code; an engine with no Claude Code harness spawns nothing; and an address pasted back is handed to the waiting session
  * only when it is that sign-in's redirect with a code and a state, never quoted in a refusal.
  */
-import { afterAll, afterEach, beforeAll, describe, test } from 'vitest';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import fs from 'node:fs';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -154,18 +154,19 @@ test('REFUSED: two sign-ins asked at once on one port, the first not yet answere
   const s = seams();
   let answer = () => {};
   const late = new Promise<void>((r) => (answer = r));
-  const slowCli: McpCli = async (args) => {
-    s.cli.push(args);
-    if (s.cli.length === 1) await late;
-    return { code: 0, out: '' };
+  let asking = false;
+  const slowAsk: McpSignInAsk = async (...args) => {
+    asking = true;
+    await late;
+    return s.ask(...args);
   };
-  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: slowCli, ask: s.ask, route: s.route });
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: slowAsk, route: s.route });
   const first = Effect.runPromise(v.mcpSignIn('github', GITHUB));
-  await until(() => s.cli.length > 0);
+  await until(() => asking);
   const second = await refusalOf(v.mcpSignIn('other', { ...GITHUB, url: 'https://other.example/mcp' }));
-  assert.deepEqual([second._tag, second.held], ['McpSignInRefused', true], 'the port is held from the first child on');
+  assert.deepEqual([second._tag, second.held], ['McpSignInRefused', true], 'the port is held from the first ask on');
   const out = await refusalOf(v.mcpSignOut('github', GITHUB));
-  assert.deepEqual([out._tag, out.held], ['McpSignInRefused', true], 'nothing to sign out of while one is started');
+  assert.deepEqual([out._tag, out.held], ['McpSignInRefused', true], 'nothing to cancel while one is started');
   answer();
   await first;
   assert.equal(s.sessions.length, 1, 'one session listens on the port');
@@ -280,11 +281,11 @@ describe('a person signs in by a code the provider takes, and their token is hel
   const TOKEN = 'https://github.com/login/oauth/access_token';
   const server = setupServer();
   beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
-  afterEach(() => server.resetHandlers());
   afterAll(() => server.close());
 
   const provider = (polls: Array<Record<string, unknown>>) => {
     let polled = 0;
+    server.resetHandlers();
     server.use(
       http.get('https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/', () =>
         HttpResponse.json({ authorization_servers: ['https://github.com/login/oauth'] }),
@@ -403,6 +404,7 @@ describe('a person signs in by a code the provider takes, and their token is hel
   });
 
   test('REFUSED: a provider that cannot be reached is refused, not fallen through to the browser road', async () => {
+    server.resetHandlers();
     server.use(http.get('https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/', () => HttpResponse.error()));
     const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { pace: 0.001 });
     const err = await refusalOf(v.mcpSignIn('github', DEVICE_GITHUB));

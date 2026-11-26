@@ -39,7 +39,10 @@ const view = (shown: SignInShown, refused: string | null = null, pasted = '') =>
 );
 
 /** A sign-in by a code started: the code in large type, the provider's page to type it at, when it stops, and Cancel. */
-export const WaitingByCode: StoryObj = { render: () => view({ at: 'waiting', started: DEVICE }) };
+export const WaitingByCode: StoryObj<{ started: typeof DEVICE }> = {
+  args: { started: DEVICE },
+  render: ({ started }) => view({ at: 'waiting', started }),
+};
 
 /** A server that reads needs-auth: the press that starts a sign-in. */
 export const Offered: StoryObj = { render: () => view({ at: 'offer' }) };

@@ -383,6 +383,7 @@ async function reloadsACode(page: Page) {
     await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expectVisible(row.getByRole('button', { name: 'Sign in', exact: true }), 'a cancelled sign-in offers Sign in again');
     await expectCount(row.locator('[data-sign-in-code]'), 0, 'and the code is gone');
+    await idle(other);
   } finally {
     await other.close();
   }

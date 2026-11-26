@@ -3,7 +3,7 @@
  *
  * A token is one file under the engine's root, `mcp-tokens/<name>-<hash>.json`, written at mode 0600 and replaced by rename, filed under
  * the server's name and the sha256 of its wire bytes (`type`, `url` and `headers`, as `mcpServerOf` spells them): the identity Claude
- * Code files its own sign-ins under, so one sign-in serves every factory that records the same server, and a changed header asks for
+ * Code files its own sign-ins under, so one sign-in serves every record of the same server, and a changed header asks for
  * a new one. It holds what a refresh needs, the token endpoint and the client id included, so a refresh needs no new discovery.
  *
  * The token is resolved at each spawn, as a kubelet resolves a secret at a container's start (`tokened`): it rides the in-memory

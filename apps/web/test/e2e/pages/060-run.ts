@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { openFold, partOf, photograph, sidebar, stepBar, themeOf } from '../board.ts';
 import { OUT } from '../world.ts';
-import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectDrawn, expectInside, expectTwoDeep, expectUncut, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -43,6 +43,7 @@ export default {
       `the run's graph has a node per step (${FAKE.steps.join(', ')})`,
     );
     for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
+    await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
     await expectVisible(
       graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-gate-band]`, { hasText: 'waits on you' }),
       `${FAKE.blocked} is drawn as a human gate`,

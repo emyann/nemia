@@ -6,8 +6,8 @@
  * Api's. Her skills and her instruction keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in
  * each file that writes or reads them (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that
  * line shows her (`feedLineWords`)
- * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and its one server is the
- * store's MCP port, read from the person's environment (`serverBreaks`). Nothing of it hands her a way to the api but a verb: no shell's
+ * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and it ships no MCP
+ * server: the store's port serves her skills to a session outside it. Nothing of it hands her a way to the api but a verb: no shell's
  * HTTP client and no fetch (`aroundVerbsIn`). Its wording is judged by a person at the landing step; this
  * holds only what it names.
  */
@@ -194,6 +194,7 @@ const SECTIONS: Record<string, string[]> = {
   'agents/nemia.md': ['What you learn of the person'],
   'skills/bring-what-waits/SKILL.md': ["A factory's upgrade", "A factory's takeover"],
   'skills/create-a-factory/SKILL.md': ['1. Ask what it is for', '2. Propose a template, where one fits', '9. Stop, and say what stands'],
+  'skills/write-a-card/SKILL.md': ['Its labels'],
 };
 
 /** The sections of `SECTIONS` that `files` miss, a file not there missing them all: a line each, `<file>: <heading>`. */
@@ -202,7 +203,7 @@ const missingSections = (files: Map<string, string>) =>
     headings.filter((heading) => !(files.get(file) ?? '').includes(`\n## ${heading}\n`)).map((heading) => `${file}: ${heading}`),
   );
 
-test('her skills recruit-or-create, first-meeting, bring-what-waits and create-a-factory, and her instruction, keep their sections', () => {
+test('her skills recruit-or-create, first-meeting, bring-what-waits, create-a-factory and write-a-card, and her instruction, keep their sections', () => {
   assert.deepEqual(missingSections(shipped()), []);
 });
 
@@ -336,46 +337,6 @@ test("her plugin's agent is the file the keeper reads, and the only agent it shi
   );
 });
 
-/**
- * Where a plugin's `.mcp.json` text breaks what her port's entry is: one server, `nemia`, of `type: "http"`, its url `${NEMIA_URL}` (a
- * default allowed) then `/mcp`, its headers given by `headersHelper: "nemia config headers"` and none written in, nothing of the store's
- * written in: a line each.
- *
- * Why: https://code.claude.com/docs/en/mcp — an http server's `headersHelper` is a command Claude Code runs in a shell at each
- * connection, at each reconnect and again after a 401 or 403, merging the JSON object of string headers it prints into those it sends.
- * `nemia config headers` prints the Authorization header of `NEMIA_TOKEN` where it is set, else of the context in use (a token `nemia
- * pair` wrote), so a token paired again is taken without restarting Claude Code, and none is held in the person's environment. The url
- * stays substituted from `${NEMIA_URL}` as the plugin is loaded: a context changed later is not followed by it.
- */
-const serverBreaks = (text: string) => {
-  const servers = (JSON.parse(text) as { mcpServers?: Record<string, Record<string, unknown>> }).mcpServers ?? {};
-  const names = Object.keys(servers);
-  if (names.length !== 1 || names[0] !== 'nemia') return [`servers: ${names.join(', ') || 'none'}`];
-  const { type, url, headers, headersHelper } = servers.nemia;
-  const breaks: string[] = [];
-  if (type !== 'http') breaks.push(`type: ${String(type)}`);
-  if (typeof url !== 'string' || !/^\$\{NEMIA_URL(?::-[^}]+)?\}\/mcp$/.test(url)) breaks.push(`url: ${String(url)}`);
-  if (headers !== undefined) breaks.push(`headers: ${JSON.stringify(headers)}`);
-  if (headersHelper !== 'nemia config headers') breaks.push(`headersHelper: ${String(headersHelper)}`);
-  return breaks;
-};
-
-test("her plugin's one server is the store's MCP port, its address read from the person's environment and its header from nemia", () => {
-  const text = shipped().get('.mcp.json');
-  assert.ok(text !== undefined, 'the plugin ships .mcp.json at its root');
-  assert.deepEqual(serverBreaks(text), []);
-});
-
-test('REFUSED: a server entry with a written address, a written header or a second server is named for each', () => {
-  const entry = (nemia: Record<string, unknown>, more = {}) => JSON.stringify({ mcpServers: { nemia, ...more } });
-  assert.deepEqual(serverBreaks(entry({ type: 'sse', url: 'http://127.0.0.1:8787/mcp', headers: { Authorization: 'Bearer nm_1234' } })), [
-    'type: sse',
-    'url: http://127.0.0.1:8787/mcp',
-    'headers: {"Authorization":"Bearer nm_1234"}',
-    'headersHelper: undefined',
-  ]);
-  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headersHelper: 'nemia config headers' }, { other: {} })), [
-    'servers: nemia, other',
-  ]);
-  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headersHelper: 'nemia config headers' })), []);
+test('her folder ships no MCP server: a session outside the store connects to its port by the line `nemia pair` prints', () => {
+  assert.equal(shipped().has('.mcp.json'), false, 'no .mcp.json ships with her');
 });

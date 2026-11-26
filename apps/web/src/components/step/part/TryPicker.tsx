@@ -7,7 +7,7 @@ import { useNavigate } from '@tanstack/react-router';
 import type { StepTry } from '@/lib/api/tries';
 import type { Frozen } from '@/lib/frozen';
 import { setTry } from '@/lib/tryAddress';
-import { Segment, SegmentedButton } from '@/components/ui/ds';
+import { Label, Segment, SegmentedButton } from '@/components/ui/ds';
 import { triesByRound } from '../Closeout';
 
 /** The picker of the tries of the step `step`, showing `shown`. */
@@ -34,7 +34,9 @@ export function TryPicker({ step, tries, shown }: { step: string; tries: readonl
     >
       {triesByRound(tries).map(({ round, tries: ofRound }) => (
         <span key={round} data-round={round} className="flex items-center">
-          <span className="me-2 text-label-small text-on-surface-variant uppercase">round {round}</span>
+          <Label size="small" component="span" colorRole="on-surface-variant" className="me-2 uppercase">
+            round {round}
+          </Label>
           {ofRound.map((t) => (
             <Segment key={t.try} id={String(t.try)} data-try={t.try} className="flex-none">
               {t.current ? `try ${t.try} (current)` : `try ${t.try}`}

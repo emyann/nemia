@@ -81,7 +81,7 @@ test('REFUSED: the box says the factories are being read until they are, and nev
   const html = await routedWith(createElement(FileCard, { shown: 'solo' }), [STORE_ANSWER]);
   assert.match(
     html,
-    /<div data-reading-factories="true"><div data-slot="skeleton-group" role="status"[^>]*><span class="sr-only">Reading the factories…<\/span><div[^>]*><span data-slot="skeleton"/,
+    /<div [^>]*data-reading-factories="true"><div data-slot="skeleton-group" role="status"[^>]*><span class="sr-only">Reading the factories…<\/span><div[^>]*><span data-slot="skeleton"/,
     'the shape of its line, the line itself said to a screen reader alone',
   );
   assert.doesNotMatch(html, /data-no-factory/);

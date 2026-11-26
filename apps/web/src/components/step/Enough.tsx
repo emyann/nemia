@@ -4,7 +4,7 @@ import { OFFERS } from '../../lib/words';
 import { Refusal } from '../gate/Ask';
 import { useApprove } from '../../lib/useApprove';
 import { AskedRow } from '../gate/Questions';
-import { Button, TextField } from '@/components/ui/ds';
+import { Body, Button, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 
 /**
@@ -19,18 +19,20 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
   const words = OFFERS.enough;
   if (approve.isSuccess) return <AskedRow step={offer.step} said={`try ${approve.data.try} ${words.approved(offer.step)}`} />;
   return (
-    <li
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
     >
       <p data-said className="break-words">
         <strong>{offer.step}</strong> {words.said}
       </p>
-      <p className="font-mono text-body-small break-words">
+      <Body size="small" className="font-mono break-words">
         <code>{`${line} --message "<why>"`}</code>
-      </p>
+      </Body>
       <form
         aria-label={words.form(offer.step)}
         className="space-y-2"
@@ -50,6 +52,6 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
         </Button>
       </form>
       {approve.isError && <Refusal error={approve.error} not="Not approved" />}
-    </li>
+    </Body>
   );
 }

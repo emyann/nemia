@@ -9,7 +9,7 @@ const meta: Meta<typeof ChatAsk> = { title: 'Frame/ChatAsk', args: { onAnswer: (
 export default meta;
 
 /** Where an ask stands in its story: her side sheet's width, on its ground. */
-const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)', display: 'flex', flexDirection: 'column' as const };
+const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-background)', display: 'flex', flexDirection: 'column' as const };
 
 /** Her question, each choice with why; `multiSelect` where it takes several. */
 const question = (multiSelect: boolean) => ({

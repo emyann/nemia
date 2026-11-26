@@ -33,9 +33,9 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Browser } from 'playwright';
 import { storyNameFromExport, toId } from 'storybook/internal/csf';
-import { importsIn } from 'test-kit/imports';
 import type { StoryReach } from '../../../contracts/touched-stories.contract.ts';
 import { APPROVED, LIGHT, LIGHT_CANARIES } from '../../../.storybook/approved.ts';
+import { ownOf, reached } from '../../reach.ts';
 import { storyModuleOf } from '../../stories.ts';
 import { composeMatch, matchesOf, targetsOf, type Match } from './targets.ts';
 import { owesAStory, storiesTouched } from './touched.ts';
@@ -43,20 +43,8 @@ import { owesAStory, storiesTouched } from './touched.ts';
 /** The board's folder, from the workspace root. */
 const BOARD = 'apps/web';
 
-/** What the board's own imports reach: its source, its Storybook's files and its theme. */
-const OWN = /^apps\/web\/(src|\.storybook|theme)\//;
-
 /** What Storybook draws every story in, from the workspace root. */
 const PREVIEW = `${BOARD}/.storybook/preview.tsx`;
-
-/** Each local stylesheet a stylesheet's text `@import`s, outside its comments, by its specifier. */
-const cssImportsIn = (text: string) =>
-  [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/g)].flatMap((m) =>
-    m[1]?.startsWith('.') ? [m[1]] : [],
-  );
-
-/** The modules `file`'s text names: a stylesheet's `@import`s, a module's imports. */
-const specsOf = (file: string, text: string) => (file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec));
 
 /** A story file of the board, from the workspace root: anywhere under `src/components` but the vendored folders. */
 const isStoryFile = (file: string) =>
@@ -90,28 +78,6 @@ const changedSince = (root: string, base: string) => [
   ),
 ];
 
-/** The file `spec`, imported by `from`, resolves to among the workspace's files, from its root; none for a package or a file not there. */
-const resolved = (root: string, from: string, spec: string) => {
-  const named = spec.startsWith('@/')
-    ? path.posix.join(BOARD, 'src', spec.slice(2))
-    : spec.startsWith('.')
-      ? path.posix.join(path.posix.dirname(from), spec)
-      : undefined;
-  if (named === undefined) return undefined;
-  for (const tail of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
-    const file = named + tail;
-    if (fs.statSync(path.join(root, file), { throwIfNoEntry: false })?.isFile()) return file;
-  }
-  return undefined;
-};
-
-/** Each file of the board's own `file`'s text names, by its path from the workspace root. */
-const ownOf = (root: string, file: string) =>
-  specsOf(file, fs.readFileSync(path.join(root, file), 'utf8')).flatMap((spec) => {
-    const next = resolved(root, file, spec);
-    return next !== undefined && OWN.test(next) ? [next] : [];
-  });
-
 /**
  * What every story is drawn in: Storybook's preview, each file of the board's own it imports, and the stylesheets those `@import`,
  * followed; none where the board has no preview. A module the preview imports is not followed, so a part behind a door it imports
@@ -136,10 +102,7 @@ const drawnIn = (root: string) => {
  * @param drawn What every story is drawn in (`drawnIn`).
  */
 const reachOf = (root: string, story: string, drawn: readonly string[]) => {
-  const reaches = [story];
-  for (let at = 0; at < reaches.length; at++) {
-    for (const next of ownOf(root, reaches[at] ?? story)) if (!reaches.includes(next)) reaches.push(next);
-  }
+  const reaches = reached(root, [story]);
   return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] } satisfies StoryReach;
 };
 

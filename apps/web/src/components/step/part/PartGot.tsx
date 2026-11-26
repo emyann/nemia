@@ -11,6 +11,7 @@ import { Markdown } from '../../markdown/Markdown';
 import { LINK } from '../Facts';
 import { packetWords } from '../PacketChip';
 import { Fold } from './Fold';
+import { Body, Label } from '@/components/ui/ds';
 
 /** One line of what the step got. */
 type GotLine = Exclude<StepPartModel['got'], 'none'>[number];
@@ -21,9 +22,9 @@ type Packet = NonNullable<Extract<GotLine, { from: 'step' }>['packet']>;
 /** A packet's chip, as the graph's edge names it: its label, then its fields and files. */
 function PacketChip({ packet }: { packet: Packet }) {
   return (
-    <span data-packet={packet.label} className="border border-outline-variant px-1.5 py-0.5 font-mono text-body-small">
+    <Body size="small" component="span" data-packet={packet.label} className="border border-outline-variant px-1.5 py-0.5 font-mono">
       {packetWords(packet)}
-    </span>
+    </Body>
   );
 }
 
@@ -73,17 +74,21 @@ function Said({ run, line }: { run: RunDetail; line: GotLine }) {
     case 'other-run':
       return (
         <>
-          <p className="text-body-small text-on-surface-variant">
+          <Body size="small" colorRole="on-surface-variant">
             asked: {line.asked}
             {line.how && ` · handed ${line.how}`}
-          </p>
+          </Body>
           <Markdown>{line.body}</Markdown>
         </>
       );
     case 'agent':
       return (
         <>
-          {line.skills.length > 0 && <p className="font-mono text-body-small">skills: {line.skills.join(', ')}</p>}
+          {line.skills.length > 0 && (
+            <Body size="small" className="font-mono">
+              skills: {line.skills.join(', ')}
+            </Body>
+          )}
           {line.text && <Markdown>{line.text}</Markdown>}
         </>
       );
@@ -94,7 +99,9 @@ function Said({ run, line }: { run: RunDetail; line: GotLine }) {
 export function PartGot({ run, got }: { run: RunDetail; got: readonly GotLine[] }) {
   return (
     <section data-part-got aria-label="What it got" className="min-w-0 space-y-1">
-      <h3 className="text-label-medium text-on-surface-variant uppercase">Got</h3>
+      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">
+        Got
+      </Label>
       <ul className="space-y-0.5">
         {got.map((line, i) => (
           <li key={i} data-got={line.from} className="min-w-0">

@@ -221,3 +221,19 @@ export const Filled: StoryObj = {
     </div>
   ),
 };
+
+/** A frame inside a frame (`hue` the inner one's): the outer frame wears the quiet grain, the inner one none, so grain never doubles. */
+export const FrameInAFrame: StoryObj<typeof CutFrame> = {
+  args: { hue: 'alive', size: 12 },
+  render: (args) => (
+    <div data-ground="plain" style={ON_PLAIN}>
+      <CutFrame size={24}>
+        <div style={{ padding: 16 }}>
+          <CutFrame {...args}>
+            <div style={EMPTY} />
+          </CutFrame>
+        </div>
+      </CutFrame>
+    </div>
+  ),
+};

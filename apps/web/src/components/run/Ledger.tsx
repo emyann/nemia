@@ -7,13 +7,16 @@ import { agentsQuery } from '@/lib/api/agents';
 import { stepAnchor } from '@/lib/asks';
 import type { RunDetail } from '@/lib/runView';
 import { StepPart } from '../step/part/StepPart';
+import { Label } from '@/components/ui/ds';
 
 /** Every step of the run `run`, a part each at L, the agents' roles read for their heads. */
 export function Ledger({ run }: { run: RunDetail }) {
   const agents = useQuery(agentsQuery);
   return (
     <section aria-label="Every step" data-ledger={run.steps.length} className="space-y-4">
-      <h2 className="text-label-large text-on-surface-variant">Every step</h2>
+      <Label size="large" component="h2" colorRole="on-surface-variant">
+        Every step
+      </Label>
       {run.steps.map((step) => (
         <StepPart key={step.name} view={run} step={step.name} size="L" agents={agents.data} id={stepAnchor(step.name)} />
       ))}

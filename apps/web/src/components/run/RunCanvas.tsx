@@ -24,9 +24,9 @@ import { useContent } from '../../lib/useContent';
 import { stepState } from '../../lib/status';
 import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
-import { FLOOR_BOX } from '../../lib/classes';
+import { FLOOR_RULED } from '../../lib/classes';
 import { cn } from '../../lib/utils';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { StateEdge } from '../step/StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from '../step/stepGraph';
@@ -88,7 +88,11 @@ export function RunCanvas(props: Props) {
   }, [names, edges]);
 
   if (computed instanceof Error) {
-    return <p className="rounded border border-failure px-3 py-2 text-body-medium text-failure">{computed.message}</p>;
+    return (
+      <Body size="medium" className="rounded border border-failure px-3 py-2 text-failure">
+        {computed.message}
+      </Body>
+    );
   }
   return (
     <ReactFlowProvider>
@@ -144,6 +148,17 @@ function Buttons({ running, onReset }: { running: string[]; onReset: () => void 
           Focus running step
         </Button>
       </span>
+    </Panel>
+  );
+}
+
+/** The canvas's hint, in its top-left corner: its cards are dragged to arrange, and the arrangement kept in this browser. */
+function ArrangeHint() {
+  return (
+    <Panel position="top-left">
+      <Body size="small" component="span">
+        Drag to arrange · kept in this browser
+      </Body>
     </Panel>
   );
 }
@@ -220,7 +235,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   useRefit(frame, resets, flow);
 
   return (
-    <div ref={frame} className={cn(FLOOR_BOX, 'h-[30rem]')}>
+    <div ref={frame} className={cn(FLOOR_RULED, 'h-[30rem]')}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -240,9 +255,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         fitViewOptions={FIT}
         minZoom={LEAST_ZOOM}
       >
-        <Panel position="top-left" className="text-body-small text-on-surface-variant">
-          Drag to arrange · kept in this browser
-        </Panel>
+        <ArrangeHint />
         <Buttons running={running} onReset={resetLayout} />
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />

@@ -17,6 +17,7 @@ import { ChevronRightIcon } from 'lucide-react';
 
 import { focusRing } from '@/components/ui/ds/utils';
 import { cn } from '@/lib/utils';
+import { Body } from '@/components/ui/ds';
 
 /**
  * A line's state: at work (`running`), failed (`error`), not started (`pending`), or waiting on the person (`yours`, the look's
@@ -41,14 +42,13 @@ function Trace({ className, ...props }: React.ComponentProps<'div'>) {
 /** One step: its icon, its sentence and its fact, in the state `status` says, done when it says none. */
 function TraceLine({ className, status, ...props }: React.ComponentProps<'span'> & { status?: TraceStatus }) {
   return (
-    <span
+    <Body
+      size="medium"
+      component="span"
+      colorRole="on-surface"
       data-slot="trace-line"
       data-status={status}
-      className={cn(
-        'flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1 text-body-medium text-on-surface',
-        status && STATUS[status],
-        className,
-      )}
+      className={cn('flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1', status && STATUS[status], className)}
       {...props}
     />
   );
@@ -69,12 +69,12 @@ function TraceIcon({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-/** A line's sentence, cut with an ellipsis where it runs out of room; a file, a command or a query in it is `code`, in mono. */
+/** A line's sentence, cut with an ellipsis where it runs out of room; a file, a command or a query in it is `code`, in mono at its size. */
 function TraceTitle({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
       data-slot="trace-title"
-      className={cn('min-w-0 flex-1 truncate motion-reduce:shimmer-none [&_code]:font-mono [&_code]:text-body-small', className)}
+      className={cn('min-w-0 flex-1 truncate motion-reduce:shimmer-none [&_code]:font-mono', className)}
       {...props}
     />
   );
@@ -83,9 +83,12 @@ function TraceTitle({ className, ...props }: React.ComponentProps<'span'>) {
 /** A line's quiet fact on its right, in mono: a duration, a count, a diff stat. */
 function TraceDescription({ className, ...props }: React.ComponentProps<'span'>) {
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-slot="trace-description"
-      className={cn('shrink-0 font-mono text-body-small text-on-surface-variant tabular-nums', className)}
+      className={cn('shrink-0 font-mono tabular-nums', className)}
       {...props}
     />
   );
@@ -139,7 +142,7 @@ function TraceCollapsibleTrigger({
 /** How a step's content stands under it: a sub-agent's steps nested on a rule, or what it asked and what came back, in mono. */
 const CONTENT = {
   nest: 'mb-1 ml-4 border-l border-outline-variant pl-2',
-  body: 'mt-0.5 mb-1.5 ml-8.5 bg-surface-container px-3 py-2 font-mono text-body-small whitespace-pre-wrap wrap-anywhere text-on-surface shadow-[inset_2px_0_0_var(--md-sys-color-outline-variant)]',
+  body: 'mt-0.5 mb-1.5 ml-8.5 bg-surface-container px-3 py-2 font-mono whitespace-pre-wrap wrap-anywhere text-on-surface shadow-[inset_2px_0_0_var(--md-sys-color-outline-variant)]',
 } as const;
 
 /** What a step holds, drawn only while it is open, as `kind` stands it: `nest` for steps under it, `body` for what it asked and got. */
@@ -157,9 +160,15 @@ function TraceCollapsibleContent({
   return (
     <DisclosurePanel data-slot="trace-collapsible-content" className="min-w-0" {...props}>
       {open && (
-        <div data-slot="trace-collapsible-content-inner" data-kind={kind} className={cn('min-w-0', CONTENT[kind], className)}>
+        <Body
+          size="small"
+          component="div"
+          data-slot="trace-collapsible-content-inner"
+          data-kind={kind}
+          className={cn('min-w-0', CONTENT[kind], className)}
+        >
           {children}
-        </div>
+        </Body>
       )}
     </DisclosurePanel>
   );

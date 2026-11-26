@@ -407,6 +407,7 @@ const PINNED: Record<string, string[]> = {
     'isBuiltinPlace',
     'isMarkdown',
     'BUILTIN_SKILLS',
+    'NEMIA_SKILLS',
     'keptRuns',
     'RECORD_CEILING',
     'RunDoor',

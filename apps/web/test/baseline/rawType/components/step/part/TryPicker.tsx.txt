@@ -1,1 +1,0 @@
-apps/web/src/components/step/part/TryPicker.tsx#text-label-small

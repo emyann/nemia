@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { litOf, photograph, pickerOf, railPlace, sidebar, startOf, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectTexts, expectTwoDeep, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -45,6 +45,7 @@ export default {
     await expectCount(page.locator('[data-factory-pane]'), 0, 'and no factory pane, the page being the store’s');
     const blocks = page.locator('.react-flow__node [data-factory]');
     await expectCount(blocks, LISTED.length, 'a block for each factory filed');
+    await expectTwoDeep(page, 'the page is two boxes deep at most: a third box is a rule or a gap');
     await expectTexts(
       page.locator('.react-flow__node [data-factory] > span:first-child'),
       LISTED,

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { ByAction, StateBox } from '../../lib/machine';
+import { Body, Label } from '@/components/ui/ds';
 
 /** A state's box, and whether it is lit: the state a task's path stands in (`DebugPanel`). */
 export type MachineFlowNode = Node<StateBox & { lit?: boolean }, 'state'>;
@@ -12,7 +13,7 @@ export type MachineFlowNode = Node<StateBox & { lit?: boolean }, 'state'>;
  */
 export function ByActionList({ list, children }: { list: readonly ByAction[]; children?: ReactNode }) {
   return (
-    <div className="px-2.5 py-1 font-mono text-body-small leading-4 whitespace-nowrap">
+    <Body size="small" component="div" className="px-2.5 py-1 font-mono leading-4 whitespace-nowrap">
       {list.map((group) => (
         <div key={group.action} data-action={group.action}>
           {group.events.map((event, i) => (
@@ -24,7 +25,7 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
         </div>
       ))}
       {children}
-    </div>
+    </Body>
   );
 }
 
@@ -51,10 +52,12 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">
-        <p className={`text-label-small uppercase text-on-surface-variant`}>{kindOf(data)}</p>
-        <p data-state-name className="text-body-medium font-semibold">
+        <Label size="small" component="p" colorRole="on-surface-variant" className={`uppercase`}>
+          {kindOf(data)}
+        </Label>
+        <Body size="medium" data-state-name className="font-semibold">
           {data.id}
-        </p>
+        </Body>
       </div>
       {data.stays.length > 0 && (
         <div className="mt-1.5 border-t border-outline-variant">

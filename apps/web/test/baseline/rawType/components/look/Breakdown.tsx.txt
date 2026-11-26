@@ -1,2 +1,0 @@
-apps/web/src/components/look/Breakdown.tsx#text-body-medium
-apps/web/src/components/look/Breakdown.tsx#text-body-small

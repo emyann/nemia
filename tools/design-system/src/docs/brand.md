@@ -35,7 +35,7 @@ A colour says one thing, on every page. Name a colour by its role, never by a va
 
 ## Grain
 
-- Put `data-grain="surface"` on the ground of a card or a framed table: specks light in dark, ink in light, one weight.
+- Put `data-grain="quiet"` on the ground of a frame that holds reading (a card, a framed table), at a third of the weight a frame wore before: specks light in dark, ink in light. A frame inside a frame wears none.
 - Put `data-grain="label"` on a label (a sticker, a stat tile, a plate): ink specks in both schemes, heavier, as on rough stock.
 - Give the page's ground its scan lines (`ScanLines`), never a grain. Give a tag and a button none. Draw the grain under a cut: nothing of it shows in the cut corner.
 

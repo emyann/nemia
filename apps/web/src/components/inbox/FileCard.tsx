@@ -11,7 +11,7 @@ import { fileCard } from '../../lib/api/inbox.ts';
 import { storeQuery } from '../../lib/api/store.ts';
 import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
-import { Select, SelectItem, TextField } from '@/components/ui/ds';
+import { Body, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Reading, ReadingLines, CutPress } from '@/components/look';
 import { CARD_FILES_MOST } from 'objects';
 import { sayWritten } from '@/lib/written';
@@ -19,7 +19,8 @@ import { inputsAdded } from '@/lib/startInputs';
 import { StartInputs } from '../run/StartInputs';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+/** A command or a name in mono, at the size of the small body it is said in. */
+const code = (text: string) => <code className="font-mono">{text}</code>;
 
 /**
  * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it
@@ -91,7 +92,9 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         <CutPress pending={file.isPending} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
         </CutPress>
-        <span className="text-body-small text-on-surface-variant">Parked, not started: nothing runs until you start it.</span>
+        <Body size="small" component="span">
+          Parked, not started: nothing runs until you start it.
+        </Body>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}
       {file.isError && <NotFiled message={file.error.message} />}
@@ -119,8 +122,12 @@ function IdeaField({ idea, onIdea }: { idea: string; onIdea: (idea: string) => v
 function NotFiled({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <p className="text-body-medium font-medium text-on-failure-container">Not filed. The api refused it:</p>
-      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        Not filed. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {message}
+      </Body>
     </div>
   );
 }
@@ -158,23 +165,23 @@ function FactoryField({
           <SelectItem key={f.name} id={f.name} label={f.name} />
         ))}
       </Select>
-      {error && <ReadTrouble what="the factories" error={error} className="text-body-small" />}
+      {error && <ReadTrouble what="the factories" error={error} size="small" />}
       {picked === '' && (
-        <p data-parked className="text-body-small text-on-surface-variant">
+        <Body size="small" data-parked>
           Parked with no factory: it gets its factory, workflow and repository when you start it.
-        </p>
+        </Body>
       )}
       {!error && !read && (
-        <div data-reading-factories>
+        <Body size="small" component="div" data-reading-factories>
           <Reading label="Reading the factories…">
-            <ReadingLines widths={['w-64']} className="text-body-small" />
+            <ReadingLines widths={['w-64']} />
           </Reading>
-        </div>
+        </Body>
       )}
       {!error && read && offered.length === 0 && store && (
-        <p data-no-factory className="text-body-small text-on-surface-variant">
+        <Body size="small" data-no-factory>
           The store has no factory yet: file one with {code(store.fileFactory)}.
-        </p>
+        </Body>
       )}
     </div>
   );
@@ -206,19 +213,21 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
           ))}
         </Select>
         {offered.length === 0 && (
-          <p data-no-workflow className="text-body-small text-on-surface-variant">
+          <Body size="small" data-no-workflow>
             {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
-          </p>
+          </Body>
         )}
       </div>
       <div className="space-y-1.5">
-        <p className="text-body-medium font-medium">Repository</p>
+        <Body size="medium" className="font-medium">
+          Repository
+        </Body>
         {on !== null && 'why' in on ? (
-          <p data-unwired={on.refused} className="text-body-small break-words text-yours">
+          <Body size="small" data-unwired={on.refused} className="break-words text-yours">
             {on.why}
-          </p>
+          </Body>
         ) : (
-          <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-on-surface-variant">
+          <Body size="small" colorRole="on-surface-variant" data-factory-repo className="py-1.5 font-mono break-all">
             {on !== null
               ? on.repo
               : only !== undefined && !more.length
@@ -226,7 +235,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
                 : only === undefined
                   ? `${factory.name} has no volume to work on: ${factory.commands.volume}`
                   : `The factory's, for the workflow its start runs.`}
-          </p>
+          </Body>
         )}
       </div>
     </div>
@@ -236,13 +245,13 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
 /** The note for a card just filed that the page's filter, on the factory `shown`, does not list: its name, and the way to see it. */
 function Hidden({ name, shown }: { name: string; shown: string }) {
   return (
-    <p data-filed-hidden className="text-body-small text-on-surface-variant">
+    <Body size="small" data-filed-hidden>
       Filed as <span className="font-mono">{name}</span>, which the cards below, of the factory <span className="font-mono">{shown}</span>,
       do not list.{' '}
       <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
         Show every factory&apos;s
       </Link>
       .
-    </p>
+    </Body>
   );
 }

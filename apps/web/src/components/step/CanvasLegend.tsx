@@ -3,6 +3,7 @@ import { Panel } from '@xyflow/react';
 import { edgeLine, edgeStroke, type EdgeState } from '../../lib/canvas';
 import { PERSON } from '../../lib/words';
 import { READ_LINE, Travelling } from './StateEdge';
+import { Body } from '@/components/ui/ds';
 
 /**
  * Beside a canvas's zoom controls, under its nodes: what the drawing means. An edge in each state it is drawn in, drawn as `StateEdge`
@@ -17,36 +18,34 @@ import { READ_LINE, Travelling } from './StateEdge';
  */
 export function CanvasLegend({ className = '', cards = false }: { className?: string; cards?: boolean }) {
   return (
-    <Panel
-      position="bottom-left"
-      aria-label="Legend"
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant ${className}`}
-    >
-      <Item sample={<Sample state="to-come" />}>{PERSON.waiting.rail}</Item>
-      <Item
-        sample={
-          <>
-            <Sample state="running" />
-            <span className="size-2.5 animate-spin rounded-full border-2 border-alive border-t-transparent" />
-          </>
-        }
-      >
-        running
-      </Item>
-      <Item sample={<Sample state="done" />}>done</Item>
-      <Item sample={<Sample state="to-come" loop />}>loops back</Item>
-      {cards && (
-        <Item sample={<CardsSample />} title="A run that has started draws no line from its waits.">
-          waits until it lands
+    <Panel position="bottom-left" aria-label="Legend" className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
+      <Body size="small" component="div" colorRole="on-surface-variant" className="contents">
+        <Item sample={<Sample state="to-come" />}>{PERSON.waiting.rail}</Item>
+        <Item
+          sample={
+            <>
+              <Sample state="running" />
+              <span className="size-2.5 animate-spin rounded-full border-2 border-alive border-t-transparent" />
+            </>
+          }
+        >
+          running
         </Item>
-      )}
-      {cards && (
-        <Item sample={<CardsSample read />} title="Drawn for the card hovered or selected: it does not wait.">
-          reads what it concluded
-        </Item>
-      )}
-      <Item sample={<span className="size-2.5 rounded-sm border-2 border-yours" />}>human gate</Item>
-      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-yours" />}>to decide</Item>}
+        <Item sample={<Sample state="done" />}>done</Item>
+        <Item sample={<Sample state="to-come" loop />}>loops back</Item>
+        {cards && (
+          <Item sample={<CardsSample />} title="A run that has started draws no line from its waits.">
+            waits until it lands
+          </Item>
+        )}
+        {cards && (
+          <Item sample={<CardsSample read />} title="Drawn for the card hovered or selected: it does not wait.">
+            reads what it concluded
+          </Item>
+        )}
+        <Item sample={<span className="size-2.5 rounded-sm border-2 border-yours" />}>human gate</Item>
+        {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-yours" />}>to decide</Item>}
+      </Body>
     </Panel>
   );
 }

@@ -5,7 +5,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { stepAnchor } from '@/lib/asks';
 import type { Packet } from '@/lib/canvas';
-import { Button } from '@/components/ui/ds';
+import { Body, Button } from '@/components/ui/ds';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -34,9 +34,15 @@ export function PacketChip({ packet, x, y }: { packet: Packet; x: number; y: num
       onPress={() => void navigate({ to: '.', search: true, hash: stepAnchor(packet.from), resetScroll: false })}
       style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, pointerEvents: 'all', zIndex: 1001 }}
       className="nodrag nopan bg-surface-container text-on-surface"
-      classNames={{ label: 'font-mono text-body-small' }}
     >
-      <span title={`What ${packet.from} handed ${packet.to}: read it in ${packet.from}'s part`}>{packetWords(packet)}</span>
+      <Body
+        size="small"
+        component="span"
+        className="font-mono"
+        title={`What ${packet.from} handed ${packet.to}: read it in ${packet.from}'s part`}
+      >
+        {packetWords(packet)}
+      </Body>
     </Button>
   );
 }

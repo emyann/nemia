@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
+import { Headline, Label } from '@/components/ui/ds';
 
 /** Bars of the plate's own ink, `widths` in pixels, an inked bar and a gap in turn, repeated along the barcode. */
 function bars(widths: readonly number[]) {
@@ -41,9 +42,9 @@ export function Plate({ count, title, hue = 'yours', quiet = false }: { count: n
       <span data-plate-count className="font-label text-[30px] leading-8 font-extrabold tracking-[-0.02em]" style={WIDE}>
         {count}
       </span>
-      <h2 className="m-0 font-label text-label-large font-extrabold uppercase" style={WIDE}>
+      <Label size="large" component="h2" className="m-0 font-label font-extrabold uppercase" style={WIDE}>
         {title}
-      </h2>
+      </Label>
       {!quiet && <span aria-hidden="true" data-plate-barcode className="ml-1.5 h-[26px] w-[54px] flex-none" style={BARCODE[hue]} />}
     </div>
   );
@@ -63,12 +64,18 @@ const LIT: CSSProperties = { backgroundColor: 'var(--md-sys-color-on-surface)' }
  */
 export function PageName({ children }: { children: ReactNode }) {
   return (
-    <h1 data-page-name className="relative m-0 pb-4.5 font-brand text-headline-small text-on-surface uppercase @lg/page:text-display-small">
+    <Headline
+      size="small"
+      component="h1"
+      colorRole="on-surface"
+      data-page-name
+      className="relative m-0 pb-4.5 font-brand uppercase @lg/page:text-display-small @lg/page:font-display-small"
+    >
       <span aria-hidden="true" data-page-rule className="absolute inset-x-0 bottom-0 h-px" style={HAIRLINE} />
       <span data-page-name-text className="relative block w-fit">
         {children}
         <span aria-hidden="true" data-page-rule-lit className="absolute inset-x-0 -bottom-4.5 h-px" style={LIT} />
       </span>
-    </h1>
+    </Headline>
   );
 }

@@ -4,9 +4,10 @@ import { DEFAULT_NAMESPACE } from 'objects';
 import { cn } from '@/lib/utils';
 import { RouteLink } from '../agent/AgentParts';
 import { focusRing } from '@/components/ui/ds/utils';
+import { Body } from '@/components/ui/ds';
 
-const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-body-small leading-none font-medium whitespace-nowrap';
-const NAMED = 'border-sage bg-surface-variant text-on-surface-variant';
+const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 leading-none font-medium whitespace-nowrap';
+const NAMED = 'border-sage bg-surface-container-highest text-on-surface-variant';
 const MUTED = 'border-outline-variant text-on-surface-variant';
 
 /** A factory's mark, before its name on a tag, so it reads as a factory beside a repository or a place. */
@@ -22,7 +23,9 @@ export function FactoryTag({ name, linked = false }: { name: string; linked?: bo
     return (
       <span data-factory-tag={name} title="The default factory: it holds every run and card that names none" className={cn(TAG, MUTED)}>
         {mark}
-        {name}
+        <Body size="small" component="span" className="leading-none font-medium">
+          {name}
+        </Body>
       </span>
     );
   }
@@ -30,7 +33,9 @@ export function FactoryTag({ name, linked = false }: { name: string; linked?: bo
     return (
       <span data-factory-tag={name} title={`In the factory ${name}`} className={cn(TAG, NAMED)}>
         {mark}
-        {name}
+        <Body size="small" component="span" className="leading-none font-medium">
+          {name}
+        </Body>
       </span>
     );
   }
@@ -43,7 +48,9 @@ export function FactoryTag({ name, linked = false }: { name: string; linked?: bo
       className={cn(TAG, NAMED, 'hover:border-on-surface-variant', focusRing())}
     >
       {mark}
-      {name}
+      <Body size="small" component="span" className="leading-none font-medium">
+        {name}
+      </Body>
     </RouteLink>
   );
 }

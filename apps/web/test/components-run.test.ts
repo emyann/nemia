@@ -57,7 +57,7 @@ const HELD: NonNullable<RunDetail['holding']> = {
 
 test('a run visited by its address that the store does not have is said gone by its id, and where the runs are listed', () => {
   const html = renderToStaticMarkup(createElement(RunGone, { id: 'r-9z8y' }));
-  assert.match(html, /^<p data-run-gone="r-9z8y" role="status"/);
+  assert.match(html, /^<p [^>]*data-run-gone="r-9z8y" role="status"/);
   assert.equal(html.replace(/<[^>]*>/g, ''), 'Run r-9z8y is not in this store: removed, or never was. Runs lists the runs the store has.');
 });
 
@@ -561,7 +561,11 @@ const TOKENS = {
 
 test('REFUSED: a Cost cell the keyboard cannot reach to open its tokens: a row with tokens draws its cost as a button', () => {
   const priced = costCell(COST, TOKENS);
-  assert.match(priced, /<button[^>]*data-cost-words[^>]*>\$5\.63<\/button>/, 'the cost words are a button that opens the preview');
+  assert.match(
+    priced,
+    /<button[^>]*data-cost-words[^>]*><span[^>]*>\$5\.63<\/span><\/button>/,
+    'the cost words are a button that opens the preview',
+  );
   const untokened = costCell(COST, null);
   assert.match(untokened, /<span[^>]*data-cost-words[^>]*>\$5\.63<\/span>/);
   assert.doesNotMatch(untokened, /<button/, 'no tokens to break down, so nothing for the keyboard to open');
@@ -685,7 +689,7 @@ test("the result: until the graph's final steps have given, where the run stands
   const html = await routedWith(createElement(RunResult, { run: atGate({}, { brief: 'Make the **floor** clear.' }) }));
   assert.match(html, /<section aria-label="The ask" data-run-ask="true"[\s\S]*<strong>floor<\/strong>/, 'the ask is the brief');
   assert.match(html, /<section aria-label="The result" data-run-result="stands"/);
-  assert.match(html, /<p data-result-stands="yours"[\s\S]*?<a [^>]*href="\/runs\/r-1#step-review"/, 'waiting on you, at review');
+  assert.match(html, /<p [^>]*data-result-stands="yours"[\s\S]*?<a [^>]*href="\/runs\/r-1#step-review"/, 'waiting on you, at review');
 });
 
 test('the result of a run called off, or ended, before its final steps gave says its end, never what is to come', async () => {
@@ -696,14 +700,14 @@ test('the result of a run called off, or ended, before its final steps gave says
     steps: [step({ name: 'review', ...coded('waiting'), closeout: null })],
   };
   const off = await routedWith(createElement(RunResult, { run: detailOf({ ...toCome, cancelledAt: '2026-09-30T06:00:00.000Z' }) }));
-  assert.match(off, /<p data-result-ended="calledOff"/);
+  assert.match(off, /<p [^>]*data-result-ended="calledOff"/);
   assert.doesNotMatch(off, /data-result-stands/, 'not to come');
   assert.ok(
     textsOf(off).some((t) => t.includes('called off')),
     'in the words a person reads',
   );
   const ended = await routedWith(createElement(RunResult, { run: detailOf({ ...toCome, status: 'succeeded' }) }));
-  assert.match(ended, /<p data-result-ended="ended"/);
+  assert.match(ended, /<p [^>]*data-result-ended="ended"/);
 });
 
 test('the result of a routed run that ended on its workflow node is the card it sent, linked, and never that the run ended before', async () => {
@@ -717,7 +721,7 @@ test('the result of a routed run that ended on its workflow node is the card it 
   });
   const html = await routedWith(createElement(RunResult, { run }));
   assert.match(html, /data-run-result="gave"/);
-  assert.match(html, /<p data-result-sent="r-1-handoff"[\s\S]*?<a [^>]*href="\/inbox\/r-1-handoff"/, 'the card it sent, linked');
+  assert.match(html, /<p [^>]*data-result-sent="r-1-handoff"[\s\S]*?<a [^>]*href="\/inbox\/r-1-handoff"/, 'the card it sent, linked');
   assert.doesNotMatch(html, /data-result-ended/);
 });
 
@@ -730,7 +734,7 @@ test('the result of a run that ended with its final steps done and nothing given
   });
   const run = detailOf({ status: 'succeeded', holding: null, graph: { roots: ['review'], edges: [] }, steps: [done] });
   const html = await routedWith(createElement(RunResult, { run }));
-  assert.match(html, /<p data-result-ended="ended"/);
+  assert.match(html, /<p [^>]*data-result-ended="ended"/);
   assert.ok(
     textsOf(html).some((t) => t.includes('finished')),
     'its last steps finished',
@@ -740,7 +744,7 @@ test('the result of a run that ended with its final steps done and nothing given
 test("the header: the brief's first line for a title, where the run stands, its id to copy, and three tiles — took, cost, rounds", async () => {
   const { RunHeader } = await import('../src/components/run/RunHeader.tsx');
   const html = await routedWith(createElement(RunHeader, { run: atGate({}, { brief: '# Make the floor clear\n\nMore.' }) }));
-  assert.match(html, /<h1 data-run-title="true"[^>]*>Make the floor clear<\/h1>/);
+  assert.match(html, /<h1 [^>]*data-run-title="true"[^>]*>Make the floor clear<\/h1>/);
   assert.match(html, /data-run-state="waiting on you"/);
   assert.deepEqual(
     [...html.matchAll(/data-stat-tile="(\w+)"/g)].map((m) => m[1]),

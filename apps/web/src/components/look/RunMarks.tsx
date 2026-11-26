@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import { titleOf } from '@/lib/factory';
@@ -55,10 +55,12 @@ export function RunMark({ id, run }: { id: string; run?: NamedRun }) {
         data-now-run={id}
         data-run-mark={id}
         aria-label={`${id.slice(-4)}: ${said}`}
-        className="inline-flex items-center gap-1 align-baseline font-mono text-body-medium whitespace-nowrap"
+        className="inline-flex items-center gap-1 align-baseline font-mono whitespace-nowrap"
       >
-        <MarkDiamond mark={run ? nowMark(run) : 'rest'} />
-        <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
+        <Body size="medium" component="span">
+          <MarkDiamond mark={run ? nowMark(run) : 'rest'} />
+          <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
+        </Body>
       </TextLink>
       <Tooltip>{`${id}\n${said}`}</Tooltip>
     </TooltipTrigger>
@@ -71,12 +73,7 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
   return (
     <CutTag edge={tag.variant === 'outlined'}>
       {tag.color === 'alive' ? (
-        <MeaningTag
-          data-now-word
-          data-tone={now.tone}
-          hue="alive"
-          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
-        >
+        <MeaningTag data-now-word data-tone={now.tone} hue="alive" className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}>
           {now.step}
         </MeaningTag>
       ) : (
@@ -85,7 +82,7 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
           data-tone={now.tone}
           variant={tag.variant}
           color={tag.color}
-          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
+          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}
         >
           {now.step}
         </Tag>
@@ -119,7 +116,11 @@ export function Pips({ round, tone, words = false }: { round: NonNullable<Now['r
           ))}
         </span>
       </Marked>
-      {words && <span className="text-body-medium text-on-surface-variant">{said}</span>}
+      {words && (
+        <Body size="medium" component="span" colorRole="on-surface-variant">
+          {said}
+        </Body>
+      )}
     </span>
   );
 }
@@ -160,12 +161,14 @@ export function Ring({ budget, words = false }: { budget: NonNullable<Now['budge
         </svg>
       </Marked>
       {budget.over ? (
-        <span className={cn('text-body-small', ink.failure)}>{NOW_WORDS.over(budget.capSaid)}</span>
+        <Body size="small" component="span" className={cn('', ink.failure)}>
+          {NOW_WORDS.over(budget.capSaid)}
+        </Body>
       ) : (
         words && (
-          <span data-ring-words className={cn('font-mono text-body-small whitespace-nowrap text-on-surface')}>
+          <Body size="small" component="span" colorRole="on-surface" data-ring-words className={cn('font-mono whitespace-nowrap')}>
             {dollars(budget.spent)} of {budget.capSaid}
-          </span>
+          </Body>
         )
       )}
     </span>
@@ -177,49 +180,54 @@ export function Fan({ count, className }: { count: number; className?: string })
   const said = NOW_WORDS.waitedBy(count);
   return (
     <Marked said={said}>
-      <span
+      <Body
+        size="small"
+        component="span"
+        colorRole="on-surface-variant"
         data-waited-by={count}
         aria-label={said}
         role="img"
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the fan's tooltip by focusing it
         tabIndex={0}
-        className={cn('inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant', focusRing(), className)}
+        className={cn('inline-flex shrink-0 items-center gap-1 font-mono', focusRing(), className)}
       >
         <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
           <path d="M0.5,5 L4.5,5 L11.5,1 M4.5,5 L11.5,5 M4.5,5 L11.5,9" fill="none" stroke="currentColor" strokeWidth="1.4" />
         </svg>
         {count}
-      </span>
+      </Body>
     </Marked>
   );
 }
 
 /**
  * The few words of what a run waits for (`nowOf`'s words), in its tone's ink; a run they name is its mark (`RunMark`), found among the
- * surface's runs (`among`). `title` says whole what a card cuts to its line.
+ * surface's runs (`among`). `title` says whole what a card cuts to its line, and `size` is the body role's, small on a card's line.
  */
 export function Words({
   words,
   tone,
   among,
   title,
+  size = 'medium',
   className,
 }: {
   words: readonly NowPart[];
   tone: ChipTone;
   among: readonly NamedRun[];
   title?: string;
+  size?: 'small' | 'medium';
   className?: string;
 }) {
   if (words.length === 0) return null;
   return (
-    <span data-now-words title={title} className={cn('min-w-0 text-body-medium', WORDS_INK[tone], className)}>
+    <Body size={size} component="span" data-now-words title={title} className={cn('min-w-0', WORDS_INK[tone], className)}>
       {words.map((part, i) => (
         <span key={i}>
           {i > 0 && ' '}
           {typeof part === 'string' ? part : <RunMark id={part.run} run={among.find((run) => run.id === part.run)} />}
         </span>
       ))}
-    </span>
+    </Body>
   );
 }

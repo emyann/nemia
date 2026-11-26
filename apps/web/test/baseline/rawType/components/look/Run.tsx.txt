@@ -1,2 +1,0 @@
-apps/web/src/components/look/Run.tsx#text-body-small
-apps/web/src/components/look/Run.tsx#text-label-small

@@ -2,6 +2,7 @@ import { CircleDashed } from 'lucide-react';
 
 import { stateClass, stepState, type StepCodes } from '../../lib/status';
 import { chipTitle, stateWordsOf } from '../../lib/words';
+import { Body } from '@/components/ui/ds';
 
 /**
  * A step's state, from its codes (`phase`, `reason`, `on`, `via`), in a person's word (`PERSON`'s rail word, never the CLI's sentence),
@@ -36,14 +37,16 @@ export function StatusChip({
   const state = stepState(codes, runCancelled, runHeld);
   const { rail, meaning } = stateWordsOf(state, codes.on, runHeld);
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
       title={chipTitle(state, meaning, codes.message, note)}
       data-state={state}
-      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${stateClass[state]}`}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono leading-none ${stateClass[state]}`}
     >
       {state === 'unverified' && <CircleDashed aria-hidden strokeWidth={2.5} className="size-2.5 shrink-0" />}
       <span className="truncate">{rail}</span>
-    </span>
+    </Body>
   );
 }
 
@@ -51,8 +54,8 @@ export function StatusChip({
 export function StepNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (
-    <p data-note className="font-mono text-body-small leading-snug text-on-surface-variant">
+    <Body size="small" colorRole="on-surface-variant" data-note className="font-mono leading-snug">
       {note}
-    </p>
+    </Body>
   );
 }

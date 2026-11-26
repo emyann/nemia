@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Cell, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Label, Row, Title as TitleType, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import type { RunClock as Clock } from '@/lib/api/runs';
@@ -15,7 +15,7 @@ import { ENDED, OPENS } from '@/lib/words';
 import { CutButton } from './CutButton';
 import { cutRing } from './cut';
 import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
-import { runRecipe, type RunTone } from './run.recipe.ts';
+import { runRecipe, runType, type RunTone, type RunType } from './run.recipe.ts';
 import { RunClock, RunCost } from './RunFigures';
 import { Chip, Fan, Pips, Ring, RunMark, Words } from './RunMarks';
 import { RunMeta } from './RunMeta';
@@ -75,7 +75,20 @@ const endedOf = (run: PartRun) =>
 function readOf({ run, size, layout = 'card' }: Pick<RunProps, 'run' | 'size' | 'layout'>) {
   const now = nowOf(run) ?? endedOf(run);
   const s = runRecipe({ size, layout, tone: now.tone });
-  return { now, s, say: says(size, layout), finished: run.state === 'finished', title: titleOf(run) };
+  return { now, s, type: runType(size, layout), say: says(size, layout), finished: run.state === 'finished', title: titleOf(run) };
+}
+
+/** The kit's primitive of each type role a run's parts take. */
+const PRIMITIVE = { body: Body, label: Label, title: TitleType } as const;
+
+/** Words of a run's part in the type role `type` gives it (`runType`), as a span, with the slot's class and marks. */
+function Typed({ type, children, ...props }: { type: RunType; children: ReactNode } & HTMLAttributes<HTMLSpanElement>) {
+  const Primitive = PRIMITIVE[type.role];
+  return (
+    <Primitive size={type.size} component="span" {...props}>
+      {children}
+    </Primitive>
+  );
 }
 
 type Look = ReturnType<typeof readOf>;
@@ -129,7 +142,7 @@ function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; s
     <Holder {...saying('title')} className="m-0 flex min-w-0 items-start gap-1">
       <TooltipTrigger delay={300}>
         <TextLink to="/runs/$runId" params={{ runId: run.id }} className={cn(look.s.title(), still)}>
-          {look.title}
+          <Typed type={look.type.title}>{look.title}</Typed>
         </TextLink>
         <Tooltip>{look.title}</Tooltip>
       </TooltipTrigger>
@@ -143,23 +156,29 @@ function ClockSaid({ run, look, asOf }: { run: PartRun; look: Look; asOf: Date }
   if (look.now.tone === 'yours' && run.waitingSince) {
     const waited = presentWait({ waitingSince: run.waitingSince }, asOf);
     return (
-      <span data-waited {...saying('clock')} className={cn(look.s.clock(), ink.yours)}>
+      <Typed type={look.type.clock} data-waited {...saying('clock')} className={cn(look.s.clock(), ink.yours)}>
         waited {waited}
-      </span>
+      </Typed>
     );
   }
   return (
     <span {...saying('clock')} className="inline-flex">
-      <RunClock run={{ ...run, clock: run.clock ?? null }} asOf={asOf} finished={look.finished} className={look.s.clock()} />
+      <RunClock
+        run={{ ...run, clock: run.clock ?? null }}
+        asOf={asOf}
+        finished={look.finished}
+        size={look.type.clock.size}
+        className={look.s.clock()}
+      />
     </span>
   );
 }
 
-/** The run's cost, in ink, with its tokens by kind over it; nothing where none was measured. */
-function CostSaid({ run, className }: { run: PartRun; className?: string }) {
+/** The run's cost, in ink, at `size` (medium by default), with its tokens by kind over it; nothing where none was measured. */
+function CostSaid({ run, size }: { run: PartRun; size?: 'small' | 'medium' }) {
   return (
     <span data-cost {...saying('cost')} className="inline-flex shrink-0 text-on-surface">
-      <RunCost run={run} className={className} />
+      <RunCost run={run} size={size} />
     </span>
   );
 }
@@ -173,9 +192,9 @@ function NowMarks({ look, small = false, words = false }: { look: Look; small?: 
         <Chip now={now} small={small} />
       </span>
       {now.agent && (
-        <span data-now-agent {...saying('agent')} className={s.agent()}>
+        <Typed type={look.type.agent} data-now-agent {...saying('agent')} className={s.agent()}>
           {now.agent}
-        </span>
+        </Typed>
       )}
       {now.round && (
         <span {...saying('round')} className="inline-flex shrink-0">
@@ -202,7 +221,7 @@ function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among:
         tone={look.now.tone}
         among={among.filter((other) => other.id !== run.id)}
         title={cut ? [said || whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
-        className={cn(cut && 'text-body-small')}
+        size={cut ? 'small' : 'medium'}
       />
     </span>
   );
@@ -214,9 +233,9 @@ function RunLine({ run, asOf, still, className, look }: RunProps & { look: Look 
   return (
     <CutFrame hue="none" size={CUT.sm} className={className}>
       <span data-run={run.id} data-now={look.now.tone} className={s.base()}>
-        <span {...saying('id')} className={s.id()}>
+        <Typed type={look.type.id} {...saying('id')} className={s.id()}>
           {run.id.slice(-4)}
-        </span>
+        </Typed>
         <span {...saying('state', 'step')} className="inline-flex shrink-0">
           <Chip now={look.now} small />
         </span>
@@ -278,7 +297,7 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
           <RunClock run={{ ...run, clock: run.clock ?? null }} asOf={asOf} finished={look.finished} />
         </span>
       </Cell>
-      <Cell data-cost className="font-mono text-body-small whitespace-nowrap">
+      <Cell data-cost className="font-mono whitespace-nowrap">
         <CostSaid run={run} />
       </Cell>
     </Row>
@@ -351,7 +370,7 @@ function RunCard({
   const waiters = waitersOf(among, run.id).length;
   return (
     <Framed run={run} look={look} size="md" ringed={ringed} className={className}>
-      <span className={s.head()}>
+      <Typed type={look.type.head} className={s.head()}>
         <Eyebrow run={run} />
         <span className="inline-flex shrink-0 items-center gap-2 tracking-normal normal-case">
           {waiters > 0 && (
@@ -359,11 +378,11 @@ function RunCard({
               <Fan count={waiters} />
             </span>
           )}
-          <span {...saying('id')} className={cn(s.id(), 'text-label-small')}>
+          <Typed type={look.type.id} {...saying('id')} className={s.id()}>
             {run.id.slice(-4)}
-          </span>
+          </Typed>
         </span>
-      </span>
+      </Typed>
       <Title run={run} look={look} still={still} end={titleEnd} heading />
       <span className={s.now()}>
         <NowMarks look={look} small />
@@ -381,7 +400,7 @@ function RunCard({
         <span {...saying('graph')} className={s.steps()}>
           <StepGraph run={run} wrap={wrap} className={still} />
         </span>
-        <CostSaid run={run} className="text-body-small" />
+        <CostSaid run={run} size="small" />
       </span>
       {children}
     </Framed>
@@ -396,9 +415,9 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
   const waiters = waitersOf(among, run.id).length;
   return (
     <Framed run={run} look={look} size={xl ? 'xl' : 'lg'} ringed={ringed} className={className}>
-      <span {...saying('id', 'where', 'labels')} className={cn(s.head(), 'flex')}>
+      <Typed type={look.type.head} {...saying('id', 'where', 'labels')} className={cn(s.head(), 'flex')}>
         <RunMeta run={run} whole={xl} />
-      </span>
+      </Typed>
       <Title run={run} look={look} still={still} end={titleEnd} heading />
       <span className={s.now()}>
         <NowMarks look={look} words={xl} />
@@ -424,7 +443,7 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
           <span {...saying('graph')} className={s.steps()}>
             <StepGraph run={run} wrap={wrap} className={still} />
           </span>
-          <CostSaid run={run} className="text-body-small" />
+          <CostSaid run={run} size="small" />
           <span {...saying('action')} className="ml-auto inline-flex">
             <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className={still}>
               {OPENS}

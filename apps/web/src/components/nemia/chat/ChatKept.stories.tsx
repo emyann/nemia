@@ -10,7 +10,7 @@ const meta: Meta<typeof ChatKeptMessage> = {
 export default meta;
 
 /** Where the message stands in its story: her side sheet's width, on its ground, laid out as the talk lays its items out. */
-const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)', display: 'flex', flexDirection: 'column' as const };
+const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-background)', display: 'flex', flexDirection: 'column' as const };
 
 /** The daemon lost: nothing reached her, and the kit's three buttons send it again, change it, or throw it away. */
 export const Lost: StoryObj<typeof ChatKeptMessage> = {

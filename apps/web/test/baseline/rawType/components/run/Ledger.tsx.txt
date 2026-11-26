@@ -1,1 +1,0 @@
-apps/web/src/components/run/Ledger.tsx#text-label-large

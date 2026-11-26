@@ -5,15 +5,19 @@
  */
 import type * as React from 'react';
 import { cn } from '@/lib/utils';
+import { Body } from '@/components/ui/ds';
 
 /** The line, its hairlines on either side of the words; `className` sets their type, the data marks its caller's own. */
 export function Marker({ className, children, ...props }: React.ComponentProps<'div'>) {
   return (
-    <div
+    <Body
+      size="medium"
+      component="div"
+      colorRole="on-surface-variant"
       {...props}
       data-slot="marker"
       className={cn(
-        'relative flex min-h-4 w-full items-center gap-2 text-left text-body-medium text-on-surface-variant',
+        'relative flex min-h-4 w-full items-center gap-2 text-left',
         'before:mr-1 before:h-px before:min-w-6 before:flex-1 before:bg-outline-variant after:ml-1 after:h-px after:min-w-6 after:flex-1 after:bg-outline-variant',
         className,
       )}
@@ -24,6 +28,6 @@ export function Marker({ className, children, ...props }: React.ComponentProps<'
       >
         {children}
       </span>
-    </div>
+    </Body>
   );
 }

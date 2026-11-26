@@ -1,2 +1,0 @@
-apps/web/src/components/agent/AgentParts.tsx#text-body-medium
-apps/web/src/components/agent/AgentParts.tsx#text-body-small

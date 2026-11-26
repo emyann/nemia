@@ -1,1 +1,0 @@
-apps/web/src/components/run/RunGone.tsx#text-body-medium

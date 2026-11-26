@@ -170,7 +170,14 @@ here.
   import of `lib/classes.ts`'s control strings, `handDrawn`; an input whose literal `type` is `checkbox` or `radio` is keyed by it, the kit
   drawing each with its own part), and the `todo` stories. `test/rulebook.test.ts` holds the rules of `DESIGN.md` the pages do not
   yet obey to four more lists of the same baseline: a kit accent role the board's parts write (`accentRole`), a `money` class or variable,
-  which no cost writes any more (`money`, kept empty so the word cannot come back), a raw type class where the kit's primitive belongs (`rawType`) and a surface role of the kit's (`kitSurface`). The
+  which no cost writes any more (`money`, kept empty so the word cannot come back), a raw type class where the kit's primitive belongs (`rawType`) and a surface role of the kit's (`kitSurface`, kept empty as `money` is). A
+  primitive's size stepped at a breakpoint, its type class beside its family under one variant as the kit's `Typography.tsx` writes it
+  (`@lg/page:text-display-small @lg/page:font-display-small`), is no `rawType` entry. The four most-read pages' own view, every file of
+  `src/components` and `src/routes` their routes' imports reach (`READ_PAGES`, walked by `test/reach.ts`, the walk the stories'
+  hand-over shares), holds no raw type class at all, listed or not; the walk stops at the files that open a view of their own over the
+  page (`OVER`, each with why: `run/RunMenu.tsx`, `step/StepPreview.tsx`), whose dialogs and popovers keep their type for a later card.
+  `expectTwoDeep` (`test/e2e/checks.ts`), asserted by those four pages' e2e files, refuses a text three boxes deep (`DESIGN.md`: a view is
+  two boxes deep at most), naming each and the boxes it sits in. The
   baseline is a folder, `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
   `test/baseline.ts`, proved by `contracts/baseline-shard.contract.ts`), so that a cut deletes a file and two runs' cuts never meet in one
   file, which git merges clean. A file you mend is cut from its list in the same change: its line, or the file where it is the last
@@ -480,7 +487,9 @@ e2e page*.
 - A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it, so
   its proof draws the card narrow.
 - The grain is `apps/web/src/components/look/grain.css`, each tile written once and percent-encoded whole — the build's minifier refuses a
-  raw `<svg` in a custom property — and worn by a part that writes `data-grain`; on a cut frame it is the ground layer's, clipped with it.
+  raw `<svg` in a custom property — and worn by a part that writes `data-grain`: `label` whole on a label, `quiet`, a third of the
+  frame's former weight (the owner's pick of 2026-11-25), on a cut frame's ground layer, clipped with it, and none on a frame inside
+  another, which `CutFrame` knows from a context it provides, so grain never doubles (`test/parts.test.ts`).
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is never
   refused: a page of the look measures through `contrastHolds` (`apps/web/test/e2e/runs-contrast.ts`), which flattens the ground first. A

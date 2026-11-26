@@ -1,2 +1,0 @@
-apps/web/src/components/look/StepGraph.tsx#text-body-small
-apps/web/src/components/look/StepGraph.tsx#text-label-small

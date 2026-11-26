@@ -7,6 +7,7 @@ import type { StepView } from '../../lib/runView';
 import type { Frozen } from '../../lib/frozen';
 import { budgetWord } from '../../lib/money';
 import { AmountField } from '../field/AmountField';
+import { Body, Label } from '@/components/ui/ds';
 
 /** The budgets a gated step proposed for the steps after it, or the caps its approval set, as the api says each. */
 export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
@@ -81,7 +82,7 @@ export function GateBudgetRows({
       data-gate-budgets={budgets.from}
       className="space-y-2 rounded border border-outline-variant p-3"
     >
-      <h3 className="text-label-medium text-on-surface-variant">
+      <Label size="medium" component="h3" colorRole="on-surface-variant">
         {proposed ? (
           <>
             The budgets <span className="text-on-surface">{step}</span> proposes for the steps after it: change one to set it with your
@@ -90,19 +91,19 @@ export function GateBudgetRows({
         ) : (
           'The budgets the approval set for the steps after it'
         )}
-      </h3>
+      </Label>
       <ul className="space-y-2">
         {budgets.steps.map((row) => (
           <BudgetRow key={row.step} row={row} typed={amounts[row.step]} onTyped={editing} />
         ))}
       </ul>
-      <p data-said className="break-words border-t border-outline-variant pt-2 text-body-small">
+      <Body size="small" data-said className="break-words border-t border-outline-variant pt-2">
         {budgets.said}
-      </p>
+      </Body>
       {budgets.line && (
-        <p data-past-line className="break-words text-body-small font-medium text-yours">
+        <Body size="small" data-past-line className="break-words font-medium text-yours">
           {budgets.line.said}
-        </p>
+        </Body>
       )}
     </section>
   );
@@ -140,19 +141,19 @@ function BudgetRow({
             {row.said}
           </span>
         )}{' '}
-        <span data-own className="text-body-small text-on-surface-variant">
+        <Body size="small" component="span" colorRole="on-surface-variant" data-own>
           {row.workflow === null ? 'no budget of its own' : `its own budget ${budgetWord(row.workflow)}`}
-        </span>{' '}
+        </Body>{' '}
         {above && row.workflow !== null && (
-          <span data-above-words className="text-body-small font-medium text-yours">
+          <Body size="small" component="span" data-above-words className="font-medium text-yours">
             {`above the workflow's ${budgetWord(row.workflow)}`}
-          </span>
+          </Body>
         )}
       </div>
       {row.why !== null && (
-        <p data-why className="break-words text-body-small text-on-surface-variant">
+        <Body size="small" data-why className="break-words">
           {row.why}
-        </p>
+        </Body>
       )}
     </li>
   );

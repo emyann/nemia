@@ -1,10 +1,10 @@
 /**
  * What the api stamps with a revision of the keyspace: the objects it serves that no verb of the orchestrator stamps (`atRevisions`) — a
  * Card, a Proposal, a Delegation and a Run's list, which the api pages itself, and an Agent, a Skill and a Workflow, which the api
- * builds from the doors' listings. Each leaves with `metadata.resourceVersion` the keyspace revision of its last change, the highest among the records
- * it is made of, and every list of one with the keyspace head read before its items were, so a watch from it loses no change between
- * the two. A GET writes nothing here, in any process, and nothing is kept between two requests: the definition index is numbered with no
- * write (`kindRevisions`).
+ * builds from the doors' listings. Each leaves with `metadata.resourceVersion` the keyspace revision of its last change, the highest
+ * among the records it is made of, and every list of one with the keyspace head read before its items were, so a watch from it loses no
+ * change between the two. A GET writes nothing here, in any process, and nothing is kept between two requests: the definition index is
+ * numbered with no write (`kindRevisions`).
  */
 import type { Context as RequestContext } from 'hono';
 import { isWatchedKind, kindRevisions, type WatchedKind } from 'agent-orchestrator';

@@ -1,10 +1,9 @@
 /**
- * What a step's card says, read from the run's own answer (`RunDetail`), the run's row on the list and the agents: the card's kind and
- * the hue of its frame, its tag, its agent, its tries and rounds, its time, its session's five facts, its spend, a note and its one
- * action, `Read and approve` at an approval's gate. Its words are the step part's head (`headOf`, stepPart.ts), their one writer, said
- * here as the card reads them, null in place of `none`. `StepPart` draws that head at M, in the waiting card's modal; the e2e's
- * preview page
- * (`059-runs-preview.ts`) reads what the diamond's glance (`StepGlance`) is expected to say here.
+ * What a step's head says, as the words the board draws, read from the run's own answer (`RunDetail`), the run's row on the list and the
+ * agents: its kind and the hue of its frame, its tag, its agent and model, its tries and rounds, its time, its session's five facts, its
+ * spend and a note. The words are the step part's head (`headOf`, stepPart.ts), their one writer, said here null in place of `none`. The
+ * e2e's preview page (`059-runs-preview.ts`) reads what the diamond's glance (`StepGlance`) is expected to say here, and the unit tests
+ * prove the head's words state by state through it.
  */
 import {
   headOf,
@@ -33,7 +32,6 @@ export type StepCardFacts = {
   facts: Array<{ key: string; value: string }> | null;
   spend: CardSpend | null;
   note: CardNote | null;
-  action: { words: string; runId: string; step: string };
 };
 
 /** What the card reads: the run's row, the step's name, the run's own answer once read, the agents once read, and the instant now. */
@@ -61,6 +59,5 @@ export function stepCardOf(input: StepCardInput) {
     facts: orNull(head.facts),
     spend: orNull(head.spend),
     note: orNull(head.note),
-    action: head.action,
   } satisfies StepCardFacts;
 }

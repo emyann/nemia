@@ -28,6 +28,16 @@ export default {
     await expectVisible(button, `the waiting card of a run at ${gated}'s gate holds Approve ${gated}`);
     await expectVisible(card.getByRole('link', { name: 'Open the run' }), 'beside Open the run');
 
+    const cards = await page.locator('section[data-section="waiting"] article[data-run]').all();
+    let others = 0;
+    for (const other of cards) {
+      const said = ((await other.locator('[data-now-words]').first().textContent()) ?? '').trim().toLowerCase();
+      const wanted = said.startsWith('approve ') ? 1 : 0;
+      if (wanted === 0) others += 1;
+      await expectCount(other.locator('[data-approve]'), wanted, `the card that says "${said}" holds ${wanted} Approve button`);
+    }
+    if (others === 0) throw new Refused('a waiting card of another kind of wait stands beside the gate, to hold no Approve');
+
     const modal = page.getByRole('dialog', { name: `Approve ${gated}`, exact: true });
     const gateOf = () => modal.locator(`section[aria-label="The gate of ${gated}"]`);
     const open = async (what: string) => {

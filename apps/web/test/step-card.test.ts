@@ -1,6 +1,6 @@
 /**
  * A step's card (src/lib/stepCard.ts): each of its five states read from a run's row and its own answer, the hue of its frame, its
- * tag, its tries and rounds, its time, its five facts, its spend, its note and its action.
+ * tag, its tries and rounds, its time, its five facts, its spend and its note.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -107,7 +107,6 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.match(card.time?.note ?? '', /^since /);
     assert.deepEqual(card.spend, { kind: 'words', label: 'Spent', said: 'not measured yet', note: 'of $10' });
     assert.deepEqual(card.note, { text: '1 call denied: Bash(cd)', icon: 'shield' });
-    assert.deepEqual(card.action, { words: 'Open the step', runId: 'r-1', step: 'implement' });
   });
   test('a step at work is drawn with no meter, even where a spend was measured before its try', () => {
     const card = cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(2)] })]);
@@ -138,7 +137,6 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.equal(card.time?.value, '17m');
     assert.deepEqual(card.spend, { kind: 'meter', label: 'Spent', value: 2.39, max: 10, said: '$2.39 of $10' });
     assert.deepEqual(card.note, { text: 'Nine questions for you, each with a recommendation.', icon: 'info' });
-    assert.equal(card.action.words, 'Read and approve');
   });
   test('a step done: no hue, its tries counted, when it ended and how long it ran, its spend on a meter', () => {
     const card = cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1), aTry(2)] })]);

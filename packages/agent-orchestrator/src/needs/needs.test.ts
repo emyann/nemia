@@ -154,7 +154,7 @@ test("a sweep reads the places', the harnesses' and every trusted factory's work
   fs.writeFileSync(path.join(trusted.repo, 'here'), '');
   const read = await Effect.runPromise(needsOnce(memo).pipe(Effect.provide(placed)));
   assert.equal(read.get(checkKey({ check: 'exit 0' })), 'met');
-  const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir) };
+  const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir), factory: 'acme' };
   assert.equal(read.get(checkKey({ check: 'exit 1', ...own })), 'missing');
   assert.equal(
     read.get(checkKey(repositoryCheckOf(toolchain, trusted.repo))),

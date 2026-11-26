@@ -306,7 +306,7 @@ const NEVER_WRITERS: Call[] = [
 
 /**
  * The reads of GitHub's Actions toolset, through which implement reads a red CI's runs, jobs and job logs where its factory names the
- * server (`ciServer`); the toolset's one write, `actions_run_trigger` (run, re-run, cancel, delete logs), is in `NEVER_WRITERS`.
+ * server (`ciServer`); the toolset's one write, its run trigger (run, re-run, cancel, delete logs), is in `NEVER_WRITERS`.
  */
 const ACTIONS_READS: Call[] = ['actions_list', 'actions_get', 'get_job_logs'].map((tool) => ({ tool: `mcp__github__${tool}` }));
 

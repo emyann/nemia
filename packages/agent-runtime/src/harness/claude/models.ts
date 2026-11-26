@@ -22,26 +22,21 @@ const MODELS_TIMEOUT_MS = 15_000;
  * words that resolve to it as its aliases, and the facts of the first row that names it. Pure.
  * @param rows The rows the harness answered, each a `ModelInfo` of the SDK.
  */
-export const listedOf: ListedOf = (rows) => {
-  const listed: { id: string; aliases: string[]; name: string; keepsAuto: boolean | undefined; efforts: readonly string[] | undefined }[] =
-    [];
-  for (const row of rows) {
-    const id = row.resolvedModel ?? row.value;
-    const held = listed.find((m) => m.id === id);
-    if (held === undefined) {
-      listed.push({
-        id,
-        aliases: id === row.value ? [] : [row.value],
-        name: row.displayName,
-        keepsAuto: row.supportsAutoMode,
-        efforts: row.supportedEffortLevels,
-      });
-    } else if (id !== row.value && !held.aliases.includes(row.value)) {
-      held.aliases.push(row.value);
-    }
-  }
-  return listed;
-};
+export const listedOf: ListedOf = (rows) =>
+  rows
+    .filter((row, i) => !rows.slice(0, i).some((before) => (before.resolvedModel ?? before.value) === (row.resolvedModel ?? row.value)))
+    .map((first) => ({
+      id: first.resolvedModel ?? first.value,
+      aliases: rows
+        .filter(
+          (row) =>
+            (row.resolvedModel ?? row.value) === (first.resolvedModel ?? first.value) && row.value !== (first.resolvedModel ?? first.value),
+        )
+        .map((row) => row.value),
+      name: first.displayName,
+      keepsAuto: first.supportsAutoMode,
+      efforts: first.supportedEffortLevels,
+    }));
 
 /** One ask of Claude Code's models, as `claudeModels` puts it: `models` answers once, `close` lets the query go whatever came of it. */
 type ModelsAsk = {

@@ -67,6 +67,7 @@ export const STEP_KEYS = [
   'workflow',
   'card',
   'relabel',
+  'waitsFor',
 ] as const;
 
 /** One of `STEP_KEYS`. */
@@ -147,6 +148,7 @@ export const STEP_KEY_FORM = {
   workflow: 'text',
   card: 'choice',
   relabel: 'list',
+  waitsFor: 'list',
 } as const satisfies { readonly [K in StepKey]: StepKeyForm };
 
 /** Each key a step has as the loader reads it, every one optional: a key added to `STEP_KEYS` without one does not typecheck. */
@@ -338,6 +340,11 @@ const stepKeyFields = {
   relabel: Schema.optionalKey(
     Schema.NullOr(Strings).annotate({
       description: 'The label edits a backlog node files the card back with: key=value sets a key, key- removes it.',
+    }),
+  ),
+  waitsFor: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({
+      description: 'The conditions a wait node waits on: it runs no session and passes once each is written True for its try.',
     }),
   ),
 } satisfies { readonly [K in StepKey]: Schema.Top };

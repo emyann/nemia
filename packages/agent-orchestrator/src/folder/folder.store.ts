@@ -523,6 +523,7 @@ const frozenStepFields = {
   workflow: Schema.optionalKey(Schema.String),
   card: Schema.optionalKey(Schema.Literals(NODE_CARDS)),
   relabel: Schema.optionalKey(Strings),
+  waitsFor: Schema.optionalKey(Strings),
 } satisfies FrozenStepFields;
 
 /** A field under each former name of a key (`FORMER_KEYS`), checked as the key it is now: what `asNamed` moves onto that key. */

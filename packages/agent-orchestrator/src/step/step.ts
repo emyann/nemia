@@ -318,6 +318,12 @@ export type StepSpec = {
    */
   relabel?: string[];
   /**
+   * `waitsFor: [ready]`: this step is a wait node. It runs no session and no command, and passes once each condition it names is written
+   * True for the try it is on, by a program of the factory or by a person (`nemia condition`): the way a Pod waits on the conditions of
+   * its `readinessGates`. The loader lays each name as a condition check in `checks`, which every reader of a step's checks then reads.
+   */
+  waitsFor?: string[];
+  /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
    * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
    * person's custom instructions for it, before the note. What the rest of the run reads is those; this says where each came from, which is
@@ -494,6 +500,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'workflow',
   'card',
   'relabel',
+  'waitsFor',
 ];
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -517,6 +524,7 @@ export const LIST_KEYS: readonly string[] = [
   'when',
   'ends',
   'relabel',
+  'waitsFor',
   'from',
   'overridable',
   'disallow',
@@ -612,6 +620,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   card: "what card this node files: `routed`, one of its own (the default); `given`, the run's own card as given, for its `workflow:`; `backlog`, the run's card back to the inbox, unqueued",
   relabel:
     'the label edits a `card: backlog` node files the card back with: `key=value` sets a key, `key-` removes it, so no trigger queues it again',
+  waitsFor:
+    'the conditions this step waits on, and nothing else: it runs no session and no command, and passes once each is written True for its try by a program or a person (`nemia condition`), as a Pod waits on its `readinessGates`',
 };
 
 /**

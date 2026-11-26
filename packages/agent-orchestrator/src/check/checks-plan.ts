@@ -229,3 +229,24 @@ export const checksWritten = (checks: readonly CheckSpec[]) =>
     if (c.usesCheckout === false) entry.usesCheckout = 'false';
     return entry;
   });
+
+/**
+ * A wait node's conditions (`waitsFor:`, its names as the list reader gives them) laid as the condition checks every reader of a step's
+ * checks reads: one per name, each waiting on none, so all are asked at once. Refused: an empty list, a name outside `CHECK_NAME` and a
+ * name written twice. Undefined where the step has no `waitsFor:`.
+ * @param step The step's name, which a refusal starts with.
+ * @param names The names of the step's `waitsFor:` list, or undefined where it has none.
+ */
+export function waitChecksOf(step: string, names: readonly string[] | undefined) {
+  if (names === undefined) return undefined;
+  if (names.length === 0)
+    return refuse(`${step}: \`waitsFor:\` names no condition, so the step would wait on nothing. Name one: \`waitsFor: [ready]\`, or delete the line.`);
+  const bad = names.find((n) => !CHECK_NAME.test(n));
+  if (bad !== undefined)
+    refuse(
+      `${step}: \`waitsFor:\` names conditions by words of lower-case letters, digits and dashes, opening on a letter (${JSON.stringify(bad)} is not): \`waitsFor: [ready]\`.`,
+    );
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice !== undefined) refuse(`${step}: \`waitsFor:\` names \`${twice}\` twice, and a condition is waited on once. Delete one.`);
+  return names.map((name) => ({ name, condition: name, after: [] }) satisfies CheckSpec);
+}

@@ -119,6 +119,7 @@ export function validate(steps: readonly StepSpec[]) {
   validateLoops(steps);
   validateRoutes(steps);
   validateCommands(steps);
+  validateWaits(steps);
   validateBaseChecks(steps);
 }
 
@@ -137,6 +138,49 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
   ['workflow', 'a workflow node files a card and runs nothing'],
   ['card', 'a card node files a card and runs nothing'],
   ['loop', 'it asks for no round'],
+];
+
+/** The keys a wait node (`waitsFor:`) cannot take, each with why: it runs nothing, so only its conditions judge it. */
+const WAIT_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
+  ['agent', 'it runs no session'],
+  ['run', 'it runs no command'],
+  ['check', 'its conditions are its checks'],
+  ['checkMemory', 'it runs no check of its own'],
+  ['checkFailurePolicy', 'it runs no check of its own'],
+  ['resume', 'it continues no session'],
+  ['workspace', 'it works in no workspace of its own'],
+  ['retries', 'a False refuses it and waits on a person, who asks `nemia retry`'],
+  ['budget', 'it spends nothing'],
+  ['loop', 'it asks for no round'],
+  ['rounds', 'it asks for no round'],
+  ['routes', 'a condition is a node of its own'],
+  ['route', 'a condition is a node of its own'],
+  ['workflow', 'a workflow node files a card and runs nothing'],
+  ['card', 'a card node files a card and runs nothing'],
+  ['output', 'it signs off with no closeout of its own'],
+  ['input', 'it reads nothing handed on'],
+  ['tally', 'it signs off with no closeout of its own'],
+  ['skills', 'it runs no session'],
+  ['mcp', 'it runs no session'],
+  ['harness', 'it runs no session'],
+  ['model', 'it runs no session'],
+  ['effort', 'it runs no session'],
+  ['context', 'it runs no session'],
+  ['permissionMode', 'it runs no session'],
+  ['sandbox', 'it runs no session'],
+  ['tools', 'it runs no session'],
+  ['disallowedTools', 'it runs no session'],
+  ['allowedTools', 'it runs no session'],
+  ['denials', 'it runs no session'],
+  ['remote', 'it runs no session'],
+  ['deadlineSeconds', 'it runs no session'],
+  ['memory', 'it runs no session'],
+  ['memoryRequest', 'it runs no session'],
+  ['writable', 'it writes nothing'],
+  ['reads', 'it reads nothing'],
+  ['slot', 'it takes no slot of its own'],
+  ['ends', 'a condition is a node of its own'],
+  ['relabel', 'a card node files a card and runs nothing'],
 ];
 
 /**
@@ -160,6 +204,32 @@ function validateCommands(steps: readonly StepSpec[]) {
     if (s.agent === undefined)
       throw new WorkflowError(
         `${s.name}: a command node acts as the agent it names, and this one names none. Add \`agent: <name>\`, the agent whose \`nemia\` calls it makes.`,
+      );
+  }
+}
+
+/**
+ * Refused: a wait node (`waitsFor:`) with a key but the four it takes (`after`, `when`, `gate`, `place`), or an instruction of its own, or
+ * inside a loop's span. It runs no session and no command, and the conditions are its checks, so a key of a session, a command, a retry or
+ * a budget would mean nothing to it. A loop round files its span again, and a wait node's conditions belong to the try they were written
+ * for, so a round of it is not built yet.
+ */
+function validateWaits(steps: readonly StepSpec[]) {
+  const inLoop = new Set(steps.filter((s) => s.loop).flatMap((s) => loopSpan(steps, s)));
+  for (const s of steps) {
+    if (s.waitsFor === undefined) continue;
+    const refused = WAIT_REFUSED.find(([key]) => s[key] !== undefined);
+    if (refused)
+      throw new WorkflowError(
+        `${s.name}: \`waitsFor:\` makes it a wait node, which takes no \`${refused[0]}:\` — ${refused[1]}. Delete the \`${refused[0]}:\` line, or the \`waitsFor:\` line to make it a step.`,
+      );
+    if (s.body.trim())
+      throw new WorkflowError(
+        `${s.name}: a wait node (\`waitsFor:\`) runs no session, so nothing reads an instruction: empty ${s.name}.md below its frontmatter, or delete \`waitsFor:\` to make it a step.`,
+      );
+    if (inLoop.has(s.name))
+      throw new WorkflowError(
+        `${s.name}: a wait node (\`waitsFor:\`) cannot sit in a loop's span, since a round files its steps again and its conditions belong to one try. Move it after the loop.`,
       );
   }
 }
@@ -245,8 +315,9 @@ function validateBaseWorkspace(steps: readonly StepSpec[]) {
  * rather than one of the two guessed.
  */
 function validateFolder(steps: readonly StepSpec[]) {
-  const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
-  const not = steps.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
+  const placed = steps.filter((s) => s.waitsFor === undefined);
+  const folder = placed.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
+  const not = placed.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
   if (!folder.length || !not.length) return;
   throw new WorkflowError(
     `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`place: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'work' : 'works'} on a repository, as \`place: git\` — every step of a team says \`place: folder\`, or none does.` +

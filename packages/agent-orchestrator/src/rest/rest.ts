@@ -155,6 +155,7 @@ export const RUN_INPUTS = {
   labels: 'stamp',
   said: 'stamp',
   refresh: 'stamp',
+  released: 'stamp',
   asks: 'stamp',
   journals: 'feed',
   tips: 'tips',
@@ -184,5 +185,6 @@ export const STAMPED_KEYS: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = 
   labels: runMarkKey('<id>', 'labels'),
   said: saidPrefix('<id>'),
   refresh: runMarkKey('<id>', 'refresh'),
+  released: runMarkKey('<id>', 'released'),
   asks: asksPrefix('<id>'),
 };

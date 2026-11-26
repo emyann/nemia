@@ -52,7 +52,7 @@ export {
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
-export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold, RunReleased } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -680,6 +680,7 @@ export {
   PAUSE_WORDS,
   PRUNE_WORDS,
   REFRESH_WORDS,
+  RELEASE_WORDS,
   RESUME_WORDS,
   RETRY_WORDS,
   RM_WORDS,

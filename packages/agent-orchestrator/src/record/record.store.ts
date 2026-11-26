@@ -20,6 +20,7 @@ import {
   type Hold,
   type Run,
   type Unheld,
+  type Released,
   type Assignee,
   type AssigneeEnd,
   type Unassigned,
@@ -293,6 +294,17 @@ function unheldIn(text: string) {
   return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined;
 }
 
+/**
+ * The release of a run's waiters as its record's text reads: its moment and who wrote it; a text that does not read as one still
+ * releases them, at no moment known.
+ * @param text What the released record holds.
+ */
+export function releasedIn(text: string) {
+  const json = jsonOr(text);
+  const at = fieldOf(json, 'at');
+  return { at: isText(at) ? at : '', ...actorIn(fieldOf(json, 'actor')) } satisfies Released as Released;
+}
+
 /** The longest time an assignee is read with, in milliseconds: 23 hours, as `--for` takes. */
 const MOST_FOR_MS = 23 * 3_600_000;
 
@@ -365,7 +377,7 @@ function saidIn(words: readonly string[]) {
 /**
  * A run's markers as its records hold them: each marker's text where the run has it, and the words said to its steps in the order kept.
  */
-export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'assignee' | 'unassigned' | 'labels']?: string } & {
+export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'released' | 'assignee' | 'unassigned' | 'labels']?: string } & {
   readonly said?: readonly string[];
 };
 
@@ -390,11 +402,12 @@ const assignedIn = (marks: RunMarks) => {
  * @param marks The run's markers.
  */
 export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks) => {
-  const [cancelled, pruned, hold, unheld, labels, saidBefore] = [
+  const [cancelled, pruned, hold, unheld, released, labels, saidBefore] = [
     marks.cancelled === undefined ? undefined : cancelledIn(marks.cancelled),
     marks.pruned === undefined ? undefined : prunedIn(marks.pruned),
     marks.hold === undefined ? undefined : holdIn(marks.hold),
     marks.unheld === undefined ? undefined : unheldIn(marks.unheld),
+    marks.released === undefined ? undefined : releasedIn(marks.released),
     marks.labels === undefined ? undefined : labelsIn(marks.labels),
     saidIn(marks.said ?? []),
   ];
@@ -420,6 +433,7 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
     ...(unheld ? { unheld } : {}),
+    ...(released ? { released } : {}),
     ...assignedIn(marks),
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),
@@ -457,6 +471,7 @@ export const recordIn = (id: string, text: string, where: string) =>
       'pruned',
       'hold',
       'unheld',
+      'released',
       'assignee',
       'unassigned',
       'labels',

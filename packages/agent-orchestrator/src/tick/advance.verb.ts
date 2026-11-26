@@ -199,7 +199,7 @@ export const advancePass = Effect.fn('advancePass')(
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
     const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
     const landing = yield* landEnding(home, run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
-    const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
+    const parents = pass?.parents ?? passParents();
     const from = pass
       ? { read: pass, slot }
       : { standing: standingNow(yield* (yield* RunDoor).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
@@ -236,7 +236,7 @@ export const advancePass = Effect.fn('advancePass')(
     const { tried, rechecked } = yield* fileTries(f, due.retry);
     const looped = yield* fileRounds(f, due.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
-    const filed = yield* fileReady(f, { ready: due.ready, send: assessed.send }, admission.starting, parents.git);
+    const filed = yield* fileReady(f, { ready: due.ready, send: assessed.send }, admission.starting);
     const heldFirst = yield* holdFirst(f, admission.held, assessed.ready);
     const { tipped, tips } = keepTips(ran, steps, assessed.status, heads);
     const wrote =
@@ -435,7 +435,7 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
 });
 
 /**
- * Lift a person's hold once every run it names has landed, each read through `parents`, and only the hold this pass read:
+ * Lift a person's hold once every run it names has released its waiters, each read through `parents`, and only the hold this pass read:
  * answers with its note, and with the moment the hold it lifted was put (`lifted`), which the feed writes as this pass's own deed and not
  * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */
@@ -443,13 +443,13 @@ const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Pare
   const nothing: { notes: string[]; lifted?: string } = { notes: [] };
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;
-  for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
+  for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.read).pipe(over(e))).standing.kind === 'released')) break;
   if (!landed || !(yield* (yield* RunDoor).holds.lift(RunId.read(run.id), run.hold.at))) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {
     notes: [
-      `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} landed`,
+      `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} succeeded or been released`,
     ],
     lifted: at,
   };
@@ -498,7 +498,7 @@ type Admission = {
 };
 
 /**
- * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has landed and the cap
+ * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has released its waiters and the cap
  * leaves it a slot.
  */
 const admit = Effect.fnUntraced(function* (
@@ -509,12 +509,12 @@ const admit = Effect.fnUntraced(function* (
   assessed: Assessment,
   parents: Parents,
 ) {
-  const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
+  const parent = yield* parentsRead(run, parents.read).pipe(over(e));
   const starting = !hasStarted(run);
-  const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).landed, r.steps);
+  const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).standing.kind === 'released', r.steps);
   const admitted = runAdmitted(run, slot, r.steps);
   const held = need.wants && !admitted ? slot : undefined;
-  const ready = runReady(run, (id) => parent(id).landed) && admitted ? assessed.ready : [];
+  const ready = runReady(run, (id) => parent(id).standing.kind === 'released') && admitted ? assessed.ready : [];
   const admission: Admission = { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
   return admission;
 });

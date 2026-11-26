@@ -407,8 +407,8 @@ test("a ghost's card says it waits on the first run it waits on, by its mark, an
     steps: base.steps.map((step) => ({ ...step, phase: 'pending', reason: 'Waiting', on: 'run' as const })),
     waiting: {
       runs: [
-        { run: 'a-1x2y', missing: false, cancelledAt: null, gone: [] },
-        { run: 'b-3z', missing: false, cancelledAt: null, gone: [] },
+        { run: 'a-1x2y', missing: false, cancelledAt: null, failed: false },
+        { run: 'b-3z', missing: false, cancelledAt: null, failed: false },
       ],
       word: 'after a-1x2y and b-3z land',
       advice: 'it starts once both land',

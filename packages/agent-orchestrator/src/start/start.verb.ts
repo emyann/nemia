@@ -567,22 +567,21 @@ function toldOf(
   };
 }
 
-/** Each run an `--after` names, as its record and `git` say it (`parentRecord`), read before the edges are judged. */
-const parentsOf = (after: readonly string[], git: BranchReader) =>
+/** Each run an `--after` names, as its record says it (`parentRecord`), read before the edges are judged. */
+const parentsOf = (after: readonly string[]) =>
   Effect.map(
-    Effect.forEach(new Set(after), (id) => Effect.map(parentRecord(id, git), (parent) => [id, parent] as const)),
+    Effect.forEach(new Set(after), (id) => Effect.map(parentRecord(id), (parent) => [id, parent] as const)),
     (pairs) => new Map(pairs),
   );
 
 /**
  * A folder run's record, its workspace its own directory in the store: fails with an `--after`'s refusal (`afterRefusal`), where the runs
- * it waits on stand read now (`standingLiveOf`).
+ * it waits on read now.
  */
 const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, steps: Run['steps']) {
   const home = yield* StoreRoot;
-  const git = yield* standingLiveOf(told.after ?? []);
-  const parents = yield* parentsOf(told.after ?? [], git);
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, (id) => parents.get(id) ?? {}));
+  const parents = yield* parentsOf(told.after ?? []);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], (id) => parents.get(id) ?? {}));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
@@ -598,14 +597,13 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
 /**
  * A repository run's record on `repo`, as the place the program was given opens it (`openPlace`): the commit HEAD is at and the
  * branch checked out there. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on
- * stand read now (`standingLiveOf`).
+ * read now.
  */
 const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const place = yield* PlaceService;
   const { baseRef, branch, inProgressFile: staged } = yield* tried(() => openPlace(place, repo, isolate));
-  const git = yield* standingLiveOf(told.after ?? []);
-  const parents = yield* parentsOf(told.after ?? [], git);
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parents.get(id) ?? {}));
+  const parents = yield* parentsOf(told.after ?? []);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], (id) => parents.get(id) ?? {}));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,

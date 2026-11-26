@@ -38,7 +38,7 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
 
 /**
  * What each run this one waited on or was handed as context concluded, for its roots' briefs (`## From run <id>` in `composeBrief`), each
- * marked `how` it was given and whether it had landed — every run waited on has, and a run read is as `parentRead` reads it now —, asked
+ * marked `how` it was given and whether it had succeeded — every run waited on has, and a run read is as `parentRead` reads it now —, asked
  * of each run that reads: the first line of its brief, and the closeout of each step whose work is that run's result (`resultSteps`), on
  * the engine's record of its current try, read as `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
@@ -49,43 +49,42 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
  *
  * A parent whose record or workflow does not read, a step never filed, a task the engine holds no closeout for — a failed step whose work
  * a person merged all the same — and a closeout that does not parse each say so in the section, and the roots are filed all the same.
- * Whether a run read has landed is read through `git` (`parentRead`), and fails with the refusal that read failed with.
+ * Whether a run read has succeeded is read by `parentRead`, and fails with the refusal that read failed with.
  */
 export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
   e: Engine,
   ids: readonly string[],
   how: ParentCloseout['how'],
-  git: BranchReader,
 ) {
   const door = yield* RunDoor;
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
     const got = yield* Effect.result(door.runs.read(RunId.read(id)));
     if (Result.isFailure(got)) {
-      out.push({ run: id, unreadable: `its record cannot be read: ${got.failure.message}`, how, landed: false });
+      out.push({ run: id, unreadable: `its record cannot be read: ${got.failure.message}`, how, succeeded: false });
       continue;
     }
     const record: Run = got.success;
     const read = yield* Effect.result(stepsOf(record));
     if (Result.isFailure(read)) {
-      out.push({ run: id, unreadable: `its record cannot be read: ${read.failure.message}`, how, landed: false });
+      out.push({ run: id, unreadable: `its record cannot be read: ${read.failure.message}`, how, succeeded: false });
       continue;
     }
     const steps: StepSpec[] = read.success;
     const said: ParentStep[] = [];
     for (const step of resultSteps(steps, record)) said.push(yield* stepSaid(e, record, step));
-    const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;
-    out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, landed });
+    const succeeded = how === 'waited' || (yield* parentRead(id).pipe(over(e))).standing.kind === 'released';
+    out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, succeeded });
   }
   return out;
 });
 
 /**
- * What a run's roots are handed of other runs, on the pass that files them: what each run it waited on concluded, landed, then what each
- * run it was handed as context concluded, landed or not (`parentCloseouts`). Undefined for a run with neither.
+ * What a run's roots are handed of other runs, on the pass that files them: what each run it waited on concluded, then what each
+ * run it was handed as context concluded, succeeded or not (`parentCloseouts`). Undefined for a run with neither.
  */
-export const handedOf = Effect.fn('handedOf')(function* (e: Engine, run: Run, git: BranchReader) {
-  const waited = run.after?.length ? yield* parentCloseouts(e, run.after, 'waited', git) : [];
-  const read = run.context?.length ? yield* parentCloseouts(e, run.context, 'read', git) : [];
+export const handedOf = Effect.fn('handedOf')(function* (e: Engine, run: Run) {
+  const waited = run.after?.length ? yield* parentCloseouts(e, run.after, 'waited') : [];
+  const read = run.context?.length ? yield* parentCloseouts(e, run.context, 'read') : [];
   return waited.length || read.length ? [...waited, ...read] : undefined;
 });

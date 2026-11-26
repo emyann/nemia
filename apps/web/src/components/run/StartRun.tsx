@@ -186,7 +186,7 @@ const startWords = (pending: boolean, files: number, sent: number) =>
 
 /**
  * That run `id` was started, linked to its page, and when its steps are filed: on the daemon's next pass, once each of `after` has
- * landed.
+ * succeeded.
  */
 function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
   return (
@@ -200,7 +200,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
       . Nothing is filed until the daemon&apos;s next pass
       {after.length > 0 && (
         <>
-          , and {after.join(' and ')} {after.length > 1 ? 'have' : 'has'} landed
+          , and {after.join(' and ')} {after.length > 1 ? 'have' : 'has'} succeeded
         </>
       )}
       .
@@ -252,7 +252,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       <Body size="medium" component="legend" id={legend} className="font-medium">
         After
       </Body>
-      <Body size="small">Waits until it lands: nothing of it is filed until each has landed, and it is handed what each concluded.</Body>
+      <Body size="small">Waits until it succeeds: nothing of it is filed until each has succeeded, and it is handed what each concluded.</Body>
       {!repo ? (
         <Body size="small" data-no-repo>
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.

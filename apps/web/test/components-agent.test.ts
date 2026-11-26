@@ -628,16 +628,16 @@ test('REFUSED: a character card draws no stats line for an agent that sets none,
   assert.doesNotMatch(broken, /data-agent-stats/);
 });
 
-test('a run picked to read shows what it would hand, as markdown — badged not landed, not judged where it has not landed, and unbadged where it has', async () => {
+test('a run picked to read shows what it would hand, as markdown — badged not succeeded, not judged where it has not landed, and unbadged where it has', async () => {
   const { ConcludedPreview } = await import('../src/components/agent/ContextPicker.tsx');
   const preview = (landed: boolean) =>
     routedWith(createElement(ConcludedPreview, { run: 'probe-b2' }), [
       [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', landed, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
     ]);
   const inFlight = await preview(false);
-  assert.match(inFlight, /data-not-landed[^>]*>(?:<[^>]*>)*not landed, not judged</);
+  assert.match(inFlight, /data-not-succeeded[^>]*>(?:<[^>]*>)*not succeeded, not judged</);
   assert.match(inFlight, /<strong>the cache<\/strong>/);
-  assert.doesNotMatch(await preview(true), /data-not-landed|not landed, not judged/);
+  assert.doesNotMatch(await preview(true), /data-not-succeeded|not succeeded, not judged/);
 });
 
 test('a link to a factory definition keeps its factory and repository in its address, and a link to another origin carries none', async () => {

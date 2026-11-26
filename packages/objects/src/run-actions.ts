@@ -119,7 +119,7 @@ export const RunStart = Schema.Struct({
       description: 'Where the workflow is read from when both the repository and the user library have it: repo or user.',
     }),
   ),
-  after: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The runs its first steps wait on to land (--after), by id.' })),
+  after: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The runs its first steps wait on to succeed (--after), by id.' })),
   context: Schema.optionalKey(
     Schema.Array(NotBlank).annotate({
       description: 'The runs whose conclusions it is handed as context (--context), by id; it does not wait on them.',
@@ -154,7 +154,7 @@ const CopiedInto = Schema.Struct({
  * (`from`); its factory; its repository, and whether it works in one (`repository`: a folder run's steps work in a folder each); its
  * workflow's name; the factory's folders it mounts read-only (`mounts`) and those some steps write (`writable`); its volumes, read-only
  * (`volumes`) and writable (`writableVolumes`); the harness settings it froze (`settings`); where it works (`workspace`); the inputs and
- * cards it copied, and where its workflow's and carried files were copied; the runs it waits on to land on its `branch` (`after`) and is
+ * cards it copied, and where its workflow's and carried files were copied; the runs it waits on to succeed (`after`) and is
  * handed as context (`context`); the steps gated (`gated`) and the endings a person approves first (`ends`); each step's model for it
  * alone (`models`); its labels, and each key it did not inherit since the runs it names disagree on it (`labelsLeftOut`).
  */
@@ -198,10 +198,10 @@ export const RunStartedFacts = Schema.Struct({
   carriedFiles: Schema.optionalKey(
     Schema.String.annotate({ description: 'Where the files its workflow shares with the others beside it were copied.' }),
   ),
-  after: Schema.optionalKey(Strings.annotate({ description: 'The runs it waits on to land on its branch.' })),
+  after: Schema.optionalKey(Strings.annotate({ description: 'The runs it waits on to succeed.' })),
   branch: Schema.String.annotate({
     description:
-      "The base branch its result goes to, which the runs it waits on land on; empty where the run's record names none, as on a folder run.",
+      "The base branch its result goes to, which the run starts from; empty where the run's record names none, as on a folder run.",
   }),
   context: Schema.optionalKey(Strings.annotate({ description: 'The runs it is handed as context.' })),
   gated: Schema.optionalKey(Strings.annotate({ description: 'The steps gated in it.' })),
@@ -231,11 +231,11 @@ export type RunStartedFacts = typeof RunStartedFacts.Type;
 
 /**
  * What a start answers: the run's name; and what `nemia start` prints of it, where the api says it: the run as it was started (`run`),
- * the store's pause as it stood once the run was written (`paused`), the runs handed as context that had landed (`landed`), a line for
+ * the store's pause as it stood once the run was written (`paused`), the runs handed as context that had succeeded (`succeeded`), a line for
  * each file of its folder that still writes a former spelling (`hints`), the factory's repositories and volumes left out of its mounts,
  * being no directory (`notMounted`, `notVolumes`), and the `?repo=` that only found the factory, its wiring placing the run on another
  * (`repoFoundFactory`). Of an inbox card's start, the card, why its `queued:` line is still on it (`queueLeft`), a `repo:` the start
- * did not take (`ignoredRepo`), and the cards of its `after:` that had not landed, which a start by hand goes ahead of (`waitedOn`).
+ * did not take (`ignoredRepo`), and the cards of its `after:` that had not succeeded, which a start by hand goes ahead of (`waitedOn`).
  */
 export const RunStarted = Schema.Struct({
   id: Schema.String.annotate({ description: "The new run's id." }),
@@ -249,13 +249,13 @@ export const RunStarted = Schema.Struct({
   waitedOn: Schema.optionalKey(
     Strings.annotate({
       description:
-        "The cards of the card's after: that had not landed, by name, on a card's start by hand: the run was started all the same, from the base as it is now.",
+        "The cards of the card's after: that had not succeeded, by name, on a card's start by hand: the run was started all the same, from the base as it is now.",
     }),
   ),
   paused: Schema.optionalKey(
     Paused.annotate({ description: "The store's pause as it stood once the run was written; absent where it is not paused." }),
   ),
-  landed: Schema.optionalKey(Strings.annotate({ description: 'The runs handed as context that had landed.' })),
+  succeeded: Schema.optionalKey(Strings.annotate({ description: 'The runs handed as context that had succeeded.' })),
   hints: Schema.optionalKey(
     Strings.annotate({ description: 'A line for each file of its workflow folder that still writes a former spelling.' }),
   ),
@@ -520,26 +520,26 @@ export const RunRefreshed = Schema.Struct({
 }).annotate({ identifier: 'RunRefreshed' });
 export type RunRefreshed = typeof RunRefreshed.Type;
 
-/** A run held until other runs land, as `nemia hold <run> --until <run>…` holds it: the runs, why, and who holds it. */
+/** A run held until other runs succeed, as `nemia hold <run> --until <run>…` holds it: the runs, why, and who holds it. */
 export const RunHold = Schema.Struct({
   until: Schema.optionalKey(
-    Strings.annotate({ description: 'The runs the hold waits on to land (--until); left out, a hold only a person lifts.' }),
+    Strings.annotate({ description: 'The runs the hold waits on to succeed (--until); left out, a hold only a person lifts.' }),
   ),
   why: Schema.optionalKey(Schema.String.annotate({ description: "The person's words for why, one line." })),
   by: Schema.optionalKey(Schema.String.annotate({ description: 'Who puts the hold, one line.' })),
 }).annotate({ identifier: 'RunHold' });
 export type RunHold = typeof RunHold.Type;
 
-/** A person's hold on a run, as written: when, the runs it waits on to land, why and by whom. */
+/** A person's hold on a run, as written: when, the runs it waits on to succeed, why and by whom. */
 const RunHoldWritten = Schema.Struct({
   at: Schema.String.annotate({ description: 'When the hold was put.' }),
-  until: Strings.annotate({ description: 'The runs it waits on to land, in the order they were named.' }),
+  until: Strings.annotate({ description: 'The runs it waits on to succeed, in the order they were named.' }),
   why: Schema.optionalKey(Schema.String.annotate({ description: "The person's words for why; absent where none were given." })),
   by: Schema.optionalKey(Schema.String.annotate({ description: 'Who put it; absent on a file older code wrote.' })),
   actor: Schema.optionalKey(Actor),
 }).annotate({
   identifier: 'RunHoldWritten',
-  description: 'A hold on a run, as written: when, the runs it waits on to land, why and by whom.',
+  description: 'A hold on a run, as written: when, the runs it waits on to succeed, why and by whom.',
 });
 type RunHoldWritten = typeof RunHoldWritten.Type;
 
@@ -630,6 +630,18 @@ export const RunCancelled = Schema.Struct({
   identifier: 'RunCancelled',
 });
 export type RunCancelled = typeof RunCancelled.Type;
+
+/** What a release answers: the run, and the release that stands on it (`nemia release`). */
+export const RunReleased = Schema.Struct({
+  id: Schema.String.annotate({ description: "The run's id." }),
+  released: Schema.Struct({
+    at: Schema.String.annotate({ description: "When the run's waiters were released." }),
+    actor: Schema.optionalKey(Actor),
+  }).annotate({ description: 'The release as written: when, and who released the waiters where the caller is known.' }),
+}).annotate({
+  identifier: 'RunReleased',
+});
+export type RunReleased = typeof RunReleased.Type;
 
 /** A condition routed by hand, as `nemia route` routes one: the route, one of the condition's `routes:`. */
 export const RunRoute = Schema.Struct({

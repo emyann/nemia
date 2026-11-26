@@ -11,10 +11,12 @@ import {
   type Event,
   type FeedWait,
   HOLD_WORDS,
+  RELEASE_WORDS,
   REFRESH_WORDS,
   ROUTE_WORDS,
   type RunCancelled,
   type RunHeld,
+  type RunReleased,
   type RunRefreshed,
   type RunRouted,
   WAIT_WORDS,
@@ -51,12 +53,12 @@ export async function cancel(args: Args) {
 /** Runs named in a sentence: `a`, `a and b`, `a, b and c`. */
 const runList = (ids: readonly string[]) => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
 
-/** A hold as `nemia hold` says it: the runs it waits on to land, or a person's lift, and why and by whom where it says. */
+/** A hold as `nemia hold` says it: the runs it waits on to succeed, or a person's lift, and why and by whom where it says. */
 const holdWords = ({ until, why, by }: RunHeld['hold']) => {
   const parts = [...(why ? [`why: ${why}`] : []), ...(by ? [`by ${by}`] : [])];
   const words = parts.length ? ` (${parts.join('; ')})` : '';
   return until.length
-    ? `held until ${runList(until)} ${until.length === 1 ? 'lands' : 'land'}${words}`
+    ? `held until ${runList(until)} ${until.length === 1 ? 'succeeds' : 'succeed'}${words}`
     : `held until a person lifts it${words}`;
 };
 
@@ -86,6 +88,25 @@ export async function hold(args: Args) {
     switchArg(args, 'off') ? c.runs.unhold({ params: { namespace, name } }) : c.runs.hold({ params: { namespace, name }, payload }),
   );
   said(holdLines(held));
+  return 0;
+}
+
+/**
+ * What `nemia release` prints of the release written.
+ * @param released What the release answered: the run, and the release as written.
+ */
+export const releaseLines = ({ id, released }: RunReleased) => [
+  `${id}  waiters released at ${released.at} — every run that waits on it goes on at the next tick, whatever became of it`,
+];
+
+/**
+ * `nemia release <runId>`: let go every run that waits on this one (`runs.release`).
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function release(args: Args) {
+  const name = runOf(args);
+  const namespace = await namespaceOfRun(RELEASE_WORDS.name, name);
+  said(releaseLines(await asked(RELEASE_WORDS.name, (c) => c.runs.release({ params: { namespace, name } }))));
   return 0;
 }
 

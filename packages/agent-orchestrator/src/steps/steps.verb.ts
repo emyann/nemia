@@ -105,15 +105,12 @@ export const stepsAmong = (runs: readonly Run[]) =>
   );
 
 /**
- * A run another waits on, as its record (`RunDoor`) and `git` say it without the engine: the record, when the store has one, and the
- * result branches it names that git no longer has and cannot find on the base by their recorded tips (`BranchReader.landed`). What
- * `nemia start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose unfrozen folder does not load
- * names no result branch, and says why (`unread`, `UnloadedFolder`'s own words, as `stepsOrWhy` keeps them); one whose branches were not
- * read names none gone. Fails with a refusal `git` threw, and any refusal of its steps' read but a folder that does not load.
+ * A run another waits on, as its record (`RunDoor`) says it, no git read: the record, when the store has one. What `nemia start --after`
+ * refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose unfrozen folder does not load says why (`unread`,
+ * `UnloadedFolder`'s own words, as `stepsOrWhy` keeps them). Fails with any refusal of its steps' read but a folder that does not load.
  * @param id The waited-on run's id, as given.
- * @param git The reader that says which result branches are gone.
  */
-export const parentRecord = (id: string, git: BranchReader) =>
+export const parentRecord = (id: string) =>
   Effect.gen(function* () {
     const read = yield* Effect.exit(
       Effect.flatMap(
@@ -124,14 +121,8 @@ export const parentRecord = (id: string, git: BranchReader) =>
     if (Exit.isFailure(read)) return Cause.hasInterruptsOnly(read.cause) ? yield* Effect.interrupt : {};
     const record = read.value;
     const frozen = yield* stepsOrWhy(record);
-    if ('unloaded' in frozen) return { record, unread: frozen.unloaded };
-    const branches = frozen.steps.length ? resultBranches(record, frozen.steps) : [];
-    const cut = isRepositoryRun(record) ? record : undefined;
-    const gone = cut
-      ? yield* tried(() => branches.filter((b) => git.unread(cut, b) === undefined && !git.has(cut.repo, b) && !git.landed(cut, b)))
-      : [];
-    return { record, ...(gone.length ? { gone } : {}) };
-  }) satisfies Effect.Effect<Pick<ParentRun, 'record' | 'gone' | 'unread'>, Refusal> as Effect.Effect<
-    Pick<ParentRun, 'record' | 'gone' | 'unread'>,
+    return 'unloaded' in frozen ? { record, unread: frozen.unloaded } : { record };
+  }) satisfies Effect.Effect<Pick<ParentRun, 'record' | 'unread'>, Refusal> as Effect.Effect<
+    Pick<ParentRun, 'record' | 'unread'>,
     Refusal
   >;

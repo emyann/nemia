@@ -425,7 +425,7 @@ const ON_A_RUN: Run = (() => {
       ...waits.status,
       steps: waits.status.steps.map((s) => (s.name === 'land' ? waitingOn('land', 'run', `waiting on ${LGLL.metadata.name}`) : s)),
       waiting: {
-        runs: [{ run: LGLL.metadata.name, missing: false, cancelledAt: null, gone: [] }],
+        runs: [{ run: LGLL.metadata.name, missing: false, cancelledAt: null, failed: false }],
         word: `waiting on ${LGLL.metadata.name}`,
         advice: '',
         waitingOnYou: false,
@@ -464,7 +464,7 @@ const HELD = staged({
     moving: false,
     holding: {
       at: before(30),
-      runs: [{ run: AT_WORK.metadata.name, missing: false, cancelledAt: null, gone: [], landed: false }],
+      runs: [{ run: AT_WORK.metadata.name, missing: false, cancelledAt: null, failed: false, released: false }],
       word: `held until ${AT_WORK.metadata.name} lands (why: merge conflicts with 1sw7’s schema change; by ann)`,
       advice: '',
       waitingOnYou: false,

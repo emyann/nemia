@@ -148,7 +148,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const assessed = assess(read);
   const decided = decision(read, how.landed ?? landedOf(run, git), assessed);
   const assessOf = (on: Run) => assess({ ...read, run: on }) satisfies Assessment;
-  const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
+  const parent = how.parent ?? (yield* parentsRead(run).pipe(over(e)));
   const scripted = base.signedOff;
   const listed = listing({
     steps: how.shown ?? steps,
@@ -258,7 +258,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   );
   if (runs.length) {
     const viewed = viewedOnce(e);
-    const held = yield* runSlots(viewed, store, yield* StoreConfig, passParents(git));
+    const held = yield* runSlots(viewed, store, yield* StoreConfig, passParents());
     for (const run of runs) {
       const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing, releases, writers.get(run.id));
       const steps = among.get(run.id) ?? [];

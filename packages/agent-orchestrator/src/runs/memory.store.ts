@@ -28,6 +28,7 @@ import type {
   TakenBack,
   Unassigned,
   Unheld,
+  Released,
 } from '../record/record.ts';
 import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
 import { conditionAsk, unconditioned, withConditions } from '../condition/condition.ts';
@@ -56,6 +57,7 @@ const COMPOSED = [
   'pruned',
   'hold',
   'unheld',
+  'released',
   'assignee',
   'unassigned',
   'labels',
@@ -79,6 +81,7 @@ type State = {
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
   unheld: Map<string, Unheld>;
+  released: Map<string, Released>;
   assignees: Map<string, Assignee>;
   unassigned: Map<string, Unassigned>;
   labels: Map<string, Labels>;
@@ -99,6 +102,7 @@ const stateOf = () =>
     pruned: new Map(),
     holds: new Map(),
     unheld: new Map(),
+    released: new Map(),
     assignees: new Map(),
     unassigned: new Map(),
     labels: new Map(),
@@ -141,6 +145,7 @@ function readOf(st: State, id: string) {
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
     ...(unheld !== undefined ? { unheld: structuredClone(unheld) } : {}),
+    ...(st.released.has(id) ? { released: structuredClone(st.released.get(id)) } : {}),
     ...(st.assignees.has(id) ? { assignee: structuredClone(st.assignees.get(id)) } : {}),
     ...(st.unassigned.has(id) ? { unassigned: structuredClone(st.unassigned.get(id)) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
@@ -173,6 +178,7 @@ function forgetOf(st: State, id: string) {
     [st.pruned, 'pruned'],
     [st.holds, 'hold'],
     [st.unheld, 'unheld'],
+    [st.released, 'released'],
     [st.assignees, 'assignee'],
     [st.unassigned, 'unassigned'],
     [st.refresh, 'refresh'],
@@ -394,6 +400,18 @@ function holdsOf(st: State) {
   } satisfies RunsLayer['holds'];
 }
 
+function releasedOf(st: State) {
+  return {
+    put: (id, actor) => {
+      if (st.released.has(id)) return null;
+      const released: Released = { at: new Date().toISOString(), ...(actor ? { actor: structuredClone(actor) } : {}) };
+      st.released.set(id, released);
+      touch(st, id);
+      return structuredClone(released);
+    },
+  } satisfies RunsLayer['released'];
+}
+
 function assigneesOf(st: State) {
   return {
     put: (id, { forMs, name, why, actor }) => {
@@ -486,6 +504,7 @@ function memoryRuns() {
     runs: runsOf(st),
     asks: asksGroup(st),
     holds: holdsOf(st),
+    released: releasedOf(st),
     assignees: assigneesOf(st),
     said: saidOf(st),
     labels: labelsOf(st),

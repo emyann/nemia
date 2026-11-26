@@ -87,6 +87,6 @@ export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string) =>
         row.id !== id &&
         ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
           row.steps.some((step) => step.baseHeldBy?.run === id) ||
-          (row.holding?.runs.some((run) => run.run === id && !run.landed) ?? false)),
+          (row.holding?.runs.some((run) => run.run === id && !run.released) ?? false)),
     )
     .map((row) => row.id);

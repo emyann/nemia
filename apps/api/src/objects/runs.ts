@@ -24,6 +24,7 @@ import {
   CONDITION,
   dropInformed,
   HOLD,
+  RELEASE,
   Informer,
   informerMemo,
   LABEL_RUN,
@@ -341,6 +342,9 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true, actor: actorOf(s.caller) }))),
+    )
+    .handle('release', ({ params: { namespace, name } }) =>
+      acted({ namespace, name }, (s) => s.inRequest(RELEASE.handler({ runId: name, actor: actorOf(s.caller) }))),
     )
     .handle('assign', ({ params: { namespace, name }, payload }) =>
       acted({ namespace, name }, (s) => s.inRequest(ASSIGN.handler({ runId: name, ...payload, off: false, actor: actorOf(s.caller) }))),

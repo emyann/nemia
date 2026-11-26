@@ -338,7 +338,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const answers = yield* answersOf(e, run, views, judged.answers);
   const used = consumption(views, run);
   const runs = !hasStarted(run) && !run.cancelledAt ? yield* (yield* RunDoor).runs.list() : [];
-  const held = runs.length ? (yield* slotsOf(e, runs, config, passParents(git))).held.get(run.id) : undefined;
+  const held = runs.length ? (yield* slotsOf(e, runs, config, passParents())).held.get(run.id) : undefined;
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),

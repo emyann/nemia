@@ -48,7 +48,7 @@ const landing = (word: Word, extra: Partial<RunView> = {}) =>
 
 const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, waitingOnYou: true };
 const waiting = {
-  runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', gone: [] }],
+  runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', failed: false }],
   word: 'waiting on r-0 (cancelled)',
   advice: COMMAND,
   waitingOnYou: true,
@@ -390,8 +390,8 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
     const onRun = summary([['land', 'waiting on r-0']], {
       waiting: {
         runs: [
-          { run: 'r-gone', missing: true, cancelledAt: null, gone: [] },
-          { run: 'r-0', missing: false, cancelledAt: null, gone: [] },
+          { run: 'r-gone', missing: true, cancelledAt: null, failed: false },
+          { run: 'r-0', missing: false, cancelledAt: null, failed: false },
         ],
         word: '',
         advice: '',
@@ -413,28 +413,28 @@ describe('railSaid, barSaid, nowOf: what the rail and a run in flight say of its
     assert.equal(nowOf(slot)?.tone, 'waits');
     const hold = { at: '2026-11-01T00:00:00.000Z', word: '', advice: '', waitingOnYou: false };
     const held = summary([['design', 'waiting']], {
-      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: false }] },
+      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, failed: false, released: false }] },
     });
-    assert.deepEqual(nowOf(held)?.words, [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.lands]);
+    assert.deepEqual(nowOf(held)?.words, [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.succeeds]);
     assert.equal(nowOf(held)?.tone, 'waits', 'a held run is drawn as not started, never grey');
     const landed = summary([['design', 'waiting']], {
-      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: true }] },
+      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, failed: false, released: true }] },
     });
     assert.deepEqual(nowOf(landed)?.words, [PERSON.held.rail], 'a hold whose run landed names none');
-    const never = (run: Partial<{ missing: boolean; cancelledAt: string | null; gone: string[] }>) =>
+    const never = (run: Partial<{ missing: boolean; cancelledAt: string | null; failed: boolean }>) =>
       summary([['design', 'waiting']], {
         holding: {
           ...hold,
           waitingOnYou: true,
-          runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: false, ...run }],
+          runs: [{ run: 'r-9', missing: false, cancelledAt: null, failed: false, released: false, ...run }],
         },
       });
     const calledOff = never({ cancelledAt: '2026-11-02T00:00:00.000Z' });
     assert.equal(nowOf(calledOff)?.tone, 'yours', 'a hold that waits on you is yellow');
-    const neverLands = [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.calledOff, NOW_WORDS.lands];
-    assert.deepEqual(nowOf(calledOff)?.words, neverLands);
+    const neverSucceeds = [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.calledOff, NOW_WORDS.succeeds];
+    assert.deepEqual(nowOf(calledOff)?.words, neverSucceeds);
     assert.deepEqual(nowOf(never({ missing: true }))?.words.at(3), NOW_WORDS.missing);
-    assert.deepEqual(nowOf(never({ gone: ['wf/r-9/run'] }))?.words.at(3), NOW_WORDS.gone);
+    assert.deepEqual(nowOf(never({ failed: true }))?.words.at(3), NOW_WORDS.failed);
   });
   test('a row that waits on you says its wait, in the yellow tone, and a failure its word, in red', () => {
     assert.deepEqual(nowOf(ROWS.check.row)?.words, [waitTag(ROWS.check.row)]);

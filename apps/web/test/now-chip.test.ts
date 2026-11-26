@@ -76,13 +76,13 @@ const row = (id: string, on: string[] = [], until: Array<[string, boolean]> = []
     waiting:
       on.length === 0
         ? null
-        : { runs: on.map((run) => ({ run, missing, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false },
+        : { runs: on.map((run) => ({ run, missing, cancelledAt: null, failed: false })), word: '', advice: '', waitingOnYou: false },
     holding:
       until.length === 0
         ? null
         : {
             at: '2026-11-15T00:00:00.000Z',
-            runs: until.map(([run, landed]) => ({ run, missing: false, cancelledAt: null, gone: [], landed })),
+            runs: until.map(([run, landed]) => ({ run, missing: false, cancelledAt: null, failed: false, released: landed })),
             word: '',
             advice: '',
             waitingOnYou: false,

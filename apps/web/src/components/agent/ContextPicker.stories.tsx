@@ -12,7 +12,7 @@ const LGLL = TARGET_RUNS.lgll.metadata.name;
 /** What lgll would hand a run that reads it: it has not landed, so its preview is badged. */
 const HANDS: Concluded = {
   run: LGLL,
-  landed: false,
+  succeeded: false,
   section: `\n## From run ${LGLL}\n\nIt measured **the cache** and wrote what it found.`,
 };
 
@@ -54,7 +54,7 @@ export const OnePicked: Story = {
   args: { selected: [LGLL] },
   play: async ({ canvasElement }) => {
     const picker = within(canvasElement);
-    await waitFor(() => expect(canvasElement.querySelector(`[data-concluded="${LGLL}"] [data-not-landed]`)).not.toBeNull());
+    await waitFor(() => expect(canvasElement.querySelector(`[data-concluded="${LGLL}"] [data-not-succeeded]`)).not.toBeNull());
     await waitFor(() => expect(picker.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked)).toHaveLength(1));
   },
 };

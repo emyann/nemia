@@ -47,13 +47,13 @@ export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
  * @param verb The verb the id was given to, `rm` where not given.
  * @param command The command a fix names, `nemia <verb>` where not given.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'assign' | 'read' = 'rm', command = `nemia ${verb}`) {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'release' | 'assign' | 'read' = 'rm', command = `nemia ${verb}`) {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
   const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.assignee|\.asks)$/.exec(id);
   if (file)
     return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id nemia ls prints: ${command} ${file[1]}.`;
   const does =
-    verb === 'hold' || verb === 'assign'
+    verb === 'hold' || verb === 'release' || verb === 'assign'
       ? `nemia ${verb} writes its file under WF_ROOT by id`
       : verb === 'read'
         ? `${command} reads a run's record under WF_ROOT by id`

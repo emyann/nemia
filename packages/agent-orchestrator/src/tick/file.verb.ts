@@ -788,17 +788,17 @@ const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, lands: 
  * File the ready steps (`due.ready`), in order, until the pass may file no more, each in the workspace cut for it: answers with the
  * steps filed. A run that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it
  * (`Filing.heads`), and keeps it where the pass did not; and a run that waited on runs or was handed runs as context reads what they
- * concluded, where their branches stand read through `git` (`handedOf`). First, each table condition's route is copied onto its record
+ * concluded, (`handedOf`). First, each table condition's route is copied onto its record
  * (`answerTables`), each workflow node in `due.send` files its card (`sendCards`), and the ready script conditions are filed as command
  * tasks (`fileScripts`), answered among the steps filed.
  */
-export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean, git: BranchReader) {
+export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean) {
   const home = yield* StoreRoot;
   const { e, run } = f;
   answerTables(f);
   const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
-  const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
+  const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
   const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready))];
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;

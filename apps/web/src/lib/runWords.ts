@@ -194,28 +194,28 @@ function runWaitWords(row: NowRow, on: WaitOn | null, step: CodedStep) {
 /** A run a hold names, as the api serves it. */
 type HeldRun = NonNullable<RunView['holding']>['runs'][number];
 
-/** Why a run a hold waits on never lands on its own, as the row says it after its id: none where it may yet land. */
+/** Why a run a hold waits on never succeeds on its own, as the row says it after its id: none where it may yet succeed. */
 const neverWord = (run: HeldRun) => {
   if (run.missing) return [NOW_WORDS.missing];
   if (run.cancelledAt) return [NOW_WORDS.calledOff];
-  return run.gone.length ? [NOW_WORDS.gone] : [];
+  return run.failed ? [NOW_WORDS.failed] : [];
 };
 
 /**
- * The words of a held run: `held · until <run> lands`, the run being the first not landed that never lands on its own, else the first not
- * landed, with why it never lands after its id (`neverWord`); `held` alone where every run it names landed, or it names none. The same
+ * The words of a held run: `held · until <run> succeeds`, the run being the first not released that never succeeds on its own, else the first not
+ * released, with why it never succeeds after its id (`neverWord`); `held` alone where every run it names released it, or it names none. The same
  * words whether the hold waits on a person or not: the hold is said, never its holder as the reader.
  * @param holding The run's hold, null where nobody holds it.
  */
 function heldWords(holding: RunView['holding']) {
-  const open = holding?.runs.filter((run) => !run.landed) ?? [];
+  const open = holding?.runs.filter((run) => !run.released) ?? [];
   const until = open.find((run) => neverWord(run).length > 0) ?? open[0];
-  return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until.run }, ...neverWord(until), NOW_WORDS.lands] : [PERSON.held.rail];
+  return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until.run }, ...neverWord(until), NOW_WORDS.succeeds] : [PERSON.held.rail];
 }
 
 /**
  * The words of a step that waits on no person, by where it stands: being checked, a run or the checkout (`runWaitWords`), a run slot, a
- * hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work or still to come.
+ * hold and the run it waits until (the first not released), a failure's or a rest's rail word, and none at work or still to come.
  */
 function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null, step: CodedStep) {
   const held = row.holding != null;

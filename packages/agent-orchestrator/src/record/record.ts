@@ -98,6 +98,12 @@ export type Hold = { at: string; until: readonly string[]; why?: string; by?: st
 export type Unheld = { since: string; actor: Actor };
 
 /**
+ * A person's release of a run's waiters (`nemia release <run>`), as its file says it: when it was written (`at`) and the caller who
+ * wrote it (`actor`), absent on one made in-process. Written once and never taken back: waiters that started cannot be un-started.
+ */
+export type Released = { at: string; actor?: Actor };
+
+/**
  * Who has a run in hand (`nemia assign`), as its file says it: when it was put (`at`), how long an ask may wait on them before the run is
  * the person's move again (`forMs`), who they are (`name`: `--to`, else the OS user of the client, absent where none is known), the words
  * for why (`why`), and the caller who put it (`actor`, objects' `Actor`), absent on one put in-process. Whether it still stands is
@@ -778,6 +784,10 @@ export type RunStore = {
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
+  };
+  readonly released: {
+    /** Release the run's waiters, once: the release written, or null when one already stands, which is kept. */
+    readonly put: (id: string, actor?: Actor) => Released | null;
   };
   readonly assignees: {
     /**

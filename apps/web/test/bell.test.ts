@@ -43,7 +43,7 @@ const bellRuns = (runs: readonly RunView[]) => bellRows(runs.filter(waitsOnYou))
 const holdOn = (onYou: boolean) =>
   ({
     at: '2026-10-01T00:00:00.000Z',
-    runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
+    runs: [{ run: 'p', missing: onYou, cancelledAt: null, failed: false, released: false }],
     word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
     advice: 'wf hold r --off',
     waitingOnYou: onYou,
@@ -52,7 +52,7 @@ const holdOn = (onYou: boolean) =>
 /** What a run started after `p` waits on: a run that never lands without a person when `onYou`. */
 const waitOn = (onYou: boolean) =>
   ({
-    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, failed: false }],
     word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
     advice: 'nothing to decide yet',
     waitingOnYou: onYou,

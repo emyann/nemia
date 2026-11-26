@@ -65,13 +65,13 @@ const placeLines = ({ workspace, repository, inputs, cards, workflowFiles, carri
   ...(carriedFiles !== undefined ? [`carried files: copied into ${carriedFiles}`] : []),
 ];
 
-/** What the run waits on to land, and each run it reads as context, landed or still in flight. */
-const waitLines = (landed: readonly string[], { after = [], branch, context = [] }: RunStartedFacts) => [
-  ...(after.length ? [`waits on: ${after.join(', ')} — nothing is filed until nemia decide says each has landed on ${branch}`] : []),
+/** What the run waits on to succeed, and each run it reads as context, succeeded or still in flight. */
+const waitLines = (succeeded: readonly string[], { after = [], context = [] }: RunStartedFacts) => [
+  ...(after.length ? [`waits on: ${after.join(', ')} — nothing is filed until each has succeeded (nemia release <run> lets one go)`] : []),
   ...context.map((id) =>
-    landed.includes(id)
+    succeeded.includes(id)
       ? `reads: ${id} — handed what it concluded, as context; not waited on`
-      : `reads: ${id}, still in flight — what it has when this run's steps are filed is handed, not landed, not judged`,
+      : `reads: ${id}, still in flight — what it has when this run's steps are filed is handed, not succeeded, not judged`,
   ),
 ];
 
@@ -120,12 +120,12 @@ const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**
- * The line of a card started by hand while cards of its `after:` had not landed: it was started all the same, from the base as it is now.
+ * The line of a card started by hand while cards of its `after:` had not succeeded: it was started all the same, from the base as it is now.
  * @param card The card started.
- * @param waitedOn The cards of its `after:` that had not landed.
+ * @param waitedOn The cards of its `after:` that had not succeeded.
  */
 const waitedOnLine = (card: string, waitedOn: readonly string[]) =>
-  `started although ${card} waits on ${waitedOn.join(', ')}, not landed yet — its run starts from the base as it is now, without their work`;
+  `started although ${card} waits on ${waitedOn.join(', ')}, not succeeded yet — its run starts from the base as it is now, without their work`;
 
 /** The line of a start whose api said nothing of the run: it started, and what reads it. */
 const bareLine = (id: string) =>
@@ -150,7 +150,7 @@ export function startedLines(answer: RunStarted, now: Date = new Date()) {
       ? [`harness settings: ${run.settings.join(', ')} — for every step on their harness, beneath its agent's own`]
       : []),
     ...placeLines(run),
-    ...waitLines(answer.landed ?? [], run),
+    ...waitLines(answer.succeeded ?? [], run),
     ...gateLines(id, run),
     ...ownLines(id, run),
     `run 'nemia tick' (or 'nemia up') to start it`,

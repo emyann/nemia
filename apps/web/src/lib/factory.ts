@@ -313,7 +313,7 @@ type Waits = Pick<RunView, 'id' | 'waiting'> & { holding?: RunView['holding'] };
  * is over, and a run it reads as context is never one.
  */
 const liveWaits = (run: Waits) => [
-  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.landed).map((h) => h.run)]),
+  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.released).map((h) => h.run)]),
 ];
 
 /**

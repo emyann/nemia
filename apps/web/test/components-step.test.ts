@@ -2004,7 +2004,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
 const waitingOnRuns = (runs: string[]) =>
   (runs.length
-    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false }
+    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, failed: false })), word: '', advice: '', waitingOnYou: false }
     : null) satisfies RunView['waiting'];
 
 test('the edges between cards are drawn only for live waits: dashed, out of one handle into the other, never moving — and a line of what the focused card reads, faint and dotted, with no arrow', () => {
@@ -2488,7 +2488,7 @@ test("outside dontAsk the settings' allow rules are listed, and the read-only co
 
 const HOLDING = {
   at: '2026-09-23T07:00:00.000Z',
-  runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], landed: false }],
+  runs: [{ run: 'p-1', missing: false, cancelledAt: null, failed: false, released: false }],
   word: 'held until p-1 lands',
   advice:
     'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has landed; to go on before then: wf hold r-1 --off',
@@ -2518,26 +2518,26 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
 });
 
 test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it landed', () => {
-  const card = (id: string, held: Array<{ run: string; landed: boolean }>) => ({
+  const card = (id: string, held: Array<{ run: string; released: boolean }>) => ({
     id,
     waiting: null,
     holding: held.length
       ? {
           at: '2026-09-13T00:30:00.000Z',
-          runs: held.map((h) => ({ ...h, missing: false, cancelledAt: null, gone: [] })),
+          runs: held.map((h) => ({ ...h, missing: false, cancelledAt: null, failed: false })),
           word: '',
           advice: '',
           waitingOnYou: false,
         }
       : null,
   });
-  const edges = afterEdges([card('p', []), card('h', [{ run: 'p', landed: false }])]);
+  const edges = afterEdges([card('p', []), card('h', [{ run: 'p', released: false }])]);
   assert.deepEqual(
     edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     [{ id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } }],
   );
   assert.match(edgeMarkup(edges[0]), /stroke-dasharray:5 4/);
-  assert.deepEqual(afterEdges([card('p', []), card('h', [{ run: 'p', landed: true }])]), [], 'a hold whose run landed is no wait');
+  assert.deepEqual(afterEdges([card('p', []), card('h', [{ run: 'p', released: true }])]), [], 'a hold whose run landed is no wait');
 });
 
 /** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */

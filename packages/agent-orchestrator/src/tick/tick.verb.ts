@@ -57,7 +57,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import { runStatusesObserved } from '../run-status/run-status.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { passParents, reportedEngine } from '../views/views.verb.ts';
-import { inboxNow, landedThrough, startQueued, type RunLanded } from '../inbox/inbox.verb.ts';
+import { inboxNow, releasedThrough, startQueued, type RunLanded } from '../inbox/inbox.verb.ts';
 import { startDue } from '../factory/schedule/schedule.verb.ts';
 import type { ScheduleStarted } from '../factory/schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
@@ -314,7 +314,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
-  const landed = landedThrough(e, passParents(standingReader(standing)));
+  const landed = releasedThrough(e, passParents());
   yield* withinEffect('act', assigneesEnded(e, home, judging));
   const inbox = yield* inboxOfPass(runs, landed, judging);
   if (informer) {

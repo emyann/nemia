@@ -380,6 +380,7 @@ export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun, type Approved } from './gate/gate.verb.ts';
 export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, type Holding, unhold } from './wait/wait.verb.ts';
+export { release, type Releasing } from './wait/release.verb.ts';
 export {
   heldLines,
   pausedLines,
@@ -403,7 +404,7 @@ export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type Floo
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
 export { CONDITION } from './condition/condition.verb.ts';
-export { HOLD } from './wait/commands.verb.ts';
+export { HOLD, RELEASE } from './wait/commands.verb.ts';
 export { ASSIGN } from './assignee/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';

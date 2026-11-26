@@ -7,7 +7,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../folder/folder.model.ts';
 import { agentNameRefusal, HARNESS_PROMPTS, skillNameRefusal } from './agents.ts';
-import { OVERRIDABLE } from '../workflow/index.ts';
+import { OVERRIDABLE, STEP_OVERRIDES } from '../workflow/index.ts';
 
 /** An agent's name: its file's in `agents/`, minus `.md` (`agentNameRefusal`). */
 export const AgentName = brandedId('AgentName', agentNameRefusal);
@@ -28,7 +28,7 @@ export const Agent = Schema.Struct({
   skills: Schema.optional(Schema.Array(SkillName.OnRead)),
   harnessPrompt: Schema.optional(Schema.Literals(HARNESS_PROMPTS)),
   mcp: Schema.optional(Schema.Array(Schema.String)),
-  /** What a step may override of it (`overridable:`); absent, everything. */
+  /** What a step may override of it beyond the harness's properties, which it always may (`overridable:`); absent, everything. */
   overridable: Schema.optional(Schema.Array(Schema.Literals(OVERRIDABLE))),
   keys: Schema.Record(Schema.String, Schema.String),
   body: Schema.String,
@@ -65,13 +65,14 @@ export type Skill = typeof Skill.Type;
 
 /**
  * The agent on a step (AgentOnStep): the agent a workflow's step is given, by name — its file's `agent:` line or a factory's hire — and
- * what the step overrides of it (`overridesOf`), each within what the agent offers (`Agent.overridable`, `offerRefusal`).
+ * what the step overrides of it (`overridesOf`): the harness's properties always, the rest within what the agent offers
+ * (`Agent.overridable`, `offerRefusal`).
  */
 export const StepAgent = Schema.Struct({
   workflow: WorkflowName.OnRead,
   step: StepName.OnRead,
   agent: AgentName.OnRead,
-  overrides: Schema.optional(Schema.Array(Schema.Literals(OVERRIDABLE))),
+  overrides: Schema.optional(Schema.Array(Schema.Literals(STEP_OVERRIDES))),
 }).annotate({ identifier: 'StepAgent' });
 export type StepAgent = typeof StepAgent.Type;
 

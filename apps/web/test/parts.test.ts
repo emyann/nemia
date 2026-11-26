@@ -564,6 +564,13 @@ describe('Run: each size draws what its ladder says and no more, in its tone, an
       assert.equal(mark, node, `${one.id}: on ${step}`);
     }
   });
+  test("md card: the eyebrow is a label, in the quiet ink of text, never the outline's line grey", async () => {
+    const html = await drawn(createElement(Run, { run, size: 'md', layout: 'card', asOf, among }));
+    const head = /<[a-z]+[^>]*class="([^"]*)"[^>]*>\s*<span data-run-where/.exec(html)?.[1];
+    assert.ok(head, 'the eyebrow sits first in the head');
+    assert.ok(head.split(' ').includes('text-on-surface-variant'), head);
+    assert.ok(!head.split(' ').includes('text-outline'), head);
+  });
   test('its words where it has some: 649a waits on a run, by its mark', async () => {
     const waits = among.find((one) => one.id.endsWith('649a'))!;
     const html = await drawn(createElement(Run, { run: waits, size: 'md', layout: 'card', asOf, among }));

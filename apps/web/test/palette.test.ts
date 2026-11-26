@@ -141,6 +141,10 @@ export interface Kept {
 const MEANING =
   "A meaning's value, written beside the theme since the kit's generator gives no colour of the board's own: DESIGN.md's table of the four meanings, held to it and to contrast by meanings.test.ts.";
 
+/** Why rest's tint is written by hand in the stylesheet. */
+const SAGE =
+  "Rest's tint, sage, written beside the theme as the meanings are: DESIGN.md's Rest bullet, held to it and to contrast by meanings.test.ts; the theme's outline is a line, too light under white ink.";
+
 /** The raw colours no role gives yet, each valid in its file alone. */
 export const KEPT: Kept[] = [
   { file: 'src/styles.css', colour: '#0c1416', why: MEANING },
@@ -151,7 +155,9 @@ export const KEPT: Kept[] = [
   { file: 'src/styles.css', colour: '#4d4800', why: MEANING },
   { file: 'src/styles.css', colour: '#5e00c1', why: MEANING },
   { file: 'src/styles.css', colour: '#676000', why: MEANING },
+  { file: 'src/styles.css', colour: '#6b6e72', why: SAGE },
   { file: 'src/styles.css', colour: '#7732d9', why: MEANING },
+  { file: 'src/styles.css', colour: '#9aa3ad', why: SAGE },
   { file: 'src/styles.css', colour: '#a9aaa8', why: MEANING },
   { file: 'src/styles.css', colour: '#c4a8ff', why: MEANING },
   { file: 'src/styles.css', colour: '#e9ddff', why: MEANING },

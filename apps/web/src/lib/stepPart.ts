@@ -99,8 +99,13 @@ export type HeadInput = {
   step: string;
   detail?: Pick<RunDetail, 'steps'> | undefined;
   agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>> | undefined;
+  /** Whether no list of the models of a harness is recorded, so a model it runs is not checked; undefined while the lists are read. */
+  unchecked?: Unchecked | undefined;
   now: Date;
 };
+
+/** Whether the models of the harness a step names (undefined for the default one) are not checked, no list of them being recorded. */
+export type Unchecked = (harness: string | null | undefined) => boolean;
 
 const TAGS: Record<StepKind, Omit<HeadTag, 'word'>> = {
   work: { color: 'alive', variant: 'tonal' },
@@ -216,19 +221,19 @@ const firstSet = (...values: Array<string | null | undefined>) => values.find((v
  * The model the session ran on, as its harness reported it, where its latest attempt did: with the model it was asked for beside it where
  * that differs (`<id> · asked <word>`); else the one it was filed with or its step sets, or `default`.
  */
-function modelSaid(step: StepView) {
+function modelSaid(step: StepView, unchecked: Unchecked | undefined) {
   const asked = firstSet(step.filed?.model, step.spec?.model);
   const ran = step.attempts.latest?.model ?? null;
-  if (ran === null) return asked;
-  return asked === 'default' || asked === ran ? ran : `${ran} · asked ${asked}`;
+  const said = ran === null ? asked : asked === 'default' || asked === ran ? ran : `${ran} · asked ${asked}`;
+  return unchecked?.(step.spec?.harness) ? `${said} · not checked` : said;
 }
 
 /** The session's five facts, whole: its harness, model, effort, context and permission, from what its try was filed with first. */
-function factsOf(step: StepView) {
+function factsOf(step: StepView, unchecked: Unchecked | undefined) {
   const { spec, filed } = step;
   return [
     { key: 'Harness', value: firstSet(spec?.harness) },
-    { key: 'Model', value: modelSaid(step) },
+    { key: 'Model', value: modelSaid(step, unchecked) },
     { key: 'Effort', value: firstSet(filed?.effort, spec?.effort) },
     { key: 'Context', value: contextSaid(filed?.contextTokens ?? spec?.context ?? null) },
     { key: 'Permission', value: firstSet(filed?.fence, spec?.fence, spec?.sandbox) },
@@ -324,14 +329,14 @@ const UNREAD: OwnFacts = {
 };
 
 /** The head's facts of `own`, a step of the run's own answer whose steps are `steps`, of kind `kind`. */
-const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date) =>
+const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date, unchecked: Unchecked | undefined) =>
   ({
     time: timeOf(own, kind, now),
     spend: spendOf(own, kind),
     round: placeOf(own, steps, kind),
     check: checkOf(own),
     gate: gateWords(own, now) ?? 'none',
-    facts: factsOf(own),
+    facts: factsOf(own, unchecked),
     note: noteOf(own, now) ?? 'none',
     tries: own.tries.map((t) => t.try),
     shown: own.shown,
@@ -341,7 +346,7 @@ const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now
  * The head of the step `step` of `run`: what the run's row knows at once (its state, its agent, its model), and once the run's own answer
  * is read, its tries, time, facts, spend, check, gate and note — each `none` until then, or where it does not apply.
  */
-export function headOf({ run, step, detail, agents, now }: HeadInput) {
+export function headOf({ run, step, detail, agents, unchecked, now }: HeadInput) {
   const row = run.steps.find((s) => s.name === step);
   const codes = row ?? UNLISTED;
   const state = stepState(codes, run.cancelledAt !== null, run.holding != null);
@@ -357,7 +362,7 @@ export function headOf({ run, step, detail, agents, now }: HeadInput) {
     word,
     who: whoOf(row ? agentOf(row) : null, agents),
     model: own?.filed?.model ?? own?.spec?.model ?? row?.spec?.model ?? 'none',
-    ...(own && detail ? ownFacts(own, detail.steps, kind, now) : UNREAD),
+    ...(own && detail ? ownFacts(own, detail.steps, kind, now, unchecked) : UNREAD),
     action: { words: state === 'awaiting-approval' ? 'Read and approve' : 'Open the step', runId: run.id, step },
   } satisfies PartHead;
 }
@@ -645,9 +650,16 @@ export const packetsOfView = (view: Pick<RunDetail, 'steps'>) => packetsOf(view.
  * @param step The step's name.
  * @param now The instant now, which the step's time and gate are said against.
  * @param agents The agents, each by name and role, once read; undefined before.
+ * @param unchecked Whether a harness's models are not checked, for the Model fact to say so; undefined while the lists are read.
  */
-export function stepPartOf(view: RunDetail, step: string, now: Date, agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>>) {
-  const head = headOf({ run: view, step, detail: view, agents, now });
+export function stepPartOf(
+  view: RunDetail,
+  step: string,
+  now: Date,
+  agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>>,
+  unchecked?: Unchecked,
+) {
+  const head = headOf({ run: view, step, detail: view, agents, unchecked, now });
   const own = view.steps.find((s) => s.name === step);
   if (!own) return { head, asks: 'none', got: 'none', said: 'none', gave: 'none', detail: 'none' } satisfies StepPartModel;
   const packets = packetsOfView(view);

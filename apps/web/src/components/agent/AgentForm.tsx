@@ -241,8 +241,8 @@ function SaveRow({
 }
 
 /**
- * The agent's model: picked from the ids its harness lists (`ids`), an alias being refused on save; free text, said not checked, where no
- * list of its harness is recorded.
+ * The agent's model: picked from the ids its harness lists (`ids`), an alias being refused where a step runs it (the load judges a step's
+ * model on the step's own harness, which may not be the agent's); free text, said not checked, where no list of its harness is recorded.
  */
 function ModelField({
   ids,
@@ -259,7 +259,7 @@ function ModelField({
     return (
       <Choice
         label={KEY_LABELS.model}
-        hint="The id its harness lists; an alias such as opus is refused."
+        hint="The id its harness lists; a step that runs an alias such as opus is refused."
         value={value}
         choices={ids}
         onChange={onChange}

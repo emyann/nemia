@@ -371,7 +371,7 @@ export function stepFrom(
   const output = merged ?? outputOf(name, meta.output, read);
   if (meta.model?.trim() === 'inherit') {
     refuse(
-      `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`,
+      `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name the id of a model its harness lists: \`model: <id>\`.`,
     );
   }
   return {

@@ -54,8 +54,10 @@ export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, sai
   for (const [name, model] of Object.entries(models)) {
     const step = steps.find((s) => s.name === name);
     if (!step) return `${said(name)}: the workflow has no step ${name} — its steps are ${steps.map((s) => s.name).join(', ')}.`;
-    if (model === 'inherit')
-      return `${said(name)}: \`inherit\` is a subagent's word for its caller's model, and a step's session has no caller. Name a model: ${name}=sonnet.`;
+    if (model === 'inherit') {
+      const ids = (listedFor(step.harness, lists) ?? []).map((m) => m.id);
+      return `${said(name)}: \`inherit\` is a subagent's word for its caller's model, and a step's session has no caller. Name a model id its harness lists: ${name}=<id>${ids.length ? `, one of ${ids.join(', ')}` : ''}.`;
+    }
     if (isRemoteHarness(step.harness))
       return `${said(name)}: ${name} runs on \`harness: ${step.harness}\`, a remote A2A agent, which runs as its operator configured it: A2A carries no model, and the runtime refuses a task filed with one. Leave ${name} out.`;
     const judged = stepModelJudged(model, step, lists);

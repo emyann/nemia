@@ -45,3 +45,30 @@ export const Theirs: Story = {
 
 /** A new agent: nothing written yet, Create agent waiting for a change. */
 export const New: Story = { args: { listing: null } };
+
+/** Its harness's recorded list: the model is picked from the ids it lists, not typed, and an alias such as `sonnet` is not among them. */
+export const PicksItsModel: Story = {
+  args: {
+    models: {
+      harnesses: [
+        {
+          harness: 'claude',
+          at: '2026-11-26T09:00:00.000Z',
+          models: [
+            { id: 'claude-opus-5-5', aliases: ['opus'], name: 'Opus 5.5', keepsAuto: true, efforts: null },
+            { id: 'claude-sonnet-5-5', aliases: ['sonnet'], name: 'Sonnet 5.5', keepsAuto: true, efforts: null },
+          ],
+        },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const form = within(canvasElement);
+    await expect(form.queryByRole('textbox', { name: 'Model' })).toBeNull();
+    await userEvent.click(form.getByRole('button', { name: /sonnet/ }));
+    const listbox = within(await within(document.body).findByRole('listbox'));
+    await expect(listbox.getByRole('option', { name: 'claude-opus-5-5' })).toBeVisible();
+    await expect(listbox.getByRole('option', { name: 'claude-sonnet-5-5' })).toBeVisible();
+    await expect(listbox.queryByRole('option', { name: 'opus' })).toBeNull();
+  },
+};

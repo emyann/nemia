@@ -146,8 +146,9 @@ claude mcp add-json --scope user nemia '{"type":"http","url":"http://<address>:8
 Claude Code runs `nemia config headers` at each connection for the token of the context in use, so no token is written in its
 settings and a token paired again is taken at the next connection.
 
-The skills are listed as the server's own, `nemia:operate` first, the role of the store's operator as you take it, then
-`nemia:write-a-card` and the others, and Claude Code loads one when it needs it. A host loads the skills of an MCP server only where it
+The skills are listed as the server's own, each `nemia:<skill>`, and Claude Code loads one when it needs it. Start from
+`nemia:operate`, the role of the store's operator as you take it, as the port's instructions say; `nemia:write-a-card` says how a card
+is written and labelled. A host loads the skills of an MCP server only where it
 takes the Skills extension: Claude Code from 2.1.331, in an interactive session (none in `claude -p`, the Agent SDK, cloud sessions or
 GitHub Actions), on by default when you sign in on a Pro, Max or Ultra plan, off on a Team or Enterprise plan until the organisation
 turns it on, and off for now under an API key. Where they are off, the tools and the instructions are there all the same.

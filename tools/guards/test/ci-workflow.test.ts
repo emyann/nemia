@@ -29,11 +29,9 @@ import path from 'node:path';
 import { claimsOf } from '../due.ts';
 import {
   ALWAYS,
-  BOUND,
   BUILD,
   dueCommand,
   DUE_IF,
-  DUE_KEY,
   DUE_LEG_AXIS,
   DUE_STEP,
   E2E,
@@ -704,9 +702,6 @@ const SHARD_FLAG = '--shard ${{ matrix.shard }}';
 /** The expression the shard count must be written as: read back off the matrix, so the count is written once, in the matrix itself. */
 const OF_FLAG = '--of ${{ strategy.job-total }}';
 
-/** The command the bound job must run: the one reader of `PAGES_BOUND_MS`, which no copy in YAML may stand in for. */
-const BOUND_COMMAND = 'apps/web/test/e2e/pages-bound.ts';
-
 /** The pages the e2e has, read off its own NAMES: a name a line, the blank lines left out. */
 const readPages = () =>
   fs
@@ -755,31 +750,6 @@ function shardDrift(workflow: Workflow, pages: readonly string[]) {
       `the ${E2E} job's matrix.shard in ${FILE} names ${shards.length} shards and ${NAMES_PATH} names ${pages.length} pages: a shard of them would visit nothing, so cut the matrix to ${pages.length} shards at most`,
     );
   return sentences satisfies string[];
-}
-
-/**
- * A bound job that is not there, does not wait for the shards, or does not run the one command that sums their page time. `--pages` and
- * `--shard` both silence the bound inside a run (`planOf`), so without this job nothing in CI holds the whole e2e's cost — and
- * `PAGES_BOUND_MS` has one writer, in `apps/web/test/e2e/timing.ts`, which is why the sum is this command's and no comparison in YAML.
- */
-function boundDrift(workflow: Workflow) {
-  const job = workflow.jobs[BOUND];
-  if (job === undefined)
-    return [
-      `${FILE} has no ${BOUND} job: a shard silences the e2e's bound the way --pages does, so add the job that needs ${E2E} and runs \`node ${BOUND_COMMAND} <dir>\` over the shards' page times, or nothing in CI holds the whole e2e's cost`,
-    ] satisfies string[];
-  return [
-    ...((job.needs ?? []).includes(E2E)
-      ? []
-      : [
-          `the ${BOUND} job in ${FILE} does not need ${E2E}: add ${E2E} to its needs, or it runs before the shards have written their page times and sums nothing`,
-        ]),
-    ...(runSteps(workflow, BOUND).some((step) => step.run?.includes(BOUND_COMMAND) === true)
-      ? []
-      : [
-          `the ${BOUND} job in ${FILE} does not run \`node ${BOUND_COMMAND}\`: it is the one place the shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than comparing a copy of the bound here`,
-        ]),
-  ] satisfies string[];
 }
 
 /** The look job's step that runs the e2e. */
@@ -1173,7 +1143,7 @@ const askedKeys = (workflow: Workflow) =>
   Object.entries(workflow.jobs)
     .filter(([name]) => name !== GATE && !ALWAYS.includes(name))
     .flatMap(([name, job]) => {
-      const key = DUE_KEY[name] ?? name;
+      const key = name;
       const axis = DUE_LEG_AXIS[name];
       if (axis === undefined) return [{ job: name, key }];
       const matrix = job.strategy?.matrix ?? {};
@@ -1196,7 +1166,7 @@ function dueDrift(workflow: Workflow, keys: readonly string[]) {
   for (const [name, job] of Object.entries(workflow.jobs)) {
     if (name === GATE || ALWAYS.includes(name)) continue;
     const steps = job.steps ?? [];
-    const command = dueCommand(DUE_KEY[name] ?? name);
+    const command = dueCommand(name);
     const at = steps.findIndex((step) => step.id === DUE_STEP);
     const due = steps[at];
     if (due === undefined || due.run?.trim() !== command) {
@@ -1225,7 +1195,7 @@ function dueDrift(workflow: Workflow, keys: readonly string[]) {
     if (env.LEG !== leg)
       sentences.push(
         leg === undefined
-          ? `the ${name} job's due step in ${FILE} sets LEG: take it off, since the job asks one key, ${DUE_KEY[name] ?? name}`
+          ? `the ${name} job's due step in ${FILE} sets LEG: take it off, since the job asks one key, ${name}`
           : `the ${name} job's due step in ${FILE} does not give LEG as ${leg}: write env LEG: ${leg}, so each leg asks its own key`,
       );
     for (const step of steps.slice(at + 1))
@@ -1279,7 +1249,6 @@ const drift = (
     ...groupDrift(workflow),
     ...targetDrift(text),
     ...shardDrift(workflow, pages),
-    ...boundDrift(workflow),
     ...lookDrift(workflow),
     ...storiesDrift(workflow),
     ...browserDrift(workflow, E2E),
@@ -1430,10 +1399,9 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
 
   const shown = structuredClone(shipped);
   const uploads = (shown.jobs[E2E]?.steps ?? []).filter((step) => step.uses?.startsWith(UPLOAD));
-  assert.equal(uploads.length, 2, 'the e2e job uploads its page times and its failing pages today');
+  assert.equal(uploads.length, 1, 'the e2e job uploads its failing pages today');
   for (const upload of uploads) delete upload.with!['include-hidden-files'];
   assert.deepEqual(hiddenDrift(shown), [
-    'the e2e job in .github/workflows/ci.yml uploads .e2e/pages-*.json, a hidden path, without include-hidden-files: actions/upload-artifact skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing',
     'the e2e job in .github/workflows/ci.yml uploads .e2e/*.png, a hidden path, without include-hidden-files: actions/upload-artifact skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing',
   ]);
 
@@ -1444,14 +1412,6 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   gate.needs = needed.filter((job) => job !== 'lint');
   assert.deepEqual(gateDrift(unneeded), [
     "the ci job in .github/workflows/ci.yml does not need lint: branch protection names ci and nothing else, so add lint to the gate's needs, or its failure reports green",
-  ]);
-
-  const unbounded = structuredClone(shipped);
-  const grown = unbounded.jobs[GATE]?.needs;
-  assert.ok(grown?.includes(BOUND) === true, `the gate needs ${BOUND} today, which this clause is what refuses forgetting`);
-  unbounded.jobs[GATE].needs = grown.filter((job) => job !== BOUND);
-  assert.deepEqual(gateDrift(unbounded), [
-    `the ci job in .github/workflows/ci.yml does not need ${BOUND}: branch protection names ci and nothing else, so add ${BOUND} to the gate's needs, or its failure reports green`,
   ]);
 
   const always = structuredClone(shipped);
@@ -1773,33 +1733,6 @@ test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a coun
   assert.deepEqual(shardDrift(shipped, ['factory', 'runs', 'say']), [
     "the e2e job's matrix.shard in .github/workflows/ci.yml names 4 shards and apps/web/test/e2e/pages/NAMES names 3 pages: " +
       'a shard of them would visit nothing, so cut the matrix to 3 shards at most',
-  ]);
-});
-
-test('REFUSED: no job that sums the shards, one that does not wait for them, and one that does not run the bound', () => {
-  const shipped = readWorkflow();
-  assert.deepEqual(boundDrift(shipped), [], 'the bound job is there, needs the shards and runs the bound today');
-
-  const ungated = structuredClone(shipped);
-  delete ungated.jobs[BOUND];
-  assert.deepEqual(boundDrift(ungated), [
-    ".github/workflows/ci.yml has no e2e-bound job: a shard silences the e2e's bound the way --pages does, so add the job that needs " +
-      "e2e and runs `node apps/web/test/e2e/pages-bound.ts <dir>` over the shards' page times, or nothing in CI holds the whole e2e's cost",
-  ]);
-
-  const racing = structuredClone(shipped);
-  racing.jobs[BOUND].needs = [];
-  assert.deepEqual(boundDrift(racing), [
-    'the e2e-bound job in .github/workflows/ci.yml does not need e2e: add e2e to its needs, or it runs before the shards have written ' +
-      'their page times and sums nothing',
-  ]);
-
-  const unsummed = structuredClone(shipped);
-  unsummed.jobs[BOUND].steps = (unsummed.jobs[BOUND].steps ?? []).filter((step) => step.run === undefined);
-  assert.deepEqual(boundDrift(unsummed), [
-    'the e2e-bound job in .github/workflows/ci.yml does not run `node apps/web/test/e2e/pages-bound.ts`: it is the one place the ' +
-      "shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than " +
-      'comparing a copy of the bound here',
   ]);
 });
 
@@ -2206,10 +2139,6 @@ test('REFUSED: a job that works without asking due.ts, asks it late or shallow, 
   const shallow = structuredClone(shipped);
   delete stepsOf(shallow, 'contracts')[0]?.with;
   refused(dueDrift(shallow, keys), 'fetch-depth: 0', 'the checkout shallow');
-
-  const self = structuredClone(shipped);
-  dueOf(self, BOUND).run = dueCommand(BOUND);
-  refused(dueDrift(self, keys), dueCommand(E2E), 'the bound asking its own key rather than the shards');
 
   const legless = structuredClone(shipped);
   delete dueOf(legless, LEGS).env?.LEG;

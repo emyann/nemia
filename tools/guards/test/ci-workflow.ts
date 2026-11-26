@@ -47,9 +47,6 @@ export const STORIES_FOLDER = 'apps/web';
 /** The e2e's flag that runs the look's tests (`planOf`, `apps/web/test/e2e/pages.ts`): the look job passes it, and a shard never does. */
 export const LOOK_FLAG = '--look';
 
-/** The job that sums every shard's page time against the bound a whole e2e run is held to. */
-export const BOUND = 'e2e-bound';
-
 /** The job that builds the board and refuses a generated file the build or the theme generator would rewrite. */
 export const BUILD = 'build';
 
@@ -77,7 +74,7 @@ export const DUE_STEP = 'due';
 /**
  * The command a job's due step runs: `due.ts` asked about a job, its leg, where it has one, given as env `LEG`.
  *
- * @param job the key the job asks, its own name but where `DUE_KEY` gives another.
+ * @param job the key the job asks: its own name.
  */
 export const dueCommand = (job: string) => `node tools/guards/due.ts ${job}`;
 
@@ -86,9 +83,6 @@ export const DUE_IF = "steps.due.outputs.due == 'true'";
 
 /** The jobs that ask no due decision: the scan reads every push's new commits, whatever they touched. The gate is not a job of work. */
 export const ALWAYS: readonly string[] = ['gitleaks'];
-
-/** A job that asks another's key: the bound sums the shards' page times, so it is due exactly when they are. */
-export const DUE_KEY: Readonly<Record<string, string>> = { 'e2e-bound': 'e2e' };
 
 /** A matrix job's axis whose value is its leg, given to the due step as env `LEG`: its key is `<job> <leg>`. */
 export const DUE_LEG_AXIS: Readonly<Record<string, string>> = { test: 'workspace', contracts: 'leg' };

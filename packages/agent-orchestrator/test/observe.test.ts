@@ -54,6 +54,7 @@ import { STEP_ATTRIBUTE_KEYS } from '../src/meter/step.ts';
 import { DEFAULT_SERVICE_NAME } from '../src/telemetry/telemetry.ts';
 import { PHASES } from '../src/meter/meter.ts';
 import { DAEMON_SERIES } from '../src/daemon/up.verb.ts';
+import { MEMORY } from '../src/telemetry/memory.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-observe-');
@@ -730,13 +731,25 @@ test('REFUSED: an expression reading a query its panel has not', () => {
 });
 
 test("the scan reads the code's metrics, and the traced pass the spans the dashboards query", () => {
-  const ids = [...Object.values(PASS_METRICS), ...Object.values(STEP_METRICS)].map((m) => m.id);
+  const ids = [...Object.values(PASS_METRICS), ...Object.values(STEP_METRICS), ...Object.values(MEMORY)].map((m) => m.id);
   assert.deepEqual(
     [...ids, 'api.poll.reads'].filter((id) => !METRICS.has(id)),
     [],
   );
   assert.deepEqual(METRICS.get('step.cost'), ['step_cost_total']);
   assert.deepEqual(METRICS.get('machine.load'), ['machine_load'], 'a gauge with no unit takes no suffix');
+  assert.deepEqual(
+    Object.values(MEMORY).map((m) => METRICS.get(m.id)),
+    [
+      ['v8js_memory_heap_used'],
+      ['v8js_memory_heap_committed'],
+      ['v8js_memory_heap_limit'],
+      ['v8js_memory_external'],
+      ['v8js_memory_array_buffers'],
+      ['process_memory_usage'],
+    ],
+    "the daemon's memory, by OpenTelemetry's names for a Node runtime where one exists",
+  );
   assert.deepEqual(METRICS.get('subscription.wakes'), ['subscription_wakes'], 'a counter that is not incremental is a gauge, no suffix');
   for (const span of ['tick', 'pass', 'advancePass', 'fileReady', 'file', 'append']) assert.ok(TRACED.spans.has(span), span);
   assert.deepEqual([...TRACED.shared], ['tick'], "the orchestrator's tick, and the runtime engine's inside it");

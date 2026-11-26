@@ -49,6 +49,7 @@ import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees } fro
 import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
 import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
 import { eventLoopWatched, EVENT_LOOP_DELAY } from '../telemetry/event-loop.store.ts';
+import { memoryWatched } from '../telemetry/memory.store.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
@@ -375,12 +376,17 @@ const limitRefusal = (config: Settings, scope: (parent?: string) => string | und
  * compacts the keyspace every `KEYSPACE_COMPACT_EVERY` (`compaction`), keeping at least the last 5 minutes of revisions a watch can
  * start from. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a
  * histogram exported with the rest (`EVENT_LOOP_DELAY`), and a stall of a second or more logged once, naming the span that was running
- * as the loop came back.
+ * as the loop came back; and its memory recorded every 10 s (`memoryWatched`), its V8 heap and its resident size, exported beside
+ * it (`MEMORY`).
  * @param e The engine every pass runs on, whose sessions the daemon holds.
  * @param options Its interval, its repository, its kind and the rest of what it runs with (`UpOptions`).
  */
 export const up = (e: Engine, options: UpOptions) =>
-  eventLoopWatched(daemon(e, options)) satisfies Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig>;
+  eventLoopWatched(memoryWatched(daemon(e, options))) satisfies Effect.Effect<
+    never,
+    unknown,
+    Scope.Scope | PlaceService | StoreRoot | StoreConfig
+  >;
 
 /**
  * Each factory file an earlier release wrote, moved into one list of volumes through the Factory door (`moveVolumes`), at every start,

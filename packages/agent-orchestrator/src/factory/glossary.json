@@ -336,6 +336,11 @@
       "term": "Card trigger",
       "meaning": "a trigger of the cards kind a factory holds by name: a label selector over its cards and the workflow it targets, written by `nemia factory trigger` and taken back by `nemia factory untrigger` in the factory's own file, or rendered from its template's `triggers` into its tree, the factory's own winning on a shared name. Judged with the factory's wiring: it targets only a workflow the factory offers, is never named as a workflow it schedules, and a workflow it targets is not detached (`CardTrigger`, `packages/agent-orchestrator/src/factory/factory.ts`).",
       "type": "CardTrigger"
+    },
+    {
+      "term": "Sign-in road",
+      "meaning": "how a server of a factory's record is signed in to from the board, chosen by the runtime from what the server's provider advertises (its OAuth metadata, RFCs 9728 and 8414): by a code the person types at the provider's page (`device`, RFC 8628), which Nemia polls for and then holds the token of, handing it to each session as the server's `Authorization` header and refreshing it with no person present; or by the browser (`browser`), Claude Code's own sign-in, whose redirect the person pastes back (`SignInRoute`, `packages/objects/src/words.ts`; `packages/agent-runtime/src/harness/mcp-device.ts`).",
+      "type": "SignInRoute"
     }
   ]
 }

@@ -182,7 +182,7 @@ test("a workflow's need of scope repository is swept in its factory's repository
       'needs:',
       '  - name: inside',
       '    message: met inside the repository',
-      '    check: test -f only-here && test -n "$WF_CARRIED_FILES"',
+      '    check: test -f only-here && test -n "$WF_CARRIED_FILES" && test "$WF_FACTORY" = acme',
       '    scope: repository',
       '  - name: outside',
       '    message: the same check, unscoped',
@@ -204,7 +204,7 @@ test("a workflow's need of scope repository is swept in its factory's repository
   assert.ok(inside !== undefined && outside !== undefined);
   const scoped = workflowCheckOf(w, inside);
   assert.equal(scoped?.cwd, repo, "it runs in the factory's repository");
-  assert.equal(read.get(checkKey(scoped ?? { check: 'none' })), 'met', 'told the carried files, as an unscoped check is');
+  assert.equal(read.get(checkKey(scoped ?? { check: 'none' })), 'met', 'told the carried files and its factory, as an unscoped check is');
   const unscoped = workflowCheckOf(w, outside);
   assert.equal(unscoped?.cwd, undefined, 'a need that says no scope runs where it always has');
   assert.equal(read.get(checkKey(unscoped ?? { check: 'none' })), 'missing');

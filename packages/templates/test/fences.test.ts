@@ -301,7 +301,14 @@ const NEVER_WRITERS: Call[] = [
   { tool: 'Edit', path: '/home/u/.claude.json' },
   { tool: 'mcp__playwright__browser_run_code_unsafe' },
   { tool: 'mcp__github__push_files' },
+  { tool: 'mcp__github__actions_run_trigger' },
 ];
+
+/**
+ * The reads of GitHub's Actions toolset, through which implement reads a red CI's runs, jobs and job logs where its factory names the
+ * server (`ciServer`); the toolset's one write, `actions_run_trigger` (run, re-run, cancel, delete logs), is in `NEVER_WRITERS`.
+ */
+const ACTIONS_READS: Call[] = ['actions_list', 'actions_get', 'get_job_logs'].map((tool) => ({ tool: `mcp__github__${tool}` }));
 
 test("the read-only agents' rendered fences run every read, and no write, program, read outside or dropped token", () => {
   for (const way of ['shipped', 'github'])
@@ -323,6 +330,15 @@ test("the writers' rendered fences refuse a push, a forced delete, gh, a kill, a
     assert.deepEqual(runsUnder({ allow: [], deny: denied }, NEVER_WRITERS, { dontAsk: false }), [], agent);
     assert.deepEqual(runsUnder({ allow: [], deny: denied }, [bash('git commit -m x')], { dontAsk: false }), ['Bash(git commit -m x)']);
   }
+});
+
+test("Grace's rendered fence, which every implement step runs under, runs the Actions toolset's reads and refuses its write", () => {
+  const { denied } = fencesOf('shipped').grace;
+  assert.deepEqual(
+    runsUnder({ allow: [], deny: denied }, ACTIONS_READS, { dontAsk: false }),
+    ACTIONS_READS.map((call) => call.tool),
+  );
+  assert.deepEqual(runsUnder({ allow: [], deny: denied }, [{ tool: 'mcp__github__actions_run_trigger' }], { dontAsk: false }), []);
 });
 
 test('REFUSED: on the fences with lines cut, a read-only agent writes a file by --output and proposes as the person, and a writer pushes', () => {

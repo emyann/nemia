@@ -34,6 +34,13 @@ change nothing, and sign off as before; the next check reads the re-run's own ve
 hands you its verdict, the failing jobs and their log included. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
 its slot and its context for nothing.
 
+**Read a red CI yourself where its lines do not say why.** The MCP server this factory reads CI through, none where nothing follows
+the colon: ${{ parameters.ciServer }}. Where it names one, your step loads it, and a red `${{ parameters.ciCheck }}` whose handed lines
+do not explain the failure (an e2e page's detail, a log the job printed past the tail, a job with no failing test) is read from the
+failed jobs themselves through it, read-only: `actions_list` the run's jobs, `actions_get` a run or a job, and `get_job_logs` the log of a
+failed job, each as `mcp__<that server>__<tool>`. Your fence refuses its writes (`actions_run_trigger`: run, re-run, cancel, delete
+logs): the check re-runs what it re-runs.
+
 ### false — in this checkout
 
 This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts`,

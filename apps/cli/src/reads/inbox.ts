@@ -29,7 +29,7 @@ const inPlay = (row: Table['rows'][number]) => {
  * @param selector The label selectors typed with `-l`, none where none was.
  * @param ended How many cards were left out for their run having ended.
  */
-export const inboxSaid = (listed: number, selector: readonly string[], ended: number) =>
+const inboxSaid = (listed: number, selector: readonly string[], ended: number) =>
   listed
     ? `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`
     : ended

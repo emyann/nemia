@@ -12,16 +12,16 @@ import path from 'node:path';
 import { chosenOf } from './context.ts';
 
 /** The lease's name under the store: what the daemon writes, and what a line about it names. */
-export const LEASE_FILE = 'daemon.json';
+const LEASE_FILE = 'daemon.json';
 
 /** The credential's name under the store: what the daemon writes at its start, as the orchestrator names it. */
-export const CREDENTIAL_FILE = 'credential';
+const CREDENTIAL_FILE = 'credential';
 
 /**
  * The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it.
  * @param env The environment read for `WF_ROOT`.
  */
-export const storeRoot = (env: NodeJS.ProcessEnv = process.env) =>
+const storeRoot = (env: NodeJS.ProcessEnv = process.env) =>
   env.WF_ROOT !== undefined && env.WF_ROOT !== '' ? env.WF_ROOT : path.join(os.homedir(), '.agent-workflows');
 
 /**

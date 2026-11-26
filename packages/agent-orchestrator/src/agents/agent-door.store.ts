@@ -48,7 +48,7 @@ import { skillsFor, type Places } from '../skills/read.store.ts';
 export type AgentAt = { readonly dir: string; readonly repo?: string; readonly anywhere?: boolean; readonly skills?: SkillsFound };
 
 /** Where an agent is written, and the result schema its `output:` names, written beside it (`AgentSidecar`), where one is sent. */
-export type AgentWriteAt = AgentAt & { readonly schema?: AgentSidecar | null };
+type AgentWriteAt = AgentAt & { readonly schema?: AgentSidecar | null };
 
 /** What a removal answers: the folder, and each file removed. */
 export type AgentRemoved = { dir: string; removed: string[] };

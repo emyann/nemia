@@ -127,7 +127,7 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin) =>
  * an install with no factory named, refused for a factory named whose repository the request leaves open), yours.
  * @param s The request's services, its caller and the place it is answered in.
  */
-export const heldIn = (s: Served) => {
+const heldIn = (s: Served) => {
   const repo = repoLayer(s);
   return [
     ...treeWorkflowsHeld(s, 'factory'),
@@ -269,7 +269,7 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/workfl
  * @param name The workflow's name.
  * @param asked The origin asked for, or undefined for the one the name resolves to.
  */
-export async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin) {
+async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin) {
   const [one] = await workflowObjectsOf(s, [servedNamed(heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one satisfies Workflow;

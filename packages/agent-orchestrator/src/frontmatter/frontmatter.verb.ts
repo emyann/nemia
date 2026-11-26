@@ -67,7 +67,7 @@ export function storeFolders(home: string) {
  * @param dir The folder to walk.
  */
 // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-export function markdownIn(dir: string): string[] {
+function markdownIn(dir: string): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))

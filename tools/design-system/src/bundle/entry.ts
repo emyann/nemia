@@ -52,7 +52,7 @@ const inLook = (name: string, door: string) =>
  * @param stories the board's story files.
  * @param modules the board's modules the stories reach.
  */
-export const boardCardsOf = (stories: readonly BoardStory[], modules: readonly string[]) => {
+const boardCardsOf = (stories: readonly BoardStory[], modules: readonly string[]) => {
   const door = fs.readFileSync(LOOK_DOOR, 'utf8');
   return stories.map((story) => {
     const look = story.group === 'Look' && inLook(story.base, door);

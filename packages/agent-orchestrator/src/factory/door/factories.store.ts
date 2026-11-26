@@ -175,7 +175,7 @@ export function instructionRead(
  * @param home The store's root.
  * @param read Reads the factory `name` as a start reads it, refused with `notDone` said where there is none.
  */
-export function factoryFiles(home: string, read: FactoryRead) {
+function factoryFiles(home: string, read: FactoryRead) {
   const rulesOf = (name: string, notDone: string) => Effect.map(read(name, notDone), (factory) => rulesAtHome(home, factory));
   const instructionOf = (name: string, notDone: string) =>
     Effect.flatMap(read(name, notDone), (factory) =>
@@ -294,7 +294,7 @@ export const factoryOrNone = (name: string | undefined) =>
  * @param offences The labels refused, each with the values its key takes.
  * @param notDone What the caller did not do, said last.
  */
-export const labelValuesRefusal = (factory: string, offences: readonly LabelValueOffence[], notDone: string) => {
+const labelValuesRefusal = (factory: string, offences: readonly LabelValueOffence[], notDone: string) => {
   const each = offences.map((o) => `${o.key}=${o.value}: the factory ${factory} takes ${o.key}=${o.takes.join('|')}`).join('; ');
   const first = offences[0];
   const again =
@@ -350,9 +350,6 @@ export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.
  * @param home The store's root.
  */
 export const listedAt = (home: string) => doorAt(home, (door) => door.factories.listed());
-
-/** A tree's check, said beside the door that reads the factory it is of. */
-export { treeChecked };
 
 /**
  * What the factories' store judges and names without reading a factory, said through the door so no file of `src` but the door's

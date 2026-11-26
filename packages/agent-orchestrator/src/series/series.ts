@@ -12,13 +12,14 @@ import { PASS_BOUNDS, PHASES, READ_BOUNDS, type Phase, type RecentPass } from '.
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
 export const SERIES_LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
+/** @public */
 export type SeriesLabelKey = (typeof SERIES_LABEL_KEYS)[number];
 /** The words a label may say: a closed set for a pass's `phase` (the meter's) and the store's disk `part` and `kind` (the disk's). */
 type LabelWord<K extends SeriesLabelKey> = K extends 'phase' ? Phase : K extends 'part' ? DiskPart : K extends 'kind' ? DiskKind : string;
 export type Labels = { [K in SeriesLabelKey]?: LabelWord<K> };
 
 /** The upper bounds of the machine's load per core. */
-export const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 4];
+const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 4];
 
 /**
  * The series kept, each a gauge or a histogram over its bounds: a pass's time and each phase's (`phase`), its journal reads, the runs in
@@ -27,7 +28,7 @@ export const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 
  * on the disk as the daemon's last sweep read it: the bytes of each `part`, by `factory` where the part is kept by run, the names of
  * each `part` that did not read, and the bytes free on the store's file system and its size.
  */
-export const SERIES = {
+const SERIES = {
   'pass.ms': { kind: 'histogram', bounds: PASS_BOUNDS },
   'pass.phase.ms': { kind: 'histogram', bounds: PASS_BOUNDS },
   'pass.reads': { kind: 'histogram', bounds: READ_BOUNDS },
@@ -64,7 +65,7 @@ export type RollupLine = {
 };
 
 /** The tiers kept on disk: a line a minute, and a line an hour. */
-export const TIERS = ['minute', 'hour'] as const;
+const TIERS = ['minute', 'hour'] as const;
 export type Tier = (typeof TIERS)[number];
 
 const MINUTE = 60_000;
@@ -363,7 +364,7 @@ export const memoDays = (tier: Tier, days: readonly string[], now: number) =>
   daysBack(Math.max(...Object.values(RANGES).flatMap((r) => (r.tier === tier ? [r.back] : []))), days, now);
 
 /** One point of a series: its span's start, and of the samples in it how many, their mean, least, most and last, and its percentiles. */
-export type SeriesPoint = { t: string; n: number; mean: number; min: number; max: number; last: number; p50?: number; p95?: number };
+type SeriesPoint = { t: string; n: number; mean: number; min: number; max: number; last: number; p50?: number; p95?: number };
 
 /** What `nemia series` and `GET /api/series` answer: a range, the span of its points, and each series and label set's points in time. */
 export type SeriesRead = {

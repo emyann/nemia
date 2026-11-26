@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Context, Effect, Layer, type Duration } from 'effect';
 import { DEFAULT_HARNESS, DEFAULT_SIGN_IN, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import type { Need, NeedState } from 'objects';
-import { pathLedByTools, StoreRoot, toolsDir } from '../config/root.store.ts';
+import { pathLedByTools, toolsDir } from '../config/root.store.ts';
 import { listedAt } from '../factory/door/factories.store.ts';
 import type { FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
@@ -28,7 +28,7 @@ import { harnessesOfRun, harnessesWithNeeds, harnessNeedsOf, signInNeedOf } from
 import { fixCommandOf, needsOfRun, needStateOf, type FixAt, type NeedHeld, type NeedRan } from './needs.ts';
 
 /** How long one check may run before it is stopped and read `unknown`: a check answers at once, or says nothing. */
-export const NEEDS_CHECK_MS = 10_000;
+const NEEDS_CHECK_MS = 10_000;
 
 /** The sweep's pace: a need met by hand is read on the next sweep, and a fix settled is read at once (`fix.verb.ts`). */
 export const NEEDS_EVERY: Duration.Input = '1 minute';
@@ -83,7 +83,7 @@ export const declaredHarnessNeeds = () =>
   harnessNeedsOf(HARNESS_DECLARATIONS, { harness: DEFAULT_HARNESS, maker: DEFAULT_SIGN_IN.maker, keep: `nemia ${TOKEN_NAME} set` });
 
 /** The names of the harnesses whose adapters declare needs, in the runtime's order. */
-export const HARNESSES_WITH_NEEDS: readonly string[] = harnessesWithNeeds(HARNESS_DECLARATIONS);
+const HARNESSES_WITH_NEEDS: readonly string[] = harnessesWithNeeds(HARNESS_DECLARATIONS);
 
 /**
  * A memory that has read nothing yet, of the store at `home`, its checks limited to `checkMs` (`NEEDS_CHECK_MS`).
@@ -279,7 +279,7 @@ export const trustedOf = Effect.fnUntraced(function* (factories: readonly Factor
  * @param w The factory's workflow, with the folder its live files are in.
  * @param needs The needs the workflow declares.
  */
-export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]) =>
+const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]) =>
   needs.flatMap((need) => {
     const at = workflowCheckOf(w, need);
     return at === undefined ? [] : [at];
@@ -506,8 +506,3 @@ const fixWords = (need: Need, fromPlace: boolean, at: FixAt | undefined) => {
  * @param run The run's record.
  */
 export const needsVersionOf = (memo: NeedsMemo | undefined, run: Run) => (memo === undefined || hasStarted(run) ? undefined : memo.version);
-
-/** `StoreRoot`'s memory, made where a program was given none: what a daemon composes its passes over. */
-export const needsMemoOf = Effect.gen(function* () {
-  return (yield* NeedsMemory) ?? needsMemo(yield* StoreRoot);
-});

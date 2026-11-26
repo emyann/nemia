@@ -40,6 +40,7 @@ const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0
  * structure — a second slash, a prefix written empty, no name, a prefix past 253 or a name past 63. Pure, and proved by
  * `contracts/label-key.contract.ts`; what the characters of each segment may be is `labelKeySpellingRefusal`'s.
  * @param key The key as given.
+ * @public
  */
 export const labelKeyShape: LabelKeyShape = (key) => {
   const slashed = key.includes('/');
@@ -79,20 +80,20 @@ export function labelKeySpellingRefusal(key: string) {
 }
 
 /** The keys Nemia sets on every run's map itself, which a person's label may not take. */
-export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
+const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
 
 /** The keys a feed line or a selector reads of itself, which a person's label may not take: the line's own, the signed ones, its prose. */
-export const RESERVED_LABEL_KEYS: readonly string[] = [
+const RESERVED_LABEL_KEYS: readonly string[] = [
   ...LABEL_KEYS.filter((key) => !CLOSED_LABEL_KEYS.includes(key)),
   ...RESERVED_KEYS,
   'message',
 ];
 
 /** The longest a label's key or value may be, as Kubernetes holds it. */
-export const LABEL_CAP = 63;
+const LABEL_CAP = 63;
 
 /** Kubernetes' name segment: alphanumerics at both ends, `-`, `_` and `.` between. */
-export const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
+const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
 
 const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reserved ones ${RESERVED_LABEL_KEYS.join(', ')}`;
 
@@ -101,7 +102,7 @@ const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reser
  * reserved keys, each compared whole, so a prefixed key such as `team.example/workflow` is a person's. Pure.
  * @param key The key as given.
  */
-export function labelKeyRefusal(key: string) {
+function labelKeyRefusal(key: string) {
   const spelling = labelKeySpellingRefusal(key);
   if (spelling !== undefined) return spelling;
   if (CLOSED_LABEL_KEYS.includes(key)) return `${key} is a key Nemia sets itself and no label of a person's: ${LISTS}`;
@@ -115,7 +116,7 @@ export function labelKeyRefusal(key: string) {
  * @param key The label's key, which the refusal names.
  * @param value The value as given; empty takes the key's value away.
  */
-export function labelValueRefusal(key: string, value: string) {
+function labelValueRefusal(key: string, value: string) {
   if (value === '') return undefined;
   if (value.length > LABEL_CAP) return `the value of ${key} is ${value.length} characters long: keep it to ${LABEL_CAP} at most`;
   if (!LABEL_NAME.test(value))

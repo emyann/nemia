@@ -20,7 +20,7 @@ import type { Run as RunAnswer, RunLines as RunLinesAnswer } from 'objects';
 export type Asked = { request: (url: string) => Response | Promise<Response> };
 
 /** A step of the run object, as `status.steps` holds it. */
-export type ObjectStep = RunAnswer['status']['steps'][number];
+type ObjectStep = RunAnswer['status']['steps'][number];
 
 /** The body `url` answers, which must be a 200. */
 async function ok(app: Asked, url: string) {
@@ -48,10 +48,6 @@ export const specOf = (run: RunAnswer, name: string) =>
 /** The step's tries, earliest first, the current one last (`…/steps/:step/tries`). */
 export const triesOf = async (app: Asked, id: string, step: string) =>
   [...((await ok(app, `${at(id, step)}/tries`)) as RunObject.StepTries).tries] satisfies RunObject.StepTry[];
-
-/** One try of the step (`…/tries/:try`). */
-export const tryOf = async (app: Asked, id: string, step: string, n: number) =>
-  (await ok(app, `${at(id, step)}/tries/${n}`)) as RunObject.StepTry;
 
 /**
  * What the step's try `n` signed off with, or why it does not read (`…/tries/:try/closeout`); with no `n`, its current try's, as the

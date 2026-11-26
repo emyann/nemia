@@ -51,7 +51,7 @@ import {
   harnessPromptNamed,
   readKeys,
 } from '../former/former.ts';
-import { headedLayers, OVERRIDABLE, stepFrom, type Overridable } from '../workflow/index.ts';
+import { HARNESS_PROPERTIES, headedLayers, OVERRIDABLE, stepFrom, type Overridable } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { frontmatterOrNull, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { declarationOf, fenceKeyOf } from '../harness/harness.ts';
@@ -167,7 +167,7 @@ export function skillTurnCost(id: string, text: string) {
 }
 
 /** A skill asked by the name a `skills:` line gives it: the folder it is, why it cannot be used, or nothing where no place has it. */
-export type SkillLookup = { get(name: string): string | WorkflowError | undefined };
+type SkillLookup = { get(name: string): string | WorkflowError | undefined };
 
 /**
  * Where the skills a workflow's agents name were found. `at` answers a name as a `skills:` line writes it: the folder the skill is
@@ -201,8 +201,8 @@ export type Agent = {
    */
   mcp?: string[];
   /**
-   * What a step may override of it (`overridable:`, each one of `OVERRIDABLE`): a step that writes anything else is refused at load
-   * (`offerRefusal`). Absent, a step may override everything it takes from the agent, as before the line.
+   * What a step may override of it beyond the harness's properties, which it always may (`overridable:`, each one of `OVERRIDABLE`): a
+   * step that writes anything else is refused at load (`offerRefusal`). Absent, a step may override everything it takes from the agent.
    */
   overridable?: Overridable[];
   keys: Partial<Record<RoleKey, string>>;
@@ -356,10 +356,16 @@ function overridableOf(file: string, written: string | undefined) {
     .split(',')
     .map((word) => word.trim())
     .filter(Boolean);
+  const harness = words.find((word) => (HARNESS_PROPERTIES as readonly string[]).includes(word));
+  if (harness !== undefined) {
+    refuse(
+      `${file}: \`overridable: ${written}\` names \`${harness}\`, a property of the harness, which is always a step's to override: take it off the line (for an agent a template rendered, \`nemia factory upgrade <factory>\` brings the template's own).`,
+    );
+  }
   const unknown = words.find((word) => !(OVERRIDABLE as readonly string[]).includes(word));
   if (unknown !== undefined) {
     refuse(
-      `${file}: \`overridable: ${written}\` names \`${unknown}\`, which is not something a step may override. A step may override ${OVERRIDABLE.join(', ')}: name those this agent offers, or delete the line, and a step may override all of them.`,
+      `${file}: \`overridable: ${written}\` names \`${unknown}\`, which is not something a step may override. The line's words are ${OVERRIDABLE.join(', ')}, and the harness's properties (${HARNESS_PROPERTIES.join(', ')}) need no word: name those this agent offers, or delete the line, and a step may override all of them.`,
     );
   }
   return { overridable: [...new Set(words)] as Overridable[] };

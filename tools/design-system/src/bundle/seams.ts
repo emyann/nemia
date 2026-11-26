@@ -13,7 +13,7 @@ import { STORY, storyFiles } from '../stories/stories.ts';
 import { SHARED, literal } from './page.ts';
 
 /** What a story takes from outside the board that no card runs: Storybook, Vitest and MSW. */
-export const OUTSIDE = /^(@storybook\/|storybook($|\/)|msw($|-|\/)|vitest($|\/)|@vitest\/)/;
+const OUTSIDE = /^(@storybook\/|storybook($|\/)|msw($|-|\/)|vitest($|\/)|@vitest\/)/;
 
 /** The names a story imports from outside the board that are always stood in for. */
 const ALWAYS = ['fn', 'expect', 'within', 'waitFor', 'userEvent', 'screen', 'http', 'HttpResponse', 'delay'];
@@ -22,7 +22,7 @@ const ALWAYS = ['fn', 'expect', 'within', 'waitFor', 'userEvent', 'screen', 'htt
  * Each name `text` imports by value from a package `OUTSIDE` matches.
  * @param text a source file's text.
  */
-export const outsideNames = (text: string) =>
+const outsideNames = (text: string) =>
   [...text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)]
     .filter(([, , from]) => OUTSIDE.test(from ?? ''))
     .flatMap(([, list]) =>

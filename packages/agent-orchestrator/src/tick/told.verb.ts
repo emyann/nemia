@@ -243,7 +243,7 @@ export const inboxViewed = (home: string, run: Pick<Run, 'id'>, step: Pick<StepS
  * @param home The store's root folder.
  * @param run The run, read down to what names its folders.
  */
-export const filedFoldersAt = (home: string, run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>) => ({
+const filedFoldersAt = (home: string, run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>) => ({
   runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
   inbox: inboxViewOf(home, run),
   ...(run.inputs?.length || run.cards?.length ? { inputs: inputsDir(home, run) } : {}),

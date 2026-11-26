@@ -51,7 +51,7 @@ export const storyFiles = (components: string) =>
  * One story file as a card: refused when its title names no group the artifact knows.
  * @param file the story file's path.
  */
-export const boardStoryOf = (file: string) => {
+const boardStoryOf = (file: string) => {
   const text = fs.readFileSync(file, 'utf8');
   const title = new RegExp(`title: *'((?:${GROUPS.join('|')})/[^']+)'`).exec(text)?.[1];
   if (title === undefined)

@@ -8,7 +8,7 @@
 import type { CardTrigger, CardTriggered, TriggerCard } from '../../contracts/card-trigger.contract.ts';
 import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 
-export type { CardTrigger, Triggered, TriggerCard } from '../../contracts/card-trigger.contract.ts';
+export type { TriggerCard } from '../../contracts/card-trigger.contract.ts';
 
 /** A card trigger as the factory's wiring holds it: the trigger the decision reads, with its selector. */
 export type SelectingTrigger = CardTrigger & { readonly selector: string };

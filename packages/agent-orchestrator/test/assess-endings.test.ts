@@ -1502,7 +1502,7 @@ describe('an ending that lands on its check: who files it, whether it stopped on
       true,
       "quick's land: filed by its review's pass and stopped there, it still offers `nemia retry <run> land` and the send-back",
     );
-    assert.equal(did(LANDER), true, "build's land, gated, as before");
+    assert.equal(did(LANDER), true, 'a gated land, as before');
     assert.equal(
       did({ ...LANDER, gate: undefined }, 'blocked', { gates: ['ship'] }),
       true,

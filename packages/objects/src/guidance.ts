@@ -9,7 +9,7 @@
 import { RUN_STATES } from './words.ts';
 
 /** A paragraph of the guidance, by what it says. */
-export type GuidanceId = 'what' | 'search' | 'skills' | 'start' | 'resources' | 'feed' | 'answers';
+type GuidanceId = 'what' | 'search' | 'skills' | 'start' | 'resources' | 'feed' | 'answers';
 
 /** A paragraph of the guidance: what it says, its port form, and its shell form, null where it is the port's seat's alone. */
 export type Guidance = { readonly id: GuidanceId; readonly port: string; readonly shell: string | null };

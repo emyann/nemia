@@ -89,7 +89,7 @@ export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean) =
   u.firstCacheWriteTokens > u.firstContextTokens / 2;
 
 /** The peak context, in tokens, past which a step with no `context:` cap is marked `large` (`peakMark`). */
-export const LARGE_CONTEXT = 200_000;
+const LARGE_CONTEXT = 200_000;
 
 /**
  * Where a peak stands against a step's `context:` cap: `cap` once the session reached it — it compacted, which a harness does well short

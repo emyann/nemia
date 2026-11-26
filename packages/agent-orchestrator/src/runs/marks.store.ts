@@ -80,7 +80,7 @@ export const marksFrom = (id: string, records: readonly KeyRecord[]) => {
 export const ownKey = (id: string) => id !== '' && !id.includes('/');
 
 /** The marks a run carries now, by which of its three records are there, in a transaction `tx`. */
-export const marksIn = (tx: KeyTxn, id: string) =>
+const marksIn = (tx: KeyTxn, id: string) =>
   Effect.gen(function* () {
     const [cancelled, pruned, held] = [
       yield* tx.get(runMarkKey(id, 'cancelled')),
@@ -91,11 +91,11 @@ export const marksIn = (tx: KeyTxn, id: string) =>
   });
 
 /** A write of `value` at `key` in `tx`: over the record there, or making it. */
-export const put = (tx: KeyTxn, key: string, value: string) =>
+const put = (tx: KeyTxn, key: string, value: string) =>
   Effect.flatMap(tx.get(key), (there) => tx.write(key, there === undefined ? create(value) : overwrite(value)));
 
 /** The record at `key` taken away in `tx`, whether it was there. */
-export const drop = (tx: KeyTxn, key: string) =>
+const drop = (tx: KeyTxn, key: string) =>
   Effect.flatMap(tx.get(key), (there) => (there === undefined ? Effect.succeed(false) : Effect.as(tx.write(key, remove), true)));
 
 /** What `nemia rm` writes of a run it forgets: any key beside these is left unread. */

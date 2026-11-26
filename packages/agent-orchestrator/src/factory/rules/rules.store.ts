@@ -29,7 +29,7 @@ export const rulesFolder = (home: string, name: string) => rulesFolderAt(home, n
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function rulesFolderAt(home: string, name: string) {
+function rulesFolderAt(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name);

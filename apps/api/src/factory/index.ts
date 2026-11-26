@@ -13,4 +13,3 @@ export {
   triggersHandlers,
   volumesHandlers,
 } from './parts/index.ts';
-export { placeFor } from './place.ts';

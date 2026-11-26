@@ -64,6 +64,10 @@ holds what every change needs.
 - `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
   boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of the files
   a change touched never run them: CI runs them, and a person runs them before a push.
+- `npx knip` — the files, exports and dependencies no workspace uses, by knip (pinned at the root, `knip.jsonc`): what it reports
+  is removed, with what served only it; what reaches a file where knip cannot see (a path run by `node`, a bundle's door) is an entry
+  of `knip.jsonc` with why, and an export kept for a reader knip cannot see (tsverify, a type equality, a `node -e` line, a glossary
+  row's `type`) says `@public` in its doc. A session's measure, never run by the suite or CI.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
@@ -115,7 +119,7 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
   branch and opens or updates its pull request, and `packages/templates/sdlc/carried/landing.ts` merges that pull request
   and fast-forwards the checkout (`build` and `quick` both run them, kept once there; `packages/templates/test/check-scripts.test.ts` holds every check to the folder its variable names). The
   one exception to the rule is a run's ending step (a workflow's last step, `workspace: base`), filed once a person approves it — or,
-  where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
+  where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `build` and `quick` land with no gate at all; an ending with a `check:` and
   neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
@@ -205,7 +209,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   skills) live in the factory's own tree, out of git. sdlc's `agents/`: Iris (product engineer), Seldon (software architect), Grace
   (lead software engineer, who builds a card herself in one session and fills implement in `build` and `quick`), Agora (code
   reviewer), Otto (release engineer), Argus (janitor). And five workflows: `front-door` (a raw card labelled for it, routed with no gate to the workflow it needs), `intake` (an idea to an intent), `build` (an intent to main,
-  started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
+  started `--after` the intake run: a spec a person approves, then implement and a review whose pass files an ungated land), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
   pass files an ungated land, as `packages/templates/sdlc/workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox
   cards, none started). The orchestrator never imports it: it finds a builtin template by path.
 - `apps/cli/` — `nemia` and `wf`, the client of the api: the moved reads over HTTP, every other verb and `--local` on the

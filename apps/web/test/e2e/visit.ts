@@ -14,7 +14,7 @@ import { seated } from './served.ts';
 import { photographing, seatToken, setMeasuring, setPhotographing } from './world.ts';
 import { costLine, PHASES, type PageTiming, type Phase } from './timing.ts';
 
-export const THEMES = ['light', 'dark'] as const;
+const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
 
 /**
@@ -33,7 +33,7 @@ const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.r
  * visited; every run then reads 404, the board says each was removed with `wf rm`, and the page being visited fails on what it never drew,
  * which is not the branch's fault. The message names the store, says to run the e2e again, and names the sweep that removes it.
  */
-export const storeGone = (store: string) =>
+const storeGone = (store: string) =>
   `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again` +
   '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
 

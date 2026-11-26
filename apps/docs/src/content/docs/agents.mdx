@@ -27,7 +27,7 @@ description: Reviews a change read-only, as a second engineer would
 harness: claude
 model: opus
 skills: review-a-change
-overridable: model, effort, fence
+overridable: fence
 claude:
   fence:
     tools: Read, Grep, Glob, Bash
@@ -54,10 +54,10 @@ narrows (below).
 
 ## What a step may override
 
-An agent says what a step may override of it, on its `overridable` line. The words are `model`, `effort`, `context`, `harness`,
-`remote`, `output`, `fence`, `skills` and `mcp` (`OVERRIDABLE`). `fence` stands for every fence key at once, and a step still only
-narrows it; `skills` and `mcp` only add. The reviewer above lets a step choose its model and effort, and narrow its fence, and nothing
-else.
+A step may always override the properties of the harness its agent runs on: `model`, `effort`, `context` and `harness`. An agent says
+what else a step may override of it, on its `overridable` line. The words are `remote`, `output`, `fence`, `skills` and `mcp`
+(`OVERRIDABLE`); a harness property on the line is refused. `fence` stands for every fence key at once, and a step still only
+narrows it; `skills` and `mcp` only add. The reviewer above lets a step narrow its fence, and nothing else of its behaviour.
 
 A step that sets something the line leaves out is refused when the workflow is read (`offerRefusal`), naming the key and the agent.
 Delete the step's line, or add the word to the agent's. It holds the same for a step that names its agent and for one a factory hires

@@ -80,7 +80,7 @@ const sidesOf = ({ daemon, client }: Releases) =>
  * @param failed What the decode failed with, its message named.
  * @param releases The daemon's release and this client's, as far as they are known.
  */
-export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases) =>
+const undecoded = (verb: string, base: string, failed: unknown, releases: Releases) =>
   new Refused(
     `nemia ${verb}: the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): ${sidesOf(releases)}. ` +
       "Type `nemia version` on both machines, then upgrade the older to the other's release: this machine with `nemia upgrade <tag>`, the server with `nemia server upgrade <tag>`; or run this command with the nemia of the daemon's release",

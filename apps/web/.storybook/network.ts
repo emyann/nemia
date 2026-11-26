@@ -12,6 +12,7 @@ import type { StrayOf } from '../contracts/story-stray.contract.ts';
 /**
  * Whether a request of a story's page is a stray: the board's api on the page's own origin, or another origin.
  * @param request Whether the request is to the page's own origin, and its path.
+ * @public
  */
 export const strayOf: StrayOf = (request) => !request.sameOrigin || request.path === '/api' || request.path.startsWith('/api/');
 

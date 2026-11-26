@@ -4,8 +4,6 @@
  */
 import type { MemoryUnit, QuantityBytes } from '../../contracts/memory.contract.ts';
 
-export type { MemoryUnit };
-
 /** The bytes one of each unit is: a power of 1000 for a decimal unit, of 1024 for a binary one, 1 for none. */
 const UNIT_BYTES: Readonly<Record<MemoryUnit, number>> = {
   '': 1,
@@ -44,6 +42,7 @@ const mostOf = (unit: MemoryUnit) => MOST_OF[unit];
  * number holds exactly.
  * @param amount How many of `unit`.
  * @param unit The unit the amount is written in, none for bytes.
+ * @public
  */
 export const quantityBytes: QuantityBytes = (amount, unit) => {
   if (!(amount > 0) || amount > mostOf(unit)) return undefined;

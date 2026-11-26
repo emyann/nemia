@@ -55,7 +55,7 @@ import { factoryKey } from './door/factory-keys.ts';
 export const factoriesDirAt = (home: string) => path.join(home, 'factories');
 
 /** A factory's record as the store holds it: its text, and the revision of the record, which a write back expects. */
-export type FactoryText = { readonly text: string; readonly revision: number };
+type FactoryText = { readonly text: string; readonly revision: number };
 
 /**
  * What the store holds of its factories, at one read: each factory's record by name, and the controller's status of each templated one
@@ -436,7 +436,7 @@ function readable(listing: readonly FactoryListing[]) {
  * The names of the factories of `listing` that read, as a refusal offers them.
  * @param listing The store's factories, each as it reads or with why it does not.
  */
-export const factoryNamesOf = (listing: readonly FactoryListing[]) => readable(listing).factories.map((f) => f.name) satisfies string[];
+const factoryNamesOf = (listing: readonly FactoryListing[]) => readable(listing).factories.map((f) => f.name) satisfies string[];
 
 /**
  * The refusal of a start that names the default factory, whatever the environment: `Invalid`, naming the factories there are.

@@ -46,7 +46,7 @@ async function flattened(page: Page) {
  *
  * @throws `Refused` when the page shows no text, or a text whose ground could still not be read: an unmeasured text is never passed
  */
-export async function failingPairs(page: Page) {
+async function failingPairs(page: Page) {
   const restore = await flattened(page);
   try {
     const { pairs, scheme } = await measure(page.locator('[data-runs-page]'));

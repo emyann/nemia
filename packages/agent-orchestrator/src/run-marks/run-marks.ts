@@ -10,7 +10,7 @@
  */
 import type { RunMark, RunMarkEvent, RunMarkMove, RunMarkMoved, RunMarkRefusal } from '../../contracts/run-marks.contract.ts';
 
-export type { RunMark, RunMarkEvent, RunMarkMove, RunMarkRefusal } from '../../contracts/run-marks.contract.ts';
+export type { RunMark, RunMarkEvent } from '../../contracts/run-marks.contract.ts';
 
 /** A mark's three parts: whether the run is called off, pruned, held. */
 type Parts = { readonly cancelled: boolean; readonly pruned: boolean; readonly held: boolean };
@@ -94,11 +94,8 @@ export const MARK_MEANS: Readonly<Record<RunMark, { readonly endedForGood: boole
   'called-off-pruned-held': { endedForGood: true, honoursAsks: false },
 };
 
-/** One move the machine draws: from marks to others, by the event that makes it. */
-export type RunMarkEdge = { readonly from: RunMark; readonly to: RunMark; readonly event: RunMarkEvent };
-
 /** Every move `runMarkMove` makes between two marks, read off it: each mark asked each event. */
-export const runMarkEdges = () =>
+const runMarkEdges = () =>
   RUN_MARKS.flatMap((from) =>
     (Object.keys(RUN_MARK_EVENTS) as RunMarkEvent[]).flatMap((event) => {
       const move = runMarkMove(from, event);
@@ -106,6 +103,9 @@ export const runMarkEdges = () =>
     }),
   );
 
-/** A person's marks on a run as a Mermaid state diagram: every move `runMarkMove` makes, by the fact that makes it. */
+/**
+ * A person's marks on a run as a Mermaid state diagram: every move `runMarkMove` makes, by the fact that makes it.
+ * @public
+ */
 export const runMarksDiagram = () =>
   ['stateDiagram-v2', '  [*] --> open', ...runMarkEdges().map((e) => `  ${e.from} --> ${e.to}: ${RUN_MARK_EVENTS[e.event]}`)].join('\n');

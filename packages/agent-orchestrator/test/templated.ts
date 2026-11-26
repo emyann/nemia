@@ -38,7 +38,7 @@ export const withBuiltins = <A, E, R>(program: Effect.Effect<A, E, R>, builtins?
  * The factory `name`'s parts an export holds, read from the store through the Factory door, as the api answers them to the client, which
  * hands them to `nemia template export` on stdin: the factory, its file, its instruction and its rules.
  */
-export const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
+const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
   const home = yield* StoreRoot;
   const factory = yield* filedFactory(name, 'rules');
   const rules = yield* (yield* FactoryDoor).rules.read(FactoryName.read(name));

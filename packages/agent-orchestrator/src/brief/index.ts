@@ -4,8 +4,8 @@
  */
 export { composeBrief, PRECEDENCE, remoteBrief, toldLayers } from './brief.ts';
 export type { ToldLayers } from './brief.ts';
-export { contextSection, fromRunSection, handedParts, handedSection } from './handed.ts';
-export type { HandedPart, ParentCloseout, ParentStep } from './handed.ts';
+export { contextSection, handedParts } from './handed.ts';
+export type { HandedPart, ParentCloseout } from './handed.ts';
 export { briefParts, inParts } from './parts.ts';
-export { acceptedLines, gateLines, loopSection, retrySection, roundSection, SIGNOFF } from './brief-sections.ts';
-export type { EndingStopped, RetryBriefing, RoundBriefing } from './brief-sections.ts';
+export { acceptedLines, gateLines, retrySection, SIGNOFF } from './brief-sections.ts';
+export type { RetryBriefing } from './brief-sections.ts';

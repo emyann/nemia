@@ -17,7 +17,7 @@ import type { Heading, List, ListItem, Paragraph, PhrasingContent, Root } from '
 export type Retired = { spelling: string; card: string; kept?: { path: string; why: string }[] };
 
 /** One row of a table: the word, what it means, the code's type for it, and the page that explains it. */
-export type Term = { term: string; meaning: string; type?: string; see?: { label: string; href: string }; retired?: Retired[] };
+type Term = { term: string; meaning: string; type?: string; see?: { label: string; href: string }; retired?: Retired[] };
 
 /** A context's glossary table, with the file it is read from, by path from the repository's root. */
 export type Table = { context: string; title: string; about: string; paths: string[]; terms: Term[]; file: string };

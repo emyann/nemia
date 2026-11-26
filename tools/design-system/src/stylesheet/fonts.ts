@@ -82,7 +82,7 @@ export const faceRules = (faces: readonly Face[], from: string) =>
 const symbolsSheet = () => fs.readFileSync(path.join(SRC, 'components', 'look', 'symbols.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 /** The symbols' files: each fontsource file `look/symbols.css` names, and its file in the artifact. */
-export const symbolFiles = () =>
+const symbolFiles = () =>
   [...new Set([...symbolsSheet().matchAll(/url\('(@fontsource[^']+)'\)/g)].map(([, spec]) => spec ?? ''))].map((spec) => ({
     spec,
     from: requireOfTheBoard.resolve(spec),

@@ -41,14 +41,14 @@ export const KINDS = ['git', 'process', 'place', 'engine', 'hand'] as const;
 export type Kind = (typeof KINDS)[number];
 
 /** The kinds refused in each package's tests. */
-export const JUDGED: Readonly<Record<(typeof PACKAGES)[number], readonly Kind[]>> = {
+const JUDGED: Readonly<Record<(typeof PACKAGES)[number], readonly Kind[]>> = {
   'packages/agent-runtime': ['git', 'process'],
   [O]: KINDS,
   'apps/api': KINDS,
 };
 
 /** How a test file's name ends when the real thing is its subject. */
-export const BOUNDARY = '.boundary.test.ts';
+const BOUNDARY = '.boundary.test.ts';
 
 /** Whether `file` says by its name that it is a boundary test: `<what>.boundary.test.ts`. */
 export const isBoundary = (file: string) => {
@@ -57,10 +57,10 @@ export const isBoundary = (file: string) => {
 };
 
 /** The package of `PACKAGES` a file is in. */
-export const packageOf = (file: string) => PACKAGES.find((p) => file.startsWith(`${p}/`)) satisfies (typeof PACKAGES)[number] | undefined;
+const packageOf = (file: string) => PACKAGES.find((p) => file.startsWith(`${p}/`)) satisfies (typeof PACKAGES)[number] | undefined;
 
 /** The modules that start a process or a thread. */
-export const STARTS = ['node:child_process', 'child_process', 'node:worker_threads', 'worker_threads', 'node:cluster', 'cluster'];
+const STARTS = ['node:child_process', 'child_process', 'node:worker_threads', 'worker_threads', 'node:cluster', 'cluster'];
 
 /** Names watched in the modules that export them. */
 type Names = { readonly modules: readonly string[]; readonly names: readonly string[] };
@@ -117,13 +117,13 @@ const HELPER = /^(?:packages|apps)\/[^/]+\/test\/.+\.ts$/;
 type Named = { readonly name: string; readonly local: string | undefined; readonly typeOnly: boolean };
 
 /** One import of a file, static, dynamic, bare or an `export … from`: its module, and the names it binds, none where it is bare. */
-export type Import = { readonly module: string; readonly names: readonly Named[]; readonly typeOnly: boolean };
+type Import = { readonly module: string; readonly names: readonly Named[]; readonly typeOnly: boolean };
 
 /** What a local name of a file is bound to. */
 export type Bound = { readonly module: string; readonly name: string; readonly typeOnly: boolean };
 
 /** `spec` as imported by `file`: a package's name as it is, a relative path as a path from the repository root. */
-export const moduleOf = (file: string, spec: string) => (spec.startsWith('.') ? path.posix.join(path.posix.dirname(file), spec) : spec);
+const moduleOf = (file: string, spec: string) => (spec.startsWith('.') ? path.posix.join(path.posix.dirname(file), spec) : spec);
 
 /** The name of a binding or specifier element, where it is a plain one. */
 const textOf = (node: ts.Node | undefined) =>
@@ -195,7 +195,7 @@ function importOf(node: ts.Node, file: string) {
 const loads = (one: Import) => !one.typeOnly && (one.names.length === 0 || one.names.some((n) => !n.typeOnly));
 
 /** What a clause reads of a file beside a node: its imports by their node, its bindings, and its string `const`s. */
-export type Read = {
+type Read = {
   readonly file: string;
   readonly imports: ReadonlyMap<ts.Node, Import>;
   readonly bindings: ReadonlyMap<string, Bound>;
@@ -219,7 +219,7 @@ function importsOf(file: string, source: ts.SourceFile) {
 }
 
 /** What each local name `text` imports is bound to, in `file`. */
-export function bindingsOf(file: string, text: string) {
+function bindingsOf(file: string, text: string) {
   return boundBy(importsOf(file, parsed(file, text)).values()) satisfies Map<string, Bound>;
 }
 
@@ -519,7 +519,7 @@ export function reachBreaks(measured: ReadonlyMap<string, Reach>, baseline: Base
 }
 
 /** How many entries and kinds a baseline holds, by package and by kind. */
-export type Sizes = {
+type Sizes = {
   readonly entries: number;
   readonly kinds: number;
   readonly byPackage: Readonly<Record<string, number>>;
@@ -554,7 +554,7 @@ export function sizes(baseline: Baseline) {
 }
 
 /** The baseline a measure writes: each file that is no boundary test and reaches a kind, sorted by path. */
-export const baselineOf = (measured: ReadonlyMap<string, Reach>) =>
+const baselineOf = (measured: ReadonlyMap<string, Reach>) =>
   Object.fromEntries(
     [...measured]
       .filter(([file, reach]) => !isBoundary(file) && reach.kinds.length)
@@ -728,7 +728,7 @@ export function measureOf(root: string) {
 }
 
 /** The source of the baseline file a measure writes, one line a test file. */
-export const baselineSource = (baseline: Baseline) =>
+const baselineSource = (baseline: Baseline) =>
   [
     '/**',
     ' * The test files that reach the real thing and are no boundary test, each by its path from the repository root with the kinds it',

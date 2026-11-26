@@ -144,6 +144,10 @@ export type RunHolding = {
   word: string;
   advice: string;
   waitingOnYou: boolean;
+  /** What the person who put the hold said of why (`nemia hold --why`), where they said it. */
+  why?: string;
+  /** Who the person who put the hold said they are, where they said it. */
+  by?: string;
   /** Who put the hold (objects' `Actor`), where its file says. */
   actor?: Actor;
 };
@@ -204,7 +208,7 @@ const neverLands = (w: Wait) => Object.entries(w).some(([key, why]) => key !== '
  * @param run The run that waits.
  * @param waits The runs it waits on, as the reading found them; empty where it waits on none.
  */
-export function runWaitingOf(run: Run, waits: readonly Wait[]) {
+function runWaitingOf(run: Run, waits: readonly Wait[]) {
   if (!waits.length) return null;
   return {
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
@@ -215,12 +219,12 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]) {
 }
 
 /**
- * A person's hold on a run (`RunHolding`), in the package's words, and who put it (`actor`) where its file says; null for a run nobody
- * holds, and one called off.
+ * A person's hold on a run (`RunHolding`), in the package's words, what its person said of why and who they are (`why`, `by`), and who
+ * put it (`actor`), each where its file says; null for a run nobody holds, and one called off.
  * @param run The run held.
  * @param holds The holds the reading found on it; empty where nobody holds it.
  */
-export function holdingOf(run: Run, holds: readonly Wait[]) {
+function holdingOf(run: Run, holds: readonly Wait[]) {
   if (!run.hold || run.cancelledAt) return null;
   return {
     at: run.hold.at,
@@ -234,6 +238,8 @@ export function holdingOf(run: Run, holds: readonly Wait[]) {
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
     waitingOnYou: holdNeedsYou(holds),
+    ...(run.hold.why ? { why: run.hold.why } : {}),
+    ...(run.hold.by ? { by: run.hold.by } : {}),
     ...(run.hold.actor ? { actor: run.hold.actor } : {}),
   };
 }
@@ -250,7 +256,7 @@ export const wordOf = (views: Views) => (taskId: string) => wordOfView(views.get
  * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason`, `on`, `via` and `verdict`): `on` null but on a
  * `Waiting` step, `via` null but on an `AwaitingAnswer` one, and its check's verdict null where it was not judged by one.
  */
-export type StepCodes = {
+type StepCodes = {
   phase: StepPhase;
   reason: StepReason;
   on: WaitOn | null;
@@ -461,7 +467,7 @@ export function standingsOf(run: Run, steps: readonly StepSpec[], status: RunSta
  * @param steps The steps the run is judged by.
  * @param git The request's reader of the branches.
  */
-export const landedThrough = (run: Run, steps: readonly StepSpec[], git: BranchReader) => (branch: string) => {
+const landedThrough = (run: Run, steps: readonly StepSpec[], git: BranchReader) => (branch: string) => {
   const kept = onTheBase.get(`${run.id}/${branch}`);
   return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
 };

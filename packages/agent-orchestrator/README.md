@@ -630,7 +630,7 @@ description: Reviews a change read-only, as a second engineer would
 harness: claude
 model: opus
 output: review.schema.json   # beside the agent, in agents/
-overridable: model, fence    # what a step may override of it
+overridable: output, fence    # what a step may override of it
 claude:
   fence:
     tools: Read, Grep, Glob, Bash
@@ -674,8 +674,9 @@ writes a resolved step back as its file was: `agent:`, the keys the step set its
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
 
-**What a step may override is the agent's to say: `overridable:`.** Its words are `OVERRIDABLE` (`src/workflow/fence.ts`): `model`,
-`effort`, `context`, `harness`, `remote`, `output`, `fence`, `skills` and `mcp`. `fence` stands for every fence key at once, and a
+**The harness's properties are always a step's to override** (`HARNESS_PROPERTIES`, `src/workflow/fence.ts`): `model`, `effort`,
+`context` and `harness`. **What shapes the agent's behaviour is the agent's to say: `overridable:`.** Its words are `OVERRIDABLE`:
+`remote`, `output`, `fence`, `skills` and `mcp`; a harness property written on the line is refused, saying to take it off. `fence` stands for every fence key at once, and a
 step's fence still only narrows its agent's; `skills` and `mcp` only add. A word not in the list is refused, naming it and the list. A
 step whose own frontmatter sets something the line leaves out is refused at load (`offerRefusal`), naming the step, the key and the
 agent: delete the step's line, or add the word to the agent's. This is judged on every load, from the files, the same for a step that
@@ -4898,7 +4899,7 @@ holding a concurrency slot forever.
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines, a daemon's start and the free sweep's processes ended written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `emitLeftEnded`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/following/following.ts` | one step's session followed live, pure: the moments a follower is handed (`StepMoment`), and where a following goes each time the step is read again — another attempt, a wait on the feed, or its end (`nextOf`) |
 | `src/following/following.verb.ts` | one step's session followed live across a person's answer, the next turn and a try, waking on the step's lines of the feed between them (`followStep`) |
-| `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
+| `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`countRead`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `skills/read.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a repository run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches/branches.store.ts` | where a run's result branches stand, read off a `BranchReader` over the place's `standing`: whether each landed and where it stands (`standingsOf`, `shippedOf`, `branchStandings`, `resultBranches`), a parent run as its record and the standing say it (`parentRecord`), and the tips of a run's branches (`resultTips`) |

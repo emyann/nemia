@@ -20,7 +20,7 @@ const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? arg
  * The token `record` is, as the api lists it: its name, its holder and when it was minted; never the token, nor its digest.
  * @param record The person's token as the store files it.
  */
-export function tokenOf(record: PersonTokenFiled) {
+function tokenOf(record: PersonTokenFiled) {
   const holder = holderOf(record);
   if (holder.kind === 'person') return { name: record.name, holder: 'person', createdAt: record.createdAt } satisfies Token;
   return {
@@ -39,7 +39,7 @@ export function tokenOf(record: PersonTokenFiled) {
  * `act` — a token is never widened, so none is above the agent's own floor.
  * @param args The command's parsed arguments.
  */
-export function holderAsked(args: Args) {
+function holderAsked(args: Args) {
   const agent = textOf(args, 'agent');
   const factory = textOf(args, 'factory');
   const narrowed = textOf(args, 'narrowed');

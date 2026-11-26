@@ -120,13 +120,6 @@ function derivedAddsIn(listing: readonly FactoryListing[], home: string, name: s
 }
 
 /**
- * The library items the factory `name` resolves today (`derivedAddsIn`), the factories read through the Factory door.
- * @param home The store's root.
- * @param name The factory's name, `default` among them.
- */
-export const derivedAdds = (home: string, name: string) => Effect.map(listedAt(home), (listing) => derivedAddsIn(listing, home, name));
-
-/**
  * The factory `name`'s adds as `listing` reads: its record's where it has one, else those derived from its workflows (`libraryAddsOf`).
  * @param listing The store's factories, as the Factory door lists them.
  * @param home The store's root.
@@ -153,7 +146,7 @@ export const factoryAdds = (home: string, name: string) => Effect.map(listedAt(h
  * @param home The store's root.
  * @param ref The item, by its kind and its name.
  */
-export function libraryOrigin(home: string, ref: LibraryRef) {
+function libraryOrigin(home: string, ref: LibraryRef) {
   if (ref.kind === 'Skill') return librarySkill(home, ref.name) satisfies DefinitionOrigin | undefined as DefinitionOrigin | undefined;
   if (ref.kind === 'Agent')
     return (fs.statSync(path.join(libraryDir(home), AGENTS_FOLDER, `${ref.name}.md`), { throwIfNoEntry: false })?.isFile()

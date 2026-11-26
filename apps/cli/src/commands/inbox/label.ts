@@ -12,7 +12,7 @@ import { namespaceOfCard, namespaceOfRun, said, switchArg, textArg } from '../re
  * absent — then the labels as they stand.
  * @param edits Each edit as typed: `key=value` to set, `key-` to remove.
  */
-export function labelledLines({ kind, name, labels, was }: Labelled, edits: readonly string[]) {
+function labelledLines({ kind, name, labels, was }: Labelled, edits: readonly string[]) {
   const what = kind === 'Run' ? `run ${name}` : `card ${name}`;
   const lines = edits.map((edit) => {
     const at = edit.indexOf('=');

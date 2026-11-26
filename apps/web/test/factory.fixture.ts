@@ -131,7 +131,7 @@ export const stepReach = (extra: Partial<StepReach> = {}) =>
   }) satisfies StepReach;
 
 /** A step off Claude Code: nothing measured, so every reach it has no measure of is null. */
-export const codexReach = () =>
+const codexReach = () =>
   stepReach({
     step: 'review',
     harness: 'codex',

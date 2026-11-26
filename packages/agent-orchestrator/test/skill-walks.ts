@@ -36,7 +36,7 @@ export const aSkill = (name = 'tidy-notes', more: Partial<SkillDraft> = {}) =>
   }) satisfies SkillDraft;
 
 /** The store's library on a side: `<root>/workflows/skills`, where a skill of yours is written. */
-export const libraryOn = ({ root }: Side) => `${root}/workflows/skills`;
+const libraryOn = ({ root }: Side) => `${root}/workflows/skills`;
 
 /** `name`, as the door takes it. */
 const named = (name: string) => SkillName.read(name) satisfies SkillName;

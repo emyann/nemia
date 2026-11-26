@@ -24,7 +24,7 @@ export type Side = { readonly journal: JournalShape };
 export type Walk = { readonly name: string; readonly walk: (side: Side) => Promise<unknown>; readonly says: unknown };
 
 /** What a method answers: its answer, `null` for none, or `{ refused, reason }` naming the tag it failed with and its reason. */
-export async function asked<A, E>(verb: Effect.Effect<A, E>) {
+async function asked<A, E>(verb: Effect.Effect<A, E>) {
   const exit = await Effect.runPromiseExit(verb);
   if (Exit.isSuccess(exit)) return (exit.value ?? null) satisfies A | null | { refused: string; reason?: string };
   const failed = Cause.squash(exit.cause) as { _tag?: string; message?: string; reason?: string };
@@ -36,7 +36,7 @@ export async function asked<A, E>(verb: Effect.Effect<A, E>) {
 }
 
 /** What a walk answered, as every side says it: its JSON. */
-export const told = (value: unknown) => (value === undefined ? null : JSON.parse(JSON.stringify(value))) as unknown;
+const told = (value: unknown) => (value === undefined ? null : JSON.parse(JSON.stringify(value))) as unknown;
 
 const AT = '2026-10-01T00:00:00.000Z';
 const id = (name: string) => TaskId.read(name);
@@ -270,7 +270,7 @@ export const unwalked = (
 ) => methods.filter((method) => !walks[method]?.length && !layerOnly.includes(method)) satisfies string[];
 
 /** What `walk` answers on `side`, as every side says it. */
-export const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
+const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
 
 /** The walks a side `sideOf` makes, a new one for each, does not answer as the contract says, by `<method>: <walk>`. */
 export async function failing(sideOf: () => Side) {

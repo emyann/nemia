@@ -24,14 +24,14 @@ export type UpgradeRecord = typeof UpgradeRecord.Type;
  * The folder of the upgrades' records of the store at `home`.
  * @param home The store's folder.
  */
-export const upgradesDir = (home: string) => path.join(home, 'upgrades');
+const upgradesDir = (home: string) => path.join(home, 'upgrades');
 
 /**
  * The record of the upgrade `id` of the store at `home`.
  * @param home The store's folder.
  * @param id The upgrade's id.
  */
-export const upgradeFile = (home: string, id: string) => path.join(upgradesDir(home), `${id}.json`);
+const upgradeFile = (home: string, id: string) => path.join(upgradesDir(home), `${id}.json`);
 
 /**
  * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.

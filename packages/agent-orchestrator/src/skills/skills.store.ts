@@ -58,9 +58,6 @@ export function skillRead(name: string, dir: string) {
   }
 }
 
-/** A skill an agent gives, read: the folder it is found in, null where none is, and its reading or why it has none. */
-export type GivenRead = { name: string; dir: string | null } & SkillRead;
-
 /**
  * The skills `skills` an agent gives, one each in its order, each found where a start finds it (`found`, the agent's `skillsFor`) and read
  * there (`skillRead`). A name two folders of one place have is the package's refusal; a name no folder has, the refusal its card states.

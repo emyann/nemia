@@ -79,7 +79,7 @@ export type UpOptions = {
 export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOW_LINES, EVENT_LOOP_DELAY] as const;
 
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
-export const QUOTA_EVERY_MS = 600_000;
+const QUOTA_EVERY_MS = 600_000;
 
 /**
  * The quota's gauges, set at each good reading by harness and window (`five_hour`, `seven_day`, …, as the harness names them): the
@@ -87,7 +87,7 @@ export const QUOTA_EVERY_MS = 600_000;
  * gave a time). An answer with no windows sets neither, and each keeps the reading before it. A process holds none until its first good
  * reading, so a daemon started again leaves a gap until it has asked.
  */
-export const QUOTA_METRICS = {
+const QUOTA_METRICS = {
   used: Metric.gauge('quota.used', { description: "the percent of a harness's quota window used, at its last good reading" }),
   resetsAt: Metric.gauge('quota.resets_at', {
     description: "when a harness's quota window resets, in seconds since the epoch, at its last good reading",
@@ -286,7 +286,7 @@ const saidStarted = ({ held, replaced }: TakenStore) =>
  * @param scope Probes a scope in the slice it is given and answers why the host cannot hold one, or undefined where it can; `scopeRefusal`
  * by default.
  */
-export const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal) => {
+const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal) => {
   const { memory, cgroupParent: parent } = ceilings(config);
   if (memory === undefined) return undefined;
   const why = scope(parent);
@@ -457,10 +457,7 @@ export const toolsOnPath = (
  * @param home The store's directory (`WF_ROOT`).
  * @param running The release this process runs.
  */
-export const carryTrees = (home: string, running: Running) => [
-  ...(running.kind === 'install' ? [running.root] : []),
-  ...releaseTrees(home),
-];
+const carryTrees = (home: string, running: Running) => [...(running.kind === 'install' ? [running.root] : []), ...releaseTrees(home)];
 
 /**
  * Before the daemon's first pass: each harness a release carries in its own tree and the tools folder has no program of, adopted into
@@ -499,7 +496,7 @@ const fixUnderWay = (home: string, need: string, now: number) => {
  * releases carry) that is not at this release's pin (`atPin`) has its install filed as a fix (`startFix`, the need's first fix), unless
  * one of it was started within a fix's deadline. A fix refused is a warning: `nemia doctor` lists the need with its fix.
  */
-export const carriedFiled = Effect.fn('carriedFiled')(function* (home: string, running: Running) {
+const carriedFiled = Effect.fn('carriedFiled')(function* (home: string, running: Running) {
   const pinned = pinnedHarnesses();
   const carried = upgradeCarries(
     harnessesHeld(home, carryTrees(home, running), pinned),

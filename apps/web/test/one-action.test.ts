@@ -15,7 +15,7 @@ import { buttonForms } from './stories.ts';
 const SOURCE = (body: string) =>
   [
     "import { Button } from '@/components/ui/ds';",
-    "import { Button as Shad, LinkButton } from '@/components/ui/button';",
+    "import { Button as Shad } from '@/components/ui/button';",
     "import { routeLink } from '@/components/nav/routeLink';",
     'const RouteButton = routeLink(Button);',
     `export const X = () => <>${body}</>;`,
@@ -33,7 +33,6 @@ test('REFUSED: a filled button of the kit or shadcn, a text action with words an
   assert.deepEqual(keyed('<Button variant="text" aria-label="Close"><X /></Button>'), []);
   assert.deepEqual(keyed('<Button variant="text" aria-label="Close">{icon}</Button>'), []);
   assert.deepEqual(keyed('<Shad>Save</Shad>'), ['<Shad filled>']);
-  assert.deepEqual(keyed('<LinkButton variant="link">Open</LinkButton>'), ['<LinkButton text>']);
   assert.deepEqual(keyed('<RouteButton to="/">Home</RouteButton>'), ['<RouteButton filled>']);
   assert.deepEqual(keyed('<Button variant="outlined">Go</Button><Shad variant="outline">Go</Shad>'), []);
   assert.deepEqual(keyed('<Button>A</Button><Button>B</Button>'), ['<Button filled>'], 'once a file');

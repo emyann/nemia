@@ -9,9 +9,6 @@ import { CLAUDE_RULES } from 'agent-orchestrator/workflow';
 import type { CapabilitiesUnread, CapabilitiesWithSteps } from 'objects';
 import type { Place } from '../factory/place.ts';
 
-/** The repository the page reads, or why there is none. */
-export type PageRead = { repo: string } | { unread: CapabilitiesUnread };
-
 /** The lines that file a factory, which a page with no factory to read names: the add, and the apply from a template. */
 export const FILE_FACTORY: readonly string[] = [
   commandLine(FACTORY_ADD, {}, { volumes: '<path|url>:rw' }),

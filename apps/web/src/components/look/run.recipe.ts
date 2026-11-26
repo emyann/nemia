@@ -80,7 +80,7 @@ export const runRecipe = tv({
       layout: 'card',
       class: {
         base: 'flex flex-col gap-1.5 pt-[11px] pr-4 pb-2 pl-3.5',
-        head: 'justify-between gap-2 text-outline uppercase',
+        head: 'justify-between gap-2 text-on-surface-variant uppercase',
         title: 'line-clamp-2',
         agent: 'min-w-0 shrink truncate',
         foot: 'justify-between',

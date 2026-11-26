@@ -200,16 +200,7 @@ test('where a token of the person is already named local, the credential is mint
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** The door's synchronous spellings, each the door run at once over the keyspace: a test's. */
-const SEAM = [
-  'mintToken',
-  'readToken',
-  'mintPersonToken',
-  'mintPersonTokenFree',
-  'personTokenOf',
-  'personTokens',
-  'revokePersonToken',
-  'credentialKeptNow',
-];
+const SEAM = ['mintToken', 'readToken', 'mintPersonToken', 'personTokenOf', 'personTokens', 'revokePersonToken', 'credentialKeptNow'];
 
 /** The door's own files: where the seam is defined, not a use. */
 const OWN = ['src/token/token.store.ts'];

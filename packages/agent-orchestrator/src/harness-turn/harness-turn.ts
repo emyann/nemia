@@ -6,8 +6,6 @@
  */
 import type { TurnCheckOf, TurnSeen } from '../../contracts/harness-turn.contract.ts';
 
-export type { TurnSeen, TurnVerdict } from '../../contracts/harness-turn.contract.ts';
-
 /** What the check turn is told: the smallest question with an answer to read. */
 export const TURN_PROMPT = 'Answer with the one word: ready';
 

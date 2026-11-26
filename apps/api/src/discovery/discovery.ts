@@ -17,7 +17,7 @@ const routes: ApiRoute[] = Object.values(Api.groups).flatMap((group) =>
 );
 
 /** What `GET /api` answers. */
-export const discovered: APIResourceList = {
+const discovered: APIResourceList = {
   apiVersion: API_VERSION,
   kind: 'APIResourceList',
   groupVersion: API_VERSION,

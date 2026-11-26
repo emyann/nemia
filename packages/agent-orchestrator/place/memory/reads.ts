@@ -10,7 +10,7 @@ import { ahead, baseOf, changesOf, commitAt, kindIn, merged, within, type Held, 
 import type { BranchStood, Held as Left, PlaceAnswers, PlaceRequests, PlaceVerb, TrialMerge } from '../../src/place/place.ts';
 
 /** A refusal in the place's words. */
-export type Refusal = { readonly refused: string };
+type Refusal = { readonly refused: string };
 
 /** What a verb answers: its answer, or its refusal. */
 export type Reply<V extends PlaceVerb> = PlaceAnswers[V] | Refusal;
@@ -25,7 +25,7 @@ export const refused = (words: string) => ({ refused: words });
 export const runBranch = (run: string, leaf: string) => `${runBranches(run)}${leaf}`;
 
 /** The prefix every branch of `run` opens with, on the test place as on git's. */
-export const runBranches = (run: string) => `wf/${run}/`;
+const runBranches = (run: string) => `wf/${run}/`;
 
 /** How a directory the test place holds no repository in is said, with what makes one. */
 export const noRepository = (dir: string) =>

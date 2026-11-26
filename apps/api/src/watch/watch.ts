@@ -30,10 +30,10 @@ import { StoreRoot } from '../store.ts';
 import type { WatchStartOf, WatchStartRefusal } from '../../contracts/watch-start.contract.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
-export const WATCH_SETTLE: Duration.Input = '500 millis';
+const WATCH_SETTLE: Duration.Input = '500 millis';
 
 /** How often a watched list is read again though no feed line came: a change on disk no line says is sent this late at most. */
-export const WATCH_RESYNC: Duration.Input = '5 seconds';
+const WATCH_RESYNC: Duration.Input = '5 seconds';
 
 /** A list's route: it answers the request given, the context's own where none is. */
 export type Listed = (c: RequestContext<ApiEnv>, request?: Request) => Response | Promise<Response>;
@@ -78,6 +78,7 @@ const refusalOf = (c: RequestContext<ApiEnv>) => {
  * @param asked The resourceVersion the query asks, or undefined where it asks none.
  * @param follows Whether the list follows the feed.
  * @param byte The byte the asked word reads as (byteOf), or undefined where it is no byte.
+ * @public
  */
 export const watchStartOf: WatchStartOf = (asked, follows, byte) => {
   if (asked === undefined || asked === '') return { kind: 'state' };
@@ -90,7 +91,7 @@ export const watchStartOf: WatchStartOf = (asked, follows, byte) => {
  * A byte of the feed as an event's `resourceVersion` writes it: a decimal with no sign and no leading zero, else none.
  * @param text The resourceVersion as asked, or undefined where none is.
  */
-export const byteOf = (text: string | undefined) => (text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
+const byteOf = (text: string | undefined) => (text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
 
 /** A read of the list: its objects by key, and the objects themselves. */
 type Read = { readonly kind: string; readonly versions: Versioned[]; readonly objects: Map<string, WatchedObject>; readonly at: number };

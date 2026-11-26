@@ -51,15 +51,14 @@ export const wordReader = (run: Run, reads: SendReads) => (name: string) => {
  * @param run The id of the run the node is in.
  * @param node The workflow node's name.
  */
-export const sentCardName = (run: string, node: string) => `${run}-${node}-routed`;
+const sentCardName = (run: string, node: string) => `${run}-${node}-routed`;
 
 /**
  * The step whose closeout a condition's route was read from: a table's producer (`route: { from: <producer>.<field> }`), else the
  * condition itself, a judge or a script whose own closeout said the route.
  * @param condition The condition whose route was read.
  */
-export const routeProducer = (condition: StepSpec) =>
-  condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name;
+const routeProducer = (condition: StepSpec) => (condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name);
 
 /**
  * The title a routed card opens with: the first line of the `title` its condition's producer signed off on, where its `output:` declares
@@ -67,7 +66,7 @@ export const routeProducer = (condition: StepSpec) =>
  * @param run The run, whose brief and id title the card where the producer says none.
  * @param producer How the condition's producer signed off, or undefined where it has not.
  */
-export function sentCardTitle(run: Run, producer: Closeout | undefined) {
+function sentCardTitle(run: Run, producer: Closeout | undefined) {
   const said = producer?.output?.title;
   const title = typeof said === 'string' ? firstPiece(said.trim(), '\n').trim() : '';
   return title || firstPiece(run.brief, '\n').trim() || `Work routed on from run ${run.id}`;

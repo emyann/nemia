@@ -18,7 +18,7 @@ import { ProposalDoor } from '../proposal/proposal.store.ts';
  * @param runs The runs the tick listed, by id.
  * @param judged Each judged run's status, by its id.
  */
-export const runStatesOf = (runs: readonly Pick<Run, 'id'>[], judged: ReadonlyMap<string, { readonly status: RunState }>) => {
+const runStatesOf = (runs: readonly Pick<Run, 'id'>[], judged: ReadonlyMap<string, { readonly status: RunState }>) => {
   const listed = new Set(runs.map((r) => r.id));
   return (run: string) => judged.get(run)?.status ?? (listed.has(run) ? undefined : 'gone');
 };
@@ -46,7 +46,7 @@ export const proposalsPass = Effect.fn('proposalsPass')(function* (place: Propos
  * @param runs The runs the tick listed, by id.
  * @param judged Each judged run's status, by its id.
  */
-export const proposalsActed: ProposalsActed = (runs, judged) =>
+const proposalsActed: ProposalsActed = (runs, judged) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const acted = yield* Effect.result(proposalsPass({ home }, runStatesOf(runs, judged)));

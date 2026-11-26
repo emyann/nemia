@@ -126,7 +126,7 @@ export const approveRun = Effect.fn('approve')(function* (
 });
 
 /** What `nemia approve --off` did: the run, the approval as given, where it was set aside, and when and by whom it was taken back. */
-export type TakenBackApproval = { run: Run; approval: Approval; file: string; takenBack: TakenBack };
+type TakenBackApproval = { run: Run; approval: Approval; file: string; takenBack: TakenBack };
 
 /**
  * Take back the approval of a step that stands approved while nothing it approved has been filed — `nemia approve <run> <step> --off` — by

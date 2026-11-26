@@ -53,7 +53,7 @@ import { AnswerRefused, noCallHeld, type Answering } from './answer.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
 
 /** One answer asked of the stand-in: the task, the ask by its id, and each question's answer by the question's own text. */
-export type TestAnswer = { taskId: string; id: string; answers: Record<string, string> };
+type TestAnswer = { taskId: string; id: string; answers: Record<string, string> };
 
 /** A task as it was filed: its spec, under the id it was filed with or given. */
 export type TestFiling = TaskSpec & { readonly id: string };

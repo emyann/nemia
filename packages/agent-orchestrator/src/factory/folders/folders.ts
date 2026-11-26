@@ -8,8 +8,7 @@ import path from 'node:path';
 import type { FolderEntry, FolderNamesShownOf } from '../../../contracts/folder-names.contract.ts';
 import type { FolderReachOf } from '../../../contracts/folder-reach.contract.ts';
 
-export type { FolderEntry, FolderNamesShown } from '../../../contracts/folder-names.contract.ts';
-export type { FolderReach } from '../../../contracts/folder-reach.contract.ts';
+export type { FolderEntry } from '../../../contracts/folder-names.contract.ts';
 
 /** The most names one listing answers. */
 export const FOLDER_NAMES_MOST = 50;

@@ -41,7 +41,7 @@ const idChecked = checked(RunId.OnCreate, (id: string) => `a new run under ${JSO
  * The door `door` checked: a new run's and a run written back's checked before the layer writes, and the pass's settle with its record.
  * @param door The Run door's layer: the keyspace's, or the memory's made a door.
  */
-export function runDoorChecked(door: RunDoorShape) {
+function runDoorChecked(door: RunDoorShape) {
   return {
     ...door,
     runs: {

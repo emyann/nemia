@@ -68,7 +68,7 @@ const BUILD_STEPS: readonly (readonly string[])[] = [
  * What `nemia upgrade` did: the release now current, whether it was built now, how the daemon was restarted, the releases it removed, and
  * its lines.
  */
-export type Upgraded = {
+type Upgraded = {
   readonly release: ReleaseFile;
   readonly dir: string;
   readonly built: boolean;

@@ -41,7 +41,7 @@ const flatTokens = (tokens: Tokens) =>
  * type styles.
  * @param text tokens.json's text.
  */
-export const tokensSheet = (text: string) => {
+const tokensSheet = (text: string) => {
   const tokens = JSON.parse(text) as Tokens;
   const themes = tokens.color.themes.map((theme) => theme.id);
   const first = themes[0] ?? 'dark';

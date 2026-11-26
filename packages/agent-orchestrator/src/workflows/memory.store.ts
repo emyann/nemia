@@ -25,7 +25,7 @@ import type { Fills, Found } from '../folder/folder.ts';
 export const MEMORY_ROOT = '/memory';
 
 /** Yours, under the stand-in's root: the folder a workflow of yours is directly in, as `<home>/workflows` is on disk. */
-export const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
+const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 
 /**
  * A workflow held: each step's file, by its name, its README where one was written, and the other files its drafts carried, by name in

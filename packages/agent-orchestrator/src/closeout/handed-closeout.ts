@@ -8,7 +8,7 @@ import { CLOSEOUT_V1 } from './envelope.ts';
 import type { Outcome } from 'objects';
 
 /** A closeout as a later step reads it in `closeout.json`: an artifact is a file by its absolute path, or a value by its name. */
-export type HandedCloseout = {
+type HandedCloseout = {
   apiVersion: typeof CLOSEOUT_V1;
   outcome: Outcome;
   summary: string;

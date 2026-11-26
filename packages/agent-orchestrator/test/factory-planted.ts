@@ -7,9 +7,9 @@
 import { Effect } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { FactoryDoor, filedFactory } from '../src/factory/door/factories.store.ts';
-import { unhiredFireRefusal, type RevisionsPolicy } from '../src/factory/factory.ts';
+import { type RevisionsPolicy } from '../src/factory/factory.ts';
 import { wire } from '../src/factory/wiring/wire.verb.ts';
-import { Missing, type Refusal } from '../src/refusal/refusal.ts';
+import { type Refusal } from '../src/refusal/refusal.ts';
 
 /** `program` run at once at the store `home`, its refusal thrown. */
 const atOnce = <A>(home: string, program: Effect.Effect<A, Refusal>) =>
@@ -20,17 +20,6 @@ export const detached = (home: string, factory: string, workflow: string) =>
   atOnce(
     home,
     Effect.map(wire(factory, { verb: 'detach', workflow }), ({ file }) => file),
-  );
-
-/** The hire of the step `step` taken back from the factory `factory`, as `nemia factory fire` takes it: the agent fired. */
-export const fired = (home: string, factory: string, step: string) =>
-  atOnce(
-    home,
-    Effect.gen(function* () {
-      const { was } = yield* wire(factory, { verb: 'fire', step });
-      const agent = was.hires[step];
-      return agent ?? (yield* Effect.fail(new Missing({ message: unhiredFireRefusal(factory, step, was.hires) })));
-    }),
   );
 
 /** Whether the factory `factory`'s runs follow merged revisions, written as `nemia factory revisions` writes it: the file. */

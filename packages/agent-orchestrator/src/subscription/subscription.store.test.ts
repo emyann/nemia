@@ -188,15 +188,7 @@ test('the default door reads the keyspace at the store root the program is given
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** The module's spellings the door is over, which `src`'s code still calls rather than yielding the door. */
-const SEAM = [
-  'listSubscriptions',
-  'putSubscription',
-  'dropSubscription',
-  'readDelivery',
-  'writeDelivery',
-  'dropDelivery',
-  'listDeliveries',
-];
+const SEAM = ['listSubscriptions', 'putSubscription', 'dropSubscription', 'readDelivery', 'writeDelivery'];
 
 /** The door's own files: where the seam is defined, not a debt. */
 const OWN = ['src/subscription/subscription.store.ts', 'src/subscription/memory.store.ts'];

@@ -163,6 +163,7 @@ export function claudeTrust(key: string, file: string = claudeConfigFile(), read
  * `contracts/trust-taken-back.contract.ts`.
  * @param key A key of a `.claude.json`'s `projects`, as written.
  * @param folder The folder taken back, resolved.
+ * @public
  */
 export const claudeKeyUnder: ClaudeKeyUnder = (key, folder) => key === folder || key.startsWith(folder + '/');
 

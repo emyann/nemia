@@ -11,7 +11,7 @@ import type { AskKey, AskOf } from '../record/record.ts';
 export const RUNS_PREFIX = '/registry/runs/';
 
 /** Where every card's claim is: a claim's key is its card's name beneath it. */
-export const CLAIMS_PREFIX = '/registry/claims/';
+const CLAIMS_PREFIX = '/registry/claims/';
 
 /** Where every run's asks are, each run's under its id. */
 export const ASKS_PREFIX = '/registry/asks/';

@@ -6,20 +6,7 @@
  */
 import type { CompactTo, KeyspaceWrite, PointersHold, SchemaDueOf, WatchStartOf } from '../../contracts/keyspace.contract.ts';
 
-export type {
-  Held,
-  KeyWrite,
-  PointerCheck,
-  PointerDecision,
-  PointerRefusal,
-  RowWritten,
-  SchemaDue,
-  WatchRefusal,
-  WatchStart,
-  WriteDecision,
-  WriteRefusal,
-  WriteVerb,
-} from '../../contracts/keyspace.contract.ts';
+export type { Held, PointerRefusal, WriteRefusal, WriteVerb } from '../../contracts/keyspace.contract.ts';
 
 /**
  * A write of a key decided against the latest row it holds and the store's head.

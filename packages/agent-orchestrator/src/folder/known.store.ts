@@ -19,7 +19,7 @@ export const NO_KNOWN: Known = { repos: new Set(), trees: new Set() };
  * made from a template.
  * @param listing The store's factories, each as it reads or with why it does not.
  */
-export const knownOf = (listing: readonly FactoryListing[]) =>
+const knownOf = (listing: readonly FactoryListing[]) =>
   ({
     repos: new Set(listing.flatMap((f) => ('volumes' in f ? workedOn(f).map((r) => path.resolve(r)) : []))),
     trees: new Set(listing.flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : []))),

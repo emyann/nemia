@@ -1,12 +1,12 @@
 /**
  * The questions a step asks now, read off its current closeout and its frozen step (`askedNow`), for the board's answers and the
  * terminal's alike; and the words a person's `--answer`s at the terminal become (`typedAnswers`), through the same refusal and the same
- * words the board's answers go through. Programs over `EngineService`, run by a caller with `runWith`. Beside them, the `--answer` flag
- * `nemia retry` and `nemia approve` take (`answerFlag`), what their help says of it (`ANSWER_HELP`) and the values typed (`typedOf`).
+ * words the board's answers go through. Programs over `EngineService`, run by a caller with `runWith`. Beside them, the values
+ * `nemia retry` and `nemia approve` were typed as `--answer` (`typedOf`).
  */
 import { Effect } from 'effect';
 import { actorWords, type Actor } from 'objects';
-import type { Args, Flag } from '../command/command.ts';
+import type { Args } from '../command/command.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -27,7 +27,7 @@ const INSTEAD = 'with --message "<words>", without --answer';
  * What `step`'s current closeout asks, field by field in the order its step's fields ask them (`askedQuestions`): none where it asks none,
  * or has not signed off. The step is read as it was frozen on the run, or from its workflow folder under `home`.
  */
-export const askedNow = Effect.fn('askedNow')(function* (home: string, run: Run, step: string) {
+const askedNow = Effect.fn('askedNow')(function* (home: string, run: Run, step: string) {
   const e = yield* EngineService;
   const taskId = run.steps[step]?.taskId;
   const views = new Map<string, TaskView>();
@@ -82,30 +82,6 @@ export const givenAnswers = Effect.fn('givenAnswers')(function* (
   const by = actor === undefined ? undefined : actorWords(actor);
   return approval ? approvedAnswerText(step, questions, answers, note, by) : answerText(questions, answers, note, by);
 });
-
-/** What `nemia retry`'s and `nemia approve`'s help say of `--answer`. */
-export const ANSWER_HELP = [
-  '--answer <n>=<letter>: answer question n, numbered as nemia decide',
-  '<runId> prints them, with the option its letter names; once for each',
-  'question: "<n>=a,c" chooses several where it takes several,',
-  '"<n>=a: <words>" adds your own words, "<n>: <words>" says words',
-  'alone, "<n>=none" says none of its options fits; --message is',
-  'then the note under your answers',
-];
-
-/**
- * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
- * @param verb The verb the flag is given to, which its words name.
- */
-export const answerFlag = (verb: 'retry' | 'approve') =>
-  ({
-    flag: '--answer',
-    kind: 'text',
-    key: 'answer',
-    many: true,
-    takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
-    only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
-  }) satisfies Flag;
 
 /**
  * The `--answer` values typed, in the order given: none where none were.

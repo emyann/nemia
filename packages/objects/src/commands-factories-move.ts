@@ -8,7 +8,7 @@ import { leftOut } from './commands-flags.ts';
 import { MOVE_CARDS } from './factory-move.ts';
 
 /** The command line `nemia factory move` takes. */
-export const MOVE_USAGE =
+const MOVE_USAGE =
   '<name> --to <context> [--from <context>] [--repo <source>=<url|path> ...] [--volume <name>=<path> ...] [--cards follow|stay]';
 
 /** `nemia factory move`'s spec: the factory, the contexts, a `--repo` and a `--volume` each as often as needed, and `--cards`. */

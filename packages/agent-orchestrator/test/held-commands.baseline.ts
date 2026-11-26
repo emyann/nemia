@@ -14,22 +14,22 @@
 export const KEPT: readonly string[] = ['doctor', 'doctor fix', 'doctor carry', 'readiness', 'daemon'];
 
 /** The run's verbs. */
-export const HELD_RUN: readonly string[] = [];
+const HELD_RUN: readonly string[] = [];
 
 /** The inbox's writes and the labels. */
-export const HELD_INBOX: readonly string[] = [];
+const HELD_INBOX: readonly string[] = [];
 
 /** The factories' verbs. */
-export const HELD_FACTORY: readonly string[] = [];
+const HELD_FACTORY: readonly string[] = [];
 
 /** The policies and the rest of the agents' and workflows' verbs. */
-export const HELD_DEFINITION: readonly string[] = [];
+const HELD_DEFINITION: readonly string[] = [];
 
 /** The moved reads whose words and help are still here: none, each said in `objects`' `READ_WORDS`. */
-export const HELD_READ: readonly string[] = [];
+const HELD_READ: readonly string[] = [];
 
 /** The rest of the store's verbs. */
-export const HELD_REST: readonly string[] = [];
+const HELD_REST: readonly string[] = [];
 
 /** Every store verb this CLI still serves. */
 export const HELD: readonly string[] = [...HELD_RUN, ...HELD_INBOX, ...HELD_FACTORY, ...HELD_DEFINITION, ...HELD_READ, ...HELD_REST];

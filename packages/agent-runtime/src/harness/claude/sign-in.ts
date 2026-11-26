@@ -22,7 +22,7 @@ import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { CLAUDE_SIGN_IN } from './vocabulary.ts';
 import type { ClaudeSignInAsk } from '../../../contracts/claude-sign-in.contract.ts';
 
-export type { ClaudeSignInAsk, ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
+export type { ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
 
 /** How long `claude auth status` is given to answer before the spawn is refused for want of an answer (`claudeSignedOutRefusal`). */
 export const CLAUDE_SIGN_IN_MS = 15_000;
@@ -34,7 +34,7 @@ export const CLAUDE_SIGN_IN_MS = 15_000;
 const AuthStatusSchema = Schema.Struct({ loggedIn: Schema.Boolean, authMethod: Schema.optional(Schema.String) });
 
 /** What `auth status` printed, as far as it is read. */
-export type AuthStatus = typeof AuthStatusSchema.Type;
+type AuthStatus = typeof AuthStatusSchema.Type;
 
 const decodeStatus = Schema.decodeUnknownOption(AuthStatusSchema);
 
@@ -52,6 +52,7 @@ export const authStatusOf = (stdout: string) => {
 /**
  * What one ask's end says of the sign-in: the exit and the JSON as Claude Code documents them.
  * @param ask How the ask ended: its exit code and `loggedIn` where it exited, else that it timed out or did not run.
+ * @public
  */
 export const claudeSignInOf: ClaudeSignInOf = (ask) => {
   if (ask.kind === 'timed-out') return 'timed-out';

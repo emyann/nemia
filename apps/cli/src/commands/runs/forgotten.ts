@@ -57,7 +57,7 @@ const refusalWords = (f: Engine, marker: string) => {
  * @param f What the engine answers of the run's tasks: those forgotten, left, waited on and refused, and its marker.
  * @param id The run's id, said for the marker where the engine names none.
  */
-export const engineWords = (f: Engine, id: string) => {
+const engineWords = (f: Engine, id: string) => {
   const marker = f.marker ?? `the marker of ${id}`;
   const left = f.left.length ? `it left ${f.left.join('; ')}` : '';
   return [forgotWords(f), left, waitWords(f, marker), refusalWords(f, marker)].filter(Boolean).join('; ');

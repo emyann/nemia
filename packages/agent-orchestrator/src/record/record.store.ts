@@ -201,7 +201,7 @@ const jsonOr = (text: string) => Result.getOrUndefined(Schema.decodeUnknownResul
  * by code older than actors — or names one that does not read as an actor, which is left out rather than refusing what the file asks.
  * @param value What the file holds under its actor's key; undefined where it holds none.
  */
-export const actorIn = (value: unknown) => {
+const actorIn = (value: unknown) => {
   const read = Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
   return read === undefined ? {} : { actor: read };
 };
@@ -282,7 +282,7 @@ export function holdIn(text: string) {
  * Who lifted the run's last hold by hand, as its record's text reads: undefined where it does not read as one.
  * @param text What the unheld record holds.
  */
-export function unheldIn(text: string) {
+function unheldIn(text: string) {
   const json = jsonOr(text);
   const since = fieldOf(json, 'since');
   const { actor } = actorIn(fieldOf(json, 'actor'));
@@ -313,7 +313,7 @@ export const isSaid = (text: string) => Option.isSome(keptSaidIn(text));
  * What was said to each of the run's steps before it was filed, by step, in the order kept: undefined where nothing was.
  * @param words The texts of the run's said records, in the order kept.
  */
-export function saidIn(words: readonly string[]) {
+function saidIn(words: readonly string[]) {
   const byStep: Record<string, SaidBefore[]> = {};
   for (const text of words) {
     const kept = keptSaidIn(text);
@@ -539,7 +539,7 @@ export function approvalIn(text: string, step: string, n: number) {
  * cannot be read as one.
  * @param asks The run's waiting asks.
  */
-export function acceptancesIn(asks: readonly AskEntry[]) {
+function acceptancesIn(asks: readonly AskEntry[]) {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
   for (const { name, text, where } of asks) {

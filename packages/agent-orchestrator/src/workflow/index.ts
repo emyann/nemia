@@ -5,25 +5,23 @@
 export { autoDropped, parseWorkflow, renderStep, skillAt, stepFrom } from './step-file.ts';
 export {
   agentDeniesOf,
-  deniesWith,
   directoryFence,
   FENCE_KEYS,
-  offerRefusal,
+  HARNESS_PROPERTIES,
   OVERRIDABLE,
+  STEP_OVERRIDES,
   OVERRIDE_KEYS,
   overridesOf,
   ownDenies,
   sandboxed,
-  toolOf,
   writesNothing,
   writesOutsideByRule,
   type Fenced,
   type Overridable,
 } from './fence.ts';
-export { headedLayers, LAYER_HEADINGS } from './layers.ts';
+export { headedLayers } from './layers.ts';
 export type { ComposedLayer } from './layers.ts';
 export { unallowedRefusal } from './unallowed.ts';
-export type { Hire } from './step-file.ts';
 export type { StepDraft } from './step-file.ts';
 export {
   afterRefusal,

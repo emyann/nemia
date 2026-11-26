@@ -91,4 +91,4 @@ export function cardFilesWords(refusal: CardFilesRefusal, card: string, most: { 
   }
 }
 
-export type { CardFileGiven, CardFileHeld, CardFilesRefusal };
+export type { CardFileGiven, CardFilesRefusal };

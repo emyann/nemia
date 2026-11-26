@@ -20,7 +20,7 @@ import { StoreRoot } from '../config/root.store.ts';
  * What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a start
  * refused part-way, which card, why, and the cards after it.
  */
-export type PlanStarted = {
+type PlanStarted = {
   started: Planned[];
   folderOf: (card: Card) => string;
   stopped?: { card: Card; error: Error & { exitCode?: number }; rest: Card[] };

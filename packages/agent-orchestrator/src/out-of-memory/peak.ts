@@ -7,8 +7,6 @@ import { memoryBytesOf } from 'agent-runtime/vocabulary';
 import type { AttemptMemory } from '../../contracts/out-of-memory.contract.ts';
 import type { TryPeak, TryPeakOf } from '../../contracts/try-peak.contract.ts';
 
-export type { TryPeak };
-
 /** What an attempt ran under, a container's `resources`, as the engine records it on the attempt: its limit and its request. */
 export type AttemptResources = { limits?: { memory?: string }; requests?: { memory?: string } };
 
@@ -24,6 +22,7 @@ export type TryMemory = { peak: TryPeak; askedBytes: number | null };
  * peak starts as null by a branch no array takes (a length below zero), since the verifier reads the shape of a variable from its first
  * value: a `null` alone would leave it no peak to compare, and a cast is a claim it refuses to trust.
  * @param memories Each attempt's memory record, in the order the attempts ran, undefined for one that carries none.
+ * @public
  */
 export const tryPeakOf: TryPeakOf = (memories) => {
   let peak = memories.length < 0 ? { peakBytes: 0, limitBytes: 0 } : null;

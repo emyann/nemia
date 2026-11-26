@@ -6,6 +6,7 @@ import { Column, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { runViewOf } from '@/lib/api/judged';
 import type { WaitingRun } from '@/lib/api/runs';
 import { nowMark } from '@/lib/stepMark';
+import { NOW_WORDS } from '@/lib/words';
 import { READS, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 import { rowOpens } from '../../../.storybook/play';
 import { Run } from './Run';
@@ -35,7 +36,7 @@ const STATES: Array<[string, keyof typeof TARGET_RUNS]> = [
   ['Waits on you · answers', '72wy'],
   ['Waits on you · decides', 'vqvd'],
   ['Waits on a run', '649a'],
-  ['Held by you', 'c7un'],
+  ['Held', 'c7un'],
   ['Finished', 'x57v'],
 ];
 
@@ -60,8 +61,8 @@ function Headed({ name, width, children }: { name: string; width?: number; child
   );
 }
 
-/** The run at md as a row: the runs table's, which gives it its columns. */
-function InTable({ run }: { run: WaitingRun }) {
+/** The runs at md as rows: the runs table's, which gives them its columns. */
+function InTable({ run, runs = [run] }: { run: WaitingRun; runs?: WaitingRun[] }) {
   return (
     <Table aria-label="Runs in flight" density="dense" style={{ minWidth: 880, tableLayout: 'fixed' }}>
       <TableHeader>
@@ -79,7 +80,9 @@ function InTable({ run }: { run: WaitingRun }) {
         </Column>
       </TableHeader>
       <TableBody>
-        <Run run={run} size="md" layout="row" asOf={AS_OF} among={AMONG} />
+        {runs.map((one) => (
+          <Run key={one.id} run={one} size="md" layout="row" asOf={AS_OF} among={AMONG} />
+        ))}
       </TableBody>
     </Table>
   );
@@ -186,6 +189,74 @@ export const EveryState: Story = {
       const drawn = one.querySelector('[data-mark]')?.getAttribute('data-mark');
       await expect(drawn, `${id} is drawn by the mark of its step now`).toBe(run ? nowMark(run) : 'rest');
     }
+  },
+};
+
+/** The held run of the targets, as another run held as `holding` says, its id ending in `four`. */
+const heldAs = (four: string, holding: Partial<NonNullable<RunObject['status']['holding']>>) => {
+  const held = TARGET_RUNS.c7un;
+  const { at, runs, word, advice, waitingOnYou } = held.status.holding!;
+  return listed({
+    ...held,
+    metadata: { ...held.metadata, name: held.metadata.name.replace(/c7un$/, four) },
+    status: { ...held.status, holding: { at, runs, word, advice, waitingOnYou, ...holding } },
+  });
+};
+
+/** A reason near the 200 characters a hold's why may hold. */
+const LONG_WHY =
+  'Waits for 1sw7 to land first: its board change reads the hold’s new fields, which only that run serves; resuming before it lands would build against a schema the api does not answer yet.';
+
+/**
+ * An unheld row that waits on a run, then the held rows: why and who said, a long why by an agent, none said, and one that waits on
+ * you.
+ */
+const HELD_ROWS = [
+  RUN('649a'),
+  RUN('c7un'),
+  heldAs('q8mw', {
+    why: LONG_WHY,
+    by: 'operator',
+    actor: { kind: 'agent', agent: 'operator', token: 'ops' },
+  }),
+  heldAs('n0ne', {}),
+  heldAs('z2pn', {
+    runs: [{ run: TARGET_RUNS['1sw7'].metadata.name, missing: false, cancelledAt: '2026-11-15T17:00:00.000Z', gone: [], landed: false }],
+    waitingOnYou: true,
+    why: 'rebase after the release is cut',
+    by: 'operator',
+    actor: { kind: 'agent', agent: 'operator', token: 'ops' },
+  }),
+];
+
+/**
+ * Held runs as rows of the runs table, under one that only waits on a run: each held row's hold line says why, or that no reason was
+ * given, and who holds it; a hold that waits on you is yellow and names the run that never lands, never the reader as its holder.
+ */
+export const HeldRows: Story = {
+  render: () => (
+    <div style={BOARD}>
+      <InTable run={HELD_ROWS[0]} runs={HELD_ROWS} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const row = (one: WaitingRun) => canvasElement.querySelector<HTMLElement>(`tr[data-run="${one.id}"]`)!;
+    const [waits, said, long, none, yours] = HELD_ROWS.map(row);
+    await expect(waits.querySelector('[data-hold]'), 'a run that only waits on a run has no hold line').toBeNull();
+    for (const held of [said, long, none, yours])
+      await expect(held.querySelectorAll('[data-hold]').length, 'a held row has one hold line').toBe(1);
+    await expect(said.querySelector('[data-hold-why]')).toHaveTextContent('merge conflicts with 1sw7’s schema change');
+    await expect(said.querySelector('[data-hold-by]')).toHaveTextContent('by ann');
+    await expect(said.querySelector('[data-hold-by] [data-actor="person"]')).not.toBeNull();
+    await expect(long.querySelector('[data-hold-why]'), 'the whole why on hover').toHaveAttribute('title', LONG_WHY);
+    await expect(long.querySelector('[data-hold-by] [data-actor="agent"]')).not.toBeNull();
+    await expect(none.querySelector('[data-hold-why]')).toHaveTextContent(NOW_WORDS.noWhy);
+    await expect(none.querySelector('[data-hold-by]'), 'a hold that says nobody names nobody').toBeNull();
+    await expect(yours.querySelector('[data-now]')).toHaveAttribute('data-now', 'yours');
+    const words = yours.querySelector('[data-now-words]');
+    await expect(words).toHaveTextContent(NOW_WORDS.calledOff);
+    await expect(words).not.toHaveTextContent(/held by you/i);
+    await expect(said.querySelector('[data-now]')).not.toHaveAttribute('data-now', 'yours');
   },
 };
 

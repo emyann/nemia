@@ -48,6 +48,7 @@ const homeOf = (list: BaselineList, entry: string) =>
  * @param list The list whose folder `file` is in.
  * @param file The file the entry sits in, from the workspace root.
  * @param entry The entry, one line of the file.
+ * @public
  */
 export const isAstray: IsAstray = (list, file, entry) => homeOf(list, entry) !== file;
 
@@ -64,7 +65,7 @@ export const misfiled: Misfiled = (list, files) => ({
 });
 
 /** The baseline as the tree holds it: each list's files, and every file under the folder that is no list's text file. */
-export type Baseline = { readonly lists: Readonly<Record<BaselineList, readonly Filed[]>>; readonly strays: readonly string[] };
+type Baseline = { readonly lists: Readonly<Record<BaselineList, readonly Filed[]>>; readonly strays: readonly string[] };
 
 /** Every file under `dir`, by its path from `root`, in a stable order. */
 const filesUnder = (root: string, dir: string) =>

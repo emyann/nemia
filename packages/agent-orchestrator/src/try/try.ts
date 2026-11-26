@@ -48,7 +48,7 @@ export type TryFence = { permissionMode: string; allowedTools: string[] };
  * `text` quoted for a POSIX shell, as a command a person pastes says a path.
  * @param text The text to quote.
  */
-export const shellQuoted = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
+const shellQuoted = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
 
 /**
  * The fence a try of agent `name`, whose keys are `keys`, writes (`directoryFence`), or why it has none: the agent's mode asks first and
@@ -95,7 +95,7 @@ export const tryText = (name: string, version: string, fence: TryFence) =>
  * @param name The agent's name.
  * @param home The store's root folder.
  */
-export function tryNameRefusal(name: string, home: string) {
+function tryNameRefusal(name: string, home: string) {
   if (name !== AGENTS_FOLDER && name !== SKILLS_FOLDER) return null;
   return `An agent named \`${name}\` cannot be tried: its try's folder would be ${tryDir(name, home)}, where every try looks for its ${name} first, and a folder named \`${name}\` is not a workflow. Rename the agent to try it.`;
 }

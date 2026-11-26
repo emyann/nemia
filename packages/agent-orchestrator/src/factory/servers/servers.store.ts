@@ -49,7 +49,7 @@ const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Sche
  * @param where The record's key or the file's path, named in a refusal.
  * @param fix The command that writes it again, as a refusal names it.
  */
-export function serversIn(text: string | undefined, where: string, fix: string) {
+function serversIn(text: string | undefined, where: string, fix: string) {
   if (text === undefined) return undefined;
   const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
   if (Option.isNone(json)) throw new Invalid({ message: `${where} is not JSON: ${fix}.` });

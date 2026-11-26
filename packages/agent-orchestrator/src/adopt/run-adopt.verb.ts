@@ -110,7 +110,7 @@ const adoptRounds = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
  * and put in `views`; it answers with them and changes nothing on the run. `forget` adopts them in memory, so a step being filed is in
  * flight, and `advance` stops them on a cancelled run, whose record would otherwise hide them from every stop.
  */
-export const unrecordedSteps = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
+const unrecordedSteps = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
   const { run, views } = read;
   const { cancelledAt: _, ...live } = run;
   const { ready } = assess({ ...read, run: live, sessionBlocked: () => false, standings: [], checkout: undefined });

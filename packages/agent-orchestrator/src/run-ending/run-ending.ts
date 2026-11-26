@@ -7,10 +7,8 @@
 import type { RunStatusWord } from 'objects';
 import type { RunEnding, RunEndingOf } from '../../contracts/run-ending.contract.ts';
 
-export type { RunEnding } from '../../contracts/run-ending.contract.ts';
-
 /** How each status of a run stands to its end. */
-export const RUN_ENDING: Readonly<Record<RunStatusWord, RunEnding>> = {
+const RUN_ENDING: Readonly<Record<RunStatusWord, RunEnding>> = {
   running: 'going',
   'awaiting approval': 'going',
   waiting: 'going',
@@ -22,6 +20,7 @@ export const RUN_ENDING: Readonly<Record<RunStatusWord, RunEnding>> = {
 /**
  * How a run stands to its end, by its status (`RUN_ENDING`).
  * @param status The run in one word, as a pass worked it out from its steps.
+ * @public
  */
 export const runEndingOf: RunEndingOf = (status) => RUN_ENDING[status];
 

@@ -29,7 +29,7 @@ const leftOutLines = (card: Card) =>
  * What `nemia inbox add` prints of the card filed: a line of it, the cards it waits on, a line per label left out, and how to start it.
  * @param card The card the api filed.
  */
-export const filedLines = (card: Card) => {
+const filedLines = (card: Card) => {
   const { name, labels } = card.metadata;
   const { spec } = card;
   const title = (spec.body ?? '').split('\n')[0] ?? '';
@@ -58,7 +58,7 @@ const SPAN = /(?<!`)(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g;
  * @param idea The idea as typed: a file's path, or words, which name none.
  * @param body The idea's text.
  */
-export function besideIdea(idea: string, body: string) {
+function besideIdea(idea: string, body: string) {
   const taken = new Set<string>();
   const notTaken = new Map<string, string>();
   if (!fs.statSync(idea, { throwIfNoEntry: false })?.isFile()) return { taken: [...taken], notTaken: [...notTaken] };

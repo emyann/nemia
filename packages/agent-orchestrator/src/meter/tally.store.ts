@@ -17,11 +17,10 @@
  * What the runtime reports of its own reads (`addRuntime`) is the pass's alone too: `tickRun` runs the pass in a tally of the runtime's
  * (`talliedIn`).
  *
- * The bytes are the ones read through `readText` and `countRead`, a thin wrapper around the store's readers: not a syscall tracer, so
+ * The bytes are the ones read through `countRead`, which the store's readers call: not a syscall tracer, so
  * what a child process reads (git) is not in them, and neither is a read the store makes some other way. Nothing is carried between
  * passes: `metered` returns the counts, and the next pass starts from nothing.
  */
-import fs from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Effect, Fiber, Context, References } from 'effect';
 import { NOTHING_SEEN, PHASES, type CheckLabels, type Phase, type PhaseCost, type Seen } from './meter.ts';
@@ -205,17 +204,7 @@ export const addRuntime = (
 };
 
 /**
- * `f`, counting done outside `within` — a runtime's report read, say — its time added to the overhead and charged to no kind: the time
- * before it is charged first, and the mark moved past it after. Outside a pass, `f` itself.
- * @param f The counting to run outside every phase.
- */
-export function aside<T>(f: () => T) {
-  const m = open();
-  return m ? counting(m, f) : f();
-}
-
-/**
- * `program`, counted as `aside` counts a function: its time added to the overhead and charged to no kind, the mark moved past it after.
+ * `program`, counted outside every phase: its time added to the overhead and charged to no kind, the mark moved past it after.
  * Outside a pass, `program` itself.
  * @param program The counting to run outside every phase.
  */
@@ -304,13 +293,3 @@ export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>) =>
     E,
     R
   >;
-
-/**
- * `fs.readFileSync(file, 'utf8')`, its bytes counted: throws as it does.
- * @param file The path of the file to read.
- */
-export const readText = (file: string) => {
-  const buf = fs.readFileSync(file);
-  countRead(buf.length);
-  return buf.toString('utf8');
-};

@@ -100,7 +100,7 @@ export const signedOffOnce = (r: Run) => {
  * The engine's word as a step's standing reads it: a session that stopped to ask is still at work, and what is not settled runs. What the
  * tables' engine words come to as the one read's phase (`phaseOfView` reads the same off a view).
  */
-export const settledWord = (phaseOf: (taskId: string) => string) => (taskId: string) => {
+const settledWord = (phaseOf: (taskId: string) => string) => (taskId: string) => {
   const word = phaseOf(taskId);
   if (word === 'input-required') return 'succeeded' as const satisfies TaskPhase;
   return (

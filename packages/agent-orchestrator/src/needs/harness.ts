@@ -7,16 +7,9 @@
  */
 import type { HarnessDeclaration, HarnessNeeds } from 'agent-runtime/vocabulary';
 import type { HarnessPart, Need } from 'objects';
-import type {
-  HarnessesOfRun,
-  HarnessVersionWord,
-  HarnessVersionWordOf,
-  RunNeeding,
-  RunsHoldingRemoval,
-  StepHarness,
-} from '../../contracts/harness-needs.contract.ts';
+import type { HarnessesOfRun, HarnessVersionWordOf, RunNeeding, RunsHoldingRemoval } from '../../contracts/harness-needs.contract.ts';
 
-export type { HarnessVersionWord, RunNeeding, StepHarness };
+export type { RunNeeding };
 
 /**
  * The harnesses a run needs, from its frozen steps (`StepHarness`): each that a step running a session runs on — the one it names, else
@@ -117,7 +110,7 @@ export const harnessInstallCommand = (harness: string, needs: HarnessNeeds) => `
  * @param harness The harness's name.
  * @param needs What its adapter declares of its install and sign-in.
  */
-export const harnessRemoveCommand = (harness: string, needs: HarnessNeeds) =>
+const harnessRemoveCommand = (harness: string, needs: HarnessNeeds) =>
   `{\n${needs.remove}\n} && mkdir -p "$NEMIA_TOOLS/harnesses/${harness}" && : > ${markOf(harness)}`;
 
 /**

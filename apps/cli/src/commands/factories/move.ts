@@ -43,7 +43,7 @@ function pairsOf(args: Args, key: string, sent: (value: string) => string) {
  * @param exp The export read of `from`'s store: the cards left there and what stays.
  * @param filed What the import into `to`'s store answers: the file, the repositories, volumes and cards, and the places left untrusted.
  */
-export function movedLines(from: string, to: string, exp: FactoryExport, filed: FactoryImported) {
+function movedLines(from: string, to: string, exp: FactoryExport, filed: FactoryImported) {
   const cloned = new Set(filed.cloned);
   return [
     `${filed.name}: moved from ${from} to ${to}`,

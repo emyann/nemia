@@ -23,6 +23,7 @@ import { isFactoryLine, isRunLine, isStoreLine, messageOf, REASON_CODES, sourceO
  * The namespace an event is in: the factory its line names, `default` for a run's or a step's that names none, else none.
  * @param kind What the line is about.
  * @param factory The factory the line names, or undefined or empty where it names none.
+ * @public
  */
 export const eventNamespace: EventNamespace = (kind, factory) => {
   if (factory !== undefined && factory !== '') return factory;
@@ -33,6 +34,7 @@ export const eventNamespace: EventNamespace = (kind, factory) => {
  * The reason an event is served under: its line's, where it is one of `known`, else `Unknown`.
  * @param reason The reason the line says.
  * @param known The reasons an event is served under.
+ * @public
  */
 export const eventReason: EventReason = (reason, known) => (known.includes(reason) ? reason : 'Unknown');
 
@@ -73,7 +75,7 @@ const labelsOf = (line: FeedLine) => {
  * only grows as the feed is written.
  * @param end The byte of the feed just after the event's line.
  */
-export const feedPosition = (end: number) => String(end);
+const feedPosition = (end: number) => String(end);
 
 /**
  * The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event: who acted (`actor`) carried where the

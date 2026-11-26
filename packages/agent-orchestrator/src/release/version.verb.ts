@@ -56,7 +56,7 @@ export function latestRelease(home: string, running: Running) {
  * What `nemia version` reads: the release's version (the root package.json's), this nemia's release, the store's pointer, the
  * daemon's, the sessions at work by release and harness version, the newest release the check read (`latest`), and its lines.
  */
-export type Versions = {
+type Versions = {
   readonly version: string;
   readonly running: Running;
   readonly current: Current | null;
@@ -64,14 +64,6 @@ export type Versions = {
   readonly sessions: readonly SessionCount[];
   readonly latest?: Latest;
   readonly lines: readonly string[];
-};
-
-/** A session in flight: the last attempt of a task, not ended, with the harness its task was filed with and whether that is remote. */
-export type InFlight = {
-  readonly attempt: TaskView['state']['attempts'][number];
-  readonly harness: string;
-  readonly remote: boolean;
-  readonly settled: boolean;
 };
 
 /**
@@ -93,7 +85,7 @@ export const inFlight = (views: readonly TaskView[]) =>
  * @param views The engine's tasks.
  * @param releases The store's real releases folder.
  */
-export const sessionsAtWork = (views: readonly TaskView[], releases: string) =>
+const sessionsAtWork = (views: readonly TaskView[], releases: string) =>
   sessionCounts(inFlight(views).flatMap((s) => (s.settled ? [] : [sessionRanOn(s.attempt, s.harness, releases)])));
 
 /** Reads the three releases and the sessions at work off the engine's records, and words them (`versionLines`). */

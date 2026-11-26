@@ -65,7 +65,7 @@ export const feedFile = (home: string) => feedAt(home);
  * Where the feed ends: the cursor after its last byte, and the generation of the feed it is the end of — the file's inode on the files, the
  * stand-in's own in memory — which changes when the feed is cut and another put in its place.
  */
-export type FeedEnd = { cursor: number; generation: number };
+type FeedEnd = { cursor: number; generation: number };
 
 /** The lines after a cursor, each with the byte just after it (`ends`, one for each of `lines`), and the cursor to read on from. */
 export type FeedRead = { lines: FeedLine[]; ends: number[]; cursor: number };

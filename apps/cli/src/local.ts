@@ -14,7 +14,7 @@ export type Entry = 'nemia' | 'wf';
  * The orchestrator's CLI entry, resolved through its package's `exports`.
  * @param entry Which bin's entry: `nemia`'s or the `wf` alias's.
  */
-export const entryOf = (entry: Entry) =>
+const entryOf = (entry: Entry) =>
   fileURLToPath(import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin'));
 
 /**

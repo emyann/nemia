@@ -53,7 +53,7 @@ type ReadOnlyCommand = NonNullable<StepReach['readOnly']>[number];
  * @param capabilities What the repository offers and its rules deny, ask and allow.
  * @param workflows The workflows listed, each with its steps or why it does not read.
  */
-export function reachOf(
+function reachOf(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflows: readonly WorkflowListing[],
 ) {

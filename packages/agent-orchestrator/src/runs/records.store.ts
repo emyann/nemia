@@ -150,7 +150,7 @@ const MergeAskSchema = Schema.StructWithRest(
  * @param step The loop's target, from its name.
  * @param n The target's try that merges, from its name.
  */
-export function mergeAskIn(text: string, step: string, n: number) {
+function mergeAskIn(text: string, step: string, n: number) {
   const held = heldText(text);
   if ('unreadable' in held) return held.unreadable satisfies RoundAsk | string;
   const read = readAs(MergeAskSchema, held.read);
@@ -840,7 +840,7 @@ const IMPORTING = Semaphore.makeUnsafe(1);
  * imports again.
  * @param home The store's root folder.
  */
-export const runKeyspace = (home: string) =>
+const runKeyspace = (home: string) =>
   Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => {
     const due = () => IMPORTED.get(home) !== plantedMark(home);
     return Effect.flatMap(fromThrow(due), (stale) =>
@@ -880,7 +880,7 @@ const runFilesPlanted = (home: string) => {
  * makes no file; else `runKeyspace`'s.
  * @param home The store's root folder.
  */
-export const runKeyspaceHeld = (home: string) =>
+const runKeyspaceHeld = (home: string) =>
   Effect.suspend(() => (!fs.existsSync(keyspaceFile(home)) && !runFilesPlanted(home) ? Effect.succeed(undefined) : runKeyspace(home)));
 
 /**

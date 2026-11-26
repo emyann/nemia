@@ -100,7 +100,7 @@ function unreadOf(servers: readonly McpServer[]) {
  * @param factory The factory's name, said where it has no server.
  * @param servers The factory's recorded servers, as the api lists them.
  */
-export function serverLines(factory: string, servers: readonly McpServer[]) {
+function serverLines(factory: string, servers: readonly McpServer[]) {
   if (servers.length === 0)
     return [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`] satisfies string[];
   const unread = unreadOf(servers);

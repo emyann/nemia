@@ -6,8 +6,6 @@
 import type { WatchChanges } from '../../contracts/watch-changes.contract.ts';
 import type { WatchChange } from '../../contracts/watch-changes.contract.ts';
 
-export type { WatchChangeType } from '../../contracts/watch-changes.contract.ts';
-
 export type { Versioned, WatchChange } from '../../contracts/watch-changes.contract.ts';
 
 export type { WatchChanges };

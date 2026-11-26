@@ -22,8 +22,8 @@ import { attemptIn, isScript, scriptRead } from './script.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** The files a script condition is handed in its artifacts folder: the request it reads, and the answer it writes. */
-export const REQUEST_FILE = 'route-request.json';
-export const ANSWER_FILE = 'route-answer.json';
+const REQUEST_FILE = 'route-request.json';
+const ANSWER_FILE = 'route-answer.json';
 
 /** What a pass hands the copy of its conditions' routes and the filing of its script conditions: a part of its `Filing` (file.verb.ts). */
 export type ScriptFiling = {

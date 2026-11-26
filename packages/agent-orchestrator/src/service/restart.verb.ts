@@ -28,7 +28,7 @@ const BY = 'nemia service restart';
 const SHAPE = 'nemia service restart [--name <name>] [--timeout <d>]';
 
 /** What `nemia service restart` did: the service, the pid that ticks the store now, whether a person's pause stood, and its lines. */
-export type Restarted = {
+type Restarted = {
   readonly name: string;
   readonly did: 'restarted' | 'started';
   readonly pid: number | null;
@@ -133,7 +133,7 @@ const RESTART: Command<Restarted> = {
 };
 
 /** The restart's command. */
-export const RESTARTS: readonly Command[] = [RESTART];
+const RESTARTS: readonly Command[] = [RESTART];
 
 /** Every command of the login service, as the command table lists them: install, uninstall, status, restart, then addresses. */
 export const SERVICE_COMMANDS: readonly Command[] = [...SERVICES, ...RESTARTS, ADDRESSES];

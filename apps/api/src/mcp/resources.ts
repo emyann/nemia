@@ -14,7 +14,7 @@ import { ANSWER_BOUND } from './bound.ts';
 export const SCHEME = 'nemia';
 
 /** The one query key a feed resource takes: the feed's selector, repeatable, OR'd. */
-export const SELECTOR_KEY = 'labelSelector';
+const SELECTOR_KEY = 'labelSelector';
 
 /** A template of the feed's resources, as `resources/templates/list` says it, beside the endpoint it reads. */
 export type FeedTemplate = {
@@ -30,7 +30,7 @@ export type FeedTemplate = {
 export type FeedView = { readonly uri: string; readonly path: string; readonly selectors: readonly string[] };
 
 /** What `viewOf` answers: the view, or why the URI names none, in words that say which URIs do. */
-export type ViewOrNot = { readonly kind: 'view'; readonly view: FeedView } | { readonly kind: 'none'; readonly message: string };
+type ViewOrNot = { readonly kind: 'view'; readonly view: FeedView } | { readonly kind: 'none'; readonly message: string };
 
 /** An endpoint's path as a URI template: each `:name` as `{name}`, under the scheme, the selector its query. */
 const uriTemplateOf = (path: string) => `${SCHEME}://${path.replace(/:([A-Za-z]+)/g, '{$1}')}{?${SELECTOR_KEY}*}`;
@@ -46,7 +46,7 @@ const nameOf = (path: string) =>
  * Whether `endpoint` lists the feed's events: a GET whose success is an `EventList`.
  * @param endpoint The endpoint, its method and the kinds it answers.
  */
-export const listsEvents = (endpoint: Endpoint) => endpoint.method === 'GET' && endpoint.kinds.includes('EventList');
+const listsEvents = (endpoint: Endpoint) => endpoint.method === 'GET' && endpoint.kinds.includes('EventList');
 
 /** The templates of the feed's resources, one per Event list of the `Api`, in `ENDPOINTS`' order (the fewest names first). */
 export const FEED_TEMPLATES: readonly FeedTemplate[] = ENDPOINTS.filter(listsEvents).map((endpoint) => ({

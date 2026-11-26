@@ -693,10 +693,16 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
       assert.equal(api.holding?.word, words);
       assert.equal(api.holding.word, holdWord(cli.holding!, run.hold));
       assert.equal((await detail(SAID)).holding?.word, words);
+      assert.equal(api.holding.why, 'merge conflicts in five files', "the list's why, a field of its own");
+      assert.equal(api.holding.by, 'operator', "the list's by, a field of its own");
+      assert.equal((await detail(SAID)).holding?.why, 'merge conflicts in five files', "the page's why");
+      assert.equal((await detail(SAID)).holding?.by, 'operator', "the page's by");
       const note = `${words}; its approval is asked once the hold lifts`;
       assert.equal(api.steps.find((s) => s.name === 'plan')!.note, note, "the list's gate note");
       assert.equal((await detail(SAID)).steps.find((s) => s.name === 'plan')!.note, note, "the page's gate note");
       assert.equal((await listed()).get(GATE)!.holding?.word, 'held until p-live lands', 'a hold older code wrote says the plain line');
+      assert.equal((await listed()).get(GATE)!.holding?.why, undefined, 'a hold older code wrote serves no why');
+      assert.equal((await listed()).get(GATE)!.holding?.by, undefined, 'a hold older code wrote serves no by');
       const res = await lift(SAID);
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), {

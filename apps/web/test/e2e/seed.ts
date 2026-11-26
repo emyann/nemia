@@ -3396,7 +3396,7 @@ export function writeShaped(root: string, { now = Date.now(), tried }: { now?: n
  * strict rows, each a later step, its amount in dollars and why. Equal to the orchestrator's `BUDGETS_SCHEMA`, which the run's record
  * must hold whole for the gate to read the field as budgets.
  */
-export const BUDGETED = {
+const BUDGETED = {
   type: 'array',
   items: {
     type: 'object',

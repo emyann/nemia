@@ -26,7 +26,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
  * file that writes one (`formerFenceLine`), and `nemia frontmatter rewrite` moves it (`fenceMoved`). Nothing writes one: `renderStep` and
  * `renderAgent` write the block (`fencedPairs`).
  */
-export const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
+const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
 
 /**
  * Whether `key` names a harness, whose block a file's frontmatter may hold.
@@ -305,7 +305,7 @@ const fenceKeyRefused = (file: string, harness: string, key: string, takes: read
  * @param block The harness block its frontmatter holds, or undefined for none.
  * @param harness The harness the file runs on.
  */
-export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string) {
+function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string) {
   if (block === undefined || block.harness === harness) return undefined;
   const takes = fenceKeysOf(harness);
   return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${takes ? ` (${takes.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;
@@ -431,7 +431,7 @@ export const formerFenceLine = (file: string, key: string) =>
  * @param file The agent file, as the line names it.
  */
 export const overridableLine = (file: string) =>
-  `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added. Say what a step may override — \`overridable: [model, fence, skills]\` — and a step that writes anything else is refused at load.`;
+  `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added; the harness's properties (model, effort, context, harness) it always may. Say what a step may override of the rest — \`overridable: [output, fence, skills]\` — and a step that writes anything else is refused at load.`;
 
 /**
  * The block a top-level fence key moves into: the harness whose fence takes it (`harnessTaking`), and for the mode key one harness takes

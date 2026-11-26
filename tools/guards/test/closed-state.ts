@@ -24,7 +24,7 @@ import ts from 'typescript';
 import { files, REPO } from 'test-kit/repo';
 
 /** The names of a field that says a state or a kind. */
-export const STATE_NAMES = new Set(['phase', 'status', 'state', 'kind', 'type', 'reason']);
+const STATE_NAMES = new Set(['phase', 'status', 'state', 'kind', 'type', 'reason']);
 
 /** The packages whose `exports` are doors, by folder from the root. */
 const PACKAGES = ['packages/agent-runtime', 'packages/agent-orchestrator'];
@@ -37,7 +37,7 @@ const apiDoor = (file: string) =>
   file.startsWith('apps/api/src/') && file.endsWith('.ts') && !file.endsWith('.d.ts') && !file.endsWith('.test.ts');
 
 /** The door files of the repository at `root`, by path from it: the packages' `exports` entries, then the api's sources. */
-export const doors = (root = REPO, listed: readonly string[] = files()) => {
+const doors = (root = REPO, listed: readonly string[] = files()) => {
   const entries = PACKAGES.flatMap((dir) => {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, dir, 'package.json'), 'utf8')) as { exports?: Record<string, string> };
     return Object.entries(manifest.exports ?? {})

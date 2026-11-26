@@ -19,7 +19,7 @@ export const pickedIn = (url: URL) => {
 };
 
 /** The store rail's groups, in their order, each with its destinations in theirs. */
-export const RAIL_GROUPS = [
+const RAIL_GROUPS = [
   ['Across factories', ['Factories', 'Waiting']],
   ['Yours', ['Agents', 'Skills', 'Library']],
   ['You', ['Stats', 'Settings']],
@@ -35,7 +35,7 @@ export const PANE_PLACES = ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Sk
 export const railColumnOf = (page: Page) => page.locator('[data-frame-rail]') satisfies Locator;
 
 /** The destinations of the frame, the rail's on a wide window and the drawer's on a narrow one. */
-export const railOf = (page: Page) => page.locator('[data-frame-rail], [aria-label="Places"]') satisfies Locator;
+const railOf = (page: Page) => page.locator('[data-frame-rail], [aria-label="Places"]') satisfies Locator;
 
 /** The rail's destination named `name`, by its label, whatever its badge adds to its name; never a place of the pane in the drawer. */
 export const railPlace = (page: Page, name: string) =>
@@ -170,7 +170,7 @@ export async function sidebar(page: Page) {
 }
 
 /** That the pane's switcher reads `name`, the factory the page sits in. */
-export async function expectPicked(page: Page, name: string) {
+async function expectPicked(page: Page, name: string) {
   await expectVisible(
     pickerOf(page).locator('[data-slot="select-value"]').getByText(name, { exact: true }),
     `the switcher reads ${name}, the factory the page sits in`,
@@ -277,7 +277,7 @@ export async function photograph(
 }
 
 /** The tallest window a picture is taken in: Chromium draws no texture taller, and a page past it is taken as Playwright takes it. */
-export const TALLEST_WINDOW = 16_384;
+const TALLEST_WINDOW = 16_384;
 
 /** How tall `page`'s document is, measured as Playwright measures a full-page picture. */
 const pageHeight = (page: Page) =>
@@ -537,7 +537,7 @@ export const QUOTA_ASKS_MS = 2 * 15_000;
  * The longest a reload waits for the quota a change makes, as a bound on a hang and never as when it comes: the api's wait for the asks
  * (`QUOTA_ASKS_MS`), and the board's next read, 2 s after a read told `asking`.
  */
-export const QUOTA_ANSWER_MS = QUOTA_ASKS_MS + 2_000;
+const QUOTA_ANSWER_MS = QUOTA_ASKS_MS + 2_000;
 
 /**
  * Reloads `page` and waits for the board's `GET /api/quota` answered in `state`, the state the page's change makes, then for the page to
@@ -788,7 +788,7 @@ const NEMIA_PROJECT = NEMIA_CWD.replaceAll('/', '-');
 export type HerLine = { text: string } | { tool: string; says: string; result?: string };
 
 /** One question of an ask of hers, as the keeper copied it into her chat. */
-export type HerQuestion = {
+type HerQuestion = {
   question: string;
   header: string;
   options: readonly { label: string; description: string; recommended: boolean }[];
@@ -802,7 +802,7 @@ export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: 
  * Who an outbox entry is from, as the orchestrator's `Speaker` writes it: the person, or another agent under the name it speaks as. An
  * entry with no `from` is the person's.
  */
-export type HerSpeaker = { kind: 'person' } | { kind: 'agent'; name: string };
+type HerSpeaker = { kind: 'person' } | { kind: 'agent'; name: string };
 
 /** What a page plants of her: her level, where her session is, her transcript, the read mark, the person's outbox, and her asks. */
 export type HerChat = {
@@ -1034,7 +1034,7 @@ export const chatPanelOf = (page: Page) => page.locator('[data-chat-panel]') sat
  * The words of every cue her face says now, in its order: none where her face counts none (`data-nemia-cues`), else read off the tooltip
  * a fresh hover of her face opens.
  */
-export async function herCues(page: Page) {
+async function herCues(page: Page) {
   const face = herFaceOf(page);
   const count = Number(await face.getAttribute('data-nemia-cues', { timeout: WAIT_MS }));
   if (count === 0) return [] satisfies string[];
@@ -1122,7 +1122,7 @@ export async function expectPanelHeld(page: Page) {
 export const chatFieldOf = (page: Page) => page.locator('[data-chat-composer] textarea') satisfies Locator;
 
 /** The piece the e2e plants in every readiness read the board makes: missing, and a run waits on it, so the setup banner is raised. */
-export const BANNER_PIECE = {
+const BANNER_PIECE = {
   name: 'e2e-banner',
   area: 'harness',
   state: 'missing',

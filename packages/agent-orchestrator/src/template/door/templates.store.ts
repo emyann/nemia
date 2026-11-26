@@ -231,7 +231,7 @@ export const templateDoorFiles = () => Layer.succeed(TemplateDoor)(templateDoorO
  * The builtin templates: the templates workspace beside this package, found by its path and never imported, as the package's own
  * skills and servers are found (`BUILTIN_SKILLS`, `BUILTIN_SERVERS`).
  */
-export const BUILTIN_TEMPLATES = path.join(import.meta.dirname, '..', '..', '..', '..', 'templates');
+const BUILTIN_TEMPLATES = path.join(import.meta.dirname, '..', '..', '..', '..', 'templates');
 
 /** The folder a template's name is looked for in: `BUILTIN_TEMPLATES`, unless a program is given another (a test, its scratch folder). */
 export const BuiltinTemplates = Context.Reference<string>('agent-orchestrator/BuiltinTemplates', {

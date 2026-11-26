@@ -161,7 +161,7 @@ export function openedTree(source: string, tree: TemplateTree, packageSkills: re
  * @param name The template's name.
  * @param files The folder's files as read.
  */
-export function folderTreeOf(name: string, files: TreeFile[]) {
+function folderTreeOf(name: string, files: TreeFile[]) {
   const problems = pathRefusals(name, files);
   return { name, files, problems, digest: problems.length ? undefined : contentDigest(name, files) };
 }
@@ -309,7 +309,7 @@ const PLAIN = 0o644;
  * real files (`skillFiles`); a path given twice holds what was given last. Reads the copies and skills the draft names.
  * @param draft The draft, as `draftOf` made it.
  */
-export function treeOfDraft(draft: Draft) {
+function treeOfDraft(draft: Draft) {
   const files = new Map<string, TreeFile>();
   for (const file of draft.files) {
     const made =
@@ -330,7 +330,7 @@ export function treeOfDraft(draft: Draft) {
 }
 
 /** A factory's words as read where they are kept: its words, or null where there are none, why they do not read, and its file. */
-export type WordsRead = { words: string | null; error: string | null; file: string };
+type WordsRead = { words: string | null; error: string | null; file: string };
 
 /**
  * A factory an export holds the parts of, as the api of the context in use answers them: the factory's name, repositories, attached

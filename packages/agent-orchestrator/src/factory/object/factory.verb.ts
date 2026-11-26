@@ -62,7 +62,7 @@ export type FiledFactory = {
 };
 
 /** A factory as `factoryFiled` answers it: as its parts read it, and its listing in the store, none for the default factory. */
-export type Filed = { readonly factory: FiledFactory; readonly listing: FactoryListing | undefined };
+type Filed = { readonly factory: FiledFactory; readonly listing: FactoryListing | undefined };
 
 /** The places of `name` among `untrusted`, as the object says them, `never` left out where any trust can be kept. */
 const untrustedOf = (untrusted: readonly Untrusted[], name: string) =>
@@ -132,7 +132,7 @@ const ownLevel = (home: string, name: string) =>
  * @param listed The store's listing whole, whose places a harness does not trust are read.
  * @param home The store's root.
  */
-export const factoryObjectOf = Effect.fn('factoryObjectOf')(function* (listing: FactoryListing, listed: FactoryListed, home: string) {
+const factoryObjectOf = Effect.fn('factoryObjectOf')(function* (listing: FactoryListing, listed: FactoryListed, home: string) {
   const { metadata, spec } = yield* filedOf(listing, home);
   if ('error' in listing)
     return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` }) satisfies FactoryObject;
@@ -157,7 +157,7 @@ export const factoryObjectOf = Effect.fn('factoryObjectOf')(function* (listing: 
  * @param listing The factory's file as the store listed it, or why it does not read.
  * @param home The store's root.
  */
-export const filedOf = Effect.fn('filedOf')(function* (listing: FactoryListing, home: string) {
+const filedOf = Effect.fn('filedOf')(function* (listing: FactoryListing, home: string) {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
   if ('error' in listing) return { metadata: meta, spec: { workflows: [], hires: {}, volumes: [] } };
   const level = yield* ownLevel(home, listing.name);
@@ -194,7 +194,7 @@ export const filedOf = Effect.fn('filedOf')(function* (listing: FactoryListing, 
  * workflow (no `workflows`), hiring no one, keeping no file.
  * @param home The store's root, whose time of birth is the default factory's.
  */
-export const defaultFactoryObject = (home: string) =>
+const defaultFactoryObject = (home: string) =>
   objectOf(
     { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
     { hires: {}, volumes: [] },
@@ -216,7 +216,7 @@ export const factoryObjectsOf = Effect.fn('factoryObjectsOf')(function* (listed:
  * The refusal of a factory no object has the name of: it names the list.
  * @param name The name asked for.
  */
-export const noFactory = (name: string) =>
+const noFactory = (name: string) =>
   new Missing({
     message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --volume <path|url>:rw`,
   });
@@ -226,7 +226,7 @@ export const noFactory = (name: string) =>
  * factories `placesOf` keeps — none unless asked, since only a Factory's status says them. No run is read: what a schedule fired is the
  * schedules' own read (`scheduleList`).
  */
-export const factoriesListed = Effect.fn('factoriesListed')(function* (
+const factoriesListed = Effect.fn('factoriesListed')(function* (
   home: string,
   placesOf: (listing: FactoryListing) => boolean = () => false,
 ) {

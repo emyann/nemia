@@ -4,13 +4,10 @@
  */
 export {
   factoryServerRefusal,
-  factoryServersRefusal,
   maskedHeaders,
-  REFUSED_HEADER,
   serverNameRefusal,
   splitServers,
   type FactoryServer,
   type FactoryServers,
-  type FactoryServersFile,
   type BuiltinServer,
 } from './servers.ts';

@@ -8,7 +8,7 @@
  * README, *Five layers*) and the owner whose words follow, in the second person: the layers a session is told as text are 1, 2, 4 and 5,
  * the folder's files being 3 and read by the harness itself wherever the session works.
  */
-export const LAYER_HEADINGS = {
+const LAYER_HEADINGS = {
   instructions: "## 1. Instructions — your role's own words",
   custom: '## 2. Custom instructions — the person who hired you',
   factory: "## 4. The factory's rules — every step of this factory",

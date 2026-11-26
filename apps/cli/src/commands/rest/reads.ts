@@ -41,7 +41,7 @@ export async function logs(args: Args) {
  * What `nemia memory` prints: one fact's words, or the facts she keeps and where.
  * @param data What the api answers of her memory: one fact's words, or the facts she keeps and their folder.
  */
-export const memoryLines = (data: typeof NemiaMemory.Type) => {
+const memoryLines = (data: typeof NemiaMemory.Type) => {
   if (data.fact !== null) return data.fact.text.replace(/\n$/, '').split('\n');
   if (!data.facts.length) return [`Nemia keeps no fact yet (${data.dir}).`];
   return [`Nemia keeps ${data.facts.length} fact${data.facts.length === 1 ? '' : 's'} in ${data.dir}:`, ...data.facts.map((f) => `  ${f}`)];

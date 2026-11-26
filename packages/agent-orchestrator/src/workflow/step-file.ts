@@ -251,8 +251,8 @@ function agentStepRefusal(
   step: StepSpec,
   skills: SkillsFound | undefined,
 ) {
-  const unoffered = offerRefusal(name, agent, own);
-  if (unoffered !== undefined) refuse(unoffered);
+  const unofferedWhy = offerRefusal(name, agent, own);
+  if (unofferedWhy !== undefined) refuse(unofferedWhy);
   const loosened = fenceRefusal(name, agent, own, step);
   if (loosened !== undefined) refuse(loosened);
   const by = `${name}: \`agent: ${agent.name}\``;

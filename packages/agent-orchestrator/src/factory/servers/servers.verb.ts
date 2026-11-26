@@ -58,7 +58,7 @@ export type ServersListing = {
  * The state of each server of `record`, read in one ask of the engine (`mcpState`), as a map by name — and `undefined`, with why, where
  * the look failed. A record with no server asks nothing: there is nothing to read, and an empty ask is refused.
  */
-export const statesOf = Effect.fn('statesOf')(function* (record: FactoryServers) {
+const statesOf = Effect.fn('statesOf')(function* (record: FactoryServers) {
   if (!Object.keys(record).length) return { by: new Map<string, McpServerState>(), unread: null };
   const e = yield* EngineService;
   const read: McpServersRead | { readonly refused: string } = yield* e
@@ -92,7 +92,7 @@ export const listedOf = (name: string, server: FactoryServers[string], state: Mc
  * the store has no factory under — a listing of nothing would read as a factory that records none — and never for the default
  * factory, which is no file.
  */
-export const serversListed = Effect.fn('serversListed')(function* (factory: string, home: string) {
+const serversListed = Effect.fn('serversListed')(function* (factory: string, home: string) {
   const record = yield* doorAt(home, (door) =>
     Effect.andThen(factoryThere(factory, 'listed'), door.servers.read(FactoryName.read(factory))),
   );

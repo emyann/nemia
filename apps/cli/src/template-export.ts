@@ -17,7 +17,7 @@ const VERB = 'template export';
  * The factory `words` name with `--factory <name>` or `--factory=<name>`, else none.
  * @param words The words typed after the bin's name.
  */
-export const factoryNamed = (words: readonly string[]) => {
+const factoryNamed = (words: readonly string[]) => {
   const at = words.findIndex((word) => word === '--factory' || word.startsWith('--factory='));
   if (at < 0) return undefined;
   const word = words[at] ?? '';
@@ -47,7 +47,7 @@ const keptAt = (name: string, env: NodeJS.ProcessEnv) => {
  * @param instruction The factory's instruction as the api answers it.
  * @param file Where the factory is kept: its file in this machine's store, or its address on the context's daemon.
  */
-export const partsOf = (factory: Factory, rules: FactoryRules, instruction: FactoryInstruction, file: string) => ({
+const partsOf = (factory: Factory, rules: FactoryRules, instruction: FactoryInstruction, file: string) => ({
   factory: {
     name: factory.metadata.name,
     volumes: factory.spec.volumes.map(({ path, readOnly }) => ({ path, readOnly })),

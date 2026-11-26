@@ -23,17 +23,17 @@ import { Refused } from './refused.ts';
  * connection, so no token is written in.
  * @param server The server's origin, as the context keeps it.
  */
-export const connectingLine = (server: string) =>
+const connectingLine = (server: string) =>
   `claude mcp add-json --scope user nemia '${JSON.stringify({ type: 'http', url: new URL('/mcp', server).href, headersHelper: 'nemia config headers' })}'`;
 
 /** The verb that pairs this client with a server: `nemia pair <url>`. */
 export const PAIR_VERB = 'pair';
 
 /** How often a pairing is claimed while it waits on the person's approval: every two seconds. */
-export const PAIR_EVERY_MS = 2_000;
+const PAIR_EVERY_MS = 2_000;
 
 /** The variable that shortens the interval between claims, for a test: a whole number of milliseconds. */
-export const PAIR_EVERY_VARIABLE = 'NEMIA_PAIR_EVERY_MS';
+const PAIR_EVERY_VARIABLE = 'NEMIA_PAIR_EVERY_MS';
 
 /** What `nemia pair` says of itself. */
 const USAGE = 'nemia pair <url> [--context <name>] [--name <client>]   pair this machine with the server at <url>, as the context <name>';

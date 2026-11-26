@@ -264,7 +264,7 @@ const READ_ROUTE = 'POST /api/skills/read';
  * text files (`spec.files`), left out where none is sent. Refused `Invalid`, naming the file, for a SKILL.md that does not read, and for
  * one that names no skill where `name` is not sent.
  */
-export function skillReadOf({ name, files }: DefinitionFiles) {
+function skillReadOf({ name, files }: DefinitionFiles) {
   const [file, ...others] = files;
   if (file === undefined) throw new Invalid({ error: `${READ_ROUTE} reads a skill's SKILL.md: send it first in \`files\`.` });
   const unread = (err: unknown): never => {

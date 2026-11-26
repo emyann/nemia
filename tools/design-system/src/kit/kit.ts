@@ -10,10 +10,10 @@ import { gunzipSync } from 'node:zlib';
 import { CACHE, SRC, readJson, writeIn } from '../paths.ts';
 
 /** The kit's repository on GitHub. */
-export const KIT_REPOSITORY = 'french-tech-homies/design-system';
+const KIT_REPOSITORY = 'french-tech-homies/design-system';
 
 /** One file of an archive: its path inside the archive and its bytes. */
-export type Entry = { readonly name: string; readonly bytes: Buffer };
+type Entry = { readonly name: string; readonly bytes: Buffer };
 
 const BLOCK = 512;
 

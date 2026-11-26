@@ -216,7 +216,7 @@ const followedFrom = (o: Onward, now: StepNow, cursor: number) => {
 };
 
 /** How long a task's following waits before it reads the task's view again, between its attempts (`followTask`). */
-export const TASK_WAIT_MS = 1000;
+const TASK_WAIT_MS = 1000;
 
 /** The task `taskId` as it stands (`StepNow`), off its view: its last attempt, whether that is live, and whether it settled. */
 const taskNowOf = (e: Engine, taskId: string) =>

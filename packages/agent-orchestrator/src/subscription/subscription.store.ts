@@ -47,10 +47,10 @@ export type Listed = { name: string; subscription: Subscription; born?: string }
  * A subscription's file left out of the listing, or one listed by less than it was asked for: its name and the words a person reads,
  * which name the file and the fix.
  */
-export type Left = { name: string; words: string };
+type Left = { name: string; words: string };
 
 /** Where the deliverer is with a subscription: what its file keeps, or the words of why it does not read; null where it has not begun. */
-export type DeliveryRead = { kept: KeptDelivery } | { unread: string } | null;
+type DeliveryRead = { kept: KeptDelivery } | { unread: string } | null;
 
 /** The Subscription door's shape: the person's subscriptions and the deliverer's records, each method answering an Effect. */
 export type SubscriptionDoorShape = {
@@ -78,7 +78,7 @@ export type SubscriptionDoorShape = {
  * A name a subscription already has, as a refusal.
  * @param name The subscription's name that is taken.
  */
-export const subscriptionTaken = (name: string) =>
+const subscriptionTaken = (name: string) =>
   new Conflict({
     message: `a subscription is already named ${name}: nemia unsubscribe ${name} removes it first, or name this one otherwise.`,
   });
@@ -484,12 +484,6 @@ export function listSubscriptions(home: string, said?: (line: string) => void) {
 }
 
 /**
- * The names of the deliverer's files at the root `home` (`deliveries.list`).
- * @param home The store's root folder.
- */
-export const listDeliveries = (home: string) => atRoot(home, (door) => door.deliveries.list());
-
-/**
  * Puts a subscription at the root `home` (`subscriptions.put`).
  * @param home The store's root folder.
  * @param name The subscription's name.
@@ -525,10 +519,3 @@ export function readDelivery(home: string, name: string, said?: (line: string) =
  */
 export const writeDelivery = (home: string, name: string, delivery: KeptDelivery) =>
   atRoot(home, (door) => door.deliveries.write(named(name), delivery));
-
-/**
- * Removes the deliverer's file of a subscription at the root `home` (`deliveries.drop`).
- * @param home The store's root folder.
- * @param name The subscription's name.
- */
-export const dropDelivery = (home: string, name: string) => atRoot(home, (door) => door.deliveries.drop(named(name)));

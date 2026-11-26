@@ -32,8 +32,8 @@ Frontmatter, then its instructions. The other keys are how its sessions run — 
 - **The fence goes under its harness's block**: `claude: { fence: { permissionMode, tools, allowedTools, disallowedTools } }`, or
   `codex: { fence: { sandbox } }`. The block holds `fence` alone, and a block for another harness than the file's is refused. A fence
   key at the top level is the former spelling, still read; `nemia frontmatter rewrite <folder>` moves it into the block.
-- **Say what a step may override**: `overridable: model, effort, fence, skills`, each word one of `OVERRIDABLE`
-  (`model`, `effort`, `context`, `harness`, `remote`, `output`, `fence`, `skills`, `mcp`). A step that sets anything else is refused at
+- **Say what a step may override**: `overridable: output, fence, skills`, each word one of `OVERRIDABLE`
+  (`remote`, `output`, `fence`, `skills`, `mcp`); `model`, `effort`, `context` and `harness` are always a step's, and a line naming one is refused. A step that sets anything else is refused at
   load, naming the key and the agent. With no line a step may override everything, and `nemia start` says to add one.
 
 ```yaml
@@ -41,7 +41,7 @@ Frontmatter, then its instructions. The other keys are how its sessions run — 
 role: Code reviewer
 harness: claude
 model: opus
-overridable: model, effort, fence
+overridable: output, fence
 claude:
   fence:
     permissionMode: dontAsk

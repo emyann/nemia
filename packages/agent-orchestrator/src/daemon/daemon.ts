@@ -17,7 +17,7 @@ import { durationWord } from '../usage/usage.ts';
  * that boot. The runtime's own `Monotonic` (its `core/clock.ts`), copied for the daemon's lease: the pure judgement and the store that read
  * `daemon.json` may not import the runtime's client, and the copy goes with the lease when it moves into the runtime.
  */
-export type Monotonic = { boot: string; ms: number };
+type Monotonic = { boot: string; ms: number };
 
 /** A moment as the daemon stamps it: its wall-clock time `at`, in epoch milliseconds, and its monotonic reading when it had one. */
 export type Instant = { at: number; mono?: Monotonic };
@@ -117,7 +117,7 @@ export const START_WORDS =
 export const DAEMON_FILE = 'daemon.json';
 
 /** How many of the holder's own intervals without a pass make it stalled — unless the floor below is longer. */
-export const STALE_PASSES = 10;
+const STALE_PASSES = 10;
 
 /**
  * The least a holder must be silent to be taken over: fifteen minutes. A pass has no bound — it files every ready step of every run, each

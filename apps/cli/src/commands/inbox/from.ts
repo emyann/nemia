@@ -15,7 +15,7 @@ const { name: COMMAND } = INBOX_FROM_WORDS;
  * @param card The card as the api answers it after the write.
  * @param was The runs the card named under `from:` before the write.
  */
-export const fromLines = (card: Card, was: readonly string[]) => {
+const fromLines = (card: Card, was: readonly string[]) => {
   const name = card.metadata.name;
   const from = card.spec.from ?? [];
   return from.length

@@ -58,7 +58,7 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
  * What `root` answers of a folder: the root of the main checkout of the repository it is in, from that root, a folder inside it or a
  * workspace cut from it alike, or null for a folder in no repository.
  */
-export type Rooted = { readonly root: string | null };
+type Rooted = { readonly root: string | null };
 
 /**
  * What `open` answers at `nemia start`: the repo, the commit a run starts from, the line of work it is on, and, where the place names
@@ -98,7 +98,7 @@ export type Made = {
 };
 
 /** What `handoff` answers: the commit it made of what a step left, or null when there was nothing to commit. */
-export type HandedOff = { readonly commit: string | null };
+type HandedOff = { readonly commit: string | null };
 
 /**
  * How a file changed over a range, in the place's words (GitHub's for a commit's files): `added`, `modified`, `removed`, `renamed` (its
@@ -179,7 +179,7 @@ export type MergeState = {
 };
 
 /** What `land` answers: the commit that landed the merge in progress, or that the merge was taken back. */
-export type PlaceLanded = { readonly commit: string } | { readonly aborted: true };
+type PlaceLanded = { readonly commit: string } | { readonly aborted: true };
 
 /**
  * One workspace a run left, as `inventory` reads it: where, for which step, on which branch, at which commit (`tip`), whether the place
@@ -218,22 +218,22 @@ export type Removed = {
 };
 
 /** What `export` answers: the commit the tag names, whose tree it wrote. */
-export type Exported = { readonly commit: string };
+type Exported = { readonly commit: string };
 
 /** What `seal` answers: whether an exported tree held the empty repository `export` gave it, now removed. */
-export type Sealed = { readonly removed: boolean };
+type Sealed = { readonly removed: boolean };
 
 /**
  * What `clone` answers: the repository it made or found at the folder asked of, and whether it made it now (`made`) or found one there
  * already. The place clones with the machine's own credentials and holds none.
  */
-export type Cloned = { readonly repo: string; readonly made: boolean };
+type Cloned = { readonly repo: string; readonly made: boolean };
 
 /**
  * What `init` answers: the repository at the folder asked of, with a first commit a run can cut a worktree from, and whether it made
  * either now (`made`) or found the folder a repository with a commit already.
  */
-export type Initialized = { readonly repo: string; readonly made: boolean };
+type Initialized = { readonly repo: string; readonly made: boolean };
 
 /** Each verb's answer. */
 export type PlaceAnswers = {
@@ -337,16 +337,16 @@ export const PLACE_SAYS = [
 ] as const;
 
 /** A key of a place's `say`. */
-export type SayKey = (typeof PLACE_SAYS)[number];
+type SayKey = (typeof PLACE_SAYS)[number];
 
 /** The keys of `say` that are a list of lines, each line a template: the others are one line. */
-export const SAY_LISTS = ['look', 'results'] as const;
+const SAY_LISTS = ['look', 'results'] as const;
 
 /**
  * The holes the code fills in each `say` template: `look` the commit a step's work started from, `results` each result branch and the
  * base it lands on, `merge` and `mergeUncommitted` the commit a round merges in, `showMerge` and `lastMerge` none.
  */
-export const SAY_HOLES: Readonly<Record<SayKey, readonly string[]>> = {
+const SAY_HOLES: Readonly<Record<SayKey, readonly string[]>> = {
   look: ['baseRef'],
   readResult: ['repo', 'baseRef', 'branch'],
   ship: ['repo', 'branch'],

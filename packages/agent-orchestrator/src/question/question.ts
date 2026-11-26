@@ -14,7 +14,7 @@ import { fieldsOf, itemsOf, knownSchemas, sameSchema } from '../shape/shape.ts';
 import { isObject } from 'effect/Predicate';
 import type { Answer, AnswerRefusal, Question, QuestionOption, RefusalWords } from '../../contracts/answer.contract.ts';
 
-export type { Answer, Question, QuestionOption } from '../../contracts/answer.contract.ts';
+export type { Answer, Question } from '../../contracts/answer.contract.ts';
 
 /** A question field of a closeout that decoded: the field's name, and its questions, in the order the agent gave them. */
 export type Asked = { field: string; questions: Question[] };

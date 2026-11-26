@@ -8,10 +8,10 @@
 import type { ReleaseRetention } from '../../contracts/retention.contract.ts';
 import type { Installed, Retention } from '../../contracts/retention.contract.ts';
 
-export type { Installed, InUse, Retention } from '../../contracts/retention.contract.ts';
+export type { Installed, Retention } from '../../contracts/retention.contract.ts';
 
 /** How many of the newest releases are kept whatever runs on them. */
-export const RELEASES_KEPT = 2;
+const RELEASES_KEPT = 2;
 
 /**
  * The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order.

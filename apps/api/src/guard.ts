@@ -64,10 +64,6 @@ import { bindOf } from './port.ts';
 import { StoreConfig } from './store.ts';
 import { mediaOf, saysForm, saysJson } from './media/media.ts';
 
-export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contract.ts';
-export { loopback } from './address/address.ts';
-export { saysJson } from './media/media.ts';
-
 /**
  * What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`).
  * @param header The Authorization header's value, or undefined where the request sends none.

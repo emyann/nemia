@@ -10,7 +10,7 @@
 import type * as Kit from '../src/components/ui/ds/index.ts';
 
 /** A part the kit exports, by its name in the kit's index: a destination naming no part of the kit fails the typecheck. */
-export type KitPart = keyof typeof Kit;
+type KitPart = keyof typeof Kit;
 
 /**
  * Where a key moves: a part of the kit (`kit`, with how where it is not plain), a part of the look (`look`), the frame's own state

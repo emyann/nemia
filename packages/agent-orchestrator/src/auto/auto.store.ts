@@ -64,15 +64,8 @@ const ProposedSchema = Schema.StructWithRest(
 );
 
 /**
- * The person's confirmed list, as read. A type of its own, not `ConfirmedSchema`'s on purpose: its `rules` are mapped by `ruleOf` into
- * the package's `PolicyRule`, their lists copied and an optional key left out where absent, and the keys the file has besides are read
- * past, not carried.
- */
-export type Confirmed = { since: string; rules: PolicyRule[] };
-
-/**
- * What an agent proposed, as read. A type of its own, not `ProposedSchema`'s on purpose, as `Confirmed` is: its `rules` mapped by
- * `ruleOf` into `PolicyRule`, and the file's other keys read past.
+ * What an agent proposed, as read. A type of its own, not `ProposedSchema`'s on purpose, as the confirmed list's (`readConfirmed`) is:
+ * its `rules` mapped by `ruleOf` into `PolicyRule`, and the file's other keys read past.
  */
 export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; digest: string | null };
 
@@ -80,7 +73,7 @@ export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; di
  * The folder of `<store>/auto/`, under the store `home`.
  * @param home The store's root.
  */
-export const policyDir = (home: string) => path.join(home, POLICY_FOLDER);
+const policyDir = (home: string) => path.join(home, POLICY_FOLDER);
 
 /** `agent`'s name, refused (`Invalid`) where it is no agent's. */
 function named(agent: string) {

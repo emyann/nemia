@@ -9,17 +9,16 @@ import { sweepLoop } from '../forget/prune/free.verb.ts';
 import { keyspaceAt, keyspaceFile } from './keyspace.store.ts';
 
 /** How often the daemon compacts the keyspace: every 5 minutes, as etcd's history is kept by Kubernetes. */
-export const KEYSPACE_COMPACT_EVERY = '5 minutes';
+const KEYSPACE_COMPACT_EVERY = '5 minutes';
 
 /** How many of the last revisions a compaction keeps: the window a watch can start from. */
-export const KEYSPACE_RETAIN = 1000;
+const KEYSPACE_RETAIN = 1000;
 
 /**
  * One compaction of the keyspace of the store `home`: the revision it compacted up to.
  * @param home The store's root folder.
  */
-export const compactOnce = (home: string) =>
-  Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => keyspace.compact(KEYSPACE_RETAIN));
+const compactOnce = (home: string) => Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => keyspace.compact(KEYSPACE_RETAIN));
 
 /** The compaction of the keyspace of the store `StoreRoot` names, for as long as the daemon runs (`sweepLoop`). */
 export const compaction = () =>

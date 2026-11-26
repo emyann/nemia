@@ -6,10 +6,10 @@ import type { Args, CommandWords, Spec } from './command.ts';
 import { leftOut } from './commands-flags.ts';
 
 /** The command line `nemia factory home` takes. */
-export const HOME_USAGE = '<factory> [<repo>] [--claude-md on|off]';
+const HOME_USAGE = '<factory> [<repo>] [--claude-md on|off]';
 
 /** Whether the repository's memory files load in the session: off, as a volume's switch is, unless turned on. */
-export const HOME_CLAUDE_MD = ['on', 'off'] as const;
+const HOME_CLAUDE_MD = ['on', 'off'] as const;
 
 /** `nemia factory home`'s spec: the factory, the repository where one is given, and `--claude-md`. */
 const HOME_SPEC: Spec = {

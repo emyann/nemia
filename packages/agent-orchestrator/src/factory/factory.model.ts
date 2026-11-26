@@ -30,7 +30,7 @@ export type FactoryName = Id<'FactoryName'>;
  * on. Marked always. Its `name`, the one it is served and linked under, where its file stores one (`volumesNamed` names one it does not),
  * and its `origin`, the git URL it was cloned from, where it was given by one.
  */
-export const Volume = Schema.Struct({
+const Volume = Schema.Struct({
   path: Schema.String,
   readOnly: Schema.Boolean,
   name: Schema.optional(Schema.String),
@@ -38,10 +38,10 @@ export const Volume = Schema.Struct({
   claudeMd: Schema.optional(Schema.Boolean),
   skills: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: 'Volume' });
-export type Volume = typeof Volume.Type;
+type Volume = typeof Volume.Type;
 
 /** A schedule of a workflow a factory has attached (`Schedule`). */
-export const Schedule = Schema.Struct({
+const Schedule = Schema.Struct({
   cron: Schema.String,
   brief: Schema.String,
   repo: Schema.optional(Schema.String),
@@ -50,7 +50,7 @@ export const Schedule = Schema.Struct({
 });
 
 /** A card trigger of a factory (`CardTrigger`): its selector, the workflow it targets, and when it was set. */
-export const CardTrigger = Schema.Struct({
+const CardTrigger = Schema.Struct({
   selector: Schema.String,
   target: Schema.Struct({ kind: Schema.Literal('Workflow'), name: Schema.String }),
   since: Schema.String,
@@ -61,11 +61,12 @@ export const CardTrigger = Schema.Struct({
  * version its file wants, and the parameters given with `--set`. Its source is read by name alone (Q22), as the file wrote it: a
  * template's whole path, or the name of a builtin template, which `templatePlace` resolves to its folder on each read.
  */
-export const AppliedTemplate = Schema.Struct({
+const AppliedTemplate = Schema.Struct({
   source: TemplateSource.OnRead,
   version: Schema.String,
   params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
 }).annotate({ identifier: 'AppliedTemplate' });
+/** @public */
 export type AppliedTemplate = typeof AppliedTemplate.Type;
 
 /** The workflow a hire's key `<workflow>/<step>` names. */
@@ -178,11 +179,15 @@ type Same<A, B> = [A, keyof A] extends [B, keyof B] ? ([B, keyof B] extends [A, 
  * The hand types of `factory.ts`, which its pure readers take, held to these Schemas' encoded sides — a field added to one alone does not
  * compile: a factory as its store reads it (its harness settings as its file holds them, judged at the door's write, not on read), a
  * volume and a schedule.
+ * @public
  */
 export const factoryHeld: Same<FactoryAsRead, Omit<typeof Factory.Encoded, 'harnessSettings'> & { harnessSettings?: SettingsAsRead }> =
   true;
+/** @public */
 export const volumeHeld: Same<VolumeAsRead, typeof Volume.Encoded> = true;
+/** @public */
 export const scheduleHeld: Same<ScheduleAsRead, typeof Schedule.Encoded> = true;
+/** @public */
 export const triggerHeld: Same<CardTriggerAsRead, typeof CardTrigger.Encoded> = true;
 
 /** A factory's hire of an agent into one step of a workflow (`nemia factory hire`): a key `<workflow>/<step>` of its hires, split. */

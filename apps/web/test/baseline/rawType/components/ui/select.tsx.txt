@@ -1,2 +1,1 @@
 apps/web/src/components/ui/select.tsx#text-body-medium
-apps/web/src/components/ui/select.tsx#text-body-small

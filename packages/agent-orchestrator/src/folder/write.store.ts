@@ -1,6 +1,6 @@
 /**
  * A workflow folder written from its steps (`writeWorkflowAt`, which `writeWorkflow` in `workflows.store.ts` calls), what the board's
- * builder saves, and one of yours removed whole (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAroundAt`);
+ * builder saves, and one of yours removed whole (`removeWorkflowAt`); where a folder's runs look for agents and skills (`placesAroundAt`);
  * and whether a folder holds the workflows the board lists (`isWorkflowsHolderAt`). A store beside `folder.store.ts`, reading through the
  * agents and skills reads: it imports neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none
  * of it.
@@ -242,7 +242,7 @@ export function stepFilesOf(steps: readonly StepDraft[], agents: Agents, fills: 
   return steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(ownLine(step, agents)), fills)] as const);
 }
 
-/** What `removeWorkflow` did: the folder removed, and the files it held, by their path in it, sorted. */
+/** What `removeWorkflowAt` did: the folder removed, and the files it held, by their path in it, sorted. */
 export type WorkflowRemoved = { dir: string; removed: string[] };
 
 /**
@@ -323,6 +323,3 @@ export function placesAroundAt(home: string, workflowDir: string, known: Known) 
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
   return { ...(knownHolds(known, repo) ? { repo } : {}), home };
 }
-
-/** A plain alias of `removeWorkflowAt`, the old spelling left in this module: the store's root first all the same. */
-export const removeWorkflow = removeWorkflowAt;

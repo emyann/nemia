@@ -26,7 +26,7 @@ export const accessChange: AccessChangeOf = (before, after) => {
 };
 
 /** An object's access where it is not there: nothing let through, nothing refused, the lowest mode. */
-export const NO_ACCESS: Access = { allows: [], denies: [], mode: 0 };
+const NO_ACCESS: Access = { allows: [], denies: [], mode: 0 };
 
 /**
  * How far each permission mode reaches, as the runtime ranks the default harness's modes (`fenceReach`), one above it so that a mode
@@ -47,7 +47,7 @@ const UNKNOWN_MODE = Math.max(0, ...Object.values(MODE_RANKS)) + 1;
  * The rank of the mode `mode` names: the runtime's given mode's where none is named.
  * @param mode The permission mode as written; undefined, null or empty where none is named.
  */
-export const modeRank = (mode: unknown) => {
+const modeRank = (mode: unknown) => {
   const named = mode === undefined || mode === null || mode === '' ? REACH?.given : mode;
   return typeof named === 'string' ? (MODE_RANKS[named] ?? UNKNOWN_MODE) : UNKNOWN_MODE;
 };
@@ -56,7 +56,7 @@ export const modeRank = (mode: unknown) => {
  * A list of rules as a line writes them, `Read, Bash(git diff *)`, split at the commas outside parentheses; a list given as is.
  * @param value A line of rules, or a list of them; anything else holds none.
  */
-export function rulesIn(value: unknown) {
+function rulesIn(value: unknown) {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string').map((v) => v.trim());
   if (typeof value !== 'string') return [];
   const out: string[] = [];

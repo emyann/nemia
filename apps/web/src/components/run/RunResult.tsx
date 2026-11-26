@@ -21,7 +21,7 @@ import { Body, Label } from '@/components/ui/ds';
 /** Where the run stands, until its final steps have given. */
 type Why = Extract<ReturnType<typeof resultOf>, { kind: 'stands' }>['why'];
 
-/** How the box says where the run stands, in the rail's words (`PERSON`), and its hue: waiting on you, failed, at work, to come. */
+/** How the box says where the run stands, in the rail's words (`PERSON`), and its hue: waiting, failed, working, pending. */
 const STANDS: Record<Why, { words: string; hue: Hue }> = {
   yours: { words: PERSON['awaiting-approval'].rail, hue: 'yours' },
   failed: { words: PERSON.failed.rail, hue: 'failure' },

@@ -729,7 +729,7 @@ const retiredBreaks = (texts: ReadonlyMap<string, string>) =>
   boardTexts(texts).flatMap(([file, text]) =>
     saidIn(file, text)
       .filter((said) => RETIRED.test(said.text))
-      .map((said) => `${file} says '${said.text.trim()}': write the person's words of ${WORDS} (waits on you, failed its check)`),
+      .map((said) => `${file} says '${said.text.trim()}': write the person's words of ${WORDS} (waiting, failed)`),
   ) satisfies string[];
 
 /** The runtime's words, which a person hovering over the board never reads. */

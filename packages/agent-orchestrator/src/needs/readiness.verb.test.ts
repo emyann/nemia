@@ -12,7 +12,7 @@
  * trust of it was refused; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
 import { plantRecord, runKey } from '../../testing.ts';
-import { createFactoryAt } from '../factory/factory.store.ts';
+import { createFactoryAt } from '../../testing.ts';
 import path from 'node:path';
 import fs from 'node:fs';
 import { beforeAll, describe, test } from 'vitest';

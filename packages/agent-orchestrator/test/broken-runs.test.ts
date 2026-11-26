@@ -318,12 +318,15 @@ describe('one broken run does not stop the others: each left out and said once, 
         return (err as Error).message;
       }
     })();
-    assert.deepEqual(workflowsOf(run, ROOT), {
+    assert.deepEqual(Effect.runSync(workflowsOf(run, ROOT)), {
       steps: null,
       warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${/[.!?]$/.test(loaded) ? loaded : `${loaded}.`}`,
     });
     const gone = path.join(ROOT, 'no-such-folder');
-    assert.deepEqual(workflowsOf({ ...run, workflowDir: gone }, ROOT), { steps: null, warning: `The workflow folder ${gone} is gone.` });
+    assert.deepEqual(Effect.runSync(workflowsOf({ ...run, workflowDir: gone }, ROOT)), {
+      steps: null,
+      warning: `The workflow folder ${gone} is gone.`,
+    });
   });
   s.test('the cap counts a broken run in flight, as the pass does', async (c) => {
     ENV.WF_MAX_RUNS = '20';

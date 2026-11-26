@@ -14,7 +14,7 @@
  *
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
-import { plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { plantRecord, recordText, runKey, runRecord, runsNow, markerText } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -178,7 +178,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
 }
 
 const lane = (id: string, step = 'work') => runRecord(ROOT, id).steps[step].workspace!;
-const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
+const whole = (id: string) => fs.existsSync(lane(id)) && markerText(ROOT, id, 'pruned') === undefined;
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
 /** A run of `folder` started on `repo`, its `work` at work in its worktree. */
@@ -249,7 +249,7 @@ describe(
           [[id, 'pruned', [wt]]],
         );
         assert.ok(!fs.existsSync(wt) && gone(id), 'the worktree and worktrees/<id> are gone');
-        const mark = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.pruned`), 'utf8')) as {
+        const mark = JSON.parse(markerText(ROOT, id, 'pruned') ?? '') as {
           at: string;
           worktrees: { path: string; bytes: number }[];
         };
@@ -334,7 +334,7 @@ describe(
         await worked(id);
         await stage.runWith(engine(), hold(id, []));
         await stage.runWith(engine(), cancelRun(id));
-        assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.hold`)), 'the hold stands, cancelled');
+        assert.ok(markerText(ROOT, id, 'hold') !== undefined, 'the hold stands, cancelled');
         const work = stepRow(listedRow(await listed(), id), 'work');
         const gate = `${shownStatus(work)} · ${shownNote(work) ?? ''}`;
         assert.ok(!gate.includes('nemia approve'), `no verb a cancelled run refuses is offered: ${gate}`);

@@ -2,13 +2,12 @@
  * The Run door's memory stand-in: a fresh layer of `RunDoor` per call, its runs and a person's files beside them held in maps, built by
  * `runDoorOver` as the files layer is, so the writes are checked the one way on both. A test gives it its program — `Effect.provide(
  * program, runDoorMemory())` — where it needs a run to exist and nothing of the disk; the walks of `test/run-walks.ts` hold it to what
- * the keyspace answers. A run's keys (`where`, `forget`) are named as the keyspace names them (`run-keys.ts`), its markers' paths under
- * `runs/`, as the files name them under `WF_ROOT`; a `nemia rm` marker's under `MEMORY_ROOT`.
+ * the keyspace answers. A run's keys (`where`, `forget`) are named as the keyspace names them (`run-keys.ts`), its markers' keys under
+ * `/registry/runmarks/<id>/`, and a `nemia rm` marker's `/registry/forgetting/<id>`.
  *
  * A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`). What it holds no
  * file for, it answers as a store with none: no files directory, and no pause.
  */
-import path from 'node:path';
 import { Layer } from 'effect';
 import { Missing } from '../refusal/refusal.ts';
 import { mergeSpent } from '../merge/merge.ts';
@@ -30,7 +29,7 @@ import type {
   Unheld,
 } from '../record/record.ts';
 import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
-import { askDoneKey, askKeyOf, askName, claimKey, runKey } from './run-keys.ts';
+import { askDoneKey, askKeyOf, askName, claimKey, forgettingKey, runKey, runMarksPrefix, saidKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
@@ -148,7 +147,7 @@ function readOf(st: State, id: string) {
 /**
  * Remove what the stand-in holds of `id`, answering each key and name removed as the keyspace and the files name them: the record, its
  * claim of a card (which the stand-in holds as the record itself, a run created only while no other from its card stands) and its asks,
- * then a person's files under `runs/`.
+ * then each marker under the run's marks key.
  */
 function forgetOf(st: State, id: string) {
   const card = st.records.get(id)?.from?.inbox;
@@ -162,17 +161,20 @@ function forgetOf(st: State, id: string) {
   st.asks.delete(id);
   st.routes.delete(id);
   const named: Array<[Map<string, unknown>, string]> = [
-    [st.cancelled, `${id}.cancelled`],
-    [st.pruned, `${id}.pruned`],
-    [st.holds, `${id}.hold`],
-    [st.unheld, `${id}.unheld`],
-    [st.assignees, `${id}.assignee`],
-    [st.unassigned, `${id}.unassigned`],
-    [st.refresh, `${id}.refresh`],
-    [st.labels, `${id}.labels`],
-    [st.said, `${id}.said/`],
+    [st.cancelled, 'cancelled'],
+    [st.pruned, 'pruned'],
+    [st.holds, 'hold'],
+    [st.unheld, 'unheld'],
+    [st.assignees, 'assignee'],
+    [st.unassigned, 'unassigned'],
+    [st.refresh, 'refresh'],
+    [st.labels, 'labels'],
   ];
-  for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
+  const marks: string[] = [];
+  for (const [held, name] of named) if (held.delete(id)) marks.push(`${runMarksPrefix(id)}${name}`);
+  for (let n = 1; n <= (st.said.get(id)?.length ?? 0); n++) marks.push(saidKey(id, n));
+  st.said.delete(id);
+  removed.push(...marks.sort());
   st.cancellers.delete(id);
   st.versions.delete(id);
   return removed;
@@ -453,7 +455,7 @@ function forgettingOf(st: State) {
     },
     list: () => [...st.forgetting.keys()].sort(),
     lift: (id) => void st.forgetting.delete(id),
-    where: (id) => path.posix.join(MEMORY_ROOT, 'forgetting', `${id}.json`),
+    where: (id) => forgettingKey(id),
   } satisfies RunsLayer['forgetting'];
 }
 

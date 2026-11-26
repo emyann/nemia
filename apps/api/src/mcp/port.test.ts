@@ -24,7 +24,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { SKILLS_EXTENSION_ID, SkillsClient } from '@modelcontextprotocol/client/ext/skills';
 import { loadSkills } from '@modelcontextprotocol/server/ext/skills/node';
 import { testEngine } from 'agent-runtime/testing';
-import { approvalKey, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { approvalKey, plantRecord, recordText, runKey, testPlace, markerText } from 'agent-orchestrator/testing';
 import { CLI_VERBS, NEMIA_SKILLS, storeConfigLayer, TABLE, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -243,7 +243,7 @@ for (const era of ERAS)
     const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: id, why: 'by the port' } });
     assert.notEqual(result.isError, true, textOf(result));
     assert.equal((result.structuredContent as { id?: string } | undefined)?.id, id);
-    assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.hold`)), 'the hold is written');
+    assert.ok(markerText(root, id, 'hold') !== undefined, 'the hold is written');
     await client.close();
   });
 
@@ -388,7 +388,7 @@ for (const era of ERAS)
     const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: 'r-port-nothing' } });
     assert.equal(result.isError, true);
     assert.ok(textOf(result).length > 0, 'the refusal carries words');
-    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-port-nothing.hold')), false, 'nothing written');
+    assert.equal(markerText(root, 'r-port-nothing', 'hold') !== undefined, false, 'nothing written');
     await client.close();
   });
 

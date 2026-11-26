@@ -352,7 +352,7 @@ export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRe
 export type { AgentSource } from './sources/sources.ts';
 export type { SkillChange, SkillRead } from './skills/skills.store.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
-export { factoriesDirAt, filedAtOnce, listedAtOnce, readFactoryAtOnce, startFactoryAtOnce } from './factory/door/factories.store.ts';
+export { doorAt, factoriesDirAt, factoryOrNone, listedAt, startFactory } from './factory/door/factories.store.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { envNameOf } from './harness/a2a.store.ts';

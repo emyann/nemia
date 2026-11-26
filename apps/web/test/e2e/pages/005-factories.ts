@@ -66,7 +66,7 @@ export default {
       `${FACTORIES.broken}'s file's volumes are no list: its block says it does not read`,
     );
     const why = (await block(FACTORIES.broken).locator('[data-error]').getAttribute('title')) ?? '';
-    if (!why.includes(`${FACTORIES.broken}.json`) || !why.includes('volumes'))
+    if (!why.includes(`/registry/factories/${FACTORIES.broken}`) || !why.includes('volumes'))
       throw new Refused(`the broken block says which file and why, whole on hover — its title is ${JSON.stringify(why)}`);
 
     await settled(page);

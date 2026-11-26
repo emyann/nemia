@@ -24,7 +24,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { BuiltinTemplates, cardNames, cardText, plantCard, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import {
+  BuiltinTemplates,
+  cardNames,
+  cardText,
+  readFactoryLevel,
+  writeFactoryLevel,
+  factoryText,
+  plantCard,
+  plantRecord,
+  recordText,
+  runKey,
+  testPlace,
+} from 'agent-orchestrator/testing';
 import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
@@ -159,7 +171,7 @@ function digestsOf(dir: string) {
 
 /** What `s` holds of the factory `name`: its file, its folder, and the inbox's cards of it. */
 const heldOf = (s: Store, name: string) => ({
-  file: fs.existsSync(path.join(s.home, 'factories', `${name}.json`)),
+  file: factoryText(s.home, name) !== undefined,
   folder: fs.existsSync(path.join(s.home, 'factories', name)),
   cards: Object.entries(cardsOf(s.home))
     .filter(([, text]) => text.includes(`factory: ${name}`))
@@ -173,9 +185,7 @@ const NOTHING = { file: false, folder: false, cards: [] };
 
 /** The factory file of `name` in `s`'s store, as the door wrote it. */
 const fileOf = (s: Store, name: string) => {
-  const made: { volumes?: Array<{ path: string; readOnly: boolean; name?: string }> } = JSON.parse(
-    fs.readFileSync(path.join(s.home, 'factories', `${name}.json`), 'utf8'),
-  );
+  const made: { volumes?: Array<{ path: string; readOnly: boolean; name?: string }> } = JSON.parse(factoryText(s.home, name) ?? '');
   return made;
 };
 
@@ -258,7 +268,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     await answered(send(source, 'PUT', '/api/factories/mill/rules', { words: 'Keep drafts short.\n' }));
     sourceTree = path.join(source.home, 'factories', 'mill', 'tree');
     fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
-    write(path.join(source.home, 'factories', 'mill', 'level.json'), `${JSON.stringify({ level: 'auto', since: SINCE })}\n`);
+    writeFactoryLevel(source.home, 'mill', { level: 'auto', since: SINCE });
     [clone = ''] = applied.volumes.map((v) => v.path);
     plantCard(
       source.home,
@@ -268,9 +278,9 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     );
     plantCard(source.home, 'pressed', '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n', SINCE);
     runFrom(source, 'run-pressed', 'pressed', clone);
+    key = fileOf(source, 'mill').volumes?.find((v) => v.readOnly)?.name ?? other;
     before = digestsOf(source.home);
     exp = await answered<FactoryExport>(send(source, 'GET', '/api/factories/mill/export'));
-    key = fileOf(source, 'mill').volumes?.find((v) => v.readOnly)?.name ?? other;
     return t.end;
   });
   const s = story(test);
@@ -348,15 +358,12 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     };
     assert.deepEqual(await instruction(target), await instruction(source));
   });
-  s.test('its tree with its edit, its rendered base and its level are the files the source holds', () => {
+  s.test('its tree with its edit, its rendered base and its level are the ones the source holds', () => {
     const folder = (s: Store) => path.join(s.home, 'factories', 'mill');
     assert.deepEqual(filesOf(path.join(folder(target), 'tree')), filesOf(path.join(folder(source), 'tree')));
     assert.equal(fs.readFileSync(path.join(folder(target), 'tree', DRAFT), 'utf8'), 'Draft it our way.\n');
     assert.deepEqual(filesOf(path.join(folder(target), 'applied')), filesOf(path.join(folder(source), 'applied')));
-    assert.equal(
-      fs.readFileSync(path.join(folder(target), 'level.json'), 'utf8'),
-      fs.readFileSync(path.join(folder(source), 'level.json'), 'utf8'),
-    );
+    assert.deepEqual(readFactoryLevel(target.home, 'mill'), readFactoryLevel(source.home, 'mill'));
   });
   s.test('its schedule, its cost line and its recorded server read there as here', async () => {
     const spec = async (st: Store, url: string) => (await answered<{ spec: unknown }>(send(st, 'GET', url))).spec;
@@ -397,6 +404,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
   s.test(
     "an upgrade to the target's version merges against the base that moved: the tree's edit kept, the new version's change taken",
     async () => {
+      await reconciled(target, OLDER);
       const plan = await answered<FactoryPlan>(send(target, 'POST', '/api/factories/mill/diff', { to: '0.2.0' }));
       assert.equal(plan.kind, 'upgrade');
       if (plan.kind !== 'upgrade') return;

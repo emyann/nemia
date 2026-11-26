@@ -20,7 +20,7 @@ import { aRun } from '../../../test/run-walks.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService } from '../../place/place.store.ts';
 import { FactoryDoor, type FactoryDoorShape } from '../door/factories.store.ts';
-import { factoryDoorMemory } from '../door/memory.store.ts';
+import { factoryDoorMemory, MEMORY_ROOT } from '../door/memory.store.ts';
 import { CardDoor, type CardDoorShape } from '../../cards/cards.store.ts';
 import { cardDoorMemory } from '../../cards/memory.store.ts';
 import { RunDoor, type RunDoorShape } from '../../runs/runs.store.ts';
@@ -28,7 +28,7 @@ import { runDoorMemory } from '../../runs/memory.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { CardName } from '../../inbox/inbox.model.ts';
 import { parseInboxCard } from '../../inbox/inbox.ts';
-import { unpackArchive } from '../../archive/archive.ts';
+import { packArchive, unpackArchive } from '../../archive/archive.ts';
 import { withTemplateTaken } from '../../template/given.store.ts';
 import type { Factory } from '../factory.ts';
 import { factoryExported, factoryImported } from './move.verb.ts';
@@ -120,6 +120,8 @@ function planted(src: Side, template = templateFolder()) {
     ]),
   );
   done(src.factories.level.write(NAME, { level: 'auto', since: SINCE }));
+  done(src.factories.servers.write(NAME, { docs: { type: 'sse', url: 'https://docs.example/mcp' } }));
+  done(src.factories.status.write(NAME, { version: '1.0.0', digest: null, params: {}, conditions: [] }));
   done(src.cards.cards.add(CardName.read('add-a-flag-c3d4'), aCard('Add a flag', { workflow: 'build', factory: 'shop', queued: SINCE })));
   done(src.cards.cards.add(CardName.read('started-e5f6'), aCard('Started already', { workflow: 'build', factory: 'shop' })));
   done(src.cards.cards.add(CardName.read('elsewhere-a1b2'), aCard('Not this one', { workflow: 'build', factory: 'other' })));
@@ -174,7 +176,14 @@ describe('the export reads the source whole and writes nothing of it', () => {
     assert.deepEqual(exp.stays, ['proposals', 'delegations']);
     assert.deepEqual(
       unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files.map((f) => f.path),
-      ['applied/factory.json', 'level.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
+      ['applied/factory.json', 'level.json', 'servers.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
+    );
+  });
+  test('its status stays: the source holds one, and the archive packs none', () => {
+    assert.equal(done(src.factories.status.read(NAME))?.version, '1.0.0');
+    assert.equal(
+      unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files.some((f) => f.path === 'status.json'),
+      false,
     );
   });
   test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
@@ -228,14 +237,28 @@ describe('the import files the factory on the target, clones its repositories, a
   test('its template, version and parameters, the template kept under the target’s store', () => {
     assert.equal(record.template?.source.startsWith(path.join(dst.root, 'templates-sent')), true);
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
-    assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
+    assert.equal(record.tree, path.join(MEMORY_ROOT, 'factories', 'shop', 'tree'), 'the tree is where the door puts it, under its root');
   });
-  test('its tree’s edits and its level, and none of what stays', () => {
+  test('its tree’s edits, its level and its servers, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));
     const implement = files.find((f) => f.path === 'tree/workflows/press/implement.md');
     assert.equal(new TextDecoder().decode(implement?.bytes), '---\n---\nBuild it, edited.\n');
     assert.deepEqual(done(dst.factories.level.read(NAME)), { level: 'auto', since: SINCE });
+    assert.deepEqual(done(dst.factories.servers.read(NAME)), { docs: { type: 'sse', url: 'https://docs.example/mcp' } });
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
+  });
+  test('its status is not carried: the target holds none, though an older archive brought one', async () => {
+    assert.equal(done(dst.factories.status.read(NAME)), undefined);
+    const files = unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files;
+    const status = {
+      path: 'status.json',
+      mode: 0o644,
+      bytes: new TextEncoder().encode('{"version":"9.9.9","digest":null,"params":{},"conditions":[]}\n'),
+    };
+    const older = { ...exp, folder: { archive: packArchive('factory', [...files, status]).archive.toString('base64') } };
+    const again = side('wf-move-dst-');
+    answer(await imported(again, older));
+    assert.equal(done(again.factories.status.read(NAME)), undefined);
   });
   test('its places are all untrusted, for the person to trust', () => {
     assert.deepEqual(

@@ -15,7 +15,7 @@
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
  * its end, or for the line it says, never for a length of time.
  */
-import { credentialKeptNow, plantRecord, runKey } from 'agent-orchestrator/testing';
+import { credentialKeptNow, plantRecord, runKey, plantMarker } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -114,17 +114,17 @@ const waitingRun = (id: string, more: object) =>
   );
 waitingRun('r-after', { after: ['r-missing'] });
 waitingRun('r-held', {});
-write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at: at(70), until: [RUN], why: 'merge conflicts', by: 'operator' }));
+plantMarker(root, 'r-held', 'hold', JSON.stringify({ at: at(70), until: [RUN], why: 'merge conflicts', by: 'operator' }));
 waitingRun('r-parked', {});
-write(path.join(root, 'runs', 'r-parked.hold'), JSON.stringify({ at: at(71), until: [], why: 'folded into an intake', by: 'operator' }));
+plantMarker(root, 'r-parked', 'hold', JSON.stringify({ at: at(71), until: [], why: 'folded into an intake', by: 'operator' }));
 write(path.join(root, 'cordon'), JSON.stringify({ at: at(90), by: 'operator', why: 'a release' }));
 waitingRun('r-cancelled', { cancelledAt: at(80), from: { inbox: 'called-off' } });
 waitingRun('r-pruned', {});
-write(path.join(root, 'runs', 'r-pruned.pruned'), JSON.stringify({ at: at(85), worktrees: [] }));
+plantMarker(root, 'r-pruned', 'pruned', JSON.stringify({ at: at(85), worktrees: [] }));
 settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, artifacts: [] }, 10);
 settled('t-build-2', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: ['NOTES.md'] }, 30);
 settled('t-review', { outcome: 'blocked', summary: 'Half reviewed.', needs: 'Which database?', artifacts: [] }, 50);
-write(path.join(root, 'runs', `${RUN}.labels`), JSON.stringify({ team: 'core' }));
+plantMarker(root, RUN, 'labels', JSON.stringify({ team: 'core' }));
 waitingRun('r-working', { steps: { build: { taskId: 't-working' } } });
 journal('t-working', [
   { kind: 'filed', at: at(100), brief: 'The brief of t-working.', cwd: root, harness: 'codex', queued: false },

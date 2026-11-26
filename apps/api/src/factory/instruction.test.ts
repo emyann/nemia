@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { factoryInstruction } from 'agent-orchestrator';
-import { addFactory, setInstruction } from 'agent-orchestrator/testing';
+import { addFactory, factoriesNow, recordText, setInstruction } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
@@ -20,7 +20,7 @@ type FactoryInstruction = import('agent-orchestrator').FactoryInstruction;
 const folder = scratch('nemia-api-instruction-folder-');
 addFactory({ name: 'mill', volumes: [folder].map((r) => `${r}:rw`) });
 
-const RECORD = path.join(root, 'factories', 'mill.json');
+const RECORD = '/registry/factories/mill';
 const STORE = path.join(root, 'factories', 'mill');
 
 const json = { 'content-type': 'application/json' };
@@ -36,7 +36,7 @@ async function answered(res: Response | Promise<Response>, status = 200) {
 }
 
 /** The factory's file and the store's folder: what a refusal must leave as it was. */
-const held = () => [fs.readFileSync(RECORD, 'utf8'), fs.existsSync(STORE) ? fs.readdirSync(STORE) : []];
+const held = () => [recordText(root, RECORD) ?? '', fs.existsSync(STORE) ? fs.readdirSync(STORE) : []];
 
 /** A request refused with `status`, its words, and the factory's file and the store's folder as they were. */
 async function refused(res: () => Response | Promise<Response>, status: number) {
@@ -79,7 +79,7 @@ describe("a person moves a factory's instruction from its folder to the store, w
     fs.writeFileSync(path.join(folder, 'docs', 'NEMIA.md'), 'Read the docs.\n');
     const moved = await answered(send('PUT', '/api/factories/mill/instruction', { path: 'docs/NEMIA.md' }));
     assert.deepEqual([moved.path, moved.file, moved.words], ['docs/NEMIA.md', path.join(folder, 'docs', 'NEMIA.md'), 'Read the docs.\n']);
-    assert.deepEqual(JSON.parse(fs.readFileSync(RECORD, 'utf8')).instruction, { path: 'docs/NEMIA.md' });
+    assert.deepEqual(JSON.parse(recordText(root, RECORD) ?? '').instruction, { path: 'docs/NEMIA.md' });
   });
   s.test("PUT the store, then its words, writes the store's file and leaves the folder's", async () => {
     const stored = await answered(send('PUT', '/api/factories/mill/instruction', { store: true }));
@@ -99,7 +99,7 @@ describe("a person moves a factory's instruction from its folder to the store, w
   s.test("DELETE the instruction reads the folder's NEMIA.md again, the key gone from the factory's file", async () => {
     const back = await answered(send('DELETE', '/api/factories/mill/instruction', {}));
     assert.deepEqual([back.path, back.store, back.words], [null, false, 'Read the folder.\n']);
-    assert.equal('instruction' in JSON.parse(fs.readFileSync(RECORD, 'utf8')), false, 'a clear removes the key');
+    assert.equal('instruction' in JSON.parse(recordText(root, RECORD) ?? ''), false, 'a clear removes the key');
   });
 });
 
@@ -108,7 +108,7 @@ describe('the instruction routes: what a read or a write refuses, changing nothi
     const ghost = await refused(() => app.request('/api/factories/ghost/instruction'), 404);
     assert.equal(
       ghost,
-      packageSays(() => factoryInstruction(root, 'ghost')),
+      packageSays(() => factoriesNow(root, factoryInstruction(root, 'ghost'))),
     );
     for (const fact of ['ghost', 'mill']) assert.ok(ghost.includes(fact), `${fact}: ${ghost}`);
     assert.match(await refused(() => send('PUT', '/api/factories/ghost/instruction', { store: true }), 404), /Nothing was changed\.$/);
@@ -117,7 +117,7 @@ describe('the instruction routes: what a read or a write refuses, changing nothi
     const fallback = await refused(() => app.request('/api/factories/default/instruction'), 409);
     assert.equal(
       fallback,
-      packageSays(() => factoryInstruction(root, 'default')),
+      packageSays(() => factoriesNow(root, factoryInstruction(root, 'default'))),
     );
     await refused(() => send('PUT', '/api/factories/default/instruction/words', { words: 'No.' }), 409);
   });

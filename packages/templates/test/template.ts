@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
+import { readStatus } from 'agent-orchestrator/testing';
 import {
   builtinGitPlace,
   engine,
@@ -89,9 +90,6 @@ export function copyOf(from: string, edit: Record<string, (text: string) => stri
 /** A factory to apply: its name, the template's folder, and its `--set` words, each `<key>=<value>`. */
 export type Applied = { name: string; template: string; sets?: string[] };
 
-/** A factory as the controller left it: its tree's folder where it was seeded, the conditions of its status, and the store it is in. */
-type Tree = { tree: string | undefined; conditions: Array<{ type: string; status: string; reason: string }>; store: string };
-
 /**
  * Each of `factories` applied on one scratch store, each over a scratch repository of its own, then rendered by `nemia up`, stopped once
  * each factory has its status written: by name, its tree and its conditions. Throws where `nemia factory apply` refuses one.
@@ -114,10 +112,7 @@ export async function rendered(factories: readonly Applied[]) {
     ]);
   }
   const folderOf = (name: string) => path.join(env.WF_ROOT!, 'factories', name);
-  const statusOf = (name: string) => {
-    const file = path.join(folderOf(name), 'status.json');
-    return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')) as Pick<Tree, 'conditions'>) : undefined;
-  };
+  const statusOf = (name: string) => readStatus(env.WF_ROOT!, name);
   const appliedOf = (name: string) => statusOf(name)?.conditions.some((c) => c.type === 'Applied' && c.status === 'True') ?? false;
   const treeOf = (name: string) => path.join(folderOf(name), 'tree');
   const settled = () =>

@@ -13,7 +13,18 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
+import {
+  asksPrefix,
+  dropMarker,
+  dropRecord,
+  keysUnder,
+  markerText,
+  plantRecord,
+  runFolderNames,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -51,7 +62,6 @@ import {
 } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
 import { isRepositoryRun } from '../src/run.ts';
-import { cancelFile } from '../src/record/record.store.ts';
 import { EngineService as Service, engineOf } from '../src/runtime-client.ts';
 import { Invalid, isRefusal } from '../src/refusal/refusal.ts';
 import { inputsDir, runsDir } from '../src/record/record.store.ts';
@@ -373,7 +383,7 @@ describe("each verb's program, given its services, answers what its plain face a
       'nemia cancel',
       async () => {
         const cancelled = await over(b.e, cancelRun(running.id));
-        fs.rmSync(cancelFile(ROOT, running.id));
+        dropMarker(ROOT, running.id, 'cancelled');
         b.tasks.get(taskId)!.stopRequested = false;
         return cancelled;
       },
@@ -416,7 +426,7 @@ describe("each verb's program, given its services, answers what its plain face a
       ];
       for (const [what, program] of programs) assert.match(await recovered(e, program, 'Invalid'), /is not JSON/, what);
       assert.ok(
-        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')),
+        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && markerText(ROOT, 'garbled', 'cancelled') === undefined,
         'nothing written',
       );
     } finally {
@@ -682,21 +692,21 @@ describe("each verb's program, given its services, answers what its plain face a
       ['--no-worktree on a fan-out', { brief: 'x', repo, workflowDir: fan, isolate: false }],
     ];
     for (const [what, opts] of cases) {
-      const before = fs.readdirSync(runsDir(ROOT)).sort();
+      const before = runFolderNames(ROOT).sort();
       const caught = Effect.runSync(placed(startRun(opts)).pipe(Effect.catchTag('Invalid', (r) => Effect.succeed(r))));
       assert.ok(caught instanceof Invalid, `${what}: an Invalid, recovered by its tag`);
       const err = await rejection(runPlaced(startRun(opts)), what);
       assert.ok(err instanceof Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
       assert.equal(err.exitCode, 2, what);
       assert.equal(caught.message, err.message, what);
-      assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, `${what}: nothing written`);
+      assert.deepEqual(runFolderNames(ROOT).sort(), before, `${what}: nothing written`);
     }
   });
   test('a run whose inputs cannot be copied is what the start program dies of, not a refusal: its face throws the same exit-1 Error, and nothing is left', async (tt: TestContext) => {
     const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
     fs.writeFileSync(input, 'the notes\n');
     const opts = { brief: 'unwritable', repo: aRepo(), workflowDir: folder(), inputs: [input] };
-    const before = fs.readdirSync(runsDir(ROOT)).sort();
+    const before = runFolderNames(ROOT).sort();
     fs.chmodSync(runsDir(ROOT), 0o555);
     tt.onTestFinished(() => fs.chmodSync(runsDir(ROOT), 0o755));
     const died = thrown(() => Effect.runSync(placed(startRun(opts)).pipe(Effect.catch(() => Effect.succeed('caught')))), 'the program');
@@ -712,7 +722,7 @@ describe("each verb's program, given its services, answers what its plain face a
     }
     const anyId = (err: unknown) => (err as Error).message.replaceAll(/unwritable-[a-z0-9]+/g, '<id>');
     assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
-    assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, 'no record, and no run directory');
+    assert.deepEqual(runFolderNames(ROOT).sort(), before, 'no record, and no run directory');
   });
   test.skipIf(process.getuid?.() === 0 && 'root reads a file of mode 000')(
     'a run that dies once its own directory is made takes that directory with it: an input that cannot be read, a skill that cannot be rendered — exit 1, and nothing of it is left',
@@ -736,14 +746,14 @@ describe("each verb's program, given its services, answers what its plain face a
         ['a skill', { brief: 'unrendered', repo: ROOT, workflowDir: team }, /agents could not be rendered/],
       ];
       for (const [what, opts, said] of cases) {
-        const before = fs.readdirSync(runsDir(ROOT)).sort();
+        const before = runFolderNames(ROOT).sort();
         const err = await rejection(runPlaced(startRun(opts)), what);
         assert.equal((err as Error & { exitCode?: number }).exitCode, 1, `${what}: ${String(err)}`);
         assert.match((err as Error).message, said, what);
         const id = /runs\/([a-z0-9-]+)\//.exec((err as Error).message)?.[1] ?? '';
         assert.ok(id, `${what}: the message names the run's directory: ${(err as Error).message}`);
         assert.equal(files.runs.taken(id), false, `${what}: nothing of ${id} is left`);
-        assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, `${what}: no record, and no run directory`);
+        assert.deepEqual(runFolderNames(ROOT).sort(), before, `${what}: no record, and no run directory`);
       }
     },
   );

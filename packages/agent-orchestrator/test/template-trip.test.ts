@@ -24,8 +24,10 @@ import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt, seededClock } from './templated.ts';
 import { checkedTree, packageSkillNames } from '../src/template/template.store.ts';
-import { readFactoriesAt, readFactoryAt } from '../src/factory/factory.store.ts';
-import { appliedDir, readStatus, statusFile, treeDir } from '../src/factory/applied/applied.store.ts';
+import { dropRecord, factoryText, plantKey, readFactoriesAt, readFactoryAt, recordRevision, recordText } from '../testing.ts';
+import { appliedDir, treeDir } from '../src/factory/applied/applied.store.ts';
+import { readStatus } from '../testing.ts';
+import { appliedKey } from '../src/factory/door/index.ts';
 import { reconcileOnce } from '../src/factory/applied/applied.verb.ts';
 import { startDue } from '../src/factory/schedule/schedule.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
@@ -205,15 +207,16 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
     assert.deepEqual(fs.readFileSync(again), fs.readFileSync(archive), 'the same folder packs to the same bytes');
     fs.rmSync(again);
   });
-  s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async () => {
+  s.test("apply of the archive with --set files only the factory's record, and trusts the repository it names", async () => {
     const made = (await stage.main(['factory', 'apply', 'trip', '--template', archive, '--volume', `${repo}:rw`, '--set', 'budget=7'])) as {
       trusts: ReadonlyArray<{ place: string; wrote?: boolean }>;
     };
     assert.deepEqual(
-      (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).filter((f) => f.startsWith('trip')),
-      ['trip.json'],
+      (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]) : []).filter((f) => f.startsWith('trip')),
+      [],
+      'no file, a record',
     );
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(FACTORIES, 'trip.json'), 'utf8')), {
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'trip') ?? '{}'), {
       volumes: [{ path: repo, readOnly: false, name: volumeBase(repo) }],
       template: { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } },
       generation: 1,
@@ -268,25 +271,25 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
     );
     assert.deepEqual(readFactoryAt(ROOT, 'trip').workflows, ['dev', 'triage']);
     fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
-    const written = fs.statSync(statusFile(ROOT, 'trip')).mtimeMs;
+    const written = recordRevision(ROOT, appliedKey('trip'));
     assert.deepEqual(await reconciled(factory('trip')), status, 'a second pass reads the archive to the same base');
     assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
-    assert.equal(fs.statSync(statusFile(ROOT, 'trip')).mtimeMs, written, 'a status that did not change is not written');
+    assert.equal(recordRevision(ROOT, appliedKey('trip')), written, 'a status that did not change is not written');
   });
   s.test('a restart reads it all again off the disk, a status it cannot read written again, a tree removed seeded again', async () => {
     const status = readStatus(ROOT, 'trip')!;
     const tree = path.join(treeDir(ROOT, 'trip'), REVIEW);
     const kept = fs.readFileSync(tree, 'utf8');
-    fs.rmSync(statusFile(ROOT, 'trip'));
+    dropRecord(ROOT, appliedKey('trip'));
     fs.rmSync(treeDir(ROOT, 'trip'), { recursive: true });
     await Effect.runPromise(
       reconcileOnce().pipe(Effect.provideService(StoreRoot, ROOT), Effect.provideService(Clock.Clock, seededClock(Date.parse(AT)))),
     );
     assert.deepEqual(readStatus(ROOT, 'trip'), status);
     assert.match(fs.readFileSync(tree, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
-    const onDisk = JSON.parse(fs.readFileSync(statusFile(ROOT, 'trip'), 'utf8'));
+    const onDisk = JSON.parse(recordText(ROOT, appliedKey('trip')) ?? '{}');
     const [applied, conflicts] = status.conditions;
-    fs.writeFileSync(statusFile(ROOT, 'trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
+    plantKey(ROOT, appliedKey('trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
     assert.equal(readStatus(ROOT, 'trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
     assert.deepEqual(await reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
     fs.writeFileSync(tree, kept);

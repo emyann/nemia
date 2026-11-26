@@ -5,7 +5,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`, where `WF_KEEP_WORKTREES` is unset, so the rule is read at its shipped default.
  */
-import { runRecord } from '../testing.ts';
+import { runRecord, markerText } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -179,7 +179,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
 }
 
 const lane = (id: string, step = 'work') => runRecord(ROOT, id).steps[step].workspace!;
-const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
+const whole = (id: string) => fs.existsSync(lane(id)) && markerText(ROOT, id, 'pruned') === undefined;
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
 /** A run of `folder` started on `repo`, its `work` at work in its worktree. */

@@ -73,7 +73,7 @@ import {
   type Factory,
   DEFAULT_NAMESPACE,
 } from '../factory/factory.ts';
-import { factoryOrNone, filedAtOnce, labelValuesJudged } from '../factory/door/factories.store.ts';
+import { factoryOrNone, labelValuesJudged } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -487,32 +487,22 @@ function mountRefusal(
 /**
  * The factory's folders `startRun` left out of `run`'s mounts, as `nemia start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
- * @param home The store's root.
  * @param run The run started.
  */
-export function leftOutMounts(home: string, run: Run) {
-  return leftOut(home, run).mounts;
-}
+export const leftOutMounts = (run: Run) => Effect.map(leftOut(run), (left) => left.mounts);
 
 /**
  * The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start.
- * @param home The store's root.
  * @param run The run started.
  */
-export function leftOutVolumes(home: string, run: Run) {
-  return leftOut(home, run).volumes;
-}
+export const leftOutVolumes = (run: Run) => Effect.map(leftOut(run), (left) => left.volumes);
 
 /** The factory's folders and volumes `startRun` left out of `run`, each no directory now; none where the factory does not read. */
-function leftOut(home: string, run: Run) {
-  if (!run.factory) return { mounts: [], volumes: [] };
-  let factory: Factory | undefined;
-  try {
-    factory = filedAtOnce(home, run.factory);
-  } catch {
-    return { mounts: [], volumes: [] };
-  }
-  if (factory === undefined) return { mounts: [], volumes: [] };
+const leftOut = Effect.fnUntraced(function* (run: Run) {
+  const none = { mounts: [] as string[], volumes: [] as string[] };
+  if (!run.factory) return none;
+  const factory = yield* Effect.orElseSucceed(factoryOrNone(run.factory), () => undefined);
+  if (factory === undefined) return none;
   const mounted = new Set([...(run.mounts ?? []), ...(run.volumes ?? [])].map((m) => m.path));
   const missing = (at: string) => !mounted.has(at) && !isDirectory(at);
   return {
@@ -523,7 +513,7 @@ function leftOut(home: string, run: Run) {
       .map((v) => v.path)
       .filter(missing),
   };
-}
+});
 
 /** The models a run is started with, as its record freezes them: none where it names none. */
 const frozenModels = (models: RunModels | undefined) =>
@@ -711,39 +701,32 @@ const frozenRead = (workflowDir: string, factory: Factory | undefined) => {
 };
 
 /**
- * The factory a run is started in, read through the door (`filedAtOnce`); none for no name and for the default factory, which is no file.
- */
-const factoryNamed = (home: string, name: string | undefined) => (name === undefined ? undefined : filedAtOnce(home, name));
-
-/**
  * The repository a run started by `nemia start` in the factory `name` works on where no wiring places it (`factoryRepo`): `named`, else
  * the factory's one repository, else `fallback`. Kept for the command line's start in the default factory alone: a card, a brief and a
  * schedule are placed by the factory's wiring (`wiredRepoFor`). Refused as `start` refuses the factory: none by that name, or one whose
  * file does not read (`readFactory`).
- * @param home The store's root.
  * @param name The factory's name, or undefined for the default factory.
  * @param named The repository `--repo` names, or undefined where none is named.
  * @param fallback The repository taken where neither names one.
  */
-export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string) =>
-  factoryRepo(factoryNamed(home, name), named, fallback);
+export const repoFor = (name: string | undefined, named: string | undefined, fallback: string) =>
+  Effect.map(factoryOrNone(name), (factory) => factoryRepo(factory, named, fallback));
 
 /**
  * The repository a run of the workflow named `workflow` works on in the factory `name` (`wiredRepo`): the one its wiring names by folder
  * name, else its only one; none for the default factory, which is no file and has no wiring. Refused, `Invalid`, in
  * `workflowRepoRefusal`'s words naming `nemia factory attach <factory> <workflow> --repo <name>`: a
  * factory of several repositories that names none for it, or a name none or two of them have; and as `start` refuses the factory.
- * @param home The store's root.
  * @param name The factory's name.
  * @param workflow The workflow's name.
  */
-export const wiredRepoFor = (home: string, name: string, workflow: string) => {
-  const factory = filedAtOnce(home, name);
+export const wiredRepoFor = Effect.fnUntraced(function* (name: string, workflow: string) {
+  const factory = yield* factoryOrNone(name);
   if (factory === undefined) return undefined;
   const of = wiredRepo(factory, workflow);
   if ('repo' in of) return of.repo;
-  throw new Invalid({ message: of.message });
-};
+  return yield* Effect.fail(new Invalid({ message: of.message }));
+});
 
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.

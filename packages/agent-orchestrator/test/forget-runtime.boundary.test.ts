@@ -11,7 +11,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest, and throws on a difference; `WF_MAX_CONCURRENT` admits sessions enough, and no cap is set on runs.
  */
-import { runRecord, runsNow } from '../testing.ts';
+import { forgettingKey, recordText, runRecord, runsNow } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -158,7 +158,10 @@ const finished = async () => {
   return { run, tasks };
 };
 
-const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
+const markerOf = (id: string) => forgettingKey(id);
+
+/** Whether the `nemia rm` marker at `key` stands. */
+const stands = (key: string) => recordText(ROOT, key) !== undefined;
 
 /** `nemia rm <args>`, as the client runs it over the api, on the engine `engine`: what it answered of each run, and its error. */
 const typedOn = (_t: TestContext, engine: Engine, ...args: string[]) => forgetTyped((effect) => runWith(engine, effect), ROOT, args);
@@ -181,7 +184,7 @@ test("`nemia rm` of a repository run that is over forgets every task of it on th
     'the engine lists none of them',
   );
   assert.ok(left.includes(`${kept.id}-implement`), "another run's task is the engine's still");
-  assert.ok(!fs.existsSync(markerOf(run.id)), 'no marker is left');
+  assert.ok(!stands(markerOf(run.id)), 'no marker is left');
 
   const read = await Effect.runPromise(e.feed(0));
   const filed = new Set(read.entries.flatMap(({ taskId, event }) => (event.kind === 'filed' ? [taskId] : [])));
@@ -213,9 +216,9 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   assert.equal(lackingForgets.length, before + 1, 'a pass asks again');
   const [line, ...more] = done.forgetting ?? [];
   assert.deepEqual([more, line?.warn], [[], true], JSON.stringify(done.forgetting));
-  assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.endsWith(`rm ${marker}`), line.text);
-  assert.ok(fs.existsSync(marker) && (await listed()).includes(task), "the marker stands, and the task is the engine's");
+  assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.includes(`${marker} keeps their ids`), line.text);
+  assert.ok(stands(marker) && (await listed()).includes(task), "the marker stands, and the task is the engine's");
 
   await runWith(e, tickRun({ repo: ROOT }));
-  assert.ok(!fs.existsSync(marker) && !(await listed()).includes(task), 'the engine with the harness forgets it, and a pass lifts it');
+  assert.ok(!stands(marker) && !(await listed()).includes(task), 'the engine with the harness forgets it, and a pass lifts it');
 });

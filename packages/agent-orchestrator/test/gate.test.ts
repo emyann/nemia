@@ -9,7 +9,19 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in scratch repositories no factory holds.
  */
-import { askKeyOf, askNames, cardText, dropRecord, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import {
+  askKeyOf,
+  askNames,
+  cardText,
+  dropRecord,
+  keysUnder,
+  listRuns,
+  plantRecord,
+  recordText,
+  runKey,
+  runRecord,
+  markCancelled,
+} from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -36,7 +48,7 @@ import {
   runWith as runEngine,
   standingLiveOf,
 } from '../src/runner.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';

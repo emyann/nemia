@@ -8,7 +8,18 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
-import { cardNames, cardText, dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
+import {
+  cardNames,
+  cardText,
+  dropRecord,
+  keysUnder,
+  plantRecord,
+  recordText,
+  runFolderNames,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../../testing.ts';
 import { CardDoor, type CardDoorShape } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { afterAll, beforeAll, describe, test } from 'vitest';
@@ -38,7 +49,7 @@ import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, dropFactory, factoryText, plantFactory } from '../../testing.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -812,7 +823,7 @@ test('a card gone between its start and the taking off of its `queued:` line is 
 
 test("a warm read of the inbox, through the informer the api keeps, answers a cold read's own; a card whose run was removed reads filed", async () => {
   emptyInbox();
-  for (const file of fs.readdirSync(path.join(ROOT, 'runs'))) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
+  for (const file of runFolderNames(ROOT)) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
   const { card } = addToInbox({ text: 'Cache the inbox' });
   writeRecord('r-started', { inbox: card.name });
   for (let n = 0; n < 20; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);
@@ -898,8 +909,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
   emptyInbox();
   const repo = aRepoWith('dev');
   addFactoryAt(ROOT, { name: 'lv', volumes: [`${repo}:rw`] });
-  const file = path.join(ROOT, 'factories', 'lv.json');
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), labelValues: { work: ['feature', 'fix'] } }));
+  plantFactory(ROOT, 'lv', JSON.stringify({ ...JSON.parse(factoryText(ROOT, 'lv') ?? ''), labelValues: { work: ['feature', 'fix'] } }));
   const cards = () => (fs.existsSync(INBOX) ? fs.readdirSync(INBOX).length : 0);
 
   assert.throws(
@@ -922,8 +932,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
     { work: 'store' },
     'the default factory judges none',
   );
-  const unread = path.join(ROOT, 'factories', 'unread.json');
-  fs.writeFileSync(unread, '{ not json');
+  plantFactory(ROOT, 'unread', '{ not json');
   try {
     assert.deepEqual(
       addToInbox({ text: 'Unread factory', factory: 'unread', labels: ['work=store'] }).card.labels,
@@ -931,7 +940,7 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
       'a factory whose file does not read judges none: the start says what is wrong with it',
     );
   } finally {
-    fs.rmSync(unread);
+    dropFactory(ROOT, 'unread');
   }
 
   const parent = await runPlaced(startRun({ brief: 'parent', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));

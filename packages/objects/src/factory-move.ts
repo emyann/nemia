@@ -94,13 +94,13 @@ export const FactoryImportedCard = Schema.Struct({
 export type FactoryImportedCard = typeof FactoryImportedCard.Type;
 
 /**
- * What an import filed: the factory, its file's path, its repositories on this machine, the URLs cloned for it, its volumes, its cards
- * with the name each had, and its places a harness does not trust: every one, since trusting them is the person's
+ * What an import filed: the factory, where it is kept (its record's key), its repositories on this machine, the URLs cloned for it, its
+ * volumes, its cards with the name each had, and its places a harness does not trust: every one, since trusting them is the person's
  * (`nemia factory trust <name>`).
  */
 export const FactoryImported = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory filed.' }),
-  file: Schema.String.annotate({ description: "Its file's path." }),
+  file: Schema.String.annotate({ description: "Where it is kept: its record's key." }),
   repos: Schema.Array(Schema.String).annotate({ description: 'Its repositories on this machine.' }),
   cloned: Schema.Array(Schema.String).annotate({ description: 'The URLs cloned for it.' }),
   volumes: Schema.Array(FactoryImportedVolume).annotate({ description: 'Its volumes.' }),

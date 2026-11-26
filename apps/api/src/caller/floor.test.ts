@@ -20,7 +20,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { app } from '../app.ts';
 import { floorEntryOf } from './floor.ts';
-import { approvalKey, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
+import { approvalKey, plantRecord, recordText, runKey, markerText } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -160,7 +160,7 @@ test('REFUSED 403 other-factory on the MCP port: a tool call reaches its endpoin
   const result = await client.callTool({ name: 'hold', arguments: { namespace: 'b', name: 'r-floor-port', why: 'by the port' } });
   assert.equal(result.isError, true);
   assert.equal((result.structuredContent as { reason?: string } | undefined)?.reason, 'other-factory');
-  assert.equal(fs.existsSync(path.join(root, 'runs', 'r-floor-port.hold')), false, 'nothing is held');
+  assert.equal(markerText(root, 'r-floor-port', 'hold') !== undefined, false, 'nothing is held');
   await client.close();
 });
 

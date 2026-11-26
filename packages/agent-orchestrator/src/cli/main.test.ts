@@ -8,7 +8,7 @@
  * record, both through the Factory door at the root the handler is given as it is typed (`StoreRoot`, `storeConfigLayer` of the
  * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
-import { recordText, runRecord, writeRun } from '../../testing.ts';
+import { recordText, runRecord, writeFactoryServers, writeRun } from '../../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -146,9 +146,7 @@ test('nemia auto, a renamed group, is read as nemia policy, answering what the n
 test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async () => {
   const { e } = board();
   const other = scratch('wf-main-other-');
-  const file = path.join(other, 'factories', 'default', 'servers.json');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify({ servers: { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } } })}\n`);
+  writeFactoryServers(other, 'default', { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } });
   const was = process.env.WF_ROOT;
   const read = async () => JSON.stringify(await handlerOf(['factory', 'servers', 'default'], e, undefined, stand().place));
   try {

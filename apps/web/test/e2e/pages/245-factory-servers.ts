@@ -6,7 +6,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storedServers, storeServers } from '../world.ts';
 
 /** The factory whose record the page reads and writes: `bare`, which no other page writes a record for. */
 const FACTORY = FACTORIES.bare;
@@ -43,12 +43,8 @@ const UNREAD = 'unread';
 /** The state the api answered for each server of the record, by name: the harness's own word, or `null` where the look failed. */
 type States = Map<string, string | null>;
 
-/** The record as it stands in the store, by server name, read as the package writes it (`{ servers }`). */
-const recorded = (file: string) =>
-  (fs.existsSync(file)
-    ? ((JSON.parse(fs.readFileSync(file, 'utf8')) as { servers?: Record<string, { url?: string; headers?: Record<string, string> }> })
-        .servers ?? {})
-    : {}) satisfies Record<string, { url?: string; headers?: Record<string, string> }>;
+/** The record as it stands in the store, by server name, read as the door reads it. */
+const recorded = () => storedServers(FACTORY);
 
 /** Whether `request` is a read of the factory's servers, which is what reads their states. */
 const isStatesRead = (request: Request) =>
@@ -162,12 +158,12 @@ async function checkAgain(page: Page, section: Locator) {
 }
 
 /** The form records a remote server, which the store's record holds and the list draws; Remove takes it off again. */
-async function recordAndRemove(page: Page, section: Locator, file: string) {
+async function recordAndRemove(page: Page, section: Locator) {
   await section.getByRole('textbox', { name: 'Name' }).fill(ADDED.name);
   await section.getByRole('textbox', { name: 'Address' }).fill(ADDED.url);
   await section.getByRole('textbox', { name: 'Headers' }).fill(ADDED.header);
   await wrote(page, section, 'Record', 'PUT');
-  const held = recorded(file)[ADDED.name];
+  const held = recorded()[ADDED.name];
   if (held?.url !== ADDED.url || held.headers?.['X-Team'] !== 'nemia')
     throw new Refused(`recorded, the server is the factory's record — it holds ${JSON.stringify(held)}`);
   await expectVisible(section.locator('[data-servers-done]', { hasText: 'Recorded' }), 'the page says what a run does with it now');
@@ -178,7 +174,7 @@ async function recordAndRemove(page: Page, section: Locator, file: string) {
   const [answer] = await Promise.all([answered(page, 'DELETE'), row.getByRole('button', { name: 'Remove', exact: true }).click()]);
   if (answer.status() !== 200) throw new Refused(`Remove writes — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
-  if (ADDED.name in recorded(file)) throw new Refused(`removed, the server is off the record — it holds ${JSON.stringify(recorded(file))}`);
+  if (ADDED.name in recorded()) throw new Refused(`removed, the server is off the record — it holds ${JSON.stringify(recorded())}`);
   await expectCount(section.locator(`[data-factory-server="${ADDED.name}"]`), 0, 'and it is no longer a row');
   await expectVisible(section.locator('[data-servers-done]', { hasText: 'Removed' }), 'the page says what a step naming it resolves now');
 }
@@ -187,13 +183,13 @@ async function recordAndRemove(page: Page, section: Locator, file: string) {
  * A recorded server loaded back into the form carries each header as the mask it was read with, and Record sends it back unchanged:
  * the store's record keeps the value it held, never the mask.
  */
-async function keepsTheMask(page: Page, section: Locator, file: string) {
+async function keepsTheMask(page: Page, section: Locator) {
   await section.locator('[data-server-recorded]').getByRole('button', { name: 'github', exact: true }).click();
   const header = await section.getByRole('textbox', { name: 'Headers' }).inputValue();
   if (header !== `X-MCP-Toolsets=${HEADER_MASK}`)
     throw new Refused(`the form holds the header as the mask — it holds ${JSON.stringify(header)}`);
   await wrote(page, section, 'Record', 'PUT');
-  const held = recorded(file).github?.headers?.['X-MCP-Toolsets'];
+  const held = recorded().github?.headers?.['X-MCP-Toolsets'];
   if (held !== RECORDED.github.headers['X-MCP-Toolsets'])
     throw new Refused(`the mask sent back keeps the value recorded — the record holds ${JSON.stringify(held)}`);
 }
@@ -352,9 +348,7 @@ export default {
   route: `/factories/${FACTORY}/settings`,
   expect: async (page) => {
     const folder = path.join(store!, 'factories', FACTORY);
-    const file = path.join(folder, 'servers.json');
-    fs.mkdirSync(folder, { recursive: true });
-    fs.writeFileSync(file, `${JSON.stringify({ servers: RECORDED }, null, 2)}\n`);
+    storeServers(FACTORY, RECORDED);
     const harnessWas = harnessFolder();
     try {
       const states = await statesRead(page, "the page's load", () => page.reload({ waitUntil: 'load' }));
@@ -372,10 +366,11 @@ export default {
       await checkAgain(page, section);
       await settled(page);
       await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`), { fullPage: true });
-      await recordAndRemove(page, section, file);
-      await keepsTheMask(page, section, file);
+      await recordAndRemove(page, section);
+      await keepsTheMask(page, section);
       await pastesBack(page);
     } finally {
+      storeServers(FACTORY, {});
       fs.rmSync(folder, { recursive: true, force: true });
       harnessWas();
     }

@@ -61,8 +61,9 @@ import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir, isDirectory } from '../record/record.store.ts';
 import { carriedFilesDir, startFoundAt, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
-import { doorAtOnce } from '../factory/door/factories.store.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
+import type { FactoryServers } from '../factory/servers/index.ts';
 import { addedServers } from '../library/library.verb.ts';
 import { cardsViewed } from '../cards/cards.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -91,6 +92,7 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
   return {
     step: told,
     own: { ...ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)), enabledSkills: enabledSkillsOf(told) },
+    servers: recordedServers(run.factory, home, yield* ownServersOf(run.factory)),
   } satisfies StepTold;
 });
 
@@ -171,6 +173,7 @@ export type PlaceTold = {
 export type StepTold = {
   readonly step: StepSpec;
   readonly own: { claude?: ClaudeFlags; codex?: CodexArgs; enabledSkills: string[] | 'default' };
+  readonly servers: ReturnType<typeof recordedServers>;
 };
 
 /** A step as a try files it (`toldOf`), with what its place says to it (`PlaceTold`). */
@@ -265,21 +268,23 @@ const handedRunsAt = (home: string, ids: readonly string[]) =>
   });
 
 /**
- * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records, read from the store `home`
- * the caller was given, its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a
+ * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records (`servers`, as `toldOf` read
+ * them), its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a
  * parameter and has no default: a caller that passes none does not compile, so no filing reads a store nobody named
  * (`test/root-given.test.ts`).
  * @param run The run, read down to what names its folders and its factory.
  * @param home The store's root folder.
  * @param workspace The step's workspace, absolute.
+ * @param servers The MCP servers the step is told (`StepTold.servers`).
  */
 export const filedAt = (
   run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles' | 'homeFiles' | 'mounts' | 'volumes'>,
   home: string,
   workspace: string,
+  servers: StepTold['servers'],
 ) => ({
   ...filedFoldersAt(home, run),
-  servers: recordedServers(run.factory, home),
+  servers,
   workspace,
   ...startFoundAt(home, run, workspace),
 });
@@ -304,17 +309,26 @@ export const sessionCwd = (step: StepSpec, run: Pick<Run, 'id' | 'homeFiles' | '
  * refuses it loudly to the person who asks.
  * @param factory The run's factory, or undefined for the default one.
  * @param home The store's root.
+ * @param own The factory's own servers record.
  */
-export const recordedServers = (factory: string | undefined, home: string) => {
+export const recordedServers = (factory: string | undefined, home: string, own: FactoryServers) => {
   try {
-    const name = factory ?? DEFAULT_NAMESPACE;
-    const own = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(name)));
-    const record = { ...addedServers(home, name), ...own };
+    const record = { ...addedServers(home, factory ?? DEFAULT_NAMESPACE), ...own };
     return Object.fromEntries(Object.entries(record).map(([server, at]) => [server, mcpServerOf(at)]));
   } catch {
     return {};
   }
 };
+
+/**
+ * The factory's own servers record (`FactoryDoor`'s `servers.read`): `{}` for a factory with none, and `{}` for a record that does not
+ * read, as `recordedServers` is said.
+ * @param factory The run's factory, or undefined for the default one.
+ */
+const ownServersOf = Effect.fnUntraced(function* (factory: string | undefined) {
+  const door = yield* FactoryDoor;
+  return yield* Effect.orElseSucceed(door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)), () => ({}));
+});
 
 /**
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):

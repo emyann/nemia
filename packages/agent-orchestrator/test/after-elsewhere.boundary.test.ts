@@ -6,7 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
-import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, recordText, runKey, runRecord, markCancelled } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import type { Env } from '../src/config/config.store.ts';
 import { factsOf, typed as onHandler } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';

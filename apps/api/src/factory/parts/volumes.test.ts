@@ -9,7 +9,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory } from 'agent-orchestrator/testing';
+import { addFactory, recordText } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../../app.ts';
@@ -18,7 +18,7 @@ const notes = path.join(scratch('nemia-api-volumes-'), 'notes');
 fs.mkdirSync(notes);
 addFactory({ name: 'mill', volumes: [`${notes}:ro`] });
 
-const RECORD = path.join(root, 'factories', 'mill.json');
+const RECORD = '/registry/factories/mill';
 const VOLUME = '/api/namespaces/mill/volumes/notes';
 
 type Volume = import('objects').Volume;
@@ -28,7 +28,7 @@ const send = (method: string, url: string, body: unknown) =>
   app.request(url, { method, headers: json, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** The volumes the factory's file holds. */
-const stored = () => (JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { volumes?: Array<Record<string, unknown>> }).volumes;
+const stored = () => (JSON.parse(recordText(root, RECORD) ?? '') as { volumes?: Array<Record<string, unknown>> }).volumes;
 
 /** What the request answered, its status asserted. */
 async function answered<T>(res: Response | Promise<Response>, status = 200) {
@@ -40,11 +40,11 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
 
 /** A request refused with `status`, the factory's file left as it was: its words. */
 async function refused(res: () => Response | Promise<Response>, status: number) {
-  const before = fs.readFileSync(RECORD, 'utf8');
+  const before = recordText(root, RECORD) ?? '';
   const answer = await res();
   const body = (await answer.json()) as { error: string };
   assert.equal(answer.status, status, body.error);
-  assert.equal(fs.readFileSync(RECORD, 'utf8'), before, 'a refused request leaves the factory as it was');
+  assert.equal(recordText(root, RECORD) ?? '', before, 'a refused request leaves the factory as it was');
   return body.error;
 }
 

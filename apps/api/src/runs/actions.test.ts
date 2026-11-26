@@ -16,7 +16,7 @@ import { app } from '../app.ts';
 import { COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
 import { forgottenOf } from '../objects/forgotten.ts';
 import { runWith } from '../../test/builtin-place.ts';
-import { approvalKey, askNames, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
+import { approvalKey, askNames, markerText, plantMarker, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -322,12 +322,11 @@ describe('what an action ignores of its body, and the removals the board will no
       ['r-lift-bare', 'not json'],
     ]) {
       gatedRun(id);
-      const held = path.join(root, 'runs', `${id}.hold`);
-      write(held, JSON.stringify({ at: at(0), until: ['r-other'] }));
+      plantMarker(root, id, 'hold', JSON.stringify({ at: at(0), until: ['r-other'] }));
       const res = await app.request(`/api/namespaces/default/runs/${id}/hold`, { method: 'DELETE', headers: BOARD, body });
       assert.equal(res.status, 200, `${id}: ${await res.clone().text()}`);
       assert.deepEqual(await res.json(), { id, lifted: true, hold: { at: at(0), until: ['r-other'] } });
-      assert.equal(fs.existsSync(held), false, id);
+      assert.equal(markerText(root, id, 'hold'), undefined, id);
     }
   });
   test('REFUSED: the retired paths `POST …/round`, `POST …/steps/:step/accept` and `POST …/merge` are served no more — 404, nothing written', async () => {

@@ -23,7 +23,7 @@ import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, prune, prunedKept, prunedWords } from 'agent-orchestrator';
-import { asksPrefix, keysUnder, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import { asksPrefix, keysUnder, markerText, plantRecord, recordText, runFolderNames, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -189,8 +189,7 @@ type PruneAnswer = {
  */
 const stateOf = (id: string) => ({
   runs: Object.fromEntries(
-    fs
-      .readdirSync(path.join(root, 'runs'))
+    runFolderNames(root)
       .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
       .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]),
   ),
@@ -253,7 +252,7 @@ describe('a finished run pruned on the board as `nemia prune` prunes it: what it
       assert.match(body.lines[0], /^p-merged {2}pruned: removed 1 worktree and its files, .* freed; its record and branches are kept$/);
       assert.equal(fs.existsSync(worktreeOf('p-merged')), false, 'its worktree is gone');
       assert.equal(fs.existsSync(filesDir('p-merged')), false, 'its files are gone');
-      assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.pruned')), 'it is marked pruned');
+      assert.ok(markerText(root, 'p-merged', 'pruned') !== undefined, 'it is marked pruned');
       assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
       assert.ok(recordText(root, runKey('p-merged')) !== undefined, 'its record is kept');
 
@@ -356,15 +355,15 @@ describe('POST /api/namespaces/:namespace/runs/:runId/prune refuses, touching no
     assert.equal(error, said.refusal);
     assert.match(error, /^a folder run: its steps' folders are its work/);
     assert.ok(fs.existsSync(path.join(work, 'write')));
-    assert.equal(fs.existsSync(path.join(root, 'runs', 'p-folder.pruned')), false);
+    assert.equal(markerText(root, 'p-folder', 'pruned') !== undefined, false);
   });
   test('REFUSED at shipped defaults: a prune of a run the store has not — none by that id, an id no run can have — is a 404, and nothing is written', async () => {
     for (const id of ['no-such-run', 'Not_A_Run']) {
-      const before = [...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort();
+      const before = [...runFolderNames(root), ...keysUnder(root, '/registry/')].sort();
       const res = await pruneOn(id, { artifacts: true });
       assert.equal(res.status, 404, id);
       assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
-      assert.deepEqual([...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort(), before, id);
+      assert.deepEqual([...runFolderNames(root), ...keysUnder(root, '/registry/')].sort(), before, id);
     }
   });
   test('REFUSED at shipped defaults: a body `RunPrune` does not read is a 400 naming the key, before the run is read, and nothing is touched', async () => {

@@ -4,7 +4,7 @@ import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectTexts, idle, settled } from '../checks.ts';
 import { HELD, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredRun, OUT, store, storeAsk, storedAsks } from '../world.ts';
+import { dropStoredMarker, dropStoredRun, OUT, plantStoredMarker, store, storeAsk, storedAsks } from '../world.ts';
 
 /** Who approved REGATED's plan, as the approval's file says it: the person, under the token named `laptop`. */
 const APPROVER = { kind: 'person', token: 'laptop' } as const;
@@ -13,7 +13,6 @@ const APPROVER = { kind: 'person', token: 'laptop' } as const;
 const HOLDER = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
 
 /** The hold the page writes on REGATED, until HELD lands. */
-const holdFile = () => path.join(store!, 'runs', `${REGATED.id}.hold`);
 
 export default {
   /**
@@ -30,10 +29,10 @@ export default {
       writeRegated(store!, Date.now());
       const approved = JSON.parse(storedAsks(REGATED.id)['approve-plan-1']) as Record<string, unknown>;
       storeAsk(REGATED.id, 'approve-plan-1', `${JSON.stringify({ ...approved, actor: APPROVER })}\n`);
-      fs.writeFileSync(
-        holdFile(),
+      plantStoredMarker(
+        REGATED.id,
+        'hold',
         JSON.stringify({ at: new Date().toISOString(), until: [HELD.id], by: 'operator', actor: HOLDER }, null, 2),
-        { flag: 'wx' },
       );
       fed(REGATED.id, 'held');
       await page.goto(new URL(`/runs/${REGATED.id}`, page.url()).href, { waitUntil: 'load' });
@@ -49,8 +48,8 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
     } finally {
-      fs.rmSync(holdFile(), { force: true });
-      fs.rmSync(holdFile().replace(/\.hold$/, '.unheld'), { force: true });
+      dropStoredMarker(REGATED.id, 'hold');
+      dropStoredMarker(REGATED.id, 'unheld');
       for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
       dropStoredRun(REGATED.id);
       fed(REGATED.id, 'gone');

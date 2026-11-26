@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
@@ -8,7 +7,7 @@ import { cardOf, wordsSaying, gateApprove } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredMarker, OUT, storedMarker } from '../world.ts';
 
 /** The why the page gives the hold. */
 const WHY = 'folded into an intake not started';
@@ -24,14 +23,13 @@ export default {
   route: `/runs/${GATED.id}`,
   expect: async (page) => {
     const { id, gated } = GATED;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
     const word = `held until a person lifts it (why: ${WHY}; by ${os.userInfo().username})`;
     const theme = await themeOf(page);
     const section = page.locator('section[aria-label="Held"]');
     const approve = partOf(page, gated).getByRole('button', { name: 'Approve', exact: true });
     await expectCount(section, 0, `before the hold, ${id}'s page says no hold`);
     await expectVisible(approve, `before the hold, ${gated}'s Approve is offered`);
-    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
+    if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page puts one — the hold record is there`);
 
     try {
       const dialog = await askRunAction(page, 'Hold…', `Hold ${id}`);
@@ -48,7 +46,7 @@ export default {
       if (answered.status() !== 200)
         throw new Refused(`the api puts the hold — it answered ${answered.status()}: ${await answered.text()}`);
       await expectCount(dialog, 0, 'the popover closes once the hold is put');
-      const written = JSON.parse(fs.readFileSync(hold, 'utf8')) as { until?: string[]; why?: string };
+      const written = JSON.parse(storedMarker(id, 'hold') ?? '') as { until?: string[]; why?: string };
       if (JSON.stringify([written.until, written.why]) !== JSON.stringify([[], WHY]))
         throw new Refused(`the hold's file names no run and says the why — it says ${JSON.stringify(written)}`);
 
@@ -74,19 +72,19 @@ export default {
       const lift = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
       await lift.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
-      if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`the lift removed the hold record — it is still there`);
       await expectVisible(approve, `and ${gated}'s Approve is offered again`);
     } finally {
-      await takeBack(page, hold, id, gated);
+      await takeBack(page, id, gated);
     }
   },
 } satisfies PageSpec;
 
 /** Whatever hold the page left, taken back as `nemia hold --off` does and said on the feed: every page after reads the store as seeded. */
-async function takeBack(page: Page, hold: string, id: string, gated: string) {
-  const left = fs.existsSync(hold);
-  fs.rmSync(hold, { force: true });
-  fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+async function takeBack(page: Page, id: string, gated: string) {
+  const left = storedMarker(id, 'hold') !== null;
+  dropStoredMarker(id, 'hold');
+  dropStoredMarker(id, 'unheld');
   fed(id, gated, 'awaiting approval');
   if (left) await idle(page);
 }

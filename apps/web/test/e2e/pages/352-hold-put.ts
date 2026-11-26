@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
@@ -7,7 +6,7 @@ import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, storedMarker, unreadName } from '../world.ts';
 
 /** The why the page gives the hold. */
 const WHY = 'its parser conflicts with the flag';
@@ -26,12 +25,11 @@ export default {
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
     const word = `held until ${unreadName(until)} lands (why: ${WHY}; by ${os.userInfo().username})`;
     const theme = await themeOf(page);
     const section = page.locator('section[aria-label="Held"]');
     await expectCount(section, 0, `before the hold, ${id}'s page says no hold`);
-    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
+    if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page puts one — the hold record is there`);
 
     try {
       const dialog = await askRunAction(page, 'Hold…', `Hold ${id}`);
@@ -41,7 +39,7 @@ export default {
       await dialog.locator(`label[data-hold-run="${until}"]`).click();
       await expectVisible(dialog.getByRole('checkbox', { name: new RegExp(literal(until)), checked: true }), `${until} is ticked`);
       await dialog.getByRole('textbox', { name: 'Why (optional)' }).fill(WHY);
-      if (fs.existsSync(hold)) throw new Refused('filling the form writes nothing');
+      if (storedMarker(id, 'hold') !== null) throw new Refused('filling the form writes nothing');
       await settled(page);
       await photograph(page, path.join(OUT, `hold-put-form-${theme}.png`), { fullPage: true });
 
@@ -56,7 +54,7 @@ export default {
       await expectCount(dialog, 0, 'the popover closes once the hold is put');
       await snackbarSaying(page, id, "and the frame's snackbar names the run held");
       await photograph(page, path.join(OUT, `hold-put-said-${theme}.png`));
-      const written = JSON.parse(fs.readFileSync(hold, 'utf8')) as { until?: string[]; why?: string; by?: string };
+      const written = JSON.parse(storedMarker(id, 'hold') ?? '') as { until?: string[]; why?: string; by?: string };
       if (JSON.stringify([written.until, written.why, written.by]) !== JSON.stringify([[until], WHY, os.userInfo().username]))
         throw new Refused(`the hold's file says the runs ticked, the why and the api's user — it says ${JSON.stringify(written)}`);
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the page says ${word}`);
@@ -82,23 +80,23 @@ export default {
       const lift = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
       await lift.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
-      if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`the lift removed the hold record — it is still there`);
       await expectVisible(
         (await openRunMenu(page)).getByRole('menuitem', { name: 'Hold…', exact: true }),
         "and the run's menu offers Hold… again",
       );
       await page.keyboard.press('Escape');
     } finally {
-      await takeBack(page, hold, id, gated);
+      await takeBack(page, id, gated);
     }
   },
 } satisfies PageSpec;
 
 /** Whatever hold the page left, taken back as `nemia hold --off` does and said on the feed: every page after reads the store as seeded. */
-async function takeBack(page: Page, hold: string, id: string, gated: string) {
-  const left = fs.existsSync(hold);
-  fs.rmSync(hold, { force: true });
-  fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+async function takeBack(page: Page, id: string, gated: string) {
+  const left = storedMarker(id, 'hold') !== null;
+  dropStoredMarker(id, 'hold');
+  dropStoredMarker(id, 'unheld');
   fed(id, gated, 'awaiting approval');
   if (left) await idle(page);
 }

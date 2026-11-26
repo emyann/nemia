@@ -19,14 +19,23 @@ import { actorWords, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { approveRun, list, retryRun } from 'agent-orchestrator';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { approvalKey, askNames, plantRecord, recordText, retryAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import {
+  approvalKey,
+  askNames,
+  plantRecord,
+  recordText,
+  retryAskKey,
+  runKey,
+  runsNow,
+  testPlace,
+  plantMarker,
+} from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 
@@ -38,11 +47,6 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
@@ -99,7 +103,7 @@ const CANCELLED = 'r-gate-cancelled';
 beforeEachTest(() => {
   record = gatedRun(R);
   gatedRun(CANCELLED);
-  write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+  plantMarker(root, CANCELLED, 'cancelled', at(20));
 });
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */

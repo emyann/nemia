@@ -22,7 +22,7 @@ import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
 import { tickRun, readFeed } from '../src/runner.ts';
-import { readFactoryAt } from '../src/factory/factory.store.ts';
+import { readFactoryAt } from '../testing.ts';
 import { readResolutions, treeDir } from '../src/factory/applied/applied.store.ts';
 import { approveProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';

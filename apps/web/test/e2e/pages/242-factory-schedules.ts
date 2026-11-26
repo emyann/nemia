@@ -6,7 +6,7 @@ import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { fireWord } from '../../../src/lib/schedules.ts';
-import { OUT, photographing, store } from '../world.ts';
+import { OUT, photographing, store, storeFactory, storedFactory } from '../world.ts';
 
 /** The factory the page schedules a workflow in, and the workflow attached to it that it schedules. */
 const FACTORY = FACTORIES.hiring.name;
@@ -141,12 +141,12 @@ async function expectRefused(page: Page, why: string) {
  * Detach WORKFLOW from FACTORY by hand, keeping its schedule, and keep the tick's refusal of the cron's latest fire, in the words the
  * package refuses such a start with. Returns those words.
  */
-function refuseLatest(factoryFile: string, factory: Record<string, unknown>, schedule: object, tries: string) {
+function refuseLatest(factoryName: string, factory: Record<string, unknown>, schedule: object, tries: string) {
   const workflows = (factory.workflows as string[]).filter((w) => w !== WORKFLOW).sort();
   const offers = workflows.length ? `it offers: ${workflows.join(', ')}` : 'it offers none yet';
   const attach = `nemia factory attach ${FACTORY} ${WORKFLOW}`;
   const why = `${WORKFLOW}: the factory ${FACTORY} does not offer this workflow — ${offers}. Attach it: ${attach}. Nothing was started.`;
-  fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, workflows, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
+  storeFactory(factoryName, `${JSON.stringify({ ...factory, workflows, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
   const kept = { due: latestFire(Date.now()), at: new Date().toISOString(), why, refused: true };
   fs.writeFileSync(path.join(tries, FACTORY, `${WORKFLOW}.json`), `${JSON.stringify(kept, null, 2)}\n`);
   return why;
@@ -164,15 +164,15 @@ export default {
   name: 'factory-schedules',
   route: '/',
   expect: async (page) => {
-    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
+    const factoryName = FACTORY;
     const tries = path.join(store!, 'schedules');
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryText = storedFactory(factoryName);
     if (fs.existsSync(tries)) throw new Refused(`the seed keeps no schedule's try — ${tries} is there`);
     const since = new Date().toISOString();
     const factory = JSON.parse(factoryText) as Record<string, unknown>;
     const schedule = { cron: CRON, brief: BRIEF, tz: 'UTC', since };
     try {
-      fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
+      storeFactory(factoryName, `${JSON.stringify({ ...factory, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
       fs.mkdirSync(path.join(tries, FACTORY), { recursive: true });
       const kept = { due: '2026-01-01T09:00:00.000Z', at: '2026-01-01T09:00:03.000Z', run: FOLDER.id };
       fs.writeFileSync(path.join(tries, FACTORY, `${WORKFLOW}.json`), `${JSON.stringify(kept, null, 2)}\n`);
@@ -180,9 +180,9 @@ export default {
       await sidebar(page);
       await expectScheduled(page);
       await expectNone(page);
-      await expectRefused(page, refuseLatest(factoryFile, factory, schedule, tries));
+      await expectRefused(page, refuseLatest(factoryName, factory, schedule, tries));
     } finally {
-      fs.writeFileSync(factoryFile, factoryText);
+      storeFactory(factoryName, factoryText);
       fs.rmSync(tries, { recursive: true, force: true });
     }
   },

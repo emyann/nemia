@@ -6,7 +6,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import { root } from '../../test/harness.ts';
-import { plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
+import { plantRecord, recordText, runKey, plantMarker } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -106,7 +106,7 @@ function finished(id: string, repo: string, costUsd: number, factory?: string, s
 
 finished('r-home', '/repos/home', 1);
 finished('r-away', '/repos/away', 2, 'other', ['look', 'look']);
-write(path.join(root, 'runs', 'r-home.labels'), JSON.stringify({ team: 'core' }));
+plantMarker(root, 'r-home', 'labels', JSON.stringify({ team: 'core' }));
 
 /** A run of the review workflow on `/repos/home`, created at `createdAt`, its skill rendered as `text`: nothing of it ran. */
 function reviewed(id: string, createdAt: string, text: string) {

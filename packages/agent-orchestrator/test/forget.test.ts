@@ -15,7 +15,23 @@
  * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
 
  */
-import { askNames, askText, dropRecord, listRuns, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import {
+  askNames,
+  askText,
+  dropRecord,
+  listRuns,
+  plantAsk,
+  plantRecord,
+  forgettingKey,
+  markerText,
+  recordText,
+  runKey,
+  runMarkKey,
+  runRecord,
+  runsNow,
+  markCancelled,
+  plantMarker,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -32,7 +48,7 @@ import { names } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { advanceRun, cancelRun, forgetRun, prune, retryRun, runsForgetting, startRun, runWith } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
-import { markCancelled } from '../src/record/record.store.ts';
+
 import { runTasks } from '../src/record/record.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
@@ -144,7 +160,10 @@ const pass = (id: string) => stage.runWith(e(), advanceRun(runRecord(ROOT, id)))
 const tick = () => stage.runWith(e(), tickRun({ repo: ROOT }));
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 const hasBranch = (repo: string, branch: string) => world().tip(repo, branch) !== null;
-const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
+const markerOf = (id: string) => forgettingKey(id);
+
+/** Whether the `nemia rm` marker at `key` stands. */
+const stands = (key: string) => recordText(ROOT, key) !== undefined;
 /** The ids of the tasks the engine has a record of. */
 const listed = async () => (await Effect.runPromise(e().list())).views.map((v) => v.id);
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
@@ -280,9 +299,9 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         'the engine lists none of them',
       );
       assert.ok(left.includes(kept), "another run's task is the engine's still");
-      assert.ok(!fs.existsSync(markerOf(id)), 'no marker is left');
+      assert.ok(!stands(markerOf(id)), 'no marker is left');
       assert.ok(
-        recordText(ROOT, runKey(id)) === undefined && !under('runs', id) && !under('runs', `${id}.pruned`),
+        recordText(ROOT, runKey(id)) === undefined && !under('runs', id) && markerText(ROOT, id, 'pruned') === undefined,
         'its record, files and mark are gone',
       );
       assert.ok(hasBranch(repo, branch), 'its branch is kept');
@@ -389,7 +408,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     assert.equal(runRecord(ROOT, run.id).steps.implement.workspace?.startsWith(path.join(ROOT, 'runs', run.id)), true, 'a folder run');
     const forgot = await stage.runWith(e(), forgetRun(run.id));
     assert.deepEqual([forgot.kind, forgot.folder, forgot.engine?.forgotten], ['forgotten', true, [`${run.id}-implement`]]);
-    assert.ok(!(await listed()).includes(`${run.id}-implement`) && !fs.existsSync(markerOf(run.id)));
+    assert.ok(!(await listed()).includes(`${run.id}-implement`) && !stands(markerOf(run.id)));
   });
   s.test(
     'a run whose tasks the engine no longer knows is forgotten; so is a record that froze no workflow and whose folder is gone; a run with no record is no such run, and what was left under its id removed',
@@ -425,12 +444,12 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.ok(said.forgot[0].files.includes(runKey(legacy.id)), said.forgot[0].files.join(', '));
       names(said.forgot[0].unfrozen, legacyDir);
 
-      fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
+      plantMarker(ROOT, 'gone-run-3c4d', 'cancelled', '2026-09-16T00:00:00.000Z');
       const leftover = await typed('rm', 'gone-run-3c4d');
       assert.equal(leftover.error?.exitCode, 2);
       assert.equal(leftover.printed.length, 1);
-      names(leftover.printed[0], 'gone-run-3c4d  no such run', 'runs/gone-run-3c4d.cancelled');
-      assert.ok(!under('runs', 'gone-run-3c4d.cancelled'));
+      names(leftover.printed[0], 'gone-run-3c4d  no such run', runMarkKey('gone-run-3c4d', 'cancelled'));
+      assert.equal(markerText(ROOT, 'gone-run-3c4d', 'cancelled'), undefined);
     },
   );
   s.test("a run with no record takes no live run's check logs, nor those of a run whose record does not read", async (tt) => {
@@ -505,7 +524,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       const forgot = await stage.runWith(e(), forgetRun(ids.running));
       assert.deepEqual([forgot.kind, forgot.engine], ['refused', undefined]);
       assert.equal(board().forgets.length, before, 'no forget asked');
-      assert.ok(!fs.existsSync(markerOf(ids.running)), 'and no marker written');
+      assert.ok(!stands(markerOf(ids.running)), 'and no marker written');
       assert.ok((await listed()).includes(`${ids.running}-implement`));
     },
   );
@@ -525,7 +544,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
           `${id}: a cancelled run files nothing, a child called off strands nothing`,
         );
       assert.ok(
-        askNames(ROOT, ids.asked).length === 0 && !under('runs', `${ids.asked}.cancelled`),
+        askNames(ROOT, ids.asked).length === 0 && markerText(ROOT, ids.asked, 'cancelled') === undefined,
         'its ask and its cancellation go with it',
       );
     },
@@ -574,7 +593,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       assert.ok(fs.existsSync(path.join(p.wt, 'uncommitted.txt')) && worktreesOf(at).includes(p.wt), 'the worktree and its work stay');
       assert.ok(hasBranch(at, p.branch), 'the branch stays');
       assert.ok(
-        recordText(ROOT, runKey(p.run.id)) !== undefined && under('runs', `${p.run.id}.cancelled`),
+        recordText(ROOT, runKey(p.run.id)) !== undefined && markerText(ROOT, p.run.id, 'cancelled') !== undefined,
         'the record and its cancellation stay',
       );
       assert.ok(!under('forgetting', `${p.run.id}.json`), 'no task written down to forget');
@@ -596,7 +615,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
         JSON.stringify(forgot.left),
       );
       assert.deepEqual([forgot.engine, board().forgets.length], [undefined, before], 'no forget asked');
-      assert.ok(!fs.existsSync(markerOf(p.run.id)), 'its marker lifted');
+      assert.ok(!stands(markerOf(p.run.id)), 'its marker lifted');
       assert.ok(
         recordText(ROOT, runKey(p.run.id)) !== undefined && (await listed()).includes(`${p.run.id}-implement`),
         'its record and its task kept',
@@ -625,7 +644,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       }
       assert.ok(
         recordText(ROOT, runKey(id)) !== undefined &&
-          under('runs', `${id}.cancelled`) &&
+          markerText(ROOT, id, 'cancelled') !== undefined &&
           askText(ROOT, id, 'retry-implement-2') !== undefined,
       );
       assert.ok(runRecord(ROOT, id).cancelledAt);
@@ -743,14 +762,14 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       const said = await typed('rm', run.id);
       assert.equal(said.error?.exitCode, 2);
       names(said.printed[0], `${run.id}  no such run`, `${task} has not settled yet`);
-      assert.ok(fs.existsSync(markerOf(run.id)), 'it is still not settled: the marker stands');
+      assert.ok(stands(markerOf(run.id)), 'it is still not settled: the marker stands');
 
       board().settle(task, 'succeeded', BLOCKED);
       const done = await tick();
       assert.equal(done.forgetting?.length, 1, JSON.stringify(done.forgetting));
       names(done.forgetting?.[0]?.text, `${run.id} (removed)`, 'the engine forgot 1 task');
       assert.equal(done.forgetting?.[0]?.warn, undefined);
-      assert.ok(!(await listed()).includes(task) && !fs.existsSync(markerOf(run.id)), 'forgotten on the engine, and the marker lifted');
+      assert.ok(!(await listed()).includes(task) && !stands(markerOf(run.id)), 'forgotten on the engine, and the marker lifted');
       assert.equal((await tick()).forgetting, undefined, 'a pass with no marker says nothing of it');
     },
   );
@@ -763,7 +782,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
     board().settle(task, 'succeeded', BLOCKED);
     const again = await stage.runWith(e(), forgetRun(run.id));
     assert.deepEqual([again.kind, again.engine?.forgotten, again.engine?.waiting], ['missing', [task], []]);
-    assert.ok(!(await listed()).includes(task) && !fs.existsSync(markerOf(run.id)));
+    assert.ok(!(await listed()).includes(task) && !stands(markerOf(run.id)));
   });
   s.test(
     "a marker beside the run's record is a `nemia rm` not finished: a pass forgets nothing of it; one that does not read is said each pass, with how a person removes it",
@@ -776,12 +795,13 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       assert.ok((await listed()).includes(`${p.run.id}-implement`));
       files.forgetting.lift(p.run.id);
 
-      fs.writeFileSync(markerOf('garbled-a1b2'), '{ not json');
+      const garbled = path.join(ROOT, 'forgetting', 'garbled-a1b2.json');
+      fs.mkdirSync(path.dirname(garbled), { recursive: true });
+      fs.writeFileSync(garbled, '{ not json');
       const done = await tick();
-      assert.equal(done.forgetting?.length, 1);
-      assert.equal(done.forgetting?.[0]?.warn, true);
-      names(done.forgetting?.[0]?.text, markerOf('garbled-a1b2'), 'garbled-a1b2', `rm ${markerOf('garbled-a1b2')}`);
-      fs.rmSync(markerOf('garbled-a1b2'));
+      assert.equal(done.forgetting, undefined, 'a file that is no marker is no marker: nothing is forgotten from it');
+      assert.ok(fs.existsSync(garbled), 'and it stays where it is, for a person to move aside');
+      fs.rmSync(garbled);
       await stage.runWith(e(), forgetRun(p.run.id));
     },
   );
@@ -806,13 +826,13 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
         const done = await tick();
         assert.equal(board().forgets.length, before + 1, 'a pass asks again');
         assert.deepEqual([done.forgetting?.length, done.forgetting?.[0].warn], [1, true]);
-        names(done.forgetting?.[0]?.text, `${p.run.id} (removed)`, 'forget: the store is read-only.', `rm ${marker}`);
-        assert.ok(fs.existsSync(marker), 'the marker stands');
+        names(done.forgetting?.[0]?.text, `${p.run.id} (removed)`, 'forget: the store is read-only.', `${marker} keeps their ids`);
+        assert.ok(stands(marker), 'the marker stands');
       } finally {
         delete refusing.whole;
       }
       await tick();
-      assert.ok(!fs.existsSync(marker) && !(await listed()).includes(task), 'once the engine forgets, a pass lifts it');
+      assert.ok(!stands(marker) && !(await listed()).includes(task), 'once the engine forgets, a pass lifts it');
     },
   );
   s.test(
@@ -857,15 +877,15 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
         assert.deepEqual(files.forgetting.read(run.id), tasks, 'the marker keeps their ids');
         const done = await tick();
         assert.deepEqual([done.forgetting?.length, done.forgetting?.[0].warn], [1, true], JSON.stringify(done.forgetting));
-        names(done.forgetting?.[0]?.text, `${run.id} (removed)`, message, `rm ${marker}`);
-        assert.ok(fs.existsSync(marker), 'the marker stands');
+        names(done.forgetting?.[0]?.text, `${run.id} (removed)`, message, `${marker} keeps their ids`);
+        assert.ok(stands(marker), 'the marker stands');
       } finally {
         delete refusing.task;
       }
       const cleared = await tick();
       names(cleared.forgetting?.[0]?.text, `${run.id} (removed)`, 'the engine forgot 1 task');
       assert.equal(cleared.forgetting![0].warn, undefined);
-      assert.ok(!(await listed()).includes(refused) && !fs.existsSync(marker), 'once the refusal clears, a pass lifts it');
+      assert.ok(!(await listed()).includes(refused) && !stands(marker), 'once the refusal clears, a pass lifts it');
     },
   );
   s.test(

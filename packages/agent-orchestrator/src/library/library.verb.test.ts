@@ -2,6 +2,7 @@
  * The store's library as a factory reads it, on the tests' team planted as the store's library: an unrecorded factory's adds derived from
  * what its steps run, the first add writing the record whole, a missing add and its state, and who uses an item.
  */
+import { factoriesNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,7 +25,7 @@ describe("a factory's adds: derived while unrecorded, written whole by its first
     home = store();
   });
   test('unrecorded, the default factory has every library agent its steps run and the skills they give', () => {
-    const { recorded, adds } = factoryAdds(home, 'default');
+    const { recorded, adds } = factoriesNow(home, factoryAdds(home, 'default'));
     assert.equal(recorded, false);
     for (const name of ['implementer', 'reviewer', 'shipper'])
       assert.ok(
@@ -35,12 +36,14 @@ describe("a factory's adds: derived while unrecorded, written whole by its first
     assert.equal(fs.existsSync(libraryAddsFile(home, 'default')), false, 'a read writes nothing');
   });
   test('REFUSED: an add of a name the library does not hold, and nothing is written', () => {
-    assert.throws(() => writeLibraryAdd(home, 'default', 'add', { kind: 'Agent', name: 'nobody' }), { _tag: 'Missing' });
+    assert.throws(() => factoriesNow(home, writeLibraryAdd(home, 'default', 'add', { kind: 'Agent', name: 'nobody' })), {
+      _tag: 'Missing',
+    });
     assert.equal(readLibraryAdds(home, 'default'), undefined);
   });
   test('the first add writes what was derived and the new one', () => {
-    const derived = factoryAdds(home, 'default').adds;
-    const added = writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' });
+    const derived = factoriesNow(home, factoryAdds(home, 'default')).adds;
+    const added = factoriesNow(home, writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' }));
     assert.equal(added.status.state, 'resolved');
     assert.equal(added.status.origin, 'builtin');
     assert.deepEqual(readLibraryAdds(home, 'default'), [...derived, { kind: 'Skill', name: 'create-an-agent' }]);
@@ -48,17 +51,17 @@ describe("a factory's adds: derived while unrecorded, written whole by its first
   test('an add the library no longer holds is missing, and can still be taken off', () => {
     fs.rmSync(path.join(home, 'workflows', 'agents', 'shipper.md'));
     const shipper = { kind: 'Agent', name: 'shipper' } as const;
-    assert.equal(libraryAddObject(home, 'default', shipper, true).status.state, 'missing');
-    writeLibraryAdd(home, 'default', 'remove', shipper);
-    assert.throws(() => writeLibraryAdd(home, 'default', 'remove', shipper), { _tag: 'Missing' });
+    assert.equal(factoriesNow(home, libraryAddObject(home, 'default', shipper, true)).status.state, 'missing');
+    factoriesNow(home, writeLibraryAdd(home, 'default', 'remove', shipper));
+    assert.throws(() => factoriesNow(home, writeLibraryAdd(home, 'default', 'remove', shipper)), { _tag: 'Missing' });
   });
 });
 
 test('who uses a library item: each factory whose adds hold it, recorded or derived', () => {
   const home = store();
-  assert.deepEqual(libraryUsers(home, { kind: 'Agent', name: 'implementer' }), ['default']);
+  assert.deepEqual(factoriesNow(home, libraryUsers(home, { kind: 'Agent', name: 'implementer' })), ['default']);
   writeLibraryAdds(home, 'default', []);
-  assert.deepEqual(libraryUsers(home, { kind: 'Agent', name: 'implementer' }), [], 'a record without it');
+  assert.deepEqual(factoriesNow(home, libraryUsers(home, { kind: 'Agent', name: 'implementer' })), [], 'a record without it');
 });
 
 test("library.json reads as undefined where absent, keeps a newer tick's keys, refuses a broken file naming it, and a broken one gates every name", () => {
@@ -102,10 +105,10 @@ test("an unrecorded factory's adds hold a library skill a step names on its own 
   fs.writeFileSync(path.join(home, 'workflows', 'notes', 'write.md'), '---\nplace: git\nskills: tidy\n---\nWrite the notes.\n');
   const tidy = { kind: 'Skill', name: 'tidy' } as const;
   assert.ok(
-    factoryAdds(home, 'default').adds.some((a) => a.kind === tidy.kind && a.name === tidy.name),
+    factoriesNow(home, factoryAdds(home, 'default')).adds.some((a) => a.kind === tidy.kind && a.name === tidy.name),
     'derived from the step',
   );
-  writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' });
+  factoriesNow(home, writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' }));
   assert.ok(
     readLibraryAdds(home, 'default')?.some((a) => a.kind === tidy.kind && a.name === tidy.name),
     'kept by the first add',

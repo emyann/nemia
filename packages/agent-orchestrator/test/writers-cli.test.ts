@@ -37,7 +37,7 @@ import {
 import { agentDraftOf, skillDraftOf } from '../src/workflow.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { keysUnder, recordText, runKey } from '../testing.ts';
+import { factoriesNow, plantFactory, keysUnder, recordText, runFolderNames, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-writers-cli-');
 process.env.NEMIA_DAEMON_START = 'off';
@@ -295,11 +295,11 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       fs.writeFileSync(path.join(tree, 'workflows', 'agents', 'scribe.md'), SCRIBE.replace('output: scribe.schema.json\n', ''));
       fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['hired'], hires: { 'hired/only': 'scribe' } }));
       const template = { source: path.join(DRAFTS, 'shop.tgz'), version: '1.0.0', params: {} };
-      fs.writeFileSync(path.join(factories, 'shop.json'), JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template }));
+      plantFactory(ROOT, 'shop', JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template }));
       const folder = path.join(DRAFTS, 'workflows', 'hired');
       fs.mkdirSync(folder, { recursive: true });
       fs.writeFileSync(path.join(folder, 'only.md'), '---\nplace: git\nskills: [tidy]\n---\n');
-      const { places, fills } = factoryDraftOf(ROOT, 'shop', 'hired');
+      const { places, fills } = factoriesNow(ROOT, factoryDraftOf(ROOT, 'shop', 'hired'));
       const draft = await handled(Effect.provideService(draftSteps(folder, places, fills), StoreRoot, ROOT));
       await handled(WORKFLOWS_WRITE.handler({ from: 'factory', name: 'hired', factory: 'shop', draft }));
       const written = fs.readFileSync(path.join(tree, 'workflows', 'hired', 'only.md'), 'utf8');
@@ -318,7 +318,7 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       assert.equal(run.brief, 'Taste the soup.');
       assert.equal(run.workflowDir, path.join(ROOT, 'tries', 'taster'));
       assert.equal(run.workflow[0].agent.name, 'taster');
-      const runs = () => [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
+      const runs = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
       const before = runs();
       await refusedAs(sub, 'Conflict', ['agents', 'try', 'user', 'taster', '--brief', 'Once more.'], `still running (${id})`);
       await refusedAs(

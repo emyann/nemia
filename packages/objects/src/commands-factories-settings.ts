@@ -1,5 +1,6 @@
 /**
- * The words of what a factory's own file keeps for its runs, beside its wiring: a folder mounted for them (`nemia factory volume add|rm`),
+ * The words of what a factory's own record keeps for its runs, beside its wiring: a folder mounted for them (`nemia factory volume
+ * add|rm`),
  * a harness setting given their sessions (`nemia factory setting set|rm`) and a workflow's cost line (`nemia factory cost-line set|rm`),
  * each with its long help and the forms `nemia factory --help` lists. Pure.
  */
@@ -45,7 +46,7 @@ and lands there. Where it has several, the wiring (nemia factory attach <factory
 is trusted for its steps as it is added, unless --no-trust. A read-only volume is mounted for every
 local step of every run, and may be any folder.
 
-Kept in the factory's own file (factories/<name>.json, "volumes"), never in a template, and kept by
+Kept in the factory's own record (/registry/factories/<name>, "volumes"), never in a template, and kept by
 nemia factory adopt and upgrade. Copied onto a run at its start, so a run in flight keeps what it began
 with. A second add of one path replaces it; nemia factory lists them under the factory.
 
@@ -192,7 +193,7 @@ Each changes what a session writes or says, and none what it may reach or run. E
 refused, those that widen a fence (permissions, hooks, MCP servers, the sandbox, env) or run a
 program among them: each keeps its own field or fence, which the refusal names.
 
-Kept in the factory's own file (factories/<name>.json, "harnessSettings"), never in a template, and
+Kept in the factory's own record (/registry/factories/<name>, "harnessSettings"), never in a template, and
 kept by nemia factory adopt and upgrade. Frozen on a run at its start, so a run in flight keeps what
 it began with; a key written into the file by hand that a factory may not set refuses the start.
 nemia factory lists them under the factory.
@@ -261,7 +262,7 @@ is read against the line; past it, the gate says so beside the caps, on the boar
 and no rule of auto approves that gate unasked. It cuts nothing: a step's cap still ends its session,
 and a rule's under keeps its own amount of what the run has spent.
 
-Kept in the factory's own file (factories/<name>.json, "costLines"), never in a template, and kept by
+Kept in the factory's own record (/registry/factories/<name>, "costLines"), never in a template, and kept by
 nemia factory adopt and upgrade. Frozen on a run at its start, so a run in flight keeps the line it
 began with: a line set or taken back reaches the runs started after it. nemia factory lists them
 under the factory. A workflow with a line is not detached until the line is taken back.

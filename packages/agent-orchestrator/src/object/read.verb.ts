@@ -10,7 +10,7 @@ import { phaseOfView } from '../views/views-words.ts';
 import { type Engine, EngineService } from '../runtime-client.ts';
 import { realReleasesDir } from '../release/release.store.ts';
 import type { RaiseReads } from '../retry/index.ts';
-import { bare, type Views, workflowsOf } from '../summary/reads.verb.ts';
+import { bare, type FolderRead, type Views, workflowsOf } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
 import { type JudgedOrWhy, type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
 import { informedJudgements, Informer, informerRead } from '../rest/informer.verb.ts';
@@ -44,7 +44,7 @@ export type StepsReading = Judgement & {
   readonly e: Engine;
   readonly home: string;
   /** The workflow folder as it loads now, or why it does not (`workflowsOf`). */
-  readonly folder: ReturnType<typeof workflowsOf>;
+  readonly folder: FolderRead;
   /** The steps a page shows the workflow of: the frozen workflow, else the folder (`shownWorkflow`). */
   readonly source: readonly StepSpec[] | null;
   readonly checks: ReadonlyMap<string, readonly StepCheck[]>;
@@ -77,7 +77,7 @@ const shownWorkflow = (run: Run, folder: readonly StepSpec[] | null) => run.work
 export const stepsReading = Effect.fnUntraced(function* (run: Run) {
   const e = yield* EngineService;
   const home = yield* StoreRoot;
-  const folder = workflowsOf(run, home);
+  const folder = yield* workflowsOf(run, home);
   const { one, git } = yield* judgedOn(e, home, run);
   return yield* stepsReadingOf(e, home, run, one, folder, git);
 });
@@ -91,7 +91,7 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
   home: string,
   run: Run,
   one: JudgedOrWhy,
-  folder: ReturnType<typeof workflowsOf>,
+  folder: FolderRead,
   git: BranchReader,
 ) {
   if ('unjudged' in one) return { unjudged: one.unjudged, saidBy: one.saidBy, steps: one.steps };

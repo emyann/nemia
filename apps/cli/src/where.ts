@@ -21,7 +21,7 @@ const CREDENTIAL_FILE = 'credential';
  * The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it.
  * @param env The environment read for `WF_ROOT`.
  */
-export const storeRoot = (env: NodeJS.ProcessEnv = process.env) =>
+const storeRoot = (env: NodeJS.ProcessEnv = process.env) =>
   env.WF_ROOT !== undefined && env.WF_ROOT !== '' ? env.WF_ROOT : path.join(os.homedir(), '.agent-workflows');
 
 /**

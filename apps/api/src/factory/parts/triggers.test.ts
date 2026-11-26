@@ -10,7 +10,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, recordText } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../../app.ts';
@@ -35,7 +35,7 @@ for (const [workflow, script] of [
 addFactory({ name: 'mill', volumes: [folder].map((r) => `${r}:rw`) });
 for (const workflow of ['sort', 'tidy', 'make']) attachWorkflow({ factory: 'mill', workflow });
 
-const RECORD = path.join(root, 'factories', 'mill.json');
+const RECORD = '/registry/factories/mill';
 const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body?: unknown) =>
   app.request(url, { method, headers: json, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -53,10 +53,10 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
 
 /** A request refused with `status`, the factory's file left as it was. */
 async function refusedWith(res: () => Response | Promise<Response>, status: number) {
-  const before = fs.readFileSync(RECORD, 'utf8');
+  const before = recordText(root, RECORD) ?? '';
   const answer = await res();
   assert.equal(answer.status, status, JSON.stringify(await answer.json()));
-  assert.equal(fs.readFileSync(RECORD, 'utf8'), before, 'a refused request leaves the factory as it was');
+  assert.equal(recordText(root, RECORD) ?? '', before, 'a refused request leaves the factory as it was');
 }
 
 const onCards = (labelSelector: string, to: string) => ({
@@ -88,7 +88,7 @@ describe('a person sets a card trigger, reads what it can spend, and takes it ba
   });
   s.test('DELETE takes the card trigger back, and the factory holds it no more', async () => {
     await answered<Trigger>(send('DELETE', '/api/namespaces/mill/triggers/sweep'));
-    const file = JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { triggers?: Record<string, unknown> };
+    const file = JSON.parse(recordText(root, RECORD) ?? '') as { triggers?: Record<string, unknown> };
     assert.deepEqual(Object.keys(file.triggers ?? {}), ['ready']);
   });
 });

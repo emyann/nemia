@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { askRunAction, fed, partOf, photograph, themeOf } from '../board.ts';
@@ -6,7 +5,7 @@ import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photog
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, plantStoredMarker, storedMarker, unreadName } from '../world.ts';
 
 export default {
   /**
@@ -20,15 +19,15 @@ export default {
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const hold = path.join(store!, 'runs', `${id}.hold`);
     const word = `held until ${unreadName(until)} lands`;
     const holdIt = () => {
-      if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
-      fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
+      if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page writes one — the hold record is there`);
+      plantStoredMarker(id, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2));
       fed(id, 'held');
     };
     const lifted = (where: string) => {
-      if (fs.existsSync(hold)) throw new Refused(`the lift from ${where} removed ${hold} once the api answered — it is still there`);
+      if (storedMarker(id, 'hold') !== null)
+        throw new Refused(`the lift from ${where} removed the hold record once the api answered — it is still there`);
     };
     const theme = await themeOf(page);
     await page.getByRole('button', { name: 'Reset layout' }).click();
@@ -50,7 +49,7 @@ export default {
       await button.click();
       const dialog = page.getByRole('dialog', { name: `Lift the hold on ${id}` });
       await expectVisible(dialog.getByText(`Lift the hold on ${id}?`, { exact: true }), 'the first press asks');
-      if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
+      if (!(storedMarker(id, 'hold') !== null)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
       await photograph(page, path.join(OUT, `lift-card-asking-${theme}.png`), { fullPage: true });
       await dialog.getByRole('button', { name: 'Lift', exact: true }).click();
@@ -68,7 +67,7 @@ export default {
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
       const menu = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
       await expectVisible(menu.getByText(`Lift the hold on ${id}?`), "the press in the run's menu asks");
-      if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
+      if (!(storedMarker(id, 'hold') !== null)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
       await photograph(page, path.join(OUT, `lift-run-asking-${theme}.png`), { fullPage: true });
       await menu.getByRole('button', { name: 'Lift', exact: true }).click();
@@ -79,16 +78,16 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `lift-lifted-${theme}.png`), { fullPage: true });
     } finally {
-      await takeBack(page, hold, id, gated);
+      await takeBack(page, id, gated);
     }
   },
 } satisfies PageSpec;
 
 /** Whatever hold the page left, taken back as `wf hold --off` does and said on the feed, so every page after reads the store as seeded. */
-async function takeBack(page: Page, hold: string, id: string, gated: string) {
-  const left = fs.existsSync(hold);
-  fs.rmSync(hold, { force: true });
-  fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
+async function takeBack(page: Page, id: string, gated: string) {
+  const left = storedMarker(id, 'hold') !== null;
+  dropStoredMarker(id, 'hold');
+  dropStoredMarker(id, 'unheld');
   fed(id, gated, 'awaiting approval');
   if (left) await idle(page);
 }

@@ -19,6 +19,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { tickRun, readFeed } from '../src/runner.ts';
 import { addsMissingNow } from '../src/library/library.verb.ts';
+import { factoriesNow } from '../testing.ts';
 import { libraryDir, writeLibraryAdds } from '../src/library/library.store.ts';
 import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
@@ -67,7 +68,7 @@ describe("a factory's library add gone missing said on the feed: one line when i
   s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
     await pass();
     await pass();
-    assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), missing: addsMissingNow(ROOT) }).lines, []);
+    assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), missing: factoriesNow(ROOT, addsMissingNow(ROOT)) }).lines, []);
     assert.equal(factorySaid().length, 1);
   });
   s.test('the skill made again in the user library: a pass says the adds resolved, once', async () => {

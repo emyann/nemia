@@ -8,7 +8,7 @@
  * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
  * what it served turns it off for itself (`unverified`).
  */
-import { emptyRuns, listRuns, runRecord } from '../../testing.ts';
+import { emptyRuns, listRuns, plantMarker, runRecord } from '../../testing.ts';
 import { beforeEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,9 +22,8 @@ import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine } fro
 import { runList } from './run-list.verb.ts';
 import { informerMemo, keepObject, keptObject, passStarted, type InformerMemo } from '../rest/informer.verb.ts';
 import type { RunList } from 'objects';
-import { pruneFile, artifactsDir } from '../record/record.store.ts';
+import { artifactsDir } from '../record/record.store.ts';
 import { passStanding } from '../standing/standing.verb.ts';
-import { writeLabels } from '../record/files.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { engineOf } from '../runtime-client.ts';
 
@@ -166,7 +165,7 @@ const ROWS: Row[] = [
   {
     name: 'the labels file, as nemia label run writes it',
     make: () => resting(),
-    plant: (run) => writeLabels(ROOT, run.id, { team: 'core' }),
+    plant: (run) => plantMarker(ROOT, run.id, 'labels', JSON.stringify({ team: 'core' })),
   },
   {
     name: 'an ask written by another process, no informer told: the gate approved',
@@ -177,7 +176,7 @@ const ROWS: Row[] = [
     name: 'a prune from the CLI: its marker written, its worktrees removed',
     make: () => resting(),
     plant: (run) => {
-      fs.writeFileSync(pruneFile(ROOT, run.id), JSON.stringify({ at: AT, worktrees: [] }));
+      plantMarker(ROOT, run.id, 'pruned', JSON.stringify({ at: AT, worktrees: [] }));
       fs.rmSync(path.join(ROOT, 'worktrees', run.id), { recursive: true, force: true });
     },
   },

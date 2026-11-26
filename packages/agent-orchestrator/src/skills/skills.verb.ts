@@ -13,7 +13,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
-import { templatedTreeOf } from '../factory/door/factories.store.ts';
+import { templatedOf } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
@@ -134,11 +134,9 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
   handler: ({ from, name, factory, version, change, copy, builtin = '' }) =>
     Effect.gen(function* () {
       const root = yield* StoreRoot;
+      const tree = from === 'factory' && factory !== undefined ? (yield* templatedOf(factory, 'nemia skills write')).tree : '';
       const library = yield* tried(() =>
-        yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, {
-          factory,
-          treeOf: (named) => templatedTreeOf(root, named, 'nemia skills write'),
-        }),
+        yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, { factory, treeOf: () => tree }),
       );
       const door = yield* SkillDoor;
       if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);

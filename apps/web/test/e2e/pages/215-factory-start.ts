@@ -6,7 +6,7 @@ import { photograph, pickIn, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
+import { OUT, store, storeFactory, storedFactory, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /**
  * The File records the page's uploads made in the store's keyspace (`<store>/db/state.db`, laid out as Kine's), taken back: a tombstone
@@ -114,9 +114,9 @@ async function severalRepos(page: Page, workflow: string, checkout: string, them
     await settled(page);
     await photograph(page, path.join(OUT, `factory-start-unwired-${theme}.png`));
 
-    const file = path.join(store!, 'factories', `${factory}.json`);
-    const read = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
-    fs.writeFileSync(file, JSON.stringify({ ...read, workflowRepos: { [workflow]: path.basename(checkout) } }, null, 2));
+    const file = factory;
+    const read = JSON.parse(storedFactory(file)) as object;
+    storeFactory(file, JSON.stringify({ ...read, workflowRepos: { [workflow]: path.basename(checkout) } }, null, 2));
     bar = await openStart(page);
     await pickIn(page, bar.locator('[data-pick-workflow]'), workflow);
     await expectVisible(bar.locator('[data-repo]', { hasText: `On ${checkout}` }), `wired, ${workflow} says the repository it runs on`);
@@ -148,8 +148,8 @@ export default {
     const checkout = path.join(store!, 'checkout');
     const factory = FACTORIES.hiring.name;
     const workflow = WORKFLOWS.good.name;
-    const factoryFile = path.join(store!, 'factories', `${factory}.json`);
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryName = factory;
+    const factoryText = storedFactory(factoryName);
     const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
     const runsBefore = storedRuns();
     const filesDir = path.join(store!, 'files', factory);
@@ -158,7 +158,7 @@ export default {
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     try {
-      fs.writeFileSync(factoryFile, withHires(factoryText, {}));
+      storeFactory(factoryName, withHires(factoryText, {}));
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       let bar = await openStart(other);
@@ -176,7 +176,7 @@ export default {
       await expectCount(bar, 0, 'Close closes the bar');
 
       fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
-      fs.writeFileSync(factoryFile, withHires(factoryText, { [`${workflow}/${UNFILLED}`]: REVIEWER }));
+      storeFactory(factoryName, withHires(factoryText, { [`${workflow}/${UNFILLED}`]: REVIEWER }));
       bar = await openStart(other);
       await expectCount(
         bar.locator(`[data-workflow="repo:${workflow}"] [data-why-not]`),
@@ -240,7 +240,7 @@ export default {
       for (const name of added) fs.rmSync(path.join(filesDir, name), { force: true });
       fileRecordsTakenBack(factory, added);
       fs.rmSync(reviewerFile, { force: true });
-      fs.writeFileSync(factoryFile, factoryText);
+      storeFactory(factoryName, factoryText);
     }
   },
 } satisfies PageSpec;

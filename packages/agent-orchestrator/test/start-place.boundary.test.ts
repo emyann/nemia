@@ -4,7 +4,7 @@
  * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
  * process group of the git `open` runs, which outlives it. Its store is its own at `ROOT`.
  */
-import { keysUnder, plantRecord, recordText, runKey, runsNow } from '../testing.ts';
+import { keysUnder, plantRecord, recordText, runFolderNames, runKey, runsNow } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -198,9 +198,5 @@ test('a SIGINT to nemia start is not passed on to the group of the git open runs
   const ended = await start.closed;
   assert.equal(ended.signal, 'SIGINT', `nemia start ended by SIGINT; it said: ${start.err()}`);
   assert.ok(groupOf(pgid).includes(String(pgid)), "the group of open's git outlives the start");
-  assert.deepEqual(
-    [...(fs.existsSync(path.join(store, 'runs')) ? fs.readdirSync(path.join(store, 'runs')) : []), ...keysUnder(store, '/registry/runs/')],
-    [],
-    'no run written',
-  );
+  assert.deepEqual([...runFolderNames(store), ...keysUnder(store, '/registry/runs/')], [], 'no run written');
 });

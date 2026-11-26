@@ -8,7 +8,9 @@
  * taken off the queue, and its labels edited — is the Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's
  * own is left: `GET /api/inbox/:name` and `PUT` and `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
-import { readFactoryAtOnce } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { factoryOrNone, Missing } from 'agent-orchestrator';
+import type { Served } from '../layer.ts';
 import type { CardFile } from 'objects';
 
 /**
@@ -17,15 +19,22 @@ import type { CardFile } from 'objects';
  * names its factory and its workflow, and nothing about repositories: the factory places its run (`nemia factory attach <factory>
  * <workflow> --repo <name>`), so no repository is read here and an api with none of its own files a card all the same.
  *
- * Refused: a `factory` the store `home` does not have, a 404 naming those it has, or a name that is no slug, a 422 (`readFactoryAtOnce`),
+ * Refused: a `factory` the store `home` does not have, a 404 naming those it has, or a name that is no slug, a 422 (`factoryOrNone`),
  * before the package is asked. The package refuses, `Invalid`, before anything is written (`addToInbox`): a `repo`, retired, naming the
  * attach; a workflow that is no name; and in a factory, a workflow it does not attach, naming the attach. `from` is retired, read and
  * ignored.
  * @param body The card's body, as the endpoint decodes it.
- * @param home The store's root folder, whose factories are read.
+ * @param s The request's services, through which the factory it names is read.
  */
-export function filingOf(body: CardFile, home: string) {
-  if (body.factory !== undefined) readFactoryAtOnce(home, body.factory, 'Nothing was filed.');
+export async function filingOf(body: CardFile, s: Pick<Served, 'inRequest'>) {
+  if (body.factory !== undefined)
+    await s.inRequest(
+      factoryOrNone(body.factory).pipe(
+        Effect.catchTag('Missing', (miss) =>
+          Effect.fail(new Missing({ message: miss.message.replace(/Nothing was read\.$/, 'Nothing was filed.') })),
+        ),
+      ),
+    );
   return {
     text: body.body,
     ...(body.workflow !== undefined ? { workflow: body.workflow } : {}),

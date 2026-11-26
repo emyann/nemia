@@ -10,7 +10,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { keysUnder, runRecord } from '../testing.ts';
+import { keysUnder, runFolderNames, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { advanceRun, forgetRun, retryRun, runWith } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, factoryText, plantFactory } from '../testing.ts';
 import { treeDir, writeTreeWiring } from '../src/factory/applied/applied.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';
@@ -83,8 +83,7 @@ function homedFactory(name: string) {
   stage.place().world.repository(repo, { 'README.md': 'x\n' });
   addFactoryAt(ROOT, { name, volumes: [`${repo}:rw`] });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'plain', repo: path.basename(repo) });
-  const file = path.join(ROOT, 'factories', `${name}.json`);
-  const filed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+  const filed = JSON.parse(factoryText(ROOT, name) ?? '{}') as {
     volumes: Array<Record<string, unknown>>;
     workflows?: string[];
     hires?: Record<string, string>;
@@ -96,7 +95,7 @@ function homedFactory(name: string) {
   fs.writeFileSync(path.join(tree, 'home', 'CLAUDE.md'), '# Where you stand\n');
   writeTreeWiring(ROOT, name, { workflows, hires, ...(workflowRepos === undefined ? {} : { workflowRepos }) });
   const template = { source: scratch('wf-home-template-'), version: '1.0.0', params: {} };
-  fs.writeFileSync(file, `${JSON.stringify({ ...rest, template, volumes: filed.volumes.map((v) => ({ ...v, claudeMd: true })) })}\n`);
+  plantFactory(ROOT, name, `${JSON.stringify({ ...rest, template, volumes: filed.volumes.map((v) => ({ ...v, claudeMd: true })) })}\n`);
   return { repo, plain };
 }
 
@@ -203,11 +202,7 @@ describe("a start whose run's home cannot be trusted is refused, and leaves no r
   });
   test("REFUSED: a harness's file that does not read refuses the start Invalid, naming the file, and nothing is started", async () => {
     const kept = fs.existsSync(CONFIG_FILE) ? fs.readFileSync(CONFIG_FILE, 'utf8') : undefined;
-    const runs = () =>
-      [
-        ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
-        ...keysUnder(ROOT, '/registry/runs/'),
-      ].sort();
+    const runs = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
     const before = runs();
     fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
     fs.writeFileSync(CONFIG_FILE, '[]');

@@ -1,7 +1,8 @@
 /**
  * A factory made from a template, on disk, beside its file: `$WF_ROOT/factories/<name>/tree/`, the folder it runs from, today's format
  * (`treeDir`), the person's once seeded; `applied/`, the template as last rendered, read-only, the base an upgrade will merge from
- * (`appliedDir`); and `status.json`, what the controller last observed (`readStatus`, `writeStatus`). The tree's wiring, `factory.json`, is
+ * (`appliedDir`); what the controller last observed is a record of the store (`/registry/applied/<name>`), read as its text (`statusOf`,
+ * `statusText`). The tree's wiring, `factory.json`, is
  * read and written whole here (`readTreeWiring`, `writeTreeWiring`) for the factory's verbs; a folder is staged whole beside its place
  * and renamed onto it, so no reader sees half of one (`stageFolder`), and swapped whole for an upgrade (`swapTree`, `replaceBase`); the
  * person's choices for an upgrade's conflicts, and the proposals that resolve a workflow's, are `resolutions.json` (`readResolutions`,
@@ -40,13 +41,6 @@ export const treeDir = (home: string, name: string) => path.join(folderAt(home, 
  * @param name The factory's name.
  */
 export const appliedDir = (home: string, name: string) => path.join(folderAt(home, name), 'applied');
-
-/**
- * What the controller last observed of a templated factory, written by it alone.
- * @param home The store's root.
- * @param name The factory's name.
- */
-export const statusFile = (home: string, name: string) => path.join(folderAt(home, name), 'status.json');
 
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
@@ -226,35 +220,19 @@ export type Status = typeof StatusSchema.Type;
 export type Condition = typeof ConditionSchema.Type;
 
 /**
- * The status of the factory `name`, or none where the controller wrote none yet or it does not read: the next pass writes it again.
- * @param home The store's root.
- * @param name The factory's name.
+ * The status a record's `text` holds, or none where there is none or it does not read: the next pass writes it again.
+ * @param text What the factory's status record holds, or undefined where there is none.
  */
-export const readStatus = (home: string, name: string) => statusIn(statusFile(home, name)) satisfies Status | undefined;
-
-/** The status a factory's `file` holds, or none where it is not there or does not read. */
-function statusIn(file: string) {
-  try {
-    return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(StatusSchema))(fs.readFileSync(file, 'utf8')));
-  } catch {
-    return undefined;
-  }
-}
+export const statusOf = (text: string | undefined) =>
+  (text === undefined ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(StatusSchema))(text))) satisfies
+    | Status
+    | undefined;
 
 /**
- * The status of the factory `name` written whole, only where it differs from what is there; whether it was written.
- * @param home The store's root.
- * @param name The factory's name.
+ * The text of a status record: what the pass observed, written whole.
  * @param status The status the pass observed.
  */
-export function writeStatus(home: string, name: string, status: Status) {
-  const text = `${JSON.stringify(status, null, 2)}\n`;
-  const file = statusFile(home, name);
-  if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === text) return false;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  writeWhole(file, text);
-  return true;
-}
+export const statusText = (status: Status) => `${JSON.stringify(status, null, 2)}\n`;
 
 /**
  * The sha256 of `entries`: each path and its bytes, in the order of their paths, so one folder digests the same wherever it is.

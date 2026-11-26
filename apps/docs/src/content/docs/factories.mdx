@@ -11,8 +11,8 @@ what every agent at work in it is told, and what Nemia is to know about it. Ever
 **It never touches** a run already started. A run reads its factory once, when it starts, and freezes what it read: a hire or a detach
 afterwards reaches only the runs started after it.
 
-**It is reached through** one file in your store, `~/.agent-workflows/factories/<name>.json` (`WF_ROOT`), written by the `nemia factory`
-verbs and by the board. Its name is the file's. The code is in `packages/agent-orchestrator/src/factory/`.
+**It is reached through** one record in your store (`/registry/factories/<name>`, in the store's database under `WF_ROOT`), written by the `nemia factory`
+verbs and by the board. Its name is the record's; a `factories/<name>.json` file of an earlier release is taken up once and moved aside. The code is in `packages/agent-orchestrator/src/factory/`.
 
 ```bash
 nemia factory add pipao --volume ~/code/pipao:rw     # a factory that works on one repository

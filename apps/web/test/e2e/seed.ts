@@ -34,7 +34,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { dropStoredRun, storeAsk, storeRecord } from './world.ts';
+import { dropStoredKey, dropStoredRun, storeAsk, storeFactory, storeRecord, storedFactory, storedKeys } from './world.ts';
 
 export const FAKE = {
   id: 'give-the-board-a-look-e2e0',
@@ -973,20 +973,19 @@ export const REVIEWER = 'reviewer-e2e';
  * a step whose file names its agent, leaves `dev` unread in the factory, and `dev/review` names no agent. Writes REVIEWER into the
  * checkout's `workflows/agents/` — the checkout's one agent gives skills, which `review`'s `tools:` could not load — and the factory's
  * file with REVIEWER hired into `review` in place of its hires. Returns the function that takes both back: the agent removed, and the
- * factory's file as it was found.
+ * factory's record as it was found.
  */
 export function hiringStarts(root: string) {
-  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
-  const found = fs.readFileSync(file, 'utf8');
+  const found = storedFactory(FACTORIES.hiring.name);
   const agent = path.join(root, 'checkout', 'workflows', 'agents', `${REVIEWER}.md`);
   fs.writeFileSync(agent, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
-  fs.writeFileSync(
-    file,
+  storeFactory(
+    FACTORIES.hiring.name,
     JSON.stringify({ ...(JSON.parse(found) as object), hires: { [`${WORKFLOWS.good.name}/review`]: REVIEWER } }, null, 2),
   );
   return (() => {
     fs.rmSync(agent, { force: true });
-    fs.writeFileSync(file, found);
+    storeFactory(FACTORIES.hiring.name, found);
   }) satisfies () => void;
 }
 
@@ -994,40 +993,35 @@ export function hiringStarts(root: string) {
  * Makes FACTORIES.hiring, the one factory on the checkout, offer `workflows` with `hires` in the store at `root`: what a page reads of
  * the checkout is read in that factory, the default one working on no repository. With no hire, `dev` reads there (the seed's hire into
  * `dev/implement`, whose file names its agent, leaves it unread) and cannot start, `review` naming no agent. Returns the function that
- * writes the factory's file back as it was found.
+ * writes the factory's record back as it was found.
  */
 export function checkoutIn(root: string, workflows: readonly string[], hires: Readonly<Record<string, string>> = {}) {
-  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
-  const found = fs.readFileSync(file, 'utf8');
-  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(found) as object), workflows, hires }, null, 2));
-  return (() => fs.writeFileSync(file, found)) satisfies () => void;
+  const found = storedFactory(FACTORIES.hiring.name);
+  storeFactory(FACTORIES.hiring.name, JSON.stringify({ ...(JSON.parse(found) as object), workflows, hires }, null, 2));
+  return (() => storeFactory(FACTORIES.hiring.name, found)) satisfies () => void;
 }
 
 /**
  * Gives FACTORIES.hiring a second repository in the store at `root`, FACTORIES.bare's folder, after its own: a factory on several, which
- * the seed has none of. Returns the second repository and the function that writes the factory's file back as it was found.
+ * the seed has none of. Returns the second repository and the function that writes the factory's record back as it was found.
  */
 export function onSeveralRepos(root: string) {
-  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
-  const found = fs.readFileSync(file, 'utf8');
+  const found = storedFactory(FACTORIES.hiring.name);
   const read = JSON.parse(found) as { volumes: { path: string; readOnly: boolean }[] };
   const second = path.join(root, FACTORIES.bare);
-  fs.writeFileSync(file, JSON.stringify({ ...read, volumes: [...read.volumes, ...worked([second])] }, null, 2));
-  return { second, back: () => fs.writeFileSync(file, found) } satisfies { second: string; back: () => void };
+  storeFactory(FACTORIES.hiring.name, JSON.stringify({ ...read, volumes: [...read.volumes, ...worked([second])] }, null, 2));
+  return { second, back: () => storeFactory(FACTORIES.hiring.name, found) } satisfies { second: string; back: () => void };
 }
 
 /**
- * Leaves the store at `root` with no factory on file: its `factories/` moved aside, and an empty one in its place. Returns the function
- * that puts the folder back.
+ * Leaves the seeded store with no factory on file: each factory's record taken out. Returns the function that files each back as it was.
  */
-export function noFactories(root: string) {
-  const dir = path.join(root, 'factories');
-  const aside = path.join(root, 'factories.aside');
-  fs.renameSync(dir, aside);
-  fs.mkdirSync(dir);
+export function noFactories() {
+  const prefix = '/registry/factories/';
+  const kept = storedKeys(prefix).map((key) => ({ key, name: key.slice(prefix.length), text: storedFactory(key.slice(prefix.length)) }));
+  for (const { key } of kept) dropStoredKey(key);
   return (() => {
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.renameSync(aside, dir);
+    for (const { name, text } of kept) storeFactory(name, text);
   }) satisfies () => void;
 }
 

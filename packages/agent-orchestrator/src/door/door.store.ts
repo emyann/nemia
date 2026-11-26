@@ -27,9 +27,15 @@ import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
 export const fromThrow = <A>(act: () => A) =>
   Effect.try({ try: act, catch: (err) => err }).pipe(Effect.catch((err) => (isRefusal(err) ? Effect.fail(err) : Effect.die(err))));
 
-/** A method of a layer, turned into the door's: its first parameter, where it is a string, the door's id `I`, and an Effect answered. */
+/** What a layer's method answers as the door's Effect answers it: the value of an Effect it answers itself, else the value. */
+type Answered<R> = R extends Effect.Effect<infer A, unknown> ? A : R;
+
+/**
+ * A method of a layer, turned into the door's: its first parameter, where it is a string, the door's id `I`, and an Effect answered. A
+ * method that reads the keyspace answers an Effect itself, whose refusal is the door's.
+ */
 type Doored<F, I> = F extends (...args: infer P) => infer R
-  ? (...args: P extends [string, ...infer Rest] ? [I, ...Rest] : P) => Effect.Effect<R, Refusal>
+  ? (...args: P extends [string, ...infer Rest] ? [I, ...Rest] : P) => Effect.Effect<Answered<R>, Refusal>
   : never;
 
 /** A door's shape from its layer's: each group of synchronous methods, each method answering an Effect (`Doored`). */
@@ -38,15 +44,24 @@ export type DoorOf<T, I extends string> = {
 };
 
 /**
- * A layer's plain value of synchronous methods as a door: each method's act run by `fromThrow` when the Effect runs, never when it is
- * built, so a read is made where the program yields it.
+ * A layer's plain value of methods as a door: each method's act run by `fromThrow` when the Effect runs, never when it is built, so a
+ * read is made where the program yields it; a method that answers an Effect itself — one that reads the keyspace — is run as it is.
  * @param layer The layer's plain value: groups of synchronous methods.
  */
 export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(layer: T) {
   return Object.fromEntries(
     Object.entries(layer).map(([group, methods]) => [
       group,
-      Object.fromEntries(Object.entries(methods).map(([name, method]) => [name, (...args: never[]) => fromThrow(() => method(...args))])),
+      Object.fromEntries(
+        Object.entries(methods).map(([name, method]) => [
+          name,
+          (...args: never[]) =>
+            Effect.flatMap(
+              fromThrow(() => method(...args)),
+              (answered) => (Effect.isEffect(answered) ? (answered as Effect.Effect<unknown, Refusal>) : Effect.succeed(answered)),
+            ),
+        ]),
+      ),
     ]),
   ) as DoorOf<T, I>;
 }

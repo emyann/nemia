@@ -30,7 +30,7 @@ import {
   type Env,
 } from '../config/config.store.ts';
 import { isRefusal } from '../refusal/refusal.ts';
-import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { listedAt } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
 import { workflowDirAt, workflowNeedsRead } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -866,7 +866,7 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
   const memo = kept ?? needsMemo(home);
   if (!memo.placeNeeds.length) memo.placeNeeds = place.declared.needs ?? [];
   if (kept === undefined || (memo.version === 0 && memo.readings.size === 0)) yield* needsOnce(memo);
-  const factories = yield* tried(() => listedAtOnce(home));
+  const factories = yield* listedAt(home);
   const workflows = factoryWorkflows(factories);
   const trusted = new Set((yield* trustedOf(factories)).map((f) => f.name));
   const untrusted = new Set(factories.map((f) => f.name).filter((name) => !trusted.has(name)));

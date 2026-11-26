@@ -1,11 +1,21 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { cardsPath, photograph, heldIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredCard, OUT, store, storeCard, storedCard, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
+import {
+  OUT,
+  dropStoredCard,
+  store,
+  storeCard,
+  storeFactory,
+  storedCard,
+  storedFactory,
+  storedRecord,
+  storedRuns,
+  takeBackRuns,
+} from '../world.ts';
 
 /** The card this page files for the factory, and starts there. */
 const CARD = 'hire-the-reviewer-in-the-factory-e2e0';
@@ -33,18 +43,18 @@ async function openStart(page: Page) {
 }
 
 /**
- * The card's start with the factory's file, as `factoryFile` holds it now, on two repositories — the checkout and FACTORIES.bare's folder
+ * The card's start with the factory's file, as `factoryName` holds it now, on two repositories — the checkout and FACTORIES.bare's folder
  * — first wiring its workflow to none: the start says it is not wired, naming the attach and both folder names, with no repository and no
  * Start; then wiring it to the checkout's folder name: the start says the checkout as text. Never a Repository list. The caller writes the
  * file back.
  */
-async function wiredOnTwo(page: Page, factoryFile: string, theme: string) {
+async function wiredOnTwo(page: Page, factoryName: string, theme: string) {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
   const second = path.join(store!, FACTORIES.bare);
-  const found = JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as object;
+  const found = JSON.parse(storedFactory(factoryName)) as object;
   const write = (workflowRepos: Record<string, string>) =>
-    fs.writeFileSync(factoryFile, JSON.stringify({ ...found, volumes: worked([checkout, second]), workflowRepos }, null, 2));
+    storeFactory(factoryName, JSON.stringify({ ...found, volumes: worked([checkout, second]), workflowRepos }, null, 2));
 
   write({});
   let item = await openStart(page);
@@ -83,14 +93,14 @@ export default {
   expect: async (page) => {
     const checkout = path.join(store!, 'checkout');
     const factory = FACTORIES.hiring.name;
-    const factoryFile = path.join(store!, 'factories', `${factory}.json`);
-    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const factoryName = factory;
+    const factoryText = storedFactory(factoryName);
     const runsBefore = storedRuns();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     let unhire = () => {};
     try {
-      fs.writeFileSync(factoryFile, withHires(factoryText, {}));
+      storeFactory(factoryName, withHires(factoryText, {}));
       storeCard(CARD, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${BODY}\n`);
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
@@ -110,8 +120,8 @@ export default {
       await expectCount(item.locator(`form[aria-label="Start ${CARD}"]`), 0, 'with no Start: the api would refuse it');
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-factory-unfilled-${theme}.png`), { fullPage: true });
-      await wiredOnTwo(other, factoryFile, theme);
-      fs.writeFileSync(factoryFile, withHires(factoryText, {}));
+      await wiredOnTwo(other, factoryName, theme);
+      storeFactory(factoryName, withHires(factoryText, {}));
 
       unhire = hiringStarts(store!);
       item = await openStart(other);
@@ -160,7 +170,7 @@ export default {
       takeBackRuns(runsBefore);
       dropStoredCard(CARD);
       unhire();
-      fs.writeFileSync(factoryFile, factoryText);
+      storeFactory(factoryName, factoryText);
     }
   },
 } satisfies PageSpec;

@@ -8,7 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its cards name no factory.
  */
-import { cardNames, plantCard, plantRecord, runKey, runRecord } from '../testing.ts';
+import { cardNames, plantCard, plantRecord, runKey, runRecord, plantMarker } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -24,7 +24,7 @@ import type { Env } from '../src/config/config.store.ts';
 import { told } from './typed.ts';
 import { Effect } from 'effect';
 import { RunDoor } from '../src/runs/runs.store.ts';
-import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt } from '../testing.ts';
 
 const ROOT = scratch('wf-resend-card-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -241,7 +241,7 @@ describe('a card of a factory sent on to a workflow its factory does not offer i
         from: { inbox: 'tidy-the-docs-m3n8' },
       }),
     );
-    fs.writeFileSync(path.join(ROOT, 'runs', 'tidy-the-docs-m3n8-r1.cancelled'), '2026-11-05T01:00:00.000Z');
+    plantMarker(ROOT, 'tidy-the-docs-m3n8-r1', 'cancelled', '2026-11-05T01:00:00.000Z');
     return t.end;
   });
   const s = story(test);

@@ -111,8 +111,9 @@ const agentsFoundIn = <A, E, R>(against: readonly Entry[] | undefined, program: 
 const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject, against?: readonly Entry[]) =>
   Effect.gen(function* () {
     const name = object.metadata.name;
-    const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
-    const { places, fills } = yield* tried(() => factoryWriteOf(place.home, factory, name));
+    const holder = yield* treeDir(place.home, factory, 'workflows');
+    const dir = yield* tried(() => workflowDirAt(path.join(holder, name)));
+    const { places, fills } = yield* factoryWriteOf(place.home, factory, name);
     const door = (yield* WorkflowDoor).workflows;
     if (verbOf(object) === 'delete') {
       yield* door.remove(dir, object.metadata.resourceVersion, [], places);
@@ -140,7 +141,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
 /** An Agent of the factory's tree written or removed, the result schema its spec's `output` carries written beside it. */
 const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
-    const dir = yield* tried(() => treeDir(place.home, factory, 'agents'));
+    const dir = yield* treeDir(place.home, factory, 'agents');
     const name = AgentName.read(object.metadata.name);
     const door = (yield* AgentDoor).agents;
     if (verbOf(object) === 'delete') {
@@ -162,7 +163,7 @@ const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObj
  */
 const skillWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
-    const at = yield* tried(() => treeDir(place.home, factory, 'skills'));
+    const at = yield* treeDir(place.home, factory, 'skills');
     const { files, ...spec } = object.spec as SkillSpec;
     const written = yield* (yield* SkillDoor).skills.write(
       SkillName.read(object.metadata.name),
@@ -209,7 +210,7 @@ const libraryAddWritten = (factory: string, object: ProposedObject) =>
       return yield* Effect.fail(
         new Invalid({ message: `${object.metadata.name} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
       );
-    yield* tried(() => writeLibraryAdd(home, factory, verbOf(object) === 'delete' ? 'remove' : 'add', ref));
+    yield* writeLibraryAdd(home, factory, verbOf(object) === 'delete' ? 'remove' : 'add', ref);
     return uncounted(object);
   });
 

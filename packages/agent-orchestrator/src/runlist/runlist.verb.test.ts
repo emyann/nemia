@@ -9,7 +9,7 @@
  * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first, and a test that compares two answers, or
  * orders runs by time, seeds `Date`.
  */
-import { emptyRuns, listRuns, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { emptyRuns, listRuns, plantRecord, recordText, runKey, runRecord, plantMarker } from '../../testing.ts';
 import { beforeEach, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -120,7 +120,7 @@ const aWaiting = async () => {
 };
 
 /** A person's cancellation of the run `id`, written beside its record as `nemia cancel` writes it. */
-const cancelled = (id: string, at: number) => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
+const cancelled = (id: string, at: number) => plantMarker(ROOT, id, 'cancelled', new Date(at).toISOString());
 
 const cold = () => ({ runs: informerMemo() });
 
@@ -397,7 +397,7 @@ test('a run held until a person lifts the hold waits on nobody: it is not among 
   seeded(t);
   const id = await started({ work: null });
   const placed = new Date(T0 + 5 * MIN).toISOString();
-  fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [] })}\n`);
+  plantMarker(ROOT, id, 'hold', `${JSON.stringify({ at: placed, until: [] })}\n`);
   vi.setSystemTime(T0 + 20 * MIN);
 
   const page = await open();
@@ -416,10 +416,7 @@ test('a run that waits on a run which never lands, held until one that will, wai
   const { repo } = runRecord(ROOT, parent) as { repo: string };
   const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
   cancelled(parent, T0 + MIN);
-  fs.writeFileSync(
-    path.join(RUNS_DIR, `${child.id}.hold`),
-    `${JSON.stringify({ at: new Date(T0 + 5 * MIN).toISOString(), until: [lands] })}\n`,
-  );
+  plantMarker(ROOT, child.id, 'hold', `${JSON.stringify({ at: new Date(T0 + 5 * MIN).toISOString(), until: [lands] })}\n`);
   vi.setSystemTime(T0 + 20 * MIN);
 
   const row = (await open()).waiting.find((run) => run.id === child.id);
@@ -512,7 +509,7 @@ test('a run held until a run that never lands waits on a person since the hold w
   const id = await started({ work: null });
   cancelled(parent, T0 + MIN);
   const placed = new Date(T0 + 5 * MIN).toISOString();
-  fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [parent] })}\n`);
+  plantMarker(ROOT, id, 'hold', `${JSON.stringify({ at: placed, until: [parent] })}\n`);
   vi.setSystemTime(T0 + 20 * MIN);
 
   const row = (await open()).waiting.find((run) => run.id === id);

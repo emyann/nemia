@@ -18,9 +18,8 @@ import {
   sentInputsWritten,
   FileDoor,
   startedFacts,
-  startFactoryAtOnce,
+  startFactory,
   wiredRepoFor,
-  type Factory,
   type StartInput,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
@@ -190,15 +189,12 @@ export async function cardStart(s: Served, card: string, body: CardStart, factor
 }
 
 /**
- * The factory a start in `default` runs in, found from `repo` (`startFactoryAtOnce`): the one whose repository holds it. Where none or two
+ * The factory a start in `default` runs in, found from `repo` (`startFactory`): the one whose repository holds it. Where none or two
  * do, the start's own refusal (`first`) where it has one, said before the factory's, else the factory's.
  */
-function foundFactory(s: Served, repo: string, first: Asked | Refusal) {
+async function foundFactory(s: Served, repo: string, first: Asked | Refusal) {
   try {
-    return startFactoryAtOnce(s.home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts) satisfies {
-      factory?: Factory;
-      repo?: string;
-    };
+    return await s.inRequest(startFactory(undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts));
   } catch (err) {
     if ('status' in first) throw declaredAs(START_REFUSALS, first);
     throw err;
@@ -234,13 +230,13 @@ const foundFactoryBy = (s: Served, wired: string | undefined) =>
  */
 export async function runStart(s: Served, body: RunStart, namespace: string) {
   const { home, factory } = s;
-  const wiredIn = (name: string) => wiredRepoFor(home, name, path.basename(body.workflow));
-  const named = factory === undefined ? undefined : wiredIn(factory.name);
+  const wiredIn = (name: string) => s.inRequest(wiredRepoFor(name, path.basename(body.workflow)));
+  const named = factory === undefined ? undefined : await wiredIn(factory.name);
   const repo = named ?? repoNeeded(s);
   const first = startOf(body, repo, home, factory?.tree);
   if ('status' in first && factory !== undefined) throw declaredAs(START_REFUSALS, first);
-  const found = factory ? { factory, repo } : foundFactory(s, repo, first);
-  const wired = named ?? (found.factory === undefined ? undefined : wiredIn(found.factory.name));
+  const found = factory ? { factory, repo } : await foundFactory(s, repo, first);
+  const wired = named ?? (found.factory === undefined ? undefined : await wiredIn(found.factory.name));
   const at = wired ?? found.repo ?? repo;
   const asked = at === repo && found.factory?.tree === factory?.tree ? first : startOf(body, at, home, found.factory?.tree);
   if ('status' in asked) throw declaredAs(START_REFUSALS, asked);

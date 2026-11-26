@@ -5,6 +5,7 @@
  * with nothing filed where the URL is no clone's, and the daemon's sweep (`clonesOnce`) making again a clone whose folder went, saying
  * one it cannot make once, and asking nothing of a factory given no URL. On the test place, a store of its own at `ROOT`.
  */
+import { clearFactories } from '../../../testing.ts';
 import { beforeAll, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -23,7 +24,7 @@ import { typed as handlerOf } from '../../../test/typed.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService, type Place } from '../../place/place.store.ts';
-import { readFactoriesAt } from '../factory.store.ts';
+import { readFactoriesAt } from '../../../testing.ts';
 import { cloneFolder, cloneTarget, isCloneFolder } from './clones.ts';
 import { clonesOnce, freshCloneMemory } from './clones.verb.ts';
 import type { Env } from '../../config/config.store.ts';
@@ -156,7 +157,7 @@ describe('a factory on a repository named by URL: cloned as it is added, refused
     assert.ok(!fs.existsSync(into));
   });
   s.test('a factory given no URL asks the place no clone', async (c) => {
-    fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+    clearFactories(ROOT);
     const plain = scratch('wf-clones-plain-');
     stand().world.repository(plain, {});
     await typed(c, ['factory', 'add', 'plain', '--volume', `${plain}:rw`, '--no-trust']);

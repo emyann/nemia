@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { hireRefusalOf } from 'agent-orchestrator';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, recordText } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app, appOf, liveOf } from '../../app.ts';
@@ -29,7 +29,7 @@ const stepIn = (dir: string, workflow: string, step: string) => {
 const WORKFLOW = 'make';
 stepIn(folder, WORKFLOW, 'code');
 
-const RECORD = path.join(root, 'factories', 'mill.json');
+const RECORD = '/registry/factories/mill';
 const HIRE = '/api/namespaces/mill/hires/make.code';
 
 type Hire = import('objects').Hire;
@@ -40,7 +40,7 @@ const send = (method: string, url: string, body: unknown, headers: Record<string
   app.request(url, { method, headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** The hires the factory's file holds. */
-const hires = () => (JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { hires?: Record<string, string> }).hires;
+const hires = () => (JSON.parse(recordText(root, RECORD) ?? '') as { hires?: Record<string, string> }).hires;
 
 /** What the request answered, its status asserted. */
 async function answered<T>(res: Response | Promise<Response>, status = 200) {
@@ -52,11 +52,11 @@ async function answered<T>(res: Response | Promise<Response>, status = 200) {
 
 /** A request refused with `status`: its words, and the factory's file as it was. */
 async function refused(res: () => Response | Promise<Response>, status: number) {
-  const before = fs.readFileSync(RECORD, 'utf8');
+  const before = recordText(root, RECORD) ?? '';
   const answer = await res();
   const body = (await answer.json()) as { error: string };
   assert.equal(answer.status, status, body.error);
-  assert.equal(fs.readFileSync(RECORD, 'utf8'), before, 'a refused request leaves the factory as it was');
+  assert.equal(recordText(root, RECORD) ?? '', before, 'a refused request leaves the factory as it was');
   return body.error;
 }
 
@@ -105,10 +105,10 @@ const naming = (dir: string, step: string, agent: string) => {
 
 describe('the Hire writes: what a hire or a fire refuses, the factory file as it was', () => {
   test('a step sent with a slash as two segments is no route (404), and so is the retired route', async () => {
-    const before = fs.readFileSync(RECORD, 'utf8');
+    const before = recordText(root, RECORD) ?? '';
     assert.equal((await send('PUT', '/api/namespaces/mill/hires/make/code', { agent: 'implementer' })).status, 404);
     assert.equal((await send('PUT', '/api/factories/mill/hires/make%2Fimplement', { agent: 'implementer' })).status, 404);
-    assert.equal(fs.readFileSync(RECORD, 'utf8'), before);
+    assert.equal(recordText(root, RECORD) ?? '', before);
   });
   test('a factory the store does not have is a 404 naming it, to hire and to fire', async () => {
     assert.match(await refused(() => send('PUT', '/api/namespaces/gone/hires/make.code', { agent: 'implementer' }), 404), /gone/);
@@ -159,7 +159,7 @@ describe('the Hire writes: what a hire or a fire refuses, the factory file as it
     seatPerson(home);
     const file = naming(home, 'mine', 'otto');
     fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
-    const record = JSON.parse(fs.readFileSync(RECORD, 'utf8')) as object;
+    const record = JSON.parse(recordText(root, RECORD) ?? '') as object;
     const bare = { path: scratch('nemia-api-hires-bare-'), readOnly: false };
     fs.writeFileSync(path.join(home, 'factories', 'mill.json'), JSON.stringify({ ...record, volumes: [bare] }));
     const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));

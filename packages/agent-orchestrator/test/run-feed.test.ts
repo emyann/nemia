@@ -14,7 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { dropRecord, emptyRuns, rewriteRun, runKey, runRecord, runsNow } from '../testing.ts';
+import { dropRecord, emptyRuns, rewriteRun, runKey, runRecord, runsNow, dropMarker, plantMarker } from '../testing.ts';
 import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -44,7 +44,7 @@ import {
   watchFeed,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { recordFeed } from '../src/feed/feed.store.ts';
 import { isRunLine } from '../src/feed/feed.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
@@ -535,7 +535,7 @@ describe("a person's acts and the runtime's faults on a run, each said once off 
       );
   });
   s.test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
-    fs.writeFileSync(path.join(RUNS, `${other.id}.pruned`), JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
+    plantMarker(ROOT, other.id, 'pruned', JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
     await ticks(3);
     assert.equal(runRecord(ROOT, other.id).pruned !== undefined, true);
     assert.deepEqual(
@@ -545,7 +545,7 @@ describe("a person's acts and the runtime's faults on a run, each said once off 
   });
   s.test('a run gone from the store writes one `removed`, with no line for its steps, then nothing, a restart included', async () => {
     dropRecord(ROOT, runKey(other.id));
-    fs.rmSync(path.join(RUNS, `${other.id}.pruned`), { force: true });
+    dropMarker(ROOT, other.id, 'pruned');
     const before = lines().length;
     await ticks(3);
     assert.deepEqual(

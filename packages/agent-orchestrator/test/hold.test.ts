@@ -11,7 +11,9 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { askKeyOf, askNames, listRuns, plantRecord, recordText, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, dropRecord, keysUnder, listRuns, plantKey, plantRecord, recordText, runRecord } from '../testing.ts';
+import { runMarkKey } from '../src/runs/run-keys.ts';
+import { RunDoor } from '../src/runs/runs.store.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
@@ -82,7 +84,8 @@ const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
-const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
+const holdKeyOf = (id: string) => runMarkKey(id, 'hold');
+const holdText = (id: string) => recordText(ROOT, holdKeyOf(id));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => stage.runWith(e, passStanding(listRuns(ROOT)));
 /** One pass of the tick over `run`, as read now or as given. */
@@ -93,9 +96,9 @@ const tick = (b: Board, run: Run | string) => stage.runWith(b.e, advanceRun(type
  * `held until <run> lands`.
  */
 const asOlder = (id: string) => {
-  const { by, ...older } = JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { by?: string };
+  const { by, ...older } = JSON.parse(holdText(id) ?? '') as { by?: string };
   assert.equal(by, os.userInfo().username, `a hold put with no --by is put by the OS user`);
-  fs.writeFileSync(holdFileOf(id), JSON.stringify(older, null, 2));
+  plantKey(ROOT, holdKeyOf(id), JSON.stringify(older, null, 2));
 };
 
 /** A repository with one commit. */
@@ -282,20 +285,17 @@ describe('a run held until another lands: said by every screen with why and who,
     run = await aStarted(repo, 'waits for the target');
     const put = await holdTyped(run.id, '--until', target.id);
     assert.deepEqual([put.id, put.lifted, put.hold.until, put.hold.by, put.hold.why], [run.id, false, [target.id], user, undefined]);
-    const file = JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')) as Record<string, unknown>;
+    const file = JSON.parse(holdText(run.id) ?? '') as Record<string, unknown>;
     assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
     assert.equal(file.by, user, 'nor --by: it is put by the OS user');
   });
   s.test("`--why` and `--by` write the person's why, one line, and who they are into the file, and say them back", async (sub) => {
     const withWords = await aStarted(repo, 'held with words');
     const put = await holdTyped(withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
-    assert.deepEqual(
-      (({ why: w, by }) => ({ why: w, by }))(JSON.parse(fs.readFileSync(holdFileOf(withWords.id), 'utf8')) as Record<string, unknown>),
-      {
-        why: 'two words',
-        by: 'operator',
-      },
-    );
+    assert.deepEqual((({ why: w, by }) => ({ why: w, by }))(JSON.parse(holdText(withWords.id) ?? '') as Record<string, unknown>), {
+      why: 'two words',
+      by: 'operator',
+    });
     assert.deepEqual([put.hold.until, put.hold.why, put.hold.by], [[target.id], 'two words', 'operator'], 'what nemia hold says back');
     const plain = await aStarted(repo, 'held with none');
     await said(sub, 'hold', plain.id, '--until=' + target.id, '--why=it waits');
@@ -303,7 +303,7 @@ describe('a run held until another lands: said by every screen with why and who,
     await said(sub, 'hold', plain.id, '--off');
     await said(sub, 'hold', plain.id, '--until', target.id);
     assert.deepEqual(
-      Object.keys(JSON.parse(fs.readFileSync(holdFileOf(plain.id), 'utf8')) as object),
+      Object.keys(JSON.parse(holdText(plain.id) ?? '') as object),
       ['at', 'until', 'by'],
       'held again with no --why after a lift: no why of the lifted hold survives',
     );
@@ -313,7 +313,7 @@ describe('a run held until another lands: said by every screen with why and who,
       throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
     });
     await said(sub, 'hold', nameless.id, '--until', target.id, '--why', 'w');
-    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(holdFileOf(nameless.id), 'utf8')) as object), ['at', 'until', 'why']);
+    assert.deepEqual(Object.keys(JSON.parse(holdText(nameless.id) ?? '') as object), ['at', 'until', 'why']);
   });
   s.test(
     'a held run files nothing, and the feed says the hold — its words where it has them — and not that the run waits on you',
@@ -346,7 +346,7 @@ describe('a run held until another lands: said by every screen with why and who,
   s.test('a hold written between the read and the filing holds: the pass checks the file at the filing', async () => {
     const other = await aStarted(repo, 'read before its hold');
     const stale = runRecord(ROOT, other.id);
-    fs.writeFileSync(holdFileOf(other.id), JSON.stringify({ at: 'by hand', until: [target.id] }));
+    plantKey(ROOT, holdKeyOf(other.id), JSON.stringify({ at: 'by hand', until: [target.id] }));
     await tick(b, stale);
     assert.ok(!b.filings.includes(`${other.id}-implement`), 'a run read before the hold was put is not filed on that read');
   });
@@ -552,11 +552,11 @@ describe('a run held until another lands: said by every screen with why and who,
     b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
     await tick(b, target.id);
     await tick(b, run.id);
-    assert.ok(fs.existsSync(holdFileOf(run.id)) && !b.filings.includes(`${run.id}-implement`), 'signed off and not merged has not landed');
+    assert.ok(holdText(run.id) !== undefined && !b.filings.includes(`${run.id}-implement`), 'signed off and not merged has not landed');
     mergedByHand(repo, runRecord(ROOT, target.id).steps.implement.branch!);
     const lifted = await tick(b, run.id);
     assert.ok(lifted.notes.includes(`the hold is lifted: ${target.id} has landed`), lifted.notes.join('\n'));
-    assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold file is gone');
+    assert.ok(!(holdText(run.id) !== undefined), 'the hold file is gone');
     assert.ok(b.filings.includes(`${run.id}-implement`), 'and the run went on on the same pass');
     assert.equal(runRecord(ROOT, run.id).hold, undefined);
   });
@@ -582,7 +582,7 @@ describe('a run held until another lands: said by every screen with why and who,
       );
       await said(sub, 'cancel', heldOn.id);
       assert.equal((await stage.runWith(b.e, forgetRun(heldOn.id, {}))).kind, 'forgotten');
-      assert.ok(!fs.existsSync(holdFileOf(heldOn.id)), 'the hold went with the run');
+      assert.ok(!(holdText(heldOn.id) !== undefined), 'the hold went with the run');
       assert.equal((await stage.runWith(b.e, forgetRun(other.id, {}))).kind, 'forgotten');
     },
   );
@@ -645,7 +645,7 @@ describe('a run held until a person lifts it: no run named, nothing asked nor fi
   s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async () => {
     const put = await holdTyped(id, '--why', why);
     assert.deepEqual([put.hold.until, put.hold.why], [[], why], 'held until a person lifts it, and why');
-    assert.deepEqual((JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { until: unknown }).until, []);
+    assert.deepEqual((JSON.parse(holdText(id) ?? '') as { until: unknown }).until, []);
   });
   s.test('the decision, `nemia ls` and the summary say it is held and why, and ask nothing', async () => {
     await aPass(b.e);
@@ -670,7 +670,7 @@ describe('a run held until a person lifts it: no run named, nothing asked nor fi
     const filed = b.filings.length;
     for (let i = 0; i < 5; i++) await tick(b, id);
     assert.equal(b.filings.length, filed, 'nothing filed while held');
-    assert.ok(fs.existsSync(holdFileOf(id)), 'the hold stands');
+    assert.ok(holdText(id) !== undefined, 'the hold stands');
     assert.deepEqual(runRecord(ROOT, id).hold?.until, []);
     assert.equal(runRecord(ROOT, id).hold?.why, why);
   });
@@ -745,20 +745,17 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
         workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }),
       }),
     );
-    before = fs.readFileSync(holdFileOf(already.id), 'utf8');
-    held = [...heldBefore, `${already.id}.hold`, `${worded.id}.hold`].sort();
+    before = holdText(already.id) ?? '';
+    held = [...heldBefore, holdKeyOf(already.id), holdKeyOf(worded.id)].sort();
     assert.deepEqual(holdFiles(), held, 'the two runs held on purpose are the hold files this story adds');
     id = run.id;
     u = ['hold', id, '--until', target.id];
     return t.end;
   });
   const holdFiles = () =>
-    (fs.existsSync(path.join(ROOT, 'runs'))
-      ? fs
-          .readdirSync(path.join(ROOT, 'runs'))
-          .filter((f) => f.includes('.hold'))
-          .sort()
-      : []) satisfies string[];
+    keysUnder(ROOT, '/registry/runmarks/')
+      .filter((key) => key.endsWith('/hold'))
+      .sort();
   const rows: Array<[string, () => [string[], string, string[]]]> = [
     ['both', () => [['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']]],
     ['a flag it does not take', () => [['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']]],
@@ -900,8 +897,8 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
     });
   }
   test('nothing written: no hold on a run refused, and the first hold stands as it was', () => {
-    assert.deepEqual(holdFiles(), held, 'no hold file under runs/ but those held on purpose');
-    assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before);
+    assert.deepEqual(holdFiles(), held, 'no hold record but those held on purpose');
+    assert.equal(holdText(already.id) ?? '', before);
   });
   test('allowed: what is left holds — the one run that may still land, and words at their caps', async () => {
     assert.equal((await typed(outer, 'hold', id, '--until', other.id)).error, undefined);
@@ -936,7 +933,7 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
     `--until ${c.id}:`,
     `${c.id} already waits on ${a.id} to land (${c.id} held until ${d.id}, ${d.id} held until ${a.id})`,
   );
-  assert.ok(!fs.existsSync(holdFileOf(a.id)));
+  assert.ok(!(holdText(a.id) !== undefined));
   const others = [runRecord(ROOT, d.id), runRecord(ROOT, c.id), runRecord(ROOT, child.id)];
   assert.match(
     holdRefusal(runRecord(ROOT, a.id), [c.id], () => ({ record: runRecord(ROOT, c.id), landed: false }), others) ?? '',
@@ -960,35 +957,41 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   assert.ok(!b.filings.includes(`${id}-c`), 'c waits on d');
   for (const step of ['a', 'b', 'd']) b.settle(`${id}-${step}`, 'succeeded', SIGNED);
 
-  const holdFile = holdFileOf(id);
   const file = b.e.file.bind(b.e);
   let held = false;
   // oxlint-disable-next-line landmines-testing/no-test-doubles -- a hold put as the check is filed: a race
   vi.spyOn(b.e, 'file').mockImplementation((spec: Parameters<Engine['file']>[0]) => {
     if (!held && spec.id?.endsWith('-check')) {
       held = true;
-      fs.writeFileSync(holdFile, JSON.stringify({ at: 'by hand', until: [other.id] }));
+      plantKey(ROOT, holdKeyOf(id), JSON.stringify({ at: 'by hand', until: [other.id] }));
     }
     return file(spec);
   });
-  const exists = fs.existsSync;
   let lifted = false;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold lifted as it is read: a race
-  vi.spyOn(fs, 'existsSync').mockImplementation((p: fs.PathLike) => {
-    const there = exists(p);
-    if (p === holdFile && there && !lifted) {
-      lifted = true;
-      fs.rmSync(holdFile);
-    }
-    return there;
-  });
-  await tick(b, id);
+  await stage.runWith(
+    b.e,
+    Effect.gen(function* () {
+      const real = yield* RunDoor;
+      const liftOnRead = (...args: Parameters<typeof real.runs.calledOff>) =>
+        Effect.tap(
+          real.runs.calledOff(...args),
+          Effect.sync(() => {
+            if (!lifted && holdText(id) !== undefined) {
+              lifted = true;
+              dropRecord(ROOT, holdKeyOf(id));
+            }
+          }),
+        );
+      const door = { ...real, runs: { ...real.runs, calledOff: liftOnRead } };
+      return yield* advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(RunDoor, door));
+    }),
+  );
   vi.restoreAllMocks();
 
   const checks = [`${id}-a-check`, `${id}-b-check`];
   assert.ok(held && lifted, 'the pass filed a check, then read the hold, which was lifted as it was read');
   assert.equal(checks.filter((task) => b.filings.includes(task)).length, 1, `one check filed, and not the other: ${b.filings.join(', ')}`);
-  assert.ok(!fs.existsSync(holdFile) && runRecord(ROOT, id).hold === undefined, 'nothing holds the run once the pass has read the hold');
+  assert.ok(holdText(id) === undefined && runRecord(ROOT, id).hold === undefined, 'nothing holds the run once the pass has read the hold');
   assert.ok(
     !b.filings.includes(`${id}-c`),
     'the ready step c is not filed: the pass read the hold in its checks, and its refusal holds for every phase after, though the store reads clear',
@@ -1012,7 +1015,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const stale = runRecord(ROOT, run.id);
   await stage.runWith(b.e, unhold(run.id));
   await stage.runWith(b.e, hold(run.id, [other.id]));
-  const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
+  const second = holdText(run.id) ?? '';
   assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
   committed(runRecord(ROOT, target.id).steps.implement.workspace!, 'target.ts');
   b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
@@ -1023,43 +1026,48 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     !pass.notes.some((n) => n.startsWith('the hold is lifted')),
     `the tick read hold A, and a person lifted it and put hold B before the tick's lift: B names what the tick never read\n${pass.notes.join('\n')}`,
   );
-  assert.equal(fs.readFileSync(holdFileOf(run.id), 'utf8'), second, 'hold B stands as it was put');
+  assert.equal(holdText(run.id) ?? '', second, 'hold B stands as it was put');
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'and nothing is filed under it');
 
   const put = { at: '2099-01-01T00:00:00.000Z', until: [other.id] };
-  const read = fs.readFileSync;
-  let reads = 0;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold changed between two reads: a race
-  vi.spyOn(fs, 'readFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
-    if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
-    return read.apply(this, args);
+  const changedAsRead = Effect.gen(function* () {
+    const real = yield* RunDoor;
+    const readThenChanged = (...args: Parameters<typeof real.runs.read>) =>
+      Effect.tap(
+        real.runs.read(...args),
+        Effect.sync(() => plantKey(ROOT, holdKeyOf(run.id), JSON.stringify(put))),
+      );
+    const door = { ...real, runs: { ...real.runs, read: readThenChanged } };
+    return yield* unhold(run.id).pipe(Effect.provideService(RunDoor, door));
   });
   await assert.rejects(
-    stage.runWith(b.e, unhold(run.id)),
+    stage.runWith(b.e, changedAsRead),
     refusedNaming('Conflict', `${run.id}'s hold changed as it was lifted`, `nemia ls ${run.id}`, `nemia hold ${run.id} --off`),
   );
-  vi.restoreAllMocks();
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')),
+    JSON.parse(holdText(run.id) ?? ''),
     put,
     '--off read hold B, and another hold was put in the moment before the removal: --off is refused, and that hold stands',
   );
 
   const race = await aRunning(b, repo);
   const first = { at: '2099-01-02T00:00:00.000Z', until: [other.id] };
-  const write = fs.writeFileSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- another hold put first: a race no seam gives
-  vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
-    if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
-    return write.apply(this, args);
+  const putFirstByAnother = Effect.gen(function* () {
+    const real = yield* RunDoor;
+    const putAfterAnother = (...args: Parameters<typeof real.holds.put>) =>
+      Effect.suspend(() => {
+        if (holdText(race.id) === undefined) plantKey(ROOT, holdKeyOf(race.id), JSON.stringify(first));
+        return real.holds.put(...args);
+      });
+    const door = { ...real, holds: { ...real.holds, put: putAfterAnother } };
+    return yield* hold(race.id, [other.id]).pipe(Effect.provideService(RunDoor, door));
   });
   await assert.rejects(
-    stage.runWith(b.e, hold(race.id, [other.id])),
+    stage.runWith(b.e, putFirstByAnother),
     refusedNaming('Conflict', `${race.id} is already held until ${other.id} lands`, first.at, 'A hold is put once, whole'),
   );
-  vi.restoreAllMocks();
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(holdFileOf(race.id), 'utf8')),
+    JSON.parse(holdText(race.id) ?? ''),
     first,
     "the first hold, whole: when two people hold one run at once, the second's exclusive write finds the first's file, is refused as " +
       'already held, and writes nothing',
@@ -1189,7 +1197,7 @@ describe("a hold's file written by hand is read as it is: a why or a by that is 
   });
   for (const bad of [7, null, '', ' \n\t ', ['x'], { a: 1 }]) {
     test(`why and by of ${JSON.stringify(bad)} read as none`, () => {
-      fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
+      plantKey(ROOT, holdKeyOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
       const read = runRecord(ROOT, run.id).hold!;
       assert.ok(!('why' in read) && !('by' in read), JSON.stringify(read));
       assert.equal(holdWord([{ run: 'a-1' }], read), 'held until a-1 lands');
@@ -1197,15 +1205,15 @@ describe("a hold's file written by hand is read as it is: a why or a by that is 
   }
   test('a long why and by read as one line, each within its cap', () => {
     const long = `${'many words\n'.repeat(30)}end`;
-    fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: long, by: `  op\nerator ${'x'.repeat(100)}` }));
+    plantKey(ROOT, holdKeyOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: long, by: `  op\nerator ${'x'.repeat(100)}` }));
     const read = runRecord(ROOT, run.id).hold!;
     assert.ok(read.why!.length <= WHY_CAP && read.why!.endsWith('…') && !/\s\s|\n/.test(read.why!), read.why);
     assert.ok(read.by!.length <= BY_CAP && read.by!.startsWith('op erator x') && read.by!.endsWith('…'), read.by);
   });
   test('a file with no why and no by, as older code wrote it', () => {
-    fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'] }));
+    plantKey(ROOT, holdKeyOf(run.id), JSON.stringify({ at: 't', until: ['a-1'] }));
     assert.deepEqual(runRecord(ROOT, run.id).hold, { at: 't', until: ['a-1'] });
-    fs.rmSync(holdFileOf(run.id));
+    dropRecord(ROOT, holdKeyOf(run.id));
   });
 });
 
@@ -1251,7 +1259,7 @@ test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its pro
     ['--off of a run not there', () => unhold('r-nope'), 'Missing'],
     ['--off of a run nobody holds', () => unhold(free.id), 'Conflict'],
   ];
-  const before = fs.readFileSync(holdFileOf(already.id), 'utf8');
+  const before = holdText(already.id) ?? '';
   for (const [what, program, tag] of refusals) {
     const err = await stage.runWith(b.e, program()).then(
       () => assert.fail(`${what}: refused`),
@@ -1260,8 +1268,8 @@ test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its pro
     assert.ok(err instanceof Error && (err as Refusal)._tag === tag, `${what}: a ${tag}, not ${String(err)}`);
     assert.equal(await recovered(program(), tag), err.message, what);
   }
-  for (const r of [called, free]) assert.ok(!fs.existsSync(holdFileOf(r.id)), `no hold written on ${r.id}`);
-  assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before, 'the first hold stands as it was');
+  for (const r of [called, free]) assert.ok(!(holdText(r.id) !== undefined), `no hold written on ${r.id}`);
+  assert.equal(holdText(already.id) ?? '', before, 'the first hold stands as it was');
 });
 
 test('a defect is no refusal: `hold` and `unhold` die of what the engine or the filesystem throws, which no `Effect.catch` recovers, and `runWith` rejects with it as it was thrown', async () => {
@@ -1275,18 +1283,17 @@ test('a defect is no refusal: `hold` and `unhold` die of what the engine or the 
   const broken = { ...b.e, view: () => Effect.die(boom) };
   await assert.rejects(stage.runWith(broken, caught(hold(run.id, [target.id]))), (err) => err === boom);
   await assert.rejects(stage.runWith(broken, hold(run.id, [target.id])), (err) => err === boom);
-  assert.ok(!fs.existsSync(holdFileOf(run.id)), 'no hold written');
+  assert.ok(!(holdText(run.id) !== undefined), 'no hold written');
 
   await stage.runWith(b.e, hold(run.id, [target.id]));
-  const denied = Object.assign(new Error(`EACCES: permission denied, unlink '${holdFileOf(run.id)}'`), { code: 'EACCES' });
-  const rm = fs.rmSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the removal refused on cue (EACCES)
-  vi.spyOn(fs, 'rmSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
-    if (args[0] === holdFileOf(run.id)) throw denied;
-    return rm.apply(this, args);
-  });
-  await assert.rejects(Effect.runPromise(storeGiven(ROOT, ENV)(caught(unhold(run.id)))), (err) => err === denied);
-  await assert.rejects(stage.runWith(b.e, unhold(run.id)), (err) => err === denied);
-  vi.restoreAllMocks();
-  assert.ok(fs.existsSync(holdFileOf(run.id)), 'the hold stands');
+  const denied = Object.assign(new Error(`EACCES: permission denied, removing the hold of '${run.id}'`), { code: 'EACCES' });
+  const refusedLift = <A, E, R>(program: EffectOf<A, E, R>) =>
+    Effect.gen(function* () {
+      const real = yield* RunDoor;
+      const door = { ...real, holds: { ...real.holds, lift: () => Effect.die(denied) } };
+      return yield* program.pipe(Effect.provideService(RunDoor, door as never));
+    });
+  await assert.rejects(Effect.runPromise(storeGiven(ROOT, ENV)(refusedLift(caught(unhold(run.id))))), (err) => err === denied);
+  await assert.rejects(stage.runWith(b.e, refusedLift(unhold(run.id))), (err) => err === denied);
+  assert.ok(holdText(run.id) !== undefined, 'the hold stands');
 });

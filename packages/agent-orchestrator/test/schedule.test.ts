@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { emptyRuns, listRuns, runRecord, runsNow } from '../testing.ts';
+import { clearFactories, emptyRuns, factoryText, listRuns, plantFactory, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -29,7 +29,7 @@ import { staged, story } from './story.ts';
 import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
-import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../testing.ts';
 import { told } from './typed.ts';
 import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -95,9 +95,10 @@ const aTeamRepo = () => {
  * repository of its own, attaching the team's `dev`, and the clock at `now`. The cap as given: `undefined` unsets it.
  */
 const aStore = (t: Finishes, now: string, cap?: string) => {
-  for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
+  for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
+  clearFactories(ROOT);
   emptyRuns(ROOT);
   ENV.WF_MAX_RUNS = cap;
   vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
@@ -207,13 +208,11 @@ describe('a due fire waits behind the run cap and behind the queue, then starts'
 describe('a schedule written after its latest fire waits for its next; refused by its factory, it is kept refused for that fire alone', () => {
   let repo!: string;
   let e!: import('agent-runtime').EngineShape;
-  let file!: string;
   beforeAll(() => {
     const t = teardowns();
     repo = aStore(t, '2026-10-05T14:00:00Z');
     weekly();
     e = runtime();
-    file = path.join(ROOT, 'factories', 'solo.json');
     return t.end;
   });
   const s = story(test);
@@ -227,7 +226,7 @@ describe('a schedule written after its latest fire waits for its next; refused b
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled?.due, '2026-10-12T13:00:00.000Z');
   });
   s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async () => {
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), workflows: [] }, null, 2));
+    plantFactory(ROOT, 'solo', JSON.stringify({ ...JSON.parse(factoryText(ROOT, 'solo') ?? '{}'), workflows: [] }, null, 2));
     vi.setSystemTime(Date.parse('2026-10-19T13:00:30Z'));
     const refused = await runWith(e, tickRun({ repo }));
     assert.ok(refused.scheduled && 'refused' in refused.scheduled, JSON.stringify(refused.scheduled));
@@ -277,9 +276,8 @@ test('across the end of daylight saving in Montreal, 2026-11-01, a daily fire at
 
 /** The schedule `schedule` planted in the factory `name`'s file by hand, as an older `nemia` wrote it: no write's refusal reads it. */
 const planted = (name: string, workflow: string, schedule: Record<string, string>) => {
-  const file = path.join(ROOT, 'factories', `${name}.json`);
-  const was = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  fs.writeFileSync(file, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);
+  const was = JSON.parse(factoryText(ROOT, name) ?? '{}') as Record<string, unknown>;
+  plantFactory(ROOT, name, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);
 };
 
 describe("an old schedule's repository is read and ignored: its run starts on the repository the factory's wiring names", () => {

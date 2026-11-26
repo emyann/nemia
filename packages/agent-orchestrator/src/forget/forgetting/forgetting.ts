@@ -94,8 +94,8 @@ const waitWords = (f: EngineForgetting, marker: string, dry: boolean) => {
 };
 
 /**
- * The engine's refusals, of tasks by name and of the whole call, in its words, and, unless `dry`, the marker they leave, which only a
- * person removes; empty without one.
+ * The engine's refusals, of tasks by name and of the whole call, in its words, and, unless `dry`, the marker they leave, which a pass
+ * lifts once the engine forgets them; empty without one.
  */
 const refusalWords = (f: EngineForgetting, marker: string, dry: boolean) => {
   if (!forgettingRefused(f)) return '';
@@ -108,7 +108,7 @@ const refusalWords = (f: EngineForgetting, marker: string, dry: boolean) => {
     .join('; ');
   if (dry) return said;
   const asks = `${marker} keeps their ids and the daemon asks again each pass`;
-  return `${said} ${asks}; only a person removes it, once nothing of them is wanted: rm ${marker}`;
+  return `${said} ${asks}; settle what the engine refused on it, and the next pass lifts it`;
 };
 
 /**

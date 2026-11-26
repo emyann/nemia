@@ -15,7 +15,6 @@ import { root, SEATED } from './harness.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from 'objects';
 import { decideRun, list, prunedKept, prunedWords, retryRun, roundRun, usedLines } from 'agent-orchestrator';
@@ -32,6 +31,8 @@ import {
   runKey,
   runsNow,
   testPlace,
+  plantMarker,
+  dropMarker,
 } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from 'test-kit/checkpoints';
@@ -47,11 +48,6 @@ type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-15T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /**
  * A step's task that ran once from `from` seconds, and signed off with `closeout` — its attempt with the usage the engine read of it, when
  * it read one.
@@ -536,9 +532,8 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
   s.test(
     "REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `nemia decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise",
     async () => {
-      const marker = path.join(root, 'runs', `${R}.pruned`);
       const pruned = { at: '2026-09-15T07:00:00.000Z', worktrees: [] };
-      write(marker, JSON.stringify(pruned));
+      plantMarker(root, R, 'pruned', JSON.stringify(pruned));
       try {
         const said = await runWith(engine(), decideRun(R));
         const body = await decision();
@@ -574,7 +569,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
         assert.deepEqual([run.status.waitingOnYou, run.status.steps.map((s) => s.raise)], [[], [null, null, null]]);
         assert.doesNotMatch(JSON.stringify(run.status.steps.map((s) => s.note)), /nemia (retry|approve) /);
       } finally {
-        fs.rmSync(marker);
+        dropMarker(root, R, 'pruned');
       }
       nothingWritten('reading a pruned run asks for nothing');
     },

@@ -162,17 +162,17 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
   const folders = folderReader(home);
   const built = (run: Run, one: JudgedOrWhy) =>
     Effect.gen(function* () {
-      const steps = yield* stepsReadingOf(e, home, run, one, folders(run), git);
+      const steps = yield* stepsReadingOf(e, home, run, one, yield* folders(run), git);
       if ('unjudged' in steps) return { core: undefined, answer: steps, failed: false };
       const core = yield* runObjectCore(run, runReadingOf(steps), { said: reads.memo.said, listed: true });
-      return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run), true)), failed: readFailed(steps) };
+      return { core, answer: withDiskParts(core, diskPartsOf(run, home, yield* folders(run), true)), failed: readFailed(steps) };
     });
   return (run: Run, judgement: Judgement) =>
     Effect.gen(function* () {
       const kept = keptObject(memo, run.id, judgement);
       if (kept !== undefined) {
         memo.objectHits++;
-        const parts = diskPartsOf(run, home, folders(run), true);
+        const parts = diskPartsOf(run, home, yield* folders(run), true);
         if (verify) {
           const fresh = yield* built(run, { judgement });
           if (!isDeepStrictEqual(withDiskParts(kept, parts), fresh.answer))

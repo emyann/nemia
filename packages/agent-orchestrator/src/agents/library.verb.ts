@@ -20,6 +20,7 @@ import type { AgentSidecar, AgentWritten } from './agents.store.ts';
 import { AgentDoor, type AgentRemoved } from './agent-door.store.ts';
 import { AgentName } from './agents.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { definitionJudged, definitionsSwept, heldVersion } from '../definition-index/definition-index.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -119,11 +120,13 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
       );
       const sidecar: AgentSidecar | null | undefined = schema;
       const door = yield* AgentDoor;
-      return yield* door.agents.write(AgentName.read(name ?? draft.name), draft, version, {
-        dir,
-        ...(sidecar !== undefined && { schema: sidecar }),
-        ...(repo !== undefined && { repo }),
-      });
+      const at = { dir, ...(repo !== undefined && { repo }) };
+      const judged = AgentName.read(name ?? draft.name);
+      yield* definitionJudged('Agent', from === 'factory' ? factory : undefined, judged, version, 'write');
+      const held = version === undefined ? undefined : (heldVersion(yield* door.agents.there(judged, at)) ?? version);
+      const written = yield* door.agents.write(judged, draft, held, { ...at, ...(sidecar !== undefined && { schema: sidecar }) });
+      yield* definitionsSwept();
+      return written;
     }),
   print: () => [],
 };
@@ -137,7 +140,12 @@ export const AGENTS_REMOVE: Served<AgentRemoved, AgentRemoveInput> = {
       const root = yield* StoreRoot;
       const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', from, name, repo ?? '', root));
       const door = yield* AgentDoor;
-      return yield* door.agents.remove(AgentName.read(name), version, { dir, ...(repo !== undefined && { repo }) });
+      const at = { dir, ...(repo !== undefined && { repo }) };
+      yield* definitionJudged('Agent', undefined, name, version, 'remove');
+      const held = version === undefined ? undefined : (heldVersion(yield* door.agents.there(AgentName.read(name), at)) ?? version);
+      const removed = yield* door.agents.remove(AgentName.read(name), held, at);
+      yield* definitionsSwept();
+      return removed;
     }),
 };
 

@@ -23,6 +23,7 @@ import { workflowsIn } from '../folder/folder.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { keyspaceAt, keyspaceFile } from '../keyspace/keyspace.store.ts';
 import { DEFINITIONS_PREFIX, REPO_SCOPE, revisionTable } from '../list-watch/kind-watch.ts';
+import { Conflict } from '../refusal/refusal.ts';
 import { recordDue } from '../observed/observed.ts';
 import { indexedRevision } from './definition-index.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
@@ -94,7 +95,7 @@ const together = (versions: readonly (string | null)[]) => {
 };
 
 /** What `there` of a door says is held: its version, none where nothing is at the name. */
-const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
+export const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
 
 /**
  * The skills a folder of skills holds, each digested as the Skill door versions it, found in `scope`.
@@ -338,3 +339,36 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
   const held = new Map([[DEFINITIONS_PREFIX, (yield* definitionsNumbered()).held]]);
   return revisionTable(kind, held)(namespace, name);
 });
+
+/**
+ * Refuses `Conflict` a write of a definition whose writer read it at another revision than it stands at now: the revision a reader is
+ * served is the one the writer names (`definitionRevisionNow`, worked out with no write), so a hand edit since the read counts and a
+ * lost update is never possible. Nothing is judged where no revision is named: a definition made.
+ * @param kind What the definition is.
+ * @param namespace The namespace it is served in, none for the library's.
+ * @param name The definition's name.
+ * @param read The `resourceVersion` the writer read it at, none for a definition made.
+ * @param what What the writer does, as the refusal says it: `write` or `remove`.
+ */
+export const definitionJudged = Effect.fn('definitionJudged')(function* (
+  kind: 'Agent' | 'Skill' | 'Workflow',
+  namespace: string | undefined,
+  name: string,
+  read: string | undefined,
+  what: 'write' | 'remove',
+) {
+  if (read === undefined) return;
+  const now = String(yield* definitionRevisionNow(kind, namespace, name));
+  if (now !== read)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `the ${kind} ${name} changed since it was read (it is at revision ${now}, not ${read}), and a ${what} would lose what changed: read it again, make the change on what it holds now, and ${what} that`,
+      }),
+    );
+});
+
+/**
+ * The index read again once a writer has changed a definition, so what the writer answers stands at a revision the keyspace holds. A
+ * sweep that cannot read leaves the write standing: the daemon's next sweep numbers it.
+ */
+export const definitionsSwept = () => Effect.ignore(indexSweep());

@@ -14,6 +14,7 @@ import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedOf } from '../factory/door/factories.store.ts';
+import { definitionJudged, definitionsSwept, heldVersion } from '../definition-index/definition-index.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
@@ -114,7 +115,7 @@ const SkillChangeValue = Schema.declare(
 
 /**
  * What `nemia skills write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the skill's
- * name on the path where it changes one (`name`), the `version` it was read at, and either its `change` or the builtin skill to `copy`
+ * name on the path where it changes one (`name`), the `version` it was read at (the `resourceVersion` the skill was served at), and either its `change` or the builtin skill to `copy`
  * from the folder of builtin skills (`builtin`).
  */
 export const SkillWriteInput = Schema.Struct({
@@ -139,14 +140,23 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
         yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, { factory, treeOf: () => tree }),
       );
       const door = yield* SkillDoor;
-      if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);
+      if (copy !== undefined) {
+        const copied = yield* door.skills.copy(SkillName.read(copy), builtin, library);
+        yield* definitionsSwept();
+        return copied;
+      }
       if (change === undefined)
         return yield* Effect.fail(
           new Invalid({
             message: 'nemia skills write takes the skill to write, its SKILL.md: nemia skills write yours --file <SKILL.md>.',
           }),
         );
-      return yield* door.skills.write(SkillName.read(change.name), change, version, library);
+      const judged = SkillName.read(name ?? change.name);
+      yield* definitionJudged('Skill', from === 'factory' ? factory : undefined, judged, version, 'write');
+      const held = version === undefined ? undefined : (heldVersion(yield* door.skills.there(SkillName.read(change.name), library)) ?? version);
+      const written = yield* door.skills.write(SkillName.read(change.name), change, held, library);
+      yield* definitionsSwept();
+      return written;
     }),
   print: () => [],
 };

@@ -2870,7 +2870,7 @@ Calls `GET /api/runs/:runId/decision`.
 Its arguments:
 
 - runId: The run's id.
-- sensitive: Comma-separated globs whose changed files the decision shows in full (nemia decide --sensitive); else the defaults.
+- sensitive: Comma-separated globs whose changed files the decision shows in full (nemia decide --sensitive); else the `radius.checkAffecting` of its factory, none where it sets none.
 - diffs: Comma-separated paths whose diffs it answers whole, * for every one; every other file's lines are left out, its path and counts kept. Not given, no diff is answered whole.
 
 - On the port: Sends diffs= where the call gives no diffs: give it to ask otherwise.

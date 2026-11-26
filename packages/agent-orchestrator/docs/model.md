@@ -229,6 +229,8 @@ erDiagram
     object workflowRepos "optional"
     object triggers "optional"
     object labelValues "optional"
+    object radius "optional"
+    string firstWorkflow "optional"
     number generation "optional"
   }
   AppliedTemplate {

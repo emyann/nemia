@@ -75,14 +75,21 @@ const addedText = (diff: string) =>
 /**
  * What each of `branches` changed against the run's base, read from `place`:
  * once for the files each changed and the base's `package.json`, whose `workspaces` group them (`workspacesIn`), then once for the diffs
- * of the files the radius's `checkAffecting` names and of the notes each added. A branch the place has not is not known,
+ * of the files `sensitive` names and of the notes each added. A branch the place has not is not known,
  * and so is everything of a read the place refused or never answered, in the place's words.
  * @param place The run's place, which reads the repository.
  * @param run The repository run, whose base the branches are read against.
  * @param branches The branches read.
- * @param globs The factory's radius: its `checkAffecting` files are the ones whose diffs are read, and each list flags its own files.
+ * @param globs The factory's radius: each list flags its own files.
+ * @param sensitive The globs whose files' diffs are read whole; the radius's `checkAffecting` where absent.
  */
-export function changesOf(place: Place, run: RepositoryRun, branches: readonly string[], globs: RadiusGlobs) {
+export function changesOf(
+  place: Place,
+  run: RepositoryRun,
+  branches: readonly string[],
+  globs: RadiusGlobs,
+  sensitive: readonly string[] = globs.checkAffecting,
+) {
   const asked = [...new Set(branches)];
   if (!asked.length) return [];
   const first = reportOf(place, run, { branches: asked, atBase: ['package.json'] });
@@ -92,7 +99,7 @@ export function changesOf(place: Place, run: RepositoryRun, branches: readonly s
     const said = 'unknown' in first ? first.unknown : `the place has no branch ${branch} in ${run.repo}`;
     return { branch, files, radius: files ? radius(files, workspaces, globs) : { error: notKnown(said) } };
   });
-  const wanted = (files: readonly ChangedFile[]) => [...sensitivePaths(files, globs.checkAffecting), ...notesIn(files)];
+  const wanted = (files: readonly ChangedFile[]) => [...sensitivePaths(files, sensitive), ...notesIn(files)];
   const diffOf = [...new Set(read.flatMap(({ files }) => (files ? wanted(files) : [])))];
   const readable = read.filter(({ files }) => files).map(({ branch }) => branch);
   const second = diffOf.length ? reportOf(place, run, { branches: readable, diffOf }) : undefined;
@@ -103,7 +110,7 @@ export function changesOf(place: Place, run: RepositoryRun, branches: readonly s
       if ('unknown' in second) return { error: notKnown(second.unknown) };
       return second.diffs[branch]?.[p] ?? { error: notKnown(`the place gave no diff of ${p} on ${branch}`) };
     };
-    const inFull = joined(sensitivePaths(files, globs.checkAffecting).map(diffOfPath));
+    const inFull = joined(sensitivePaths(files, sensitive).map(diffOfPath));
     return { branch, radius: r, inFull: inFull ?? '', notes: notesFrom(notesIn(files), diffOfPath) };
   });
 }

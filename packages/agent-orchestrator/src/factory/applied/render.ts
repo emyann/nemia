@@ -37,8 +37,8 @@ export type TemplateRead = {
 /**
  * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
  * its runs follow merged revisions, where the manifest says (`spec.revisions`), and the values each label key it names takes, where the
- * manifest's `spec.labelValues` renders any (`renderedLabelValues`), the globs of its radius (`renderedRadius`) and the workflow its first
- * card runs in, where the manifest names them.
+ * manifest's `spec.labelValues` renders any (`renderedLabelValues`), the globs of its radius (`renderedSettings`) and the workflow its
+ * first card runs in, where the manifest names them.
  */
 export type Wiring = {
   workflows: string[];

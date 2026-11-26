@@ -469,6 +469,8 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.workflowRepos',
     'output.triggers',
     'output.labelValues',
+    'output.radius',
+    'output.firstWorkflow',
   ],
   ensures: {
     detachWithdraws: {

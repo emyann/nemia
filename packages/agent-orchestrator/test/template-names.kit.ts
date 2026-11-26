@@ -95,7 +95,7 @@ function wordsOf(template: string) {
 
 /**
  * Every template Nemia ships, read: the folders of `packages/templates` that hold a `nemia.yaml`.
- * @param kept The names the core says for its own reasons (`TEMPLATE_KEPT`), left out of what is counted.
+ * @param kept The names the core says for its own reasons (`KEPT_NAMES`), left out of what is counted.
  */
 export function templateWords(kept: ReadonlySet<string>) {
   const root = path.join(ROOT, 'packages', 'templates');

@@ -239,10 +239,7 @@ const branchesOf = Effect.fnUntraced(function* (
     namesInOrder(run, decided.steps).map((name) => run.steps[name]?.branch),
     run.isolate ? run.branch : undefined,
   );
-  const changes = changesOf(place, run, [...toRead, ...branches, ...(run.isolate ? results : [])], {
-    ...radiusOf,
-    ...(how.sensitive === undefined ? {} : { checkAffecting: how.sensitive }),
-  });
+  const changes = changesOf(place, run, [...toRead, ...branches, ...(run.isolate ? results : [])], radiusOf, how.sensitive);
   const touched = toRead.map((branch) => changeOf(changes, branch));
   const read = branches.map((branch) => changeOf(changes, branch));
   if (!run.isolate) return { touched, results: read, standings: [] };

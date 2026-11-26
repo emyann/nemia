@@ -91,7 +91,7 @@ describe('closeoutIn: the counts a step declares', () => {
       step,
     ])!;
   test('each tally its step declares is valued off the closeout, in the step order', () => {
-    const c = served({ ...STEP, tally: ['issues', 'issues.open'] } as unknown as StepSpec);
+    const c = served({ ...STEP, tally: ['issues', 'issues.open'] });
     assert.deepEqual(c.tallies, [
       { tally: 'issues', value: 2 },
       { tally: 'issues.open', value: 1 },

@@ -242,7 +242,7 @@ const factoryFolder = (name: string) => {
 function rendered(name: string, workflows: readonly string[]) {
   const tree = path.join(factoryFolder(name), 'tree');
   fs.mkdirSync(tree, { recursive: true });
-  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows, hires: {} }, null, 2));
+  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows, hires: {}, firstWorkflow: 'quick' }, null, 2));
 }
 
 /**

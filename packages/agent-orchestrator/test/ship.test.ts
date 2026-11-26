@@ -869,6 +869,9 @@ const checkedDecision = async (exitCode: number | undefined) => {
     'approve-ship-1',
     JSON.stringify({ ...JSON.parse(askText(ROOT, id, 'approve-ship-1') ?? ''), at: '2026-09-17T08:00:00.000Z' }),
   );
+  const files = artifactsDir(ROOT, { id }, 'ship');
+  fs.mkdirSync(files, { recursive: true });
+  for (const name of ['answer-light-failed.png', 'page-001-dark.png']) fs.writeFileSync(path.join(files, name), Buffer.alloc(10, 1));
   stage.board().settle(checkId, 'failed', undefined, exitCode);
   if (exitCode !== undefined) stage.board().tasks.get(checkId)!.printed = { stdout: '' };
   await at.pass(id);

@@ -404,6 +404,202 @@
       }
     },
     {
+      "id": 48,
+      "type": "row",
+      "title": "Memory",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "id": 49,
+      "type": "timeseries",
+      "title": "Daemon memory",
+      "description": "process.memory.usage, v8js.memory.heap.space.size and v8js.memory.heap.used: the daemon's resident size, what V8 has committed for its heap and what the heap holds live; a leak climbs and stays, a burst rises and falls.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "process_memory_usage{service_name=\"$service\"}",
+          "legendFormat": "resident"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "v8js_memory_heap_space_size{service_name=\"$service\"}",
+          "legendFormat": "heap committed"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "v8js_memory_heap_used{service_name=\"$service\"}",
+          "legendFormat": "heap used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 50,
+      "type": "timeseries",
+      "title": "Outside the heap",
+      "description": "v8js.memory.external and v8js.memory.array_buffers: what the daemon holds outside the V8 heap, its buffers among it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "v8js_memory_external{service_name=\"$service\"}",
+          "legendFormat": "external"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "v8js_memory_array_buffers{service_name=\"$service\"}",
+          "legendFormat": "array buffers"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 51,
+      "type": "timeseries",
+      "title": "Heap limit",
+      "description": "v8js.memory.heap.size_limit: the size the daemon's V8 heap may grow to before the process fails, beside which the heap used is read.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "v8js_memory_heap_size_limit{service_name=\"$service\"}",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 5,
       "type": "row",
       "title": "Store and sessions",
@@ -412,7 +608,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 18
       },
       "panels": []
     },
@@ -427,7 +623,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 19,
         "w": 6,
         "h": 7
       },
@@ -479,7 +675,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 10,
+        "y": 19,
         "w": 6,
         "h": 7
       },
@@ -540,7 +736,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 19,
         "w": 6,
         "h": 7
       },
@@ -592,7 +788,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 10,
+        "y": 19,
         "w": 6,
         "h": 7
       },
@@ -642,7 +838,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 26
       },
       "panels": []
     },
@@ -657,7 +853,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 27,
         "w": 6,
         "h": 8
       },
@@ -710,7 +906,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 18,
+        "y": 27,
         "w": 6,
         "h": 8
       },
@@ -763,7 +959,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 27,
         "w": 6,
         "h": 8
       },
@@ -825,7 +1021,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 18,
+        "y": 27,
         "w": 6,
         "h": 8
       },
@@ -878,7 +1074,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 35,
         "w": 24,
         "h": 14
       },
@@ -938,7 +1134,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 49,
         "w": 24,
         "h": 14
       },
@@ -1032,7 +1228,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 63
       },
       "panels": []
     },
@@ -1047,7 +1243,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 55,
+        "y": 64,
         "w": 8,
         "h": 8
       },
@@ -1099,7 +1295,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 55,
+        "y": 64,
         "w": 8,
         "h": 8
       },
@@ -1151,7 +1347,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 55,
+        "y": 64,
         "w": 8,
         "h": 8
       },
@@ -1201,7 +1397,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 72
       },
       "panels": []
     },
@@ -1216,7 +1412,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1276,7 +1472,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 64,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1336,7 +1532,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 64,
+        "y": 73,
         "w": 8,
         "h": 9
       },
@@ -1396,7 +1592,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 73,
+        "y": 82,
         "w": 8,
         "h": 9
       },
@@ -1467,7 +1663,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 73,
+        "y": 82,
         "w": 8,
         "h": 9
       },
@@ -1528,7 +1724,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 73,
+        "y": 82,
         "w": 8,
         "h": 9
       },
@@ -1589,7 +1785,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 82,
+        "y": 91,
         "w": 12,
         "h": 8
       },
@@ -1650,7 +1846,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 82,
+        "y": 91,
         "w": 12,
         "h": 8
       },
@@ -1721,7 +1917,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 90,
+        "y": 99,
         "w": 8,
         "h": 9
       },
@@ -1792,7 +1988,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 90,
+        "y": 99,
         "w": 8,
         "h": 9
       },
@@ -1863,7 +2059,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 90,
+        "y": 99,
         "w": 8,
         "h": 9
       },
@@ -1932,7 +2128,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 99
+        "y": 108
       },
       "panels": []
     },
@@ -1947,7 +2143,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 100,
+        "y": 109,
         "w": 6,
         "h": 7
       },
@@ -1999,7 +2195,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 100,
+        "y": 109,
         "w": 6,
         "h": 7
       },
@@ -2069,7 +2265,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 100,
+        "y": 109,
         "w": 6,
         "h": 7
       },
@@ -2148,7 +2344,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 100,
+        "y": 109,
         "w": 6,
         "h": 7
       },
@@ -2198,7 +2394,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 107
+        "y": 116
       },
       "panels": []
     },
@@ -2208,7 +2404,7 @@
       "title": "",
       "gridPos": {
         "x": 0,
-        "y": 108,
+        "y": 117,
         "w": 24,
         "h": 2
       },
@@ -2228,7 +2424,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 110,
+        "y": 119,
         "w": 12,
         "h": 16
       },
@@ -2257,7 +2453,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 110,
+        "y": 119,
         "w": 12,
         "h": 16
       },
@@ -2282,7 +2478,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 126,
+        "y": 135,
         "w": 24,
         "h": 1
       },
@@ -2299,7 +2495,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 127,
+        "y": 136,
         "w": 6,
         "h": 9
       },
@@ -2381,7 +2577,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 127,
+        "y": 136,
         "w": 6,
         "h": 9
       },
@@ -2442,7 +2638,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 127,
+        "y": 136,
         "w": 6,
         "h": 9
       },
@@ -2494,7 +2690,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 127,
+        "y": 136,
         "w": 6,
         "h": 9
       },

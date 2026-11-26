@@ -4385,6 +4385,13 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   came back (`span`, its parents in `spans`), kept by a wrapping of the process's tracer (`openSpans`). A pass gives the loop up between
   two runs it judges in full (`advanceResting`), and so does a judgement of many runs (`judgementsOf`). What the passes cost the loop on a
   copy of the store is `tools/store-measure/loop.ts`'s.
+- **And records its memory** (`memoryWatched`, `src/telemetry/memory.store.ts`), so a leak or a burst shows as a line: every 10 s,
+  `process.memoryUsage()` and `v8.getHeapStatistics()` are read into gauges in bytes (`MEMORY`), named by OpenTelemetry's semantic
+  conventions for a Node runtime where one exists — `v8js.memory.heap.used` and `v8js.memory.heap.space.size` (the heap allocated and
+  the heap committed, each summed over V8's spaces), `process.memory.usage` (the resident size) — and in the same family where none
+  does: `v8js.memory.heap.size_limit` (V8's `heap_size_limit`: the convention's `v8js.memory.heap.limit` is the deprecated name of
+  `v8js.memory.heap.space.size`, a heap committed), `v8js.memory.external` and `v8js.memory.array_buffers`. **System**'s row **Memory** draws them. A gauge is no series read by its
+  increase, so none is born at zero.
 - **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
   what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it
   reads settled that the run's mark does not hold (`settlesCounted`, `settlesDue`), a task shared by tries once, and reads each of its

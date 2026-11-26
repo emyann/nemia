@@ -41,7 +41,7 @@ const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => read
       description: 'A first run is gated at its workflow’s ending, the step that lands, so the person approves what lands',
       condition: ({ input: [steps], output }) => {
         const ending = steps === undefined ? undefined : endingOf(steps);
-        return ending === undefined || (output.length === 1 && output[0] === ending);
+        return ending === undefined || (output.length === 1 && output.at(0) === ending);
       },
     },
     ungatedWithNoEnding: {

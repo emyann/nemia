@@ -2530,19 +2530,17 @@ kept nowhere:
   not ours, but a `workspaces` line names it: a file still counts once, in the outermost package on its
   way. A move counts in both
   places it touched, a binary file as a file with no lines. Then, each only when true, the
-  *agent-facing* files — what an agent reads as instructions: `CLAUDE.md`, `AGENTS.md`, `.claude/`,
-  `.codex/`, `.mcp.json`, a `README.md` — and the *check-affecting* ones: every `package.json`, the
-  lockfile, `tsconfig*.json`, `turbo.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `*.test.*`, anything under `test/` or `.e2e/`. Before a
+  *agent-facing* files — what an agent reads as instructions — and the *check-affecting* ones — what decides what a check means.
+  Which files they are is the run's factory's own setting, its `radius` (`agentFacing`, `checkAffecting`, `lessons`: lists of globs,
+  set by a template's `spec.radius` or a hand-made factory's file); the core names none, and a factory that sets none flags nothing. Before a
   terminal step has a branch — the first step's check refused it — the screen reads every branch a
   step worked on.
-- **in full** is the whole diff of the check-affecting files, because a check that passed says
+- **in full** is the whole diff of the factory's check-affecting files, because a check that passed says
   nothing about a check that was changed to pass. `wf decide <run> --sensitive <globs>` prints other
   files in full, for one screen; the touched lines still say which files are check-affecting. The
   heading with `none` under it means nothing on the list changed, not that nobody looked.
-- **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
-  `AGENTS.md`, the root's `docs/` or a workspace package's own — or that it wrote nothing there. Not any
-  `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. Writing down what a run
-  learned is the factory's rule, and this line holds a person to it.
+- **lesson** says whether the run changed a file where the next agent reads — the factory's `radius.lessons` globs — or that it wrote
+  nothing there. Writing down what a run learned is the factory's rule, and this line holds a person to it.
 - **not known**: where the place refused the report or was not heard — git not there, a repository gone, a branch it has not — each
   line says `what this run changed is not known: <what the place said>`, and the lesson that it could not be read, never that the
   branch changed nothing. A declared file the workspace no longer has is looked for on the step's branch the same way, and said to

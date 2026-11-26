@@ -8,7 +8,18 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
-import { cardNames, cardText, dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
+import {
+  cardNames,
+  cardText,
+  dropRecord,
+  keysUnder,
+  plantRecord,
+  recordText,
+  runFolderNames,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../../testing.ts';
 import { CardDoor, type CardDoorShape } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { afterAll, beforeAll, describe, test } from 'vitest';
@@ -812,7 +823,7 @@ test('a card gone between its start and the taking off of its `queued:` line is 
 
 test("a warm read of the inbox, through the informer the api keeps, answers a cold read's own; a card whose run was removed reads filed", async () => {
   emptyInbox();
-  for (const file of fs.readdirSync(path.join(ROOT, 'runs'))) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
+  for (const file of runFolderNames(ROOT)) fs.rmSync(path.join(ROOT, 'runs', file), { recursive: true });
   const { card } = addToInbox({ text: 'Cache the inbox' });
   writeRecord('r-started', { inbox: card.name });
   for (let n = 0; n < 20; n++) writeRecord(`fin-${String(n).padStart(3, '0')}`);

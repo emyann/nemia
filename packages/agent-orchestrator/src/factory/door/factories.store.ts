@@ -36,7 +36,7 @@ import { DEFAULT_FACTORY_RECORD, Factory as FactoryModel, FactoryName, isDefault
 import { defaultNamedRefusal, foundFactory, treeChecked } from '../factory.store.ts';
 import { folderPlacedAt, folderReadAt, folderRemovedAt } from './folder.store.ts';
 import { factoryRecords, recordsAt } from './records.store.ts';
-import type { FactoryDoorShape, FactoryLayer, FactoryRead } from './layer.ts';
+import type { FactoryDoorShape, FactoryLayer, FactoryRead } from './layer.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten } from '../rules/rules.store.ts';
 import {
   clearInstructionText,
@@ -47,7 +47,7 @@ import {
   type FactoryInstruction,
 } from '../instruction.store.ts';
 
-export type { FactoryDoorShape, FactoryLayer } from './layer.ts';
+export type { FactoryDoorShape, FactoryLayer } from './layer.store.ts';
 
 /** A factory written: what the model's `Factory` refuses of it, its invariants among it. */
 const factoryChecked = checked(FactoryModel, (factory: Factory) => `the factory ${factory.name}`);

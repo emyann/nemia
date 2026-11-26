@@ -20,19 +20,20 @@ import {
   cardKey,
   cardNames,
   cardText,
-  plantCard,
   dropFactory,
   dropRecord,
   emptyCards,
   emptyRuns,
   hireAgent,
   keysUnder,
+  markerText,
+  plantCard,
   plantFactory,
   plantRecord,
   removeFactory,
+  runFolderNames,
   runKey,
   runsNow,
-  markerText,
 } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
@@ -90,11 +91,7 @@ hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
 const cards = () => cardNames(root).map((n) => `${n}.md`);
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
-    ...keysUnder(root, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(root), ...keysUnder(root, '/registry/runs/')].sort();
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** The factory a card's namespace names: none for `default`. */

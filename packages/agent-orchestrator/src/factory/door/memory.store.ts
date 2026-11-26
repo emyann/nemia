@@ -18,7 +18,7 @@ import { Conflict, Invalid } from '../../refusal/refusal.ts';
 import { DEFAULT_INSTRUCTION } from '../factory.ts';
 import { factoryRulesRefusal, FACTORY_RULES_FILE } from '../rules/rules.ts';
 import { FactoryDoor, factoryDoorOver, factoryLayerOf, folderKeptRefusal, instructionRead, type FactoryLayer } from './factories.store.ts';
-import type { FactoryRead } from './layer.ts';
+import type { FactoryRead } from './layer.store.ts';
 import { factoryRecords } from './records.store.ts';
 import type { TreeFile } from '../../archive/archive.ts';
 import { folderPathRefusal, staysWithStore } from './folder.store.ts';

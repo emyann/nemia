@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { emptyRuns, listRuns, runRecord, runsNow } from '../testing.ts';
+import { clearFactories, emptyRuns, factoryText, listRuns, plantFactory, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -95,9 +95,10 @@ const aTeamRepo = () => {
  * repository of its own, attaching the team's `dev`, and the clock at `now`. The cap as given: `undefined` unsets it.
  */
 const aStore = (t: Finishes, now: string, cap?: string) => {
-  for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
+  for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
+  clearFactories(ROOT);
   emptyRuns(ROOT);
   ENV.WF_MAX_RUNS = cap;
   vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
@@ -277,9 +278,8 @@ test('across the end of daylight saving in Montreal, 2026-11-01, a daily fire at
 
 /** The schedule `schedule` planted in the factory `name`'s file by hand, as an older `nemia` wrote it: no write's refusal reads it. */
 const planted = (name: string, workflow: string, schedule: Record<string, string>) => {
-  const file = path.join(ROOT, 'factories', `${name}.json`);
-  const was = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  fs.writeFileSync(file, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);
+  const was = JSON.parse(factoryText(ROOT, name) ?? '{}') as Record<string, unknown>;
+  plantFactory(ROOT, name, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);
 };
 
 describe("an old schedule's repository is read and ignored: its run starts on the repository the factory's wiring names", () => {

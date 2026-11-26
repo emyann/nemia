@@ -560,6 +560,16 @@ export const recordText = (root: string, key: string) => {
 };
 
 /**
+ * The names under the store `home`'s `runs/` folder, none where the folder is not there: a run's own folders, which a store with no run
+ * started has none of.
+ * @param home The store's root folder.
+ */
+export const runFolderNames = (home: string) => {
+  const dir = path.join(home, 'runs');
+  return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+};
+
+/**
  * The revision a record holds at its key in the store `root`: undefined where none is there. Two reads that answer the same prove no
  * write came between.
  * @param root The store's root folder.

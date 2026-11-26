@@ -44,15 +44,16 @@ import {
   askNames,
   asksPrefix,
   dropAsk,
+  dropMarker,
   keysUnder,
+  markerText,
   plantAsk,
+  plantMarker,
   plantRecord,
   recordText,
+  runFolderNames,
   runKey,
   runsNow,
-  markerText,
-  plantMarker,
-  dropMarker,
 } from 'agent-orchestrator/testing';
 
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
@@ -549,8 +550,7 @@ const lift = (id: string, headers: Record<string, string> = BOARD) =>
 /** Every file of a run in the store's `runs/`, and what each holds: what a refusal must leave as it was. */
 const filesOf = (id: string) =>
   Object.fromEntries([
-    ...fs
-      .readdirSync(path.join(root, 'runs'))
+    ...runFolderNames(root)
       .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
       .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]),
     ...[runKey(id), ...keysUnder(root, asksPrefix(id))].map((key) => [key, recordText(root, key)]),
@@ -635,11 +635,11 @@ describe('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing no
   test('REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written', async () => {
     plantMarker(root, 'h-removed', 'hold', JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
     for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
-      const before = [...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort();
+      const before = [...runFolderNames(root), ...keysUnder(root, '/registry/')].sort();
       const res = await lift(id);
       assert.equal(res.status, 404, id);
       assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
-      assert.deepEqual([...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort(), before, id);
+      assert.deepEqual([...runFolderNames(root), ...keysUnder(root, '/registry/')].sort(), before, id);
     }
     assert.ok(
       holdText('h-removed') !== undefined,
@@ -800,11 +800,11 @@ describe('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing noth
     }
   });
   test('REFUSED at shipped defaults: a hold of a run the store does not have is a 404, and nothing is written', async () => {
-    const before = [...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort();
+    const before = [...runFolderNames(root), ...keysUnder(root, '/registry/')].sort();
     const res = await put('h-nope', { until: ['p-live'] });
     assert.equal(res.status, 404);
     assert.match(((await res.json()) as { error: string }).error, /^No run 'h-nope' in this store/);
-    assert.deepEqual([...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort(), before);
+    assert.deepEqual([...runFolderNames(root), ...keysUnder(root, '/registry/')].sort(), before);
   });
   test("REFUSED at shipped defaults: a hold `hold` refuses — a run already held, a cancelled run, a run to wait on the store does not have, the run itself, a run that waits on this one — is a 409 in `nemia hold`'s words, and nothing is written", async () => {
     const cases: Array<[string, string[], string]> = [

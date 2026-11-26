@@ -14,8 +14,8 @@
 
  */
 import type { Effect } from 'effect';
-import { clearFactories } from '../testing.ts';
-import { factoriesNow } from '../testing.ts';
+import { clearFactories, runFolderNames } from '../testing.ts';
+import { factoriesNow, factoryText } from '../testing.ts';
 import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -83,11 +83,7 @@ const promptOf = (run: Parameters<typeof agentFilesDir>[1], step: string) =>
   fs.readFileSync(path.join(agentFilesDir(ROOT, run, step), 'prompt.md'), 'utf8');
 
 /** The runs written under the store. */
-const runsWritten = () =>
-  [
-    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
-    ...keysUnder(ROOT, '/registry/runs/'),
-  ] satisfies string[];
+const runsWritten = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')] satisfies string[];
 
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
 const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
@@ -105,13 +101,11 @@ const keysOf = (steps: readonly StepSpec[]) =>
 describe("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", () => {
   let here!: { repo: string; dev: string; file: string };
   let FILE!: string;
-  let record!: string;
   let told!: import('../src/start/start.verb.ts').StartedRun;
   beforeAll(() => {
     const t = teardowns();
     here = fresh();
     FILE = here.file;
-    record = path.join(ROOT, 'factories', 'pipao.json');
     told = none;
     return t.end;
   });
@@ -129,7 +123,7 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     const written = await rulesOf({ factory: 'pipao', words: '\n\nBefore: never push on a Friday.\n\n' });
     assert.deepEqual(written, { name: 'pipao', file: FILE, words: 'Before: never push on a Friday.', error: null });
     assert.equal(fs.readFileSync(FILE, 'utf8'), 'Before: never push on a Friday.\n');
-    assert.deepEqual(factoryRules(ROOT, 'pipao'), written);
+    assert.deepEqual(factoriesNow(ROOT, factoryRules(ROOT, 'pipao')), written);
   });
   s.test("`nemia start` freezes them on every step, after the agent's own, and they are all that was added", async () => {
     told = await started(here, 'freeze the rules', 'pipao');
@@ -220,11 +214,11 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
   });
   s.test('`nemia factory instruction` writes where it is kept, a path or the store, every other key of the file kept', () => {
-    const others = JSON.parse(fs.readFileSync(record, 'utf8'));
+    const others = JSON.parse(factoryText(ROOT, 'pipao') ?? '');
     setInstructionAt(ROOT, { factory: 'pipao', at: { path: 'docs/../docs/X.md' } });
-    assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), { ...others, instruction: { path: 'docs/X.md' } });
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'pipao') ?? ''), { ...others, instruction: { path: 'docs/X.md' } });
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
-    assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), { ...others, instruction: { store: true } });
+    assert.deepEqual(JSON.parse(factoryText(ROOT, 'pipao') ?? ''), { ...others, instruction: { store: true } });
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').instruction, { store: true });
   });
   s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and the words a file holds', async () => {
@@ -252,7 +246,7 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     assert.deepEqual([cleared.file, cleared.removed], [kept, true]);
     assert.equal(factoriesNow(ROOT, factoryInstruction(ROOT, 'pipao')).stored, false);
     setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
-    assert.ok(!('instruction' in JSON.parse(fs.readFileSync(record, 'utf8'))), 'the key removed, never null');
+    assert.ok(!('instruction' in JSON.parse(factoryText(ROOT, 'pipao') ?? '')), 'the key removed, never null');
   });
 });
 

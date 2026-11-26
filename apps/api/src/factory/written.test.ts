@@ -5,6 +5,7 @@
  * instruct --clear` took off an instruction. A story in a scratch store
  * whose factory is filed with the package's own verb; a read answers no `written`.
  */
+import '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

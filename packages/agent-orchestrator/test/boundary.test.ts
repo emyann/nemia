@@ -221,6 +221,14 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/factory/door/folder.store.ts',
     'src/config/root.store.ts',
     'src/factory/door/records.store.ts',
+    'src/factory/door/layer.store.ts',
+  ],
+  'src/factory/door/layer.store.ts': [
+    'src/factory/factory.store.ts',
+    'src/factory/door/folder.store.ts',
+    'src/factory/rules/rules.store.ts',
+    'src/factory/instruction.store.ts',
+    'src/factory/applied/applied.store.ts',
   ],
   'src/factory/instruction.store.ts': ['src/record/record.store.ts'],
   'src/factory/door/folder.store.ts': [],
@@ -233,6 +241,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/level/level.store.ts',
     'src/factory/servers/servers.store.ts',
     'src/factory/applied/applied.store.ts',
+    'src/factory/door/layer.store.ts',
   ],
   'src/cards/cards.store.ts': ['src/door/door.store.ts', 'src/keyspace/import.store.ts', 'src/keyspace/keyspace.store.ts'],
   'src/folder/version.store.ts': [

@@ -6,7 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
-import { factoryText, cardKey, dropRecord, plantCard, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { factoryText, plantFactory, cardKey, dropRecord, plantCard, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -133,7 +133,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
       await madeByHand('crew', repo);
       await printedBy('factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
       await printedBy('factory', 'instruction', 'crew', '--store');
-      fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
+      plantFactory(ROOT, 'crew', `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = await startedId('Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo);
       runBefore = JSON.stringify(runRecord(ROOT, run));
       finished = await aFinished(repo, 'crew');
@@ -190,7 +190,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
   });
   s.test('a takeover stopped after staging, before the file, is finished by the next', async () => {
     const { template: _gone, ...rest } = fileOf('crew');
-    fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify(rest, null, 2)}\n`);
+    plantFactory(ROOT, 'crew', `${JSON.stringify(rest, null, 2)}\n`);
     const { digest: again } = await previewed('crew', dir);
     await printedBy('factory', 'adopt', 'crew', '--template', dir, '--plan', again);
     assert.equal((fileOf('crew').template as { source: string }).source, dir);

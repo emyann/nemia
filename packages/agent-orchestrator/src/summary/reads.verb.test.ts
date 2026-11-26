@@ -11,7 +11,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { workflowsOf } from './reads.verb.ts';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
-import { addFactoryAt, attachWorkflowAt, hireAgentAt, removeFactoryAt } from '../../testing.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt, plantFactory, removeFactoryAt } from '../../testing.ts';
 import type { Run } from '../record/record.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 
@@ -148,7 +148,7 @@ test('REFUSED: a run of a factory since removed is quiet while its folder reads,
 test('REFUSED: a run of a factory whose file no longer reads names the factory, and never the hires the loader was not given', () => {
   const { repo, folder } = repository();
   hiring('unread', repo);
-  fs.writeFileSync(path.join(ROOT, 'factories', 'unread.json'), 'not json');
+  plantFactory(ROOT, 'unread', 'not json');
   assert.equal(
     workflowsOf(runOf(repo, folder, 'unread', false), ROOT).warning,
     `The workflow folder ${folder} is not read as this run's start read it: the factory unread it started in no longer reads.`,

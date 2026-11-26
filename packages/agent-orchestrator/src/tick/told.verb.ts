@@ -327,7 +327,7 @@ export const recordedServers = (factory: string | undefined, home: string, own: 
  */
 const ownServersOf = Effect.fnUntraced(function* (factory: string | undefined) {
   const door = yield* FactoryDoor;
-  return yield* Effect.orElseSucceed(door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)), () => ({}) as FactoryServers);
+  return yield* Effect.orElseSucceed(door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)), () => ({}));
 });
 
 /**

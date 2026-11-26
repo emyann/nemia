@@ -123,7 +123,7 @@ async function severalRepos(page: Page, theme: string) {
 
 /** The box in a store with no factory on file: the one choice, no factory, and the line that files one, in the api's words. */
 async function noFactory(page: Page, theme: string) {
-  const back = noFactories(store!);
+  const back = noFactories();
   try {
     await open(page, '/inbox');
     const box = page.locator('form[aria-label="File a card"]');

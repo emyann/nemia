@@ -35,6 +35,7 @@ import {
   plantFactory,
   plantRecord,
   removeFactory,
+  runFolderNames,
   runKey,
   runsNow,
   setSchedule,
@@ -106,11 +107,7 @@ const get = async <T>(url: string) => {
 };
 const said = (body: unknown) => (body as { error: string }).error;
 const names = (listings: WorkflowListing[]) => listings.map((w) => w.name);
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
-    ...keysUnder(root, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(root), ...keysUnder(root, '/registry/runs/')].sort();
 
 const post = (url: string, body: unknown) =>
   app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

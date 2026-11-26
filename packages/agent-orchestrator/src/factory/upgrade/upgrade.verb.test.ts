@@ -24,7 +24,7 @@ import { FACTORY_RULES, factoryRules, runWith as runEngine } from '../../runner.
 import { readFactoryAt } from '../../../testing.ts';
 import { factoryTyped } from '../../../test/factory-typed.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
-import { dropRecord, recordRevision } from '../../../testing.ts';
+import { dropRecord, factoriesNow, recordRevision } from '../../../testing.ts';
 import { appliedKey } from '../door/factory-keys.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
@@ -359,7 +359,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     assert.equal(status.upgrade, undefined, 'no conflict');
     assert.equal(textIn(treeDir(ROOT, 'ruled'), RULES), 'Never push on a Friday.\n');
     assert.equal(textIn(appliedDir(ROOT, 'ruled'), RULES), 'Never push on a Friday.\n');
-    assert.deepEqual(factoryRules(ROOT, 'ruled'), {
+    assert.deepEqual(factoriesNow(ROOT, factoryRules(ROOT, 'ruled')), {
       name: 'ruled',
       file: path.join(treeDir(ROOT, 'ruled'), RULES),
       words: 'Never push on a Friday.',

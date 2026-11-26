@@ -28,7 +28,7 @@ export const fromThrow = <A>(act: () => A) =>
   Effect.try({ try: act, catch: (err) => err }).pipe(Effect.catch((err) => (isRefusal(err) ? Effect.fail(err) : Effect.die(err))));
 
 /** What a layer's method answers as the door's Effect answers it: the value of an Effect it answers itself, else the value. */
-type Answered<R> = R extends Effect.Effect<infer A, unknown, never> ? A : R;
+type Answered<R> = R extends Effect.Effect<infer A, unknown> ? A : R;
 
 /**
  * A method of a layer, turned into the door's: its first parameter, where it is a string, the door's id `I`, and an Effect answered. A

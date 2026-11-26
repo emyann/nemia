@@ -34,17 +34,18 @@ import {
   askKey,
   asksPrefix,
   claimKey,
+  dropMarker,
   keysUnder,
+  markCancelled,
+  plantMarker,
   plantRecord,
   recordText,
   runFilesImported,
+  runFolderNames,
   runKey,
-  runsNow,
-  markCancelled,
-  plantMarker,
-  dropMarker,
   runMarkKey,
   runMarksPrefix,
+  runsNow,
 } from '../testing.ts';
 
 const ROOT = scratch('wf-run-store-');
@@ -304,7 +305,7 @@ test("a run forgotten loses its record, its claim and its asks, key by key, then
   assert.deepEqual(keysUnder(ROOT, asksPrefix(run.id)), []);
   assert.deepEqual(keysUnder(ROOT, runMarksPrefix(run.id)), [], 'no marker is left');
   assert.deepEqual(
-    fs.readdirSync(runsDir(ROOT)).filter((name) => name === run.id || name.startsWith(`${run.id}.`)),
+    runFolderNames(ROOT).filter((name) => name === run.id || name.startsWith(`${run.id}.`)),
     [],
   );
   assert.equal(store.runs.exists(other.id), true);

@@ -14,6 +14,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { factoryText } from 'agent-orchestrator/testing';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { FACTORY_APPLY, loadWorkflows } from 'agent-orchestrator';
@@ -334,7 +335,11 @@ test('REFUSED: a github that is no boolean, at apply, naming the --set that fixe
     handled(env, FACTORY_APPLY, ['x', '--template', COPY, '--volume', `${repo}:rw`, '--no-trust', '--set', 'github=yes']),
     /--set github=(?:true|false)\b/,
   );
-  assert.equal(fs.existsSync(path.join(env.WF_ROOT!, 'factories', 'x')), false, 'and no factory is filed');
+  assert.equal(
+    fs.existsSync(path.join(env.WF_ROOT!, 'factories', 'x')) || factoryText(env.WF_ROOT!, 'x') !== undefined,
+    false,
+    'and no factory is filed',
+  );
 });
 
 test("each step that writes its own output has its schema beside it, the template's bytes, and so has each agent", () => {

@@ -216,7 +216,7 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   assert.equal(lackingForgets.length, before + 1, 'a pass asks again');
   const [line, ...more] = done.forgetting ?? [];
   assert.deepEqual([more, line?.warn], [[], true], JSON.stringify(done.forgetting));
-  assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.endsWith(`rm ${marker}`), line.text);
+  assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.includes(`${marker} keeps their ids`), line.text);
   assert.ok(stands(marker) && (await listed()).includes(task), "the marker stands, and the task is the engine's");
 
   await runWith(e, tickRun({ repo: ROOT }));

@@ -15,7 +15,7 @@ import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
 import { startedFacts } from './commands.verb.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt, attachWorkflowAt } from '../../testing.ts';
+import { addFactoryAt, attachWorkflowAt, factoryText, plantFactory } from '../../testing.ts';
 
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -128,8 +128,7 @@ describe("a start's own --label is judged against its factory's label values; a 
   beforeAll(() => {
     repo = aRepo();
     addFactoryAt(ROOT, { name: 'lv', volumes: [`${repo}:rw`] });
-    const file = path.join(ROOT, 'factories', 'lv.json');
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), labelValues: { work: ['feature', 'fix'] } }));
+    plantFactory(ROOT, 'lv', JSON.stringify({ ...JSON.parse(factoryText(ROOT, 'lv') ?? '{}'), labelValues: { work: ['feature', 'fix'] } }));
   });
   test('REFUSED: --label work=store in a factory that takes work=feature|fix is Invalid, naming it, before any file is written', async () => {
     const before = fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [];

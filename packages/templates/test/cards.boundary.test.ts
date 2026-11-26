@@ -6,7 +6,7 @@
  * ready to start, never a card whose title the inbox already has, and starts nothing; `check` files none. Each refusal has a fixture that
  * breaks its rule, and files nothing at all. A refusal is held by its exit and by what it filed, never by its words.
  */
-import { keysUnder } from 'agent-orchestrator/testing';
+import { keysUnder, runFolderNames } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -89,11 +89,7 @@ test('each card is filed through nemia inbox add, ready to start, with its numbe
     assert.doesNotMatch(text, /^queued:/m);
   }
   assert.ok(ran.out.includes('Allow agora the log it reads'), ran.out);
-  assert.deepEqual(
-    [...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []), ...keysUnder(root, '/registry/runs/')],
-    [],
-    'no run started',
-  );
+  assert.deepEqual([...runFolderNames(root), ...keysUnder(root, '/registry/runs/')], [], 'no run started');
 });
 
 test("Argus's check, cards.ts check, files nothing; the command node after it, cards.ts file, files what it passed", async (t) => {

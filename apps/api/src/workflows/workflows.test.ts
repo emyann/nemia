@@ -29,11 +29,12 @@ import {
   attachWorkflow,
   hireAgent,
   keysUnder,
+  plantMarker,
   plantRecord,
   recordText,
+  runFolderNames,
   runKey,
   runsNow,
-  plantMarker,
 } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
@@ -177,11 +178,7 @@ const tells = (said: string, head: string, facts: string[]) => {
 };
 
 /** The files in the store's runs directory: a record per run, and anything else anyone wrote there. */
-const runFiles = () =>
-  [
-    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
-    ...keysUnder(root, '/registry/runs/'),
-  ].sort();
+const runFiles = () => [...runFolderNames(root), ...keysUnder(root, '/registry/runs/')].sort();
 
 /** The tasks filed with the engine: a journal each. */
 const filedTasks = () => (fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : []);

@@ -41,7 +41,7 @@ export const libraryServerObjects = Effect.fn('libraryServerObjects')(function* 
   );
   return [...own, ...builtin].sort((a, b) =>
     a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0,
-  ) satisfies McpServer[] as McpServer[];
+  ) satisfies McpServer[];
 });
 
 /** The object of the library server `name` at `origin`, with the factories that add it. */

@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
-import { keysUnder, plantRecord, recordText, runKey, runsNow, testPlace, plantMarker } from 'agent-orchestrator/testing';
+import { keysUnder, plantMarker, plantRecord, recordText, runFolderNames, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -89,8 +89,7 @@ const sayTo = (step: string, body: unknown, headers: Record<string, string> = BO
 /** Every file the api could have written, the runs' records and marks, and every word the engine was asked to say. */
 const written = () => ({
   files: Object.fromEntries(
-    fs
-      .readdirSync(path.join(root, 'runs'))
+    runFolderNames(root)
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(root, 'runs', f), 'utf8')]),
   ),

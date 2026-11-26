@@ -13,7 +13,7 @@
 
  */
 import { factoryKey } from '../src/factory/door/factory-keys.ts';
-import { clearFactories, factoryNamesAt, factoryText, plantFactory } from '../testing.ts';
+import { clearFactories, dropFactory, factoryNamesAt, factoryText, plantFactory, runFolderNames } from '../testing.ts';
 import { cardText, factoriesNow, keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { factoryLines } from '../src/factory/factory.ts';
+import { DEFAULT_NAMESPACE, factoryLines } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -76,11 +76,7 @@ async function refusedBy(act: () => unknown, tag: 'Missing' | 'Invalid' | 'Confl
 }
 
 /** The runs written under the store: none after a refusal. */
-const runsWritten = () =>
-  [
-    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
-    ...keysUnder(ROOT, '/registry/runs/'),
-  ] satisfies string[];
+const runsWritten = () => [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')] satisfies string[];
 
 /** `refusedBy`, and no run written by it. */
 async function startRefused(act: () => unknown, tag: 'Missing' | 'Invalid', ...facts: string[]) {
@@ -216,8 +212,8 @@ function asShipped(t: { onTestFinished: (fn: () => void) => void }) {
 /** The factory `name`'s record, as JSON. */
 const fileOf = (name: string) => JSON.parse(factoryText(ROOT, name) ?? '{}') as Record<string, unknown>;
 
-/** The factories the store holds a record of, by name. */
-const factoryFiles = () => factoryNamesAt(ROOT);
+/** The factories the store holds a record of, by name: the listing but the default factory, which is no record. */
+const factoryFiles = () => factoryNamesAt(ROOT).filter((name) => name !== DEFAULT_NAMESPACE);
 
 /** The workspaces the place lists under the store's worktrees for `repo`, as a string to compare. */
 const worktrees = (repo: string) => {
@@ -616,7 +612,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
   s.test(
     'with WF_DEFAULT_FACTORY_STARTS=1, a start no factory holds is in the default factory: plain sessions, no factory recorded',
     async () => {
-      fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"volumes": [], "hires": {"build/implement": "shipper"}}\n');
+      plantFactory(ROOT, 'default', '{"volumes": [], "hires": {"build/implement": "shipper"}}\n');
       const loose = aRepo();
       for (const factory of [undefined, 'default']) {
         const started = await runPlaced(
@@ -629,7 +625,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
       }
       const typed = runRecord(ROOT, startedId(await startTypedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
       assert.deepEqual(['factory' in typed, typed.repo], [false, loose]);
-      fs.rmSync(path.join(FACTORIES, 'default.json'));
+      dropFactory(ROOT, 'default');
     },
   );
   s.test('`nemia factory rm` removes the record, its rules and its instruction, and nothing of another factory', async () => {
@@ -641,7 +637,7 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
     assert.deepEqual([fs.existsSync(rules), fs.existsSync(path.join(FACTORIES, 'pipao'))], [false, false]);
     assert.deepEqual(factoryFiles(), ['mono']);
     assert.deepEqual(factoryText(ROOT, 'mono'), mono);
-    fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{');
+    plantFactory(ROOT, 'torn', '{');
     await typedFrom(ROOT, ['factory', 'rm', 'torn']);
     await typedFrom(ROOT, ['factory', 'rm', 'mono']);
     assert.deepEqual(factoryFiles(), []);

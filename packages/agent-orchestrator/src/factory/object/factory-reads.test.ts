@@ -15,7 +15,7 @@ import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { addFactory, attachWorkflow, plantRecord, runKey, setSchedule } from '../../../testing.ts';
-import { addFactoryAt } from '../../../testing.ts';
+import { addFactoryAt, plantFactory } from '../../../testing.ts';
 import { treeDir } from '../applied/applied.store.ts';
 import { metered } from '../../meter/tally.store.ts';
 import { recordMemo } from '../../rest/index.ts';
@@ -61,7 +61,7 @@ attachWorkflow({ factory: 'mill', workflow: 'nightly' });
 attachWorkflow({ factory: 'mill', workflow: 'janitor' });
 setSchedule({ factory: 'mill', workflow: 'nightly', cron: '0 3 * * *', brief: 'tidy at night' });
 setSchedule({ factory: 'mill', workflow: 'janitor', cron: '0 9 * * 1', brief: 'read the stats' });
-fs.writeFileSync(path.join(ROOT, 'factories', 'stray.json'), '{ not json');
+plantFactory(ROOT, 'stray', '{ not json');
 writeRun('r-fired', '2026-10-16T00:00:00.000Z', { factory: 'mill', workflow: 'janitor', due: '2026-10-15T09:00:00.000Z' });
 for (let n = 0; n < 200; n++) writeRun(`fin-${String(n).padStart(3, '0')}`, '2026-10-16T00:00:00.000Z');
 

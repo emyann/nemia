@@ -40,7 +40,7 @@ import { serversOf, serversTextOf } from '../servers/servers.store.ts';
 import { statusOf, statusText } from '../applied/applied.store.ts';
 import type { FactoryLevelFile } from '../../level/level.ts';
 import { APPLIED_PREFIX, FACTORIES_PREFIX, appliedKey, factoryKey, levelKey, serversKey } from './factory-keys.ts';
-import type { FactoryLayer } from './layer.ts';
+import type { FactoryLayer } from './layer.store.ts';
 
 /** Opens the keyspace the records are held in, refused as opening it is. */
 type Open = Effect.Effect<Keyspace, Refusal>;

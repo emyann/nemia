@@ -16,14 +16,15 @@ import {
   asksPrefix,
   keysUnder,
   listRuns,
+  markCancelled,
   plantRecord,
   readAnswers,
   recordText,
   retryAskKey,
+  runFolderNames,
   runKey,
   runRecord,
   runsNow,
-  markCancelled,
 } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -1656,7 +1657,7 @@ describe('telling a running step something with `nemia say`, and the try that co
     await tick(run.id);
     ended(taskId(), 'working');
     record = storedText(run.id);
-    beside = [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
+    beside = [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
     const told = await stage.runWith(
       b.e,
       SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope to apps/api too.', caller: PERSON }),
@@ -1667,11 +1668,7 @@ describe('telling a running step something with `nemia say`, and the try that co
   });
   s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
     assert.equal(storedText(run.id), record);
-    assert.deepEqual(
-      [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort(),
-      beside,
-      'the engine journal is the record',
-    );
+    assert.deepEqual([...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort(), beside, 'the engine journal is the record');
   });
   s.test('`nemia ls` notes the step said to, once and then twice', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0], {

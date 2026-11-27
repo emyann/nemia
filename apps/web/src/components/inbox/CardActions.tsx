@@ -7,7 +7,7 @@ import { CutComboBox } from '@/components/look';
 import { factoriesQuery } from '@/lib/api/factories';
 import { cardBodyQuery, dropCard, inboxPageQuery, queueCard, setCardAfter, setCardFrom, startCard, type InboxEntry } from '@/lib/api/inbox';
 import { type Started } from '@/lib/api/workflows';
-import { queueable, startedCard, unassigned, type CardRefusal } from '@/lib/inbox';
+import { chainOffered, queueable, startedCard, unassigned, type CardRefusal } from '@/lib/inbox';
 import { sayWritten } from '@/lib/written';
 import { copyAndSay, type CopySaid } from '@/lib/useCopy';
 import { FactoryCardStart, UnassignedStart } from '../factory/FactoryCardStart';
@@ -171,7 +171,9 @@ function CardMenu({
   const items = [
     ...(open ? [{ id: 'now', label: 'Start now, ahead of its chain', onAction: () => onSheet('start') }] : []),
     ...(open && entry.state === 'queued' ? [{ id: 'cancel', label: 'Cancel start', onAction: () => unqueue.mutate() }] : []),
-    ...(open && chain !== null && chain.length > 1 ? [{ id: 'chain', label: 'Start chain…', onAction: () => onSheet('chain') }] : []),
+    ...(open && chain !== null && chain.length > 1 && chainOffered(chain).length > 0
+      ? [{ id: 'chain', label: 'Start chain…', onAction: () => onSheet('chain') }]
+      : []),
     ...(open ? [{ id: 'edit', label: 'Edit', onAction: () => void navigate({ to: '/inbox/$name', params: { name: entry.name } }) }] : []),
     ...(open ? [{ id: 'after', label: 'Run it after…', onAction: () => onSheet('after') }] : []),
     ...(open ? [{ id: 'reads', label: 'Runs it reads…', onAction: () => onSheet('reads') }] : []),
@@ -342,7 +344,7 @@ function ChainSheet({
   onRefused: Refused;
 }) {
   const read = useRead();
-  const open = chain.filter((card) => startable(card) && card.state === 'filed' && queueable(card));
+  const open = chainOffered(chain);
   const must = new Set<string>([entry.name]);
   for (let again = true; again;) {
     again = false;
@@ -425,14 +427,15 @@ export function CardLink({ entry, className }: { entry: InboxEntry; className?: 
 
 /**
  * The chain's own Start chain…, at the head of a chain drawn whole: the sheet that chooses which of its cards to queue (`ChainSheet`),
- * asked about the card the chain leads toward (the last of `chain`, the chain's cards). A refusal of the api is said in the sheet, in its
+ * asked about the card the chain leads toward (the last of `chain`, the chain's cards); none where the chain has no card to offer
+ * (`chainOffered`). A refusal of the api is said in the sheet, in its
  * words.
  */
 export function StartChain({ chain }: { chain: readonly InboxEntry[] }) {
   const [open, setOpen] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const last = chain.at(-1);
-  if (last === undefined) return null;
+  if (last === undefined || chainOffered(chain).length === 0) return null;
   return (
     <>
       <Button variant="outlined" size="xsmall" onPress={() => setOpen(true)}>

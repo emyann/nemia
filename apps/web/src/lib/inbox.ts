@@ -192,6 +192,13 @@ export const queueable = (entry: InboxEntry) =>
   !unassigned(entry) && entry.state === 'filed' && entry.workflow !== null && entry.error === null;
 
 /**
+ * The cards of a chain its Start chain… offers to queue: each filed, read and queueable. A chain where none is shows no Start chain…, at
+ * its head or in a card's menu, since its sheet would offer nothing.
+ * @param chain The cards of the chain.
+ */
+export const chainOffered = (chain: readonly InboxEntry[]) => chain.filter((card) => !startedCard(card) && queueable(card));
+
+/**
  * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started
  * card, whatever try it still carries.
  * @param entry The inbox's entry.

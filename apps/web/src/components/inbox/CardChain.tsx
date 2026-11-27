@@ -7,7 +7,8 @@ import { InboxCard } from './InboxCard';
 /**
  * One chain of cards drawn whole: its cards in columns, the ones with nothing before them first, the cards each waits on to its left,
  * each in the compact size, and a wire between the columns (the line between them says what a card runs after). Its head says the card it
- * leads toward and how many of its cards are working or not started, and holds Start chain…. `members` are its columns.
+ * leads toward and how many of its cards are working or not started, and holds Start chain… where a card is left to offer. `members` are
+ * its columns.
  */
 export function CardChain({ members }: { members: readonly (readonly InboxEntry[])[] }) {
   const cards = members.flat();

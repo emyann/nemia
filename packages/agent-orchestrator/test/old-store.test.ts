@@ -15,6 +15,8 @@
  * - `drafts`, a folder run whose one step says the former `workspace: folder`, a list under its former name beside the new one on the
  *   step and in its agent's `given`, its agent's harness prompt as `systemPrompt: default`, and a key on the record and one on the step
  *   that a newer nemia wrote and this one does not name. It has filed nothing, and its folder is gone too.
+ * - `landed` and `shelved`, repository runs frozen under the old ending: a `land` step gated and `workspace: base`, approved on its first
+ *   try before it was filed, then tried again by a person, its second try signed off, on the base branch. `shelved` is pruned besides.
  * - `workflows/renamed`, and the agent it names in `workflows/agents`, a folder whose files still write `disallow:` and `allow:`.
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
@@ -29,7 +31,7 @@ import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { decidedOn } from './screens.ts';
-import { runWith, tickRun } from '../src/runner.ts';
+import { readFeed, runWith, tickRun } from '../src/runner.ts';
 
 import { ownDenies } from '../src/workflow/index.ts';
 import { stepPlace } from '../src/workflow.ts';
@@ -169,6 +171,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       'notes-implement-try2',
       'notes-implement-try2-check',
       'notes-ship',
+      ...['landed', 'shelved'].flatMap((id) => [`${id}-review`, `${id}-land`, `${id}-land-try2`]),
     ]) {
       await Effect.runPromise(b.e.file({ id: taskId, brief: 'as it stood', cwd: ROOT, harness: 'claude' }));
       b.settle(taskId, 'succeeded', SIGNED);
@@ -198,6 +201,38 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       'the step read as `place: folder` works in a folder of its own',
     );
   });
+  s.test(
+    'a run frozen under the old ending, its gated land approved before it was filed and signed off since, reads as landed, pruned or not',
+    async () => {
+      const report = await pass();
+      assert.deepEqual(
+        ['landed', 'shelved'].map((id) => report.runs.find((a) => a.run.id === id)?.status),
+        ['succeeded', 'succeeded'],
+        'not awaiting approval',
+      );
+      const { runs } = await listed();
+      for (const id of ['landed', 'shelved']) {
+        const listing = runs.find((r) => r.run.id === id)?.listed;
+        assert.ok(listing && 'waitingOnYou' in listing, `${id} is judged`);
+        assert.deepEqual(listing.waitingOnYou, [], `${id} waits on nobody`);
+        assert.notEqual(listing.steps.find((step) => step.name === 'land')?.reason, 'AwaitingApproval', `${id}'s land is not at its gate`);
+      }
+      const awaiting = readFeed(ROOT, 0).lines.filter(
+        (line) => line.reason === 'AwaitingApproval' && ['landed', 'shelved'].includes(String(line.labels?.run)),
+      );
+      assert.deepEqual(awaiting, [], 'the feed says no approval awaited of either');
+      assert.deepEqual(
+        [written('landed').approvedFirst, holdsAny(written('landed').workflow[1], 'workspace')],
+        [['land'], false],
+        'the record written back keeps the fact under `approvedFirst`, and the retired word goes',
+      );
+      assert.equal(
+        (await pass()).runs.find((a) => a.run.id === 'landed')?.status,
+        'succeeded',
+        'and the next pass, reading it back, agrees',
+      );
+    },
+  );
   s.test('each record the pass wrote holds the names its keys have now alone, and what a newer nemia wrote', () => {
     const [implement, review, ship] = written('tides').workflow;
     assert.deepEqual(

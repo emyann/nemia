@@ -77,8 +77,8 @@ test("POST /api/namespaces/acme/runs with models, gates and inputs starts a run 
   assert.deepEqual(fs.readFileSync(path.join(inputs, 'shot.png')), PNG);
   assert.deepEqual(
     [started.run?.models, started.run?.gated],
-    [{ implement: 'sonnet' }, ['implement']],
-    'what nemia start prints of it: its models and its gates',
+    [{ implement: 'sonnet' }, ['implement', 'ship']],
+    "what nemia start prints of it: its models, and its gates: the start's and the workflow's own",
   );
 });
 

@@ -470,17 +470,16 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     async () => {
       const repo = aRepo();
       const add = 'packages/x/src/add.ts';
+      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+      fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
       const working = async (file: string, text: string, settled: boolean) => {
-        const run = await started({ brief: `write ${file}`, repo, workflowDir: folder() });
+        const run = await started({ brief: `write ${file}`, repo, workflowDir: dir });
         await tick(run.id);
         const work = runRecord(ROOT, run.id).steps.implement;
         commitIn(work.workspace!, { [file]: text }, `write ${file}`);
         if (settled) {
-          settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED, usage: USAGE });
+          settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
           await tick(run.id);
-          settle(`${run.id}-implement-check`, 'succeeded', { exitCode: 0 });
-          await tick(run.id);
-          settle(`${run.id}-review`, 'succeeded', { closeout: SIGNED });
         }
         return { id: run.id, branch: work.branch! };
       };

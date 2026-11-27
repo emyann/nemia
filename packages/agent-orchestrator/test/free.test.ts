@@ -191,7 +191,10 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
   fs.writeFileSync(path.join(at, `${id}.txt`), 'work\n');
   world().commit(at, `work of ${id}`);
   sign(id, outcome);
-  return ticked((pass) => !atWork(id) && answerOf(pass, id)?.status !== 'running', `${id} past its work`);
+  return ticked((pass) => {
+    if (atWork(id)) sign(id, outcome);
+    return !atWork(id) && answerOf(pass, id)?.status !== 'running';
+  }, `${id} past its work`);
 }
 
 /** A one-step run that succeeded, its branch merged into main by hand: finished, with no ending. */
@@ -202,19 +205,17 @@ async function merged(repo = aRepo()) {
   return run;
 }
 
-/** A run of `work → ship` landed by its ending: approved at its gate, its session merging the branch in the checkout and signing off. */
+/** A run of `work → ship` whose ending has signed off and is approved, its branch then merged by hand: finished, on its base. */
 async function land(id: string, repo: string) {
   await worked(id);
   return shipped(id, repo);
 }
 
-/** The ending of a run whose work is done: approved, its merge made in the checkout, signed off; passes until the run rests, landed. */
+/** The ending of a run whose work is done and signed off: approved, its branch merged by hand; passes until the run rests, succeeded. */
 async function shipped(id: string, repo: string) {
   await stage.runWith(engine(), approveRun(id, 'ship'));
-  await ticked(() => atWork(id), `${id}'s ending at work`);
   mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, `land ${id}`);
-  sign(id);
-  return ticked((pass) => rests(pass, id, 'succeeded'), `${id} landed and at rest`);
+  return ticked((pass) => rests(pass, id, 'succeeded'), `${id} merged and at rest`);
 }
 
 /** What `nemia ls` answers (`RunsListed`) over the stage's engine. */

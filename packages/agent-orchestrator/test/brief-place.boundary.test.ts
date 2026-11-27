@@ -149,8 +149,7 @@ test("a repository run's briefs say what they said before the place gave their g
 test('a run is told the words of the place it is given, whatever place its record once named', () => {
   const run = runOf();
   const named: RepositoryRun = { ...run, placeSkill: { skill: 'git', version: 'a'.repeat(64) } };
-  for (const each of [run, named])
-    assert.deepEqual(toldBy()(each, stepNamed('review')), { say: builtinGitPlace.declared.say });
+  for (const each of [run, named]) assert.deepEqual(toldBy()(each, stepNamed('review')), { say: builtinGitPlace.declared.say });
 });
 
 test("a planted place's words replace every git command of a repository run's briefs", () => {

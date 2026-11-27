@@ -109,7 +109,11 @@ export function gateRefusal(
  * @param rule How the place reads one rule.
  * @param denies What the place denies the step besides.
  */
-export const fenceRules = (step: Pick<StepSpec, 'disallowedTools' | 'allowedTools'>, rule: (r: string) => string, denies: readonly string[]) => {
+export const fenceRules = (
+  step: Pick<StepSpec, 'disallowedTools' | 'allowedTools'>,
+  rule: (r: string) => string,
+  denies: readonly string[],
+) => {
   const read = (rules: readonly string[] | undefined, more: readonly string[]) =>
     (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
   return { disallowedTools: read(step.disallowedTools, denies), allowedTools: read(step.allowedTools, []) };

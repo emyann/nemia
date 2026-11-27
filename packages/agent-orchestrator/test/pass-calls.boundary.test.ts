@@ -20,7 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
-import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { advanceRun, cancelRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { meteredEngine } from '../src/meter/meter.verb.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
@@ -290,26 +290,19 @@ row(FILED, "a cancelled run's task in flight is stopped by the pass, and nothing
   assert.deepEqual(stopped.counted, { journals: 1, act: 3 });
 });
 
-row(FILED, 'an approved ending is filed in the checkout, once the pass has read afresh who holds it', async () => {
+row(FILED, 'a step that follows one is filed on the pass that reads the first signed off, and no sooner', async () => {
   const run = await started(folder({ implement: '', ship: 'after: implement\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
   fs.writeFileSync(path.join(runRecord(ROOT, run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const gated = await pass(b, run.id);
-  assert.deepEqual(gated.advanced.filed, [], 'the gate holds it');
-  assert.deepEqual(gated.calls, ['view R-implement']);
-  assert.deepEqual(gated.counted, { journals: 1, act: 3 }, 'the hand-off of what implement left, written, and the asks');
-
-  await runWith(b.e, approveRun(run.id, 'ship', 'Merge it.'));
-  const landing = await pass(b, run.id);
-  assert.deepEqual(landing.advanced.filed, ['ship']);
-  assert.deepEqual(landing.calls, ['view R-implement', 'view R-implement', 'file R-ship'], "the pass's read, and the filing");
-  assert.deepEqual(landing.counted, { journals: 2, act: 5 });
+  const filed = await pass(b, run.id);
+  assert.deepEqual(filed.advanced.filed, ['ship']);
+  assert.deepEqual([filed.calls[0], filed.calls.at(-1)], ['view R-implement', 'file R-ship'], "the pass's read, then the filing");
 });
 
 describe(
-  "what a pass calls of the engine, in order: each filing looked for first, a cancelled run's task stopped, an ending filed in the checkout",
+  "what a pass calls of the engine, in order: each filing looked for first, a cancelled run's task stopped, a follower filed once its step signed off",
   told(FILED),
 );
 

@@ -100,7 +100,7 @@ function FilterLine({ total, onClear }: { total: number; onClear: () => void }) 
       <Body size="small" component="span" colorRole="on-surface-variant">
         {total} {total === 1 ? 'card' : 'cards'}
       </Body>
-      <Button variant="text" size="xsmall" onPress={onClear}>
+      <Button variant="outlined" size="xsmall" onPress={onClear}>
         Clear filters
       </Button>
     </div>

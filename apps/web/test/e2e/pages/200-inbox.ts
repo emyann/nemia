@@ -76,7 +76,7 @@ async function stated(page: Page) {
   await offered.first().click();
   await page.waitForURL((url) => url.searchParams.has('phase'), { timeout: WAIT_MS });
   await idle(page);
-  const selected = page.locator('[aria-label="State"] [role="row"][aria-selected="true"]');
+  const selected = page.locator('[aria-label="State"] [role="radio"][aria-checked="true"]');
   const chip = ((await selected.textContent()) ?? '').toLowerCase();
   if (!chip.startsWith(word.toLowerCase()))
     throw new Refused(`the state picked in the bar is the chip selected — ${word}; the chip says ${chip}`);

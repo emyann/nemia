@@ -65,7 +65,7 @@ export type InboxEntry = {
   /** On a card two triggers of its factory would send to two workflows: their names. It waits until a selector or its labels change. */
   clash?: string[];
   /**
-   * On a card not started whose `after:` names cards that have not landed (`status.waitingOn`): each, where its work stands and whether
+   * On a card not started whose `after:` names cards that have not succeeded (`status.waitingOn`): each, where its work stands and whether
    * only a person can release it. No trigger queues it and the tick starts none of it while any is listed.
    */
   waits?: CardWait[];

@@ -75,7 +75,7 @@ const bodyOf = (l: InboxListing, text: string) => {
 
 /**
  * What the listed card `l`'s status says of the queue: its place, the triggers that queue it, those that clash on it, and the cards of its
- * `after:` not landed that keep it out of the queue (`waitingOn`).
+ * `after:` not released that keep it out of the queue (`waitingOn`).
  */
 const queueStatusOf = (l: InboxListing) => ({
   ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),

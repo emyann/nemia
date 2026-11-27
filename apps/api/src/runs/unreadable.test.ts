@@ -2,7 +2,7 @@
  * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: the RunList (`runListOf`) answers
  * every other run as it would, and leaves the run whose task does not read unjudged, saying why in the runtime's words (its `unjudged`
  * entry) — in flight on a list asked by state, as the tick leaves such a run where it is and counts it. So does a run waiting on it,
- * whose parent's task is read to see if it landed. A run's own page refuses in those words, and the cap on runs in flight counts both,
+ * whose parent's task is read to see if it succeeded. A run's own page refuses in those words, and the cap on runs in flight counts both,
  * unjudged, as the tick counts them. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
  * `standing.json`.
  *
@@ -41,8 +41,8 @@ git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'base');
 const base = git(repo, 'rev-parse', 'HEAD').trim();
 
-/** A branch off main with one commit of work on it, merged into main: the run it is the result of has landed. */
-function landed(branch: string) {
+/** A branch off main with one commit of work on it, merged into main: the run it is the result of has succeeded. */
+function branchMerged(branch: string) {
   git(repo, 'checkout', '-q', '-b', branch);
   write(path.join(repo, `${branch.replaceAll('/', '-')}.txt`), branch);
   git(repo, 'add', '-A');
@@ -99,11 +99,11 @@ function writeRun(id: string, steps: Record<string, object>, more: object = {}) 
   );
 }
 
-landed('wf/r-good/implement');
+branchMerged('wf/r-good/implement');
 signedOff('r-good-implement');
 writeRun('r-good', { implement: { taskId: 'r-good-implement', branch: 'wf/r-good/implement' } }, { factory: 'pipao' });
 
-landed('wf/r-bad/implement');
+branchMerged('wf/r-bad/implement');
 signedOff('r-bad-implement');
 fs.appendFileSync(journal('r-bad-implement'), jsonl([MISWRITTEN]));
 writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/implement' } }, { factory: 'pipao' });

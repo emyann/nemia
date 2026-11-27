@@ -174,7 +174,7 @@ export const approvalRefusal: ApprovalRefusal = (
     if (resultOnBase(standings)) {
       return (
         `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. ` +
-        `The run has landed as git reads it — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
+        `Every branch of the run is merged — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
       );
     }
   }

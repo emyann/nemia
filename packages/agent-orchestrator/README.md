@@ -240,8 +240,8 @@ the engine's job. This one follows what only this package knows.
 ## What the runs add up to: `wf stats`
 
 `wf stats` reads every run in the store, of every factory and repository, and adds up how the work
-flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
-that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
+flows: the runs finished and merged, the rounds a loop took to be accepted, the share of merged runs
+that merged on their first try, the cost and wall time of a merged run, and per step its tries, their
 time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it, the
 skills its sessions loaded, each rule its skills declare, kept or broken, and each count its workflow
 declares over its closeouts (`tally:`). It prints tiles — the last 14 days against the 14 before — a
@@ -260,7 +260,7 @@ wf stats --json                            # what GET /api/stats answers
 
 - **A number nothing measured is absent** — `—` in words, null in JSON — never 0: a run with a session
   not measured has no cost, a workflow with no `loop:` step has no rounds, and a day on which no run
-  recorded whether it landed has no landed count.
+  recorded whether it merged has no merged count.
 - **A try falls on the UTC day it ended, a run on the day it finished**: its ending step's landing
   settled (committed, aborted or untouched), or, for an ending that commits in its own prose and so
   never says how it landed, its current try done (its session succeeded and not blocked, its check
@@ -2527,16 +2527,16 @@ the root is printed in full, because that is a step writing to a human; source i
 diff, where source belongs. All of it is read out of git rather than off disk, since the worktree
 is gone by the time anyone decides and the branch is exactly as it was left.
 
-**Whether a run landed is asked, not stored.** Git already knows — is the result branch an
+**Whether a run merged is asked, not stored.** Git already knows — is the result branch an
 ancestor of the base branch — so a `decidedAt` field would be a second copy, wrong the moment
 somebody merges by hand. A run still holds no status of its own; cancellation stays the single
-exception, and only because nothing else can know it. A fan-out is landed when *every* terminal
-branch has landed, not when one has.
+exception, and only because nothing else can know it. A fan-out is merged when *every* terminal
+branch has merged, not when one has.
 
 Git's yes needs one more question. A result branch is cut at the run's base, so a branch nobody
 committed to is on the base branch from the start. Such a branch lands only a run whose steps all
 succeeded, with nothing to merge. A run whose step failed, signed off blocked or ended unsigned with
-nothing committed is decided, not landed. Work past the base that is on the base branch lands whatever
+nothing committed is decided, not merged. Work past the base that is on the base branch lands whatever
 the steps said, since a person merged it (the place's `standing` says which: `true`, or `'unchanged'`).
 
 A failed run is decided too. The first run this was pointed at had been sitting for hours marked
@@ -2544,7 +2544,7 @@ A failed run is decided too. The first run this was pointed at had been sitting 
 which anything in this tool had ever shown anyone.
 
 `wf decide` is read-only. It reports facts and changes nothing. Whether a loop's work still merges onto its base, it asks the run's
-place (`trial`, for the merges it offers); where each result branch stands, and whether the run landed, it asks the place's
+place (`trial`, for the merges it offers); where each result branch stands, and whether the run merged, it asks the place's
 `standing` once, live (`standingNow`), never the tick's last snapshot. It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
 then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
@@ -2552,7 +2552,7 @@ its own prose where that step is an ending that has not run, since approving is 
 step of the workflow merges, the exact `git merge --no-ff` and `git branch -D` a person types.
 
 A run started with `--no-worktree` worked on the base branch itself, where git's answer to "has it
-landed" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
+merged" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
 branch, classifies its steps like any other, and prints the diff against the base instead of a merge.
 
 ### What the screen puts in front of you
@@ -2765,7 +2765,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and
   a restart changes nothing.
 - **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps
-  before it, so *has it landed*, *what did it touch* and *what is there to decide* are asked of
+  before it, so *has it merged*, *what did it touch* and *what is there to decide* are asked of
   `wf/<run>/run`, never of `main`, which would answer yes to everything.
 - **`→ to decide`**, the fifth reason a run waits on a person, beside blocked, unsigned, over budget and at a
   gate. A run is one to decide when it is at its result and a last step's gate has nobody's approval — said in
@@ -2778,7 +2778,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`standing.json`), one judgement for all: a hand merge shows on each after the next pass, and before any
   pass a branch reads unread. That holds at an ending's gate too: an ending
   that has not run, whose result git already has on the base branch, has nothing left to merge — nothing is to
-  decide, the run reads as landed (below), its line on `wf ls` and `wf decide`'s screen say where the branch
+  decide, the run reads as merged (below), its line on `wf ls` and `wf decide`'s screen say where the branch
   stands and name `wf cancel <run>` to close the record, `wf rm` forgets it, and `wf approve <run> ship` is
   refused in those words. A run whose work is going round again, or whose
   work a person has just sent back, has nothing to decide: the gate holds on what the work says, and the work
@@ -3393,7 +3393,7 @@ run 'wf tick' (or 'wf up') to start them
   body is the run's brief. `README.md` says what the plan is for, and is not a card.
 - **The runs and their `after` are the plan.** `wf start <folder>` starts every card with `start()`, parents first, each
   `after` the runs of the cards it names: the record `wf start --after` writes. Nothing downstream is new. The tick
-  files a card's run once its parents have landed (*A run that waits on a run*, above), `wf ls` says what each
+  files a card's run once its parents have succeeded (*A run that waits on a run*, above), `wf ls` says what each
   waits on, each card's first steps are told what its parents concluded (`## From run <id>`), and every card is a
   decision at its own `wf decide`. Nothing else is written: no plan record, and no file of its own.
 - **Refused before any run is started**, by name and with the fix:
@@ -4523,7 +4523,7 @@ out of rounds or budget, denied (`holdsTheRun`, the rule `wf ls` says *waiting o
 it is called off: that is how a person sets it aside and keeps its record, and it stops being listed
 as waiting on them. A finished run, one that succeeded or failed with nothing waiting on anyone, is
 deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
-cancelled would make `wf ls` lie about work that actually landed. Cancelling twice keeps the first
+cancelled would make `wf ls` lie about work that succeeded. Cancelling twice keeps the first
 time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
 next tick: running it again is how a person deals with one that slipped through, not a no-op.
 
@@ -4685,7 +4685,7 @@ was not heard and removed all the same leaves the run pruned. The read and the w
 one process, not a lock: two processes can still cross inside it.
 
 **The daemon frees a finished run itself.** A run that is finished — every result branch on its base,
-landed by its ending or merged by hand, or cancelled with its tasks settled — has its worktrees removed
+merged by its ending or by hand, or cancelled with its tasks settled — has its worktrees removed
 with no person's act: beside its passes the daemon sweeps every 5 seconds (`free`, `freeOnce` in
 `src/forget/prune/free.verb.ts`), and asks of each such run exactly what `wf prune <id> --yes` asks, with no flag.
 So everything below holds for it: what is kept is kept, what is refused is refused, and the run is marked

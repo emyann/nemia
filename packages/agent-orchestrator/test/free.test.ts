@@ -272,7 +272,7 @@ describe(
         assert.equal(recordText(ROOT, runKey(id)) ?? '', record, 'the sweep wrote nothing on the run record');
         assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
-        assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'landed');
+        assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'merged');
         const row = (await listed()).runs.find((r) => r.run.id === id);
         assert.ok(row?.run.pruned, `nemia ls answers ${id} pruned`);
         assert.deepEqual(
@@ -673,14 +673,14 @@ describe('the rule as data: which answers are candidates, which a sweep takes, a
   test('`freeable`: the runs at rest that succeeded or were cancelled, of a repository', () => {
     assert.deepEqual(
       freeable([
-        answer('landed', 'succeeded', true),
+        answer('merged', 'succeeded', true),
         answer('cancelled', 'cancelled', true),
         answer('gated', 'failed', true),
         answer('flying', 'running', false),
         answer('settling', 'cancelled', false),
         answer('folder', 'succeeded', true, false),
       ]),
-      ['landed', 'cancelled'],
+      ['merged', 'cancelled'],
     );
   });
   test('`freeTurn`: the bound of those not judged, then one already judged in its turn', () => {
@@ -695,7 +695,7 @@ describe('the rule as data: which answers are candidates, which a sweep takes, a
     assert.deepEqual(freeTurn([], new Set(), 2, 0), []);
   });
   test('`freeSaid`: what is said of a run a sweep left — a place unread or a hold of git, never a rule of the run', () => {
-    const facts = { decided: 'landed' as const, held: null, owed: [], worktrees: [] };
+    const facts = { decided: 'merged' as const, held: null, owed: [], worktrees: [] };
     assert.equal(freeSaid(undefined, 'the place did not answer'), 'the place did not answer');
     assert.equal(freeSaid(facts, 'locked'), 'locked');
     assert.equal(freeSaid({ ...facts, decided: 'cancelled' }, 'locked'), 'locked');

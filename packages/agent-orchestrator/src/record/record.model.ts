@@ -318,7 +318,7 @@ const runFields = {
   workflow: Schema.optional(Schema.Array(FrozenSteps)),
   /**
    * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
-   * every one of them has landed (`runReady`). Absent on a run that waits on none.
+   * every one of them has succeeded or been released (`runReady`). Absent on a run that waits on none.
    */
   after: Schema.optional(Schema.Array(RunId.OnRead)),
   /**
@@ -519,8 +519,9 @@ const runFields = {
    * its own, `/registry/runmarks/<id>/hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing
    * new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
-   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
-   * landed (the Run door's holds.lift); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has succeeded or been released, as
+   * `--after` reads
+   * succeeded (the Run door's holds.lift); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold: Schema.optional(Hold),
   /**

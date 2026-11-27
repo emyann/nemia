@@ -344,7 +344,7 @@ describe("the gate's commands are never empty, by what the ending waits on and w
     );
     for (const { commands } of [wideGate, lone]) {
       assert.deepEqual(
-        commands.filter((c) => c.label === 'land it' || c.label === 'drop it'),
+        commands.filter((c) => c.label === 'merge it' || c.label === 'drop it'),
         [],
         'neither is handed git merge by hand: the ending step is what merges',
       );
@@ -483,7 +483,7 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
       );
       assert.deepEqual(
         commands.map((c) => c.label),
-        ['land it', 'drop it'],
+        ['merge it', 'drop it'],
         'the commands a person runs by hand, which this folder leaves to them',
       );
     },
@@ -497,9 +497,10 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
       assert.equal((await detailOf(id)).status.toDecide, null, 'the branch is on the base: nothing left to decide');
       assert.equal((await listedOf(id)).toDecide, null);
       assert.equal(recordText(root, runKey(id)) ?? '', record, "and nothing is written on the run's record");
-      assert.deepEqual(
-        await decisionOf(id),
-        { nothing: `landed — wf/${id}/implement is already on main` },
+      const decided = await decisionOf(id);
+      assert.match(
+        'nothing' in decided ? decided.nothing : '',
+        new RegExp(`^\\w+ — wf/${id}/implement merged into main$`),
         "nemia decide's own answer reads the same way",
       );
     } finally {
@@ -509,7 +510,7 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
   s.test(
     'an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `nemia approve` writes one',
     async () => {
-      const id = 'r-landed';
+      const id = 'r-done';
       const branch = `wf/${id}/implement`;
       branchOff(repo, branch, 'src/c.ts', 'export const c = 3;\n');
       signedOff(`${id}-implement`, repo);

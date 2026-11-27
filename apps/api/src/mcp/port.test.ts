@@ -165,7 +165,7 @@ type Era = (typeof ERAS)[number];
 
 /**
  * The SDK's client connected to `/mcp` of `on` in `era` (the client's default for `legacy`, pinned to the modern revision for `modern`),
- * presenting `token`, through `fetch` where given (a recording one), and checked to have landed in that era.
+ * presenting `token`, through `fetch` where given (a recording one), and checked to have arrived in that era.
  */
 async function connected(
   on: Parameters<typeof fetchInto>[0],

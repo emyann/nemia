@@ -168,7 +168,7 @@ export type {
   RoundAsk,
   RunSlot,
   Said,
-  Landed,
+  Merged,
   Spend,
   SpendOf,
   TaskSpend,

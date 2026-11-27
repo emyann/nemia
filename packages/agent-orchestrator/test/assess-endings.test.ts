@@ -168,7 +168,7 @@ const said = (outcome: Closeout['outcome']) => ({
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
+const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'merge it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) => ({
@@ -610,7 +610,7 @@ describe("an ending's gate does not hold while the work goes round again or is b
 
 describe("`workspacePlan` and the run's result: an ending works in the repository's own checkout, on the work of the steps before it", () => {
   test("`workspace: base` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch", () => {
-    const ending: StepSpec = { name: 'ship', after: ['review'], body: 'land it', workspace: 'base', gate: true };
+    const ending: StepSpec = { name: 'ship', after: ['review'], body: 'merge it', workspace: 'base', gate: true };
     const dev = [step('implement'), step('review', ['implement']), ending];
     assert.deepEqual(workspacePlan(dev, ending), { kind: 'base' }, 'said by the step, not by the shape');
     assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
@@ -624,7 +624,7 @@ describe("`workspacePlan` and the run's result: an ending works in the repositor
       ['review'],
       'a folder with no ending step is unchanged',
     );
-    const fanIn: StepSpec[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'base' }];
+    const fanIn: StepSpec[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'merge it', workspace: 'base' }];
     assert.deepEqual(
       resultSteps(fanIn).map((s) => s.name),
       ['a', 'b'],
@@ -848,7 +848,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
   });
   test('landed is asked of git, not stored on the run', () => {
     const d = decision(aRead(STEPS, finished(), { phaseOf: DONE }), (b) => b === 'wf/r-1/review');
-    assert.equal(d.kind, 'landed');
+    assert.equal(d.kind, 'merged');
   });
   test('a fan-out is not landed because ONE of its branches landed', () => {
     const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
@@ -864,7 +864,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
     );
     const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
     assert.equal(decision(aRead(fan, r, { phaseOf: all }), (b) => b === 'wf/r-1/docs').kind, 'awaiting');
-    assert.equal(decision(aRead(fan, r, { phaseOf: all }), () => true).kind, 'landed');
+    assert.equal(decision(aRead(fan, r, { phaseOf: all }), () => true).kind, 'merged');
   });
   test('a FAILED run is still decided, and names the step that failed', () => {
     const d = decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), nothingShipped);
@@ -895,7 +895,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
     assert.equal(done.kind, 'awaiting', 'nothing to merge is not the same as merged');
 
     const isolated = decision(aRead(STEPS, finished(), { phaseOf: DONE }), everythingShipped);
-    assert.equal(isolated.kind, 'landed', 'a worktree run is still asked of git');
+    assert.equal(isolated.kind, 'merged', 'a worktree run is still asked of git');
   });
   test('a run that never filed anything has no branch to land, and is not "landed"', () => {
     const d = decision(aRead(STEPS, run({ implement: null, review: null }), { phaseOf: phases({}) }), () => true);
@@ -989,7 +989,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
       ['failed', ['tests']],
       'a fan-out lands on its work only when every branch has some on the base; one that never moved leaves a failed run decided',
     );
-    assert.equal(decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }) }), half).kind, 'landed');
+    assert.equal(decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }) }), half).kind, 'merged');
     assert.equal(
       decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }) }), () => true).kind,
       'landed',
@@ -1020,7 +1020,7 @@ describe("an ending's gate and git's word: what is to decide, read off where the
 
     const byHand = decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), merged);
     assert.deepEqual(
-      [byHand.kind, byHand.kind === 'landed' ? byHand.branches : []],
+      [byHand.kind, byHand.kind === 'merged' ? byHand.branches : []],
       ['landed', ['wf/r-1/implement']],
       'merged by hand before the ending ran: the gate held the merge and nothing else, and git has it: landed, so a run --after it starts',
     );
@@ -1052,7 +1052,7 @@ describe("an ending's gate and git's word: what is to decide, read off where the
       merged,
     );
     assert.deepEqual(
-      [landed.kind, landed.kind === 'landed' ? landed.branches : []],
+      [landed.kind, landed.kind === 'merged' ? landed.branches : []],
       ['landed', ['wf/r-1/implement']],
       'approved, filed and done, it lands as any run does: on the branch the ending step merged, never on main',
     );

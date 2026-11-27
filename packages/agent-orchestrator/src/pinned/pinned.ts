@@ -15,7 +15,7 @@ import type { StepSpec } from '../workflow.ts';
 type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly StepSpec[] } };
 
 /**
- * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a landed step says which
+ * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a finished step says which
  * revisions it ran on once a refresh has moved the run's own past them. None for a step with no agent.
  * @param step The step, whose agent and its skills are read.
  * @param pins The run's pins, of every agent and skill it resolved.
@@ -29,7 +29,7 @@ const stepPins = (step: StepSpec, pins: readonly Pin[]) => {
 
 /**
  * What a step's record keeps of the filing: the agent and skill revisions it was filed on (`stepPins`), and the digest of the closeout
- * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
+ * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has finished says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
  * @param f The run's pins and the steps it is filed from.
  * @param step The step filed, or undefined where the steps given do not hold it.

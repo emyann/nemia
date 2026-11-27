@@ -1,6 +1,6 @@
 /**
  * A factory's server signed in to and out of, from the board: the server read off the factory's record, and the engine asked to hold
- * the sign-in (`mcpSignIn`), read it (`mcpSignInState`), complete a browser one with the address a person's browser landed on
+ * the sign-in (`mcpSignIn`), read it (`mcpSignInState`), complete a browser one with the address a person's browser was sent to
  * (`mcpSignInCallback`) or end it (`mcpSignOut`). The road is the engine's to choose, from what the server's provider advertises: a code
  * the person types at the provider, or the browser. The engine holds the token and hands it to each session; no answer here carries
  * it, the device code, or the pasted address, and no refusal does either.
@@ -63,7 +63,7 @@ export const serverSignInState = Effect.fn('serverSignInState')(function* (facto
 });
 
 /**
- * `server`'s waiting sign-in handed `url`, the address the person's browser landed on once they approved, where that browser runs on
+ * `server`'s waiting sign-in handed `url`, the address the person's browser was sent to once they approved, where that browser runs on
  * another machine than the engine: answers the sign-in's state, which reads `connected` once the harness took it. Refused as the server
  * is read (`Missing`), where no sign-in to it waits (`Conflict`), and where the address is not its redirect with a code and a state
  * (`Invalid`).

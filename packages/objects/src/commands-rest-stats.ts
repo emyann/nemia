@@ -31,8 +31,8 @@ const statsTakes = (key: string) => `--${key} takes ${TAKES[key as StatsKey] ?? 
 /** What `nemia stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
 export const STATS_MANUAL = `nemia stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [-l <key>=<value>] [--line|--json]
 
-The flow numbers of every run in the store, of every factory and repository: the runs finished and landed, the rounds
-a loop took to its approval, the share of landed runs that landed on their first try, the cost and wall time of a landed
+The flow numbers of every run in the store, of every factory and repository: the runs finished and merged, the rounds
+a loop took to its approval, the share of merged runs that merged on their first try, the cost and wall time of a merged
 run, and per step its tries, their time and cost, its checks' verdicts and its waits at a gate. It prints tiles, the
 last 14 days against the 14 before, a row per UTC day, and a row per step and agent. A number nothing measured is
 absent, "—" in words and null in JSON, never 0.
@@ -85,7 +85,7 @@ export const STATS_WORDS = {
   help: [
     'what every run in the store adds up to, by UTC day: rounds to',
     'acceptance of each loop: step, landings of the workspace: base step',
-    "and on which try, cost and time per landed run, and each step's",
+    "and on which try, cost and time per merged run, and each step's",
     'tries, time, cost, checks and gate waits; first the last 14 days',
     'against the 14 before. A number nothing measured reads —, never 0.',
     '--line: one line, for a recap; --json: the whole answer; -l: the',

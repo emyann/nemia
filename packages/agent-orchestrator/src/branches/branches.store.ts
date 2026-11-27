@@ -1,6 +1,6 @@
 /**
  * What is said of a repository run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
- * (`landedOf`) — each read through a `BranchReader`, which
+ * (`mergedOf`) — each read through a `BranchReader`, which
  * answers off what the place's `standing` said (`standingReader`), never off a git process of its own. What a branch changed against the
  * run's base is the place's to say (`changes.store.ts`).
  *
@@ -11,7 +11,7 @@ import { askedOf, branchesAsked, resultSteps } from './branches.ts';
 import type { Assessment } from '../tick/assess.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
-import type { Landed } from '../decide/decide.ts';
+import type { Merged } from '../decide/decide.ts';
 import type { StepSpec } from '../workflow.ts';
 
 /**
@@ -40,15 +40,15 @@ export const askedStandings = (run: Run, steps: readonly StepSpec[], status: Ass
  * @param run The run.
  * @param git What reads the branches off git.
  */
-export const landedOf = (run: Run, git: BranchReader) => (branch: string) => (isRepositoryRun(run) ? git.landed(run, branch) : false);
+export const mergedOf = (run: Run, git: BranchReader) => (branch: string) => (isRepositoryRun(run) ? git.merged(run, branch) : false);
 
 /**
  * Where each of a run's result branches stands against the base branch it was cut from, as `git` says it (`BranchStanding`): unread, where
- * it was not read, with why; on it (either yes of `landed`); gone — git no longer has it, and no recorded tip puts it on the base — or
+ * it was not read, with why; on it (either yes of `merged`); gone — git no longer has it, and no recorded tip puts it on the base — or
  * ahead of it, by the commits the base branch does not have.
  *
- * Read on the pass that asks and never stored, for the reason `landed` is asked rather than stored: a person merging by hand changes the
- * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as landed.
+ * Read on the pass that asks and never stored, for the reason `merged` is asked rather than stored: a person merging by hand changes the
+ * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as merged.
  * @param run The repository run.
  * @param branches Its result branches.
  * @param git What reads the branches off git.
@@ -57,7 +57,7 @@ export function branchStandings(run: RepositoryRun, branches: readonly string[],
   return [...new Set(branches)].map((branch) => {
     const why = git.unread(run, branch);
     if (why !== undefined) return { branch, where: 'unread', why } satisfies BranchStanding;
-    if (git.landed(run, branch) !== false) return { branch, where: 'on' } satisfies BranchStanding;
+    if (git.merged(run, branch) !== false) return { branch, where: 'on' } satisfies BranchStanding;
     if (!git.has(run.repo, branch)) return { branch, where: 'gone' } satisfies BranchStanding;
     return { branch, where: 'ahead', commits: git.ahead(run, branch) } satisfies BranchStanding;
   }) satisfies BranchStanding[];
@@ -69,10 +69,10 @@ export function branchStandings(run: RepositoryRun, branches: readonly string[],
  */
 export type BranchReader = {
   /**
-   * Whether the branch has landed on the run's base branch, and which yes it is (`Landed`, `landedOver`): a branch git no longer has is
+   * Whether the branch has merged into the run's base branch, and which yes it is (`Merged`, `mergedOver`): a branch git no longer has is
    * asked by the tip the run recorded (`tipsSeen`). False where it was not read.
    */
-  landed(run: RepositoryRun, branch: string): Landed;
+  merged(run: RepositoryRun, branch: string): Merged;
   /** Whether git has the branch; true where nothing of the repository was read, so a branch not read is never called gone. */
   has(repo: string, branch: string): boolean;
   /** The commits on the branch that the run's base branch does not have; none where git cannot count, or nothing was read. */

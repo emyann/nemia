@@ -570,7 +570,7 @@ row(
     const { b, repo } = await theStore();
     const parent = await atTheGate(b, repo);
     const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
-    git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge it', parent.steps.implement.branch!);
     const unread = standingUnread('the standing broke');
     const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(unread)));
     assert.equal(
@@ -639,7 +639,7 @@ row(
     const { b, repo } = await theStore();
     const parent = await atTheGate(b, repo);
     const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
-    git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge it', parent.steps.implement.branch!);
     await runWith(b.e, release(parent.id));
     const headless = PlaceService.layer(
       placeOver(builtinGitPlace, {

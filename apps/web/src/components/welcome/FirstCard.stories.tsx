@@ -59,9 +59,9 @@ export const Estimate: Story = {
   },
 };
 
-/** Quick runs that landed on this store: the cost line says what one took and cost here. */
+/** Quick runs that merged on this store: the cost line says what one took and cost here. */
 export const Measured: Story = {
-  parameters: { msw: firstCardStore({ landedRuns: 4 }) },
+  parameters: { msw: firstCardStore({ mergedRuns: 4 }) },
   play: async ({ canvasElement }) => {
     const page = await loaded(canvasElement, 'measured');
     await expect(page.querySelector('[data-cost-line]')).toHaveTextContent('$3.20');

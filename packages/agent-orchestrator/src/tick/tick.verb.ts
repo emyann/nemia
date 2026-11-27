@@ -57,7 +57,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import { runStatusesObserved } from '../run-status/run-status.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { passParents, reportedEngine } from '../views/views.verb.ts';
-import { inboxNow, releasedThrough, startQueued, type RunLanded } from '../inbox/inbox.verb.ts';
+import { inboxNow, releasedThrough, startQueued, type RunReleased } from '../inbox/inbox.verb.ts';
 import { startDue } from '../factory/schedule/schedule.verb.ts';
 import type { ScheduleStarted } from '../factory/schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
@@ -314,9 +314,9 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
-  const landed = releasedThrough(e, passParents());
+  const released = releasedThrough(e, passParents());
   yield* withinEffect('act', assigneesEnded(e, home, judging));
-  const inbox = yield* inboxOfPass(runs, landed, judging);
+  const inbox = yield* inboxOfPass(runs, released, judging);
   if (informer) {
     const judged = yield* informed(e, informer, runs, judging, verify);
     yield* runStatusesObserved(e, informer, runs, judged.runs, Date.now()).pipe(
@@ -326,7 +326,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
-      ? yield* withinEffect('act', startQueued(repo, runs, landed))
+      ? yield* withinEffect('act', startQueued(repo, runs, released))
       : undefined;
   const scheduled =
     !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
@@ -433,10 +433,10 @@ const informed = Effect.fnUntraced(function* (
 
 /**
  * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stalled waits, each run's landing read through the
- * pass's `landed` and its phase as the pass judged it; none of either where the inbox does not read.
+ * pass's `released` and its phase as the pass judged it; none of either where the inbox does not read.
  */
-const inboxOfPass = (runs: readonly Run[], landed: RunLanded, { done }: Judging) =>
-  inboxNow(runs, landed, (id) => phaseOfStatus(done.get(id)?.status)).pipe(
+const inboxOfPass = (runs: readonly Run[], released: RunReleased, { done }: Judging) =>
+  inboxNow(runs, released, (id) => phaseOfStatus(done.get(id)?.status)).pipe(
     Effect.map(({ clashes, stalled }) => ({ clashes, waits: stalled }) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
     Effect.orElseSucceed(() => ({}) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
   );

@@ -66,7 +66,7 @@ const FACTORY_NEXT = {
       message: 'make a first factory: with Nemia, from a template, or from scratch; it may start with no volume',
     },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+    { name: 'succeeded', state: 'later', message: 'see a first run succeed' },
   ],
 };
 
@@ -206,7 +206,7 @@ async function givesAFolder(page: Page) {
 /** The label that marks a first card and its run, as the board files it (`FIRST_CARD_LABEL`). */
 const FIRST_LABEL = 'onboarding=first-card';
 
-/** The milestones answered once a change has landed: every one done. */
+/** The milestones answered once a run has succeeded: every one done. */
 const ALL_DONE = { milestones: FACTORY_NEXT.milestones.map((m) => ({ ...m, state: 'done' })) };
 
 /** `edits` made to the labels of the seeded run `id` through the api (`600-labels`' way). */
@@ -300,7 +300,7 @@ async function startsTheFirstCard(page: Page, filed: string[]) {
 }
 
 /** The run `id`'s page, labelled as a first card's, drawing the hint of `beat`. */
-async function hints(page: Page, id: string, beat: 'gate' | 'landed') {
+async function hints(page: Page, id: string, beat: 'gate' | 'succeeded') {
   await labelRun(page, id, [FIRST_LABEL]);
   await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
@@ -311,8 +311,8 @@ async function hints(page: Page, id: string, beat: 'gate' | 'landed') {
 
 /**
  * The first card's whole way: started (`startsTheFirstCard`), its gate's hint on the seeded gated run labelled as the first card, its
- * landed hint on the seeded landed run, whose button leads to "You are set", drawing its three next steps once the milestones say a
- * change landed: connecting GitHub among them, with the follow line the api reads off the template, since the factory made was given a
+ * succeeded hint on the seeded run, whose button leads to "You are set", drawing its three next steps once the milestones say a
+ * run succeeded: connecting GitHub among them, with the follow line the api reads off the template, since the factory made was given a
  * folder of this machine. The labels and the card are taken back.
  */
 async function runsTheFirstCard(page: Page, milestones: { answer: object }) {
@@ -320,12 +320,12 @@ async function runsTheFirstCard(page: Page, milestones: { answer: object }) {
   try {
     await startsTheFirstCard(page, filed);
     await hints(page, GATED.id, 'gate');
-    await hints(page, LANDED.id, 'landed');
+    await hints(page, LANDED.id, 'succeeded');
     milestones.answer = ALL_DONE;
-    await page.locator('aside[data-first-hint="landed"] [data-first-next]').click();
+    await page.locator('aside[data-first-hint="succeeded"] [data-first-next]').click();
     await page.waitForURL((url) => url.pathname === '/welcome/next');
     await idle(page);
-    await expectVisible(page.locator('article[data-you-are-set="set"]'), 'a change landed: the last page says You are set');
+    await expectVisible(page.locator('article[data-you-are-set="set"]'), 'a run succeeded: the last page says You are set');
     await expectVisible(page.locator('[data-next-step="level"]'), 'its first next step is the level of the factory');
     await expectVisible(
       page.locator('[data-next-step="github"] [data-follow-line]'),

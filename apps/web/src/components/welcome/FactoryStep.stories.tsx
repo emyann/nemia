@@ -143,7 +143,7 @@ export const VolumeGiven: Story = {
       timeout: 5000,
     });
     await expect(page.querySelector('[data-factory-no-volume]')).toBeNull();
-    await expect(within(page).getByRole('link', { name: 'Next: a first change merged' })).toBeVisible();
+    await expect(within(page).getByRole('link', { name: 'Next: a first run that succeeded' })).toBeVisible();
   },
 };
 

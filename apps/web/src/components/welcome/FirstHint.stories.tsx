@@ -5,7 +5,7 @@ import { FirstHint } from './FirstHint';
 
 /**
  * A first card's run as the hints read it: labelled, in `status`, its first step filed where `filed`, and `land` its ending step
- * (`workspace: base`), so a run that succeeded landed.
+ * (`workspace: base`), so a run that succeeded draws it.
  */
 const runOf = (status: RunView['status'], filed: boolean) => ({
   labels: { onboarding: 'first-card', workflow: 'quick' },
@@ -44,9 +44,9 @@ export const Gate: Story = {
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint="gate"]')).not.toBeNull(),
 };
 
-/** Landed: the hint leads to what is next. */
-export const Landed: Story = {
-  args: { run: runOf('succeeded', true), beat: 'landed' },
+/** Succeeded: the hint leads to what is next. */
+export const Succeeded: Story = {
+  args: { run: runOf('succeeded', true), beat: 'succeeded' },
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-next]')).not.toBeNull(),
 };
 

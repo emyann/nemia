@@ -623,7 +623,7 @@ const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string
  * against its lockfile first, and provisioned again where they part (`keepWorktreeInstalled`).
  *
  * Before any of it, a run that cuts worktrees has its place bring the repository's checkout up to its remote (`follow`): the base a step
- * merges (`main-worktree/HEAD` in git's words) is then the remote's, whoever landed on it, and a checkout that cannot be moved is left
+ * merges (`main-worktree/HEAD` in git's words) is then the remote's, whoever merged into it, and a checkout that cannot be moved is left
  * as it is and said in the notes, what to do with it. A run without isolation works in the checkout itself, and is never moved under it.
  *
  * A step is cut from the parents that ran (`ranShape`): a condition cuts no worktree, so a step after one is cut as if it followed the

@@ -146,8 +146,8 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
         <Sticker hue="alive" label="In flight">
           {strip.inFlight}
         </Sticker>
-        <Sticker hue="grey" label="Landed">
-          {strip.landed}
+        <Sticker hue="grey" label="Succeeded">
+          {strip.succeeded}
         </Sticker>
         <StatTile
           hue="ink"

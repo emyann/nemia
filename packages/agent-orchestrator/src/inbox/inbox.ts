@@ -11,9 +11,9 @@
  *
  * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and
  * that is chosen at start; it is a workflow's name, the folder its factory offers. And an inbox card's `after:` names cards, not steps: the
- * cards it waits on, by name, since a card has no run before it starts. While any of them has not landed (`cardWaitsOf`, waits.ts) no
+ * cards it waits on, by name, since a card has no run before it starts. While any of them has not succeeded (`cardWaitsOf`, waits.ts) no
  * trigger queues it and the tick starts none of it (`queueOrder`), and it is listed with each (`waits`), read on every pass and never
- * written on the card; a start by hand still starts it, saying which had not landed. `nemia start --after <run>` still waits on runs.
+ * written on the card; a start by hand still starts it, saying which had not released. `nemia start --after <run>` still waits on runs.
  *
  * `repo:` is retired: a card names its factory and its workflow, never a repository, and the factory's wiring places its run (`nemia
  * factory attach <factory> <workflow> --repo <name>`). A new one is refused where a card is filed or written whole; an old card's still
@@ -436,7 +436,7 @@ export type InboxListing = {
   /** The cards it waits on (`after:`): none on a card that names none, and on an entry that does not read as a card. */
   after: string[];
   /**
-   * On a card not started whose `after:` names cards that have not landed, as the listing was handed what the store and git say
+   * On a card not started whose `after:` names cards that have not succeeded, as the listing was handed what the store and git say
    * (`Waiting`): each, with where its work stands and whether only a person can release it. No trigger queues it and the tick starts none
    * of it while any is listed (`queueOrder`).
    */
@@ -564,7 +564,7 @@ export type Triggering = { readonly triggers: readonly SelectingTrigger[]; reado
 /**
  * What the card triggers do with a card the listing read, as `cardTriggered` decides: the listing's `queued` or `clash`, or nothing.
  * @param entry The card: its name, labels, workflow and factory, whether it is queued by hand, the runs it was started as, and the cards
- *   of its `after:` not landed.
+ *   of its `after:` not released.
  * @param triggering The card triggers of every factory, and when each card was filed.
  */
 function triggeredOf(
@@ -595,7 +595,7 @@ function triggeredOf(
  * @param factories The store's factories that read, by name; none where none is handed.
  * @param triggering The card triggers of every factory and when each card was filed: a card one selects is listed queued by it, or with
  *   its clash (`cardTriggered`); none where none is handed.
- * @param waiting What the store and git say of the cards a card waits on: a card not started whose `after:` names one not landed is
+ * @param waiting What the store and git say of the cards a card waits on: a card not started whose `after:` names one not released is
  *   listed with its `waits`, queued by no trigger and started by no tick; none where none is handed, and then no card waits.
  */
 export function cardsListed(
@@ -699,10 +699,10 @@ function waitsOf(
 ) {
   if (waiting === undefined || !after?.length || startedAs.length) return {};
   const cycle = afterCycle(name, afterOf);
-  const waits = cardWaitsOf(after, waiting.look).map<ListedWait>(({ card, landing }) => {
+  const waits = cardWaitsOf(after, waiting.look).map<ListedWait>(({ card, release }) => {
     if (cycle !== undefined && cycle[1] === card) return { card, kind: 'cycle', cycle, stalled: true };
-    if (landing.kind === 'missing') return { card, kind: 'missing', ...(landing.card === card ? {} : { at: landing.card }), stalled: true };
-    return { card, kind: 'waiting', ...(landing.card === card ? {} : { at: landing.card }), stalled: false };
+    if (release.kind === 'missing') return { card, kind: 'missing', ...(release.card === card ? {} : { at: release.card }), stalled: true };
+    return { card, kind: 'waiting', ...(release.card === card ? {} : { at: release.card }), stalled: false };
   });
   return (waits.length ? { waits } : {}) satisfies Pick<CardListing, 'waits'>;
 }
@@ -762,7 +762,7 @@ export function inboxListing(
 /**
  * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a run was started from left out
  * (`startedAs`), since it is never started again, even one whose `queued:` line its start could not take off, and a card that waits on a
- * card of its `after:` not landed (`waits`), which takes its place once the last of them lands. Pure. A card whose start was refused
+ * card of its `after:` not released (`waits`), which takes its place once the last of them succeeds. Pure. A card whose start was refused
  * keeps its place, and the tick passes over it (`nextQueued`).
  * @param listing The inbox's entries.
  */

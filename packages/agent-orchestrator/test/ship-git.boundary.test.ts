@@ -70,7 +70,7 @@ type Place = import('../src/place/place.store.ts').Place;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
 /** Whether `branch` of `run` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
-const isLanded = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).landed(run, branch);
+const isLanded = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).merged(run, branch);
 
 /** A run this file started on a repository, as `isLanded` reads one: a repository run. */
 const repositoryRun = (run: Run) => {
@@ -492,7 +492,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(landed.status, 'succeeded');
   await aPass();
   const { decision } = await runWith(e, decideRun(id));
-  assert.equal(decision.kind, 'landed');
+  assert.equal(decision.kind, 'merged');
   const shipLine = (await runWith(e, list(e, runRecord(ROOT, id)))).steps.find((s) => s.name === 'ship')!;
   assert.equal(shipLine.message, 'verified ✓');
   assert.equal(

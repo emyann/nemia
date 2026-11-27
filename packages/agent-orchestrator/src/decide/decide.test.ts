@@ -67,7 +67,7 @@ describe('choicesOf', () => {
       choicesOf(STEPS, RUN, awaiting(), offers).map((c) => [c.label, c.command, c.said, c.step]),
       [
         ...offers.map((o, i) => [labels[i], o.command, o.said, o.step]),
-        ['land it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
+        ['merge it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
         ['drop it', 'git -C /code/app branch -D wf/r-1/implement', null, null],
       ],
     );
@@ -113,7 +113,7 @@ describe('choicesOf', () => {
   });
   for (const [row, decided] of [
     ['a running run is offered nothing', { kind: 'running', waiting: ['implement'] }],
-    ['a landed run is offered nothing', { kind: 'landed', branches: ['wf/r-1/implement'] }],
+    ['a landed run is offered nothing', { kind: 'merged', branches: ['wf/r-1/implement'] }],
   ] as Array<[string, Decision]>) {
     test(row, () => {
       assert.deepEqual(choicesOf(STEPS, RUN, decided, [offer('nemia retry r-1 implement')]), []);

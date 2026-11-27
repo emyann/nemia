@@ -321,10 +321,14 @@
       "retired": []
     },
     {
-      "term": "Landed",
-      "meaning": "a run's result is on its base: asked of the place's standing on each pass, never stored. A run lands; `nemia decide` says it has landed. A wait never reads it: a run waiting on another (`--after`, a hold's `--until`) goes on once that run has succeeded, or released (`Released`).",
-      "type": "Landed",
+      "term": "Merged",
+      "meaning": "a run's result is on its base: asked of the place's standing on each pass, never stored. `nemia decide` says its status and the branches merged into the base. A wait never reads it: a run waiting on another (`--after`, a hold's `--until`) goes on once that run has succeeded, or released (`Released`).",
+      "type": "Merged",
       "retired": [
+        {
+          "spelling": "landed",
+          "card": "run-core-say-succeeded-and-m-k9iy: a run succeeded and a branch is merged; landed is sdlc's word only"
+        },
         {
           "spelling": "shipped",
           "card": "decision 13a: 'landed' for a run's result on its base"
@@ -1156,7 +1160,7 @@
     },
     {
       "term": "Milestone",
-      "meaning": "one step of a store on its way to its first landed change — a harness signed in, a factory filed, a volume a run would mount, a run landed — done by what the store holds now and never by a saved flag, the first not done `next` (`milestonesOf`, `packages/agent-orchestrator/src/milestones/milestones.ts`; `milestonesNow`, `packages/agent-orchestrator/src/milestones/milestones.verb.ts`).",
+      "meaning": "one step of a store on its way to its first run that succeeded — a harness signed in, a factory filed, a volume a run would mount, a run succeeded — done by what the store holds now and never by a saved flag, the first not done `next` (`milestonesOf`, `packages/agent-orchestrator/src/milestones/milestones.ts`; `milestonesNow`, `packages/agent-orchestrator/src/milestones/milestones.verb.ts`).",
       "type": "MilestoneStates"
     },
     {

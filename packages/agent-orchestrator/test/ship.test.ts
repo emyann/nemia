@@ -218,7 +218,7 @@ async function endings(stage: Stage, root: string) {
     /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
     aPass: (e: Engine) => stage.runWith(e, passStanding(rooted.runs.list())),
     /** Whether `branch` of `r` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
-    isLanded: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).landed(r, branch),
+    isLanded: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).merged(r, branch),
     /** Every branch of a run's repository and its commit, asked of this test's place now (`headsNow`). */
     liveHeads: (r: RepositoryRun) => headsNow(r, stage.place().place),
     /** A run this file started on a repository: a repository run. */
@@ -484,7 +484,7 @@ describe("a run waits at its ending's gate, is approved, stages its merge, lands
     assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
     assert.notEqual(world().head(repo), base);
     await at.aPass(e);
-    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
+    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'merged');
   });
   s.test(
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",
@@ -519,7 +519,7 @@ describe('a landing a pass reads again — after a restart, under a pause, or wi
       assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { commit: head }, "the next pass reads the result on the checkout's HEAD");
       assert.equal(world().head(repo), head, 'nothing committed again');
       await at.aPass(stage.board().e);
-      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
+      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'merged');
     },
   );
   s.test('a refused merge aborted by hand is recorded as nothing landed', async () => {
@@ -1115,14 +1115,15 @@ describe('a result a person merged by hand before its ending ran: the run has la
     },
   );
   s.test(
-    'the decision says the same before anybody closes the record: landed, its ending never run, and no approval above a branch on main',
+    'the decision says the same before anybody closes the record: merged, its ending never run, and no approval above a branch on main',
     async () => {
       const { id, branch } = gate;
       const { decision } = await stage.runWith(e(), decideRun(id));
-      assert.deepEqual([decision.kind, decision.kind === 'landed' ? decision.branches : []], ['landed', [branch]]);
-      assert.deepEqual((await decisionOn(stage, id)).decision, {
-        nothing: `landed — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${id}`,
-      });
+      assert.deepEqual([decision.kind, decision.kind === 'merged' ? decision.branches : []], ['merged', [branch]]);
+      const decided = (await decisionOn(stage, id)).decision;
+      const said = 'nothing' in decided ? decided.nothing : '';
+      assert.match(said, new RegExp(`^\\w+ — ${branch} merged into main\\n  ship never ran`));
+      assert.ok(said.endsWith(`nemia cancel ${id}`));
     },
   );
   s.test('REFUSED at shipped defaults: `nemia approve` names `nemia cancel` instead, and writes nothing', async () => {
@@ -1468,7 +1469,7 @@ describe('two runs of one repository land close together: each records the commi
       assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
       assert.equal(world().head(repo), mergedB, 'nothing committed by the run');
       await at.aPass(e());
-      assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
+      assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'merged');
     },
   );
   s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {

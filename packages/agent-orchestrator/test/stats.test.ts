@@ -251,11 +251,11 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
       assert.deepEqual(
         [
           all.all.total.runs,
-          all.all.total.landed,
+          all.all.total.merged,
           all.all.total.firstTry,
           all.all.total.rounds,
-          all.all.total.costPerLanded,
-          all.all.total.timePerLanded,
+          all.all.total.costPerMerged,
+          all.all.total.timePerMerged,
         ],
         [1, 1, 1, 1, 3.5, 4 * 3_600_000],
       );
@@ -284,7 +284,7 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
     assert.ok(all.tiles.before.to < all.tiles.last.from, 'the 14 days before end before the last 14 begin');
     const day = all.days.find((d) => d.day === DAY);
     assert.deepEqual(
-      [day?.runs, day?.landed, day?.rounds, day?.firstTry, day?.costPerLanded, day?.timePerLanded],
+      [day?.runs, day?.merged, day?.rounds, day?.firstTry, day?.costPerMerged, day?.timePerMerged],
       [1, 1, 1, 1, 3.5, 4 * 3_600_000],
     );
     assert.deepEqual(all.marks, [], 'no run changed what it froze');

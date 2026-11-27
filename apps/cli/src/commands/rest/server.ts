@@ -44,7 +44,7 @@ export const repository = (args: Args) => answered('repository', args, (c) => c.
 export const store = (args: Args) => answered('store', args, (c) => c.server.store());
 
 /**
- * `nemia milestones`' runner: how far the store is towards its first landed change.
+ * `nemia milestones`' runner: how far the store is towards its first run that succeeded.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export const milestones = (args: Args) => answered('milestones', args, (c) => c.readiness.milestones());

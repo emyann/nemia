@@ -110,7 +110,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   hand-off is marked once for the try, unless git refused the commit, which the next pass tries again; a mark made is always written,
  *   or the next pass would commit a person's edits as the step's.
  * - lands or aborts an ending's staged merge (`landEnding`) before anything reads where the ending stands, so the pass that lands it
- *   reads it landed, and no try of it is filed over a merge still staged.
+ *   reads it succeeded or released, and no try of it is filed over a merge still staged.
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
  * - lifts a person's hold on the pass that reads every run it names succeeded or released (`keptParent`), and goes on on that pass. A
@@ -142,7 +142,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * - hands the metrics the run's timeline on the first pass that reads it over with nothing in flight, and marks it (`runTimed`,
  *   `timedOnce`).
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
- *   branch a person deleted after its merge is on the base (`BranchReader.landed`).
+ *   branch a person deleted after its merge is on the base (`BranchReader.merged`).
  * - writes the record only where the pass changed it and only while it is there, and sets the asks it holds aside under `done/` in the
  *   same transaction (the Run door's `runs.settle`), never apart: a pass that died before settling leaves both for the next. An ask `nemia
  *   pause --now` wrote that is void on this pass (`pauseAsksVoid`) is set aside with them, paused or not.

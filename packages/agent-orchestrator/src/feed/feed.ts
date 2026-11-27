@@ -541,7 +541,7 @@ const liftedBy = (note: string, receipt: { since: string; actor: Actor } | undef
  * lift already written is no concern of this: each is an offer like any other, and `oncePast` holds it to one line. Pure.
  *
  * **The put is offered from the hold the pass lifted too.** `liftHold` takes the hold off the record before the pass is worded, so a pass
- * that reads a hold and lifts it in one go — a parent that landed before the daemon's next pass, or a daemon restarted after it — sees
+ * that reads a hold and lifts it in one go — a parent that succeeded before the daemon's next pass, or a daemon restarted after it — sees
  * only `lifted`. Offering the put from `held ?? lifted` is what keeps the person's own `nemia hold` from losing its line there; on a pass
  * that had already written the put, `oncePast` drops the second offer.
  *
@@ -549,7 +549,8 @@ const liftedBy = (note: string, receipt: { since: string; actor: Actor } | undef
  * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
  * hold put, lifted and put again is two puts and two lifts, each told apart by the moment its hold was put (`holdSince`).
  *
- * The tick lifts a hold itself once every run it names has landed (`liftHold`), and by then the hold is already off the record, so the
+ * The tick lifts a hold itself once every run it names has succeeded or been released (`liftHold`), and by then the hold is already off
+ * the record, so the
  * absence rule would read the tick's own deed as a person's. The pass that lifted it says so (`lifted`), and that one put is the
  * absence rule's exception: exactly one lift either way, sourced by whoever took the hold off.
  *
@@ -937,7 +938,7 @@ export type FeedWaits = readonly { factory: string; card: string; waits: readonl
 /**
  * The lines the cards' stalled waits owe the feed: `CardWaitStalled` for each card stalled now that the feed did not last say so, its note
  * the card and each wait with its fix; `CardWaitFreed` for each card the feed last said stalled that is stalled no more — the card it waits
- * on landed or came back in play, its `after:` edited, started, or removed. Compared by the reason the fold keeps under `waitKey`, never
+ * on succeeded or came back in play, its `after:` edited, started, or removed. Compared by the reason the fold keeps under `waitKey`, never
  * its note, so a wait that moves along stalled writes no line, and a restarted daemon, whose fold is the whole feed, says none again. Pure.
  */
 function waitLines(fold: FeedFold, at: string, waits: FeedWaits) {
@@ -1162,7 +1163,7 @@ export type FeedAppended = { lines: FeedLine[]; before: number; after: number; l
 /**
  * Each line of an append with the bytes it was written at, for the live readers to take without reading the file (`FeedPublished`) — or
  * none, when the file grew by more than the append wrote: another writer appended between the size read before and the one after, and
- * where in that range this append's lines landed is not known, so nothing is vouched for and a reader reads the file. Pure.
+ * where in that range this append's lines arrived is not known, so nothing is vouched for and a reader reads the file. Pure.
  */
 export function publishedOf({ lines, before, after, leading }: FeedAppended) {
   const sized = lines.map((line) => ({ line, size: Buffer.byteLength(`${JSON.stringify(line)}\n`) }));

@@ -76,8 +76,8 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
     >
       <Title size="small" component="h2">{`Hold ${id}`}</Title>
       <Body size="small" colorRole="on-surface-variant">
-        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed, or, with none ticked, until you lift
-        the hold. What runs now finishes.
+        Nothing more of it is filed, and nothing is asked of you, until every run ticked has succeeded or been released, or, with none
+        ticked, until you lift the hold. What runs now finishes.
       </Body>
       <WaitFor
         runs={runs}

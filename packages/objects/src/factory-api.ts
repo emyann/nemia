@@ -416,7 +416,7 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Completes a sign-in by the browser with the address the person's browser landed on, which no answer or log carries. Answers SignInState.",
+    "Completes a sign-in by the browser with the address the person's browser was sent to, which no answer or log carries. Answers SignInState.",
   ),
   HttpApiEndpoint.delete('signOut', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
     params: cardParams,

@@ -239,6 +239,6 @@ export class ReadinessGroup extends HttpApiGroup.make('readiness').add(
   ),
   HttpApiEndpoint.get('milestones', '/api/readiness/milestones', { success: Milestones, error: [Invalid, Failed] }).annotate(
     OpenApi.Description,
-    'Reads where the store stands on the way to its first landed change: a harness, a factory, a volume and a run landed, each done by what the store holds now. Answers Milestones.',
+    'Reads where the store stands on the way to its first run that succeeded: a harness, a factory, a volume and a run that succeeded, each done by what the store holds now. Answers Milestones.',
   ),
 ) {}

@@ -1,5 +1,5 @@
 /**
- * Where a store stands on the way to its first landed change (`milestonesOf`, whose laws are contracts/milestones.contract.ts'): four
+ * Where a store stands on the way to its first run that succeeded (`milestonesOf`, whose laws are contracts/milestones.contract.ts'): four
  * milestones in order, each done by what the store holds now, the first not done `next` and any other `later`; and what each says
  * (`MILESTONE_WORDS`). A state worked out on every read and never written. Pure: the store's facts are read and handed in
  * (`milestonesNow`, `milestones.verb.ts`).
@@ -14,12 +14,12 @@ import type { MilestoneFacts, MilestonesOf } from '../../contracts/milestones.co
 export const milestonesOf: MilestonesOf = (f: MilestoneFacts) => {
   const factoryNext = f.harness;
   const volumeNext = f.harness && f.factory;
-  const landedNext = f.harness && f.factory && f.volume;
+  const succeededNext = f.harness && f.factory && f.volume;
   return {
     harness: f.harness ? 'done' : 'next',
     factory: f.factory ? 'done' : factoryNext ? 'next' : 'later',
     volume: f.volume ? 'done' : volumeNext ? 'next' : 'later',
-    landed: f.landed ? 'done' : landedNext ? 'next' : 'later',
+    succeeded: f.succeeded ? 'done' : succeededNext ? 'next' : 'later',
   };
 };
 
@@ -40,10 +40,10 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
     next: 'give a factory a writable volume, trusted, that its runs work in',
     later: 'give a factory a writable volume, trusted',
   },
-  landed: {
-    done: "a run's change is merged into its base branch",
-    next: 'start a first card, and merge its change into the base branch',
-    later: 'merge a first change into its base branch',
+  succeeded: {
+    done: 'a run has succeeded',
+    next: 'start a first card, and see it through to succeeded',
+    later: 'see a first run succeed',
   },
 };
 

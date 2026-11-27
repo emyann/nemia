@@ -118,7 +118,7 @@ const resultNamed = ({ result = [], toDecide }: Run['status']) =>
  * What waits on you, as `nemia ls` said it under a run (`asksLines`): what to decide with its command, the steps waiting on you (an
  * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it — each asked of
  * its assignee instead while someone has the run in hand, with who, when it comes back and how to give it back — and where its
- * work ended up (`result`), landed or not, unless what to decide names those branches already.
+ * work ended up (`result`), merged or not, unless what to decide names those branches already.
  */
 const waitsCell = ({ metadata: { name }, status }: Run) => {
   const { toDecide, waiting, holding, assignee } = status;

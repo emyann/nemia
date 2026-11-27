@@ -12,7 +12,7 @@ export type { RunAssignee };
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords, queuedForOf } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
-import { type BranchReader, branchStandings, landedOf } from '../branches/branches.store.ts';
+import { type BranchReader, branchStandings, mergedOf } from '../branches/branches.store.ts';
 import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spendKnown, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
@@ -22,7 +22,7 @@ import { type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { RunRead } from '../tick/told.verb.ts';
-import type { Decision, Landed } from '../decide/decide.ts';
+import type { Decision, Merged } from '../decide/decide.ts';
 import { inFlight, type CheckoutHold } from '../cap/cap.ts';
 import { type Assignee, isRepositoryRun, type Run } from '../record/record.ts';
 import { assigneeStanding, assigneeWord, type AssigneeStanding } from '../assignee/assignee.ts';
@@ -476,11 +476,11 @@ type Judged = {
  * It spares the store's long tail — finished runs whose branches are already on the base — a reading a branch on every poll of the list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
- * a run whose branch had nothing on it past its base reads `on` too (`landedOver`'s `unchanged`), and its next try may commit. A try or a
+ * a run whose branch had nothing on it past its base reads `on` too (`mergedOver`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and the branch read afresh. What is left is a person committing
  * to a finished run's branch by hand, which nothing on the board or on `nemia decide` is told of: a fresh process reads it afresh.
  */
-const onTheBase = new Map<string, { filed: string; landed: Landed }>();
+const onTheBase = new Map<string, { filed: string; merged: Merged }>();
 
 /**
  * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
@@ -525,7 +525,7 @@ export function standingsOf(run: Run, steps: readonly StepSpec[], status: RunSta
       git,
     );
     for (const stood of read)
-      if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, { filed, landed: landedOf(run, git)(stood.branch) });
+      if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, { filed, merged: mergedOf(run, git)(stood.branch) });
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     if (asked && read.some((stood) => stood.where === 'unread')) asked.failed = true;
     return branches.map(
@@ -538,16 +538,16 @@ export function standingsOf(run: Run, steps: readonly StepSpec[], status: RunSta
 }
 
 /**
- * Whether a branch of `run` is on its base (`Landed`), as `standingsOf` says it: off the memo of branches already on the base where it
- * holds the branch against the work filed (`onTheBase`), else as `git` reads it (`landedOf`). What the judgement's decision reads, so it
- * never says a branch landed or not where its standings say otherwise.
+ * Whether a branch of `run` is on its base (`Merged`), as `standingsOf` says it: off the memo of branches already on the base where it
+ * holds the branch against the work filed (`onTheBase`), else as `git` reads it (`mergedOf`). What the judgement's decision reads, so it
+ * never says a branch merged or not where its standings say otherwise.
  * @param run The run whose branch is asked of.
  * @param steps The steps the run is judged by.
  * @param git The request's reader of the branches.
  */
-const landedThrough = (run: Run, steps: readonly StepSpec[], git: BranchReader) => (branch: string) => {
+const mergedThrough = (run: Run, steps: readonly StepSpec[], git: BranchReader) => (branch: string) => {
   const kept = onTheBase.get(`${run.id}/${branch}`);
-  return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
+  return kept && kept.filed === workFiled(run, steps) ? kept.merged : mergedOf(run, git)(branch);
 };
 
 /**
@@ -590,7 +590,8 @@ export type JudgeHow = {
  * The runs its roots wait on and the runs a person holds it until are each read once, through the request's reader: a root of a run
  * waiting on runs says `waiting on <run>`, and the run moves while each may still land — the tick files the roots when they do — and not
  * once one never will without a person. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it
- * once every run it names has landed, and files then what is due — and not once it lifts only by a person's hand: a run it names never
+ * once every run it names has succeeded or been released, and files then what is due — and not once it lifts only by a person's hand: a
+ * run it names never
  * lands, or it names none. No slot is said — the board says the run slots over its Factory — and the run holding the repository's
  * checkout is read as the pass reads it (`listReading`): a try a person asked stands in `asked` while the checkout or the pause holds it.
  *
@@ -614,7 +615,7 @@ export const judge = Effect.fn('judge')(function* (
     shown,
     standings,
     git,
-    landed: landedThrough(run, steps, git),
+    merged: mergedThrough(run, steps, git),
     ...(config ? { config } : {}),
     ...(parent ? { parent } : {}),
     ...(store ? { store } : {}),

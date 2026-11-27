@@ -148,7 +148,7 @@ const loggedOf = (now: ReadonlyMap<string, FeedWords>) => (line: FeedLine) => {
  * clashing where it hands them (`clashes`), its cards whose wait only a person can release where it hands them (`waits`), and the
  * store's readiness where it moved where it hands the daemon's read (`readiness`), each line written logged (`loggedOf`: a `closed out`
  * line as its closeout, every other as its words) and, where the process has a hub
- * (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes landed among them.
+ * (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes arrived among them.
  * Answers with the lines written. `memo` is for a test, which starts one afresh to be a restarted daemon. Fails with a refusal of the store
  * — the door's, given no store root among them — and dies of anything else it threw.
  */

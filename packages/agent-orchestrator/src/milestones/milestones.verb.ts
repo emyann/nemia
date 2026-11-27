@@ -1,9 +1,9 @@
 /**
- * Where the store stands on the way to its first landed change, read now (`milestonesNow`): the four facts `milestonesOf` judges, each
+ * Where the store stands on the way to its first run that succeeded, read now (`milestonesNow`): the four facts `milestonesOf` judges, each
  * read from the store on every read and never from a flag — a harness whose install and sign-in are both met (this process's needs'
  * readings, `NeedsMemory`, or read now where it keeps none), a factory filed, a writable volume of a factory that is there, that no mount
  * would refuse (`volumeRefusal`) and that every harness keeping a trust trusts now (`untrustedPlaces`, read off the place), and a run with
- * a step whose landing made a commit. A controller: it reads the store and asks the place.
+ * a run that succeeded, as `nemia ls` says it. A controller: it reads the store and asks the place.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -14,6 +14,9 @@ import { listedAt } from '../factory/door/factories.store.ts';
 import { factoryVolumesNamed, volumeRefusal } from '../factory/volume/index.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
+import type { Run } from '../record/record.ts';
+import { EngineService, over } from '../runtime-client.ts';
+import { keptParent, passParents } from '../views/views.verb.ts';
 import { harnessOfNeed, signInNeedOf } from '../needs/index.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory, needsOnce } from '../needs/needs.verb.ts';
 import { untrustedPlaces } from '../trust/untrusted.verb.ts';
@@ -35,6 +38,24 @@ const harnessReady = Effect.fnUntraced(function* (home: string) {
 });
 
 /**
+ * Whether some run succeeded as `nemia ls` says it, read through the parents' reader (`keptParent`) one run at a time and stopping at the
+ * first that did; a run whose read fails has not.
+ * @param runs The runs the store holds.
+ */
+const someSucceeded = Effect.fnUntraced(function* (runs: readonly Run[]) {
+  const e = yield* EngineService;
+  const parents = passParents();
+  for (const run of runs) {
+    const standing = yield* keptParent(run.id, parents.read).pipe(
+      over(e),
+      Effect.orElseSucceed(() => undefined),
+    );
+    if (standing?.standing.kind === 'released' && standing.standing.by === 'succeeded') return true;
+  }
+  return false;
+});
+
+/**
  * The store's four milestones now, in `MILESTONES`' order, each with its state (`milestonesOf`) and what it says (`MILESTONE_WORDS`).
  */
 export const milestonesNow = Effect.fn('milestonesNow')(function* () {
@@ -51,8 +72,8 @@ export const milestonesNow = Effect.fn('milestonesNow')(function* () {
   const volume = writable.some(trusted);
   const waiting = writable.find((w) => !trusted(w));
   const runs = yield* (yield* RunDoor).runs.list();
-  const landed = runs.some((run) => Object.values(run.steps).some((s) => s.landed !== undefined && 'commit' in s.landed));
-  const states = milestonesOf({ harness: yield* harnessReady(home), factory: factories.length > 0, volume, landed });
+  const succeeded = yield* someSucceeded(runs);
+  const states = milestonesOf({ harness: yield* harnessReady(home), factory: factories.length > 0, volume, succeeded });
   return {
     milestones: MILESTONES.map((name) => ({
       name,

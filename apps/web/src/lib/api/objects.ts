@@ -679,7 +679,7 @@ export const mcpServers = {
   signInState: (namespace: string, name: string) =>
     call((c) => c.mcpservers.signInState({ params: { namespace, name } }), read(SignInState)),
   /**
-   * The server `name`'s waiting sign-in handed `url`, the address the person's browser landed on once they approved, where that
+   * The server `name`'s waiting sign-in handed `url`, the address the person's browser was sent to once they approved, where that
    * browser runs on another machine than the daemon: answers the sign-in's state.
    */
   signInCallback: (namespace: string, name: string, url: string) =>

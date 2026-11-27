@@ -92,12 +92,12 @@ export const STORE_WORDS = {
   class: 'read',
 } as const satisfies CommandWords;
 
-/** `nemia milestones`: how far the store is on the way to its first landed change. */
+/** `nemia milestones`: how far the store is on the way to its first run that succeeded. */
 export const MILESTONES_WORDS = {
   name: 'milestones',
   served: [{ endpoint: 'readiness.milestones' }],
   usage: '[--json]',
-  help: ['how far the store is towards its first landed change, each milestone', 'done or not, as YAML; --json: as JSON'],
+  help: ['how far the store is towards its first run that succeeded, each milestone', 'done or not, as YAML; --json: as JSON'],
   spec: bareSpec('milestones'),
   writes: false,
   class: 'read',

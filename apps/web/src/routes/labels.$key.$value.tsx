@@ -13,13 +13,13 @@ import type { Hue } from '../lib/meaning';
 import { dollars } from '../lib/money';
 
 /** A bucket a run of the label page is counted in, by its phase and whether it waits on a person. */
-type Bucket = 'waiting' | 'running' | 'needs a person' | 'landed' | 'failed' | 'stopped';
+type Bucket = 'waiting' | 'running' | 'needs a person' | 'succeeded' | 'failed' | 'stopped';
 
 const BUCKETS: ReadonlyArray<{ bucket: Bucket; hue: Hue }> = [
   { bucket: 'waiting', hue: 'grey' },
   { bucket: 'running', hue: 'alive' },
   { bucket: 'needs a person', hue: 'yours' },
-  { bucket: 'landed', hue: 'sage' },
+  { bucket: 'succeeded', hue: 'sage' },
   { bucket: 'failed', hue: 'failure' },
   { bucket: 'stopped', hue: 'grey' },
 ];
@@ -35,7 +35,7 @@ const bucketOf = (run: RunRow) => {
     case 'running':
       return 'running';
     case 'succeeded':
-      return 'landed';
+      return 'succeeded';
     case 'failed':
       return 'failed';
     case 'stopped':
@@ -71,7 +71,7 @@ function Section({ name, plate, children }: { name: string; plate: ReactNode; ch
 /**
  * The page of one label value, `key=value`: the cards of the inbox it holds that are still in play — the api's default listing: not
  * started, or whose run is in flight, each started one with its run's phase (`CardStateChip`) — then the runs it holds counted by
- * where each stands, and what they cost: every try of every run summed, whatever became of it, and the mean of those that landed — each
+ * where each stands, and what they cost: every try of every run summed, whatever became of it, and the mean of those that merged — each
  * linking to its list filtered by it.
  */
 function LabelPage() {
@@ -83,7 +83,7 @@ function LabelPage() {
   const counts = new Map<Bucket, number>();
   for (const run of runs) counts.set(bucketOf(run), (counts.get(bucketOf(run)) ?? 0) + 1);
   const spent = spentOf(stats);
-  const cost = stats.all.total.costPerLanded;
+  const cost = stats.all.total.costPerMerged;
   return (
     <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
       <article data-label-page={selector} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
@@ -128,7 +128,7 @@ function LabelPage() {
               <StatTile hue="ink" label="Spent" value={dollars(spent)} breakdown={null} />
             </span>
             <span data-label-cost>
-              <StatTile hue="ink" label="Cost per landed run" value={dollars(cost)} breakdown={null} />
+              <StatTile hue="ink" label="Cost per merged run" value={dollars(cost)} breakdown={null} />
             </span>
           </div>
           <TextLink to="/runs" search={{ l: selector }} className="w-fit text-body-medium underline">

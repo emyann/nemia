@@ -495,7 +495,7 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       const second = addToInbox({ text: 'Land the second slice', workflow: 'dev', after: [first.card.name] });
       assert.match(cardAt(second.file), new RegExp(`^after: ${first.card.name}$`, 'm'), 'filed with its after:');
       const started = await runPlaced(
-        startFromInbox({ name: second.card.name, workflow: 'dev', callerRepo: repo, landed: () => Effect.succeed(false) }),
+        startFromInbox({ name: second.card.name, workflow: 'dev', callerRepo: repo, released: () => Effect.succeed(false) }),
       );
       assert.deepEqual(started.waitedOn, [first.card.name]);
       assert.equal(runRecord(ROOT, started.run.id).from?.inbox, second.card.name, 'started all the same');

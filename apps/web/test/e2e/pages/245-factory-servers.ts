@@ -219,7 +219,7 @@ function harnessFolder() {
   }) satisfies () => void;
 }
 
-/** What a person pastes back on the paste page: the address the browser landed on, with a code and a state, and one that is not it. */
+/** What a person pastes back on the paste page: the address the browser was sent to, with a code and a state, and one that is not it. */
 const PASTE = {
   landed: `http://localhost:${RECORDED.github.oauth.callbackPort}/callback?code=e2e-code&state=e2e-state`,
   wrong: `http://localhost:${RECORDED.github.oauth.callbackPort}/callback?state=e2e-state`,
@@ -229,7 +229,7 @@ const PASTE = {
 const githubAt = (sub = '') => `/api/namespaces/${FACTORY}/mcpservers/github${sub}`;
 
 /**
- * A sign-in completed by pasting back the address the browser landed on, on a page of its own whose watch expects its one refusal.
+ * A sign-in completed by pasting back the address the browser was sent to, on a page of its own whose watch expects its one refusal.
  *
  * The e2e's api runs the real engine, whose sign-in opens a real harness session against GitHub and writes that harness's own store, so
  * a sign-in is never started for real here: the page holds, by `route`, the four reads and writes a sign-in makes — the servers' read
@@ -290,8 +290,8 @@ async function pastesBack(page: Page) {
     await row.getByRole('button', { name: 'Sign in', exact: true }).click();
     const panel = row.locator('[data-server-sign-in="waiting"]');
     await expectVisible(panel.locator('[data-sign-in-link]'), 'a sign-in started waits, with the address to open');
-    const field = panel.getByRole('textbox', { name: 'the address your browser landed on' });
-    await expectVisible(field, 'and a field to paste the address the browser landed on');
+    const field = panel.getByRole('textbox', { name: 'the address your browser was sent to' });
+    await expectVisible(field, 'and a field to paste the address the browser was sent to');
     const complete = panel.getByRole('button', { name: 'Complete', exact: true });
 
     await field.fill(PASTE.wrong);
@@ -400,7 +400,7 @@ export default {
    * is read on load and on a press alone, which Check again then does. The form records a remote server, which lands in the store's
    * record and in the list, and Remove takes it off again; a header's value is shown as the mask, and a recorded server loaded back
    * into the form and recorded again keeps the value the record holds. A sign-in waiting is completed by pasting back the address the
-   * browser landed on, and a paste the api refuses is said in the panel (`pastesBack`);
+   * browser was sent to, and a paste the api refuses is said in the panel (`pastesBack`);
    * a sign-in by a code is drawn again on a reload, and cancelled (`reloadsACode`). The record is taken back whatever happens.
    *
    * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests of the McpServer's

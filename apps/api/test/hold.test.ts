@@ -6,7 +6,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, with git for real, though a wait reads none of it, in the
  * harness's scratch store (`root`), and the harness's fake `claude` (test/harness.ts) first on PATH.
  *
- * The runs held on: `p-live`, still working, which may succeed yet; `p-landed`, signed off, its branch merged into main (merged or
+ * The runs held on: `p-live`, still working, which may succeed yet; `p-done`, signed off, its branch merged into main (merged or
  * not, it has succeeded); `p-cancelled`, called off before anything of it was filed; `p-failed`, whose one step failed. A pass has read
  * where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
@@ -163,9 +163,9 @@ const review = { name: 'review', after: ['implement'], body: 'Review it.', harne
 branch('wf/p-live/implement', false);
 working('t-p-live');
 writeRun('p-live', [implement], { implement: { taskId: 't-p-live', branch: 'wf/p-live/implement' } });
-branch('wf/p-landed/implement', true);
-signedOff('t-p-landed', DONE);
-writeRun('p-landed', [implement], { implement: { taskId: 't-p-landed', branch: 'wf/p-landed/implement' } });
+branch('wf/p-done/implement', true);
+signedOff('t-p-done', DONE);
+writeRun('p-done', [implement], { implement: { taskId: 't-p-done', branch: 'wf/p-done/implement' } });
 const cancelledAt = at(20);
 writeRun('p-cancelled', [implement], { implement: { taskId: null } }, { cancelledAt });
 journal('t-p-failed', [
@@ -229,7 +229,7 @@ holdOn(BLOCKS, ['p-live']);
  */
 const ON = {
   live: ['p-live'],
-  landed: ['p-landed'],
+  done: ['p-done'],
   cancelled: ['p-cancelled'],
   failed: ['p-failed'],
   missing: ['no-such-run'],
@@ -253,10 +253,10 @@ writeRun(
 signedOff(`${CANCELLED}-implement`, DONE);
 holdOn(CANCELLED, ['p-live']);
 
-/** Started `--after p-live`, nothing of it filed, and held until p-landed as well. */
+/** Started `--after p-live`, nothing of it filed, and held until p-done as well. */
 const AFTER = 'h-after';
 writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'] });
-holdOn(AFTER, ['p-landed', 'p-live']);
+holdOn(AFTER, ['p-done', 'p-live']);
 await runWith(engine(ENV), passStanding(runsNow(root).runs.list()));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
@@ -464,7 +464,7 @@ describe('a person holds a run until another succeeds: the list, the page and th
     async () => {
       const runs = await listed();
       const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.waitingOnYou]));
-      assert.deepEqual(onYou, { live: false, landed: false, cancelled: true, failed: true, missing: true, none: false });
+      assert.deepEqual(onYou, { live: false, done: false, cancelled: true, failed: true, missing: true, none: false });
       for (const kind of Object.keys(ON)) {
         const holding = runs.get(`h-on-${kind}`)!.holding!;
         assert.equal(
@@ -473,8 +473,8 @@ describe('a person holds a run until another succeeds: the list, the page and th
           `${kind}: held to nemia decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
         );
       }
-      assert.deepEqual(runs.get('h-on-landed')!.holding!.runs, [
-        { run: 'p-landed', missing: false, cancelledAt: null, failed: false, released: true },
+      assert.deepEqual(runs.get('h-on-done')!.holding!.runs, [
+        { run: 'p-done', missing: false, cancelledAt: null, failed: false, released: true },
       ]);
       assert.deepEqual(runs.get('h-on-cancelled')!.holding!.runs, [
         { run: 'p-cancelled', missing: false, cancelledAt, failed: false, released: false },
@@ -495,7 +495,7 @@ describe('a person holds a run until another succeeds: the list, the page and th
     async () => {
       const runs = await listed();
       const moving = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.moving]));
-      assert.deepEqual(moving, { live: true, landed: true, cancelled: false, failed: false, missing: false, none: false });
+      assert.deepEqual(moving, { live: true, done: true, cancelled: false, failed: false, missing: false, none: false });
       for (const kind of Object.keys(ON)) assert.equal(runs.get(`h-on-${kind}`)!.status, 'running', kind);
       for (const id of [GATE, LOOP, BUDGET, BLOCKS])
         assert.equal(runs.get(id)!.moving, false, `${id}: a run that would wait on you unheld moves no more for being held`);
@@ -814,7 +814,7 @@ describe('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing noth
   });
   test("REFUSED at shipped defaults: a hold `hold` refuses — a run already held, a cancelled run, a run to wait on the store does not have, the run itself, a run that waits on this one — is a 409 in `nemia hold`'s words, and nothing is written", async () => {
     const cases: Array<[string, string[], string]> = [
-      [GATE, ['p-landed'], 'is already held until p-live succeeds'],
+      [GATE, ['p-done'], 'is already held until p-live succeeds'],
       [CANCELLED, ['p-live'], 'was cancelled at'],
       [PUT, ['p-nope'], 'the store has no run p-nope'],
       [PUT, [PUT], 'that is h-put itself'],

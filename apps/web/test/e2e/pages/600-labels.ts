@@ -90,7 +90,7 @@ export default {
         'it lists the card no run started, which is in play',
       );
       await expectVisible(page.locator('[data-section="in play"] h2', { hasText: /^Card in play$/ }), 'one card is said in the singular');
-      await expectVisible(page.locator('[data-bucket="landed"]', { hasText: '1' }), 'and counts the landed run');
+      await expectVisible(page.locator('[data-bucket="succeeded"]', { hasText: '1' }), 'and counts the succeeded run');
       await expectVisible(page.locator('[data-section="runs"] h2', { hasText: /^Run$/ }), 'one run is said in the singular');
       await expectVisible(page.locator('[data-label-spent]'), 'and says what its runs spent, landed or not');
       const read = await page.request.get(new URL(withSelector('/api/stats', LABEL), page.url()).href);
@@ -100,8 +100,8 @@ export default {
       await expectTexts(figure('label-spent'), [dollars(spentOf(stats))], 'what they spent is said as every page says an amount');
       await expectTexts(
         figure('label-cost'),
-        [dollars(stats.all.total.costPerLanded)],
-        'and so is what a landed run cost, `—` where none landed with a cost',
+        [dollars(stats.all.total.costPerMerged)],
+        'and so is what a merged run cost, `—` where none merged with a cost',
       );
       await settled(page);
       await photograph(page, path.join(OUT, `labels-page-${theme}.png`), { fullPage: true });

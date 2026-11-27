@@ -78,9 +78,13 @@
       }
     },
     {
-      "term": "Landed",
-      "meaning": "a run's result is on its base, as the package asks it: and the decision's `land it`. A wait on a run reads that it succeeded (the `succeeded` key of a run waited on and of a run handed as context), never that it landed.",
+      "term": "Merged",
+      "meaning": "a run's result is on its base, as the package asks it: and the decision's `merge it`. A wait on a run reads that it succeeded (the `succeeded` key of a run waited on and of a run handed as context), never that it merged.",
       "retired": [
+        {
+          "spelling": "landed",
+          "card": "run-core-say-succeeded-and-m-k9iy: a run succeeded and a branch is merged; landed is sdlc's word only"
+        },
         {
           "spelling": "shipped",
           "card": "decision 13a: 'landed' for a run's result on its base"

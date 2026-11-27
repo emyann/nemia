@@ -24,8 +24,8 @@ import { selectedRuns } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
-import { askedStandings, landedOf, resultBranches, type BranchReader } from '../branches/branches.store.ts';
-import { decision, type Decision, type Landed } from '../decide/decide.ts';
+import { askedStandings, mergedOf, resultBranches, type BranchReader } from '../branches/branches.store.ts';
+import { decision, type Decision, type Merged } from '../decide/decide.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
@@ -69,7 +69,7 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  *   the program's (`StoreConfig`).
  * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
- * @param landed Whether a result branch is on its base, as the decision reads it; left out, as `git` reads it (`landedOf`).
+ * @param merged Whether a result branch is on its base, as the decision reads it; left out, as `git` reads it (`mergedOf`).
  */
 export type ListReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
@@ -81,7 +81,7 @@ export type ListReadingHow = {
   config?: Settings;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
-  landed?: (branch: string) => Landed;
+  merged?: (branch: string) => Merged;
   /**
    * The store's runs as the caller listed them, among which the claims on the repository's checkout are read (`checkoutHold`): a caller
    * that reads many runs off one listing hands it, so the store is not listed again for each; left out, it is listed where a claim is read.
@@ -101,7 +101,7 @@ export type ListReadingHow = {
  * inputs (`assessed`) — with `assessOf` to ask it again of the record as it would stand (a hold lifted), each task's phase as the tick
  * reads it (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`);
  * the run's one read it assessed, with its checkout and standings (`read`), and what is left for a person to do about it on the same
- * read (`decision`), each branch on the base or not as `git` says it (`landedOf`): what `nemia decide` answers from.
+ * read (`decision`), each branch on the base or not as `git` says it (`mergedOf`): what `nemia decide` answers from.
  */
 export type ListReading = Listing & {
   assessed: Assessment;
@@ -146,7 +146,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const standings = how.standings ? how.standings(status, steps) : askedStandings(run, steps, status, git);
   const read = { ...held, standings };
   const assessed = assess(read);
-  const decided = decision(read, how.landed ?? landedOf(run, git), assessed);
+  const decided = decision(read, how.merged ?? mergedOf(run, git), assessed);
   const assessOf = (on: Run) => assess({ ...read, run: on }) satisfies Assessment;
   const parent = how.parent ?? (yield* parentsRead(run).pipe(over(e)));
   const scripted = base.signedOff;

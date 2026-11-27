@@ -148,7 +148,7 @@ export const Trusted: Story = {
     await userEvent.click(within(page).getByRole('button', { name: 'Trust' }));
     await loaded(canvasElement, 'done');
     await expect(sent[sent.length - 1]?.route).toBe(`POST /api/factories/${ACME}/trust`);
-    await expect(within(page).getByRole('link', { name: 'Next: a first change merged' })).toBeVisible();
+    await expect(within(page).getByRole('link', { name: 'Next: a first run that succeeded' })).toBeVisible();
   },
 };
 

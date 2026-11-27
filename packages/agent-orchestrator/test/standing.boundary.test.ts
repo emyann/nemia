@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
-import { landedOver } from '../src/branches/branches.ts';
+import { mergedOver } from '../src/branches/branches.ts';
 import { knownOf, toldOf } from '../src/standing/standing.verb.ts';
 import { scratch } from 'test-kit/scratch';
 import { columnsListed, plantedGit } from './planted-git.ts';
@@ -197,7 +197,7 @@ test('a branch is landed by its standing exactly when git asked one question at 
   git(repo.dir, 'branch', '-q', '-D', 'wf/r/u');
   const branches = [...asked(repo), { branch: 'wf/r/u', tip: unmerged, baseRef: repo.cut }];
   const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches }));
-  const said = branches.map((_, i) => landedOver(answer.branches[i]));
+  const said = branches.map((_, i) => mergedOver(answer.branches[i]));
   assert.deepEqual(said, [true, false, 'unchanged', true, false, false, false]);
   assert.deepEqual(
     said,
@@ -306,7 +306,7 @@ test('a branch moved since standing last read it is asked of git again, by one m
   assert.equal(first.branches[2].pastBase, false, 'it had nothing of its own');
   const next = git(repo.dir, 'commit-tree', `${moved.branch}^{tree}`, '-p', moved.branch, '-m', 'more');
   git(repo.dir, 'update-ref', `refs/heads/${moved.branch}`, next);
-  git(repo.dir, 'update-ref', 'refs/heads/main', git(repo.dir, 'commit-tree', 'main^{tree}', '-p', 'main', '-p', next, '-m', 'land it'));
+  git(repo.dir, 'update-ref', 'refs/heads/main', git(repo.dir, 'commit-tree', 'main^{tree}', '-p', 'main', '-p', next, '-m', 'merge it'));
   const planted = plantedGit(ENV);
   const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: knownFrom(repo.asked, first) }, planted.env));
   assert.deepEqual(again, answerOf(standing({ repo: repo.dir, base: 'main', branches: repo.asked })));
@@ -385,7 +385,7 @@ test('a branch read off its base and landed since, its tip unchanged, is asked o
   const planted = plantedGit(ENV);
   const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: told }, planted.env));
   assert.deepEqual(again, answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) })));
-  assert.deepEqual([again.branches[1].onBase, again.branches[1].pastBase, landedOver(again.branches[1])], ['yes', true, true]);
+  assert.deepEqual([again.branches[1].onBase, again.branches[1].pastBase, mergedOver(again.branches[1])], ['yes', true, true]);
   assert.deepEqual(
     planted.said().filter((line) => line === `merge-base --is-ancestor ${tip} ${repo.cut}`),
     [`merge-base --is-ancestor ${tip} ${repo.cut}`],

@@ -223,10 +223,11 @@ export const queuedWord = (queued: NonNullable<InboxEntry['queued']>) => {
 };
 
 /**
- * The line of a card's waits on the cards of its `after:` not landed: each card, the card its work stands at where it is another, and that
+ * The line of a card's waits on the cards of its `after:` not succeeded: each card, the card its work stands at where it is another, and
+ * that
  * card's state, or that the store has no such card, or the cycle; and, where only a person can release one, `Needs you:` with the fix.
  * @param name The waiting card, by name, which the fix names.
- * @param waits The cards it waits on that have not landed.
+ * @param waits The cards it waits on that have not succeeded.
  */
 export const waitWords = (name: string, waits: readonly CardWait[]) => {
   const one = (w: CardWait) => {

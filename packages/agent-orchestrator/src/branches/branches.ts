@@ -25,7 +25,7 @@ import type { BranchesAsked } from '../../contracts/branches-asked.contract.ts';
  * repository's own checkout (`workspace: base`), the steps it waits on instead. Pure.
  *
  * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
- * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
+ * the result, its `main` would be the run's own branch, and every question about the run's result — has it merged, what did it touch,
  * what is there to decide — would be asked of the base branch and answered yes.
  * @param steps The run's steps.
  * @param run The run, read for the workflow nodes that routed it on; absent, none did.
@@ -118,12 +118,12 @@ export function resultTips(run: Pick<Run, 'tips'>, branches: readonly string[], 
 }
 
 /**
- * Whether a branch has landed on its base, read off where the place's `standing` says it stands: yes when it is on
+ * Whether a branch has merged into its base, read off where the place's `standing` says it stands: yes when it is on
  * its base — `true` with work past its run's base, `'unchanged'` with none or where git could not tell — and false otherwise, or where
  * nothing was read. Pure.
  * @param stood Where the place says the branch stands; undefined where nothing was read.
  */
-export const landedOver = (stood: BranchStood | undefined) =>
+export const mergedOver = (stood: BranchStood | undefined) =>
   stood?.onBase !== 'yes' ? false : stood.pastBase === true ? true : 'unchanged';
 
 /**

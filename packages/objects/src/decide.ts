@@ -109,7 +109,7 @@ export type Lesson = typeof Lesson.Type;
 export const DecideCommand = Schema.Struct({
   label: Schema.Literals(DECIDE_LABELS).annotate({
     description:
-      'What the command does, as nemia decide labels it: land it, drop it, read it, once more, refresh, approve, send back, forget it.',
+      'What the command does, as nemia decide labels it: merge it, drop it, read it, once more, refresh, approve, send back, forget it.',
   }),
   command: Schema.String.annotate({ description: 'The bare line to type.' }),
   said: Schema.NullOr(Schema.String).annotate({ description: 'The sentence the line ends, where it has one; null otherwise.' }),
@@ -319,7 +319,8 @@ export type Decidable = typeof Decidable.Type;
 
 /**
  * A run's decision, in one order: `nothing`, in the package's words, for a run called off; `waiting` for a run whose roots wait on runs
- * that have not landed, with the hold beside it for one a person holds too; `holding` alone for a run a person holds, which offers
+ * that have not succeeded or been released, with the hold beside it for one a person holds too; `holding` alone for a run a person
+ * holds, which offers
  * nothing; `running` while it runs and nobody is waited on, `held` beside it for a run the cap on runs in flight holds; `nothing` for a
  * run whose branches are already on its base; else what there is to decide (`Decidable`). A union of members told apart by their keys,
  * the first that decodes taken: a run waiting and held reads as waiting, with its hold.

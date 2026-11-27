@@ -75,10 +75,10 @@ describe('pruneOffer, awaitingOf: what a finished run is offered to prune, and w
     assert.match(offer.warning!, /^It worked on main itself and nobody has decided it/);
     assert.doesNotMatch(offer.warning!, /only copy/);
   });
-  test('a failed run whose branch a person merged by hand landed, as the package reads it: both choices open, and no branch is said to be the only copy', () => {
-    const landedByHand = { nothing: 'landed — wf/r-1/implement is already on main' };
+  test('a failed run whose branch a person merged by hand merged, as the package reads it: both choices open, and no branch is said to be the only copy', () => {
+    const mergedByHand = { nothing: 'failed — wf/r-1/implement merged into main' };
     const failed = { ...finished, status: 'failed' as const };
-    const offer = pruneOffer(failed, awaitingOf(landedByHand))!;
+    const offer = pruneOffer(failed, awaitingOf(mergedByHand))!;
     assert.deepEqual(
       offer.choices.map((c) => [c.key, c.unavailable]),
       [

@@ -3,7 +3,7 @@
 Pages for a person who will use Nemia, on Astro Starlight: what Nemia is, the map of its four parts, a page for each part and idea
 (the runtime, A2A, workflows, agents, factories, how a run lives, Nemia), a glossary, and getting started. It sits beside the
 layers, not among them: it imports no workspace package and depends on none, and reads the repository's text at build, by path from
-its root. A page holds landed material only; a term designed and not built sits in the glossary under its `planned` badge.
+its root. A page holds built material only; a term designed and not built sits in the glossary under its `planned` badge.
 
 ## Pages and diagrams
 

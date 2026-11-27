@@ -105,7 +105,8 @@ const answered = (read: DecisionRead | DecisionUnjudged) => read;
  * read, where its branches stand as the tick's last pass read them (`standing.json`), never git asked now. A run whose unfrozen folder or a
  * task journal of which does not read is answered unjudged (`DecisionUnjudged`), as its object is, called off or not. Called off is
  * `nothing`. Then the runs it waits on and is held until, as the judgement read them: a run whose roots wait on runs that have not
- * landed is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight (`decided`). Else the run is
+ * succeeded or been released is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight
+ * (`decided`). Else the run is
  * decided (`decidedOf`). A run the cap on runs in flight holds is `running` with its slot (its `WF_MAX_RUNS` before any pass is `env`'s),
  * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`, with an approved ending that
  * never ran named. Else what there is to decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
@@ -137,8 +138,8 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
   if (judged.status === 'running' && !judged.waitingOnYou.length)
     return { decision: { running: true }, decided, ...none } satisfies DecisionRead;
   const d = decided.decision;
-  if (d.kind === 'landed')
-    return { decision: { nothing: landedWords(run, d.branches, decided.steps) }, decided, ...none } satisfies DecisionRead;
+  if (d.kind === 'merged')
+    return { decision: { nothing: mergedWords(run, judged.status, d.branches, decided.steps) }, decided, ...none } satisfies DecisionRead;
   const steps = decided.steps;
   const collisions = decided.collisions ?? null;
   const read = yield* branchesOf(run, git, steps, decided, d.kind === 'awaiting' ? d.branches : undefined, collisions, how);
@@ -192,13 +193,14 @@ export const runDecision = Effect.fn('runDecision')(function* (id: string, how: 
   return answer;
 });
 
-/** What a run whose branches are already on its base says: that, and an ending approved first that never ran, nothing left for it. */
-function landedWords(run: Run, branches: readonly string[], steps: Decided['steps']) {
+/** What a run whose branches are already on its base says: its status, the branches merged, and an ending approved first that never ran,
+ * nothing left for it. */
+function mergedWords(run: Run, status: string, branches: readonly string[], steps: Decided['steps']) {
   const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
   const never = unrun
     ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
     : '';
-  return `landed — ${branches.join(', ')} is already on ${run.branch}${never}`;
+  return `${status} — ${branches.join(', ')} merged into ${run.branch}${never}`;
 }
 
 /** What `branch` changed among `changes`, which `changesOf` gives for each branch it was asked: thrown, naming it, where none. */

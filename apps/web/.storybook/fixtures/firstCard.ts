@@ -2,7 +2,7 @@
  * The first card's reads and writes, and "You are set"'s, as the api answers them, for their stories (`Pages/Welcome first card`,
  * `Pages/You are set`), each typed by `objects`' own types so a key the api renames fails the typecheck here: the factory `acme` with the
  * workflows it offers and its first volume (`Factory`), its lines with and without the host its template follows (`FactoryCommands`),
- * each workflow it offers, an `implement` step then its ending step `land` (`Workflow`), the stats of a workflow's landed runs (`Stats`),
+ * each workflow it offers, an `implement` step then its ending step `land` (`Workflow`), the stats of a workflow's merged runs (`Stats`),
  * the quota, the milestones, a card filed (`Card`) and started (`CardStarted`). Each
  * story makes its own store (`firstCardStore`); `filed` holds what the page wrote, in order.
  */
@@ -58,28 +58,28 @@ const factoryFixture = (name: string, workflows: string[], volumes: FactoryVolum
   status: { conditions: [], untrusted: [] },
 }) satisfies Factory;
 
-/** The stats of a workflow's landed runs: `landed` of them, each about 14 minutes and $3.20, or none. */
-const statsOf = (landed: number) => ({
+/** The stats of a workflow's merged runs: `merged` of them, each about 14 minutes and $3.20, or none. */
+const statsOf = (merged: number) => ({
   from: null,
   to: '2026-11-18',
   by: null,
   filters: {},
-  all: { total: { runs: landed, landed, costPerLanded: landed ? 3.2 : null, timePerLanded: landed ? 14 * 60_000 : null } },
+  all: { total: { runs: merged, merged, costPerMerged: merged ? 3.2 : null, timePerMerged: merged ? 14 * 60_000 : null } },
   groups: [],
   unreadable: [],
   health: {},
 });
 
 /** The milestones, the landing `done` or next. */
-const milestonesOf = (landed: boolean) => ({
+const milestonesOf = (succeeded: boolean) => ({
   milestones: [
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'done', message: 'a factory is filed' },
     { name: 'volume', state: 'done', message: 'a writable volume is mounted and trusted' },
     {
-      name: 'landed',
-      state: landed ? 'done' : 'next',
-      message: landed ? 'a run landed' : 'start a first card, and merge its change into the base branch',
+      name: 'succeeded',
+      state: succeeded ? 'done' : 'next',
+      message: succeeded ? 'a run has succeeded' : 'start a first card, and see it through to succeeded',
     },
   ],
 }) satisfies Milestones;
@@ -129,21 +129,21 @@ const workflowFixture = (name: string) => ({
   },
 }) satisfies Workflow;
 
-/** What a store of a story holds: the workflows `acme` offers, its first volume's origin, how many quick runs landed, and more. */
+/** What a store of a story holds: the workflows `acme` offers, its first volume's origin, how many quick runs merged, and more. */
 type Held = {
   workflows?: string[];
   origin?: string;
-  landedRuns?: number;
-  landed?: boolean;
+  mergedRuns?: number;
+  succeeded?: boolean;
   follows?: boolean;
   refuses?: string;
 };
 
 /**
  * The handlers of a store that holds the factory `acme`, its own for one story.
- * @param held What the store holds: by default quick offered, a folder of this machine, no landed run, a host followed.
+ * @param held What the store holds: by default quick offered, a folder of this machine, no succeeded run, a host followed.
  */
-export const firstCardStore = ({ workflows = ['build', 'quick'], origin, landedRuns = 0, landed = false, follows = true, refuses }: Held = {}) => {
+export const firstCardStore = ({ workflows = ['build', 'quick'], origin, mergedRuns = 0, succeeded = false, follows = true, refuses }: Held = {}) => {
   const volume: FactoryVolume = { name: 'app', path: '/home/you/code/app', readOnly: false, ...(origin === undefined ? {} : { origin }) };
   return [
     http.get('/api/factories', () =>
@@ -161,9 +161,9 @@ export const firstCardStore = ({ workflows = ['build', 'quick'], origin, landedR
     http.get('/api/namespaces/:namespace/schedules', () =>
       HttpResponse.json({ apiVersion: 'nemia/v1', kind: 'ScheduleList', metadata: {}, items: [] }),
     ),
-    http.get('/api/stats', () => HttpResponse.json(statsOf(landedRuns))),
+    http.get('/api/stats', () => HttpResponse.json(statsOf(mergedRuns))),
     http.get('/api/quota', () => HttpResponse.json(QUOTA)),
-    http.get('/api/readiness/milestones', () => HttpResponse.json(milestonesOf(landed))),
+    http.get('/api/readiness/milestones', () => HttpResponse.json(milestonesOf(succeeded))),
     http.post('/api/namespaces/:namespace/cards', async ({ request }) => {
       const body = await bodyOf(request);
       filed.push({ route: 'POST cards', body });

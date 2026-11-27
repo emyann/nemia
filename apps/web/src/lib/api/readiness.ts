@@ -65,7 +65,7 @@ export const turnQuery = (id: string) =>
     refetchInterval: (query) => (query.state.data?.check.state === 'running' ? TURN_EVERY_MS : false),
   });
 
-/** The store's milestones on the way to its first landed change, read as often as the readiness read. */
+/** The store's milestones on the way to its first run that succeeded, read as often as the readiness read. */
 export const milestonesQuery = queryOptions({
   queryKey: ['readiness', 'milestones'],
   queryFn: () => call((c) => c.readiness.milestones(), read(Milestones)),

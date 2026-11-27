@@ -160,8 +160,8 @@ const oneStepRun = (id: string, taskId: string, more: object = {}, step: object 
     }),
   );
 write(path.join(root, 'standing.json'), JSON.stringify({ v: 1, at: at(0), places: [] }));
-oneStepRun('r-landed', 't-landed', {}, { branch: 'wf/r-landed/build' });
-settled('t-landed', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] }, 210);
+oneStepRun('r-merged', 't-merged', {}, { branch: 'wf/r-merged/build' });
+settled('t-merged', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] }, 210);
 oneStepRun('r-unread', 't-unread', {}, { branch: 'wf/r-unread/build' });
 write(path.join(root, 'engine', 'tasks', 't-unread.jsonl'), '{ this is no journal\n');
 const asker = path.join(root, 'asker');
@@ -344,7 +344,7 @@ test('`nemia ls` over a runs list answered in pages prints a line per run of eve
   });
   const listed = await nemia(['ls']);
   assert.equal(listed.code, 0, listed.err);
-  for (const run of ['r-parity', 'r-after', 'r-held', 'r-parked', 'r-cancelled', 'r-working', 'r-landed', 'r-unread', 'r-asking'])
+  for (const run of ['r-parity', 'r-after', 'r-held', 'r-parked', 'r-cancelled', 'r-working', 'r-merged', 'r-unread', 'r-asking'])
     assert.match(listed.out, new RegExp(`^${run} `, 'm'), `${run}'s line, whichever page it was on`);
   assert.equal(listed.out.match(/^NAME +STATUS/gm)?.length, 1, 'one table, its columns named once');
   assert.ok(asks.length > 2, `it read on past the first page: ${JSON.stringify(asks)}`);
@@ -395,7 +395,7 @@ test('`nemia ls` says again what it said before the table: how old where the bra
   assert.ok(stood > 0, `how long ago the last pass read where the branches stand: ${listed.out}`);
   assert.ok(lines.findIndex((l) => l.startsWith('r-')) < stood, 'after the runs');
   assert.ok(stood < lines.findIndex((l) => l.startsWith('scheduled ')), 'before the schedules');
-  assert.match(listed.out, /^r-landed .*result: wf\/r-landed\/build — nemia decide r-landed$/m, "a finished run's result branch");
+  assert.match(listed.out, /^r-merged .*result: wf\/r-merged\/build — nemia decide r-merged$/m, "a finished run's result branch");
   const wide = await nemia(['ls', '-o', 'wide']);
   assert.equal(wide.code, 0, wide.err);
   assert.match(wide.out, /^r-asking .*plan succeeded · BLOCKED · asks 2 questions$/m, 'a step notes the questions it asks');
@@ -757,10 +757,10 @@ const ONE_RUN: Readonly<Record<string, readonly string[]>> = {
     '   build          pending              ',
     '   → held until r-parity succeeds (why: merge conflicts; by operator)  —  nemia hold r-held --off lifts it',
   ],
-  'r-landed': [
-    'r-landed  The run r-landed',
-    '   build          unverified · done    wf/r-landed/build',
-    '   → result: wf/r-landed/build  —  nemia decide r-landed',
+  'r-merged': [
+    'r-merged  The run r-merged',
+    '   build          unverified · done    wf/r-merged/build',
+    '   → result: wf/r-merged/build  —  nemia decide r-merged',
   ],
   'r-after': [
     'r-after  The run r-after',

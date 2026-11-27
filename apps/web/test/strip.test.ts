@@ -166,9 +166,9 @@ describe('stripOf and readoutOf: the factory in view, its agents at work, and th
   test("the numbers are those of the reads handed, the factory in view's when it names one, the default's those of none", () => {
     console.log(`stripOf: waitsOnYou, inFlight, landed: each counts what its read hands in, never a run of another factory.`);
     const kit = strip('kit');
-    assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.landed], [1, 0, 0]);
+    assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.succeeded], [1, 0, 0]);
     const home = strip('default');
-    assert.deepEqual([home.inFlight, home.waitsOnYou, home.landed], [1, 2, 1]);
+    assert.deepEqual([home.inFlight, home.waitsOnYou, home.succeeded], [1, 2, 1]);
   });
   test('the agents at work are counted once each against those hired in view, their steps longest at work first', () => {
     console.log(`stripOf: agents: agentsOf(rows, hiredIn(...)); rows: rows.slice(0, ROWS_SHOWN), rowsOf(open, now) sorted longest first.`);
@@ -292,7 +292,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
       `stripOf: finishedToday: finishedAt >= dayStart; landed: outcome 'succeeded'; failed: outcome 'failed'; perLanding: today's priced landings.`,
     );
     const s = strip();
-    assert.equal(s.landed, 1, 'landed 10 minutes after midnight, not 10 minutes before');
+    assert.equal(s.succeeded, 1, 'landed 10 minutes after midnight, not 10 minutes before');
     assert.equal(s.failed, 1, 'failed on the stroke of midnight');
     assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
   });
@@ -300,7 +300,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     console.log(`stripOf: priced: landed with a cost; perLanding: the mean of the priced.`);
     const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
     const s = bare({ finished: [landedToday, unpriced] });
-    assert.deepEqual([s.landed, s.perLanding], [2, 6]);
+    assert.deepEqual([s.succeeded, s.perLanding], [2, 6]);
   });
   test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
     console.log(`stripOf: rows and sessions: working(run, step), by stepState.`);
@@ -314,7 +314,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
       `stripOf: landed and failed: by the list's outcome, never the status (both runs say succeeded); spentUsd: finishedToday in worked.`,
     );
     const s = bare({ finished: [cancelledToday, undecided] });
-    assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
+    assert.deepEqual([s.succeeded, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
   });
   test('a run counts in Wait on you or In flight as the list puts it, one that moves and waits with the waiting alone', () => {
     console.log(`stripOf: waitsOnYou: open.waiting; inFlight: open.inFlight.`);

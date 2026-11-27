@@ -55,7 +55,7 @@ function RunRead({ runId }: { runId: string }) {
  * inspected in the frame's bar; the ask beside the result (`RunResult`); every step in one part (`Ledger`); and its receipts, folded
  * (`Receipts`). The machine's detail is one fold down, never gone. Where it is the welcome's first card's run, the hint of the beat it
  * stands at is drawn where that beat is (`FirstHint`): the gate's over the asks, the card's under the header, the steps' over the graph
- * and landed's over the result.
+ * and succeeded's over the result.
  */
 function Run({ run }: { run: RunDetail }) {
   return (
@@ -84,7 +84,7 @@ function Run({ run }: { run: RunDetail }) {
         <RunCanvas run={run} />
       </section>
 
-      <FirstHint run={run} beat="landed" />
+      <FirstHint run={run} beat="succeeded" />
 
       <RunResult run={run} />
 

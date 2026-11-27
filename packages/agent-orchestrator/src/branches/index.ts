@@ -11,7 +11,7 @@ export {
   parseGlobs,
   resultSteps,
   resultTips,
-  landedOver,
+  mergedOver,
   tipBranches,
   tipsSeen,
   touchedLines,

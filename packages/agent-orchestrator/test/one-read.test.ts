@@ -22,7 +22,7 @@ import { staged } from './story.ts';
 import { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } from '../src/runner.ts';
 import { decisionRead } from '../src/decide/decision.verb.ts';
 import { decision } from '../src/decide/decide.ts';
-import { landedOf } from '../src/branches/branches.store.ts';
+import { mergedOf } from '../src/branches/branches.store.ts';
 import { Tracer } from 'effect';
 import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
 import { readRun as theRead } from '../src/tick/told.verb.ts';
@@ -64,7 +64,7 @@ const tickRead = (e: Engine, run: Run) =>
     );
     return {
       ...assessed,
-      landed: decision(read, landedOf(run, standingReader(snapshot)), assessed).kind === 'landed',
+      landed: decision(read, mergedOf(run, standingReader(snapshot)), assessed).kind === 'merged',
       checkout: read.checkout?.run ?? null,
       plan: cancelPlan(read, assessed),
       asked: assessed.due.retry.filter((t) => t.by === 'ask').map((t) => t.step),
@@ -223,7 +223,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}) => {
       retries: sorted(decided.retrying.map((r) => r.step)),
       rounds: sorted(decided.rounding.map((r) => r.step)),
       toDecide: decideWord(decided.toDecide),
-      landed: decided.decision.kind === 'landed',
+      landed: decided.decision.kind === 'merged',
       waitingOn: sorted(decided.waiting.map((w) => w.run)),
       checkout: decided.checkout?.run ?? null,
       tries: triesOn(decided.timeline.steps),

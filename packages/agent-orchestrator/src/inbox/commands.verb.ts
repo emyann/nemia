@@ -190,7 +190,7 @@ export const INBOX_RESEND: Served<Resent, InboxResendInput> = {
 /**
  * `nemia inbox from`: the runs a card's run is handed as context (its `from:`), set, or with `--off` taken off, its words the client's
  * (`objects`' `INBOX_FROM_WORDS`), which writes the card whole through the Card's `update`. Context is no wait: the run reads what each
- * concluded when its steps are filed, landed or in flight, and waits on none (`setFrom`).
+ * concluded when its steps are filed, succeeded or in flight, and waits on none (`setFrom`).
  */
 const INBOX_FROM: Served<InboxFrom & { name: string; from: string[] }> = {
   ...INBOX_FROM_WORDS,

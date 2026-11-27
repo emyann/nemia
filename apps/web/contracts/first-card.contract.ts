@@ -138,8 +138,7 @@ const firstBeatOfSpec = spec<(run: FirstRunRead) => FirstBeat | null>({
     },
     theCardBeforeAnything: {
       description: 'Started and nothing filed yet, the hint is the card: what was asked, and that the daemon files it',
-      condition: ({ input: [run], output }) =>
-        !run.first || run.succeeded || run.ended || run.waitsOnYou || run.filed || output === 'card',
+      condition: ({ input: [run], output }) => !run.first || run.succeeded || run.ended || run.waitsOnYou || run.filed || output === 'card',
     },
   },
 });

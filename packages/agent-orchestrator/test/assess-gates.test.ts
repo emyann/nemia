@@ -277,7 +277,7 @@ describe('decision at a gate', () => {
     ]);
   });
   test('work merged by a person is landed for any other run', () => {
-    assert.equal(decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'landed');
+    assert.equal(decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'merged');
   });
   test('REFUSED landed for one whose last step waits at its gate, merged or not', () => {
     assert.equal(decision(aRead(STEPS, gatedAtReview(), { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'awaiting');
@@ -287,7 +287,7 @@ describe('decision at a gate', () => {
     );
   });
   const shippedParent = (parent: Run) => (id: string) =>
-    id === 'r-1' && decision(aRead(STEPS, parent, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind === 'landed';
+    id === 'r-1' && decision(aRead(STEPS, parent, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind === 'merged';
   test('REFUSED a run --after a parent at its gate is not ready', () => {
     child = run({ implement: null, review: null }, { after: ['r-1'] });
     assert.equal(runReady(child, shippedParent(gatedAtReview())), false);
@@ -295,7 +295,7 @@ describe('decision at a gate', () => {
   test('approved and merged, the parent lands and the child is ready', () => {
     const approved = gatedAtReview({ approvals: [approval('review', 1)] });
     assert.equal(runReady(child, shippedParent(approved)), true);
-    assert.equal(decision(aRead(STEPS, approved, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'landed');
+    assert.equal(decision(aRead(STEPS, approved, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'merged');
   });
 });
 

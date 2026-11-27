@@ -7,7 +7,7 @@ import { SignInView, signInShownOf, type SignInShown } from './ServerSignIn';
  * A server's sign-in on its row, in each place it stands: offered on `needs-auth`, and on `pending` and `failed` for a server whose
  * record has `oauth`, nothing for one without it, waiting by a code, or with the address to open and
  * the field to
- * paste the address the browser landed on, ended with why and the press to try again, connected with Sign out, and refused in the api's
+ * paste the address the browser was sent to, ended with why and the press to try again, connected with Sign out, and refused in the api's
  * words — a paste refused among them. No node test can judge how each reads, so each is
  * drawn here.
  */
@@ -86,7 +86,7 @@ export const Offered: StoryObj = { render: () => view({ at: 'offer' }) };
 /** A sign-in by the browser started: the address to open, when it stops waiting, the empty field to paste back into, and Cancel. */
 export const Waiting: StoryObj = { render: () => view({ at: 'waiting', started: BROWSER }) };
 
-/** A waiting sign-in with the address the browser landed on pasted, Complete ready to press. */
+/** A waiting sign-in with the address the browser was sent to pasted, Complete ready to press. */
 export const Pasted: StoryObj = {
   render: () =>
     view({ at: 'waiting', started: BROWSER }, null, 'http://localhost:8791/callback?code=3f1c9a0e2b7d4c6e8a10&state=pYk2v9Qm4sT7wX1z'),
@@ -97,7 +97,7 @@ export const PasteRefused: StoryObj = {
   render: () =>
     view(
       { at: 'waiting', started: BROWSER },
-      'what was pasted for `github` is not the address its sign-in sends the browser back to. Paste the address your browser landed on after you approved, starting http://localhost:8791/callback.',
+      'what was pasted for `github` is not the address its sign-in sends the browser back to. Paste the address your browser was sent to after you approved, starting http://localhost:8791/callback.',
       'http://localhost:3000/factories/default/settings',
     ),
 };

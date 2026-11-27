@@ -4,7 +4,7 @@
  * it and writes it to `standing.json` (`passStanding`); a read off the tick — `nemia ls`, the board — decodes that file, with no process
  * (`standingSnapshot`); a person's one-off verb asks it live and writes nothing (`standingNow`, `standingLive`). One reader answers off any
  * of them (`standingReader`): a question none asked is unread, never asked of git as it goes. A reading the place refused or did not
- * answer is unread too: nothing on it has landed, and the reader says why.
+ * answer is unread too: nothing on it has merged, and the reader says why.
  */
 import { idRefusal } from '../forget/forget.ts';
 import { RunId } from '../record/record.model.ts';
@@ -17,7 +17,7 @@ import { within } from '../meter/tally.store.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
-import { landedOver } from '../branches/index.ts';
+import { mergedOver } from '../branches/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
@@ -319,7 +319,7 @@ const repoHeads = (standing: PassStanding, repo: string) => {
 /**
  * The `BranchReader` that answers off what was read (`PassStanding`), with no process of its own. A question nobody asked — a run whose
  * repository, place and base were not read, a branch not asked of — and one on a reading that is unread are unread (`unread` says why):
- * not landed, never gone, ahead by none; a branch of a run whose folder does not load says that folder's words (`unloaded`). Whether git
+ * not merged, never gone, ahead by none; a branch of a run whose folder does not load says that folder's words (`unloaded`). Whether git
  * has a branch is read off any answered reading of its repository.
  * @param standing What the pass read of where the branches stand.
  */
@@ -330,7 +330,7 @@ export function standingReader(standing: PassStanding) {
     return stood && 'answer' in stood ? stood.answer.branches.find((b) => b.branch === branch) : undefined;
   };
   return {
-    landed: (run, branch) => landedOver(stoodBranch(run, branch)),
+    merged: (run, branch) => mergedOver(stoodBranch(run, branch)),
     has: (repo, branch) => {
       const heads = repoHeads(standing, repo);
       return heads ? Object.hasOwn(heads, branch) : true;

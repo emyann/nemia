@@ -1113,7 +1113,7 @@ test('the whole decision of a loop out of rounds, once a pass has read where its
     [['on', `wf/${loop.id}/run is on main`]],
   );
   assert.deepEqual(
-    d.commands.filter((x) => x.label === 'land it' || x.label === 'drop it').map((x) => x.command),
+    d.commands.filter((x) => x.label === 'merge it' || x.label === 'drop it').map((x) => x.command),
     [`git -C ${repo} merge --no-ff wf/${loop.id}/run`, `git -C ${repo} branch -D wf/${loop.id}/run`],
   );
   await stage.runWith(b.e, roundRun(loop.id, 'review'));
@@ -1166,7 +1166,7 @@ test('the whole decision of a loop a person accepted as it stands, once a pass h
     [['ahead', `wf/${loop.id}/run is ahead of main by 1 commit`]],
   );
   assert.deepEqual(
-    d.commands.filter((x) => x.label === 'land it' || x.label === 'drop it').map((x) => x.command),
+    d.commands.filter((x) => x.label === 'merge it' || x.label === 'drop it').map((x) => x.command),
     [`git -C ${repo} merge --no-ff wf/${loop.id}/run`, `git -C ${repo} branch -D wf/${loop.id}/run`],
   );
 });

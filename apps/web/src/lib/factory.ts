@@ -18,7 +18,8 @@ import type { Frozen } from './frozen.ts';
  * Nothing here reads a step's words. The status alone is not enough: `assess` reads a fan-out as failed once one step is final without
  * letting its followers run, while a sibling's session still works. A run is finished once it has stopped moving without running:
  * succeeded; failed at a refused check or a step signed off blocked, whose followers read `pending` and will never be filed; or cancelled,
- * its stop landed. A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show
+ * its stop took effect. A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under
+ * "Show
  * finished", or on Runs.
  *
  * A run started `--after` runs that have not succeeded is in flight while each may still succeed: it moves, since the tick files its
@@ -262,7 +263,7 @@ type FloorRun = Pick<RunView, 'id' | 'createdAt' | 'status' | 'moving' | 'waitin
  * approval or the answer is given; a cancelled run waits on nobody, and is not kept by this. The header's `waiting on you` counts the
  * same runs (`waitsOnYou`), so each one it counts has its card on the floor.
  *
- * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it landed or was
+ * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it succeeded or was
  * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
  * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
  * @param runs The runs the floor may draw, each judged.

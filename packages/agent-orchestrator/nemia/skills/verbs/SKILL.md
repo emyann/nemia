@@ -138,7 +138,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
-                               and on which try, cost and time per landed run, and each step's
+                               and on which try, cost and time per merged run, and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
                                --line: one line, for a recap; --json: the whole answer; -l: the
@@ -340,7 +340,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                each tool's words: tools.md#store
                                on the port: store
   nemia milestones [--json]
-                               how far the store is towards its first landed change, each milestone
+                               how far the store is towards its first run that succeeded, each milestone
                                done or not, as YAML; --json: as JSON
                                each tool's words: tools.md#milestones
                                on the port: milestones

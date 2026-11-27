@@ -280,7 +280,7 @@ export function freeTurn(candidates: readonly string[], judged: ReadonlySet<stri
 
 /**
  * What the daemon says of a run it judged and did not free — or null, when the refusal is the rule's own boundary and nothing is to be
- * said. Pure. Said: a place that did not answer (`facts` undefined: the judgement got no further), and a finished run — landed or
+ * said. Pure. Said: a place that did not answer (`facts` undefined: the judgement got no further), and a finished run — merged or
  * cancelled, nothing holding it, no hand-off owed — whose worktree is what refuses, locked, on no branch or holding changes: a person
  * must see to it. Not said: a run not merged or not over, which is kept on purpose.
  * @param facts What the prune found of the run, or undefined where its place did not answer.
@@ -288,7 +288,7 @@ export function freeTurn(candidates: readonly string[], judged: ReadonlySet<stri
  */
 export function freeSaid(facts: PruneFacts | undefined, refusal: string) {
   if (!facts) return refusal;
-  const finished = (facts.decided === 'landed' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
+  const finished = (facts.decided === 'merged' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
   return finished ? refusal : null;
 }
 

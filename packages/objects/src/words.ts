@@ -46,7 +46,8 @@ export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in
- * flight (`limit`), the base branch the run lands on, while another run lands there (`base`), the store's pause (`pause`), or a person's
+ * flight (`limit`), the base branch the run merges into, while another run merges there (`base`), the store's pause (`pause`), or a
+ * person's
  * hold that names no run, which a person alone lifts (`hold`).
  */
 export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
@@ -796,10 +797,10 @@ export const TRANSCRIPT_ORIGINS = [
 export type TranscriptOrigin = (typeof TRANSCRIPT_ORIGINS)[number];
 
 /**
- * The label of a command `nemia decide` offers on a run awaiting a person (`DecideCommand`, decide.ts): land it, drop it, read it, once
+ * The label of a command `nemia decide` offers on a run awaiting a person (`DecideCommand`, decide.ts): merge it, drop it, read it, once
  * more, refresh, approve, send back, forget it.
  */
-export const DECIDE_LABELS = ['land it', 'drop it', 'read it', 'once more', 'refresh', 'approve', 'send back', 'forget it'] as const;
+export const DECIDE_LABELS = ['merge it', 'drop it', 'read it', 'once more', 'refresh', 'approve', 'send back', 'forget it'] as const;
 export type DecideLabel = (typeof DECIDE_LABELS)[number];
 
 /** Which of its three the lesson line of a decision is (`Lesson`, decide.ts): written where the next agent reads, nothing, or not known. */
@@ -1025,10 +1026,11 @@ export const TURN_FAILURES = ['deadline', 'budget', 'unstarted', 'stopped', 'una
 export type TurnFailure = (typeof TURN_FAILURES)[number];
 
 /**
- * The milestones of a store on its way to a first landed change, in order: a harness activated and signed in, a factory filed, a volume
- * a run would mount, a run landed.
+ * The milestones of a store on its way to a first run that succeeded, in order: a harness activated and signed in, a factory filed, a
+ * volume
+ * a run would mount, a run succeeded.
  */
-export const MILESTONES = ['harness', 'factory', 'volume', 'landed'] as const;
+export const MILESTONES = ['harness', 'factory', 'volume', 'succeeded'] as const;
 
 /** One of `MILESTONES`. */
 export type Milestone = (typeof MILESTONES)[number];

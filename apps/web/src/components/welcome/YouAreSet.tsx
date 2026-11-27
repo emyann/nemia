@@ -11,30 +11,31 @@ const setFactoryOf = (factories: readonly Factory[]) => {
 };
 
 /**
- * The welcome's last page, "You are set", at `/welcome/next`, once a run has landed (the store's `landed` milestone): three next steps
+ * The welcome's last page, "You are set", at `/welcome/next`, once a run has succeeded (the store's `succeeded` milestone): three next
+ * steps
  * (`nextStepsOf`) — raise Nemia's level; connect the host the factory's template follows, shown only where its first writable volume was a
  * folder of this machine, with the line the api answers for it (`follow`); and Nemia from a terminal or a coding agent. Before a run has
- * landed, it says so and leads back to the first card. A way to the board on every screen.
+ * succeeded, it says so and leads back to the first card. A way to the board on every screen.
  */
 export function YouAreSet() {
   const { data: milestones } = useSuspenseQuery(milestonesQuery);
   const { data: factories } = useSuspenseQuery(factoriesQuery);
-  const landed = milestones.milestones.some((m) => m.name === 'landed' && m.state === 'done');
+  const succeeded = milestones.milestones.some((m) => m.name === 'succeeded' && m.state === 'done');
   const factory = setFactoryOf(factories);
   const first = factory?.volumes.find((v) => !v.readOnly);
   const follow = factory?.follow;
   const steps = nextStepsOf({ local: first !== undefined && first.origin === null, follows: follow !== undefined });
   return (
-    <article data-you-are-set={landed ? 'set' : 'not-yet'} className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
+    <article data-you-are-set={succeeded ? 'set' : 'not-yet'} className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
       <header className="flex flex-col gap-1">
-        <PageName>{landed ? 'You are set' : 'Not landed yet'}</PageName>
+        <PageName>{succeeded ? 'You are set' : 'Not succeeded yet'}</PageName>
         <p className="text-body-medium text-on-surface-variant">
-          {landed
-            ? 'A card said what you wanted, a workflow did it in steps, and a gate waited on you before it landed. Next:'
-            : 'No change has landed in this store yet: start a first card, and come back once its run has landed.'}
+          {succeeded
+            ? 'A card said what you wanted, a workflow did it in steps, and a gate waited on you before it finished. Next:'
+            : 'No run has succeeded in this store yet: start a first card, and come back once its run has succeeded.'}
         </p>
       </header>
-      {landed ? (
+      {succeeded ? (
         <ol className="m-0 flex list-none flex-col gap-6 p-0">
           {steps.map((step) => (
             <li key={step} data-next-step={step} className="flex flex-col items-start gap-2">

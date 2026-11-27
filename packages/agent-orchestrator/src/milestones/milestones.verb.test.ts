@@ -38,12 +38,8 @@ const milestonesOf = (root: string, harness: 'met' | 'missing', runs: readonly R
   });
   const read = Effect.runSync(
     Effect.provide(
-      Effect.provideService(
-        Effect.provideService(Effect.provideService(program, StoreRoot, root), NeedsMemory, memo),
-        EngineService,
-        engineOf(engine().layer),
-      ),
-      Layer.mergeAll(runDoorMemory(), PlaceService.layer(testPlace().place)),
+      Effect.provideService(Effect.provideService(program, StoreRoot, root), NeedsMemory, memo),
+      Layer.mergeAll(runDoorMemory(), PlaceService.layer(testPlace().place), EngineService.layer(engineOf(engine().layer))),
     ),
   );
   return read.milestones;

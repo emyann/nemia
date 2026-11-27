@@ -578,6 +578,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
 });
 
 const SHIP = 'workflows/dev/ship.md';
+const CLOSER = 'workflows/agents/closer.md';
 
 /**
  * The tests' team as a template at 0.1.0, its ship step filled by a hire of an agent, `closer`, that only 0.1.0 holds, applied as `name`;
@@ -610,6 +611,7 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     const dir = await appliedWithHire('wait');
     const tree = treeDir(ROOT, 'wait');
     fs.writeFileSync(path.join(tree, SHIP), textIn(tree, SHIP).replace(/^---\n/, '---\ndisallowedTools: Bash(git push)\n'));
+    fs.appendFileSync(path.join(tree, CLOSER), '\nMine, kept by the person.\n');
     fs.rmSync(path.join(dir, 'agents/closer'), { recursive: true });
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
@@ -629,6 +631,20 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     await main(['factory', 'resolve', 'wait', refused.at, '--theirs'], noEngine());
     const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'wait'), 'utf8')).proposals?.['Workflow/dev'] ?? '';
     assert.ok(proposal, 'the workflow is proposed');
+    await main(['factory', 'resolve', 'wait', CLOSER, '--theirs'], noEngine());
+    const agent: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'wait'), 'utf8')).proposals?.['Agent/closer'] ?? '';
+    assert.ok(agent, 'the agent removal is proposed, with the hire it fires');
+    assert.deepEqual(
+      (await proposalHeld(ROOT, 'wait', agent)).spec.objects.map((o) => [o.kind, o.metadata.name]),
+      [
+        ['Hire', 'dev.ship'],
+        ['Agent', 'closer'],
+      ],
+      'the hire is fired before the agent goes, in the same proposal',
+    );
+    await runWith(noEngine(), approveProgram(PERSON, 'wait', agent, { home: ROOT }));
+    const removed = await proposalHeld(ROOT, 'wait', agent);
+    assert.equal(removed.status.phase, 'applied', removed.status.message);
     await runWith(noEngine(), approveProgram(PERSON, 'wait', proposal, { home: ROOT }));
     const decided = await proposalHeld(ROOT, 'wait', proposal);
     assert.equal(decided.status.phase, 'applied', decided.status.message);
@@ -674,6 +690,17 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     const asked = changed.conditions[1].message;
     assert.match(asked, new RegExp(`resolve tidy '${SHIP}#disallowedTools'`));
     assert.doesNotMatch(asked, /rounds/, 'the conflict that did not change is not asked again');
+    await main(['factory', 'resolve', 'tidy', `${SHIP}#disallowedTools`, '--theirs'], noEngine());
+    const again = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'tidy'), 'utf8'));
+    assert.deepEqual(Object.keys(again.choices).sort(), at.slice().sort(), 'the kept choice and the new one');
+    assert.deepEqual(Object.keys(again.seen).sort(), at.slice().sort(), 'each against what it was made on');
+    const second: string = again.proposals?.['Workflow/dev'] ?? '';
+    assert.ok(second && second !== proposal, 'the workflow is proposed anew, from both choices');
+    assert.match(
+      JSON.stringify((await proposalHeld(ROOT, 'tidy', second)).spec),
+      /rounds\W+2\b/,
+      "the kept choice's rounds, the template's",
+    );
   });
 });
 

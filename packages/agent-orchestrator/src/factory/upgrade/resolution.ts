@@ -246,29 +246,31 @@ export const keptChoiceLine = (factory: string, at: string, choice: Choice) =>
 
 /**
  * The line that proposes again, in the factory `factory`, the owner whose resolution is the proposal `proposal`, where `proposals` (by
- * owner key, as `resolutions.json` records them) names it: the first conflict of that owner the person chose for (`choices`), given its
- * choice again (`keptChoiceLine`), which proposes the owner from every kept choice. None where no owner's resolution is that proposal.
+ * owner key, as `resolutions.json` records them) names it: where each conflict of that owner has a choice that holds (`choices`), its first
+ * given its choice again (`keptChoiceLine`), which proposes the owner from every kept choice; no line where one does not. None where no
+ * owner's resolution is that proposal.
  * @param factory The factory's name.
  * @param proposal The name of the proposal that cannot apply.
  * @param proposals The proposal recorded for each owner, by owner key.
- * @param choices The person's choice for each conflict, by its address.
+ * @param choices The person's choice for each conflict that still holds, by its address.
+ * @param conflicts The address of each conflict the merge has now; the line is given only where each of the owner's has a choice.
  */
 export function resolvedAgain(
   factory: string,
   proposal: string,
   proposals: Readonly<Record<string, string>>,
   choices: Readonly<Record<string, Choice>>,
+  conflicts: readonly string[],
 ) {
   const recorded = Object.entries(proposals).find(([, name]) => name === proposal);
   if (recorded === undefined) return undefined;
   const owner = ownerOfKey(recorded[0]);
   const key = ownerKey(owner);
-  const [first] = Object.keys(choices)
-    .filter((at) => {
-      const of = resolvedBy(segmentsOf(at), keyOf(at), true, factory);
-      return of !== null && ownerKey(of) === key;
-    })
-    .sort();
+  const own = conflicts.filter((at) => {
+    const of = resolvedBy(segmentsOf(at), keyOf(at), true, factory);
+    return of !== null && ownerKey(of) === key;
+  });
+  const [first] = own.every((at) => Object.hasOwn(choices, at)) ? own.sort() : [];
   const choice = first === undefined ? undefined : choices[first];
   return {
     owner: `the ${owner.kind} ${owner.name}`,

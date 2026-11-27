@@ -535,7 +535,7 @@ export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory
  * base is rendered, no status written. None where `name` is no factory made from a template, its template does not render at the version
  * wanted, its base is absent, or no upgrade is due. What a conflict's resolution is checked against as it applies (`applyProgram`).
  */
-export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: string) {
+const composedOf = Effect.fn('composedOf')(function* (name: string) {
   const home = yield* StoreRoot;
   const filed = yield* factoryOrNone(name);
   if (filed?.template === undefined) return undefined;
@@ -550,8 +550,26 @@ export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: str
   const { choices, read } = upgradeRead(home, factory, now, base, { ...last, version: last.version }, phases);
   const unchosen = Object.fromEntries(read.merge.conflicts.map((c) => [c.at, 'ours'] satisfies [string, Choice]));
   const composed = compose(read.merge, { ...unchosen, ...choices });
-  return 'entries' in composed ? composed.entries : undefined;
+  return {
+    entries: 'entries' in composed ? composed.entries : undefined,
+    choices,
+    conflicts: read.merge.conflicts.map((c) => c.at),
+  };
 });
+
+/**
+ * The files of the tree the upgrade of the factory `name` under way composes (`composedOf`): what a conflict's resolution is checked
+ * against as it applies (`applyProgram`). None where no upgrade is due, as `composedOf` says.
+ * @param name The factory's name.
+ */
+export const upgradeComposed = (name: string) => Effect.map(composedOf(name), (c) => c?.entries);
+
+/**
+ * The choices of the upgrade of the factory `name` that still hold (`choicesHeld`), and the address of each conflict the merge has now:
+ * what tells a failed resolution's proposal whether its owner can be proposed again from the kept choices. None where no upgrade is due.
+ * @param name The factory's name.
+ */
+export const upgradeHeld = (name: string) => Effect.map(composedOf(name), (c) => c && { choices: c.choices, conflicts: c.conflicts });
 
 /**
  * Each templated factory's `ConflictsPending` condition as `reconcileFactory` last wrote it, read through the Factory door for the tick's

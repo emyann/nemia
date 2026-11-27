@@ -233,8 +233,12 @@ A conflict in a file that belongs to an object of the tree is resolved by a prop
 
 `nemia factory resolve` records each choice. Once every conflict of an owner has a choice, it proposes that object as the choices
 make it, at its current version, and prints the command that approves it: `nemia proposals approve <proposal> -n <factory>`. The
-daemon merges once each such proposal has been applied. If one is declined or goes stale, the factory's status tells you to resolve
-again. A choice that would remove a skill, the rules, or the instruction file (which no proposal can remove) is rejected, and the
+daemon merges once each such proposal has been applied, in any order. If one is declined or goes stale, your choices are kept: the
+factory's status gives one line that proposes the object again, and asks you again only for a conflict whose text changed since you
+chose. Resolving an agent's removal also fires the hires of that agent, in the same proposal.
+
+When an upgrade turns a step into a wait node, any key of yours on that step that a wait node can't take (`disallowedTools`, `budget`
+and so on) shows up in `nemia factory diff` as a conflict, with the reason, so you settle it before you approve anything. A choice that would remove a skill, the rules, or the instruction file (which no proposal can remove) is rejected, and the
 choice is kept: keep the existing version with `--ours`, or provide a file.
 
 Every other conflict is settled by your choice alone. That covers the factory file's other keys (its revisions policy is your

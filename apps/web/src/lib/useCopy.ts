@@ -7,8 +7,33 @@ export const COPY_REST_MS = 1_500;
 export type CopySaid = 'copy' | 'copied' | 'failed';
 
 /**
- * Copies `text` to the clipboard and tells `say` what came of it — `copied`, or `failed` where the clipboard refused it or the page has
- * none, as outside a secure context — then `copy` again `COPY_REST_MS` later. Returns what stops it: nothing is said after that.
+ * Copies `text` the way a page without the clipboard's interface can, as one outside a secure context: selected in a textarea off the
+ * screen, and the browser's copy command asked. The textarea goes and the focus returns where it was, whatever the command answered.
+ * @param text The text to copy.
+ */
+function copyBySelection(text: string) {
+  if (typeof document === 'undefined') return false;
+  const was = document.activeElement as HTMLElement | null;
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  Object.assign(area.style, { position: 'fixed', top: '0', left: '-9999px', opacity: '0' });
+  document.body.appendChild(area);
+  area.select();
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    area.remove();
+    was?.focus();
+  }
+}
+
+/**
+ * Copies `text` to the clipboard and tells `say` what came of it — `copied`, or `failed` where neither the clipboard nor, where it refused
+ * or the page has none, as outside a secure context, a copy of the text selected took it — then `copy` again `COPY_REST_MS` later.
+ * Returns what stops it: nothing is said after that.
  * @param text The text to copy.
  * @param say Told what the control says, each time that changes.
  */
@@ -23,7 +48,9 @@ export function copyAndSay(text: string, say: (said: CopySaid) => void) {
   const written = navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
   written.then(
     () => sayFor('copied'),
-    () => sayFor('failed'),
+    () => {
+      if (!stopped) sayFor(copyBySelection(text) ? 'copied' : 'failed');
+    },
   );
   return () => {
     stopped = true;

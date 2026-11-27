@@ -730,6 +730,18 @@ test('the result of a routed run that ended on its workflow node is the run it s
   assert.doesNotMatch(html, /data-result-ended/);
 });
 
+test("the ask of a run a workflow node started links the run that started it and the node's name; a run started any other way says none", async () => {
+  const { RunResult } = await import('../src/components/run/RunResult.tsx');
+  const child = await routedWith(createElement(RunResult, { run: detailOf({ startedBy: { run: 'r-1-parent', node: 'handoff' } }) }));
+  assert.match(child, /<p [^>]*data-started-by="r-1-parent"[\s\S]*?<a [^>]*href="\/runs\/r-1-parent"/, 'the parent run, linked');
+  assert.ok(
+    textsOf(child).some((t) => t.includes('handoff')),
+    'and the node of it that started this run',
+  );
+  const loose = await routedWith(createElement(RunResult, { run: detailOf({}) }));
+  assert.doesNotMatch(loose, /data-started-by/);
+});
+
 test('the result of a run that ended with its final steps done and nothing given says they finished, not that they never gave', async () => {
   const { RunResult } = await import('../src/components/run/RunResult.tsx');
   const done = step({

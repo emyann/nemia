@@ -14,6 +14,7 @@ import { workflowDirAt, workflowFolder, workflowsIn } from '../folder/folder.sto
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import {
   cardOrWhy,
+  type ReadFile,
   cardWorkflowName,
   cardWorkflowRefusal,
   fromText,
@@ -37,7 +38,8 @@ import {
   type Waiting,
   waitSaid,
 } from './inbox.ts';
-import type { PlanFile } from '../plan/plan.ts';
+import { cardsRead, type CardReads } from './card-reads.ts';
+import { Informer } from '../rest/informer.verb.ts';
 import type { RunPhase } from '../phase/phase.ts';
 import { resentCardName } from './resend.ts';
 import type { CardLook } from './waits.ts';
@@ -477,6 +479,21 @@ export const releasedThrough = (e: Engine, parents: Parents) =>
     )) satisfies RunReleased;
 
 /** A run's release that reads none: every run is read as not released, so a card that waits on a known card is never started for it. */
+/**
+ * The inbox folder's entries, each with its parse as the informer keeps it (`cardsRead`): a card is parsed once per change of its text,
+ * across passes and requests; with no informer, entries as read, parsed afresh by whoever lists them.
+ * @param memo The informer's card parses, none where the caller keeps none.
+ * @param verify Whether a kept parse is parsed afresh too (`WF_VERIFY_REST`).
+ */
+const entriesRead = Effect.fnUntraced(function* (memo: CardReads | undefined, verify: boolean) {
+  return cardsRead(memo, verify, yield* (yield* CardDoor).cards.entries());
+});
+
+/** The entries as a pass reads them: through the informer where there is one. */
+const entriesNow = Effect.fnUntraced(function* () {
+  return yield* entriesRead((yield* Informer)?.cards, yield* setting('verifyRest'));
+});
+
 const NONE_RELEASED: RunReleased = () => Effect.succeed(false);
 
 /**
@@ -484,10 +501,10 @@ const NONE_RELEASED: RunReleased = () => Effect.succeed(false);
  * @param files The inbox folder's entries, each with its text.
  * @param started Whether a run was started from a card, by its name.
  */
-const namedAfter = (files: readonly PlanFile[], started: (name: string) => boolean) => {
-  const named = files.flatMap(({ file, text }) => {
+const namedAfter = (files: readonly ReadFile[], started: (name: string) => boolean) => {
+  const named = files.flatMap(({ file, text, read: given }) => {
     if (!file.endsWith('.md') || started(file.slice(0, -'.md'.length))) return [];
-    const read = cardOrWhy(file, text);
+    const read = given ?? cardOrWhy(file, text);
     return 'card' in read ? (read.card.after ?? []) : [];
   });
   return [...new Set(named)];
@@ -513,7 +530,7 @@ const handedOn = (run: Pick<Run, 'steps'>) => Object.values(run.steps).some((s) 
  * @param phaseOf A run's phase as read now, by id; undefined where it was not read.
  */
 export const waitingOf = Effect.fnUntraced(function* (
-  files: readonly PlanFile[],
+  files: readonly ReadFile[],
   runs: readonly WaitedRuns[],
   released: RunReleased,
   phaseOf: (run: string) => RunPhase | undefined = () => undefined,
@@ -561,8 +578,7 @@ export const waitingOf = Effect.fnUntraced(function* (
  */
 const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, released: RunReleased | undefined) {
   if (released === undefined || !card.after?.length) return [];
-  const door = yield* CardDoor;
-  const files = yield* door.cards.entries();
+  const files = yield* entriesNow();
   const runs = yield* (yield* RunDoor).runs.list();
   const listed = cardsListed(files, runs, new Map(), new Map(), undefined, yield* waitingOf(files, runs, released));
   return (listed.find((l) => l.name === card.name)?.waits ?? []).map((w) => w.card);
@@ -591,7 +607,7 @@ export const inboxNow = Effect.fn('inboxNow')(function* (
   phaseOf?: (run: string) => RunPhase | undefined,
 ) {
   const door = yield* CardDoor;
-  const files = yield* door.cards.entries();
+  const files = yield* entriesNow();
   const factories = yield* readableFactories();
   const triggering = yield* triggeringOf(files, factories.values());
   const waiting = yield* waitingOf(files, runs, released, phaseOf);
@@ -634,7 +650,7 @@ export const startQueued = Effect.fn('startQueued')(function* (
 ) {
   const door = yield* CardDoor;
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
-  const files = yield* door.cards.entries();
+  const files = yield* entriesNow();
   const tries = yield* door.tries.list();
   const factories = yield* readableFactories();
   const triggering = yield* triggeringOf(files, factories.values());
@@ -683,7 +699,7 @@ export const startQueued = Effect.fn('startQueued')(function* (
  */
 const inboxJudgedAfresh = Effect.fnUntraced(function* (e: Engine, how: SummaryHow) {
   const door = yield* CardDoor;
-  const entries = yield* door.cards.entries();
+  const entries = yield* entriesRead(how.memo.cards, how.verify);
   const tries = yield* door.tries.list();
   const runs = yield* cardRuns(e, how);
   const factories = yield* readableFactories();

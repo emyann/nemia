@@ -17,7 +17,8 @@ const cardReadServedSpec = spec<(kept: CardReadKey | undefined, file: string, te
       condition: ({ input: [kept], output }) => kept !== undefined || !output,
     },
     otherTextIsParsed: {
-      description: 'A card whose text is not the one its kept parse was made of is parsed afresh: no read serves a card older than its record',
+      description:
+        'A card whose text is not the one its kept parse was made of is parsed afresh: no read serves a card older than its record',
       condition: ({ input: [kept, , text], output }) => kept === undefined || kept.text === text || !output,
     },
     otherFileIsParsed: {
@@ -26,8 +27,7 @@ const cardReadServedSpec = spec<(kept: CardReadKey | undefined, file: string, te
     },
     sameCardIsServed: {
       description: 'A card read with the very file and text its kept parse was made of is served that parse, never parsed again',
-      condition: ({ input: [kept, file, text], output }) =>
-        kept === undefined || kept.file !== file || kept.text !== text || output,
+      condition: ({ input: [kept, file, text], output }) => kept === undefined || kept.file !== file || kept.text !== text || output,
     },
   },
 });

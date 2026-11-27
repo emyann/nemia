@@ -571,6 +571,26 @@ test('the inbox is judged once while the keyspace head and the pass stand, again
   assert.equal(reads.fifth, reads.fourth);
 });
 
+test('a page of cards read in a new pass parses no card again, and answers the same items', () => {
+  const e = engineOf(engine().layer);
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE))));
+  const reads = valueOf(
+    over(
+      five,
+      Effect.gen(function* () {
+        const first = yield* cardList(e, how, {});
+        const parsed = how.memo.cards.parsed;
+        passStarted(how.memo);
+        const second = yield* cardList(e, how, {});
+        return { first, second, parsed, after: how.memo.cards.parsed };
+      }),
+    ),
+  );
+  assert.ok(reads.parsed > 0);
+  assert.equal(reads.after, reads.parsed, 'no card is parsed again in the next pass');
+  assert.deepEqual(reads.second.items, reads.first.items);
+});
+
 test('WF_VERIFY_REST judges the inbox afresh each read and dies where the informer held another', () => {
   const e = engineOf(engine().layer);
   const how = { ...Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE)))), verify: true };

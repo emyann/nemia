@@ -20,8 +20,11 @@ export {
   queueOrder,
   startedRefusal,
 } from './inbox.ts';
+export { cardOrWhy } from './inbox.ts';
+export { cardReadsMemo, cardReadThrough, cardsRead } from './card-reads.ts';
+export type { CardReads } from './card-reads.ts';
 export type { CardPhase } from 'objects';
-export type { CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox.ts';
+export type { CardOrWhy, ReadFile, CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox.ts';
 export { byCreated, cardWork, workRuns } from './card-work.ts';
 export { cardFileReplaced, fileLetGo } from './card-files.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';

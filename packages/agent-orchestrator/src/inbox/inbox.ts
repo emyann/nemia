@@ -238,6 +238,12 @@ function afterCards(file: string, name: string, after: string) {
   return cards;
 }
 
+/** A card as the inbox reads it, or why it does not read. */
+export type CardOrWhy = { card: InboxCard } | { why: string };
+
+/** An entry of the inbox's folder with, where a caller kept it, its parse: a caller with no memo hands none and gets a fresh parse. */
+export type ReadFile = PlanFile & { readonly read?: CardOrWhy };
+
 /**
  * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
  * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
@@ -246,10 +252,9 @@ function afterCards(file: string, name: string, after: string) {
  */
 export function cardOrWhy(file: string, text: string) {
   try {
-    return { card: parseInboxCard(file, text) } satisfies { card: InboxCard } | { why: string } as { card: InboxCard } | { why: string };
+    return { card: parseInboxCard(file, text) } satisfies CardOrWhy as CardOrWhy;
   } catch (err) {
-    if (err instanceof WorkflowError)
-      return { why: err.message } satisfies { card: InboxCard } | { why: string } as { card: InboxCard } | { why: string };
+    if (err instanceof WorkflowError) return { why: err.message } satisfies CardOrWhy as CardOrWhy;
     throw err;
   }
 }
@@ -610,7 +615,7 @@ function triggeredOf(
  *   listed with its `waits`, queued by no trigger and started by no tick; none where none is handed, and then no card waits.
  */
 export function cardsListed(
-  files: readonly PlanFile[],
+  files: readonly ReadFile[],
   runs: readonly Worked[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
@@ -626,7 +631,7 @@ export function cardsListed(
   };
   const shown = files.filter((f) => !f.file.startsWith('.') && !isReadme(f.file)).sort((a, b) => a.file.localeCompare(b.file));
   const reads = new Map(
-    shown.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), cardOrWhy(f.file, f.text)]),
+    shown.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), f.read ?? cardOrWhy(f.file, f.text)]),
   );
   const afterOf = (name: string) => {
     const read = reads.get(name);
@@ -757,7 +762,7 @@ function statesOfWaits(listed: readonly CardListing[], runs: readonly Worked[], 
  *   none is handed.
  */
 export function inboxListing(
-  files: readonly (PlanFile & { filedAt?: string })[],
+  files: readonly (ReadFile & { filedAt?: string })[],
   runs: readonly CardRun[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),

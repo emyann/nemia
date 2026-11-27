@@ -232,6 +232,8 @@ of its kind, never from an older file that looks alike:
 
 ## The tick
 
+- **The informer keeps each card's parse by its file and its text** (`cards`, `src/inbox/card-reads.ts`), across passes and requests, and
+  the kept parse is frozen: nothing may mutate a listed card's `labels`, `from`, `after`, `files` or `model` in place.
 - **A command that lives as long as its process is an Effect run by `runMain`** (`src/daemon/up.verb.ts`, run by `wf up` and the api's
   `src/main.ts`): what it holds is taken with `acquireRelease` in its scope, never let go in a signal handler, and a signal exits 128 +
   its number once the scope is closed.

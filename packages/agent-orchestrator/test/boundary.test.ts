@@ -1270,6 +1270,7 @@ test('REFUSED: a verb that reaches the client only through a controller that no 
           'src/summary/summary.verb.ts',
           'src/views/views.verb.ts',
           'src/standing/standing.verb.ts',
+          'src/rest/informer.verb.ts',
           CLIENT,
         ].includes(m),
     );

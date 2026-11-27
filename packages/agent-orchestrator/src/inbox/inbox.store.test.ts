@@ -859,12 +859,13 @@ test("a card is parsed once per change, across passes: a changed card is served 
   assert.ok(Object.isFrozen(kept.read.card) && Object.isFrozen(kept.read.card.labels), 'a kept parse is frozen');
 
   passStarted(memo);
-  fs.writeFileSync(path.join(inboxDir(ROOT), fileOf(a)), cardAt(a.file).replace('Alpha card', 'Alpha changed'));
+  const changed = cardAt(a.file).replace('Alpha card', 'Alpha changed');
+  await runPlaced(Effect.flatMap(CardDoor, (door) => door.cards.rewrite(CardName.read(a.card.name), changed)));
   assert.deepEqual(await titles(), ['Alpha changed', 'Bravo card', 'Charlie card'], 'the change is served');
   assert.equal(memo.cards.parsed, 4, 'only the changed card is parsed again');
 
   passStarted(memo);
-  fs.rmSync(path.join(inboxDir(ROOT), fileOf(c)));
+  dropFromInbox(c.card.name);
   assert.deepEqual(await titles(), ['Alpha changed', 'Bravo card']);
   assert.equal(memo.cards.parsed, 4, 'a removed card costs no parse');
   assert.deepEqual([...memo.cards.kept.keys()].sort(), [fileOf(a), fileOf(b)].sort(), "a removed card's entry goes");

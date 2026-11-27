@@ -186,8 +186,7 @@ describe('nemia start judges what a session may call: a tool no rule names refus
   );
 });
 
-/** What a place denies a landing session, as a start hands it on: a commit, as the git place denies one, given here by hand. */
-const DENIED = ['Bash(git commit:*)'];
+/** Where the run's agents and skills are found: the store alone. */
 const PLACES = { home: ROOT };
 
 describe("configRefused: the runtime asked of each local step's first filing, refused in its words after the line it comes from", () => {
@@ -196,40 +195,22 @@ describe("configRefused: the runtime asked of each local step's first filing, re
   beforeAll(() => {
     gated = folder('gated', {
       implement: '---\nplace: git\neffort: high\n---\nBuild it.\n',
-      ship: '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\ncheck: npm test\n---\nShip it.\n',
+      ship: '---\nafter: implement\nplace: git\ngate: true\ncheck: npm test\n---\nShip it.\n',
     });
     steps = loadWorkflows(gated, PLACES);
   });
   const over = (name: string, more: Partial<Workflow>) => steps.map((s) => (s.name === name ? { ...s, ...more } : s));
   test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
     names(
-      configRefused(ROOT, over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
+      configRefused(ROOT, over('implement', { effort: 'ultra' }), PLACES, []),
       'implement: `effort: ultra` (filed as `effort`): ',
       configRefusal('claude', { effort: 'ultra' })!,
     );
   });
-  test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone', () => {
-    const why = configRefused(ROOT, over('ship', { harness: 'codex' }), PLACES, [], DENIED);
-    names(why, `ship: ${configRefusal('codex', { disallowedTools: [...DENIED] })}`);
-  });
-  test('REFUSED: the deny list follows an ending that lands on its check, gated or not; an ending with no `check:` takes none', () => {
-    const ungated = over('ship', { harness: 'codex', gate: undefined });
-    assert.match(
-      configRefused(ROOT, ungated, PLACES, [], DENIED)!,
-      /^ship: .*is a deny list/,
-      'an ungated ending lands on its check all the same',
-    );
-    assert.match(
-      configRefused(ROOT, ungated, PLACES, ['ship'], DENIED)!,
-      /^ship: .*is a deny list/,
-      'a gate given at start changes nothing',
-    );
-    assert.equal(configRefused(ROOT, over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED), undefined);
-  });
   test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
     const [implement] = loadWorkflows(lone('taken', 'effort: high'), PLACES);
-    assert.equal(configRefused(ROOT, [implement], PLACES, [], DENIED), undefined);
-    assert.equal(configRefused(ROOT, [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
+    assert.equal(configRefused(ROOT, [implement], PLACES, []), undefined);
+    assert.equal(configRefused(ROOT, [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, []), undefined);
   });
   test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', async () => {
     const asked: (readonly string[])[] = [];
@@ -239,7 +220,6 @@ describe("configRefused: the runtime asked of each local step's first filing, re
           lone('let-through', 'effort: high'),
           true,
           PLACES,
-          DENIED,
           undefined,
           ['implement'],
           (_h, _s, _p, gates) => void asked.push(gates),
@@ -284,10 +264,10 @@ describe("REFUSED at nemia start, before a run is written: a step's first filing
     const dir = lone('settings-asked', 'agent: plain', { plain: '---\nrole: Builder\n---\nBuild it.\n' });
     const file = { volumes: [{ path: repo, readOnly: false }], workflows: ['settings-asked'], harnessSettings };
     plantFactory(ROOT, 'settled', JSON.stringify(file));
-    await started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[6]) });
+    await started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[5]) });
     assert.deepEqual(asked, [harnessSettings]);
     const steps = loadWorkflows(dir, PLACES);
-    assert.equal(configRefused(ROOT, steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
+    assert.equal(configRefused(ROOT, steps, PLACES, [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
   });
   test('REFUSED: `remote: true` where the runtime bridges no session — codex — named by its line; taken on a claude job, and `remote: false` on any', async () => {
     await refused(
@@ -352,11 +332,6 @@ describe("REFUSED at nemia start: a store whose path holds a `(`, which no permi
   });
   test('REFUSED: a step whose `reads:` names the inbox', async () => {
     await storeRefused(folder('reads', lines({ triage: 'reads: inbox' })), 'triage', 'the inbox', { isolate: false });
-  });
-  test("REFUSED: a lone step in the checkout, and one after another, each filed a read of its run's artifacts folder", async () => {
-    await storeRefused(folder('alone', lines({ ship: 'workspace: base' })), 'ship', "a read of its run's artifacts folder");
-    const after = folder('after', lines({ implement: '', ship: 'after: implement\nworkspace: base' }));
-    await storeRefused(after, 'ship', "a read of its run's artifacts folder");
   });
   test("REFUSED at nemia start --input: a lone step, filed its run's inputs folder read-only", async () => {
     const given = path.join(ROOT, 'notes.md');

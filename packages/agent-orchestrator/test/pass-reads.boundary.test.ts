@@ -50,7 +50,6 @@ import { stepsNow as stepsOf } from './steps-now.ts';
 import { passRead } from '../src/cap/cap.verb.ts';
 import { passRevisions } from '../src/revisions/pin.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
-import { checkoutHold } from '../src/ending/ending.verb.ts';
 import { passParents, reportedEngine } from '../src/views/views.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
@@ -59,7 +58,6 @@ import { runsListed } from '../src/list/list.verb.ts';
 import { onYouWords, shownNote, shownStatus, standingLine } from '../src/list/list.ts';
 import { toDecideWords } from '../src/ending/ending.ts';
 import { NOTHING_READ, standingReader, standingSnapshot } from '../src/standing/standing.verb.ts';
-import { statusMemo } from '../src/place/landing.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 
 const ROOT = scratch('wf-pass-reads-');
@@ -306,38 +304,7 @@ row(ONCE, 'a one-off verb, handed no pass, resolves the folder for itself', asyn
   );
 });
 
-row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
-  const { b, waiting } = await theStore();
-  const run = runRecord(ROOT, waiting.id);
-  let asked = 0;
-  const slots = Effect.sync(() => {
-    asked++;
-    return new Map();
-  });
-  const hold = await Effect.runPromise(
-    checkoutHold(
-      b.e,
-      run,
-      stepsOf(run, ROOT),
-      {
-        read: {
-          runs: [run],
-          slots,
-          parents: passParents(),
-          standing: NOTHING_READ,
-          revisions: aPassRevisions(),
-        },
-        slot: undefined,
-      },
-      settingsOf(ENV),
-      statusMemo(() => undefined, builtinGitPlace),
-    ).pipe(Effect.provide(configGiven(ROOT, ENV))),
-  );
-  assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
-  assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
-});
-
-describe("a pass reads once what its runs share: each view, the cap's slots, a workflow folder, the slot a claim was given", told(ONCE));
+describe("a pass reads once what its runs share: each view, the cap's slots, a workflow folder", told(ONCE));
 
 row(GIT, 'a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
   const { b, repo, waiting, second } = await theStore();

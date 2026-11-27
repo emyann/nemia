@@ -16,10 +16,8 @@ import { commandHarness, Engine as EngineService } from 'agent-runtime';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
-  INSTALL,
   UNPROVISIONED,
   type CheckFirst,
-  LANDING_CHECK_DEADLINE_SECONDS,
   attemptVerdict,
   checkArgv,
   checkContract,
@@ -29,9 +27,6 @@ import {
   REPORTED_LINES,
   reportedLines,
   checkHandedSection,
-  FAILING_LINES,
-  failingLines,
-  landingSaidSection,
   keptOutput,
   REFUSAL_FILE_BYTES,
   type CheckEnv,
@@ -62,16 +57,6 @@ describe('checkArgv: the line the run froze, run by sh', () => {
   test('as `sh -c` and the line, as it is', () => {
     assert.deepEqual(checkArgv('npm test'), ['sh', '-c', 'npm test']);
     assert.deepEqual(checkArgv('npm test', undefined), ['sh', '-c', 'npm test']);
-  });
-  test("an ending's check that owes an install runs it first, its text fixed, then the command on a line of its own", () => {
-    const [sh, c, script] = checkArgv('npm test # the suite', 'install');
-    assert.deepEqual([sh, c], ['sh', '-c']);
-    const lines = script.split('\n');
-    assert.equal(lines[0], `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`);
-    assert.ok(lines[1].startsWith(`${INSTALL} 2>&1 || {`), lines[1]);
-    assert.match(lines[1], /kill -s KILL \$\$; \}$/, 'an install that fails ends the process by a signal: no exit code, no verdict');
-    assert.equal(lines.at(-1), 'npm test # the suite', 'the command last, alone on its line');
-    assert.equal(lines.length, 3);
   });
 });
 
@@ -212,9 +197,8 @@ describe("checkLogsOf: a run's check logs, its steps' checks on every try", () =
 });
 
 describe("the check's harness and its bounds", () => {
-  test("a check's bound on a hang, a round's as a landing's, is never below 2400 s", () => {
+  test("a check's bound on a hang is never below 2400 s", () => {
     assert.ok(CHECK_DEADLINE_SECONDS >= 2400, `CHECK_DEADLINE_SECONDS is ${CHECK_DEADLINE_SECONDS}`);
-    assert.ok(LANDING_CHECK_DEADLINE_SECONDS >= 2400, `LANDING_CHECK_DEADLINE_SECONDS is ${LANDING_CHECK_DEADLINE_SECONDS}`);
   });
   test("the run's `check` harness is the runtime's command harness under the name checks have always run under", () => {
     assert.equal(HARNESSES.check.name, 'check', 'the name keeps runs/check/, where checks filed before read');
@@ -258,29 +242,8 @@ const checked = (npm: ReturnType<typeof fakeNpm>, install: CheckFirst | undefine
   return { r: spawnSync(cmd, args, { cwd: workspace, encoding: 'utf8', env: { ...process.env, PATH: npm.PATH } }), workspace };
 };
 
-describe('checkArgv run by sh, `npm` faked: the install a check owes', () => {
-  test("one that owes it runs `npm install --no-save` first, in its workspace, then its command, to the command's exit code", () => {
-    const npm = fakeNpm(0);
-    const { r, workspace } = checked(npm, 'install');
-    assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.deepEqual(fs.readFileSync(npm.args, 'utf8').trim().split('\n'), ['install', '--no-save', '--no-audit', '--no-fund']);
-    assert.equal(INSTALL, 'npm install --no-save --no-audit --no-fund');
-    assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')), 'the command ran after it');
-    assert.match(r.stdout, /^\[nemia check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
-    assert.match(r.stdout, /^npm said this$/m, "the install's stderr is in the log");
-  });
-  test('REFUSED: an install that fails runs no command and prints no exit code — the process ends by a signal', () => {
-    const npm = fakeNpm(3);
-    const { r, workspace } = checked(npm, 'install');
-    assert.deepEqual(
-      [r.status, r.signal],
-      [null, 'SIGKILL'],
-      `the worker records no exit code for a process a signal ended, which the run reads as unfinished\n${r.stdout}${r.stderr}`,
-    );
-    assert.equal(fs.existsSync(path.join(workspace, 'ran.txt')), false, 'the command never ran');
-    assert.match(r.stdout, /^\[nemia check\] install failed, exit 3: no verdict on the work$/m);
-  });
-  test('one that owes no install never calls npm', () => {
+describe('checkArgv run by sh, `npm` faked: the install a check does not make', () => {
+  test('a check never calls npm itself', () => {
     const npm = fakeNpm(0);
     const { r, workspace } = checked(npm, undefined);
     assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -386,32 +349,6 @@ describe('refusalSection: the files of the whole output, named before the data',
     assert.ok(!text.includes('.log'));
   });
   test('no files kept: no path, as before', () => assert.ok(!refusalSection(said).includes('checks/')));
-});
-
-describe('landingSaidSection: the files of the whole output, named before the data', () => {
-  const said = {
-    step: 'ship',
-    check: 'r-ship-check',
-    command: 'npm test',
-    verdict: 1 as const,
-    stdout: 'o',
-    stderr: 'e',
-    failing: [],
-    cut: 0,
-    partial: false,
-  };
-  test('both paths before the fence, and the section still ends with the JSON', () => {
-    const kept: RefusalKept = {
-      stdout: { path: '/a/checks/r-ship-check.stdout.log', lines: 9, cut: false },
-      stderr: { path: '/a/checks/r-ship-check.stderr.log', lines: 1, cut: true },
-      capBytes: REFUSAL_FILE_BYTES,
-    };
-    const text = landingSaidSection({ ...said, kept });
-    const fenceAt = text.search(/`{3,}json/);
-    for (const fact of [kept.stdout.path, kept.stderr.path, `${REFUSAL_FILE_BYTES / 1024 / 1024} MiB`])
-      assert.ok(text.includes(fact) && text.indexOf(fact) < fenceAt, fact);
-    assert.ok(text.endsWith('\n```'));
-  });
 });
 
 describe('keptOutput: a stream kept whole up to its bound, its end past it', () => {
@@ -551,35 +488,6 @@ test('LIVE: a failing check still fails through `nice`, with its own exit code',
   assert.equal(attemptVerdict(v.state.attempts.at(-1)), 5);
 });
 
-test(
-  "LIVE: an ending's check whose install fails settles failed with no exit code, which the run reads as a check that did not finish",
-  WAITED,
-  async (t) => {
-    const { e, file } = rig();
-    const npm = fakeNpm(3);
-    const PATH = process.env.PATH;
-    t.onTestFinished(() => {
-      process.env.PATH = PATH;
-    });
-    process.env.PATH = npm.PATH;
-    const id = await file('ship', 'echo command ran', 60, 'install');
-    const v = await settled(t, e, id);
-    process.env.PATH = PATH;
-    assert.equal(v.state.settled, 'failed');
-    assert.equal(v.state.attempts.at(-1)?.exitCode, null, 'no exit code on the attempt');
-    const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never, [])('ship');
-    assert.equal(verdict, 'unfinished');
-    assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
-    const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
-    assert.match(
-      log,
-      /\[nemia check\] install failed, exit 3/,
-      "the worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled",
-    );
-    assert.doesNotMatch(log, /command ran/);
-  },
-);
-
 describe('reportedLines: the lines a check marks, `wf <name>:`', () => {
   test('whole and in order — never a prefixed line or `wfx:`', () => {
     const log = [
@@ -675,81 +583,3 @@ describe('checkHandedSection: what a step after a check is handed', () => {
   });
 });
 
-describe("failingLines: the lines naming a failing test, node's `✖` and TAP's `not ok`", () => {
-  test("after an indent and a tool's prefix, each once and in order — never the spec reporter's heading over them", () => {
-    const log = [
-      '@x/agent-orchestrator:test: ✔ a test that passed (1.0ms)',
-      '@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)  ',
-      '  ✖ a subtest that failed (2ms)\r',
-      'not ok 3 - a TAP test',
-      '@x/agent-orchestrator:test: ✖ failing tests:',
-      '@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)',
-      'a line that says ✖ in its middle',
-      'nothing ok 4',
-    ].join('\n');
-    assert.deepEqual(failingLines(log), {
-      lines: ['@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)', '✖ a subtest that failed (2ms)', 'not ok 3 - a TAP test'],
-      cut: 0,
-    });
-  });
-  test("a runner's failed subject, once however many times its workers and the runner say it, in order", () => {
-    const page = 'the run page (/runs/r) in the dark theme';
-    const log = [
-      `[w1] e2e: FAILED — ${page}: not visible after 10000 ms`,
-      '[w1]   what it looked like: /tmp/run-dark.png',
-      `e2e: worker 1 FAILED — ${page}: not visible after 10000 ms`,
-      `web:e2e: e2e: FAILED — ${page}: not visible after 10000 ms`,
-      `e2e: FAILED — ${page.replace('dark', 'light')}: not visible`,
-      'npm error Lifecycle script `e2e` failed with error:',
-    ].join('\n');
-    assert.deepEqual(failingLines(log).lines, [
-      `[w1] e2e: FAILED — ${page}: not visible after 10000 ms`,
-      `e2e: FAILED — ${page.replace('dark', 'light')}: not visible`,
-    ]);
-  });
-  test('past FAILING_LINES the first that many are kept, and how many more there were is said', () => {
-    const log = Array.from({ length: FAILING_LINES + 2 }, (_, i) => `✖ test ${i + 1}`).join('\n');
-    const { lines, cut } = failingLines(log);
-    assert.equal(lines.length, FAILING_LINES);
-    assert.equal(lines.at(-1), `✖ test ${FAILING_LINES}`);
-    assert.equal(cut, 2);
-    const section = landingSaidSection({
-      step: 'ship',
-      check: 'c',
-      command: 'npm test',
-      verdict: 1,
-      stdout: '',
-      stderr: '',
-      failing: lines,
-      cut,
-      partial: false,
-    });
-    assert.ok(section.includes(`In \`failing\`, the first ${FAILING_LINES}, and \`cut\` says how many more there were.`));
-  });
-});
-
-describe('landingSaidSection: what a landing check said on the merged tree, handed as data', () => {
-  const said = { step: 'ship', check: 'r-ship-check', command: 'npm test' };
-  test('its command, exit, failing tests and streams', () => {
-    const section = landingSaidSection({ ...said, verdict: 1, stdout: 'out ```', stderr: 'err', failing: ['✖ x'], cut: 0, partial: true });
-    assert.match(
-      section,
-      /^\n## What ship's check said on the merged tree\n\nThe run executed `npm test` on the merged tree after ship signed off/,
-    );
-    assert.ok(section.includes('Its whole stdout was not kept, so `failing` is read from the end of it'), section);
-    assert.ok(
-      section.endsWith(
-        '\n````json\n' +
-          JSON.stringify({ command: 'npm test', exit: 1, failing: ['✖ x'], stdout: 'out ```', stderr: 'err', partial: true }, null, 2) +
-          '\n````',
-      ),
-      section,
-    );
-  });
-  test('why it is missing where it cannot be read', () => {
-    assert.equal(
-      landingSaidSection({ ...said, unreadable: 'gone' }),
-      "\n## What ship's check said on the merged tree\n\nWhat it said cannot be given here — gone. Its task is `r-ship-check`.",
-    );
-  });
-});

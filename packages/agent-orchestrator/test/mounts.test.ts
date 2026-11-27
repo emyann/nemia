@@ -163,7 +163,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
     wide = workflow(team, 'wide', {
       implement: `---\nplace: git\nagent: implementer\nwritable: ${path.basename(web)}\nreads: inbox\n---\nBuild what was asked.\n`,
       review: '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 2\n---\nReview it.\n',
-      ship: '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ngate: true\n---\nShip it.\n',
+      ship: '---\nafter: review\nplace: git\nagent: shipper\ngate: true\n---\nShip it.\n',
     });
     attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide', repo: path.basename(own) });
     given = path.join(ROOT, 'template-draft.md');

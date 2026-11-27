@@ -29,7 +29,7 @@ import {
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { Schema } from 'effect';
 import { WorkflowDir } from '../src/folder/folder.model.ts';
-import { baseLine, formerFenceLine, placeLine } from '../src/former/former.ts';
+import { formerFenceLine, placeLine } from '../src/former/former.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM_DEV, teamCopy } from './team.ts';
 
@@ -205,7 +205,7 @@ describe('REFUSED: a command node or a named check the run could not file as wri
     ],
     [
       'a command node with a workspace of its own',
-      { 'file-notes.md': '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts\nworkspace: base\n---\n' },
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts\n---\n' },
       'file-notes:',
     ],
     [
@@ -339,8 +339,6 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n')}\n---\nDo the work.\n`;
   const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
-  const ending = fm('ship', 'after: review\nworkspace: base');
-  assert.equal(ending.workspace, 'base', 'workspace: is read on a step of its own: no step may set it beside a check:');
   const watching = fm('supervise', 'slot: none');
   assert.equal(watching.slot, 'none', "slot: is read on a step of its own: it is a workflow of one step's");
   const attached = parseWorkflow(
@@ -389,7 +387,6 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     card: filedBack.card,
     relabel: filedBack.relabel,
     waitsFor: waiting.waitsFor,
-    workspace: ending.workspace,
     slot: watching.slot,
     agent: attached.agent,
     skills: attached.skills,
@@ -842,13 +839,6 @@ describe('`nemia start` is told which files of a folder still say a former line,
       (_, dir) => [placeLine(path.join(dir, 'review.md')), placeLine(path.join(dir, 'write.md'))],
     ],
     ['place: folder', { 'write.md': '---\nplace: folder\n---\nWrite.\n' }, '', () => []],
-    [
-      'workspace: main',
-      { 'ship.md': '---\nplace: git\nworkspace: main\n---\nShip.\n' },
-      '',
-      (_, dir) => [baseLine(path.join(dir, 'ship.md'))],
-    ],
-    ['workspace: base', { 'ship.md': '---\nplace: git\nworkspace: base\n---\nShip.\n' }, '', () => []],
   ];
   for (const [row, files, sub, lines] of rows)
     test(row, () => {
@@ -864,7 +854,6 @@ describe('`nemia start` is told which files of a folder still say a former line,
     ]);
     assert.deepEqual(formerKeysIn('no frontmatter\nallow: x\n'), []);
     assert.deepEqual(formerKeyLines(path.join(scratch('wf-none-'), 'nope')), [], 'no folder: nothing to say');
-    assert.ok(baseLine('w/ship.md').includes('`workspace: base`'));
     const [write, review] = loadWorkflows(path.join(folder(rows[2][1]), 'team'));
     assert.equal(write.check, '{ npm test; npm run lint: x; }', 'a quoted value reads as written');
     assert.equal(review.check, 'npm test # all of it', 'a quoted value is YAML');

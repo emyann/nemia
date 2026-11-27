@@ -681,7 +681,7 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
       fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
       fs.writeFileSync(
         path.join(dir, 'ship.md'),
-        '---\nplace: git\nharness: codex\nafter: implement\nworkspace: base\ngate: true\n---\nship it\n',
+        '---\nplace: git\nharness: codex\nafter: implement\ngate: true\n---\nship it\n',
       );
       const [first, second] = await s.started(2, dir, aRepo(), true);
       for (const run of [first, second]) s.touched.add(run.id);

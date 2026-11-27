@@ -48,7 +48,6 @@ const aRun = (run: string, costUsd: number | null, more: Partial<RunFact> = {}) 
   agents: [null],
   rounds: [],
   merged: null,
-  firstTry: null,
   costUsd,
   wallMs: null,
   ...more,

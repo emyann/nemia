@@ -124,9 +124,9 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       'a codex sandbox frozen as `permissionMode` reads as frozen',
     );
     assert.deepEqual(
-      [ship.workspace, ship.agent?.keys, Reflect.get(ship, 'background')],
-      ['base', ['workspace'], true],
-      '`workspace: main` reads as `base`; `background:` still decodes',
+      [Reflect.get(ship, 'workspace'), Reflect.get(ship, 'background')],
+      [undefined, true],
+      '`workspace: main` and `background:` still decode, and neither is kept',
     );
 
     const notes = runRecord(ROOT, 'notes');
@@ -138,14 +138,14 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       'the former `then` and `nudge` read as today',
     );
     assert.deepEqual(
-      [notes.steps.implement.check?.taskId, Reflect.get(notes.steps.ship.landed ?? {}, 'commit')],
-      ['notes-implement-try2-check', 'fed789'],
+      [notes.steps.implement.check?.taskId, notes.steps.ship.taskId],
+      ['notes-implement-try2-check', 'notes-ship'],
     );
 
     const [write] = runRecord(ROOT, 'drafts').workflow!;
     assert.deepEqual(
-      [write.place, write.workspace, write.agent?.keys, write.disallowedTools, write.agent?.given],
-      ['folder', undefined, ['place', 'disallowedTools'], ['SendMessage'], { disallowedTools: 'SendMessage' }],
+      [write.place, write.agent?.keys, write.disallowedTools, write.agent?.given],
+      ['folder', ['place', 'disallowedTools'], ['SendMessage'], { disallowedTools: 'SendMessage' }],
       '`workspace: folder` reads as `place: folder`, its agent’s keys too; the former name beside the new one reads under the new alone',
     );
     assert.equal(write.agent?.harnessPrompt, 'keep', '`systemPrompt: default` reads as `harnessPrompt: keep`');

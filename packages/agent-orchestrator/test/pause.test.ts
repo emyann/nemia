@@ -143,7 +143,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
     setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
     ONE = folder(['work']);
     CHECKED = folder(['work'], () => 'check: "true"\n');
-    SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
+    SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\ncheck: "true"\n' : ''));
     stopping = {
       ...b.e,
       stop: (taskId: string) =>

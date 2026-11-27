@@ -253,8 +253,8 @@ test('a condition is tried only while none of its followers is filed; a skipped 
 
 test('a workflow without the routing keys assesses exactly as before', () => {
   const r = run({ implement: 't-i', review: null });
-  const { stepWords, due, unheld, ...a } = assess(aRead(STEPS, r, { phaseOf: phases({ 't-i': 'succeeded' }) }));
-  assert.deepEqual([[...stepWords.keys()], due, unheld], [['implement', 'review'], { retry: [], round: [] }, []]);
+  const { stepWords, due, ...a } = assess(aRead(STEPS, r, { phaseOf: phases({ 't-i': 'succeeded' }) }));
+  assert.deepEqual([[...stepWords.keys()], due], [['implement', 'review'], { retry: [], round: [] }]);
   assert.deepEqual(a, {
     ready: ['review'],
     send: [],
@@ -262,7 +262,6 @@ test('a workflow without the routing keys assesses exactly as before', () => {
     retry: [],
     round: [],
     unreachable: [],
-    waitingOnCheckout: [],
     status: 'running',
   });
   const done = assess(

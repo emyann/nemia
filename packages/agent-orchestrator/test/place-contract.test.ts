@@ -23,15 +23,13 @@ const NO_COMMIT = 'f'.repeat(40);
 /** For each verb, an answer the git place would not give, made of the true one. */
 const LIES: { readonly [V in PlaceVerb]: (answer: PlaceAnswers[V]) => PlaceAnswers[V] } = {
   root: (answer) => ({ root: answer.root === null ? '/elsewhere' : null }),
-  open: (answer) => ({ ...answer, inProgressFile: `${answer.inProgressFile}.elsewhere` }),
+  open: (answer) => ({ ...answer, repo: `${answer.repo}.elsewhere` }),
   follow: (answer) => (answer.state === 'no-upstream' ? { state: 'up-to-date', upstream: 'origin/main' } : { state: 'no-upstream' }),
   make: (answer) => ({ ...answer, conflicts: [] }),
   handoff: () => ({ commit: null }),
   report: (answer) => ({ ...answer, files: Object.fromEntries(Object.keys(answer.files).map((branch) => [branch, []])) }),
   standing: (answer) => ({ ...answer, tips: Object.fromEntries(Object.entries(answer.tips).slice(1)) }),
   trial: (answer) => ({ ...answer, trials: answer.trials.map(() => ({ clean: true })) }),
-  status: (answer) => ({ ...answer, merging: 'none' }),
-  land: (answer) => ('commit' in answer ? { commit: NO_COMMIT } : answer),
   inventory: (answer) => ({ ...answer, workspaces: answer.workspaces.map(({ changes: _changes, ...w }) => ({ ...w, clean: true })) }),
   remove: (answer) => ({ ...answer, removed: [...answer.removed, ...answer.left.map((l) => l.path)], left: [] }),
   export: () => ({ commit: NO_COMMIT }),
@@ -189,5 +187,5 @@ test('REFUSED: a git word in a nested property of an exported type, and an allow
   ].join('\n');
   assert.deepEqual(gitWords(namesIn(door)), ['head (head)', 'isDetached (detached)', 'lineHead (head)']);
   assert.deepEqual(wordsOf('PLACE_VERBS'), ['place', 'verbs']);
-  assert.deepEqual(wordsOf('inProgressFile'), ['in', 'progress', 'file']);
+  assert.deepEqual(wordsOf('lineHeadFile'), ['line', 'head', 'file']);
 });

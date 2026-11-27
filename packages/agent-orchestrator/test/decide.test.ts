@@ -147,7 +147,7 @@ const folder = (implementKeys = '') => {
 const ending = (last: string, body: string, agent?: string, under = ROOT) => {
   const dir = fs.mkdtempSync(path.join(under, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const keys = ['after: implement', 'place: git', 'workspace: base', 'gate: true', ...(agent ? [`agent: ${agent}`] : [])];
+  const keys = ['after: implement', 'place: git', 'gate: true', ...(agent ? [`agent: ${agent}`] : [])];
   fs.writeFileSync(path.join(dir, `${last}.md`), `---\n${keys.join('\n')}\n---\n${body}`);
   return dir;
 };
@@ -685,7 +685,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     async () => {
       const repo = aRepo();
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-      fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: base\nslot: none\n---\nWatch the runs.\n');
+      fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nslot: none\n---\nWatch the runs.\n');
       const run = await started({ brief: 'supervise this repository', repo, workflowDir: dir });
       await tick(run.id);
       settle(`${run.id}-supervise`, 'succeeded', { closeout: blocked('Merge add-sub, or hold it?', 'add-sub is ready to merge.') });

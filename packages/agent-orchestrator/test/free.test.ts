@@ -91,7 +91,7 @@ const CHECKED = fs.mkdtempSync(path.join(ROOT, 'wf-checked-'));
 fs.writeFileSync(path.join(CHECKED, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 fs.writeFileSync(
   path.join(CHECKED, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
+  '---\nafter: work\nplace: git\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
 );
 
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
@@ -99,7 +99,7 @@ const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
 fs.writeFileSync(path.join(ENDING, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 fs.writeFileSync(
   path.join(ENDING, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\nharness: codex\n---\nShip it.\n',
+  '---\nafter: work\nplace: git\ngate: true\nharness: codex\n---\nShip it.\n',
 );
 
 /** `work`, gated once it has run: its session signs off, and the step waits at its gate on a person, as a design's does. */
@@ -424,28 +424,6 @@ describe(
         mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, 'by hand');
         const done = await sweep(await tick(), [id], memory);
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true], 'on its base now, it is finished');
-      },
-    );
-    s.test(
-      "REFUSED at shipped defaults: a finished run that stays, judged while another merge is staged in its repository's checkout, has the checkout's status asked off the loop",
-      async () => {
-        const { id, repo } = await started(CHECKED);
-        await worked(id);
-        await stage.runWith(engine(), cancelRun(id));
-        fs.writeFileSync(path.join(lane(id), 'left.txt'), 'not committed\n');
-        world().branch(repo, 'other', { 'other.txt': "another run's work\n" });
-        const pass = await ticked((p) => rests(p, id, 'cancelled'), 'cancelled at its gate, and at rest');
-        world().stage(repo, 'other');
-        assert.ok(fs.existsSync(runRecord(ROOT, id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
-
-        const done = await sweep(pass, [id], freshFreeMemory());
-        assert.deepEqual(
-          done.asked.filter((a) => a.verb === 'status').map((a) => a.door),
-          ['ask'],
-          'the checkout is read, once, and off the loop',
-        );
-        assert.deepEqual([done.freed, whole(id)], [[], true]);
-        world().takeBack(repo);
       },
     );
     s.test(

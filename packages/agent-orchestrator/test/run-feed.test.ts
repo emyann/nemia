@@ -147,7 +147,7 @@ const GATED = folderOf({ plan: ['gate: true'], implement: ['after: plan'] });
 /** `plan → implement`, with no gate. */
 const UNGATED = folderOf({ plan: [], implement: ['after: plan'] });
 /** `implement → ship`, whose ending waits at its gate before it is filed, as a shipped `build` ends. */
-const ENDING = folderOf({ implement: [], ship: ['after: implement', 'workspace: base', 'gate: true'] });
+const ENDING = folderOf({ implement: [], ship: ['after: implement', 'gate: true'] });
 
 /** A run started on `workflowDir` in a repository of its own, its steps sharing its checkout unless `isolate`. */
 const started = (brief: string, workflowDir = GATED, isolate = false) =>

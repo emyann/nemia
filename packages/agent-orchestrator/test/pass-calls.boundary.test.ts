@@ -291,7 +291,7 @@ row(FILED, "a cancelled run's task in flight is stopped by the pass, and nothing
 });
 
 row(FILED, 'an approved ending is filed in the checkout, once the pass has read afresh who holds it', async () => {
-  const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
+  const run = await started(folder({ implement: '', ship: 'after: implement\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
   fs.writeFileSync(path.join(runRecord(ROOT, run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
@@ -318,7 +318,7 @@ describe(
 );
 
 test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, the checkout's follow, a worktree's make, a hand-off", async (t) => {
-  const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
+  const run = await started(folder({ implement: '', ship: 'after: implement\ngate: true' }), true);
   const b = board();
   const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
   const ran = path.join(bin, 'ran');

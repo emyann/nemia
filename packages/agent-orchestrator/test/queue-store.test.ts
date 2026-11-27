@@ -288,7 +288,7 @@ const asShipped = (t: { onTestFinished: (f: () => void) => void }) => {
 
 /** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
 const WATCHER = folderOf({
-  supervise: 'workspace: base\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
+  supervise: 'slot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
 
 describe('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` and `nemia decide` say; the run created first takes a slot a finished or called-off run frees; a watcher and a run waiting on another are not counted; with no cap, nothing waits', () => {

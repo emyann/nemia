@@ -78,7 +78,7 @@ const documents = () => ({
           overrides: { skills: ['change-the-board'], claude: { fence: { disallowedTools: ['Bash(npm publish:*)'] } } },
         },
         { name: 'review', after: ['implement'], loop: 'implement', rounds: 3, budget: 16, overrides: { claude: { model: 'sonnet' } } },
-        { name: 'land', after: ['review'], workspace: 'main', gate: true, check: { param: 'check' } },
+        { name: 'land', after: ['review'], gate: true, check: { param: 'check' } },
       ],
     }),
     metadata: { name: 'dev', description: 'An accepted intent to main: design → implement ⇄ review → land.' },
@@ -437,12 +437,6 @@ describe('the check of a template folder: the whole folder passes, and each rule
       workflow,
       ['spec', 'steps', 0, 'tally', 0],
       'none of a field',
-    );
-    assertRefused(
-      step((s) => (s.workspace = 'home')),
-      workflow,
-      ['spec', 'steps', 0, 'workspace'],
-      'workspace is one of',
     );
     assertRefused(
       step((s) => (s.place = 'cloud')),

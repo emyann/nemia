@@ -1,6 +1,6 @@
 /**
  * What a reader of `GET /api/stats` reads off a group and the health it answers as JSON (`Stats`' `all`, `groups` and `health`): the
- * headline numbers, a row per day, per step, per change and per tally, the landing checks over half their deadline, each workflow
+ * headline numbers, a row per day, per step, per change and per tally, each workflow
  * step's memory peaks, and the system's health over the range; and bytes as a person writes a memory quantity (`memoryBytesWord`),
  * which the peaks are said in here and on a step's filing. `nemia stats` decodes its answer's groups by these to print them; the `Stats`
  * answer keeps them as JSON, so these say what a reader takes of it and never narrow what the api sends. A number nothing measured is
@@ -26,12 +26,11 @@ export const memoryBytesWord = (n: number) => {
 /** A number, or null where nothing measured it. */
 const Measured = Schema.NullOr(Schema.Number);
 
-/** The numbers of a group, a day or a tile: runs, merges, rounds, first tries, cost and time per merged run, tries and waits. */
+/** The numbers of a group, a day or a tile: runs, merges, rounds, cost and time per merged run, tries and waits. */
 export const StatsHeadline = Schema.Struct({
   runs: Schema.Number,
   merged: Measured,
   rounds: Measured,
-  firstTry: Measured,
   costPerMerged: Measured,
   timePerMerged: Measured,
   tries: Schema.Number,
@@ -90,7 +89,7 @@ export type StatsStepRow = typeof StatsStepRow.Type;
 /** A tally's cell: its sum, null where no try measured it, and the tries it was measured on. */
 const TallyCell = Schema.Struct({ sum: Measured, tries: Schema.Number });
 
-/** A group of runs' stats: its headline, a row per day, per step, the tiles, the change marks, the tallies and the slow landings. */
+/** A group of runs' stats: its headline, a row per day, per step, the tiles, the change marks, and the tallies. */
 export const StatsGroup = Schema.Struct({
   total: StatsHeadline,
   days: Schema.Array(Schema.Struct({ ...StatsHeadline.fields, day: Schema.String })),
@@ -111,17 +110,6 @@ export const StatsGroup = Schema.Struct({
       tally: Schema.String,
       total: TallyCell,
       days: Schema.Array(Schema.Struct({ ...TallyCell.fields, day: Schema.String })),
-    }),
-  ),
-  slowLandings: Schema.Array(
-    Schema.Struct({
-      day: Schema.String,
-      run: Schema.String,
-      step: Schema.String,
-      try: Schema.Number,
-      checkMs: Schema.Number,
-      deadlineMs: Schema.Number,
-      share: Schema.Number,
     }),
   ),
   checks: Schema.optionalKey(

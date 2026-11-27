@@ -74,15 +74,6 @@ const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: ca
 /** A run that waits on itself. */
 const selfWaiting = (id: string) => ({ ...aRun(id), after: [id] }) satisfies Run;
 
-/** A run whose implement step landed both a commit and an abort. */
-const landedTwice = (id: string) => {
-  const run = aRun(id);
-  return {
-    ...run,
-    steps: { ...run.steps, implement: { ...run.steps.implement, landed: { commit: 'a'.repeat(40), aborted: 'conflict' } } },
-  } satisfies Run;
-};
-
 /** One ask of each kind a person writes, and its key's number. */
 const ASKS: Array<{ asked: PersonRequest; n: number }> = [
   { asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } }, n: 2 },
@@ -138,11 +129,6 @@ const CREATE: Walk[] = [
   {
     name: 'REFUSED: a new run that waits on itself is not made (afterOthers)',
     walk: ({ door }) => [act(door.runs.create(selfWaiting('w-self'))), act(door.runs.exists(idOf('w-self')))],
-    says: [{ refused: 'Invalid' }, false],
-  },
-  {
-    name: 'REFUSED: a new run whose step landed both a commit and an abort is not made',
-    walk: ({ door }) => [act(door.runs.create(landedTwice('w-landed'))), act(door.runs.exists(idOf('w-landed')))],
     says: [{ refused: 'Invalid' }, false],
   },
   {
@@ -202,7 +188,7 @@ const REWRITE: Walk[] = [
     name: 'a settle that writes the record sets aside, with it, an approval its record spent and keeps the answer of a retry',
     walk: ({ door }) => {
       const run = made(door, 'w-settle');
-      act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, work: { implement: 1 } } }));
+      act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } }));
       act(door.asks.write(idOf(run.id), ASKS[0].asked));
       const { asks, rounds } = done(door.asks.read(idOf(run.id)));
       const tried = {
@@ -666,36 +652,6 @@ const ASK_WALKS: Record<string, Walk[]> = {
         return [stays, (act(door.asks.read(idOf(run.id))) as { asks: unknown[] }).asks.length];
       },
       says: [1, 0],
-    },
-    {
-      name: "an ending's approval is read while the work it names stands, and once a try of that work is filed it is read spent and consumed",
-      walk: ({ door }) => {
-        const run = made(door, 'w-work');
-        act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'review', try: 1, at, work: { implement: 1 } } }));
-        const approvalsOf = () => {
-          const read = act(door.runs.read(idOf(run.id)));
-          return 'refused' in read ? read : (read.approvals ?? []).map((a) => a.step);
-        };
-        const before = approvalsOf();
-        const sentBack = {
-          ...run,
-          steps: {
-            ...run.steps,
-            implement: {
-              ...run.steps.implement,
-              tries: [{ taskId: `${run.id}-implement`, cause: 'continue' as const }],
-              taskId: `${run.id}-implement-try2`,
-            },
-          },
-        };
-        act(door.runs.rewrite(sentBack));
-        const spent = approvalsOf();
-        const { asks, rounds } = done(door.asks.read(idOf(run.id)));
-        act(door.runs.settle(sentBack, { write: false, asks, rounds }));
-        act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'review', try: 1, at, work: { implement: 2 } } }));
-        return [before, spent, approvalsOf()];
-      },
-      says: [['review'], [], ['review']],
     },
   ],
   'asks.answers': [

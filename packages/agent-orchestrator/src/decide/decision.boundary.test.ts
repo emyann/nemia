@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantAsk, plantFactory, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
+import { plantFactory, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -239,7 +239,17 @@ describe("a finished run's decision: what its branch touched, the lesson, the di
         'awaiting',
         'collisions',
       ]);
-      assert.equal(body.collisions, null, 'a branch handed to a person to merge is at no ending: no collision is read');
+      assert.deepEqual(
+        body.collisions,
+        {
+          onto: 'main',
+          base: [{ branch: 'wf/r-d1/implement', clean: true, said: 'merges cleanly onto main' }],
+          inFlight: [],
+          colliding: [],
+          said: 'no other run is in flight on main',
+        },
+        'a branch handed to a person to merge is read against the base and the runs in flight on it',
+      );
       assert.deepEqual(
         body.awaiting,
         { branches: [branch], direct: false },
@@ -499,66 +509,6 @@ describe('the commands a decision offers are bare `nemia` lines, by the state th
     assert.ok(accept?.said, JSON.stringify(body.commands));
     assert.match(accept.said, /^review: enough — .*:  nemia approve r-d9 review --message "<why>"$/);
   });
-  test('an ending whose check did not finish on the merge it staged is offered the bare `nemia retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge', async () => {
-    const { repo, base } = aRepo();
-    const branch = 'wf/r-d20/implement';
-    branchOff(repo, branch, () => write(repo, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n'));
-    const landing = [
-      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-      {
-        name: 'ship',
-        after: ['implement'],
-        body: 'Ship it.',
-        harness: 'claude',
-        workspace: 'main',
-        gate: true,
-        check: 'npm test',
-        output: {
-          file: 'shipper.schema.json',
-          schema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false },
-        },
-      },
-    ];
-    settledTask('t-d20-implement', done);
-    settledTask('t-d20-ship', { ...done, message: 'Add sub\n\nsub beside add.' });
-    journal('t-d20-ship-check', [
-      { kind: 'filed', at, brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: repo, maxAttempts: 1, harness: 'check' },
-      { kind: 'starting', at, attempt: 1 },
-      { kind: 'spawned', at, attempt: 1 },
-      { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-d20-ship-check/1', observed: 'failed', reason: 'deadline' },
-      { kind: 'settled', at, outcome: 'failed' },
-    ]);
-    writeRun({
-      id: 'r-d20',
-      repo,
-      baseRef: base,
-      workflow: landing,
-      steps: {
-        implement: { taskId: 't-d20-implement', branch },
-        ship: {
-          taskId: 't-d20-ship',
-          workspace: repo,
-          branch: 'main',
-          check: { taskId: 't-d20-ship-check' },
-          /** Its check was killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`). */
-          landed: { aborted: 'its check did not finish' },
-        },
-      },
-    });
-    plantAsk(root, 'r-d20', 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
-
-    const body = await decidable('r-d20');
-    const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
-    assert.deepEqual(
-      offered.map(({ command }: DecideCommand) => command),
-      ['nemia retry r-d20 ship'],
-      JSON.stringify(body.commands),
-    );
-    const [first] = offered;
-    assert.ok(first?.said, JSON.stringify(offered));
-    assert.match(first.said, /^ship: its check did not finish, .*:  nemia retry r-d20 ship$/);
-    assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
-  });
   test('a step `denials: fail` stopped is offered the bare `nemia retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `nemia decide` said — and reads `denied`, waited on by a person', async () => {
     const denying = [
       { ...workflow[0], harness: 'claude', denials: 'fail' },
@@ -798,54 +748,4 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     decided.commands.map((c: { label: string }) => c.label),
     ['once more', 'merge it', 'drop it'],
   );
-});
-
-test("a run whose approved ending waits for the repository's checkout, which another run's ending is in, answers `baseHeldBy` with that run — read by the `WF_MAX_RUNS` of the environment it is read over, never the process's — and one nothing holds answers none", async () => {
-  const { repo: shared, base: from } = aRepo();
-  const landing = [
-    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-    { name: 'notes', after: [], body: 'Write the notes.', harness: 'codex', gate: true },
-    { name: 'ship', after: ['implement'], body: 'Ship it.', harness: 'claude', workspace: 'main', gate: true },
-  ];
-  const approve = (id: string) => {
-    fs.mkdirSync(path.join(root, 'runs', `${id}.asks`), { recursive: true });
-    plantAsk(root, id, 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
-  };
-  settledTask('t-d14-implement', done);
-  settledTask('t-d14-notes', done);
-  writeRun({
-    id: 'r-d14',
-    repo: shared,
-    baseRef: from,
-    workflow: landing,
-    steps: {
-      implement: { taskId: 't-d14-implement', branch: 'wf/r-d14/implement' },
-      notes: { taskId: 't-d14-notes', branch: 'wf/r-d14/notes' },
-      ship: { taskId: null },
-    },
-  });
-  approve('r-d14');
-  assert.equal(ENV.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
-  const answer = () => decidable('r-d14', { ...ENV, WF_MAX_RUNS: '1' });
-  assert.ok(!('baseHeldBy' in (await answer())), 'no other run is in the checkout, so nothing holds it');
-
-  settledTask('t-d15-implement', done);
-  journal('t-d15-ship', [
-    { ...filed('t-d15-ship'), cwd: shared },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-  ]);
-  writeRun({
-    id: 'r-d15',
-    repo: shared,
-    baseRef: from,
-    workflow: landing,
-    steps: {
-      implement: { taskId: 't-d15-implement', branch: 'wf/r-d15/implement' },
-      notes: { taskId: null },
-      ship: { taskId: 't-d15-ship', workspace: shared, branch: 'main' },
-    },
-  });
-  approve('r-d15');
-  assert.deepEqual((await answer()).baseHeldBy, { run: 'r-d15', step: 'ship' });
 });

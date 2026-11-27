@@ -73,8 +73,6 @@ export {
   FACTORY_CONDITION_STATUSES,
   FACTORY_CONDITION_TYPES,
   FIELD_SHAPES,
-  GATE_AT,
-  type GateAt,
   type FieldShape,
   FILL_ORIGINS,
   GATE_BUDGETS_FROM,
@@ -401,7 +399,7 @@ export {
   TRANSCRIPT_ROLES,
   type TranscriptRole,
 } from './words.ts';
-export { BaseHold, QueuedFor, RunAssignee, RunHolding, RunWaiting } from './run.ts';
+export { QueuedFor, RunAssignee, RunHolding, RunWaiting } from './run.ts';
 export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,

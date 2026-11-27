@@ -41,7 +41,7 @@ export type { RunPhase };
  * (`base`), the store's pause (`pause`), or a person's hold that names no run, lifted by a person alone (`hold`). A field beside the
  * reason, never part of it, so a selector names it as a key (`on=limit`).
  */
-export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const satisfies readonly WaitOn[];
+export const WAIT_ON = ['run', 'limit', 'pause', 'hold'] as const satisfies readonly WaitOn[];
 
 /** One of `WAIT_ON`. */
 export type { WaitOn };

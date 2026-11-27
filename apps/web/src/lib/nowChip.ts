@@ -32,8 +32,8 @@ const FAILED: ReadonlySet<StepState> = new Set(['failed', 'failed-check', 'unrea
 /** The states at rest: parked by the pause, called off, passed by, unknown, sent on, or done. */
 const AT_REST: ReadonlySet<StepState> = new Set(['paused', 'cancelled', 'skipped', 'unknown', 'sent', 'verified', 'unverified']);
 
-/** What a step not started stands as, by the thing it waits on: another run or the checkout, a run slot, the pause, a hold. */
-const ON: Record<WaitOn, NowStands> = { run: 'waitsOnARun', base: 'waitsOnARun', limit: 'waitsForASlot', pause: 'atRest', hold: 'held' };
+/** What a step not started stands as, by the thing it waits on: another run, a run slot, the pause, a hold. */
+const ON: Record<WaitOn, NowStands> = { run: 'waitsOnARun', limit: 'waitsForASlot', pause: 'atRest', hold: 'held' };
 
 /**
  * Where a row's step stands, as its chip reads it: at work, failed, at rest; held where a person holds the run and the step has not
@@ -68,17 +68,13 @@ export const CHIP_TAG: Record<ChipTone, { variant: 'tonal' | 'filled' | 'outline
   rest: { variant: 'filled', color: 'neutral' },
 };
 
-/** A row as the fan counts it: its waits, its hold, and of each step the run whose ending holds the checkout it waits on. */
-type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'> & {
-  steps: ReadonlyArray<Partial<Pick<RunView['steps'][number], 'baseHeldBy'>>>;
-};
+/** A row as the fan counts it: its waits and its hold. */
+type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'>;
 
 /**
- * Which of `rows` wait on the run `id`, by id, on its checkout, or are held until it succeeds: a run that names it among the runs it
- * waits on
- * and the store has, a run a step of which waits on the checkout its ending has (`baseHeldBy`), or one that names it among the runs its
- * hold waits for that have not succeeded; each run once, never `id` itself.
- * @param rows The runs of the page, each with what it waits on, its hold and its steps.
+ * Which of `rows` wait on the run `id`, by id, or are held until it succeeds: a run that names it among the runs it waits on and the
+ * store has, or one that names it among the runs its hold waits for that have not succeeded; each run once, never `id` itself.
+ * @param rows The runs of the page, each with what it waits on and its hold.
  * @param id The run waited on.
  */
 export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string) =>
@@ -87,7 +83,6 @@ export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string) =>
       (row) =>
         row.id !== id &&
         ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
-          row.steps.some((step) => step.baseHeldBy?.run === id) ||
           (row.holding?.runs.some((run) => run.run === id && !run.released) ?? false)),
     )
     .map((row) => row.id);

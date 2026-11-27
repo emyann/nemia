@@ -18,7 +18,6 @@ import { frontmatterOfValues, frontmatterValues } from '../../frontmatter/frontm
 import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, HOME_FOLDER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
 import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../template/index.ts';
 import { renderStep } from '../../workflow/index.ts';
-import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
 import { checkFailurePolicyOf, checksOf } from '../../check/index.ts';
 import { selectorsRefusal } from '../../watch/selector.ts';
@@ -251,7 +250,6 @@ const STEP_WORDS = [
   'after',
   'input',
   'place',
-  'workspace',
   'budget',
   'check',
   'run',
@@ -308,7 +306,7 @@ const checksOfTemplate = (step: string, checks: unknown) =>
   checks === undefined ? {} : { checks: checksOf(step, undefined, JSON.stringify(checks)) };
 
 /**
- * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
+ * The step `step` of `workflow` as its file: its wiring, its overrides on
  * the harness it runs on (`harness`), and its instruction.
  */
 function stepFile(workflow: string, step: Spec, harness: string, read: TemplateRead, params: Params, refusals: string[]) {
@@ -317,7 +315,6 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   const keys: Record<string, string> = {};
   for (const key of STEP_WORDS) if (step[key] !== undefined && !blankAsked(key, step[key])) keys[key] = lineOf(step[key]);
   if (step.gate === true) keys.gate = 'true';
-  Object.assign(keys, baseSpelled(keys));
   const output = isMap(step.output) ? step.output.path : undefined;
   const folder = `${WORKFLOWS}/${workflow}/`;
   if (typeof output === 'string' && output.startsWith(folder)) keys.output = output.slice(folder.length);

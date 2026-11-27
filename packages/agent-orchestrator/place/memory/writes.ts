@@ -1,12 +1,12 @@
 /**
- * The verbs of the test place that change a repository or a directory: `follow`, `make`, `handoff`, `land`, `remove`, `export`,
+ * The verbs of the test place that change a repository or a directory: `follow`, `make`, `handoff`, `remove`, `export`,
  * `seal`, `clone` and `init`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its
  * own words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, takenBack, treeOf } from './acts.ts';
+import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, treeOf } from './acts.ts';
 import { isDirectory, OWN, real, SELF_IGNORED, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
 import { commitAt, commitOf, within, type Held, type Repository } from './world.ts';
@@ -131,27 +131,6 @@ export function handoff(held: Held, { workspace, step, why }: PlaceRequests['han
   if (!found) return refused(`nothing of ${step} can be handed off: ${noRepository(workspace)}`);
   if (!dirty(found.repo, found.checkout)) return { commit: null };
   return { commit: committed(held, found, `${step}: hand off what was left uncommitted${why}`) };
-}
-
-/**
- * `land`: the merge staged in a checkout committed under the message given, or taken back. The commit holds the merge as it was staged
- * and resolved, never a file the checkout was left since.
- */
-export function land(held: Held, request: PlaceRequests['land']) {
-  const { repo: dir, act } = request;
-  const found = checkoutAt(held, dir);
-  if (!found) return refused(`there is no merge to ${act}: ${noRepository(dir)}`) satisfies Reply<'land'>;
-  const { staged } = found.checkout;
-  if (!staged) return refused(`no merge is in progress in ${dir}, so there is none to ${act}`) satisfies Reply<'land'>;
-  if (request.act === 'abort') {
-    takenBack(found);
-    return { aborted: true } satisfies Reply<'land'>;
-  }
-  if (staged.conflicts.length)
-    return refused(`${staged.conflicts.join(', ')} still in conflict in ${dir}: resolve each, then land again`) satisfies Reply<'land'>;
-  if (!request.message.trim())
-    return refused(`the merge in ${dir} is given an empty message, and is not committed under none`) satisfies Reply<'land'>;
-  return { commit: committed(held, found, request.message.trim(), staged.tree) } satisfies Reply<'land'>;
 }
 
 /** Why the workspace `dir` of `repo` is not removed, or undefined once it is, with its directory. */

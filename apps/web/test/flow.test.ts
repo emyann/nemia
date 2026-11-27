@@ -36,16 +36,7 @@ const buildGraph: RunGraph = {
   edges: [after('design', 'implement'), after('implement', 'review'), after('review', 'land'), loop('review', 'implement')],
 };
 const buildAt = (states: Record<string, StepState>, notes: Record<string, string> = {}) =>
-  graphOf(
-    build,
-    buildGraph,
-    stepsOf(states, notes),
-    [
-      { step: 'design', at: 'after' },
-      { step: 'land', at: 'before' },
-    ],
-    false,
-  );
+  graphOf(build, buildGraph, stepsOf(states, notes), [{ step: 'design' }], false);
 
 describe("graphOf and windowOf: a run's steps as its workflow's graph drawn small, folded around the live column", () => {
   test("a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering's order", () => {
@@ -101,12 +92,9 @@ describe("graphOf and windowOf: a run's steps as its workflow's graph drawn smal
     assert.equal(new Set(bottoms).size, 2, bottoms.join());
     assert.ok(g.height >= Math.max(...bottoms));
   });
-  test("a gate is a tick 12 pixels after a step whose closeout waits, and 12 before an ending approved first, at the step's row", () => {
+  test("a gate is a tick 12 pixels after a step whose closeout waits, at the step's row", () => {
     const g = buildAt({ design: 'awaiting-approval', implement: 'waiting', review: 'waiting', land: 'waiting' });
-    assert.deepEqual(g.gates, [
-      { step: 'design', at: 'after', x: 26, y: 8 },
-      { step: 'land', at: 'before', x: 162, y: 8 },
-    ]);
+    assert.deepEqual(g.gates, [{ step: 'design', x: 26, y: 8 }]);
     const [design, implement] = g.points;
     assert.ok(design.x < g.gates[0].x && g.gates[0].x < implement.x, 'between design and the column after it');
   });
@@ -122,7 +110,7 @@ describe("graphOf and windowOf: a run's steps as its workflow's graph drawn smal
       ['next', 'a', 'b'],
       graph,
       stepsOf({ next: 'awaiting-approval', a: 'waiting', b: 'waiting' }),
-      [{ step: 'next', at: 'after' }],
+      [{ step: 'next' }],
       false,
     );
     const at = new Map(g.points.map((p) => [p.names[0], p]));

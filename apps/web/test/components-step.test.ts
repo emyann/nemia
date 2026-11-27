@@ -31,11 +31,9 @@ import {
   routedWith,
   runOf,
   runWith,
-  SHIP_SAYS,
   textsOf,
   threeTries,
   tookAt,
-  toShip,
   unescaped,
   UNMEASURED,
   WAIT,
@@ -568,7 +566,7 @@ const panelMarkup = async (run: RunView, selected: string | null = null) => {
   const { Run } = await import('../src/components/look/Run.tsx');
   return routedWith(
     createElement(Run, {
-      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/flows/build', gates: [{ step: 'theme', at: 'after' }] }, run),
+      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/flows/build', gates: [{ step: 'theme' }] }, run),
       size: 'xl',
       asOf: new Date('2026-10-12T11:00:00.000Z'),
       read: null,
@@ -679,7 +677,6 @@ test("a step's detail shows `loop` and `rounds` beside `after` on a looping step
     effort: null,
     context: null,
     after: ['implement'],
-    workspace: null,
     place: null,
     resume: null,
     fence: null,
@@ -938,7 +935,6 @@ const unset: WorkflowStepSpec = {
   after: [],
   resume: null,
   input: [],
-  workspace: null,
   place: null,
   writable: [],
   reads: [],
@@ -1454,7 +1450,6 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     effort: null,
     context: null,
     after: [],
-    workspace: null,
     place: null,
     resume: null,
     fence: null,
@@ -1628,7 +1623,6 @@ test("a step's memory row says what its session asks, its limit and its peak, th
     effort: null,
     context: null,
     after: [],
-    workspace: null,
     place: null,
     resume: null,
     fence: null,
@@ -1685,7 +1679,6 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     effort: null,
     context: null,
     after: ['draft'],
-    workspace: null,
     place: null,
     resume: null,
     fence: null,
@@ -1742,7 +1735,6 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     effort: null,
     context: null,
     after: [],
-    workspace: null,
     place: null,
     resume: null,
     fence: null,
@@ -1917,54 +1909,14 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
     `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
-  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunDetail['steps'][number]['spec'];
-  const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
-  assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
-  assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
   assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], waitingOnYouWords: [], cancelledAt: at }))), false);
-});
-
-test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone — never its step's body, which opens with its agent's instructions", async () => {
-  const led = endingRun();
-  const ship = { ...led.steps[1], body: "You are Otto, a release engineer. You land a run's result.\n\nNever push." };
-  const asks = async (toDecide: RunDetail['toDecide']) =>
-    /<section data-part-asks="L"[\s\S]*$/.exec(await partOf({ ...led, toDecide, steps: [led.steps[0], ship] }, 'ship'))?.[0] ?? '';
-  const brief = async (toDecide: RunDetail['toDecide']) => textsOf((await asks(toDecide)).split('data-part-detail')[0]).join(' ');
-  for (const toDecide of [null, { ...toShip, step: 'implement' }]) {
-    const said = await brief(toDecide);
-    assert.ok(said.includes('ship waits at its gate'), said);
-    assert.doesNotMatch(said, /You are|Its folder says/, 'no decision about this step: nothing quoted');
-  }
-  assert.ok(
-    (await brief(toShip)).includes(`Its folder says what it does: “${SHIP_SAYS}”`),
-    "the decision's own words, where it names this step",
-  );
-});
-
-test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {
-  const [implement, ship] = endingRun().steps;
-  const rowsOf = (step: RunDetail['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
-  assert.ok(
-    rowsOf(ship).some(([key]) => key === 'workspace'),
-    JSON.stringify(rowsOf(ship)),
-  );
-  assert.equal(rowsOf(ship).find(([key]) => key === 'workspace')![1], 'set');
-  assert.ok(
-    !rowsOf({ ...ship, spec: { ...ship.spec!, workspace: null } }).some(([key]) => key === 'workspace'),
-    'a step in a worktree says nothing',
-  );
-  assert.ok(
-    !rowsOf({ ...ship, spec: { ...ship.spec!, workspace: undefined as unknown as null } }).some(([key]) => key === 'workspace'),
-    'nor a detail from an api without the key',
-  );
-  assert.ok(!implement.spec, 'and the work of this fixture has no spec at all, which is not a row either');
 });
 
 test("a step's facts say `place` only for a step in a folder the run makes, on a remote agent too: none for a step on a repository", () => {
   const [, ship] = endingRun().steps;
   const placeOf = (spec: StepSpec) => specRows(spec).find(([key]) => key === 'place')?.[1];
-  const inFolder = { ...ship.spec!, workspace: null, place: 'folder' };
+  const inFolder = { ...ship.spec!, place: 'folder' };
   assert.equal(renderToStaticMarkup(createElement(Facts, { rows: [['place', placeOf(inFolder)]] })).includes('>folder</span>'), true);
   assert.ok(placeOf({ ...inFolder, harness: 'a2a:scribe' }), 'a remote step in a folder says it too');
   assert.equal(placeOf({ ...inFolder, place: 'git' }), undefined, 'a step that says `place: git` works where every step did before');
@@ -3436,7 +3388,7 @@ async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const form = keyForm({
     keys: [
-      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main'], byHarness: null },
+      { key: 'place', meaning: 'Where the step works.', kind: 'choice', choices: ['folder'], byHarness: null },
       { key: 'disallowedTools', meaning: 'What it may never run.', kind: 'list', choices: null, byHarness: null },
       { key: 'agent', meaning: 'Who it is.', kind: 'choice', choices: ['writer'], byHarness: null },
     ],
@@ -3478,7 +3430,7 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
     'data-layer="policy"',
     'Its words',
     'data-field="disallowedTools"',
-    'data-field="workspace"',
+    'data-field="place"',
   ].map(at);
   assert.deepEqual(
     order,

@@ -12,7 +12,7 @@ import { broughtFacts, broughtPart, type BroughtPart } from '@/lib/brought';
 import { titleOf } from '@/lib/factory';
 import { useRunRead, type RunDetail, type StepView } from '@/lib/runView';
 import { AnswerRow, Continue } from '@/components/gate/Decide';
-import { Approved, endsTheRun } from '@/components/gate/Gate';
+import { Approved } from '@/components/gate/Gate';
 import { GateBrief } from '@/components/gate/GateBrief';
 import { AskedRow } from '@/components/gate/Questions';
 import { RunGone } from '@/components/run/RunGone';
@@ -92,7 +92,7 @@ function Settled({ run, step }: { run: RunDetail; step: StepView }) {
         <StatusChip codes={step} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
         <StepNote note={step.note} />
       </div>
-      {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} ends={endsTheRun(step)} />}
+      {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} />}
     </div>
   );
 }

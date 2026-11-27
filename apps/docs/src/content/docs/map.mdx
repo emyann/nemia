@@ -65,7 +65,7 @@ on the runtime's page, and [A2A](/a2a/) for how the runtime reaches each harness
 `packages/agent-orchestrator`, with its command `nemia` (`wf` is its old name, kept as an alias).
 
 **It owns** what a session means. It reads a folder of Markdown as a workflow and runs it: which task to start next, what a person
-must decide, and what the run's record says. It also owns run slots, worktrees and landing, what a check means, budgets across tries,
+must decide, and what the run's record says. It also owns run slots, worktrees, where a run's branch stands, what a check means, budgets across tries,
 gates, the inbox, factories, levels, stats, and agent definitions. Its decisions also come from one pure function, `assess`, in
 `packages/agent-orchestrator/src/tick/assess.ts`. The daemon ticks: it reads the world, asks `assess`, and acts.
 

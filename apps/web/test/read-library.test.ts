@@ -111,16 +111,9 @@ describe("a step's page and a list of workflows are read in the place named, und
     await (stepQuery('user', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
     assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=user&repo=%2Fcode%2Fapp');
   });
-  test("a Workflow is read as the board's view of it, and a step its object spells `workspace: main` is unread", async (t) => {
+  test("a Workflow is read as the board's view of it", async (t) => {
     answering(t, listOfItems('Workflow', [workflowObject()]));
     assert.deepEqual(await readWorkflows(), [rowOf(viewed())], "each step resolved with every key, its own keys, the graph's nodes");
-    const object = workflowObject();
-    const former = {
-      ...object,
-      status: { ...object.status, steps: object.status.steps.map((step) => ({ ...step, spec: { ...step.spec, workspace: 'main' } })) },
-    };
-    answering(t, listOfItems('Workflow', [former]));
-    await assert.rejects(readWorkflows(), UnreadAnswer, "the former spelling is no word of the object's: its api spells it `base`");
   });
   test("REFUSED: a list of workflows is read in its place — with none, the list the builder drafts from; in a factory, the factory's, under the key its start reads", async (t) => {
     const asked = answering(t, listOfItems('Workflow', [workflowObject()]));

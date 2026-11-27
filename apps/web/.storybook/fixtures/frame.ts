@@ -29,13 +29,12 @@ export const quietChat = [
 const PAUSED_AT = '2026-11-16T14:05:00.000Z';
 
 /** Every factory running: no pause, nothing finishing. */
-export const RUNNING: Paused = { pause: null, finishing: [], parked: [], staged: [], held: [] };
+export const RUNNING: Paused = { pause: null, finishing: [], parked: [], held: [] };
 
 /** Every factory paused, a session parked at a tool call's end and nothing finishing. */
 export const PAUSED: Paused = {
   pause: { at: PAUSED_AT, by: 'yann', why: 'merging by hand on main' },
   finishing: [],
   parked: [{ run: 'the-frame-draws-w-u4n7', step: 'implement', after: 'Bash' }],
-  staged: [],
   held: [],
 };

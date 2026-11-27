@@ -108,8 +108,8 @@ export default {
    * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
    * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Stop now… (`stop-now`'s page).
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
-   * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a landing is held
-   * with its merge staged and another step's check held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
+   * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and two steps'
+   * checks are held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
    * naming each; and on the run's page that step's chip is drawn waiting, `paused`, the api's read of the run held with
    * `route` as the package words it. Which tasks finish, and which checks are held, is the package's judgement, proven in its own tests
    * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,
@@ -191,7 +191,7 @@ export default {
       const calling = { run: FAKE.id, step: FAKE.refused, kind: 'session', calling: 'Bash' };
       await page.route('**/api/pause', (route) =>
         route.request().method() === 'GET'
-          ? route.fulfill({ json: { pause: put, finishing: [calling], parked: [], staged: [], held: [] } })
+          ? route.fulfill({ json: { pause: put, finishing: [calling], parked: [], held: [] } })
           : route.fallback(),
       );
       await page.reload({ waitUntil: 'load' });
@@ -205,11 +205,11 @@ export default {
       await page.keyboard.press('Escape');
       await page.unroute('**/api/pause');
 
-      const staged = { run: GATED.id, step: 'ship', repo: '/code/app' };
       const held = { run: FAKE.id, step: FAKE.refused };
+      const alsoHeld = { run: GATED.id, step: 'ship' };
       await page.route('**/api/pause', (route) =>
         route.request().method() === 'GET'
-          ? route.fulfill({ json: { pause: put, finishing: [], parked: [], staged: [staged], held: [held] } })
+          ? route.fulfill({ json: { pause: put, finishing: [], parked: [], held: [alsoHeld, held] } })
           : route.fallback(),
       );
       await page.reload({ waitUntil: 'load' });
@@ -224,14 +224,12 @@ export default {
         'its popover says since when, by whom and why, and how many checks it holds',
       );
       await expectTexts(
-        popover.locator('[data-pause-staged] li'),
-        [`${GATED.id}'s ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on the resume`],
-        'and the landing it holds with its merge staged',
-      );
-      await expectTexts(
         popover.locator('[data-pause-held] li'),
-        [`${FAKE.id}'s ${FAKE.refused} has signed off, and its check waits on the resume`],
-        'and each other check it holds',
+        [
+          `${GATED.id}'s ship has signed off, and its check waits on the resume`,
+          `${FAKE.id}'s ${FAKE.refused} has signed off, and its check waits on the resume`,
+        ],
+        'and each check it holds',
       );
       await page.keyboard.press('Escape');
       await heldRun(page, theme);

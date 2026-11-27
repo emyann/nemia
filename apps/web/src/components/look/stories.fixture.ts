@@ -106,14 +106,11 @@ const HOLD: NonNullable<RunView['holding']> = {
   waitingOnYou: false,
 };
 
-/** Build's gates: design approved after it, its closeout waiting; land, an ending, approved before it runs. */
-const BUILD_GATES: RunView['gates'] = [
-  { step: 'design', at: 'after' },
-  { step: 'land', at: 'before' },
-];
+/** Build's gate: design approved after it, its closeout waiting. */
+const BUILD_GATES: RunView['gates'] = [{ step: 'design' }];
 
 /**
- * A run of `steps` as its graph draws it: build's graph among them, design and land gated.
+ * A run of `steps` as its graph draws it: build's graph among them, design gated.
  * @param steps The run's steps.
  * @param held Whether a person holds it.
  */
@@ -171,7 +168,7 @@ export const ROUTED: GraphRunFixture = {
       { name: 'to-quick', kind: 'workflow', workflow: 'quick' },
     ],
   },
-  gates: [{ step: 'next', at: 'after' }],
+  gates: [{ step: 'next' }],
   cancelledAt: null,
   holding: null,
 };

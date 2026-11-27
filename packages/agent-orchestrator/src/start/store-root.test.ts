@@ -9,8 +9,6 @@ import type { StepSpec } from '../step/step.ts';
 import { storeRootRefusal } from './store-root.ts';
 
 const IMPLEMENT = { name: 'implement', after: [] } as unknown as StepSpec;
-const SHIP = { name: 'ship', after: ['implement'], workspace: 'base' } as unknown as StepSpec;
-const LONE_SHIP = { name: 'ship', after: [], workspace: 'base' } as unknown as StepSpec;
 const REVIEW = { name: 'review', after: ['implement'] } as unknown as StepSpec;
 const TRIAGE = { name: 'triage', after: [], reads: ['inbox'] } as unknown as StepSpec;
 
@@ -18,10 +16,10 @@ const TRIAGE = { name: 'triage', after: [], reads: ['inbox'] } as unknown as Ste
 const refusal = (root: string, steps: readonly StepSpec[]) =>
   storeRootRefusal(root, steps, { runArtifacts: path.join(root, 'runs', 'r', 'artifacts'), inbox: path.join(root, 'inbox') });
 
-test("REFUSED: a `(` in the root, under an ending after a step, in the store's words naming WF_ROOT, its value, the `(` and the fix", () => {
-  const why = refusal('/srv/my wf (old)', [IMPLEMENT, SHIP]) ?? '';
-  assert.match(why, /^ship: /);
-  assert.match(why, /a read of its run's artifacts folder/);
+test("REFUSED: a `(` in the root, under a step after another, in the store's words naming WF_ROOT, its value, the `(` and the fix", () => {
+  const why = refusal('/srv/my wf (old)', [IMPLEMENT, REVIEW]) ?? '';
+  assert.match(why, /^review: /);
+  assert.match(why, /the artifacts folders of the steps before it/);
   assert.ok(why.includes('WF_ROOT=/srv/my wf (old) '), why);
   assert.match(why, /cannot carry the "\(" in it/);
   assert.match(why, /\nSet WF_ROOT to a directory/);
@@ -30,10 +28,7 @@ test("REFUSED: a `(` in the root, under an ending after a step, in the store's w
   assert.doesNotMatch(why ?? '', /is not a list of permission rules|Mount a folder/);
 });
 
-test("REFUSED: a lone ending is given a read of its run's artifacts, a step after another their folders, and one that reads the inbox the inbox", () => {
-  const ship = refusal('/srv/wf*', [LONE_SHIP]) ?? '';
-  assert.match(ship, /^ship: /);
-  assert.match(ship, /a read of its run's artifacts folder/);
+test('REFUSED: a step after another is given their folders, and one that reads the inbox the inbox', () => {
   const review = refusal('/srv/wf?', [IMPLEMENT, REVIEW]) ?? '';
   assert.match(review, /^review: /);
   assert.match(review, /the artifacts folders of the steps before it/);
@@ -44,13 +39,13 @@ test("REFUSED: a lone ending is given a read of its run's artifacts, a step afte
 });
 
 test('a root every rule carries, a space, a comma and braces in it, starts the same steps', () => {
-  assert.equal(refusal('/srv/my wf,{a}', [IMPLEMENT, SHIP, TRIAGE]), undefined);
+  assert.equal(refusal('/srv/my wf,{a}', [IMPLEMENT, REVIEW, TRIAGE]), undefined);
 });
 
 test('a step whose filing names nothing under the store in a rule is let through, whatever the root: alone, on codex, on a remote agent', () => {
   assert.equal(refusal('/srv/wf*', [IMPLEMENT]), undefined);
-  assert.equal(refusal('/srv/wf*', [{ ...LONE_SHIP, harness: 'codex' }]), undefined);
-  assert.equal(refusal('/srv/wf*', [IMPLEMENT, { ...SHIP, harness: 'codex' }, { ...TRIAGE, harness: 'a2a:x' }]), undefined);
+  assert.equal(refusal('/srv/wf*', [{ ...REVIEW, harness: 'codex' }]), undefined);
+  assert.equal(refusal('/srv/wf*', [IMPLEMENT, { ...REVIEW, harness: 'codex' }, { ...TRIAGE, harness: 'a2a:x' }]), undefined);
 });
 
 test("REFUSED: a `(` in the root, for a lone step of a run given inputs, names the run's inputs folder; given none, the same step starts", () => {

@@ -1,27 +1,19 @@
 import { useContext, useId, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { decisionQuery } from '../../lib/api/decision.ts';
 import { type Question } from '../../lib/api/tries.ts';
 import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
-import type { RunDetail, StepView } from '../../lib/runView';
+import type { StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
-import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
-import { stepAnchor } from '../../lib/asks';
-import { RouteLink } from '../agent/AgentParts';
-import { LINK } from '../step/Facts';
 import { Answered, MODES, Refusal, useAsk } from './Ask';
 import { QuestionSeries, RecommendButton } from './Questions';
 import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
 import { when } from '../step/Facts';
 import { useApprove } from '../../lib/useApprove';
-import { backName, endingWarning } from '../../lib/gate';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
-import { Body, Button, Label, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Body, Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
-import { Pending, Reading, ReadingLines, CutPress } from '@/components/look';
-import { troubleOf } from '@/lib/api/read';
+import { Pending, CutPress } from '@/components/look';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -36,13 +28,8 @@ type StepApproval = NonNullable<StepGate['approval']>;
  * refusal shows beside the button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does
  * with it, until the run is read again and the step says it: approved under the step, or the try asked in its note.
  *
- * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself, which is the default and §6's
- * gate; or, at an ending step's gate — held before the step is filed — the steps it waits on, whose work the objection is about, since the
- * ending has done nothing to object to. The CLI's `retry` of the step at such a gate is refused, so the button asks for a try of the work
- * instead, and where the ending waits on several steps a person picks which. Empty for an ending that waits on nothing — a workflow of one
- * step in the checkout — and then there is no send-back at all, as the CLI `ls`'s own gate note prints none (`gateNote`): approving it is
- * the only word there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the
- * words given with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
+ * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself. Empty where there is
+ * nothing to send back, and then approving is the only word there is to say.
  *
  * What is being approved — the step's summary and each field it declared — is its part's Said and Gave, drawn beside the gate in the
  * step's part (`components/step/part`), so the gate draws none of it.
@@ -57,17 +44,14 @@ type StepApproval = NonNullable<StepGate['approval']>;
  * as `budgets`, and none where nothing changed, so the proposal is what the package writes (`approvalBody`, `budgetsGiven`); it waits
  * while a field holds no amount above zero.
  *
- * An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>. The words
- * of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a send-back with
- * none is the package's to refuse. Where the ending waits on more than one step, one of them is enough to hold its gate again.
+ * The words of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a
+ * send-back with none is the package's to refuse.
  */
 export function Gate({
   runId,
   step,
   approveLine,
   back = [step],
-  acts = false,
-  onto = null,
   framed = true,
   questions = [],
   budgets,
@@ -77,9 +61,6 @@ export function Gate({
   /** The line that approves the step from a terminal, as the api answers it (`commands.approve` on the step). */
   approveLine: string;
   back?: readonly string[];
-  acts?: boolean;
-  /** The base branch an ending runs on, where the run knows it (`branch`), named in the warning its second press reads. */
-  onto?: string | null;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
   questions?: readonly Frozen<Question>[];
@@ -88,7 +69,6 @@ export function Gate({
 }) {
   const [draft, setDraft] = useState<Draft>({});
   const [amounts, setAmounts] = useState<Amounts>({});
-  const [to, setTo] = useState(back[0] ?? step);
   const field = useId();
   const answered = useContext(Answered);
   const forget = () => {
@@ -103,9 +83,9 @@ export function Gate({
   const budgeting = budgetsGiven(budgets, amounts);
 
   const taken = approval.isSuccess
-    ? takenOf({ approved: approval.data.try }, step, acts)
+    ? takenOf({ approved: approval.data.try }, step)
     : sendBack.isSuccess
-      ? takenOf({ asked: sendBack.data, step: to }, step, acts)
+      ? takenOf({ asked: sendBack.data, step }, step)
       : null;
   if (taken) return <GateTaken step={step} taken={taken} />;
 
@@ -116,24 +96,13 @@ export function Gate({
         data-gate="awaiting"
         className={cn('space-y-4', framed && 'rounded border border-yours bg-surface-container-low p-3')}
       >
-        {framed && <GateSentence step={step} back={back} acts={acts} />}
+        {framed && <GateSentence step={step} />}
 
         <div className="min-w-0 space-y-4">
           {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
           <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} />
-          <ApproveForm
-            step={step}
-            acts={acts}
-            onto={onto}
-            approveLine={approveLine}
-            approval={approval}
-            busy={busy}
-            budgeting={budgeting}
-            {...answering}
-          />
-          {back.length > 0 && (
-            <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
-          )}
+          <ApproveForm step={step} approveLine={approveLine} approval={approval} busy={busy} budgeting={budgeting} {...answering} />
+          {back.length > 0 && <SendBackForm step={step} field={field} sendBack={sendBack} busy={busy} {...answering} />}
         </div>
       </section>
     </Body>
@@ -141,13 +110,10 @@ export function Gate({
 }
 
 /** What a gate asks of a person, said above it where nothing else says it. */
-function GateSentence({ step, back, acts }: { step: string; back: readonly string[]; acts: boolean }) {
+function GateSentence({ step }: { step: string }) {
   return (
     <p className="break-words">
-      <strong>{step}</strong> waits at its gate:{' '}
-      {acts
-        ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName(back)} back` : ''}.`
-        : 'nothing after it is filed until you approve what it handed on, or send it back.'}
+      <strong>{step}</strong> waits at its gate: nothing after it is filed until you approve what it handed on, or send it back.
     </p>
   );
 }
@@ -185,14 +151,9 @@ const approveWaits = (left: readonly string[], unread: readonly string[]) =>
   [notAnswered(left), unread.length > 0 ? `No amount above $0 for: ${unread.join(' · ')}` : undefined].filter(Boolean).join(' — ') ||
   undefined;
 
-/**
- * Approve, with a box for the words — the note beside the answers where the step asks questions, and held until each has one. At an
- * ending's gate (`acts`), a second press runs it.
- */
+/** Approve, with a box for the words — the note beside the answers where the step asks questions, and held until each has one. */
 function ApproveForm({
   step,
-  acts,
-  onto,
   approveLine,
   approval,
   busy,
@@ -202,8 +163,6 @@ function ApproveForm({
   left,
 }: Answering & {
   step: string;
-  acts: boolean;
-  onto: string | null;
   approveLine: string;
   approval: ReturnType<typeof useApprove>;
   busy: boolean;
@@ -211,9 +170,7 @@ function ApproveForm({
   budgeting: { given: readonly GivenBudget[]; unread: readonly string[] };
 }) {
   const [words, setWords] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const handed = (what: string) =>
-    acts ? `the step is handed ${what} as the terms it acts on` : `every step after the gate is handed ${what}`;
+  const handed = (what: string) => `every step after the gate is handed ${what}`;
   const hint = questions.length
     ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
     : `Your words (optional): ${handed('them')}, under “Approved”.`;
@@ -223,7 +180,6 @@ function ApproveForm({
       className="space-y-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (acts && !confirming) return setConfirming(true);
         approval.mutate(approvalBody(questions, draft, words, budgeting.given));
       }}
     >
@@ -238,47 +194,26 @@ function ApproveForm({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={approveWaits(left, budgeting.unread)} className="inline-flex">
           <CutPress pending={approval.isPending} type="submit" isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}>
-            {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
+            {approval.isPending ? 'Approving…' : 'Approve'}
           </CutPress>
         </span>
-        {confirming && !approval.isPending && (
-          <Button variant="tonal" onPress={() => setConfirming(false)}>
-            Not yet
-          </Button>
-        )}
         <Body size="small">
-          as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
+          as <code>{approveLine}</code> approves it: the next tick files what waits on it
         </Body>
       </div>
-      {confirming && <EndingConfirm step={step} onto={onto} />}
       {approval.isError && <Refusal error={approval.error} not="Not approved" />}
     </form>
   );
 }
 
 /**
- * What an ending's second press asks, once Approve was pressed: the warning the card says too (`endingWarning`), then the press that
- * approves it.
- */
-export function EndingConfirm({ step, onto }: { step: string; onto: string | null }) {
-  return (
-    <Body size="small" data-confirm className="font-medium text-yours">
-      {`${endingWarning(step, onto)} Press Run ${step} now to approve it.`}
-    </Body>
-  );
-}
-
-/**
- * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to one of `back`. Sent back to the
- * gated step itself where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
+ * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to the gated step.
+ * Where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
  */
 const SEND_BACK_HINT = 'What to change: its next try is told it, under “Your answer”, and waits at its gate again.';
 
 function SendBackForm({
   step,
-  back,
-  to,
-  onTo,
   field,
   sendBack,
   busy,
@@ -286,20 +221,17 @@ function SendBackForm({
   draft,
 }: Answering & {
   step: string;
-  back: readonly string[];
-  to: string;
-  onTo: (name: string) => void;
   field: string;
   sendBack: ReturnType<typeof useAsk>;
   busy: boolean;
 }) {
   const [objection, setObjection] = useState('');
   const [mode, setMode] = useState<RetryMode>('continue');
-  const body = sendBackBody({ step, to, mode, objection, questions, draft });
-  const waits = sendBackWaits({ step, to, questions, draft });
+  const body = sendBackBody({ step, to: step, mode, objection, questions, draft });
+  const waits = sendBackWaits({ step, to: step, questions, draft });
   return (
     <form
-      aria-label={`Send ${backName(back)} back`}
+      aria-label={`Send ${step} back`}
       className="space-y-2 border-t border-outline-variant pt-3"
       onSubmit={(event) => {
         event.preventDefault();
@@ -307,7 +239,7 @@ function SendBackForm({
       }}
     >
       <TextField
-        aria-label={`What to change, sent back to ${backName(back)}`}
+        aria-label={`What to change, sent back to ${step}`}
         multiline
         value={objection}
         onChange={setObjection}
@@ -326,7 +258,7 @@ function SendBackForm({
           </Button>
         </span>
         <Choice
-          legend={`How to send ${backName(back)} back`}
+          legend={`How to send ${step} back`}
           name={`${field}-mode`}
           options={GATE_MODES}
           value={mode}
@@ -334,9 +266,6 @@ function SendBackForm({
           label={modeLabel}
         />
       </div>
-      {back.length > 1 && (
-        <Choice legend="Which step to send back" name={`${field}-to`} options={back} value={to} onChange={onTo} label={asIs} />
-      )}
       {sendBack.isError && <Refusal error={sendBack.error} />}
     </form>
   );
@@ -352,9 +281,6 @@ const modeLabel = (m: RetryMode) =>
       {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
     </>
   ) satisfies ReactNode as ReactNode;
-
-/** A step's name, as its radio says it. */
-const asIs = (name: string) => name satisfies ReactNode as ReactNode;
 
 /** A row of radios, each option drawn by `label`: a retry's mode with its flag, or the step a send-back names. */
 function Choice<T extends string>({
@@ -479,148 +405,38 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
  * What a gate says the moment a person's word is taken, until the run is read again and the step's own note says it: the step the word was
  * about, and what the next tick does with it.
  *
- * An approval is about the gated step, and what follows it is filed — except at an ending step's gate (`acts`), where nothing follows and
- * the approval files that step itself. A send-back is about the step whose try was asked for, which at such a gate is the work and not the
- * step at the gate (`sendBackTo` in agent-orchestrator): naming the ending there would say a try was filed for a step that has not run.
+ * An approval is about the gated step, and what follows it is filed. A send-back is about the step whose try was asked for.
  *
  * @param taken what the api took: an approval, or an ask for a try of some step
  * @param step the gated step
- * @param acts whether the gated step ends the run in the checkout, where nothing follows its gate
  */
-export const takenOf = (
-  taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string },
-  step: string,
-  acts: boolean,
-) =>
+export const takenOf = (taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string }, step: string) =>
   'approved' in taken
-    ? { named: step, said: `approved try ${taken.approved} — the next tick files ${acts ? 'it' : 'what waits on it'}` }
+    ? { named: step, said: `approved try ${taken.approved} — the next tick files what waits on it` }
     : { named: taken.step, said: askedSaid(taken.asked) };
 
 /**
- * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: base`, `endsOnBase` in
- * agent-orchestrator): a gate on it holds before it is filed, and a person's approval files it; with no gate, as quick's land, the pass
- * of the step before it that can send the work back files it instead.
- *
- * A gate on a step that works, §6's, holds the handoff after the step has signed off, so that step has a task and a closeout to read; an
- * ending step acts where nothing can be taken back, and has no closeout of its own — what a person approves is the work it would act on.
- * The two read the same off a step's record at its gate (unfiled, awaiting approval), so the key is what tells them apart; a detail from an
- * api that does not carry it reads as any other step, and its gate is drawn as §6's.
- *
- * @param step the step, read for its frozen spec
- */
-export const endsTheRun = (step: Pick<StepView, 'spec'>) => step.spec?.workspace === 'base';
-
-/**
- * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.
- *
- * Where each result branch stands against the base branch and how much it changed, in the package's words (`branchWord`, `countsLine`,
- * off the run's decision, read once for this state of the run); then, for each step the ending waits on — the steps a send-back goes to
- * (`sendBackTo`) — a link to that step's part on the run's page (`#step-<name>`), where what it gave is drawn once, with its summary
- * beside it. The counts sit under each branch — `3 files: +14 −1`, or the sentence saying what the run changed is not known — as the
- * CLI's `decide` prints them beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever
- * the ending's spec reads.
- */
-export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
-  const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
-  const standings = isDecidable(data) ? data.standings : [];
-  const waitsOn = new Set(
-    run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from),
-  );
-  const work = run.steps.filter((one) => waitsOn.has(one.name));
-
-  return (
-    <Body size="medium" component="div" className="contents">
-      <section aria-label={`What ${step.name} would act on`} className="min-w-0 space-y-3 rounded border border-outline-variant p-3">
-        <div className="space-y-1">
-          <Label size="medium" component="h3" colorRole="on-surface-variant">
-            The result it would act on
-          </Label>
-          {standings.map((s) => (
-            <p key={s.branch} data-standing={s.where} className="break-words">
-              <Body size="small" component="span" className="font-mono">
-                {s.said}
-              </Body>
-              {s.stat && (
-                <Body size="small" component="span" colorRole="on-surface-variant" data-stat className="block font-mono">
-                  {s.stat}
-                </Body>
-              )}
-            </p>
-          ))}
-          {!standings.length &&
-            (error || isDecidable(data) ? (
-              <Body size="small" colorRole="on-surface-variant">
-                {error
-                  ? `The branch could not be read: ${troubleOf(error).words}`
-                  : 'No result branch of its own: the work is on the base branch.'}
-              </Body>
-            ) : (
-              <Reading label="Reading the branch…">
-                <Body size="small" component="div" className="contents">
-                  <ReadingLines widths={['w-2/3', 'w-1/3']} className="font-mono" />
-                </Body>
-              </Reading>
-            ))}
-        </div>
-
-        {work.length > 0 && (
-          <ul aria-label="The work it acts on" className="space-y-1 border-t border-outline-variant pt-3">
-            {work.map((one) => (
-              <li key={one.name} data-acts-on={one.name} className="break-words">
-                <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
-                  What {one.name} gave
-                </RouteLink>
-                {one.closeout && (
-                  <Body size="small" component="span" colorRole="on-surface-variant">
-                    {' '}
-                    — {one.closeout.summary}
-                  </Body>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </Body>
-  );
-}
-
-/**
- * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off, and for a
- * step that ends the run in the checkout (`ends`, `endsTheRun`) once the work it acts on has, since such a step never signs off before its
- * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
+ * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off.
+ * The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
  *
  * @param gate the step's gate
- * @param ends whether the step ends the run in the checkout (`endsTheRun`)
  */
-export const gateWord = (gate: StepGate, ends = false) =>
-  gate.approval
-    ? `approved, try ${gate.approval.try}`
-    : gate.awaiting
-      ? 'awaiting approval'
-      : ends
-        ? 'holds once the work has handed on, and your approval files it'
-        : 'holds once it has signed off';
+export const gateWord = (gate: StepGate) =>
+  gate.approval ? `approved, try ${gate.approval.try}` : gate.awaiting ? 'awaiting approval' : 'holds once it has signed off';
 
 /**
  * A gated step's approval, under the step: the try approved, when, and the words given with it, as the person wrote them — what every step
  * after the gate is handed under `## Approved`.
- *
- * `ends` for the step that ends the run in the checkout (`endsTheRun`): nothing follows its gate, and the package hands the words to that
- * step itself — the terms it acts on (`approvedSection` in agent-orchestrator). Its approval is also what filed it, so the sentence says
- * that and not that something after it was let through.
  *
  * `budgets`, where the step's gate carries the caps its approval set (`from: 'approved'`), are drawn under the words, read only.
  */
 export function Approved({
   step,
   approval,
-  ends = false,
   budgets,
 }: {
   step: string;
   approval: StepApproval;
-  ends?: boolean;
   /** The step's gate's budgets: drawn under the approval once they are the caps it set (`from: 'approved'`). */
   budgets?: Frozen<GateBudgets> | null;
 }) {
@@ -634,10 +450,8 @@ export function Approved({
         <p>
           <span className="font-medium text-on-surface">Approved</span>{' '}
           <span className="text-on-surface-variant">
-            try {approval.try}, {when(approval.at)} —{' '}
-            {ends
-              ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
-              : `every step after the gate is handed ${approval.message === null ? 'the approval' : 'these words'}`}
+            try {approval.try}, {when(approval.at)} — every step after the gate is handed{' '}
+            {approval.message === null ? 'the approval' : 'these words'}
           </span>
         </p>
         <Actor actor={approval.actor} />

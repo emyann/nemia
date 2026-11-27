@@ -1,22 +1,13 @@
 /**
  * The readers of a step's keys, one each: a value as written in the frontmatter in, the value the step carries out, or a
- * `WorkflowError` that names the fix (`harnessOf`, `wordOf`, `contextOf`, `budgetOf`, `workspaceOf`, `denialsOf`, `slotOf`,
+ * `WorkflowError` that names the fix (`harnessOf`, `wordOf`, `contextOf`, `budgetOf`, `denialsOf`, `slotOf`,
  * `outputOf`, …); and what a step and an agent are both judged by: skills or a system prompt a step's sessions cannot reach
  * (`composedRefusal`). The tool rules are `tools.ts`'s.
  */
 import path from 'node:path';
 import { memoryBytesOf, memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepSpec } from '../step/step.ts';
-import {
-  declarationOf,
-  DEFAULT_HARNESS,
-  fenceKeyOf,
-  fenceListsOf,
-  HARNESSES,
-  isRemoteHarness,
-  REMOTE_NAME,
-  remoteNameOf,
-} from '../harness/harness.ts';
+import { declarationOf, DEFAULT_HARNESS, fenceKeyOf, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
 import { looseAt } from '../closeout/index.ts';
 import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
@@ -293,13 +284,6 @@ export function gateOf(step: string, gate: string | undefined) {
 }
 
 /**
- * The words `workspace:` takes. `base`: a step of a repository run works in the repository's checkout, on the base branch, rather than
- * where the workflow's shape puts it; `main` is its former spelling, still read (`baseSpelled`). `folder` was its other word, and is now
- * `place: folder` (`placeSpelled`).
- */
-export const WORKSPACES: readonly string[] = ['base'];
-
-/**
  * The words `place:` takes: where a step works. `git`: on branches of a repository. `folder`: in a folder the run makes, in a run that
  * needs no git repository. A step file says one (`placeRequired`); no word is the default. `objects`' `PLACE_KINDS` word for word
  * (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
@@ -331,64 +315,6 @@ export function placeRequired(step: string, place: string | undefined) {
   return refuse(
     `${step}: says no \`place:\`, where the step works, and a step does not work on a repository unless it says so. Write \`place: git\` to work on branches of a repository, or \`place: folder\` to work in folders the run makes, with no git repository — every step of a workflow says the same.`,
   );
-}
-
-/**
- * `workspace:` as written: `base`, or its former spelling `main` read as it (`baseSpelled`), or refused. A step without the line works
- * where the shape of the workflow puts it (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is
- * that said twice, while any other word is a directory the run would have to invent; `workspace: folder` reaches here only when read past
- * `placeSpelled`, and is refused naming `place: folder`. `base` takes a `check:` — the run executes it on the merge the step stages, and
- * commits or aborts that merge onto the base branch on its word (`landingDue`) — but not on codex, which cannot be denied the commit
- * (`filedDenies`), and never a `retries:`, since a try of an ending is a person's to ask for. Who may file that check — a person's
- * approval, or a step before it that can send the work back — reads the steps together, so it is `validateBaseWorkspace`'s refusal and not
- * this one's: this function is given one step's keys and cannot see what precedes it.
- * @param step The step's name, which a refusal starts with.
- * @param workspace The `workspace:` line's value, undefined where the step has none.
- * @param check The step's `check:`, undefined where it has none.
- * @param resume The step's `resume:`, undefined where it has none.
- * @param retries The step's `retries:` as written, undefined where it has none.
- * @param harness The step's `harness:`, undefined for the default harness.
- */
-export function workspaceOf(
-  step: string,
-  workspace: string | undefined,
-  check: string | undefined,
-  resume: string | undefined,
-  retries: string | undefined,
-  harness: string | undefined,
-) {
-  if (workspace === undefined) return undefined;
-  if (workspace === 'folder') {
-    refuse(
-      `${step}: \`workspace: folder\` is now \`place: folder\`: where a step works is its \`place:\`, and \`workspace:\` says only \`base\`. Write \`place: folder\` instead.`,
-    );
-  }
-  if (workspace === 'worktree') {
-    refuse(
-      `${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: base\` to run the step in the repository's own checkout.`,
-    );
-  }
-  if (workspace !== 'base' && workspace !== 'main') {
-    refuse(
-      `${step}: \`workspace: ${workspace}\` is not \`base\`. \`workspace: base\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. A step that works in a folder the run makes, with no git repository, says \`place: folder\`. Without the line, the step works where the workflow's shape puts it.`,
-    );
-  }
-  if (check !== undefined && fenceListsOf(harness)?.length === 0) {
-    refuse(
-      `${step}: \`workspace: base\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session (\`denyWhileLanding\`, which its place declares) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
-    );
-  }
-  if (retries !== undefined) {
-    refuse(
-      `${step}: \`workspace: base\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: nemia retry <run> ${step}. Delete the \`retries:\` line.`,
-    );
-  }
-  if (resume !== undefined) {
-    refuse(
-      `${step}: \`workspace: base\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`,
-    );
-  }
-  return 'base';
 }
 
 /** The words `denials:` takes. One: a denied try fails its step's hand-off; without the line, denials are said and decide nothing. */

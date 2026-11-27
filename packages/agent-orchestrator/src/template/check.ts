@@ -7,8 +7,7 @@
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
-import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
-import { baseSpelled } from '../former/former.ts';
+import { givenSkillOf, PLACES, STORE_READS } from '../keys/index.ts';
 import { harnessModelJudged, HARNESS_PROPERTIES, listedFor, modelWords, OVERRIDABLE, type ModelLists } from '../workflow/index.ts';
 import { selectorsRefusal } from '../watch/selector.ts';
 import { labelValuesOf } from '../label-spelling/label-spelling.ts';
@@ -261,8 +260,7 @@ function siblingRefusals(file: string, at: At, step: Record<string, unknown>, na
 }
 
 /**
- * What a step's own words name that today's are not: its place, workspace — `main` read as its former spelling of `base` (`baseSpelled`) —
- * what it reads of the store, and the form of its tallies.
+ * What a step's own words name that today's are not: its place, what it reads of the store, and the form of its tallies.
  */
 function wordRefusals(file: string, at: At, step: Record<string, unknown>) {
   const refusals: Refusal[] = [];
@@ -271,12 +269,6 @@ function wordRefusals(file: string, at: At, step: Record<string, unknown>) {
       refusals.push({ file, at: where, message: `${spelled(where)} is ${value}, and ${key} is one of ${words.join(', ')}.` });
   };
   among('place', step.place, PLACES, [...at, 'place']);
-  among(
-    'workspace',
-    baseSpelled({ workspace: step.workspace as string | undefined }).workspace,
-    ['worktree', ...WORKSPACES],
-    [...at, 'workspace'],
-  );
   for (const [name, i] of stringsOf(step.reads)) among('reads', name, STORE_READS, [...at, 'reads', i]);
   for (const [entry, i] of stringsOf(step.tally))
     if (!/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*(?:=[^=\s]+)?)?$/.test(entry))

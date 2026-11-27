@@ -10,7 +10,7 @@
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
 import { listRuns, runRecord, runsNow } from '../testing.ts';
-import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
+import { type Env } from '../src/config/config.store.ts';
 import type { Run } from '../src/run.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -24,12 +24,10 @@ import { decisionRead } from '../src/decide/decision.verb.ts';
 import { decision } from '../src/decide/decide.ts';
 import { mergedOf } from '../src/branches/branches.store.ts';
 import { Tracer } from 'effect';
-import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
+import { passStanding, standingSnapshot, standingReader } from '../src/standing/standing.verb.ts';
 import { readRun as theRead } from '../src/tick/told.verb.ts';
 import { passAssessment } from '../src/tick/advance.verb.ts';
 import { cancelPlan } from '../src/cancel/cancel.ts';
-import { statusMemo } from '../src/place/landing.store.ts';
-import { PlaceService } from '../src/place/place.store.ts';
 import { judging } from '../src/forget/prune/prune.verb.ts';
 import { hold } from '../src/wait/wait.verb.ts';
 import { putPause, resumePause } from '../src/pause/pause.store.ts';
@@ -52,20 +50,16 @@ const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(ROOT)))
 
 /**
  * The run as the tick's pass reads and assesses it: its one read (`readRun`), then the pass's own assessment (`passAssessment`, which
- * `advancePass` calls), the checkout read off what `nemia ls` reads where branches stand.
+ * `advancePass` calls), read off what `nemia ls` reads where branches stand.
  */
 const tickRead = (e: Engine, run: Run) =>
   Effect.gen(function* () {
     const { read: reads } = yield* theRead(e, run, { earlierTries: 'budgeted' });
     const snapshot = yield* standingSnapshot();
-    const memo = statusMemo(headsOver(standingReader(snapshot)), yield* PlaceService);
-    const { read, assessed } = yield* passAssessment(e, run, reads, { standing: Effect.succeed(snapshot) }, memo, snapshot).pipe(
-      Effect.provide(StoreConfig.layer(settingsOf(ENV))),
-    );
+    const { read, assessed } = passAssessment(reads, snapshot);
     return {
       ...assessed,
       landed: decision(read, mergedOf(run, standingReader(snapshot)), assessed).kind === 'merged',
-      checkout: read.checkout?.run ?? null,
       plan: cancelPlan(read, assessed),
       asked: assessed.due.retry.filter((t) => t.by === 'ask').map((t) => t.step),
       roundDue: assessed.round.map((t) => t.step),
@@ -129,8 +123,6 @@ type Said = {
   landed?: boolean;
   /** The runs the run's roots wait on, by id. */
   waitingOn?: string[];
-  /** The run whose ending holds the repository's checkout while this run's waits for it, or null. */
-  checkout?: string | null;
   /** Each step's tries on the clock, as `<step>:<try>` in the order the reader names them. */
   tries?: string[];
   /** Where each try's check stands on the clock, as `<step>:<try>:<at>` (`TaskSpan`'s `at`), for a try whose check was filed. */
@@ -167,12 +159,6 @@ const checksOn = (steps: Record<string, readonly { try: number; check: { at: str
     .sort()
     .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
 
-/** The run whose ending holds the checkout a step of the object waits on (`baseHeldBy`), said only where one waits on it (`on: base`). */
-const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: string } }[]) => {
-  const waits = steps.find((s) => s.on === 'base');
-  return waits ? { checkout: waits.baseHeldBy?.run ?? null } : {};
-};
-
 /**
  * What each reader says of the run `id`, the tick's pass first, after a pass wrote where the branches stand; with `pass: false`, off
  * what the last pass wrote, a person's hand on the repository since read by none.
@@ -202,7 +188,6 @@ const readers = async (id: string, { pass: passFirst = true } = {}) => {
       roundDue: sorted(pass.roundDue),
       toDecide: decideWord(pass.toDecide),
       landed: pass.landed,
-      checkout: pass.checkout,
     },
     listing: {
       status: listed.assessed.status,
@@ -225,14 +210,12 @@ const readers = async (id: string, { pass: passFirst = true } = {}) => {
       toDecide: decideWord(decided.toDecide),
       landed: decided.decision.kind === 'merged',
       waitingOn: sorted(decided.waiting.map((w) => w.run)),
-      checkout: decided.checkout?.run ?? null,
       tries: triesOn(decided.timeline.steps),
       checks: checksOn(decided.timeline.steps),
     },
     decision: {
       landed: 'nothing' in read && Boolean(read.nothing?.includes(' merged into ')),
       waitingOn: sorted('waiting' in read ? read.waiting.runs.map((w) => w.run) : []),
-      ...('standings' in read ? { checkout: read.baseHeldBy?.run ?? null } : {}),
     },
     ...('unjudged' in object
       ? {}
@@ -246,7 +229,6 @@ const readers = async (id: string, { pass: passFirst = true } = {}) => {
             waitingOn: sorted((object.status.waiting?.runs ?? []).map((w) => w.run)),
             tries: triesOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
             checks: checksOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
-            ...onTheCheckout(object.status.steps),
           },
         }),
     ...(pruned.facts?.decided ? { prune: { running: pruned.facts.decided === 'running' } } : {}),
@@ -275,32 +257,6 @@ const agree = (said: Record<string, Said>) => {
 };
 
 describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the run object say the same of each run', () => {
-  test('an ending waits for the checkout another run holds: nothing of it is ready, for any reader', async () => {
-    const repo = aRepo();
-    const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
-    const first = await started(workflow, repo);
-    stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
-    await tick(first);
-    stage.board().settle(`${first}-land`, 'working');
-    const second = await started(workflow, repo);
-    stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
-    agree(await readers(second));
-  });
-  test('a try of an ending asked while another run holds the checkout: no reader says the try is filed now', async () => {
-    const repo = aRepo();
-    const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
-    const second = await started(workflow, repo);
-    stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
-    await tick(second);
-    stage.board().settle(`${second}-land`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which way?' });
-    await tick(second);
-    const first = await started(workflow, repo);
-    stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
-    await tick(first);
-    stage.board().settle(`${first}-land`, 'working');
-    await stage.runWith(stage.board().e, retryRun(second, 'land', { mode: 'continue', message: 'this way' }));
-    agree(await readers(second));
-  });
   test('a finished run with no gated ending and its branch ahead of the base: the result is to decide, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     const workspace = theRun(id).steps.implement.workspace!;
@@ -379,8 +335,8 @@ describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and t
     await stage.runWith(stage.board().e, hold(id, []));
     agree(await readers(id));
   });
-  test('an ending at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
-    const id = await started(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));
+  test('a step at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
+    const id = await started(folder({ implement: ['gate: true'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await tick(id);
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue', message: 'not this way' }));
@@ -425,26 +381,6 @@ describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and t
     const said = await readers(child.id, { pass: false });
     agree(said);
     assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge: a parent still at work is waited on, merged or not');
-  });
-  test('F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder', async () => {
-    const repo = aRepo();
-    const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
-    const first = await started(workflow, repo);
-    stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
-    await tick(first);
-    stage.board().settle(`${first}-land`, 'working');
-    const second = await started(workflow, repo);
-    stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
-    await aPass();
-    stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
-    agree(await readers(second, { pass: false }));
-  });
-  test('F5: a gated ending never filed whose result a person merged by hand: nothing to approve, for every reader', async () => {
-    const { id, repo, branch } = await worked(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));
-    mergedByHand(repo, branch);
-    const said = await readers(id);
-    agree(said);
-    assert.equal(said.object?.toDecide, null, 'nothing is left for the ending to merge');
   });
   test('F8: a step tried twice: nemia decide and the run object name the same tries, in the same order', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));

@@ -313,7 +313,6 @@ export const waitNode = (step: StepView, written?: Partial<Record<(typeof WAITS)
       model: null,
       effort: null,
       context: null,
-      workspace: null,
       place: null,
       resume: null,
       fence: null,

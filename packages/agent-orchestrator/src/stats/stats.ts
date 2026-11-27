@@ -1,10 +1,9 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
- * to acceptance, the tries of the `workspace: base` step to a merge, what a merged run cost and how long it took, and every step's tries,
+ * to acceptance, whether each run merged, what a merged run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
  * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
- * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day; and each landing check
- * that passed in more than half the deadline its task was filed with (`SlowLanding`), which asks for the deadline to be measured again.
+ * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day.
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -14,12 +13,12 @@
 import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { checkTasksOf, isRepositoryRun, tryOf, type Run } from '../record/record.ts';
+import { checkTasksOf, tryOf, type Run } from '../record/record.ts';
 import { medianOf, p90Of } from '../costs/index.ts';
 import type { TryMemory } from '../out-of-memory/index.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { endsOnBase, hasChecks, type StepSpec } from '../step/step.ts';
-import { askedAgain, landsOnCheck } from '../status/status.ts';
+import { hasChecks, type StepSpec } from '../step/step.ts';
+import { askedAgain } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
@@ -70,8 +69,7 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * it does not say its files. `rules` holds each rule the step's frozen skills declare, kept or broken by `denied` (`rulesOfTry`), `[]` with
  * none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued off its session's own
  * closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose closeout does not hold
- * it. `landingDeadlineMs` is the deadline its check's task was filed with, where that check lands the run (`landsOnCheck`); null for any
- * other check, a try with none, and a task filed with no deadline.
+ * it.
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -88,7 +86,6 @@ export type TryFact = RunKeys & {
   due: DueFact[] | null;
   rules: RuleFact[] | null;
   tallies: TallyFact[];
-  landingDeadlineMs: number | null;
   /** Each of its checks, by name: how long it ran, null while not ended, and its verdict; absent on a fact read before checks had names. */
   checks?: CheckFact[];
   /**
@@ -203,10 +200,10 @@ const checkFactsOf = (r: RunRead, t: TimelineTry) =>
   );
 
 /**
- * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
- * `loop:` step whose loop ended accepted, how many rounds it ran. `merged` says whether its `workspace: base` step committed, and
- * `firstTry` whether it did so on its first try: null with no such step or where its record does not say, and `firstTry` null on a run
- * that did not land. `costUsd` is every
+ * One run that finished, on the UTC day its last task ended. `rounds` holds, for each
+ * `loop:` step whose loop ended accepted, how many rounds it ran. `merged` says whether every result branch of the run is on its base, as
+ * the tick's last reading of where the branches stand says (`standing.json`): null for a run with no result branch, or where that reading
+ * does not say. `costUsd` is every
  * session's cost, null unless each was measured; `wallMs` its first filing to its last end. A run counts under every step and agent it has.
  */
 export type RunFact = RunKeys & {
@@ -215,7 +212,6 @@ export type RunFact = RunKeys & {
   agents: Array<string | null>;
   rounds: number[];
   merged: boolean | null;
-  firstTry: boolean | null;
   costUsd: number | null;
   wallMs: number | null;
 };
@@ -244,8 +240,8 @@ export type RunRead = {
   rulesOf: (step: StepSpec) => ReadonlyMap<string, readonly SkillRule[]>;
   appliesOf: (step: StepSpec) => ReadonlyMap<string, readonly string[]>;
   closeoutOfTask: (taskId: string) => Closeout | undefined;
-  deadlineOf: (taskId: string) => number | null;
   memoryOf: (taskId: string) => TryMemory;
+  merged: boolean | null;
 };
 
 /**
@@ -270,13 +266,6 @@ export const keysOf = (run: Run) => ({
   workflow: path.basename(run.workflowDir),
   repo: run.repo ?? null,
 });
-
-/** The deadline in ms a try's check was filed with, where its step lands the run on that check (`landsOnCheck`); else null. */
-function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry) {
-  if (!t.check || !isRepositoryRun(r.run) || !landsOnCheck(step, r.run)) return null;
-  const seconds = r.deadlineOf(t.check.taskId);
-  return seconds === null ? null : seconds * 1000;
-}
 
 /** A try's session's memory (`TryFact.memory`), on a try that ran a session of its own; nothing on a recheck's or an answer's. */
 const ownMemoryOf = (r: RunRead, t: TimelineTry) => (t.session && t.turn === undefined ? { memory: r.memoryOf(t.session.taskId) } : {});
@@ -309,7 +298,6 @@ function tryFactsOf(r: RunRead) {
             tally,
             value: t.session ? tallyIn(tally, r.closeoutOfTask(t.session.taskId)?.output) : null,
           })),
-          landingDeadlineMs: landingDeadlineOf(r, step, t),
           checks: checkFactsOf(r, t),
           pictures: t.try === 1 ? picturesHanded(r.run.steps[step.name]?.pictures) : null,
           ...ownMemoryOf(r, t),
@@ -356,19 +344,13 @@ function doneStep(r: RunRead, step: StepSpec) {
 }
 
 /**
- * Whether a run is finished, and the time it finished: its ending's last try's end once the record says how the ending merged. Else, once
- * nothing is in flight, its last task's end when its ending's current try is done (`doneStep`) — an ending that commits in its own prose,
- * whose record never says — or, with no ending, when every step's is. Null for a run cancelled, a run whose ending lands on its check
- * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked, a loop that asked for
- * another round nobody accepted — and a run still going.
+ * Whether a run is finished, and the time it finished: once nothing is in flight, its last task's end when every step's current try is
+ * done (`doneStep`). Null for a run cancelled, a run that waits on a person — a check refused, a session failed or blocked, a loop that
+ * asked for another round nobody accepted — and a run still going.
  */
-function finishedAt(r: RunRead, ending: StepSpec | undefined) {
+function finishedAt(r: RunRead) {
   if (r.run.cancelledAt) return null;
-  if (ending && (r.run.steps[ending.name]?.landed || landsOnCheck(ending, r.run))) {
-    const last = r.timeline.steps[ending.name]?.at(-1);
-    return r.run.steps[ending.name]?.landed && last ? tryEndOf(last) : null;
-  }
-  if (r.timeline.run.inFlight || !(ending ? [ending] : r.steps).every((s) => doneStep(r, s))) return null;
+  if (r.timeline.run.inFlight || !r.steps.every((s) => doneStep(r, s))) return null;
   return (
     Object.values(r.timeline.steps)
       .flat()
@@ -381,11 +363,8 @@ function finishedAt(r: RunRead, ending: StepSpec | undefined) {
 
 /** The fact of a finished run (`RunFact`); none for a run that has not finished. */
 function runFactOf(r: RunRead) {
-  const ending = r.steps.find((s) => endsOnBase(s));
-  const at = finishedAt(r, ending);
+  const at = finishedAt(r);
   if (!at) return [];
-  const how = ending && r.run.steps[ending.name]?.landed;
-  const merged = how ? 'commit' in how : null;
   return [
     {
       ...keysOf(r.run),
@@ -393,8 +372,7 @@ function runFactOf(r: RunRead) {
       steps: r.steps.map((s) => s.name),
       agents: [...new Set(r.steps.map((s) => s.agent?.name ?? null))],
       rounds: roundsOf(r),
-      merged,
-      firstTry: ending && merged ? tryOf(r.run, ending.name) === 1 : null,
+      merged: r.merged,
       costUsd: runCostOf(r.timeline),
       wallMs: r.timeline.run.wallMs,
     },
@@ -410,7 +388,7 @@ export const factsOf = (r: RunRead) => ({ tries: tryFactsOf(r), runs: runFactOf(
 /**
  * The headline numbers of a set of facts. `runs` counts the runs finished and `merged` those that merged, null where no run recorded
  * whether it merged. `rounds` is the mean rounds
- * to acceptance, `firstTry` the share of merged runs that merged on their first try, `costPerMerged` and `timePerMerged` the mean cost and
+ * to acceptance, `costPerMerged` and `timePerMerged` the mean cost and
  * wall time of a merged run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
  * wait at a gate. `deniedPerTry` is the mean count of calls refused per try, over the tries whose harness records them, and `skillsPerTry`
  * the mean count of skills loaded per try, over the tries whose sessions' ends say. Each mean over nothing is null.
@@ -419,7 +397,6 @@ type Headline = {
   runs: number;
   merged: number | null;
   rounds: number | null;
-  firstTry: number | null;
   costPerMerged: number | null;
   timePerMerged: number | null;
   tries: number;
@@ -459,31 +436,13 @@ type StepRow = {
   pictures: { handed: number; shown: number } | null;
 };
 
-/**
- * A landing check that passed in more than half the deadline its task was filed with: the try's run, day, step and number, its check's run
- * time, that deadline, and the share of it the check took.
- */
-type SlowLanding = RunKeys & { day: string; step: string; try: number; checkMs: number; deadlineMs: number; share: number };
-
-/**
- * Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries.
- * @param tries The facts of the tries, in their order.
- */
-export const slowLandingsOf = (tries: readonly TryFact[]) =>
-  tries.flatMap(({ run, factory, workflow, repo, day, step, try: n, check, checkMs, landingDeadlineMs: deadlineMs }) =>
-    check === 'passed' && checkMs !== null && deadlineMs !== null && checkMs > deadlineMs / 2
-      ? [{ run, factory, workflow, repo, day, step, try: n, checkMs, deadlineMs, share: checkMs / deadlineMs }]
-      : [],
-  );
-
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
 type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
 
 /**
  * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; the changes to what its runs
  * froze on the days of the range (`Mark`, `marks.ts`), sorted by day, run, kind and name; and a row per step and count it declares
- * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured; and each landing check
- * of the range that passed in more than half its filed deadline (`SlowLanding`).
+ * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured.
  */
 type Group = {
   total: Headline;
@@ -492,7 +451,6 @@ type Group = {
   tiles: Tiles;
   marks: Mark[];
   tallies: TallyRow[];
-  slowLandings: SlowLanding[];
   checks: CheckRow[];
   memory: MemoryRow[];
 };
@@ -528,7 +486,6 @@ export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>) {
     runs: f.runs.length,
     merged: f.runs.some((r) => r.merged !== null) ? merged.length : null,
     rounds: mean(f.runs.flatMap((r) => r.rounds)),
-    firstTry: merged.length ? merged.filter((r) => r.firstTry === true).length / merged.length : null,
     costPerMerged: mean(merged.map((r) => r.costUsd)),
     timePerMerged: mean(merged.map((r) => r.wallMs)),
     tries: f.tries.length,
@@ -627,7 +584,6 @@ function groupOf(f: Kept, from: string | null, to: string, today: string) {
     tiles: { last: tile(dayPlus(today, -13), today), before: tile(dayPlus(today, -27), dayPlus(today, -14)) },
     marks: kept.marks,
     tallies: tallyRowsOf(kept.tries, from ? daysBetween(from, to) : []),
-    slowLandings: slowLandingsOf(kept.tries),
     checks: checkRowsOf(kept.tries),
     memory: memoryRowsOf(kept.tries),
   };

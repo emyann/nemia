@@ -70,27 +70,18 @@ const folderOf = (reviewKeys: string | null, files: Record<string, string | obje
 /** The text of a step file: its frontmatter `lines`, and a body. */
 const fileOf = (lines: string) => `---\n${lines}\n---\nDo the work.\n`;
 
-/** A team of steps in a line, each with the place `words` gives it: `base` is the ending's workspace, none is a step frozen before. */
-const team = (...words: Array<'folder' | 'git' | 'base' | undefined>) => {
+/** A team of steps in a line, each with the place `words` gives it: none is a step frozen before. */
+const team = (...words: Array<'folder' | 'git' | undefined>) => {
   const made: StepSpec[] = words.map((word, i) => ({
     name: `s${i}`,
     after: i ? [`s${i - 1}`] : [],
     body: 'x',
     permissionMode: 'dontAsk',
-    ...(word === 'base' ? { workspace: word } : word ? { place: word } : {}),
+    ...(word ? { place: word } : {}),
   }));
   return made;
 };
 
-const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'base' } as StepSpec;
-const chain: StepSpec[] = [step('implement'), step('review', ['implement']), ship];
-/** implement → review (looping back when `loop`) → ship, in the base workspace with a check, gated when `gate`. */
-const ending = (loop: boolean, gate: boolean) =>
-  [
-    step('implement'),
-    { ...step('review', ['implement']), ...(loop ? { loop: 'implement' } : {}) },
-    { ...ship, check: 'npm test', ...(gate ? { gate: true } : {}) },
-  ] satisfies StepSpec[];
 const watcher = { name: 'supervise', after: [], body: 'x', slot: 'none' } as StepSpec;
 const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
 const docs = { docs: '---\nafter: implement\nplace: git\n---\ndocument it\n' };
@@ -250,132 +241,6 @@ const ROWS: Row[] = [
       }),
     naming: ['implement: ', '`output: implement.schema.json` declares `replies`', '(`loop: implement`)', 'Rename the field'],
   },
-  { row: 'base: the last step may work in the checkout', run: () => validate(chain) },
-  { row: 'base: so may a workflow of one step', run: () => validate([{ ...ship, after: [] }]) },
-  {
-    row: 'base: REFUSED, a step waiting on it',
-    run: () => validate([...chain, step('tell', ['ship'])]),
-    naming: ['ship: ', '`workspace: base`', 'tell waits on it', 'Move tell before ship'],
-  },
-  {
-    row: 'base: REFUSED, two steps waiting on it',
-    run: () => validate([...chain, step('tell', ['ship']), step('say', ['ship'])]),
-    naming: ['ship: ', 'tell, say wait on it'],
-  },
-  {
-    row: 'base: REFUSED, a step ending the workflow beside it',
-    run: () => validate([...chain, step('publish', ['review'])]),
-    naming: ['ship: ', 'publish ends the workflow beside it', 'make ship wait on publish'],
-  },
-  {
-    row: 'base: REFUSED, two of them',
-    run: () =>
-      validate([
-        { ...step('a'), workspace: 'base' },
-        { ...step('b'), workspace: 'base' },
-      ]),
-    naming: ['a: ', 'b ends the workflow beside it'],
-  },
-  {
-    row: 'base: REFUSED, a resume, whichever line comes first',
-    run: () => {
-      assert.throws(() => parseWorkflow('ship', fileOf('place: git\nresume: review\nworkspace: base')), WorkflowError);
-      parseWorkflow('ship', fileOf('place: git\nworkspace: base\nresume: review'));
-    },
-    naming: ['ship: ', '`workspace: base`', "`resume: review` continues review's session", 'Delete one of the two lines'],
-  },
-  {
-    row: "base: a check, a gate and retries' absence read as on any step",
-    run: () => {
-      const gated = parseWorkflow('ship', fileOf('place: git\ncheck: npm test\ngate: true\nworkspace: base'));
-      assert.deepEqual([gated.workspace, gated.gate, gated.check], ['base', true, 'npm test']);
-      assert.equal(parseWorkflow('ship', fileOf('place: git\nworkspace: base\ncheck: npm test')).gate, undefined);
-      assert.throws(() => parseWorkflow('ship', fileOf('place: git\nworkspace: base\ngate: true\ncheck: none')), /check/);
-    },
-  },
-  {
-    row: 'base: REFUSED, a check with neither a gate nor a loop before it',
-    run: () => validate(ending(false, false)),
-    naming: ['ship: ', '`workspace: base`', '`check: npm test`', '(it waits on review)', 'Add `gate: true`', 'give review a `loop:`'],
-  },
-  {
-    row: 'base: REFUSED, a check on an ending that waits on nothing',
-    run: () => validate([{ ...ship, after: [], check: 'npm test' }]),
-    naming: ['ship: ', 'waits on nothing', 'give the step before it a `loop:`'],
-  },
-  {
-    row: 'base: REFUSED, a check behind a step between it and the loop',
-    run: () =>
-      validate([...ending(true, false).slice(0, 2), step('measure', ['review']), { ...ship, check: 'npm test', after: ['measure'] }]),
-    naming: ['ship: ', '(it waits on measure)', 'give measure a `loop:`'],
-  },
-  {
-    row: 'base: REFUSED, checks: with neither a gate nor a loop before it',
-    run: () =>
-      validate(
-        ending(false, false).map((s) =>
-          s.name === 'ship' ? { ...s, check: undefined, checks: [{ name: 'receipt', run: 'npm test', after: [] }] } : s,
-        ),
-      ),
-    naming: ['ship: ', '`workspace: base`', '`checks:` (receipt)', '(it waits on review)', 'Add `gate: true`'],
-  },
-  {
-    row: 'base: an ending with two checks, one a condition',
-    run: () =>
-      validate(
-        ending(false, true).map((s) =>
-          s.name === 'ship'
-            ? {
-                ...s,
-                check: undefined,
-                checks: [
-                  { name: 'receipt', run: 'npm test', after: [] },
-                  { name: 'base-ci', condition: 'base-ci', after: ['receipt'] },
-                ],
-              }
-            : s,
-        ),
-      ),
-  },
-  { row: "base: a check after a loop (quick's shape)", run: () => validate(ending(true, false)) },
-  { row: "base: a gated check (build's shape)", run: () => validate(ending(false, true)) },
-  { row: 'base: a check gated after a loop', run: () => validate(ending(true, true)) },
-  {
-    row: 'base: no check, nothing to file',
-    run: () => validate(ending(false, false).map((s) => (s.name === 'ship' ? { ...s, check: undefined } : s))),
-  },
-  ...['workspace: base\ngate: true\ncheck: npm test\nharness: codex', 'harness: codex\ncheck: npm test\ngate: true\nworkspace: base'].map(
-    (lines) =>
-      ({
-        row: `base: REFUSED, a gated check on codex — ${lines.split('\n')[0]} first`,
-        run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
-        naming: ['ship: ', '`workspace: base`', '`check: npm test`', '`denyWhileLanding`', 'delete `harness: codex`'],
-      }) satisfies Row,
-  ),
-  {
-    row: 'base: on codex with no check of its own, and on claude with one',
-    run: () => {
-      assert.equal(parseWorkflow('ship', fileOf('place: git\nworkspace: base\ngate: true\nharness: codex')).harness, 'codex');
-      assert.equal(
-        parseWorkflow('ship', fileOf('place: git\nworkspace: base\ngate: true\ncheck: npm test\nharness: claude')).check,
-        'npm test',
-      );
-    },
-  },
-  ...['workspace: base\ngate: true\ncheck: npm test\nretries: 1', 'retries: 1\nworkspace: base', 'workspace: base\nretries: 0'].map(
-    (lines) =>
-      ({
-        row: `base: REFUSED, retries — ${lines.replace(/\n/g, ', ')}`,
-        run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
-        naming: [
-          'ship: ',
-          '`workspace: base`',
-          `\`retries: ${/retries: (\d)/.exec(lines)?.[1]}\``,
-          'nemia retry <run> ship',
-          'Delete the `retries:` line',
-        ],
-      }) satisfies Row,
-  ),
   { row: 'slot: a workflow of one step takes none', run: () => validate([watcher]) },
   {
     row: 'slot: REFUSED, a root beside it',
@@ -398,7 +263,7 @@ const ROWS: Row[] = [
     naming: ['supervise: ', 'implement, review beside it'],
   },
   { row: 'place: every step says folder', run: () => validate(team('folder', 'folder')) },
-  { row: 'place: none says folder, one frozen before the key', run: () => validate(team(undefined, 'git', 'base')) },
+  { row: 'place: none says folder, one frozen before the key', run: () => validate(team(undefined, 'git', 'git')) },
   {
     row: 'place: REFUSED, folder then a step frozen on git',
     run: () => validate(team('folder', undefined)),
@@ -412,11 +277,6 @@ const ROWS: Row[] = [
   {
     row: 'place: REFUSED, folder then git',
     run: () => validate(team('folder', 'git')),
-    naming: ['s0 says `place: folder`', 's1 works on a repository'],
-  },
-  {
-    row: 'place: REFUSED, folder then base',
-    run: () => validate(team('folder', 'base')),
     naming: ['s0 says `place: folder`', 's1 works on a repository'],
   },
   {
@@ -603,7 +463,6 @@ describe('a wait node (`waitsFor:`): what loads, and what it refuses at load, na
     ['check', { check: 'true' }],
     ['checkFailurePolicy', { checkFailurePolicy: {} as never }],
     ['resume', { resume: 'work' }],
-    ['workspace', { workspace: 'base' }],
     ['retries', { retries: 1 }],
     ['budget', { budget: 1 }],
     ['loop', { loop: 'work' }],

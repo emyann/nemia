@@ -2,7 +2,7 @@
  * What a step is told: its brief (`composeBrief`) or, on a remote A2A agent, its remote brief (`remoteBrief`), with what the runs it waited
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
-import { endsOnBase, hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -23,16 +23,15 @@ import {
   type RetryBriefing,
   type RoundBriefing,
 } from './brief-sections.ts';
-import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
+import { merged, owesReplies } from '../status/status.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
-import { checkContract, checkHandedSection, checksContract, landingContract, type CheckHanded, type LandingWords } from '../check/index.ts';
+import { checkContract, checkHandedSection, checksContract, type CheckHanded } from '../check/index.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS, headedLayers, ownDenies, type ComposedLayer } from '../workflow/index.ts';
 import { INPUTS_HEADING, inputsLine, mountsLine, namedInText } from '../start/index.ts';
-import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import { judgeSection } from '../route/index.ts';
@@ -40,15 +39,10 @@ import type { RetryAsk } from '../retry/index.ts';
 import type { ToldVia } from 'objects';
 
 /**
- * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
- * place's own commands (`say`). A folder run's place gives none; a repository run's absent `say` sends the step to its place's skill.
- */
-/**
- * What a step's place says to it: an ending's landing words (`words`), the place's commands (`say`), and, for a judge, what each workflow a
+ * What a step's place says to it: the place's commands (`say`), and, for a judge, what each workflow a
  * node after it routes to says it is for (`targets`, by the workflow's name).
  */
 export type BriefPlace = {
-  readonly words?: LandingWords;
   readonly say?: PlaceSay;
   readonly targets?: Readonly<Record<string, string>>;
   /** The step's workspace, absolute, which a session that starts in its factory's home is told to work in (`mountsLine`). */
@@ -88,30 +82,29 @@ export const PRECEDENCE =
   "Of what you are told, your instructions are layer 1, the custom instructions 2, the files of the folder you work in 3, this factory's rules 4 and this step's policy 5: where two of them say different things, the higher number wins, and what is asked of you below is above them all.";
 
 /**
- * What a step is told of what judges it before it signs off: an ending that lands on its checks, the landing (`landingContract`); a step
+ * What a step is told of what judges it before it signs off: a step
  * with one check, its line (`checkContract`); a step with several, each by its name (`checksContract`). Nothing for a step with none.
  */
-const checksTold = (step: StepSpec, run: Run, words: LandingWords | undefined) => {
+const checksTold = (step: StepSpec) => {
   const plan = stepChecks(step);
-  if (plan.length && landsOnCheck(step, run)) return [landingContract(plan, words)];
   const only = plan.length === 1 ? plan[0] : undefined;
   if (only?.condition === undefined && only) return [checkContract(only.run)];
   return plan.length ? [checksContract(plan)] : [];
 };
 
 /**
- * What every brief ends on: the check the step is judged by, as a landing's or a step's (`landingContract`, `checkContract`), where its
+ * What every brief ends on: the check the step is judged by, as a step's (`checkContract`, `checksContract`), where its
  * files go (`artifactsContract`), and the closeout, last (`closeoutContract`).
  */
 const contractsOf = (
   step: StepSpec,
   run: Run,
   steps: readonly StepSpec[],
-  at: { artifactsDir?: string; round?: RoundBriefing; words?: LandingWords; inFolder: boolean },
+  at: { artifactsDir?: string; round?: RoundBriefing; inFolder: boolean },
 ) =>
   [
-    ...checksTold(step, run, at.words),
-    ...(at.artifactsDir ? [artifactsContract(at.artifactsDir, endsOnBase(step), at.inFolder)] : []),
+    ...checksTold(step),
+    ...(at.artifactsDir ? [artifactsContract(at.artifactsDir, at.inFolder)] : []),
     closeoutContract(step, repliesOf(step, run, steps, at.round), at.inFolder),
   ].join('\n');
 
@@ -140,14 +133,8 @@ const resumedLook = (tree: readonly string[]) => (tree.length ? ['', '', '## Whe
 const inputsNamed = (run: Run) => namedInText(run.brief, run.inputs ?? []);
 
 /** The line a step's brief says of the run's inputs (`inputsLine`), naming the copy in its workspace where one is made (`inputsGiven`). */
-function inputsSaid(
-  step: StepSpec,
-  run: Run,
-  steps: readonly StepSpec[],
-  inputsDir: string | undefined,
-  folders: Parameters<typeof inputsLine>[3],
-) {
-  const copied = inputsGiven(run, workspacePlan(steps, step));
+function inputsSaid(run: Run, inputsDir: string | undefined, folders: Parameters<typeof inputsLine>[3]) {
+  const copied = inputsGiven(run);
   const inFolder = placeOf(run) === 'folder';
   return inputsLine(inputsDir, run.inputs, copied ? { at: copied, inFolder } : null, folders, run.cards, inputsNamed(run));
 }
@@ -198,13 +185,10 @@ function inputsSaid(
  * folders the run mounts (`mountsLine`), only when there are any; the files given with it stand after it under a heading of their own
  * (`INPUTS_HEADING`, `inputsLine`), likewise, as part of what was asked and outside the request's own sections.
  *
- * A fan-in works on a branch with every step it waits on merged in, unless it works in the repository's checkout or in a folder, where
+ * A fan-in works on a branch with every step it waits on merged in, unless it works in a folder, where
  * nothing is merged. A folder step is told which earlier steps worked in its own folder, read off the folders the record names, not the
  * plan, and the folders it was given (`givenPlan`), inside the fence — never those of steps it does not wait on; it is told to judge
- * only what it can open. A step in the repository's own checkout (`workspace: base`) is told the run's result branches, or, for a run
- * that cut none, that there is no work of its to read; never where the checkout stands, since a step composed again on every answer
- * would name a commit behind it. Unless it has a check of its own, which the run executes on its merge (`landingContract`), it is told
- * the workflow's checks its work was judged by (`workChecks`).
+ * only what it can open.
  *
  * A judge (`route: judge`) is told its routes, each with what it reaches or that it ends the run, and the `route` it owes (`judgeSection`).
  *
@@ -230,9 +214,8 @@ function inputsSaid(
  *   inputs folder, named so on the inputs line (`inputsLine`). Absent, and nothing is said of them.
  * @param costs For a step whose `reads:` names `costs`: what recent finished runs of its workflow in its factory cost (`costsRead`), read
  *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
- * @param place What the run's place says (`BriefPlace`): for an ending that lands on its check, how it stages the merge and what it
- *   denies (`landingWords`), said in its contract; and the commands a step reads its work and merges its base with. Absent, and the
- *   contract and the brief send the step to its place's skill.
+ * @param place What the run's place says (`BriefPlace`): the commands a step reads its work and merges its base with. Absent, and the
+ *   brief sends the step to its place's skill.
  * @param merge For a step that waits on several, as its place merged them (`make`): the paths the merge left conflicted, and the place's
  *   sentence of how to see them (`say.conflicts`). Conflicts are named under what is in the workspace; none, and nothing is said of them.
  * @param answers Every answer a person gave with `nemia retry --message` on the run, waiting or consumed (`asks.answers`): those to the
@@ -257,7 +240,7 @@ export function composeBrief(
   answers: readonly RetryAsk[] = [],
 ) {
   const inFolder = placeOf(run) === 'folder';
-  const contracts = contractsOf(step, run, steps, { artifactsDir, round, words: place.words, inFolder });
+  const contracts = contractsOf(step, run, steps, { artifactsDir, round, inFolder });
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   const tree = depsLines(deps);
   if (retry?.resumed || round?.resumed) return again.slice(1) + resumedLook(tree) + contracts;
@@ -271,12 +254,12 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const inputs = inputsSaid(step, run, steps, inputsDir, folders);
+  const inputs = inputsSaid(run, inputsDir, folders);
   const request = [run.brief, ...mountsLine(step, run, folders, place.workspace), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
   const parts = [...opening, headingOf('What was asked for'), '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
 
-  if (step.after.length > 1 && !endsOnBase(step) && !inFolder) {
+  if (step.after.length > 1 && !inFolder) {
     return [
       ...parts,
       '',
@@ -290,7 +273,7 @@ export function composeBrief(
     ].join('\n');
   }
 
-  if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', headingOf('Where to look'), '');
+  if (earlier.length || tree.length || inFolder) parts.push('', headingOf('Where to look'), '');
   if (inFolder) {
     parts.push(
       'This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.',
@@ -314,8 +297,6 @@ export function composeBrief(
     if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
-  } else if (endsOnBase(step) && isRepositoryRun(run)) {
-    parts.push(...endingLook(step, run, steps, earlier, place.say));
   } else if (earlier.length && isRepositoryRun(run)) {
     parts.push(
       `This workspace has already been worked in by: ${earlier.join(', ')}.`,
@@ -339,42 +320,6 @@ function laterLook(run: RepositoryRun, say: PlaceSay | undefined) {
   const lead = `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed`;
   if (!say) return [`${lead}, ${skillSaid('read')}.`];
   return [`${lead}:`, '', '```', ...say.look.map((line) => sayFilled(line, { baseRef: run.baseRef })), '```'];
-}
-
-/**
- * Where a step in the repository's own checkout looks (`workspace: base`): that it is there, the run's result branches and how to read
- * each against the base — in the place's words (`say.results`), or where its place's skill says them — or that the run cut none; the
- * workflow's checks, unless it has its own; and that the checkout is the person's.
- */
-function endingLook(step: StepSpec, run: RepositoryRun, steps: readonly StepSpec[], earlier: readonly string[], say: PlaceSay | undefined) {
-  const results = resultSteps(steps)
-    .map((s) => run.steps[s.name]?.branch)
-    .filter((b): b is string => Boolean(b));
-  const lead = `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : "The run's work is"} on ${results.join(' and ')}, cut from \`${run.baseRef}\``;
-  const read = say
-    ? [
-        `${lead}:`,
-        '',
-        '```',
-        ...results.flatMap((branch) => say.results.map((line) => sayFilled(line, { base: run.branch, branch }))),
-        '```',
-      ]
-    : [`${lead}. Read each against \`${run.branch}\` ${skillSaid('read')}.`];
-  return [
-    `You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`,
-    ...(results.length
-      ? [...read, '']
-      : [
-          `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
-          '',
-        ]),
-    ...(hasChecks(step) ? [] : workChecks(steps)).flatMap((check) => [
-      `This workflow's check, which its work was judged by: \`${check}\``,
-      '',
-    ]),
-    'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
-    'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
-  ];
 }
 
 /**

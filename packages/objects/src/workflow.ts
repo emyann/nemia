@@ -27,7 +27,6 @@ export const STEP_KEYS = [
   'resume',
   'input',
   'place',
-  'workspace',
   'writable',
   'reads',
   'slot',
@@ -99,7 +98,7 @@ export type StepKeyForm = (typeof STEP_KEY_FORMS)[number];
 
 /**
  * Each key's form (`STEP_KEY_FORMS`), in `STEP_KEYS`' order: a key added to `STEP_KEYS` without one does not typecheck. `place` is a
- * `choice` of its words, `git` and `folder`; `workspace` of one, `base`, `slot` of one, `none`, and `denials` of one, `fail`, since a
+ * `choice` of its words, `git` and `folder`; `slot` of one, `none`, and `denials` of one, `fail`, since a
  * step either says it or says nothing; `agent` a `choice` of the agents offered. The `count`s are the parser's counts, whose keys are
  * typed by these.
  */
@@ -108,7 +107,6 @@ export const STEP_KEY_FORM = {
   resume: 'step',
   input: 'steps',
   place: 'choice',
-  workspace: 'choice',
   writable: 'list',
   reads: 'list',
   slot: 'choice',
@@ -167,12 +165,6 @@ const stepKeyFields = {
   place: Schema.optionalKey(
     Schema.NullOr(Schema.Literals(PLACE_KINDS)).annotate({
       description: 'Where the step works: folder, a folder the run makes, or git, branches of a repository.',
-    }),
-  ),
-  workspace: Schema.optionalKey(
-    Schema.NullOr(Schema.Literal('base')).annotate({
-      description:
-        "base: the step runs in the repository's own working tree rather than a worktree of its own, as a workflow's last step does.",
     }),
   ),
   writable: Schema.optionalKey(

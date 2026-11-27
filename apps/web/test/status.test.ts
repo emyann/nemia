@@ -55,7 +55,6 @@ const PHASE: Record<StepReason, StepPhase> = {
 const QUALIFIED = {
   'Waiting on run': { reason: 'Waiting', on: 'run', via: null },
   'Waiting on limit': { reason: 'Waiting', on: 'limit', via: null },
-  'Waiting on base': { reason: 'Waiting', on: 'base', via: null },
   'Waiting on pause': { reason: 'Waiting', on: 'pause', via: null },
   'Waiting on hold': { reason: 'Waiting', on: 'hold', via: null },
   'AwaitingAnswer via session': { reason: 'AwaitingAnswer', on: null, via: 'session' },
@@ -85,7 +84,6 @@ describe('stepState: each reason the api carries, read as the state a person act
       ['AwaitingAnswer via closeout', 'blocked'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Waiting on run', 'waiting'],
-      ['Waiting on base', 'waiting'],
       ['Waiting on pause', 'waiting'],
       ['Waiting on hold', 'waiting'],
     ];
@@ -100,7 +98,7 @@ describe('stepState: each reason the api carries, read as the state a person act
     assert.notEqual(stateAt('Succeeded'), stateAt('CheckPassed'));
   });
   test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {
-    for (const named of ['Pending', 'Waiting on run', 'Waiting on limit', 'Waiting on base', 'Waiting on pause'] as const)
+    for (const named of ['Pending', 'Waiting on run', 'Waiting on limit', 'Waiting on pause'] as const)
       assert.equal(stateAt(named, true), 'cancelled', named);
     assert.equal(stateAt('Running', true), 'working', 'a step still running when the run was called off is running until the stop lands');
   });
@@ -228,7 +226,6 @@ describe('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work do
     const unmoved: Array<[Named, StepState]> = [
       ['Waiting on run', 'waiting'],
       ['Pending', 'waiting'],
-      ['Waiting on base', 'waiting'],
       ['Waiting on pause', 'waiting'],
       ['Waiting on limit', 'waiting-for-slot'],
       ['Running', 'working'],

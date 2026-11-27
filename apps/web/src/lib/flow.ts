@@ -8,7 +8,6 @@
  * after them folded into a point that counts them. A column holds at most `RAIL_LANES` points, the last of them counting the steps it
  * leaves out.
  */
-import type { GateAt } from 'objects';
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
 import type { RunView } from './api/judged.ts';
@@ -130,17 +129,17 @@ export type GraphLine = {
   head: string | null;
 };
 
-/** A gate of the run as the graph draws it: its step, and whether its approval is after the step or before it. */
-export type GraphGate = { step: string; at: GateAt };
+/** A gate of the run as the graph draws it: its step, whose approval is after it. */
+export type GraphGate = { step: string };
 
 /**
- * A run's graph laid out small: its points, its lines, a tick for each gated step on the side its approval is, the room they take, and
+ * A run's graph laid out small: its points, its lines, a tick after each gated step, the room they take, and
  * why it has no lines.
  */
 export type StepGraphLayout = {
   points: GraphPoint[];
   lines: GraphLine[];
-  gates: Array<{ step: string; at: GateAt; x: number; y: number }>;
+  gates: Array<{ step: string; x: number; y: number }>;
   width: number;
   height: number;
   error: string | null;
@@ -233,9 +232,9 @@ export function graphOf(
     } satisfies GraphLine;
   });
   const drawn = new Map(points.filter((point) => point.kind === 'step').map((point) => [point.names[0], point]));
-  const ticks = gates.flatMap(({ step, at }) => {
+  const ticks = gates.flatMap(({ step }) => {
     const point = drawn.get(step);
-    return point ? [{ step, at, x: r1(at === 'after' ? point.x + GRAPH.gate : point.x - GRAPH.gate), y: point.y }] : [];
+    return point ? [{ step, x: r1(point.x + GRAPH.gate), y: point.y }] : [];
   });
   const rows = lanes <= 2 ? GRAPH.height : GRAPH.height + (lanes - 2) * GRAPH.lane;
   const under = loops > 0 ? lowest + GRAPH.under + GRAPH.nest * (loops - 1) + 1 : 0;

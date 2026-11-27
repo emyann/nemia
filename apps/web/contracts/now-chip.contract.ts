@@ -8,7 +8,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * Where the step a row is on now stands, as the chip reads it (implement maps the board's `StepState`, the step's `on` and the run's hold
- * onto it in src/lib/nowChip.ts): at work (a session or its check), failed, waiting on another run or the checkout, waiting for a run
+ * onto it in src/lib/nowChip.ts): at work (a session or its check), failed, waiting on another run, waiting for a run
  * slot, held by a person, asking what someone has in hand (the run's assignee), still to come, or at rest (the store's pause, called
  * off, skipped, unknown).
  */

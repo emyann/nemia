@@ -76,15 +76,9 @@ const usedLines = (d: Decidable) => [
 const standingLines = (d: Decidable) =>
   d.standings.map((s) => `${s.branch}  ${s.said}${s.stat !== null ? `  ${s.stat}` : ''}${s.merge !== null ? `  · ${s.merge.said}` : ''}`);
 
-/** The collisions read at an ending's decision: the whole in one line, then each branch that does not merge and the semantic refusal. */
+/** The collisions a decision reads: the whole in one line, then each branch that does not merge. */
 const collisionLines = (d: Decidable) =>
-  d.collisions === null
-    ? []
-    : [
-        d.collisions.said,
-        ...d.collisions.colliding.map((c) => `  ${c.said}`),
-        ...(d.collisions.semantic !== null ? [`  ${d.collisions.semantic.said}`] : []),
-      ];
+  d.collisions === null ? [] : [d.collisions.said, ...d.collisions.colliding.map((c) => `  ${c.said}`)];
 
 /** One question as asked: its number and title, its body, each option by its letter, the recommended marked, and how many it takes. */
 const questionBlock = (q: DecisionQuestion) => [
@@ -135,7 +129,6 @@ export function decisionLines(runId: string, decision: RunDecision) {
   const d = decision;
   const sections = [
     d.overBudget !== null ? [d.overBudget] : [],
-    d.baseHeldBy ? [`waits for the base's checkout, which ${d.baseHeldBy.run}'s ${d.baseHeldBy.step} holds`] : [],
     touchedLines(d),
     [`lesson  ${d.lesson.said}`],
     inFullLines(d),

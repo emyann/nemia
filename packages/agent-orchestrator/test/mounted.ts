@@ -43,7 +43,6 @@ export const filedOf = (steps: readonly Step[], inputs?: string) =>
           inbox: INBOX,
           ...(inputs === undefined ? {} : { inputs }),
           own: {},
-          landingDenied: () => [],
         },
       ),
     ]),

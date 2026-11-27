@@ -13,8 +13,8 @@
       "meaning": "an idea on its way to a run: a short markdown brief in the inbox, started as a run, and kept there after it starts. It names its factory and its workflow, never a repository: the factory's wiring places its run (`nemia factory attach <factory> <workflow> --repo <name>`).",
       "type": "Card",
       "see": {
-        "label": "From a card to a landing",
-        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+        "label": "From a card to a branch",
+        "href": "/how-a-run-lives/#from-a-card-to-a-branch"
       },
       "retired": [
         {
@@ -47,8 +47,8 @@
       "meaning": "where a card is in its life: filed, queued or refused before it starts, and its run's phase once it has (pending, running, waiting, succeeded, failed, stopped, cancelled), read from the run each time the inbox is read and never stored on the card; a card whose run was removed reads filed again. Computed once by the orchestrator and sent on the wire as is.",
       "type": "CardState",
       "see": {
-        "label": "From a card to a landing",
-        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+        "label": "From a card to a branch",
+        "href": "/how-a-run-lives/#from-a-card-to-a-branch"
       }
     },
     {
@@ -61,8 +61,8 @@
       "meaning": "a card the inbox lists by default (Open on the Inbox page): filed, queued or refused, or started with a run that is pending, running or waiting. A card whose run ended is listed with nemia inbox --all, and under the Inbox page's Closed.",
       "type": "CardState",
       "see": {
-        "label": "From a card to a landing",
-        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+        "label": "From a card to a branch",
+        "href": "/how-a-run-lives/#from-a-card-to-a-branch"
       }
     },
     {
@@ -70,8 +70,8 @@
       "meaning": "where cards wait before they are started.",
       "type": "Inbox",
       "see": {
-        "label": "From a card to a landing",
-        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+        "label": "From a card to a branch",
+        "href": "/how-a-run-lives/#from-a-card-to-a-branch"
       }
     },
     {
@@ -79,8 +79,8 @@
       "meaning": "the tick's start of a queued card that did not happen, as it writes it down: when, on which repository, why, and whether it was a refusal.",
       "type": "MissedStart",
       "see": {
-        "label": "From a card to a landing",
-        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+        "label": "From a card to a branch",
+        "href": "/how-a-run-lives/#from-a-card-to-a-branch"
       },
       "retired": [
         {

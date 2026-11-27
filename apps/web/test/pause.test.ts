@@ -17,26 +17,28 @@ const AT = '2026-10-04T15:40:00.000Z';
 const PAUSE = { at: AT, by: 'ann', why: 'merging by hand' };
 
 /** What `GET /api/pause` answers, with `extra` over a pause and nothing at work. */
-const paused = (extra: Partial<Paused> = {}) => ({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [], ...extra });
+const paused = (extra: Partial<Paused> = {}) => ({ pause: PAUSE, finishing: [], parked: [], held: [], ...extra });
 
 describe('pauseWords: what the pause says, from none to Pausing to Paused', () => {
   test('no pause: all factories run, with no short form, and the button pauses them all', () => {
-    const words = pauseWords({ pause: null, finishing: [], parked: [], staged: [], held: [] }, null, NOW);
+    const words = pauseWords({ pause: null, finishing: [], parked: [], held: [] }, null, NOW);
     assert.equal(words.state, 'running');
     assert.equal(words.text, null);
     assert.equal(words.label, 'Pause all factories');
     assert.match(words.line, /^Pause all factories: nothing new starts/);
     assert.match(words.line, /each working session stops when its current tool call ends/);
   });
-  test('a pause with tasks at work is Pausing with their count and the checks it holds, and names each, each landing staged and each check held', () => {
+  test('a pause with tasks at work is Pausing with their count and the checks it holds, and names each task and each check held', () => {
     const words = pauseWords(
       paused({
         finishing: [
           { run: 'r-1', step: 'plan', kind: 'session' },
-          { run: 'r-2', step: 'ship', kind: 'landing' },
+          { run: 'r-2', step: 'ship', kind: 'check' },
         ],
-        staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }],
-        held: [{ run: 'r-4', step: 'land' }],
+        held: [
+          { run: 'r-3', step: 'ship' },
+          { run: 'r-4', step: 'land' },
+        ],
       }),
       null,
       NOW,
@@ -48,12 +50,11 @@ describe('pauseWords: what the pause says, from none to Pausing to Paused', () =
       words.line,
     );
     assert.match(words.line, /each working session runs on to its end/, 'a pause with no timeout lets each session run on');
-    assert.deepEqual(words.finishing, [
-      "r-1's plan is finishing: its session is at work",
-      "r-2's ship is finishing: the check of its landing runs",
+    assert.deepEqual(words.finishing, ["r-1's plan is finishing: its session is at work", "r-2's ship is finishing: its check runs"]);
+    assert.deepEqual(words.held, [
+      "r-3's ship has signed off, and its check waits on the resume",
+      "r-4's land has signed off, and its check waits on the resume",
     ]);
-    assert.deepEqual(words.staged, ["r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on the resume"]);
-    assert.deepEqual(words.held, ["r-4's land has signed off, and its check waits on the resume"]);
   });
   test('a pause with nothing at work counts the check it holds, and says none where it holds none', () => {
     const words = pauseWords(paused({ held: [{ run: 'r-4', step: 'land' }] }), null, NOW);
@@ -126,7 +127,7 @@ describe('pauseWords under a pause with a timeout: sessions finishing a call and
         finishing: [
           { run: 'r-1', step: 'plan', kind: 'session', calling: 'Bash' },
           { run: 'r-2', step: 'implement', kind: 'session' },
-          { run: 'r-3', step: 'ship', kind: 'landing' },
+          { run: 'r-3', step: 'ship', kind: 'check' },
         ],
         parked,
         held: [{ run: 'r-4', step: 'land' }],
@@ -176,7 +177,7 @@ describe('pauseWords under a pause with a timeout: sessions finishing a call and
     );
   });
   test('with only checks finishing, or no timeout, it counts what finishes as before', () => {
-    const checks = paused({ pause: timed, finishing: [{ run: 'r-3', step: 'ship', kind: 'landing' }] });
+    const checks = paused({ pause: timed, finishing: [{ run: 'r-3', step: 'ship', kind: 'check' }] });
     assert.match(pauseWords(checks, null, NOW).line, /^Pausing: 1 finishing — /);
     const untimed = paused({ finishing: [{ run: 'r-1', step: 'plan', kind: 'session' }] });
     assert.match(pauseWords(untimed, null, NOW).line, /^Pausing: 1 finishing — /);

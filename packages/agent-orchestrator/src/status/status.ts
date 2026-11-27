@@ -1,12 +1,12 @@
 /**
  * Where one step of a run stands (`stepStatus`, `ownStatus`), and the facts it reads: a gate's (`hasGate`, `approvalOf`, `atGate`), an
- * ending's (`endsOnBase`, `landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a
+ * what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a
  * loop's (`roundOf`, `loopOf`, `owedFields`). What a step consumed, in words, is `usage/usage.ts`'s, a sum of
  * money's `money/money.ts`'s, and a person's route for a try `route/person-route.ts`'s. Pure, and read by nearly every other part of the
  * run's judgement; it reads the record alone.
  */
-import { checkedWord, onItsCheck, type Verdict } from '../check/index.ts';
-import { DEFAULT_ROUNDS, endsOnBase, hasChecks, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
+import { checkedWord, type Verdict } from '../check/index.ts';
+import { DEFAULT_ROUNDS, hasChecks, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import { budgetWord, dollars } from '../money/money.ts';
@@ -16,9 +16,9 @@ import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 import { declarationOf } from '../harness/harness.ts';
-import type { Actor, GateAt } from 'objects';
+import type { Actor } from 'objects';
 export { budgetOf } from '../budget/budget.ts';
-import type { Retry, RetryHow } from '../retry/index.ts';
+import type { RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
   refusedCheck,
@@ -26,14 +26,12 @@ import {
   SETTLED,
   TRIED_FROM,
   tryOf,
-  type Approval,
   type CloseoutAsked,
   type Run,
   type StepRecord,
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
-import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
 import { waitFiled } from '../wait-node/index.ts';
 
@@ -53,94 +51,11 @@ export const hasGate = (step: Pick<StepSpec, 'name' | 'gate'>, run: Pick<Run, 'g
 export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) => steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
- * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it; an
- * ending's, given for work that has had a try since, is spent by that try, and the record's read leaves it out (`workStands`). Pure.
+ * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it. Pure.
  * @param run The run's record.
  * @param step The step's name.
  */
 export const approvalOf = (run: Run, step: string) => run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
-
-/**
- * Whether each step an approval's `work` names is still on the try it was on when the approval was given (as `tryOf` counts it); an
- * approval with none stands. Each step's record is found among the record's own entries, never read at a name the approval's file gave.
- * One that does not stand is spent: the record's read composes no such approval onto the run (`runRecord`, the Run door's memory), and
- * the pass moves its file into `done/` (`spentApprovals`).
- * @param run The run's step records.
- * @param a The approval, whose `work` names each step and its try.
- */
-export const workStands = (run: Pick<Run, 'steps'>, a: Approval) => {
-  const records = Object.entries(run.steps);
-  return Object.entries(a.work ?? {}).every(([step, n]) => {
-    const record = records.find(([name]) => name === step)?.[1];
-    return (record?.tries?.length ?? 0) + 1 === n;
-  });
-};
-
-/**
- * The tries of the work an ending would act on, as they stand now — what its approval names (`Approval.work`): each step it waits on.
- * None for a step that is not approved first (`approvedFirst`), whose approval its own try spends. Pure.
- * @param step The step.
- * @param run The run's record.
- */
-export const approvedWork = (step: StepSpec, run: Run) =>
-  approvedFirst(step, run) ? Object.fromEntries(step.after.map((a) => [a, tryOf(run, a)])) : undefined;
-
-/**
- * The approval of an ending approved first (`approvedFirst`) that is in force (`approvalOf`) while nothing of the ending is filed: it waits
- * for the checkout, or for the pass that files it. None on a run called off, which files nothing. Pure.
- * @param step The step.
- * @param run The run's record.
- */
-const unfiledApproval = (step: StepSpec, run: Run) =>
-  !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId ? approvalOf(run, step.name) : undefined;
-
-/**
- * Whether an ending approved and not filed (`unfiledApproval`) may still have its work sent back (`sendsBack` in `retryable`): its approval
- * names the work it approved (`Approval.work`), so the try the send-back files spends it (`workStands`), as the try after a gated step's
- * own does. Not one an older nemia wrote, which names none: nothing in the record would spend it, and the ending would be filed on it once
- * the work signed off again — its send-back is refused, naming how to take it back (`retryRefusal`). Pure.
- * @param step The step.
- * @param run The run's record.
- */
-export const approvedUnfiled = (step: StepSpec, run: Run) => unfiledApproval(step, run)?.work !== undefined;
-
-/**
- * What an ending approved and not filed whose approval names no work (`unfiledApproval`, not `approvedUnfiled`) says of a send-back of its
- * work: no try of the work would spend that approval, so it is taken back first — `nemia approve <run> <step> --off`, which sets its record
- * aside under the run's asks' `done/` — and then the work is sent back (`sendBackTo`). Empty for any other step. Pure.
- * @param step The step.
- * @param run The run's record.
- */
-export const takeBackWords = (step: StepSpec, run: Run) => {
-  const given = unfiledApproval(step, run);
-  return given && given.work === undefined ? takeBackOf(step, run, given) : '';
-};
-
-/**
- * `takeBackWords` for the approval `given` of `step`, an ending approved and not filed whose approval names no work. Pure.
- * @param step The step.
- * @param run The run's record.
- * @param given The step's approval, which names no work.
- */
-export const takeBackOf = (step: StepSpec, run: Run, given: Approval) => {
-  const back = sendBackTo(step, run)
-    .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
-    .join(' or ');
-  return (
-    `${step.name}'s approval of try ${given.try} (at ${given.at}) names no work: an older nemia wrote it, so no try of the work would spend it, and ${step.name} would be filed on it once the work signed off again. ` +
-    `To send the work back, take that approval back first — nemia approve ${run.id} ${step.name} --off${back ? ` — then: ${back}` : ''}.`
-  );
-};
-
-/**
- * The steps a send-back from an ending approved and not filed goes to (`sendBackTo`), as `nemia ls`, `nemia decide` and a second `nemia
- * approve` offer it beside the approval: none for a step that is not such an ending, none on a run held, whose hold refuses a try until
- * it lifts (`heldRefusal`), and none on a run pruned, which takes no try (`prunedRefusal`). Pure.
- * @param step The step.
- * @param run The run's record.
- */
-export const unfiledBack = (step: StepSpec, run: Run) =>
-  run.hold || run.pruned || !approvedUnfiled(step, run) ? [] : sendBackTo(step, run);
 
 /**
  * Whether a step's sessions are filed held open (the runtime's `holdOpen`): its harness, `DEFAULT_HARNESS` where it names none, declares
@@ -155,7 +70,7 @@ export const holdsOpenOn = (step: Pick<StepSpec, 'harness'>) => declarationOf(st
  * Pure.
  * @param run The run's record.
  */
-export const spentApprovals = (run: Run) => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step) || !workStands(run, a));
+export const spentApprovals = (run: Run) => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
 /**
  * What a person accepted of a loop on the try its looping step is on (`nemia approve`). One for an earlier try was spent by the try after
@@ -200,182 +115,12 @@ export const gateWords = (run: Run, step: string) => {
 /**
  * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not
  * approved for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate
- * holds it: the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed
- * (`approvedFirst`) is that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
+ * holds it: the round is its loop's, and the gate is on what comes after. Pure.
  */
 function atGate(step: StepSpec, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined) {
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
-  if (approvedFirst(step, run) && run.steps[step.name]?.tries?.length) return false;
   if (askedAgain(step, run, closeoutOf)) return false;
   return !approvalOf(run, step.name);
-}
-
-export { endsOnBase };
-
-/**
- * Whether a step's gate holds it BEFORE it is filed rather than after it signs off: it is gated (`hasGate`) and acts on the base branch
- * (`endsOnBase`). Pure.
- *
- * A gate holds what the approval decides. Where steps follow, that is the handoff, and the step runs first: a person reads what it
- * produced and says whether the work after it may start. An ending step in the repository's checkout produces nothing to read — it acts,
- * on the base branch, where nothing can be taken back — so the approval is of the act, and it is given before the step is filed.
- *
- * An ending with no gate is filed by its workflow instead, once the step before it — one that can send the work back (`loop:`) — passes:
- * a landing the review before it routes. Nothing of this holds such a step: there is no approval to wait for, and nothing for a person
- * to decide (`toDecide`, `endingSteps`).
- * @param step The step, its name, `gate:` and `workspace:`.
- * @param run The run, the gates it was started with among it.
- */
-export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>) =>
-  endsOnBase(step) && hasGate(step, run);
-
-/**
- * The steps a run is gated at, in the order they run (`gatesOf`), each with where its approval is: `before` for one approved first
- * (`approvedFirst`), `after` for one whose closeout waits. Pure.
- * @param steps The run's steps, in the order they run.
- * @param run The run, the gates it was started with among it.
- */
-export const gatesAt = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) =>
-  steps.filter((s) => hasGate(s, run)).map((s) => ({ step: s.name, at: approvedFirst(s, run) ? 'before' : 'after' })) satisfies Array<{
-    step: string;
-    at: GateAt;
-  }>;
-
-/**
- * Whether the run waits at that step's gate now, with nothing of the step filed: it is approved first (`approvedFirst`), it has not been
- * filed, nobody has approved the try it would be filed on, and every step it waits on has satisfied it. Pure.
- *
- * Level-triggered like the rest: a step of the work sent back un-holds it on the next pass, and finishing again holds it anew. False on a
- * cancelled run, which files nothing, so that its unfiled steps read as waiting.
- * @param step The step.
- * @param run The run's record.
- * @param phaseOf The phase of a task, by its id, as the engine reads it.
- * @param closeoutOf The closeout a step signed off, by the step's name, or undefined where it gave none.
- * @param askedCloseout Whether the task of that id was asked for a closeout.
- * @param steps The run's steps.
- * @param spendOf What each task's sessions cost (`taskSpend`).
- * @param verdictOf What each step's current check exited with (`refusedCheck`).
- */
-export function waitsAtGate(
-  step: StepSpec,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly StepSpec[],
-  spendOf: SpendOf,
-  verdictOf: (step: string) => Verdict | undefined,
-) {
-  if (run.cancelledAt || !approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
-  return notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).length === 0;
-}
-
-/**
- * The steps an ending step waits on that have not handed their work on, in the workflow's order: one that has not satisfied `after`, and
- * a looping step that asked for another round (`roundWanted`), whose work the run will file again. Pure.
- *
- * The round is the case a status alone does not tell: a looping step that says `again: true` below its cap reads `unverified` on its own
- * work, since it signed off — and `assess` only calls it `running` when it sets the round due. An ending read off that word would hold its
- * gate in the very pass that sends the work round again: `nemia ls` would offer the merge while the reviewer was asking for a change, and
- * an approval taken then names a try nothing spends, so the round's work would merge unread. `atGate` keeps the same rule for a gated step
- * of its own loop; this is that rule for the step after one.
- *
- * A predecessor approved first itself is read on its own work (`ownStatus`): `validate` refuses one that anything waits on, and reading
- * it so keeps this from asking itself where it stands.
- * @param step The step.
- * @param run The run's record.
- * @param phaseOf The phase of a task, by its id, as the engine reads it.
- * @param closeoutOf The closeout a step signed off, by the step's name, or undefined where it gave none.
- * @param askedCloseout Whether the task of that id was asked for a closeout.
- * @param steps The run's steps.
- * @param spendOf What each task's sessions cost (`taskSpend`).
- * @param verdictOf What each step's current check exited with (`refusedCheck`).
- */
-export function notHandedOn(
-  step: StepSpec,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly StepSpec[],
-  spendOf: SpendOf,
-  verdictOf: (step: string) => Verdict | undefined,
-  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-): string[] {
-  return step.after.filter((name) => {
-    const dep = steps.find((s) => s.name === name);
-    if (!dep) return true;
-    if (dep.loop && roundWanted(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) return true;
-    return !satisfiesAfter(
-      approvedFirst(dep, run)
-        ? ownStatus(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
-        : standing(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status,
-    );
-  });
-}
-
-/**
- * The ending steps a pass is about to un-hold: those held at their gate, unfiled (`waitsAtGate`), that wait on a step this pass files
- * again — a try due, or a step a round re-files (`roundSpans`). Pure.
- *
- * A person's `nemia retry` of the work is the send-back at an ending's gate, and between the ask and the pass that files it the record
- * alone still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected
- * to the work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
- *
- * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`), or a merge of the base due (`Round.back`):
- * the pass that files it moves the ending's try behind (`sentBack`), and it waits for the work again.
- * @param steps The run's steps.
- * @param run The run's record.
- * @param retry The tries due on this pass.
- * @param round The rounds due on this pass.
- */
-export function unheld(steps: readonly StepSpec[], run: Run, retry: readonly Retry[], round: readonly Round[]) {
-  const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
-  const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
-  return new Set([...held.map((s) => s.name), ...[...retry, ...round].flatMap((r) => r.back ?? [])]);
-}
-
-/**
- * Whether an ending step that acts on the base branch (`endsOnBase`) was filed — on an approval, or by its workflow — and stopped there
- * without doing it: its try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was
- * stopped, or reached its budget. Pure.
- *
- * Such an ending has two ways on. Its own try (`nemia retry <run> <ending>`) does the act again, for what was not the work — a checkout
- * left dirty, a flaky test. And the send-back (`sendsBack` in `retryable`): the work does not hold on the base branch as it is now, so it
- * goes back through the folder's loop, and the ending returns to its gate once that settles (`sentBack`).
- * @param step The step.
- * @param run The run's record.
- * @param phaseOf The phase of a task, by its id, as the engine reads it.
- * @param closeoutOf The closeout a step signed off, by the step's name, or undefined where it gave none.
- * @param askedCloseout Whether the task of that id was asked for a closeout.
- * @param steps The run's steps.
- * @param spendOf What each task's sessions cost (`taskSpend`).
- */
-export function endingStopped(
-  step: StepSpec,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly StepSpec[],
-  spendOf: SpendOf,
-) {
-  const taskId = run.steps[step.name]?.taskId;
-  if (!endsOnBase(step) || !taskId || !SETTLED.has(phaseOf(taskId))) return false;
-  const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  return TRIED_FROM.has(own) || own === 'budget exhausted';
-}
-
-/**
- * The record of an ending sent back with its work (`Retry.back`): its try moved behind, `cause: 'back'`, and nothing in its place — so it
- * waits for the work, then at its gate for an approval of the try it is now on: the one given for the try that stopped names a try it is
- * past, and is spent (`spentApprovals`). Pure.
- * @param record The ending's step record.
- */
-export function sentBack(record: StepRecord) {
-  const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
-  const moved: NonNullable<StepRecord['tries']> = taskId === null ? [] : [{ taskId, ...(check ? { check } : {}), cause: 'back' }];
-  return { ...rest, taskId: null, tries: [...tries, ...moved] } satisfies StepRecord as StepRecord;
 }
 
 /**
@@ -385,34 +130,6 @@ export function sentBack(record: StepRecord) {
  * @param run The run's record.
  */
 export const sendBackTo = (step: StepSpec, run: Run) => (waitFiled(step, run.steps[step.name]) ? [step.name] : [...step.after]);
-
-/**
- * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
- * workflow takes beside `workspace: base` only with `gate: true`, so that a person's approval files it, or with a step before it that can
- * send the work back (`loop:`), so that its pass files it (`validateBaseWorkspace`). Pure, and no reading of the gate: what the step is,
- * not who files it.
- *
- * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the
- * merge onto the base branch on its word, with the message the step signed off, or aborts it (`landingDue`). An ending with no check runs
- * one itself, in its prose, and commits or aborts on what it found.
- *
- * It still takes the run, which it no longer reads, so that every caller reads a step beside the run it belongs to and a gate started with
- * cannot be made to change the answer by leaving it out.
- * @param step The step, its `workspace:` and its `check:`.
- * @param _run The run the step belongs to, which it no longer reads.
- */
-export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>) =>
-  endsOnBase(step) && hasChecks(step);
-
-/**
- * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
- * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
- * @param steps The run's steps.
- * @param name The step's name.
- * @param checkout The other run's step in the checkout, or undefined where none is.
- */
-export const waitsOnCheckout = (steps: readonly StepSpec[], name: string, checkout: CheckoutHold | undefined) =>
-  Boolean(checkout) && steps.some((s) => s.name === name && endsOnBase(s));
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in
@@ -439,16 +156,6 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding) =>
       : s.where === 'gone'
         ? `${s.branch} is gone: git no longer has it`
         : `${s.branch}: where it stands is not read (${s.why})`;
-
-/**
- * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that
- * merges has nothing left to merge — a person merged it by hand, or the work committed nothing past the run's base. Pure.
- *
- * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks. False over a
- * branch whose standing is `unread`: a result not read is never called taken.
- * @param standings Each result branch's standing, as read; none where git was not asked.
- */
-export const resultOnBase = (standings: readonly BranchStanding[]) => standings.length > 0 && standings.every((b) => b.where === 'on');
 
 /**
  * Where one step stands — see `StepStatus`. Pure, and the one place the words are decided.
@@ -526,8 +233,7 @@ export const stepStatus = (
 
 /**
  * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways
- * are its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed
- * (`waitsAtGate`).
+ * are its own status's. `awaiting approval` is the gate after a step signs off (`atGate`).
  * @param step The step.
  * @param run The run's record.
  * @param phaseOf The phase of a task, by its id, as the engine reads it.
@@ -541,8 +247,6 @@ export const standing: WhereAStepStands = (step, run, phaseOf, closeoutOf, asked
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };
-  if (own === 'pending' && waitsAtGate(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))
-    return { own, status: 'awaiting approval' };
   return { own, status: own };
 };
 
@@ -637,10 +341,8 @@ const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: read
  *
  * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
  * follows (agent-runtime's README) — until a recheck files the step's check on that task (`retryable`), after which it stands on its
- * check (`onItsCheck`) as a signed step does: the world, read with no session. `denied` for a signed step denied a call under
- * `denials: fail`, before its check, which would judge work done without the tool. An ending that lands on its check (`landsOnCheck`)
- * stands where the run's landing of its merge left it (`onItsCheck`), so nothing offers a try of it while its merge is staged in the
- * checkout.
+ * check (`checkedWord`) as a signed step does: the world, read with no session. `denied` for a signed step denied a call under
+ * `denials: fail`, before its check, which would judge work done without the tool.
  * @param step The step.
  * @param run The run's record.
  * @param phaseOf The phase of a task, by its id, as the engine reads it.
@@ -685,7 +387,7 @@ const waitStanding = (step: StepSpec, st: StepRecord | undefined, phaseOf: (task
   (waitFiled(step, st) ? checkedWord(st?.check, phaseOf) : 'pending') satisfies StepStatus;
 
 /**
- * Where a step stands on its checks (`onItsCheck`), `exhausted` where they passed but its loop asked another round past its cap.
+ * Where a step stands on its checks (`checkedWord`), `exhausted` where they passed but its loop asked another round past its cap.
  * @param step The step.
  * @param run The run.
  * @param st The step's record.
@@ -699,7 +401,7 @@ function checkedStatus(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
 ) {
-  const s = onItsCheck(step, st, phaseOf);
+  const s = checkedWord(st.check, phaseOf);
   return (
     s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s
   ) satisfies StepStatus;
@@ -917,15 +619,8 @@ export function budgetUsdFor(cap: number | undefined, spent: Spend = NOTHING_SPE
 export const MOMENTUM = 1;
 
 /**
- * The momentum of a landing's check, one above `MOMENTUM`: an ending's check holds the repository's checkout from its filing, queued or
- * not, so every other run's landing waits behind it while it waits for room. Filed above the sessions of the runs in flight, it is
- * admitted before them when room frees, and so lets the checkout go sooner. Read at admission and nowhere else, as `MOMENTUM` is.
- */
-export const LANDING_MOMENTUM = MOMENTUM + 1;
-
-/**
  * The priority of a turn a person is waiting on: the next turn after they answered a step, a try or a round they asked for (a `Retry` or
- * a `Round` `by: 'ask'`), and an upgrade they started. Above every filing of the work (`LANDING_MOMENTUM` and below), below Nemia's own
+ * a `Round` `by: 'ask'`), and an upgrade they started. Above every filing of the work (`MOMENTUM` and below), below Nemia's own
  * session, so it goes before every waiting task but hers; and the threshold of the room the engine keeps for such turns (`keptRoom`,
  * `WF_KEPT_TURNS`), which nothing below it takes. Nothing running is stopped for it, and it is read at admission and nowhere else.
  */
@@ -1010,19 +705,13 @@ export type Round = {
   raise?: string[];
   /** On a merge (`by: 'merge'`): the base branch, and the commit of it the target merges, which the run's base moves to. */
   merge?: MergeOf;
-  /** On a merge: the endings that stopped on the base branch it sends the work back from, each moved behind (`sentBack`). */
-  back?: string[];
 };
 
 /**
  * What a person's `nemia refresh --base` asks: the step that merges (the loop's target), its try that does, the base branch, and its
- * commit; and, where the work merges cleanly onto that commit and the ending's check refused the merged tree there, that landing
- * (`landing`): the ending and its check's task, whose failing tests the target is told.
+ * commit.
  */
-export type MergeOf = { target: string; try: number; onto: string; sha: string; landing?: MergeLanding };
-
-/** A landing refused on the commit a merge takes in: the ending step, and the task of its check that refused the merged tree. */
-export type MergeLanding = { step: string; check: string };
+export type MergeOf = { target: string; try: number; onto: string; sha: string };
 
 /**
  * A person's `nemia retry --round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when.

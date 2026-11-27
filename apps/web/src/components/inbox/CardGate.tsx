@@ -1,7 +1,7 @@
 import { useRef, useState, type RefObject } from 'react';
-import { Button, Popover, Radio, RadioGroup, SplitButton, TextField, Title } from '@/components/ui/ds';
+import { Button, Popover, SplitButton, TextField, Title } from '@/components/ui/ds';
 import { barValue } from '../../lib/bar';
-import { backName, endingWarning, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
+import { gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
 import { RouteLink } from '../agent/AgentParts';
 import { Refusal, useAsk } from '../gate/Ask';
 import { useApprove } from '../../lib/useApprove';
@@ -21,9 +21,8 @@ type Asked = 'approve' | 'send';
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
  * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
  * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — the kit's
- * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves a gate mid-run at once, with
- * no words, as the CLI's `approve` does; at an ending, which cannot be taken back, it is the first of two presses, as on the run's gate:
- * it opens the approval's form, which says what running it does (`endingWarning`) over `Run ship now`. Its menu holds Approve with words…
+ * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves the gate at once, with
+ * no words, as the CLI's `approve` does. Its menu holds Approve with words…
  * and Send back…, each opening its form in a popover over the card; a send-back needs words, as the CLI's `retry --message` does. A
  * refusal shows in the popover in the api's words, the words kept in the box: one of the main press opens the approval's form to say it.
  *
@@ -39,7 +38,7 @@ export function CardGate({
 }: {
   run: RunAt;
   gate: GateAsk;
-  /** The gate's words in full, on hover under the line: the folder's own for an ending, the CLI `ls`'s for a step's hand-off. */
+  /** The gate's words in full, on hover under the line: the CLI `ls`'s for a step's hand-off. */
   title: string;
   stamp: string;
   onTaken: (taken: Taken) => void;
@@ -65,12 +64,7 @@ export function CardGate({
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
     >
-      <p
-        data-to-decide={gate.ends ? 'approve' : undefined}
-        data-gate-line={gate.step}
-        title={`${line}\n${title}`}
-        className="truncate text-body-small text-yours"
-      >
+      <p data-gate-line={gate.step} title={`${line}\n${title}`} className="truncate text-body-small text-yours">
         {line}
       </p>
       <div className="flex items-center gap-1.5">
@@ -78,7 +72,7 @@ export function CardGate({
           <SplitButton
             size="xsmall"
             icon={approval.isPending ? Pending : undefined}
-            onPress={() => (gate.ends ? setAsked('approve') : approve(''))}
+            onPress={() => approve('')}
             isDisabled={approval.isPending}
             menuLabel={`Other answers to ${gate.step}`}
             items={[
@@ -102,7 +96,7 @@ export function CardGate({
         <RouteLink
           to="/runs/$runId"
           params={{ runId: run.id }}
-          {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: run.id, step: read.step }) } } : { hash: read.hash })}
+          search={{ bar: barValue({ kind: 'step', run: run.id, step: read.step }) }}
           data-read={gate.step}
           className="ml-auto min-w-0 truncate rounded-sm text-body-small font-medium text-on-surface underline decoration-outline underline-offset-2 outline-none hover:decoration-on-surface focus-visible:ring-2 focus-visible:ring-ring/50"
         >
@@ -143,9 +137,7 @@ function GateForms({
   onApprove: (words: string) => void;
   onSent: (said: string) => void;
 }) {
-  const [to, setTo] = useState(gate.back[0] ?? gate.step);
   const sendBack = useAsk(run.id, gate.step, () => undefined, run.namespace);
-  const backTo = gate.ends ? backName(gate.back) : gate.step;
   return (
     <Popover
       triggerRef={anchor}
@@ -153,7 +145,7 @@ function GateForms({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      aria-label={asked === 'send' ? `Send ${backTo} back` : `Approve ${gate.step}`}
+      aria-label={asked === 'send' ? `Send ${gate.step} back` : `Approve ${gate.step}`}
       placement="bottom start"
       offset={6}
       className="w-80"
@@ -170,18 +162,16 @@ function GateForms({
       {asked === 'send' && (
         <SendBackForm
           gate={gate}
-          to={to}
-          onTo={setTo}
           pending={sendBack.isPending}
           error={sendBack.isError ? sendBack.error : null}
           onCancel={onClose}
           onSend={(message) =>
             sendBack.mutate(
-              { mode: 'continue', message, step: to },
+              { mode: 'continue', message, step: gate.step },
               {
                 onSuccess: (sent) => {
                   onClose();
-                  onSent(takenLine({ asked: sent, to }, gate));
+                  onSent(takenLine({ asked: sent, to: gate.step }, gate));
                 },
               },
             )
@@ -193,8 +183,7 @@ function GateForms({
 }
 
 /**
- * The approval, confirmed: the words to go with it, if any, and the press that sends it. An ending's is `Run <step> now`, under what
- * running it does, since nothing of it can be taken back.
+ * The approval, confirmed: the words to go with it, if any, and the press that sends it.
  */
 function ApproveForm({
   gate,
@@ -219,9 +208,7 @@ function ApproveForm({
       }}
     >
       <Title size="small" component="h3">{`Approve ${gate.step}?`}</Title>
-      <p className="text-body-small text-on-surface-variant">
-        {gate.ends ? endingWarning(gate.step, gate.onto) : `What waits on ${gate.step} is filed next, handed what it handed on.`}
-      </p>
+      <p className="text-body-small text-on-surface-variant">{`What waits on ${gate.step} is filed next, handed what it handed on.`}</p>
       <TextField
         multiline
         label={`Words to approve ${gate.step} with, if any`}
@@ -231,7 +218,7 @@ function ApproveForm({
       />
       <div className="flex items-center gap-2">
         <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" size="xsmall" isDisabled={pending}>
-          {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
+          {pending ? 'Approving…' : 'Approve'}
         </Button>
         <Button variant="outlined" size="xsmall" onPress={onCancel}>
           Not yet
@@ -242,26 +229,22 @@ function ApproveForm({
   );
 }
 
-/** The send-back: the words it needs, and which step it goes to where the ending waits on several. It continues that step's session. */
+/** The send-back: the words it needs. It continues the step's session. */
 function SendBackForm({
   gate,
-  to,
-  onTo,
   pending,
   error,
   onCancel,
   onSend,
 }: {
   gate: GateAsk;
-  to: string;
-  onTo: (step: string) => void;
   pending: boolean;
   error: Error | null;
   onCancel: () => void;
   onSend: (message: string) => void;
 }) {
   const [message, setMessage] = useState('');
-  const name = gate.ends ? backName(gate.back) : gate.step;
+  const name = gate.step;
   return (
     <form
       className="flex flex-col gap-3"
@@ -281,15 +264,6 @@ function SendBackForm({
         value={message}
         onChange={setMessage}
       />
-      {gate.ends && gate.back.length > 1 && (
-        <RadioGroup aria-label="Which step to send back" orientation="horizontal" value={to} onChange={onTo}>
-          {gate.back.map((step) => (
-            <Radio key={step} value={step}>
-              {step}
-            </Radio>
-          ))}
-        </RadioGroup>
-      )}
       <div className="flex items-center gap-2">
         <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
           {pending ? 'Sending back…' : 'Send back'}

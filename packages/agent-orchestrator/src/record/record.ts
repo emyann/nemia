@@ -1,7 +1,7 @@
 /**
  * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Assignee`,
  * `Approval`, `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`,
- * `LandingRecord`), the try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's
+ * the try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's
  * judgement shares (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through
  * (`RunStore`). Pure: `record.store.ts` reads and writes the record.
  */
@@ -154,18 +154,14 @@ export type PrunedFiles = { at: string; bytes: number };
  * words every step after the gate is handed under `## Approved` (`approvedSection`). `message` is absent on an approval given without any.
  * `budgets`: the caps it sets for the steps after the gate, by step, in dollars — the budgets the gated step proposed, with the amounts the
  * person gave over them (`approvedCaps`) — read on every pass as those steps' caps (`budgetOf`); absent where it sets none. `actor`: who
- * approved (objects' `Actor`), absent on an approval given in-process and on a file older code wrote. `work`: on an ending's approval
- * (`approvedFirst`), nothing of which runs before it, the try each step it waits on was on when it was given — the work it approved. It is
- * in force only while those tries stand (`approvalOf`): a send-back of the work files a try past it, and spends it (`spentApprovals`).
- * Absent on any other gate's, whose own try is what it names, and on a file older code wrote, which counts as current.
- */
+ * approved (objects' `Actor`), absent on an approval given in-process and on a file older code wrote.
+ *  */
 export type Approval = {
   step: string;
   try: number;
   at: string;
   message?: string;
   budgets?: Record<string, number>;
-  work?: Record<string, number>;
   actor?: Actor;
 };
 
@@ -200,9 +196,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
  *   awaiting approval verified or unverified, at a gate (`hasGate`), with no approval of the try it is on: nothing after it is filed until
- *                    a person says so — `nemia approve`, or `nemia retry --message` to send it back. And, on an ending step in the
- *                    repository's checkout (`approvedFirst`), the same word before it is filed: its approval is what runs it
- *                    (`waitsAtGate`)
+ *                    a person says so — `nemia approve`, or `nemia retry --message` to send it back.
  *   exhausted        verified or unverified, and it asked for another round of its `loop:` on the last one `rounds:` allows
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
@@ -417,11 +411,6 @@ export type StepRecord = {
    */
   handedOff?: string;
   /**
-   * What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once
-   * for each try.
-   */
-  landed?: LandingRecord;
-  /**
    * What the run read of the files the closeout of a task of the step named (`FilesRead`): written by the tick on the pass that first
    * read the task signed (`filesDue`), whether or not a file lacked, so the files of a task are read once. The step whose current task
    * named a file the run did not have reads `unsigned` (`lackedOf`): a closeout the run does not accept. Gone with the try, as
@@ -476,14 +465,6 @@ export const lackedOf = (record: StepRecord | undefined) =>
   record?.filesRead && record.filesRead.taskId === record.taskId
     ? Object.entries(record.filesRead.lacked).map(([path, why]) => ({ path, why }))
     : [];
-
-/**
- * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
- * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that
- * what a person stages in the checkout after it is theirs. An abort of a merge its check refused names the base it was staged on
- * (`refusedOn`), which `nemia refresh --base` reads (`mergeAsk`).
- */
-export type LandingRecord = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.

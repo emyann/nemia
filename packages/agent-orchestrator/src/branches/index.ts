@@ -15,7 +15,6 @@ export {
   tipBranches,
   tipsSeen,
   touchedLines,
-  workChecks,
 } from './branches.ts';
 export { mergeWord, mergeWordOf } from './merges.ts';
 export type { MergeWord, StandingMerge } from './merges.ts';

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { settingsOf } from './config/config.store.ts';
 import { storeAdmission, storeLimits } from './runtime-client.ts';
-import { ASKED_PRIORITY, LANDING_MOMENTUM, MOMENTUM } from './status/status.ts';
+import { ASKED_PRIORITY, MOMENTUM } from './status/status.ts';
 import { NEMIA_PRIORITY } from './nemia/keep.verb.ts';
 
 const GI = 1024 ** 3;
@@ -75,6 +75,6 @@ describe("`storeAdmission`: the room kept for a person's turn, WF_KEPT_TURNS pla
 });
 
 test("`ASKED_PRIORITY` lies above every filing of the work and below Nemia's own session", () => {
-  assert.ok(ASKED_PRIORITY > LANDING_MOMENTUM && LANDING_MOMENTUM > MOMENTUM);
+  assert.ok(ASKED_PRIORITY > MOMENTUM);
   assert.ok(ASKED_PRIORITY < NEMIA_PRIORITY);
 });

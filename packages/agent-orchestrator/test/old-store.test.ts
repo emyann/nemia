@@ -7,10 +7,10 @@
  * What each run holds:
  * - `tides`, a repository run frozen while the lists were `disallow:` and `allow:` (`FORMER_KEYS`), its agent's harness prompt under
  *   `systemPrompt: own` and frozen before an agent's denies were kept apart (`agentDenies`), a codex step whose sandbox is the former
- *   `permissionMode`, and an ending frozen as `workspace: main` with `background:`, a key no step has now, its agent on `systemPrompt:
+ *   `permissionMode`, and a last step frozen as `workspace: main` with `background:`, two keys no step has now, its agent on `systemPrompt:
  *   no-coding`. It has filed nothing, and its folder is gone, so a pass files it from what it froze.
- * - `notes`, a repository run that froze no workflow, its steps read off its folder (`workflows/notes`, whose ending says `workspace:
- *   main`), with an earlier try under the former `then`, one whose cause is the former `nudge`, a check, a hand-off, a landing and a
+ * - `notes`, a repository run that froze no workflow, its steps read off its folder (`workflows/notes`), with an earlier try
+ * under the former `then`, one whose cause is the former `nudge`, a check, a hand-off and a
  *   held slot. Its tasks are the engine's as they stood, filed and settled before the walk.
  * - `drafts`, a folder run whose one step says the former `workspace: folder`, a list under its former name beside the new one on the
  *   step and in its agent's `given`, its agent's harness prompt as `systemPrompt: default`, and a key on the record and one on the step
@@ -124,9 +124,9 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       'a codex sandbox frozen as `permissionMode` reads as frozen',
     );
     assert.deepEqual(
-      [ship.workspace, ship.agent?.keys, Reflect.get(ship, 'background')],
-      ['base', ['workspace'], true],
-      '`workspace: main` reads as `base`; `background:` still decodes',
+      [Reflect.get(ship, 'workspace'), Reflect.get(ship, 'background')],
+      [undefined, true],
+      '`workspace: main` and `background:` still decode; the retired `workspace` is dropped, and nothing reads `background`',
     );
 
     const notes = runRecord(ROOT, 'notes');
@@ -137,15 +137,12 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       ['retries', false, 'continue'],
       'the former `then` and `nudge` read as today',
     );
-    assert.deepEqual(
-      [notes.steps.implement.check?.taskId, Reflect.get(notes.steps.ship.landed ?? {}, 'commit')],
-      ['notes-implement-try2-check', 'fed789'],
-    );
+    assert.deepEqual([notes.steps.implement.check?.taskId, notes.steps.ship.taskId], ['notes-implement-try2-check', 'notes-ship']);
 
     const [write] = runRecord(ROOT, 'drafts').workflow!;
     assert.deepEqual(
-      [write.place, write.workspace, write.agent?.keys, write.disallowedTools, write.agent?.given],
-      ['folder', undefined, ['place', 'disallowedTools'], ['SendMessage'], { disallowedTools: 'SendMessage' }],
+      [write.place, write.agent?.keys, write.disallowedTools, write.agent?.given],
+      ['folder', ['place', 'disallowedTools'], ['SendMessage'], { disallowedTools: 'SendMessage' }],
       '`workspace: folder` reads as `place: folder`, its agent’s keys too; the former name beside the new one reads under the new alone',
     );
     assert.equal(write.agent?.harnessPrompt, 'keep', '`systemPrompt: default` reads as `harnessPrompt: keep`');
@@ -183,11 +180,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       [['implement'], [], ['write']],
       'the unfiled runs file their first step, and the run that froze no workflow files nothing it has already run',
     );
-    assert.equal(
-      report.runs.find((a) => a.run.id === 'notes')?.status,
-      'succeeded',
-      'and is judged on its tries, its check and its landing',
-    );
+    assert.equal(report.runs.find((a) => a.run.id === 'notes')?.status, 'succeeded', 'and is judged on its tries and its check');
     const implement = b.tasks.get('tides-implement')!.spec.config;
     assert.deepEqual(
       [implement?.disallowedTools, implement?.allowedTools],
@@ -215,7 +208,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       ],
     );
     assert.equal(holdsAny(implement, 'disallow', 'allow') || holdsAny(implement.agent, 'systemPrompt'), false, 'no former name written');
-    assert.deepEqual([review.permissionMode, ship.workspace], ['bypassPermissions', 'base']);
+    assert.deepEqual([review.permissionMode, holdsAny(ship, 'workspace')], ['bypassPermissions', false]);
     const drafts = written('drafts');
     const [write] = drafts.workflow;
     assert.deepEqual([write.place, holdsAny(write, 'workspace', 'disallow')], ['folder', false]);

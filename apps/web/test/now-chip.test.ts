@@ -43,10 +43,9 @@ describe('nowStandsOf: where a step stands, by its state, what it waits on and t
     for (const [state, stands] of Object.entries(STANDS) as Array<[StepState, NowStands]>)
       assert.equal(nowStandsOf(state, null, false), stands, state);
   });
-  test('a step to come by what it waits on: another run or the checkout, the pause, a hold', () => {
+  test('a step to come by what it waits on: another run, the pause, a hold', () => {
     const on: Record<WaitOn, NowStands> = {
       run: 'waitsOnARun',
-      base: 'waitsOnARun',
       limit: 'waitsForASlot',
       pause: 'atRest',
       hold: 'held',
@@ -103,15 +102,5 @@ describe('waitersOf: the runs of the page that wait on a run, on its checkout, o
   });
   test('a run that both waits on and is held until the run is one run', () => {
     assert.equal(waitersOf([row('b', ['a'], [['a', false]])], 'a').length, 1);
-  });
-  test('a run whose step waits on the checkout counts in the fan of the run whose ending has it, once', () => {
-    const onCheckout = (id: string, holder: string, waitsOn: string[] = []) => {
-      const r = row(id, waitsOn);
-      return { ...r, steps: [{ ...r.steps[0], on: 'base' as const, baseHeldBy: { run: holder, step: 'land' } }] };
-    };
-    const rows = [row('a'), onCheckout('b', 'a'), onCheckout('c', 'a', ['a']), row('d', ['a'])];
-    assert.equal(waitersOf(rows, 'a').length, 3);
-    assert.equal(waitersOf(rows, 'b').length, 0);
-    assert.equal(waitersOf([onCheckout('a', 'a')], 'a').length, 0, 'never the run itself');
   });
 });

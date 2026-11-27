@@ -172,7 +172,7 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
  * A run's steps as its workflow's graph drawn small (`graphOf`), `width` wide, 24 high for a row or a fork: each step a cut diamond by its
  * mark (`stepMark`, a step at work or waiting on you a size larger, at work with a slow pulse), a route a dot, a line solid where the run
  * has gone and dashed ahead, a loop under the row at right angles, violet once gone round, a gate a tick on the side of its step its
- * approval is (after a step whose closeout waits, before an ending approved first), yellow where that step waits on you. Past what its
+ * approval is (after a step whose closeout waits), yellow where that step waits on you. Past what its
  * width holds the columns away from where the run is fold into a count. Read aloud as one group, each step and its word (`railSaid`). With
  * `wrap`, each node is put inside what it gives (a button that opens the step); without, each says its name and word in the kit's tooltip.
  * A run listed without its graph says what to do (`UNGRAPHED`). `width` is 188 pixels by default; `className` is the box's, `nodrag` on
@@ -246,7 +246,7 @@ export function StepGraph({
   );
 }
 
-/** The graph's lines under its nodes, and each gate's tick on the side of its step its approval is, yellow where that step waits on you. */
+/** The graph's lines under its nodes, and each gate's tick after its step, yellow where that step waits on you. */
 function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: ReadonlyMap<string, { mark: StepMark }> }) {
   return (
     <svg
@@ -262,7 +262,6 @@ function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: Readonl
         <line
           key={gate.step}
           data-gate={gate.step}
-          data-gate-at={gate.at}
           x1={gate.x}
           x2={gate.x}
           y1={gate.y - 5.5}

@@ -1,6 +1,6 @@
 /**
  * The flow numbers (`factsOf`, `statsOf`, `stats.ts`), off a real timeline (`timeline`) of hand-built views, as one table per function:
- * each number is keyed on a workflow's structure — `loop:` for rounds, `workspace: base` for landings — never on a step's name, and
+ * each number is keyed on a workflow's structure — `loop:` for rounds, the branch standing for merges — never on a step's name, and
  * absent, null, never 0, where nothing measured it. Their words are the client's (`apps/cli/test/rest-lines.test.ts`). `nemia stats`
  * over a store, and its null read through the engine, are the stories of `test/stats.test.ts`.
  */
@@ -20,7 +20,6 @@ import {
   keysOf,
   checkRowsOf,
   memoryRowsOf,
-  slowLandingsOf,
   statsOf,
   statsQueryOf,
   type CheckVerdict,
@@ -45,7 +44,7 @@ const TEAM = [
   step('design', [], { by: 'planner' }),
   step('implement', ['design'], { by: 'implementer' }),
   step('review', ['implement'], { by: 'reviewer', loop: 'implement', rounds: 3 }),
-  step('land', ['review'], { by: 'shipper', workspace: 'base', gate: true, check: 'npm test' }),
+  step('land', ['review'], { by: 'shipper', gate: true, check: 'npm test' }),
 ];
 
 /**
@@ -172,6 +171,7 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
       const output = closeouts.get(taskId);
       return output && { outcome: 'done' as const, summary: '', artifacts: [], output };
     },
+    merged: null as boolean | null,
     closeoutOf: (name: string) =>
       steps.find((s) => s.name === name)?.loop ? { outcome: 'done' as const, summary: '', artifacts: [], output: { again } } : undefined,
   };
@@ -181,8 +181,8 @@ const DAY = '2026-09-10';
 const at = (hour: number, day = DAY) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
 const NOW = new Date(`${DAY}T20:00:00.000Z`);
 
-/** A run of the team that went round its loop twice and landed on the ending's first try. */
-const twoRounds = (id: string, steps = TEAM, landed: object = { commit: 'abc' }, more: Partial<Run> = {}) => {
+/** A run of the team that went round its loop twice, its branches on the base unless `merged` says otherwise. */
+const twoRounds = (id: string, steps = TEAM, merged: boolean | null = true, more: Partial<Run> = {}) => {
   const [design, implement, review, land] = steps.map((s) => s.name);
   const tries = {
     [design]: [{ end: at(1) }],
@@ -193,14 +193,11 @@ const twoRounds = (id: string, steps = TEAM, landed: object = { commit: 'abc' },
     [review]: [{ end: at(3), cause: 'round' as const }, { end: at(5) }],
     [land]: [{ end: at(7), check: 'passed' as const }],
   };
-  return withLanded(readOf(id, steps, tries, more), land, landed);
+  return withMerged(readOf(id, steps, tries, more), merged);
 };
 
-/** `r` with its ending's record saying what the run did with its merge. */
-function withLanded<R extends ReturnType<typeof readOf>>(r: R, ending: string, landed: object) {
-  r.run.steps[ending] = { ...r.run.steps[ending], landed } as Run['steps'][string];
-  return r satisfies R;
-}
+/** `r` read with its result branches on the base (`true`), off it (`false`), or not read (`null`). */
+const withMerged = <R extends ReturnType<typeof readOf>>(r: R, merged: boolean | null) => ({ ...r, merged }) satisfies R;
 
 const factsOfAll = (...reads: ReturnType<typeof readOf>[]) =>
   ({
@@ -235,15 +232,6 @@ const TWO_BEFORE = '2026-09-08';
 
 /** A workflow of one step that tallies its issues and the open ones (`tally:`). */
 const TRIAGE = [step('triage', [], { by: 'sorter', tally: ['issues', 'issues.open'] })];
-
-/** A run of the team whose ending's one try's check ended `check`, after `checkRan` seconds, its task filed with `deadline` seconds. */
-const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?: number, steps = TEAM) =>
-  readOf(id, steps, {
-    design: [{ end: at(1) }],
-    implement: [{ end: at(2) }],
-    review: [{ end: at(3) }],
-    land: [{ end: at(7), check, checkRan, ...(deadline === undefined ? {} : { deadline }) }],
-  });
 
 /** A row whose body is its claim: the name says it, `check` asserts it. */
 type Row = { name: string; check: () => void };
@@ -288,8 +276,7 @@ describe('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days
 
 const renamedLoop = TEAM.map((s) => (s.name === 'review' ? { ...s, name: 'critique' } : s));
 const noLoop = TEAM.map(({ loop: _loop, rounds: _rounds, ...s }) => s as StepSpec);
-const noEnding = TEAM.filter((s) => s.workspace !== 'base');
-const prose = TEAM.map((s) => (s.workspace === 'base' ? { ...s, check: undefined } : s));
+const noEnding = TEAM.filter((s) => s.name !== 'land');
 const plain = [step('implement', []), step('document', ['implement'])];
 const gated = [
   step('brief', []),
@@ -302,40 +289,18 @@ const gatedTries = {
   implement: [{ end: at(5) }],
 };
 const answered = { design: [{ end: at(1) }, { end: at(2), answers: true as const }] };
-const proseTries = (land: Try[]) => ({
-  design: [{ end: at(1) }],
-  implement: [{ end: at(2), cause: 'round' as const }, { end: at(4) }],
-  review: [{ end: at(3), cause: 'round' as const }, { end: at(5) }],
-  land,
-});
 /** How many runs of `plain` finish, its last try `last`. */
 const finished = (last: Try) => factsOf(readOf('p', plain, { implement: [{ end: at(1) }], document: [last] })).runs.length;
 /** A run of the team whose sessions cost `big`, but its design's, which was not measured. */
 const partly = (big: number) =>
-  withLanded(
+  withMerged(
     readOf('partly', TEAM, {
       design: [{ end: at(1), cost: null }],
       implement: [{ end: at(2), cost: big }],
       review: [{ end: at(3), cost: big }],
-      land: [{ end: at(7), cost: big }],
+      land: [{ end: at(7), cost: big, check: 'passed' as const }],
     }),
-    'land',
-    { commit: 'x' },
-  );
-/** A run of `steps` whose landing went to a second try. */
-const secondTry = () =>
-  withLanded(
-    readOf('second', TEAM, {
-      design: [{ end: at(1) }],
-      implement: [{ end: at(2) }],
-      review: [{ end: at(3) }],
-      land: [
-        { end: at(5), check: 'refused', cause: 'retries' },
-        { end: at(7), check: 'passed' },
-      ],
-    }),
-    'land',
-    { commit: 'def' },
+    true,
   );
 const declaredSpec = { design: { 'write-a-spec': [readWithRead] } };
 const planner = [step('design', [], { by: 'planner' })];
@@ -352,48 +317,45 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
     },
     { name: 'a workflow with no loop has no rounds', check: () => assert.deepEqual(factsOf(twoRounds('r3', noLoop)).runs[0].rounds, []) },
     {
-      name: 'a loop that has not ended accepted counts no rounds; an acceptance of the try the loop is on ends it',
+      name: 'a loop that has not ended accepted is no finished run; an acceptance of the try the loop is on ends it',
       check: () => {
-        const r = withLanded(
-          readOf(
-            'r-open',
-            TEAM,
-            { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] },
-            {},
-            true,
-          ),
-          'land',
-          { commit: 'abc' },
+        const r = readOf(
+          'r-open',
+          TEAM,
+          {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          },
+          {},
+          true,
         );
-        assert.deepEqual(factsOf(r).runs[0].rounds, []);
+        assert.equal(factsOf(r).runs.length, 0, 'a loop that asked for another round nobody accepted has not finished');
         r.run.acceptances = [{ step: 'review', try: 1, at: at(4), message: 'enough' }];
         assert.deepEqual(factsOf(r).runs[0].rounds, [1]);
       },
     },
     {
-      name: 'an acceptance of an earlier try of the loop counts no rounds: the loop is on another try',
+      name: 'an acceptance of an earlier try of the loop finishes no run: the loop is on another try',
       check: () => {
-        const r = withLanded(
-          readOf(
-            'r-earlier',
-            TEAM,
-            {
-              design: [{ end: at(1) }],
-              implement: [{ end: at(2), cause: 'round' }, { end: at(4) }],
-              review: [{ end: at(3), cause: 'round' }, { end: at(5) }],
-              land: [{ end: at(7) }],
-            },
-            { acceptances: [{ step: 'review', try: 1, at: at(4), message: 'enough' }] },
-            true,
-          ),
-          'land',
-          { commit: 'abc' },
+        const r = readOf(
+          'r-earlier',
+          TEAM,
+          {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2), cause: 'round' }, { end: at(4) }],
+            review: [{ end: at(3), cause: 'round' }, { end: at(5) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          },
+          { acceptances: [{ step: 'review', try: 1, at: at(4), message: 'enough' }] },
+          true,
         );
-        assert.deepEqual(factsOf(r).runs[0].rounds, []);
+        assert.equal(factsOf(r).runs.length, 0, 'the loop is on another try, which nobody accepted');
       },
     },
     {
-      name: 'a landing on try 1 of the `workspace: base` step, whatever its name, is landed and first-try',
+      name: 'a run whose result branches are all on the base is merged, whatever its steps are called',
       check: () => {
         const [run] = factsOf(
           twoRounds(
@@ -401,20 +363,16 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
             TEAM.map((s) => (s.name === 'land' ? { ...s, name: 'ship' } : s)),
           ),
         ).runs;
-        assert.deepEqual([run.merged, run.firstTry], [true, true]);
+        assert.equal(run.merged, true);
       },
     },
     {
-      name: 'a landing on try 2 is landed, not first-try',
-      check: () => assert.deepEqual([factsOf(secondTry()).runs[0].merged, factsOf(secondTry()).runs[0].firstTry], [true, false]),
-    },
-    {
-      name: 'no ending: its landing is absent, null',
+      name: 'a run whose branches were not read has no merged answer: null',
       check: () => {
         const [run] = factsOf(
           readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] }),
         ).runs;
-        assert.deepEqual([run.merged, run.firstTry], [null, null]);
+        assert.equal(run.merged, null);
       },
     },
     {
@@ -429,28 +387,6 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
     },
     { name: 'a failed session waits for nemia retry', check: () => assert.equal(finished({ end: at(2), failed: true }), 0) },
     {
-      name: 'an ending that commits in its own prose finishes once done: its run and rounds counted, its landing unknown',
-      check: () => {
-        const [old] = factsOf(readOf('old', prose, proseTries([{ end: at(7) }]))).runs;
-        assert.deepEqual([old?.day, old?.rounds, old?.merged, old?.firstTry], [DAY, [2], null, null]);
-      },
-    },
-    {
-      name: 'an ending in prose that failed waits',
-      check: () => assert.equal(factsOf(readOf('old', prose, proseTries([{ end: at(7), failed: true }]))).runs.length, 0),
-    },
-    {
-      name: 'an ending that lands on its check waits for the run to land it, then is landed',
-      check: () => {
-        const staged = readOf('staged', TEAM, proseTries([{ end: at(7), check: 'passed' }]));
-        assert.equal(factsOf(staged).runs.length, 0);
-        assert.deepEqual(
-          factsOf(withLanded(staged, 'land', { commit: 'abc' })).runs.map((r) => r.merged),
-          [true],
-        );
-      },
-    },
-    {
       name: 'a step that signed off blocked leaves its run waiting, though its session succeeded',
       check: () => {
         const r = readOf('b', plain, { implement: [{ end: at(1) }], document: [{ end: at(2) }] });
@@ -462,7 +398,7 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
     {
       name: 'a cancelled run never finishes: its tries are counted, and the run is not',
       check: () => {
-        const facts = factsOf(twoRounds('c', TEAM, { commit: 'abc' }, { cancelledAt: at(8) }));
+        const facts = factsOf(twoRounds('c', TEAM, true, { cancelledAt: at(8) }));
         assert.deepEqual([facts.runs.length, facts.tries.length], [0, 6]);
         assert.equal(factsOf(twoRounds('c')).runs.length, 1, 'the same run, not cancelled, finished');
       },
@@ -707,18 +643,18 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
       check: () =>
         assert.deepEqual(factsOf(readOf('plain', planner, { design: [{ end: at(1), closeout: { issues: [1] } }] })).tries[0].tallies, []),
     },
-    {
-      name: 'a landing check filed with no deadline has none',
-      check: () =>
-        assert.equal(factsOf(landingAt('unfiled', 'passed', 2430)).tries.find((x) => x.step === 'land')?.landingDeadlineMs, null),
-    },
   ]);
 });
 
 describe('`headlineOf`: the headline numbers of a set of facts, each mean over what was measured and null over nothing', () => {
   const headline = (...reads: ReturnType<typeof readOf>[]) => headlineOf(factsOfAll(...reads));
   const old = (id: string) =>
-    readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+    readOf(id, TEAM, {
+      design: [{ end: at(1) }],
+      implement: [{ end: at(2) }],
+      review: [{ end: at(3) }],
+      land: [{ end: at(7), check: 'passed' as const }],
+    });
   const deniedSteps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer', harness: 'codex' })];
   const deniedTries = {
     design: [
@@ -734,11 +670,11 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
     },
     { name: 'a workflow with no loop: rounds null, not 0', check: () => assert.equal(headline(twoRounds('r3', noLoop)).rounds, null) },
     {
-      name: 'first-try landings are a share of the landed runs, and a run with no ending is counted, not landed',
+      name: 'merged counts the runs whose branches are on the base, and a run not read is counted, not merged',
       check: () => {
         const none = readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] });
-        const h = headline(twoRounds('first'), secondTry(), none);
-        assert.deepEqual([h.firstTry, h.merged, h.runs], [0.5, 2, 3]);
+        const h = headline(twoRounds('first'), twoRounds('open', TEAM, false), none);
+        assert.deepEqual([h.merged, h.runs], [1, 3]);
       },
     },
     {
@@ -750,11 +686,7 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
     },
     {
       name: 'runs that never recorded their landing have no landed count: null, never 0',
-      check: () =>
-        assert.deepEqual(
-          [headline(old('o1'), old('o2')).runs, headline(old('o1'), old('o2')).merged, headline(old('o1'), old('o2')).firstTry],
-          [2, null, null],
-        ),
+      check: () => assert.deepEqual([headline(old('o1'), old('o2')).runs, headline(old('o1'), old('o2')).merged], [2, null]),
     },
     {
       name: 'one run of the day that recorded its landing counts it',
@@ -766,7 +698,7 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
     },
     {
       name: 'a run recorded as not landing is counted: 0, not null',
-      check: () => assert.equal(headline(twoRounds('aborted', TEAM, { aborted: 'its check refused' })).merged, 0),
+      check: () => assert.equal(headline(twoRounds('aborted', TEAM, false)).merged, 0),
     },
     {
       name: 'refused calls are a mean per measured try: three calls over two, the codex try not one of them',
@@ -800,8 +732,6 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
     },
   ]);
 });
-
-const landingOf = (r: ReturnType<typeof readOf>) => slowLandingsOf(factsOf(r).tries);
 
 describe('`checkRowsOf`: a row per named check of a step, its median and p90 over the tries that ran it to a verdict, and the share it refused', () => {
   const tryOf = (n: number, checks: TryFact['checks']) => ({ workflow: 'build', step: 'implement', try: n, checks }) as TryFact;
@@ -883,82 +813,6 @@ describe("`memoryRowsOf`: a row per workflow step whose tries ran a session, its
       [measured, undefined],
     );
   });
-});
-
-describe('`slowLandingsOf`: each landing check that passed in more than half the deadline its task was filed with', () => {
-  rowsOf([
-    {
-      name: 'a passed landing check over half its deadline is named, with its time, the deadline and the share',
-      check: () => {
-        const [slow, ...more] = landingOf(landingAt('slow', 'passed', 1377, 2700));
-        assert.deepEqual(more, []);
-        const { share, ...rest } = slow;
-        assert.deepEqual(rest, {
-          run: 'slow',
-          factory: 'default',
-          workflow: 'dev',
-          repo: '/r',
-          day: DAY,
-          step: 'land',
-          try: 1,
-          checkMs: 1_377_000,
-          deadlineMs: 2_700_000,
-        });
-        assert.equal(Math.round(share * 100), 51);
-      },
-    },
-    { name: 'at 49% it is not named', check: () => assert.deepEqual(landingOf(landingAt('quick', 'passed', 1323, 2700)), []) },
-    { name: 'at exactly half it is not named', check: () => assert.deepEqual(landingOf(landingAt('half', 'passed', 1350, 2700)), []) },
-    ...(['refused', 'unfinished'] as const).map((verdict) => ({
-      name: `a landing check ${verdict} at 90% is not named`,
-      check: () => assert.deepEqual(landingOf(landingAt(verdict, verdict, 2430, 2700)), []),
-    })),
-    {
-      name: 'the same 1033 s is judged against the deadline its task was filed with: over half of 1200',
-      check: () =>
-        assert.deepEqual(
-          landingOf(landingAt('old', 'passed', 1033, 1200)).map((x) => [x.run, x.deadlineMs, Math.round(x.share * 100)]),
-          [['old', 1_200_000, 86]],
-        ),
-    },
-    { name: 'and under half of 2700, at 38%', check: () => assert.deepEqual(landingOf(landingAt('new', 'passed', 1033, 2700)), []) },
-    {
-      name: 'a check filed with no deadline is not measured',
-      check: () => assert.deepEqual(landingOf(landingAt('unfiled', 'passed', 2430)), []),
-    },
-    {
-      name: "a round's check is no landing, whatever its time",
-      check: () => {
-        const checked = TEAM.map((s) => (s.name === 'implement' ? { ...s, check: 'npm test' } : s));
-        assert.deepEqual(
-          landingOf(
-            readOf('round', checked, {
-              design: [{ end: at(1) }],
-              implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],
-            }),
-          ),
-          [],
-        );
-      },
-    },
-    {
-      name: 'a step is a landing by its structure, not its name',
-      check: () => {
-        const landing = TEAM.map((s) =>
-          s.name === 'implement' ? { ...s, check: 'npm test', workspace: 'base' as const, gate: true as const } : s,
-        );
-        assert.deepEqual(
-          landingOf(
-            readOf('lands', landing, {
-              design: [{ end: at(1) }],
-              implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],
-            }),
-          ).map((x) => x.step),
-          ['implement'],
-        );
-      },
-    },
-  ]);
 });
 
 const deniedByCall = {
@@ -1069,7 +923,12 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
       name: 'a day whose runs never recorded their landing has no landed count',
       check: () => {
         const old = (id: string) =>
-          readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+          readOf(id, TEAM, {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          });
         const s = statsOf(factsOfAll(old('old-1'), old('old-2')), { by: 'workflow' }, NOW);
         assert.equal(s.groups[0].days.find((d) => d.day === DAY)?.merged, null);
       },
@@ -1316,23 +1175,6 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
         assert.deepEqual(s.health, HEALTH);
       },
     },
-    {
-      name: "the slow landings keep to the query's filters and days, and each group has its own",
-      check: () => {
-        const facts = factsOfAll(landingAt('slow', 'passed', 2430, 2700));
-        assert.deepEqual(statsOf(facts, { factory: 'other' }, NOW).all.slowLandings, []);
-        assert.deepEqual(statsOf(facts, { from: '2026-09-11', to: '2026-09-11' }, NOW).all.slowLandings, []);
-        assert.deepEqual(
-          statsOf(facts, { by: 'step' }, NOW).groups.map((g) => [g.key, g.slowLandings.length]),
-          [
-            ['design', 0],
-            ['implement', 0],
-            ['land', 1],
-            ['review', 0],
-          ],
-        );
-      },
-    },
   ]);
 });
 
@@ -1354,7 +1196,12 @@ describe('what `nemia stats` prints is made of: null where nothing was measured,
       name: "a day's landed is null where no run recorded it, not 0",
       check: () => {
         const old = (id: string) =>
-          readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+          readOf(id, TEAM, {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          });
         const day = statsOfReads([old('old-1'), old('old-2')], { by: 'workflow' }).groups[0]?.days.find((d) => d.day === DAY);
         assert.deepEqual([day?.runs, day?.merged], [2, null]);
       },
@@ -1434,26 +1281,6 @@ describe('what `nemia stats` prints is made of: null where nothing was measured,
           [implement?.agent, implement?.tries, implement?.ranMs, implement?.checkMs, implement?.costUsd],
           ['implementer', 2, 4 * 3_600_000, 2 * 3_600_000, 2],
         );
-      },
-    },
-    {
-      name: 'a slow landing carries its time, the deadline and the share; a quick one is none',
-      check: () => {
-        const [slow] = statsOfReads([landingAt('slow', 'passed', 1377, 2700)]).all.slowLandings;
-        assert.deepEqual(
-          [slow?.run, slow?.step, slow?.try, slow?.checkMs, slow?.deadlineMs, slow?.share],
-          ['slow', 'land', 1, 1_377_000, 2_700_000, 1377 / 2700],
-        );
-        assert.deepEqual(statsOfReads([landingAt('quick', 'passed', 1323, 2700)]).all.slowLandings, []);
-        assert.equal(statsOfReads([landingAt('a', 'passed', 1377, 2700), landingAt('b', 'passed', 2000, 2700)]).all.slowLandings.length, 2);
-      },
-    },
-    {
-      name: "one older than the last 14 days falls before the tiles' range, which the recap counts within",
-      check: () => {
-        const later = new Date(Date.parse(NOW.toISOString()) + 20 * 86_400_000);
-        const s = statsOfReads([landingAt('slow', 'passed', 1377, 2700)], {}, later);
-        assert.ok((s.all.slowLandings[0]?.day ?? '') < s.all.tiles.last.from, JSON.stringify(s.all.tiles.last));
       },
     },
     {

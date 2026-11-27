@@ -19,7 +19,7 @@ import { LOOP_REPLIES, loopSpan, outputFields, type StepSpec } from '../workflow
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
-import { gatesAt, stepStatus } from '../status/status.ts';
+import { gatesOf, stepStatus } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { runInputGraph } from '../summary/graph.ts';
 import { bare, tryOf } from '../summary/reads.verb.ts';
@@ -86,7 +86,6 @@ const specStepOf = (s: StepSpec) => ({
   model: s.model ?? null,
   effort: s.effort ?? null,
   context: s.context ?? null,
-  workspace: s.workspace ?? null,
   place: s.place ?? null,
   resume: s.resume ?? null,
   fence: s.permissionMode ?? null,
@@ -249,12 +248,6 @@ const asksOf = (judged: RunReading['judged'], name: string) => {
   return asks ? { asks } : {};
 };
 
-/** The run whose ending holds the checkout the step waits on (`Judged`'s `beside`), where it waits on it. */
-const baseHeldByOf = (judged: RunReading['judged'], name: string) => {
-  const hold = judged.beside.get(name)?.baseHeldBy;
-  return hold ? { baseHeldBy: { run: hold.run, step: hold.step } } : {};
-};
-
 /**
  * One step's status (`RunStepStatus`), off what `runObject` read once for the run (`StepAt`), its current try's short read off its tries.
  * One more observation for a blocked session's last line (`lastLineOf`).
@@ -300,7 +293,6 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, at),
     ...asksOf(judged, name),
-    ...baseHeldByOf(judged, name),
   };
   return status;
 });
@@ -327,7 +319,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
     read: runRead(at),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
-    gates: gatesAt(steps, run),
+    gates: gatesOf(steps, run).map((step) => ({ step })),
     warning: null,
     kinds: [...kinds],
     ...resultOf(run, steps),

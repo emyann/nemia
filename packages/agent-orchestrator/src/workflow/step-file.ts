@@ -49,7 +49,6 @@ import {
   slotOf,
   toolsOf,
   wordOf,
-  workspaceOf,
   placeNamed,
   placeRequired,
 } from '../keys/index.ts';
@@ -61,9 +60,6 @@ import {
   FORMER_KEYS,
   formerKeyWritten,
   placeSpelled,
-  placeWritten,
-  baseSpelled,
-  baseWritten,
   readKeys,
   type Spelled,
 } from '../former/former.ts';
@@ -137,8 +133,9 @@ export function parseWorkflow(
     block: fenced,
   } = block === null
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
-    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), MAP_KEYS);
-  meta = baseSpelled(placeSpelled(name, meta));
+    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) || key === 'workspace' ? undefined : unknownKey(name, key)), MAP_KEYS);
+  meta = placeSpelled(name, meta);
+  if (Object.hasOwn(meta, 'workspace')) refuse(unknownKey(name, 'workspace'));
   placedOrWaits(name, meta);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
@@ -407,7 +404,6 @@ export function stepFrom(
     after,
     resume: meta.resume,
     place: placeNamed(name, meta.place),
-    workspace: workspaceOf(name, meta.workspace, meta.check ?? meta.checks, meta.resume, meta.retries, harness),
     writable: writableNamesOf(name, meta.writable),
     reads: readsNamesOf(name, meta.reads),
     slot: slotOf(name, meta.slot),
@@ -496,8 +492,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a comma inside a step's name in `after:` or `input:`, which
- * would be read as two names; and `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes
- * (`placeWritten`), as `workspace: main` is of `workspace: base` (`baseWritten`). A line break in a value is no refusal: it is written
+ * would be read as two names. A line break in a value is no refusal: it is written
  * as a literal block, which holds it.
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
@@ -511,8 +506,6 @@ export function renderStep(step: StepDraft) {
   if (unknown !== undefined)
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
   if (fenceKeyOf(step.harness) === 'sandbox' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
-  if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
-  if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key) => {
     if (key === 'route') {

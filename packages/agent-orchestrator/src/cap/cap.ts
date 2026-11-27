@@ -1,7 +1,7 @@
 /**
- * The caps a pass keeps over runs: runs in flight (`RunSlot`, `runAdmitted`, `heldRuns`), one run's step in a repository's own checkout at
- * a time (`heldCheckouts`), and what is still in flight when a run is called off (`inFlight`). Pure. Sessions at work per pool are the
- * runtime's to admit, under the ceiling `engine()` hands it (`runtime-client.ts`).
+ * The caps a pass keeps over runs: runs in flight (`RunSlot`, `runAdmitted`, `heldRuns`) and what is still in flight when a run is
+ * called off (`inFlight`). Pure. Sessions at work per pool are the runtime's to admit, under the ceiling `engine()` hands it
+ * (`runtime-client.ts`).
  */
 import type { StepSpec } from '../step/step.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
@@ -9,52 +9,6 @@ import { hasStarted, runReady } from '../wait/wait.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { SlotSettled } from '../../contracts/slot-settled.contract.ts';
 import { runEnded } from '../run-ending/run-ending.ts';
-
-/**
- * Which run's `workspace: base` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
- * and its step.
- */
-export type CheckoutHold = { run: string; step: string };
-
-/**
- * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: base` step that works there,
- * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
- * the time of the word that would file it (`claimedAt`): a person's approval or ask, or the run's creation for an ending its workflow
- * files with no gate, and for the try the run files itself of an ending whose try made no commit. That time orders the runs waiting
- * for it.
- */
-export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
-
-/**
- * The runs whose ending step waits for a checkout another run's step has, each with the run and step holding it. Pure.
- *
- * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
- * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
- * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: base` task is in flight has the checkout, and
- * every other run of the same repository waiting to file one is held until it settles, and a run in it is never held. With none in it,
- * the oldest word takes it — then by id — so which pass reads which run first decides nothing.
- *
- * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
- * and a run held on one pass is asked again on the next.
- * @param claims Each run's claim on its repository's checkout: whether its ending step holds it, else since when it waits for it.
- */
-export function heldCheckouts(claims: readonly MainClaim[]) {
-  const held = new Map<string, CheckoutHold>();
-  const repos = new Map<string, MainClaim[]>();
-  for (const c of claims) repos.set(c.repo, [...(repos.get(c.repo) ?? []), c]);
-  for (const group of repos.values()) {
-    let taken = group.find((c) => c.holds);
-    const waiting = group
-      .flatMap((c) => (!c.holds && c.at !== undefined ? [{ claim: c, at: c.at }] : []))
-      .sort((a, b) => a.at.localeCompare(b.at) || a.claim.id.localeCompare(b.claim.id))
-      .map(({ claim }) => claim);
-    for (const c of waiting) {
-      if (!taken) taken = c;
-      else if (taken.id !== c.id) held.set(c.id, { run: taken.id, step: taken.step });
-    }
-  }
-  return held;
-}
 
 /**
  * The cap on runs in flight (`WF_MAX_RUNS`), and how many are in flight as a run with nothing filed is judged: every run that has started
@@ -81,22 +35,20 @@ export type RunSlot = { inFlight: number; cap: number };
  *
  * @param run The run's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
- * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the checkout or the pause holds.
+ * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the pause holds.
  * @param released Whether the run of that id has succeeded or been released, which a run waiting on runs (`--after`) asks.
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnPause'>,
   released: (runId: string) => boolean,
   steps: readonly Pick<StepSpec, 'slot'>[] = [],
 ) {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due =
-    a.ready.length + a.check.length + a.retry.length + a.round.length + a.waitingOnCheckout.length + (a.waitingOnPause?.steps.length ?? 0) >
-    0;
+  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + (a.waitingOnPause?.steps.length ?? 0) > 0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
     wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, released),

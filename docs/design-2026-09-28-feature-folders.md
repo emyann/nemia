@@ -257,7 +257,7 @@ Pure layering, leaf first. "code" is today's code lines moving in, from the decl
 | `wait/` | `wait.ts`, `wait.verb.ts` | `run.ts` 1175–1211 and 1322–1573 (waits, holds, their advice and refusals); `verbs.ts`'s `hold`, `unhold` |
 | `artifacts/` | `artifacts.ts`, `artifacts.store.ts` | `run.ts` 4187–4344; `artifacts.ts` |
 | `prune/` | `prune.ts`, `prune.verb.ts` | `run.ts` 3922–4132; `forget.ts`'s `prune` |
-| `ending/` | `ending.ts`, `ending.verb.ts` | `run.ts` 803–1175 (landing, one checkout, `toDecide`, `gateRefusal`) without the facts that went to `status/`; `tick.ts`'s `landEnding`, `checkoutHold`, `mainClaim` |
+| `ending/` | `ending.ts`, `ending.verb.ts` | `run.ts` 803–1175 (landing, one checkout, `toDecide`, `gateRefusal`) without the facts that went to `status/`; `tick.ts`'s the retired landing act, the retired checkout hold, the retired checkout claim |
 | `gate/` | `gate.ts`, `gate.verb.ts` | `run.ts` 479–803's refusals (`approvalRefusal`, `approvalWordsRefusal`, `holdsOpen`); `verbs.ts`'s `approve` |
 | `round/` | `round.ts`, `round.verb.ts` | `run.ts` 2817–3347 without the loop facts (`roundsDue`, `roundAsk`, `acceptAsk`, notes, `roundLines`: ~310); `verbs.ts`'s `round`, `accept` |
 | `retry/` | `retry.ts`, `retry-ask.ts`, `retry.verb.ts`, `index.ts` | `run.ts` 2064–2761 (`retryable`, `retriesDue`, `retryRefusal` and their words `tryNote`, `retryLines`, `deniedOffer`, `answerLines`: ~470 code) → `retry.ts`; today's `retry.ts` (85) → `retry-ask.ts`, since together they pass 500; `verbs.ts`'s `retry` |
@@ -339,7 +339,7 @@ Every file of today, where it goes:
 | lines | section | goes to |
 |---|---|---|
 | 1–479 | the record: `TaskPhase` … `RunBase`, `Hold`, `Pruned`, `Approval`, `Acceptance`, `StepStatus`, `satisfiesAfter`, `stopsFollowers`, `stoppedOnWord` | `record/record.ts`. `assess` → `tick/assess.ts` |
-| 479–803 | a gate | facts (`hasGate`, `gatesOf`, `approvalOf`, `acceptanceOf`, `askedAgain`, `atGate`, `approvedFirst`, `waitsAtGate`, `notHandedOn`, `unheld`, `endingStopped`, `sentBack`, `sendBackTo`, `gateWords`, spent approvals and acceptances) → `status/status.ts`. `approvalRefusal`, `approvalWordsRefusal`, `holdsOpen` → `gate/gate.ts` |
+| 479–803 | a gate | facts (`hasGate`, `gatesOf`, `approvalOf`, `acceptanceOf`, `askedAgain`, `atGate`, the retired approval-first fact, `waitsAtGate`, `notHandedOn`, `unheld`, `endingStopped`, `sentBack`, `sendBackTo`, `gateWords`, spent approvals and acceptances) → `status/status.ts`. `approvalRefusal`, `approvalWordsRefusal`, `holdsOpen` → `gate/gate.ts` |
 | 803–961 | an ending that lands on its check | `landsOnCheck` → `status/status.ts`; the rest → `ending/ending.ts` |
 | 961–1175 | one checkout, one ending step | `heldByCheckout`, `resultOnBase` → `status/status.ts`; `heldCheckouts` → `cap/cap.ts`; `firstLine` → `record/record.ts`; the rest (`toDecide`, `merges`, `gateRefusal`, …) → `ending/ending.ts` |
 | 1175–1211 | waiting on a run | `wait/wait.ts` |
@@ -427,14 +427,14 @@ passes 500 in any one file; it splits along these three sections and no further.
 |---|---|---|
 | top | `underBudget` | `tick/advance.verb.ts` |
 | 162–301 | `adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps` (the read phase) | `tick/advance.verb.ts` |
-| 301–428 | `Advanced`, `advance`; `checkoutHold`, `mainClaim` | `advance` → `tick/advance.verb.ts`; `checkoutHold`, `mainClaim` → `ending/ending.verb.ts` |
+| 301–428 | `Advanced`, `advance`; the retired checkout hold, the retired checkout claim | `advance` → `tick/advance.verb.ts`; the retired checkout hold, the retired checkout claim → `ending/ending.verb.ts` |
 | 433–594 | `advanceRun`: read, cancelled, hand-off and artifacts, landing, checkout hold, hold lift, `assess`, waiting tasks closed, parents and admission, feed words | `tick/advance.verb.ts`, one named phase each |
 | 595–867 | retries filed, rounds filed | `tick/file.verb.ts` |
 | 868–1017 | checks filed, ready roots filed with their parents' closeouts | `tick/file.verb.ts` |
 | 1018–1090 | slot held first, tips, record written, rest facts | `tick/advance.verb.ts` |
 | 1090–1300 | `handOffOwed`, `closeHeld`, `closeWaitingTasks`, `answerHeld` | `tick/advance.verb.ts` |
 | | `resultTips` | `branches/branches.store.ts` |
-| | `landEnding` | `ending/ending.verb.ts` |
+| | the retired landing act | `ending/ending.verb.ts` |
 | | `localFields`, `toldOf`, `parentCloseouts` | `tick/file.verb.ts` |
 | 1300–1430 | `Pass`, `refusalLines`, `tick`, `pass`; `runSlots` (1671) | `tick/tick.verb.ts` |
 | 1430–1568 | runs at rest: `RestMemo`, `restingPass`, `advanceResting` | `tick/tick.verb.ts` |

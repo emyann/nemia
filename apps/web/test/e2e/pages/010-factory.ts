@@ -344,13 +344,13 @@ export default {
     );
 
     const ending = cardOf(page, ENDING.id);
-    await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
+    await expectVisible(ending, `a run at its gate keeps its card on the floor with no Show finished (${ENDING.id})`);
     await expectVisible(
       ending.locator(
-        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
-        { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` },
+        `[data-gate-line="${ENDING.ending}"][title^="approve what ${ENDING.ending} handed on, or send it back"][title$="${ENDING.ending} has signed off at its gate — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
+        { hasText: `approve what ${ENDING.ending} handed on, or send it back` },
       ),
-      `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
+      `its card says what approving does and where a send-back goes, the command on hover`,
     );
     await expectVisible(ending.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card: Approve');
     await expectVisible(
@@ -384,7 +384,7 @@ export default {
     await expectCount(
       cardOf(page, LANDED.id),
       0,
-      `a run whose ending merged it is decided: no card on the floor by default (${LANDED.id})`,
+      `a run whose gate was approved and branch merged is decided: no card on the floor by default (${LANDED.id})`,
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), { fullPage: true });

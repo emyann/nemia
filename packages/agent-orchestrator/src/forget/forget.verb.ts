@@ -11,7 +11,6 @@ import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { StepSpec } from '../step/step.ts';
 import { isRepositoryRun, namesInOrder, runTasks, type RepositoryRun, type Run } from '../record/record.ts';
-import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import {
   branchFates,
   askOffLine,
@@ -30,12 +29,9 @@ import {
 import { lstatOf } from '../record/record.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
-import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
+import { PlaceService, readRunPlace, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
-import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
-import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
-import { statusMemo } from '../place/landing.store.ts';
-import { merging, resolved, sayLeft } from './prune/prune.verb.ts';
+import { resolved, sayLeft } from './prune/prune.verb.ts';
 import { untrustRunHome } from '../trust/home.verb.ts';
 import { taskPhasesRead } from '../views/views.verb.ts';
 import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
@@ -68,7 +64,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * Read as `cancel` reads a run: a check, a try, a round or a step a pass filed and never wrote down is adopted in memory, so it is in
  * flight too — on a cancelled run as well, which a pass that read it before the cancel may be filing now. A record with no frozen workflow
  * reads its folder, which may be gone: the run is then judged without its steps (`forgetRefusal`). Where the result stands against the
- * base branch is read only for an ending that has not run: one whose result git already has holds nothing.
+ * base branch is read only for a result not yet on the base: one git already has holds nothing.
  *
  * Once nothing refuses, a task held open that waits for a word is closed, as no pass reads the run again to close it; one the engine
  * refuses to close, answered, settled or stopped since it was read, waits for nothing. A folder run's folders are under its own directory,
@@ -111,9 +107,8 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
-  const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
   const asked = yield* PlaceService;
-  const refusal = yield* refusalOf(id, f, git, asked);
+  const refusal = yield* refusalOf(id, f);
   if (refusal) {
     const refused: Forgot = { ...said, kind: 'refused', refusal, ...nothing() };
     return refused;
@@ -213,21 +208,12 @@ export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: rea
 });
 
 /**
- * Whether `nemia rm` reads where `run`'s result stands: for an ending gated before it runs that has not run, or one that lands on its
- * check, whose staged merge is read off its result tips.
+ * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs.
  */
-const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined) =>
-  isRepositoryRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
-
-/**
- * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
- * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
- */
-const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting, git: BranchReader, place: Place) {
+const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting) {
   const { run, steps } = f;
   const offOf = (a: AskName) => askOffLine(id, a);
   const others = (yield* (yield* RunDoor).runs.list()).filter((o) => o.id !== id);
-  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, checkKillOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
     steps,
@@ -241,9 +227,7 @@ const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting, git: B
     rounds,
     spendOf,
     offOf,
-    standings,
     'rm',
-    merging(run, steps, statusMemo(headsOver(git), place)),
     `nemia rm ${run.id}`,
     checkKillOf,
   ) satisfies string | null;

@@ -65,10 +65,17 @@ import {
   gitPlaceLayer,
 } from '../src/runner.ts';
 import * as verbs from '../src/runner.ts';
-import { sentBack, stepTaskId } from '../src/run.ts';
+import { stepTaskId, type StepRecord } from '../src/run.ts';
 import { builtinGitPlace, engine, START, type StartInput } from '../src/runner.ts';
 import { factsOf, handled } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
+
+/** `record` with its try moved behind and none in its place: the step unfiled, as a person's objection at its gate leaves it. */
+const unfiled = (record: StepRecord) => {
+  const { check, tries = [], taskId, handedOff: _, filesRead: __, ...rest } = record;
+  const moved = taskId === null ? [] : [{ taskId, ...(check ? { check } : {}), cause: 'round' as const }];
+  return { ...rest, taskId: null, tries: [...tries, ...moved] } satisfies StepRecord;
+};
 
 const ROOT = scratch('wf-folder-');
 const NOT_A_REPO = path.join(ROOT, 'somewhere');
@@ -671,7 +678,7 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
   settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
 
   const record = runRecord(ROOT, run.id);
-  record.steps.c = sentBack(record.steps.c);
+  record.steps.c = unfiled(record.steps.c);
   plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
@@ -722,7 +729,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   fs.symlinkSync(outside, path.join(work, 'c', 'given'));
 
   const record = runRecord(ROOT, run.id);
-  record.steps.c = sentBack(record.steps.c);
+  record.steps.c = unfiled(record.steps.c);
   plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   let said = '';
   let filed: string[] = [];

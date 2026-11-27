@@ -258,7 +258,6 @@ const DEV: NonNullable<RunStarted['run']> = {
   workspace: '/r',
   workflowFiles: '/s/runs/r-1/workflow/5b5d',
   branch: 'main',
-  ends: ['ship'],
 };
 
 test('nemia start prints the run it started, worded off the answer, line for line as it printed the api’s lines', () => {
@@ -282,7 +281,6 @@ test('nemia start prints the run it started, worded off the answer, line for lin
         'inputs: notes.md — copied into /s/runs/r-1/inputs',
         'workflow files: copied into /s/runs/r-1/workflow/5b5d',
         'gated at: implement — nothing after it is filed until nemia approve r-1 <step>, once it has signed off',
-        'ends at: ship — nothing of it runs until nemia approve r-1 ship, which is what files it',
         "models: implement=sonnet — for this run alone; its other steps run on their agents'",
         'labels: area=cache,team=core',
         "run 'nemia tick' (or 'nemia up') to start it",
@@ -298,7 +296,7 @@ test('nemia start prints the run it started, worded off the answer, line for lin
         waitedOn: ['first-card'],
         succeeded: ['r-0'],
         hints: ['dev/implement.md still writes `nudge`'],
-        paused: { pause: { at: 't', by: 'ann', why: 'upgrade' }, finishing: [], parked: [], staged: [], held: [] },
+        paused: { pause: { at: 't', by: 'ann', why: 'upgrade' }, finishing: [], parked: [], held: [] },
         run: {
           ...DEV,
           from: 'cache-card',
@@ -325,7 +323,6 @@ test('nemia start prints the run it started, worded off the answer, line for lin
         'waits on: r-0 — nothing is filed until each has succeeded (nemia release <run> lets one go)',
         'reads: r-0 — handed what it concluded, as context; not waited on',
         "reads: r-9, still in flight — what it has when this run's steps are filed is handed, not succeeded, not judged",
-        'ends at: ship — nothing of it runs until nemia approve r-2 ship, which is what files it',
         'label team not inherited: r-0 has team=core, r-9 has team=edge — set it with nemia label run r-2 team=<value>',
         "run 'nemia tick' (or 'nemia up') to start it",
         'Paused since t by ann: upgrade — nothing runs and nothing new starts; nemia resume resumes it: nothing of this run is filed until then',
@@ -355,7 +352,6 @@ test('nemia start prints the run it started, worded off the answer, line for lin
           settings: ['team-hooks'],
           cards: { names: ['spec'], dir: '/s/runs/r-3/inputs/cards' },
           carriedFiles: '/s/runs/r-3/carried/9e88',
-          ends: [],
         },
       },
       [
@@ -385,7 +381,6 @@ test('nemia start prints the run it started, worded off the answer, line for lin
           ...DEV,
           steps: [{ name: 'build', agent: 'plain' }, { name: 'judge' }],
           gated: ['build', 'judge'],
-          ends: ['ship', 'docs'],
         },
       },
       [
@@ -394,7 +389,6 @@ test('nemia start prints the run it started, worded off the answer, line for lin
         'workspace: /r',
         'workflow files: copied into /s/runs/r-1/workflow/5b5d',
         'gated at: build, judge — nothing after each is filed until nemia approve r-5 <step>, once it has signed off',
-        'ends at: ship, docs — nothing of them runs until nemia approve r-5 ship, which is what files them',
         "run 'nemia tick' (or 'nemia up') to start it",
       ],
     ],

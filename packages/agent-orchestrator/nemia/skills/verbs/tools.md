@@ -1336,9 +1336,8 @@ Its arguments:
     flight); what each step's tries and the run have cost, where measured;
     last, whether a nemia up ticks the store and when its last pass was;
     first, while the store is paused, Pausing: N finishing and each
-    session, check or landing at work, or Paused once none is, then each
-    check it holds, a landing with its merge staged in the repository's
-    own working tree (MERGE_HEAD) among them; a step whose check it holds
+    session or check at work, or Paused once none is, then each
+    check it holds; a step whose check it holds
     says waiting on the pause. -l: the runs whose labels match (team=core,
     given again for another); --show-labels: each run with its labels;
     -L <key>: that label beside each run, given again for another; -o
@@ -1370,9 +1369,8 @@ Its arguments:
     flight); what each step's tries and the run have cost, where measured;
     last, whether a nemia up ticks the store and when its last pass was;
     first, while the store is paused, Pausing: N finishing and each
-    session, check or landing at work, or Paused once none is, then each
-    check it holds, a landing with its merge staged in the repository's
-    own working tree (MERGE_HEAD) among them; a step whose check it holds
+    session or check at work, or Paused once none is, then each
+    check it holds; a step whose check it holds
     says waiting on the pause. -l: the runs whose labels match (team=core,
     given again for another); --show-labels: each run with its labels;
     -L <key>: that label beside each run, given again for another; -o
@@ -1535,8 +1533,8 @@ Its arguments:
 ```text
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
     what every run in the store adds up to, by UTC day: rounds to
-    acceptance of each loop: step, landings of the workspace: base step
-    and on which try, cost and time per merged run, and each step's
+    acceptance of each loop: step, cost and time per merged run,
+    and each step's
     tries, time, cost, checks and gate waits; first the last 14 days
     against the 14 before. A number nothing measured reads —, never 0.
     --line: one line, for a recap; --json: the whole answer; -l: the
@@ -2314,7 +2312,7 @@ Its arguments:
     check filed, no queued task admitted, no queued card started — and
     every session, job or attached, parks at its tool call's end: a call
     still in flight once the timeout has passed is cut. A check runs on, its
-    end recorded; a landing whose check has ended commits or aborts.
+    end recorded.
     Pausing: N sessions finishing a tool call, cut in M min while they
     do, Paused once none does; nemia ls says each step paused.
     nemia start still writes a run, and approvals, retries and answers are
@@ -2325,8 +2323,8 @@ Its arguments:
     (default: your OS user)
     --timeout: how long a call in flight is given to end, for this pause
     (90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout
-    --now: pause at once, the board's Stop now — each step session at work,
-    but a landing's, has its call cut at once and parks, going on as the
+    --now: pause at once, the board's Stop now — each step session at work
+    has its call cut at once and parks, going on as the
     same try on nemia resume;
     each check is asked to stop and run again. A pause that stands is kept.
     --yes: with --now, act; without it, --now only says what it would
@@ -2394,11 +2392,11 @@ Calls `DELETE /api/pause`.
 
 ```text
   nemia paused
-    the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them
+    the store's pause, what finishes under it, and each check it holds
     the port's alone: no `nemia` verb runs it at a shell
 ```
 
-Reads the store's pause, or null where none stands, with each task still finishing under it and each session, landing and check it holds. Answers Paused.
+Reads the store's pause, or null where none stands, with each task still finishing under it and each session and check it holds. Answers Paused.
 
 Calls `GET /api/pause`.
 
@@ -2406,11 +2404,11 @@ Calls `GET /api/pause`.
 
 ```text
   nemia pause now
-    what a pause at once would stop, each task at work but a landing, and what that costs
+    what a pause at once would stop, each task at work, and what that costs
     the port's alone: no `nemia` verb runs it at a shell
 ```
 
-Reads what a pause at once would cut, each task at work but a landing, and what that costs. Answers PauseNowRead.
+Reads what a pause at once would cut, each task at work, and what that costs. Answers PauseNowRead.
 
 Calls `GET /api/pause/now`.
 

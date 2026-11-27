@@ -8,7 +8,7 @@
  * copy that stays, since `GET /api/pause` answers the pause's facts (`objects`' `Paused`) and none of its sentences, and the board says
  * them with its own clock (`clockWord`) and the time handed in. Served sentences would be an addition to `Paused` first.
  */
-import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api/pause.ts';
+import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld } from './api/pause.ts';
 import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 import { troubleOf } from './api/read.ts';
@@ -37,8 +37,8 @@ export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
 
 /**
  * The pause in words: its `state`; `text`, the button's short form (`Pausing · 2`, `Paused`, none while all factories run); `label`, the
- * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, session parked, landing
- * staged and other check held, a sentence each.
+ * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, session parked
+ * and check held, a sentence each.
  */
 export type PauseWords = {
   state: PauseState;
@@ -47,7 +47,6 @@ export type PauseWords = {
   line: string;
   finishing: string[];
   parked: string[];
-  staged: string[];
   held: string[];
 };
 
@@ -66,10 +65,10 @@ export const finishingSentence = ({ run, step, kind, stopping, resumed, calling 
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? ', and is tried again on the resume' : ''}`
     : `${run}'s ${step} is finishing: ${atWork(kind, calling)}`;
 
-/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its landing's. */
+/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its check. */
 const atWork = (kind: Finishing['kind'], calling: string | undefined) => {
   if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
-  return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
+  return 'its check runs';
 };
 
 /** A session the pause has parked, in a sentence: its run and step, and the call it stopped after or the call cut (`parkedWords`). */
@@ -98,16 +97,12 @@ const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date)
 /** A task a pause at once would stop, in a few words: its run, then its step's session or check. */
 export const interruptSentence = ({ run, step, kind }: Interrupt) => `${run}: ${step}'s ${kind}`;
 
-/** A landing the pause holds with its merge staged, in a sentence: whose, where, and that its check waits on the resume. */
-const stagedSentence = ({ run, step, repo }: PauseStaged) =>
-  `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on the resume`;
-
-/** A check the pause holds whose merge is not staged, in a sentence: whose, and that its check waits on the resume. */
+/** A check the pause holds, in a sentence: whose, and that its check waits on the resume. */
 const heldSentence = ({ run, step }: PauseHeld) => `${run}'s ${step} has signed off, and its check waits on the resume`;
 
-/** How many checks the pause holds back, staged landings among them: `, 2 checks held`, or nothing for none. */
-const heldCount = ({ staged, held }: Paused) => {
-  const n = staged.length + held.length;
+/** How many checks the pause holds back: `, 2 checks held`, or nothing for none. */
+const heldCount = ({ held }: Paused) => {
+  const n = held.length;
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
 
@@ -123,7 +118,6 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
   const lists = {
     finishing: (paused?.finishing ?? []).map(finishingSentence),
     parked: (paused?.parked ?? []).map(parkedSentence),
-    staged: (paused?.staged ?? []).map(stagedSentence),
     held: (paused?.held ?? []).map(heldSentence),
   };
   if (!paused) {

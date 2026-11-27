@@ -24,7 +24,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Context, Effect, Layer } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import type { InboxListing } from '../inbox/index.ts';
+import { cardReadsMemo, type CardReads, type InboxListing } from '../inbox/index.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
@@ -68,6 +68,8 @@ export type InformerMemo<T = Judgement, O = RunObject> = {
    * pure function, never a source of truth: served only while its key holds, in memory alone, and empty after a restart.
    */
   inbox?: { key: string; listing: readonly InboxListing[] };
+  /** Each card's parse by its file and text, served while the text holds, swept to the cards listed; in memory alone. */
+  cards: CardReads;
   cursor?: number;
   runs: Map<string, Entry<T, O>>;
   pass?: number;
@@ -77,7 +79,7 @@ export type InformerMemo<T = Judgement, O = RunObject> = {
 
 /** An informer that holds nothing: what a serving process starts with. */
 export const informerMemo = <T = Judgement, O = RunObject>() =>
-  ({ runs: new Map(), hits: 0, objectHits: 0 }) satisfies InformerMemo<T, O> as InformerMemo<T, O>;
+  ({ runs: new Map(), hits: 0, objectHits: 0, cards: cardReadsMemo() }) satisfies InformerMemo<T, O> as InformerMemo<T, O>;
 
 /**
  * The listed object kept for the run `id` on the very entry that holds `judgement`, the one this read was served or judged: none where

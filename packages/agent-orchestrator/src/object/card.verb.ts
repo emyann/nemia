@@ -28,7 +28,9 @@ import {
   INBOX_COLUMNS,
   inboxCells,
   type InboxListing,
-  parseInboxCard,
+  cardOrWhy,
+  cardReadThrough,
+  type CardOrWhy,
 } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { FileDoor } from '../start/files.store.ts';
@@ -69,15 +71,19 @@ const namespaceOf = (l: InboxListing) => l.factory ?? DEFAULT_NAMESPACE;
  */
 const keyOf = (l: InboxListing) => `${l.name}\n${l.file}`;
 
+/** How a card's text is parsed: the informer's kept parse (`cardReadThrough`) or a fresh one (`cardOrWhy`). */
+type ReadOf = (file: string, text: string) => CardOrWhy;
+
 /**
  * The body a card's text holds, or why it holds none: the listing's own `error` for an entry it found no card, and for a card the listing
  * read and whose text no longer parses (edited between the two reads), the parse's own reason, so a card is never listed with no body and
  * no word of why.
  */
-const bodyOf = (l: InboxListing, text: string) => {
+const bodyOf = (l: InboxListing, text: string, readOf: ReadOf) => {
   if (l.error !== null) return { error: l.error };
   try {
-    return { body: parseInboxCard(l.file, text).body };
+    const read = readOf(l.file, text);
+    return 'card' in read ? { body: read.card.body } : { error: read.why };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
@@ -106,9 +112,17 @@ const specKeysOf = (l: InboxListing) => ({
   ...(l.files !== undefined && l.files.length ? { files: l.files.map((f) => ({ ...f })) } : {}),
 });
 
-/** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
-const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, files?: Card['status']['files'], revision = 0) => {
-  const { body, error } = bodyOf(l, text);
+/** The object of the listed card `l`, of its text, its body and filing time; its text as `status.source` where `source` (one card read). */
+const cardOf = (
+  l: InboxListing,
+  text: string,
+  filedAt: string,
+  made: { body?: string; error?: string },
+  source = false,
+  files?: Card['status']['files'],
+  revision = 0,
+) => {
+  const { body, error } = made;
   return {
     apiVersion: API_VERSION,
     kind: 'Card',
@@ -143,12 +157,12 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, 
  * the card's file as written in its `status.source` where `source`. Null for one gone since the listing.
  * Untraced: the cards list runs it once per card, and a span each would bury the list's trace under hundreds.
  */
-const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
+const objectOf = Effect.fnUntraced(function* (l: InboxListing, readOf: ReadOf, source = false) {
   const door = yield* CardDoor;
   if (!l.file.endsWith('.md')) {
     const at = yield* door.cards.entryAt(l);
     if (at === null) return null;
-    const stray = cardOf(l, '', at);
+    const stray = cardOf(l, '', at, bodyOf(l, '', readOf));
     const text = source ? yield* door.cards.entryText(l) : null;
     return text === null ? stray : { ...stray, status: { ...stray.status, source: text } };
   }
@@ -156,7 +170,8 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
   if (text === null || filedAt === null) return null;
-  return cardOf(l, text, filedAt, source, yield* filesOf(l, bodyOf(l, text).body ?? ''), (yield* door.cards.revision(name)) ?? 0);
+  const made = bodyOf(l, text, readOf);
+  return cardOf(l, text, filedAt, made, source, yield* filesOf(l, made.body ?? ''), (yield* door.cards.revision(name)) ?? 0);
 });
 
 /**
@@ -231,8 +246,15 @@ const labelsInUseOf = (kept: readonly InboxListing[]) => {
  * and its search words keep, counted by phase and by label in use (`metadata.counts`, `labelsInUse`), then those its field selector keeps,
  * sorted by its order (by name unless `orderBy` says), cut by its `limit` after its `continue`. Objects are built for the page alone.
  * `Invalid` for a selector, an order, a limit or a token that is not one.
+ * @param listing The inbox as listed.
+ * @param query What the page asks for.
+ * @param readOf How a card's text is parsed for its body: the informer's kept parse, or a fresh one where none is given.
  */
-export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly InboxListing[], query: CardQuery) {
+export const cardListOf = Effect.fn('cardListOf')(function* (
+  listing: readonly InboxListing[],
+  query: CardQuery,
+  readOf: ReadOf = cardOrWhy,
+) {
   const { namespace } = query;
   const inNamespace = namespace === undefined ? listing : listing.filter((l) => namespaceOf(l) === namespace);
   const selectors = query.labelSelector ?? [];
@@ -260,7 +282,7 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
     labels: cardLabels,
     descending: order.descending,
   });
-  const items = (yield* Effect.forEach(page.items, (l) => objectOf(l))).filter((c): c is Card => c !== null);
+  const items = (yield* Effect.forEach(page.items, (l) => objectOf(l, readOf))).filter((c): c is Card => c !== null);
   const answered: CardList = {
     ...listOf('Card', page, items),
     metadata: { ...listOf('Card', page, items).metadata, counts: countsOf(kept), labelsInUse: labelsInUseOf(kept) },
@@ -272,13 +294,18 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
  * The same page of `listing` as `cardListOf` answers, as a table (`Table`): the columns `nemia inbox` prints (`INBOX_COLUMNS`), a row per
  * card of the page with its cells (`inboxCells`) and the card itself, and where the page stands (`continue`). A card that names no factory
  * is said to start on a repository where `unfactoredStarts` lets it, as `nemia inbox` says it.
+ * @param listing The inbox as listed.
+ * @param query What the page asks for.
+ * @param unfactoredStarts Whether a card naming no factory starts on a repository.
+ * @param readOf How a card's text is parsed for its body: the informer's kept parse, or a fresh one where none is given.
  */
 export const cardTableOf = Effect.fn('cardTableOf')(function* (
   listing: readonly InboxListing[],
   query: CardQuery,
   unfactoredStarts: boolean,
+  readOf: ReadOf = cardOrWhy,
 ) {
-  const list = yield* cardListOf(listing, query);
+  const list = yield* cardListOf(listing, query, readOf);
   const byKey = new Map(listing.map((l) => [keyOf(l), l]));
   const table: Table = {
     kind: 'Table',
@@ -298,11 +325,20 @@ export const cardTableOf = Effect.fn('cardTableOf')(function* (
  * card): a card before a stray entry of the same name (`notes.md` and `notes` both list as `notes`), a stray entry, its `status.error`
  * saying why it is no card, carrying its own file's text where it is a file. `Missing` where no entry has that name, or the one that does
  * is in another namespace.
+ * @param listing The inbox as listed.
+ * @param name The card's name.
+ * @param namespace The card's namespace, any where none is given.
+ * @param readOf How a card's text is parsed for its body: the informer's kept parse, or a fresh one where none is given.
  */
-export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readonly InboxListing[], name: string, namespace?: string) {
+export const cardObjectOf = Effect.fn('cardObjectOf')(function* (
+  listing: readonly InboxListing[],
+  name: string,
+  namespace?: string,
+  readOf: ReadOf = cardOrWhy,
+) {
   const named = listing.filter((entry) => entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace));
   const l = named.find((entry) => entry.file.endsWith('.md')) ?? named[0];
-  const card = l === undefined ? null : yield* objectOf(l, true);
+  const card = l === undefined ? null : yield* objectOf(l, readOf, true);
   if (card === null)
     return yield* Effect.fail(
       new Missing({
@@ -317,7 +353,7 @@ export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readon
  * run's phase, read through the informer `how.memo`.
  */
 export const cardList = Effect.fn('cardList')(function* (e: Engine, how: SummaryHow, query: CardQuery) {
-  return yield* cardListOf(yield* inboxJudged(e, how), query);
+  return yield* cardListOf(yield* inboxJudged(e, how), query, cardReadThrough(how.memo.cards, how.verify));
 });
 
 /**
@@ -325,10 +361,15 @@ export const cardList = Effect.fn('cardList')(function* (e: Engine, how: Summary
  * names no factory starts is the store's setting (`StoreConfig`'s `defaultFactoryStarts`).
  */
 export const cardTable = Effect.fn('cardTable')(function* (e: Engine, how: SummaryHow, query: CardQuery) {
-  return yield* cardTableOf(yield* inboxJudged(e, how), query, yield* setting('defaultFactoryStarts'));
+  return yield* cardTableOf(
+    yield* inboxJudged(e, how),
+    query,
+    yield* setting('defaultFactoryStarts'),
+    cardReadThrough(how.memo.cards, how.verify),
+  );
 });
 
 /** The inbox card `name` as an object (`cardObjectOf`), in `namespace` where one is given, off the inbox as it reads now. */
 export const cardObject = Effect.fn('cardObject')(function* (e: Engine, how: SummaryHow, name: string, namespace?: string) {
-  return yield* cardObjectOf(yield* inboxJudged(e, how), name, namespace);
+  return yield* cardObjectOf(yield* inboxJudged(e, how), name, namespace, cardReadThrough(how.memo.cards, how.verify));
 });

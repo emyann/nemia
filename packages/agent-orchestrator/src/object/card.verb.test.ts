@@ -571,6 +571,30 @@ test('the inbox is judged once while the keyspace head and the pass stand, again
   assert.equal(reads.fifth, reads.fourth);
 });
 
+test("a page's card bodies are read through the informer's kept parses: a page read with them swept parses each card of the page again", () => {
+  const e = engineOf(engine().layer);
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE))));
+  const reads = valueOf(
+    over(
+      five,
+      Effect.gen(function* () {
+        passStarted(how.memo);
+        const first = yield* cardList(e, how, {});
+        const warm = how.memo.cards.parsed;
+        const second = yield* cardList(e, how, {});
+        const kept = how.memo.cards.parsed;
+        how.memo.cards.kept.clear();
+        const third = yield* cardList(e, how, {});
+        return { first, second, third, warm, kept, swept: how.memo.cards.parsed };
+      }),
+    ),
+  );
+  assert.equal(reads.kept, reads.warm, 'a second read of the pass parses no card');
+  assert.deepEqual(reads.second.items, reads.first.items);
+  assert.equal(reads.swept - reads.kept, 5, 'with the kept parses gone, the page parses its five cards for their bodies, once each');
+  assert.deepEqual(reads.third.items, reads.first.items);
+});
+
 test('WF_VERIFY_REST judges the inbox afresh each read and dies where the informer held another', () => {
   const e = engineOf(engine().layer);
   const how = { ...Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE)))), verify: true };

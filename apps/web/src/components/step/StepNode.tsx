@@ -227,10 +227,6 @@ const headOf = (node: Frozen<GraphNode> | null | undefined, index: number) =>
   node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index);
 
 /**
- * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node starts a run of; a condition with
- * an agent (a judge) runs on it as a step does, and one with none answers its route with no session.
- */
-/**
  * What a node with no attempt says of its session: none at all for a workflow node, which starts a run, and for a condition with no agent,
  * which its table or script answers; else that it is not filed yet, or has no session yet.
  */
@@ -249,6 +245,10 @@ function unfiledLine(
   return taskId === null ? 'not filed yet' : 'no session yet';
 }
 
+/**
+ * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node starts a run of; a condition with
+ * an agent (a judge) runs on it as a step does, and one with none answers its route with no session.
+ */
 function nodeLine(
   node: Frozen<GraphNode> | null | undefined,
   spec: { agent?: string | null; harness: string | null; model: string | null } | null,

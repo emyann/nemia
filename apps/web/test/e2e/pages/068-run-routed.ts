@@ -43,7 +43,7 @@ export default {
         `${ROUTED.skipped} reads skipped`,
       );
       await expectVisible(
-        node(ROUTED.workflowNode).locator('[data-node-kind="workflow"]', { hasText: `files a card for ${ROUTED.workflow}` }),
+        node(ROUTED.workflowNode).locator('[data-node-kind="workflow"]', { hasText: `starts a run of ${ROUTED.workflow}` }),
         `${ROUTED.workflowNode} is drawn as a workflow node naming ${ROUTED.workflow}`,
       );
       await expectVisible(

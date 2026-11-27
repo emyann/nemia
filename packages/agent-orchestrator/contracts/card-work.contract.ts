@@ -1,7 +1,7 @@
 /**
- * One step of the runs a card's work went through (agent-orchestrator, src/inbox/card-work.ts, `reach`, which `cardWork` repeats): the run started from the card, then
- * each run a workflow node of one of them started (`startedBy`), and so on, in the order they were started. What a card's state, its
- * served `runs`, its waiters' release and `nemia inbox resend` read, worked out on every read and stored nowhere. Pure.
+ * One step of the runs a card's work went through (agent-orchestrator, src/inbox/card-work.ts, `reach`, which `cardWork` repeats): the run
+ * started from the card, then each run a workflow node of one already found started (`startedBy`), carrying no card of its own. What a
+ * card's state, its served `runs`, its waiters' release and `nemia inbox resend` read, worked out on every read and stored nowhere. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

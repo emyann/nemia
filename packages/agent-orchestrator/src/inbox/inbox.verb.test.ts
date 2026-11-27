@@ -130,6 +130,10 @@ test('`waitingOf` follows a card to the card a node of its run filed (`sent`) an
   assert.deepEqual(waiting.look('x-5v6u'), { known: true, runs: [{ id: 'x-run-p7q8', released: false }], onward: ['x-run-p7q8-resent'] });
   assert.deepEqual(waiting.look('x-run-p7q8-resent'), { known: true, runs: [], onward: [] }, 'in the inbox, with no run of its own yet');
   assert.equal(waiting.look('gone-1a2b').known, false, 'neither in the inbox nor started from');
-  assert.deepEqual([...asked].sort(), ['a2-run-m5n6', 'x-run-p7q8'], 'each run read once, but the one that handed its work on, which releases no waiter');
+  assert.deepEqual(
+    [...asked].sort(),
+    ['a2-run-m5n6', 'x-run-p7q8'],
+    'each run read once, but the one that handed its work on, which releases no waiter',
+  );
   assert.equal(Effect.runSync(waitingOf(files.slice(1), [routed], released)), undefined, 'no card names one: nothing is read');
 });

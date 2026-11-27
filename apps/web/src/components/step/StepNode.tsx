@@ -34,6 +34,8 @@ export type StepNodeData = {
   routes?: string[];
   taken?: string | null;
   routed?: Routed | null;
+  /** What a workflow node started (a run) or a backlog node filed (a card), and when: null for any other step. */
+  sent?: StepView['sent'] | null;
   /** What its part says it gave, of the try it shows (`stepPartOf`): its first item takes the line of what it runs on once given. */
   gave?: StepPartModel['gave'];
 };
@@ -98,7 +100,7 @@ function SpecLines({ lines, clamp }: { lines: ReturnType<typeof specLines>; clam
  * - What the harness denied its current try: a job carries on past a denied call, so its work may be short of it. How many, on a line
  *   that fits; which, in the package's words, on hover and on the step's section.
  * - A condition is headed `condition` and lists its routes, the one it took marked and those it ends on said; a workflow node is headed
- *   `workflow`, says the workflow it files a card for, and links to its card once sent; a node its route passed by sinks into the floor,
+ *   `workflow`, says the workflow it starts a run of, and links to that run once started; a node its route passed by sinks into the floor,
  *   dashed (`RouteBand`, `nodeLine`, `nodeFrame`).
  * - Its handles: on its sides, then under it where the edge back that `loop:` makes leaves its looping step and comes into its target
  *   (`StateEdge`). The side ones come first, so an edge that names no handle takes the one on the side.
@@ -144,7 +146,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
         <RunsOnOrGave step={step} gave={data.gave} line={nodeLine(node, spec)} />
       </div>
 
-      {node && <RouteBand node={node} routes={data.routes} taken={data.taken} routed={data.routed} />}
+      {node && <RouteBand node={node} routes={data.routes} taken={data.taken} routed={data.routed} sent={data.sent} />}
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip codes={step} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
@@ -225,11 +227,11 @@ const headOf = (node: Frozen<GraphNode> | null | undefined, index: number) =>
   node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index);
 
 /**
- * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node files a card for; a condition with
+ * What a condition or a workflow node runs on, in its node's second line: the workflow a workflow node starts a run of; a condition with
  * an agent (a judge) runs on it as a step does, and one with none answers its route with no session.
  */
 /**
- * What a node with no attempt says of its session: none at all for a workflow node, which files a card, and for a condition with no agent,
+ * What a node with no attempt says of its session: none at all for a workflow node, which starts a run, and for a condition with no agent,
  * which its table or script answers; else that it is not filed yet, or has no session yet.
  */
 function unfiledLine(
@@ -251,7 +253,7 @@ function nodeLine(
   node: Frozen<GraphNode> | null | undefined,
   spec: { agent?: string | null; harness: string | null; model: string | null } | null,
 ) {
-  if (node?.kind === 'workflow') return `files a card for ${node.workflow ?? 'a workflow'}`;
+  if (node?.kind === 'workflow') return `starts a run of ${node.workflow ?? 'a workflow'}`;
   if (node?.kind === 'condition' && !spec?.agent) return 'answers its route, no session';
   if (node?.kind === 'command') return spec?.agent ? `runs a command as ${spec.agent}, no session` : 'runs a command, no session';
   if (node?.kind === 'wait') return 'waits on its conditions, no session';
@@ -366,7 +368,7 @@ export function SpecNode({
         </Body>
       </div>
 
-      {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
+      {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} sent={null} />}
 
       {lines.length > 0 && node?.kind !== 'workflow' && <SpecLines lines={lines} clamp={3} />}
 
@@ -476,18 +478,27 @@ function RouteBand({
   routes = [],
   taken = null,
   routed = null,
+  sent = null,
 }: {
   node: Frozen<GraphNode>;
   routes?: readonly string[];
   taken?: string | null;
   routed?: Routed | null;
+  sent?: StepView['sent'] | null;
 }) {
   if (node.kind === 'workflow')
-    return routed?.kind === 'sent' ? (
-      <Body size="small" data-sent={routed.card} className="truncate border-t border-outline-variant px-3 py-1">
+    return sent && 'run' in sent ? (
+      <Body size="small" data-sent={sent.run} className="truncate border-t border-outline-variant px-3 py-1">
+        <span className="text-on-surface-variant">started </span>
+        <TextLink to="/runs/$runId" params={{ runId: sent.run }} title={`The run ${sent.run}, which this node started`}>
+          {sent.run}
+        </TextLink>
+      </Body>
+    ) : sent ? (
+      <Body size="small" data-sent={sent.card} className="truncate border-t border-outline-variant px-3 py-1">
         <span className="text-on-surface-variant">sent </span>
-        <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
-          {routed.card}
+        <TextLink to="/inbox/$name" params={{ name: sent.card }} title={`The card ${sent.card}`}>
+          {sent.card}
         </TextLink>
       </Body>
     ) : null;

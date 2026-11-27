@@ -107,6 +107,7 @@ const object = () =>
       after: [],
       context: [],
       from: null,
+      startedBy: null,
     },
     status: {
       status: 'running',

@@ -1,9 +1,8 @@
 /**
  * What the canvases draw of a routed workflow: which node is a condition or a workflow node (the graph's `nodes`), and on a run, the route
- * each condition took and the card each workflow node sent. The run object carries no route of its own, so the route and the card are read
- * off the step's sentence, in the words the orchestrator's listing writes them (`routedRows`): `routed: <route>` on a condition, `skipped
- * (<condition>: <route>)` on a node off the route, `sent → <card>` on a workflow node, and `· proposes <route>` after a gated condition's
- * word. Its state is never read from there: that is the codes' (`status.ts`). Pure.
+ * each condition took. The run object carries no route of its own, so it is read off the step's sentence, in the words the orchestrator's
+ * listing writes them (`routedRows`): `routed: <route>` on a condition, `skipped (<condition>: <route>)` on a node off the route, and
+ * `· proposes <route>` after a gated condition's word. What a workflow node sent is the step's own `sent`, never read from a sentence. Its state is never read from there: that is the codes' (`status.ts`). Pure.
  */
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
@@ -12,21 +11,17 @@ import type { Frozen } from './frozen.ts';
 export type Routed =
   | { kind: 'routed'; route: string }
   | { kind: 'proposes'; route: string }
-  | { kind: 'skipped'; condition: string; route: string }
-  | { kind: 'sent'; card: string };
+  | { kind: 'skipped'; condition: string; route: string };
 
 const ROUTED = /^routed: (\S+)/;
 const PROPOSES = / · proposes (\S+)$/;
 const SKIPPED = /^skipped \((\S+): (\S+)\)/;
-const SENT = /^sent → (\S+)/;
 
 /**
  * What `message`, a step's sentence, says of its routing; null for a sentence that says none.
  * @param message The step's sentence, as the listing writes it.
  */
 export function routedOf(message: string) {
-  const sent = SENT.exec(message);
-  if (sent?.[1]) return { kind: 'sent', card: sent[1] } satisfies Routed | null;
   const skipped = SKIPPED.exec(message);
   if (skipped?.[1] && skipped[2]) return { kind: 'skipped', condition: skipped[1], route: skipped[2] } satisfies Routed | null;
   const routed = ROUTED.exec(message);

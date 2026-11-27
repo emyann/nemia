@@ -91,6 +91,7 @@ const run = ({ name, brief, createdAt, steps, status }: Shape) => ({
     after: [],
     context: [],
     from: null,
+    startedBy: null,
   },
   status: {
     on: null,

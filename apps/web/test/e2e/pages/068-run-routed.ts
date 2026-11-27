@@ -51,8 +51,8 @@ export default {
         `${ROUTED.workflowNode} reads sent`,
       );
       await expectVisible(
-        node(ROUTED.workflowNode).locator(`[data-sent] a[href="/inbox/${ROUTED.card}"]`, { hasText: ROUTED.card }),
-        `${ROUTED.workflowNode} links to the card it filed, ${ROUTED.card}`,
+        node(ROUTED.workflowNode).locator(`[data-sent] a[href="/runs/${ROUTED.child}"]`, { hasText: ROUTED.child }),
+        `${ROUTED.workflowNode} links to the run it started, ${ROUTED.child}`,
       );
       await expectCount(
         graph.locator('.react-flow__edge path[data-untaken]'),
@@ -61,8 +61,8 @@ export default {
       );
       const result = page.locator('section[data-run-result]');
       await expectVisible(
-        result.locator(`[data-result-gave="${ROUTED.workflowNode}"] [data-result-sent] a[href="/inbox/${ROUTED.card}"]`),
-        `the run's result is what its final ${ROUTED.workflowNode} gave: the card it sent, linked`,
+        result.locator(`[data-result-gave="${ROUTED.workflowNode}"] [data-result-sent] a[href="/runs/${ROUTED.child}"]`),
+        `the run's result is what its final ${ROUTED.workflowNode} gave: the run it started, linked`,
       );
       await expectCount(result.locator('[data-result-ended], [data-result-stands]'), 0, 'and never that the run ended before it gave');
       await settled(page);
@@ -83,7 +83,7 @@ export default {
       );
       await expectVisible(
         page.locator(`.react-flow__node[data-id="${ROUTED.workflowNode}"] [data-node-kind="workflow"]`, {
-          hasText: `files a card for ${ROUTED.workflow}`,
+          hasText: `starts a run of ${ROUTED.workflow}`,
         }),
         `and ${ROUTED.workflowNode} as a workflow node naming ${ROUTED.workflow}`,
       );

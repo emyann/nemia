@@ -81,6 +81,7 @@ const NO_HEALTH: StatsHealth = {
 const stats = (all: StatsGroup = group(), more: Partial<StatsRead> = {}) =>
   ({
     from: null,
+    startedBy: null,
     to: '2026-09-30',
     by: null,
     filters: {},

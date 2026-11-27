@@ -8,7 +8,7 @@ import { stepAnchor } from '@/lib/asks';
 import { ink, type Hue } from '@/lib/meaning';
 import { resultOf, resultStepsOf, runEndOf } from '@/lib/runResult';
 import { routedOf } from '@/lib/routing';
-import type { RunDetail } from '@/lib/runView';
+import type { RunDetail, StepView } from '@/lib/runView';
 import { stepPartOf } from '@/lib/stepPart';
 import { useNow } from '@/lib/useNow';
 import { ENDED, PERSON } from '@/lib/words';
@@ -38,15 +38,24 @@ function ToPart({ run, step }: { run: string; step: string }) {
   );
 }
 
-/** What a node that runs no session did, as its sentence says it: the card a workflow node sent, linked, or the route a condition took. */
-function Routed({ message }: { message: string }) {
+/** What a node that runs no session did: the run a workflow node started, linked, or the route a condition took, as its sentence says it. */
+function Routed({ message, sent }: { message: string; sent: StepView['sent'] | null }) {
   const routed = routedOf(message);
-  if (routed?.kind === 'sent')
+  if (sent && 'run' in sent)
     return (
-      <Body size="medium" data-result-sent={routed.card}>
+      <Body size="medium" data-result-sent={sent.run}>
+        <span className="text-on-surface-variant">started </span>
+        <TextLink to="/runs/$runId" params={{ runId: sent.run }} title={`The run ${sent.run}, which this node started`}>
+          {sent.run}
+        </TextLink>
+      </Body>
+    );
+  if (sent)
+    return (
+      <Body size="medium" data-result-sent={sent.card}>
         <span className="text-on-surface-variant">sent </span>
-        <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
-          {routed.card}
+        <TextLink to="/inbox/$name" params={{ name: sent.card }} title={`The card ${sent.card}`}>
+          {sent.card}
         </TextLink>
       </Body>
     );
@@ -71,7 +80,7 @@ function Gave({ run, step, now }: { run: RunDetail; step: string; now: Date }) {
   return (
     <div data-result-gave={step} className="space-y-2">
       <ToPart run={run.id} step={step} />
-      <Routed message={own.message} />
+      <Routed message={own.message} sent={own.sent ?? null} />
       {own.closeout?.summary && (
         <Body size="medium" className="break-words">
           {own.closeout.summary}
@@ -146,6 +155,16 @@ export function RunResult({ run }: { run: RunDetail }) {
         {run.fromNote && (
           <Body size="medium" data-from={run.from?.inbox}>
             {run.fromNote}
+          </Body>
+        )}
+        {run.startedBy && (
+          <Body size="medium" data-started-by={run.startedBy.run}>
+            <span className="text-on-surface-variant">Started by </span>
+            <TextLink to="/runs/$runId" params={{ runId: run.startedBy.run }} title={`The run ${run.startedBy.run}`}>
+              {run.startedBy.run}
+            </TextLink>
+            <span className="text-on-surface-variant">, at its step </span>
+            <span className="font-mono">{run.startedBy.node}</span>
           </Body>
         )}
       </section>

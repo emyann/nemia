@@ -549,6 +549,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
         after: [],
         context: [],
         from: null,
+        startedBy: null,
         steps: undefined,
       },
     );

@@ -316,7 +316,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
   const e = viewedOnce(seenBy(at.e, views));
-  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds } = judged.read;
+  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, roundAsks: rounds } = judged.read;
   const steps = [...at.steps];
   const { decision: d, assessed, spendOf } = judged;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
@@ -334,18 +334,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
-    ...retryOffers(
-      steps,
-      run,
-      d,
-      phaseOf,
-      reader,
-      asked,
-      spendOf,
-      verdictOf,
-      checkKillOf,
-      judged.read.tipOf,
-    ),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, checkKillOf, judged.read.tipOf),
   ];
   const answer: Decided = {
     run,
@@ -364,10 +353,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCostSaid: runCostWords(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefusedOf(steps, run, judged.read)),
-    gates: saidBy(
-      gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf),
-      (name) => approvalOf(run, name)?.actor,
-    ),
+    gates: saidBy(gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf), (name) => approvalOf(run, name)?.actor),
     budgets: gatesBudgets(run, steps, reader, spendOf),
     accepted: saidBy(acceptedLines(steps, run), (name) => acceptanceOf(run, name)?.actor),
     waitingOn: waitingOnOf(run.id, run, views),

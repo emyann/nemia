@@ -1,7 +1,8 @@
 /**
  * The names a key had before it was renamed, and every place one is still read or written back: `FORMER_KEYS`, the frontmatter read under
  * either name (`readKeys`), a line written in the form the file has (`formerKeyWritten`, `codexModeWritten`), a Codex sandbox named by
- * `permissionMode:` (`codexSandboxNamed`, `formerSandbox`), `workspace: folder` read as `place: folder` (`placeSpelled`), the fence a step asks for under either key (`modeOf`), an agent's own key renamed and its
+ * `permissionMode:` (`codexSandboxNamed`, `formerSandbox`), `workspace: folder` read as `place: folder` (`placeSpelled`), the fence a
+ * step asks for under either key (`modeOf`), an agent's own key renamed and its
  * words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step frozen on a run record under an old name (`asNamed`).
  */
 import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type StepSpec } from '../step/step.ts';
@@ -531,7 +532,8 @@ export type FrozenStep = Omit<StepSpec, 'agent'> & {
  */
 function isNamed(step: FrozenStep): step is StepSpec {
   if (step.agent && Object.hasOwn(step.agent, 'systemPrompt')) return false;
-  if (isFormerWorkspace(step.workspace) || isFormerWorkspace((step.agent?.given as Record<string, unknown> | undefined)?.workspace)) return false;
+  if (isFormerWorkspace(step.workspace) || isFormerWorkspace((step.agent?.given as Record<string, unknown> | undefined)?.workspace))
+    return false;
   return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
 }
 
@@ -568,7 +570,8 @@ function renamedFields(fields: object) {
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no `allowedTools` and
  * the step would run unfenced, with nothing said; and its agent's harness prompt as `systemPrompt`, in a former word (`FORMER_OWN_KEYS`):
  * read so, `own` would be filed appended to Claude Code's prompt instead of in its place; and its place as `workspace: 'folder'`, which is
- * `place: 'folder'` now, and its agent's `keys` naming `workspace` for it; and a retired `workspace: 'base'`, which is read by nothing, so it is read as one that works in a worktree. Read by `runRecord`, so no reader — the tick, `nemia ls`, the api — ever
+ * `place: 'folder'` now, and its agent's `keys` naming `workspace` for it; and a retired `workspace: 'base'`, which is read by nothing,
+ * so it is read as one that works in a worktree. Read by `runRecord`, so no reader — the tick, `nemia ls`, the api — ever
  * sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
  * value. A step with no former name is returned as it is. Pure.
  * @param step The step as the record holds it.

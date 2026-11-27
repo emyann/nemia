@@ -7,7 +7,6 @@
  */
 import { RunId } from '../record/record.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { StoreConfig } from '../config/config.store.ts';
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
@@ -29,7 +28,7 @@ import type { FeedWords } from '../feed/index.ts';
 import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
-import { headsFor, headsNow, standingNow, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
+import { headsFor, headsNow, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/index.ts';
 import { everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { waitsForWord } from '../views/views-words.ts';
@@ -139,7 +138,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   same transaction (the Run door's `runs.settle`), never apart: a pass that died before settling leaves both for the next. An ask `nemia
  *   pause --now` wrote that is void on this pass (`pauseAsksVoid`) is set aside with them, paused or not.
  *
- * A try goes on in the workspace and on the branch the step had, under its next try's id; A try of a step whose task has not settled — its session blocked by its
+ * A try goes on in the workspace and on the branch the step had, under its next try's id; A try of a step whose task has not settled —
+ * its session blocked by its
  * harness, or asked for while it was and working again since — stops the session and files nothing; a later pass, once the task has
  * settled, files the try. A recheck files no session, only its check, under the new try's id. A continue of a step whose task is held
  * open and waits for their word is that task's next turn, in the session that signed, under the same id (`answerHeld`); any other try, and
@@ -158,7 +158,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * Its span is annotated with the run, `run`, and so is every log said within it, the runtime's included; a filing of a step adds the
  * step, `step`, to the runtime's spans and logs under it (`forStep`).
  *
- * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, the runs the cap holds, and the runs others wait on, which
+ * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, the runs the cap
+ * holds, and the runs others wait on, which
  *   lifting a hold (`liftHold`) and admitting the run (`admit`) read through. Left out, the runs this run waits on are read for this call
  *   alone.
  */
@@ -173,7 +174,7 @@ export const advancePass = Effect.fn('advancePass')(
       askNotes,
       adopted,
     } = yield* readAndAdopt(e, run, { earlierTries: 'budgeted', unrecorded: Boolean(run.cancelledAt) });
-    const { steps, phaseOf, signedOff, asked, verdictOf, spendOf, asks, roundAsks } = reads;
+    const { steps, phaseOf, spendOf, asks, roundAsks } = reads;
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const place = yield* PlaceService;
     const handed = yield* withinEffect('act', handOffAll(run, reads, place));
@@ -181,19 +182,12 @@ export const advancePass = Effect.fn('advancePass')(
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
     const parents = pass?.parents ?? passParents();
     const lift = yield* liftHold(e, run, parents);
-    const { assessed } = yield* passAssessment(e, run, reads, yield* standingOf(pass), heads);
+    const { assessed } = passAssessment(reads, yield* standingOf(pass), heads);
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(ran, reads, closer);
     const admission = yield* admit(e, ran, slot, reads, assessed, parents);
-    const feed = wordFeed(
-      ran,
-      reads,
-      assessed,
-      admission,
-      lift.lifted,
-      yield* behindNow(ran, assessed.status === 'succeeded', revisions),
-    );
+    const feed = wordFeed(ran, reads, assessed, admission, lift.lifted, yield* behindNow(ran, assessed.status === 'succeeded', revisions));
     const { followed, pinned, ...due } = yield* followedDue(ran, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...lift.notes, ...closeNotes];
@@ -282,20 +276,15 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
 
 /**
  * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
- * read (`reads`), where its branches stand (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's recheck of a blocked step is judged on), judged
+ * read (`reads`), where its branches stand (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's
+ * recheck of a blocked step is judged on), judged
  * by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
  */
-export const passAssessment = Effect.fnUntraced(function* (
-  e: Engine,
-  run: Run,
-  reads: RunRead,
-  standing: PassStanding,
-  heads?: Heads,
-) {
+export const passAssessment = (reads: RunRead, standing: PassStanding, heads?: Heads) => {
   const tipOf = heads ? { tipOf: (branch: string) => heads()?.[branch] } : {};
   const read = withStandings({ ...reads, ...tipOf }, standing);
   return { read, assessed: assess(read) };
-});
+};
 
 /**
  * The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, what the last
@@ -546,7 +535,7 @@ function answerOf(
   done: Done,
   pass: { acted: boolean; tipped: string[] },
 ) {
-  const { steps, views, phaseOf, asks } = r;
+  const { steps, views, phaseOf } = r;
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
   const { status, unreachable } = assessed;

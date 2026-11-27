@@ -100,13 +100,7 @@ export type { Interrupt, Parked, Pause, Paused, PauseHeld } from './pause/pause.
 export { artifactLines, artifactPlace, artifactsContract, HANDED_CLOSEOUT, sizeOf } from './artifacts/artifacts.ts';
 export { heldRefusal, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneRefusal, pruningBytes } from './forget/prune/prune.ts';
 export type { Pruning } from './forget/prune/prune.ts';
-export {
-  endingSteps,
-  gateRefusal,
-  ownNote,
-  toDecide,
-  toDecideWords,
-} from './ending/ending.ts';
+export { endingSteps, gateRefusal, ownNote, toDecide, toDecideWords } from './ending/ending.ts';
 export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
 export { admissionOrder, ceilingLines, heldCheckouts, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
 export type { MainClaim, RunSlot } from './cap/cap.ts';

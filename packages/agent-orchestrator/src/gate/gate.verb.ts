@@ -28,7 +28,8 @@ export type Approved = { run: Run; approval: Approval; file: string; caps: StepB
  * `## Approved`. Like a retry ask it is the person's own record, and the verb never writes the run's.
  *
  * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
- * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, and a send-back already asked for. An approval written by someone else
+ * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, and a send-back already asked
+ * for. An approval written by someone else
  * between the look and the write is refused as the look would have refused it, and a file at the approval's name that is not one is
  * named, with how to clear it.
  *

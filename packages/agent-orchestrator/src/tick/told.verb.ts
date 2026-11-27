@@ -14,21 +14,13 @@ import { standingReader, type PassStanding } from '../standing/standing.verb.ts'
 import { askedStandings } from '../branches/branches.store.ts';
 import { declarationOf, DEFAULT_HARNESS } from '../harness/harness.ts';
 import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
-import {
-  isRepositoryRun,
-  lackedOf,
-  type CloseoutAsked,
-  type Run,
-  type StepRecord,
-  type StepStatus,
-  type TaskPhase,
-} from '../record/record.ts';
+import { lackedOf, type CloseoutAsked, type Run, type StepRecord, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, readsMounts, startOf } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { RetryBriefing } from '../brief/index.ts';
-import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
+import { budgetOf, type SpendOf } from '../status/status.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import {
   checkKills,
@@ -503,7 +495,8 @@ export type RunReadHow = {
  * The one read of a run (`RunRead`) every reader of it judges it by — the tick's pass, every verb, `nemia ls`, the api's listing and the
  * run object: its frozen steps, the engine's views of its tasks and the readers made of them (`readersOf`), and a person's asks, through
  * the Run door; and, of a run that has filed nothing, its needs — those of the harnesses its frozen steps run on among them — as this
- * process's memory of them reads them (`runNeeds`, `NeedsMemory`), none where it keeps none. Where the result branches stand is a caller's to add, read where it reads it (`standings`): left as none here. With it, the notes the
+ * process's memory of them reads them (`runNeeds`, `NeedsMemory`), none where it keeps none. Where the result branches stand is a
+ * caller's to add, read where it reads it (`standings`): left as none here. With it, the notes the
  * asks' read said (`askNotes`).
  */
 export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: RunReadHow = {}) {

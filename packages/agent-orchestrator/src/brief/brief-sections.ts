@@ -28,16 +28,15 @@ import {
   sendBackTo,
   standing,
   type Round,
-  type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
-import { modeWord, retriesDue, type CheckKillOf, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
+import { modeWord, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
 import { refusalSection, refusalsSection, type CheckRefusal, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
-import { heldLater, roundsDue } from '../round/round.ts';
+import { heldLater } from '../round/round.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
 import { answersOr } from '../question/index.ts';
 import type { TaskSource } from 'objects';

@@ -121,18 +121,6 @@ export function trial(held: Held, { repo: dir, trials }: PlaceRequests['trial'])
   return { at, trials: trials.map((pair) => tried(repo, pair)) } satisfies Reply<'trial'>;
 }
 
-/**
- * The first commit of `head`'s first-parent line that holds every one of `ids`, each held by `head`: for each, the oldest commit of the
- * line that holds it, and of those the newest. Undefined where none is asked of. Read off the place's own graph, not git's walk.
- */
-function firstToHold(repo: Repository, head: string, ids: readonly string[]) {
-  if (!ids.length) return undefined;
-  const line: string[] = [];
-  for (let at: string | undefined = head; at !== undefined; at = repo.commits.get(at)?.parents[0]) line.push(at);
-  const depths = ids.map((id) => line.filter((c) => within(repo, id, c)).length - 1);
-  return line[Math.min(...depths)];
-}
-
 /** A path the commit does not know, as the highest folder of it holding no path the commit knows, closed by `/`; else the path. */
 function unknownIn(known: readonly string[], file: string) {
   const folders = file.split('/').slice(0, -1);

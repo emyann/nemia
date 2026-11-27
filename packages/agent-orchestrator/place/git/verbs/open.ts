@@ -1,6 +1,7 @@
 /**
  * `open`: the repository a run starts in, read at `nemia start` (`openPlace` in `src/place/place.store.ts`) — the commit HEAD is at and the
- * branch it is on. Takes `{ root, isolate }`; answers `{ repo, baseRef, branch }`, `repo` as given. Refuses a `root` that is no directory, no git repository, or a
+ * branch it is on. Takes `{ root, isolate }`; answers `{ repo, baseRef, branch }`, `repo` as given. Refuses a `root` that is no
+ * directory, no git repository, or a
  * repository with no commit yet; and, for a run that cuts worktrees (`isolate`), a `.worktreeinclude` that is no file or has a line `make`
  * would refuse as written (`worktreeInclude`), each line named, before anything of the run is written.
  */

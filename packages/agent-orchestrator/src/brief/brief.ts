@@ -2,7 +2,7 @@
  * What a step is told: its brief (`composeBrief`) or, on a remote A2A agent, its remote brief (`remoteBrief`), with what the runs it waited
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
-import { hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -133,11 +133,7 @@ const resumedLook = (tree: readonly string[]) => (tree.length ? ['', '', '## Whe
 const inputsNamed = (run: Run) => namedInText(run.brief, run.inputs ?? []);
 
 /** The line a step's brief says of the run's inputs (`inputsLine`), naming the copy in its workspace where one is made (`inputsGiven`). */
-function inputsSaid(
-  run: Run,
-  inputsDir: string | undefined,
-  folders: Parameters<typeof inputsLine>[3],
-) {
+function inputsSaid(run: Run, inputsDir: string | undefined, folders: Parameters<typeof inputsLine>[3]) {
   const copied = inputsGiven(run);
   const inFolder = placeOf(run) === 'folder';
   return inputsLine(inputsDir, run.inputs, copied ? { at: copied, inFolder } : null, folders, run.cards, inputsNamed(run));

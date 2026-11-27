@@ -3,15 +3,7 @@
  * a person is told them. Pure; what may be tried is `retry.ts`'s (`retryable`, `retriesDue`).
  */
 import type { StepSpec } from '../step/step.ts';
-import {
-  lackedOf,
-  refusedCheck,
-  tryOf,
-  type CloseoutAsked,
-  type Run,
-  type StepStatus,
-  type TaskPhase,
-} from '../record/record.ts';
+import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import {
   aboveWord,
@@ -35,7 +27,6 @@ import { remoteRetryRefusal } from '../harness/harness.ts';
 import { listedFor, modelWords, stepModelJudged, type ModelLists } from '../workflow/index.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
-import { checksPhase } from '../check/index.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {
@@ -286,7 +277,7 @@ function checkNameRefusal({ how, run, name, command, phaseOf }: Judged) {
 }
 
 function modeRefusal(c: Judged) {
-  const { run, name, how, command, modes, status, via, sendsBack } = c;
+  const { run, name, how, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (status === 'budget exhausted') return budgetStopRefusal(c);
   if (status === 'blocked') return blockedRecheckRefusal(c);

@@ -53,27 +53,27 @@ export const artifactsContract = (dir: string, inFolder = false) =>
         '',
         ...configurationRefused('copied out'),
       ]
-      : [
-          '',
-          '## Files for the steps after you',
-          '',
-          'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
-          '',
-          `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
-          '  this step, outside every workspace, so a file there does not ride the branch.',
-          '- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as',
-          '  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the',
-          '  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over',
-          '  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.',
-          '',
-          "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
-          'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
-          'file that is not there: name each file.',
-          '',
-          LACKS_REFUSE,
-          '',
-          ...configurationRefused('handed over'),
-        ]
+    : [
+        '',
+        '## Files for the steps after you',
+        '',
+        'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
+        '',
+        `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
+        '  this step, outside every workspace, so a file there does not ride the branch.',
+        '- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as',
+        '  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the',
+        '  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over',
+        '  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.',
+        '',
+        "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
+        'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
+        'file that is not there: name each file.',
+        '',
+        LACKS_REFUSE,
+        '',
+        ...configurationRefused('handed over'),
+      ]
   ).join('\n');
 
 /**

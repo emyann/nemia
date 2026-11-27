@@ -324,15 +324,7 @@ describe('waitsOf: the lines that wait on a person are those of the Awaiting rea
     assert.equal(line.waits, undefined);
   });
   test('every former code is gone from the table, and each converts through FORMER_REASONS', () => {
-    const former = [
-      'NeedsHuman',
-      'Blocked',
-      'RoundsExhausted',
-      'WaitingForSlot',
-      'WaitingForPause',
-      'Held',
-      'CheckDenied',
-    ];
+    const former = ['NeedsHuman', 'Blocked', 'RoundsExhausted', 'WaitingForSlot', 'WaitingForPause', 'Held', 'CheckDenied'];
     for (const code of former) {
       assert.ok(!(REASON_CODES as readonly string[]).includes(code), `${code} is no current code`);
       assert.ok(Object.hasOwn(FORMER_REASONS, code), `${code} is read through FORMER_REASONS`);

@@ -18,7 +18,7 @@ import { budgetOf } from '../budget/budget.ts';
 import { declarationOf } from '../harness/harness.ts';
 import type { Actor } from 'objects';
 export { budgetOf } from '../budget/budget.ts';
-import type { Retry, RetryHow } from '../retry/index.ts';
+import type { RetryHow } from '../retry/index.ts';
 import {
   lackedOf,
   refusedCheck,
@@ -26,7 +26,6 @@ import {
   SETTLED,
   TRIED_FROM,
   tryOf,
-  type Approval,
   type CloseoutAsked,
   type Run,
   type StepRecord,

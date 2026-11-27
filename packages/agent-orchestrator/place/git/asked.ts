@@ -19,13 +19,6 @@ function text(request: Request, key: string) {
   if (typeof request[key] !== 'string') throw new Malformed(`the request's \`${key}\` is ${said(request[key])}, where a string is asked`);
 }
 
-/** Refuses a `key` of `request` that is no object of strings. */
-function strings(request: Request, key: string) {
-  const value = request[key];
-  if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.values(value).some((v) => typeof v !== 'string'))
-    throw new Malformed(`the request's \`${key}\` is ${said(value)}, where an object of strings is asked`);
-}
-
 /** Refuses a `key` of `request` that is no list of strings. */
 function texts(request: Request, key: string) {
   const value = request[key];
@@ -74,14 +67,6 @@ function pairs(request: Request) {
       return typeof p === 'object' && typeof one.onto === 'string' && typeof one.branch === 'string';
     });
   if (!valid) throw new Malformed(`the request's \`trials\` is ${said(value)}, where a list of { onto, branch } is asked`);
-}
-
-/** Refuses an `act` of `request` that is neither commit nor abort, and a commit with no message. */
-function act(request: Request) {
-  text(request, 'act');
-  if (request.act !== 'commit' && request.act !== 'abort')
-    throw new Malformed(`the request's \`act\` is ${JSON.stringify(request.act)}, where commit or abort is asked`);
-  if (request.act === 'commit') text(request, 'message');
 }
 
 /** Refuses a `given` of `request` that is there and is no `{ from, to }` of strings. */

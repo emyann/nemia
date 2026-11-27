@@ -5,7 +5,7 @@
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { StoreRoot } from '../config/root.store.ts';
-import { type Settings, StoreConfig } from '../config/config.store.ts';
+import { StoreConfig } from '../config/config.store.ts';
 import { realReleasesDir } from '../release/release.store.ts';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
@@ -26,7 +26,7 @@ import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
 import { askedStandings, mergedOf, resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { decision, type Decision, type Merged } from '../decide/decide.ts';
-import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
+import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
 import {
@@ -221,7 +221,6 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   const listed: RunsListed['runs'] = [];
   const reads: Read[] = [];
   const standing = yield* standingSnapshot();
-  const git = standingReader(standing);
   const among = yield* stepsAmong(runs);
   const writers = yield* writersOfRuns(
     e,
@@ -251,7 +250,10 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   } satisfies RunsListed;
 });
 
-/** A run, the package's reading of it or why it is left unjudged, and its steps (`stepsAmong`: none for a run whose unfrozen folder does not load). */
+/**
+ * A run, the package's reading of it or why it is left unjudged, and its steps (`stepsAmong`: none for a run whose unfrozen folder does
+ * not load).
+ */
 type Read = { run: Run; read: ListReading | Unjudged; steps: readonly StepSpec[] };
 
 /** The checks of `run` the pause keeps from being filed (`waitingOnPause.checks`, `assess`'s). */

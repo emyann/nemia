@@ -8,30 +8,10 @@
  * can still take one.
  */
 import { outputFields, type StepSpec } from '../step/step.ts';
-import {
-  dataBlock,
-  isRepositoryRun,
-  satisfiesAfter,
-  stopsFollowers,
-  tryOf,
-  type Run,
-  type StepRecord,
-  type StepStatus,
-} from '../record/record.ts';
+import { dataBlock, isRepositoryRun, satisfiesAfter, stopsFollowers, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import { loopSpan } from '../workflow/index.ts';
-import {
-  approvalOf,
-  capOf,
-  hasGate,
-  loopOf,
-  roundOf,
-  roundWord,
-  tryCommand,
-  type MergeOf,
-  type Round,
-  type RoundAsk,
-} from '../status/status.ts';
+import { capOf, loopOf, roundOf, roundWord, tryCommand, type MergeOf, type Round, type RoundAsk } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 
@@ -202,7 +182,8 @@ export function mergeAsk(
       `whether ${branch} merges onto ${run.branch} is not known: ${trial.error}. Try again once git can say: nemia refresh ${run.id} ${looping.name} --base.`,
     );
   if (!base) return no(`git cannot read ${run.branch} in ${run.repo}. Check the repository, then: nemia refresh ${run.id} --base.`);
-  if (trial.clean) return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — see where the run stands: nemia decide ${run.id}.`);
+  if (trial.clean)
+    return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — see where the run stands: nemia decide ${run.id}.`);
   const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base };
   return { ask: { step: looping.name, round: roundOf(run, looping.name), at, merge } };
 }
@@ -267,7 +248,7 @@ function followerRefusal(steps: readonly StepSpec[], run: Run, looping: StepSpec
  * that the check runs and nothing else changes, and that no round is spent and no finding is owed an answer.
  *
  * @param step The loop's target, filed by the merge.
- * @param merge The base branch, the commit of it the person's trial merge read, and 
+ * @param merge The base branch, the commit of it the person's trial merge read, and
  * @param loop The looping step, which reads the merge once the target signs off.
  * @param steps The workflow's steps, which say the steps between the target and the looping step.
  * @param say The run's place's words for a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.

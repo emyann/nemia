@@ -427,7 +427,8 @@ export function terminalSteps(steps: readonly StepSpec[]) {
  * the name a run's own line of work is cut under, whose cut and the run's would claim one branch; a step named for another step's
  * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
  * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
- * work on, one that can run two steps at once (`fansOut`), which would share a directory. And a judge whose fence writes (`judgeRefusal`), with its hire or with none: load left a
+ * work on, one that can run two steps at once (`fansOut`), which would share a directory. And a judge whose fence writes
+ * (`judgeRefusal`), with its hire or with none: load left a
  * judge with no agent and no fence of its own to a hire, and a set that has none runs it on its harness's default, which writes.
  *
  * Asked twice, of the same set: of the folder `nemia start` is given, which it refuses (`stepsToStart`), and of the folder a run that has

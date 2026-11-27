@@ -622,7 +622,8 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline,
- * and put it on the record: the step's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
+ * and put it on the record: the step's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check
+ * runs no command and ends
  * with no verdict (`checkArgv`'s `unprovisioned`).
  * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run, and records the commit the step's
  * branch was at as the pass read it (`CheckTask.tip`), which a recheck of a blocked step compares against (`blockedRecheck`).

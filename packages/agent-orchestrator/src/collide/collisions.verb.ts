@@ -17,7 +17,8 @@ import { collisionsOf, othersInFlight, trialsOf, type Collisions, type Theirs } 
 const ahead = (standings: readonly BranchStanding[]) => standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
 
 /**
- * What `run`'s decision reads before its branches are merged (`collisionsOf`): its branches ahead of the base (`standings`, as the decision read
+ * What `run`'s decision reads before its branches are merged (`collisionsOf`): its branches ahead of the base (`standings`, as the
+ * decision read
  * them) tried onto the base and onto each branch ahead of it of every other run in flight (`othersInFlight`), whose standings `git` reads.
  * Undefined, asking nothing, for a folder run, a run without worktrees, or one with no branch ahead of its base. Fails with a refusal a
  * read threw; dies of anything else (`tried`).

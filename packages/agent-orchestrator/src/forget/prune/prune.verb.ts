@@ -25,7 +25,7 @@ import { mergedOf } from '../../branches/branches.store.ts';
 import { standingLive } from '../../standing/standing.verb.ts';
 import { handOffOwed } from '../../tick/advance.verb.ts';
 import { readAndAdopt } from '../../adopt/run-adopt.verb.ts';
-import { Conflict, Invalid } from '../../refusal/refusal.ts';
+import { Invalid } from '../../refusal/refusal.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 
 /**

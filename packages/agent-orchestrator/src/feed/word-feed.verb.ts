@@ -35,14 +35,7 @@ type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: strin
  * @param lifted When the hold the pass lifted itself this pass was put, or undefined where it lifted none.
  * @param behind What the pass read of a pinned run's next filing against its pins; none where not given.
  */
-export function wordFeed(
-  run: Run,
-  r: RunRead,
-  assessed: Assessment,
-  admission: Admitted,
-  lifted?: string,
-  behind: readonly Behind[] = [],
-) {
+export function wordFeed(run: Run, r: RunRead, assessed: Assessment, admission: Admitted, lifted?: string, behind: readonly Behind[] = []) {
   const { views, steps } = r;
   return feedWords(
     listing({

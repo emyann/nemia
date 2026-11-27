@@ -7,16 +7,7 @@
 import path from 'node:path';
 import { memoryBytesOf, memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepSpec } from '../step/step.ts';
-import {
-  declarationOf,
-  DEFAULT_HARNESS,
-  fenceKeyOf,
-  fenceListsOf,
-  HARNESSES,
-  isRemoteHarness,
-  REMOTE_NAME,
-  remoteNameOf,
-} from '../harness/harness.ts';
+import { declarationOf, DEFAULT_HARNESS, fenceKeyOf, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
 import { looseAt } from '../closeout/index.ts';
 import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';

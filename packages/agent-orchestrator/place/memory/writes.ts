@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, takenBack, treeOf } from './acts.ts';
+import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, treeOf } from './acts.ts';
 import { isDirectory, OWN, real, SELF_IGNORED, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
 import { commitAt, commitOf, within, type Held, type Repository } from './world.ts';

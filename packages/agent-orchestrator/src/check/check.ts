@@ -24,9 +24,8 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
-import { checkLine, type CheckSpec, type StepSpec } from '../step/step.ts';
+import { type CheckSpec, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/index.ts';
-import { firstPiece } from '../piece/piece.ts';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import { checksPhase } from './checks-due.ts';
 
@@ -175,7 +174,10 @@ export const INSTALL_ARGS = ['install', '--no-save', '--no-audit', '--no-fund'] 
 export const UNPROVISIONED =
   '[nemia check] the node_modules of this worktree could not be installed from its package-lock.json: no verdict on the work; the notes of the run say what npm said';
 
-/** What a check's script runs instead of its command: nothing at all, where the pass could not install the worktree's tree (`unprovisioned`). */
+/**
+ * What a check's script runs instead of its command: nothing at all, where the pass could not install the worktree's tree
+ * (`unprovisioned`).
+ */
 export type CheckFirst = 'unprovisioned';
 
 /**
@@ -194,9 +196,7 @@ export type CheckFirst = 'unprovisioned';
 export const checkArgv = (command: string, first?: CheckFirst) => [
   'sh',
   '-c',
-  [
-    ...(first === 'unprovisioned' ? [`echo '${UNPROVISIONED}'`, 'kill -s KILL $$'] : [command]),
-  ].join('\n'),
+  (first === 'unprovisioned' ? [`echo '${UNPROVISIONED}'`, 'kill -s KILL $$'] : [command]).join('\n'),
 ];
 
 /** A check's verdict: the exit code, or `unfinished` when it has none. */

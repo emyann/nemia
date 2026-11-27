@@ -192,7 +192,8 @@ export const Interrupt = Schema.Struct({
 export type Interrupt = typeof Interrupt.Type;
 
 /**
- * `GET /api/pause`: the store's pause or null; each task still finishing under it; and each session it parked at a tool call's end; and each check it holds.
+ * `GET /api/pause`: the store's pause or null; each task still finishing under it; and each session it parked at a tool call's end; and
+ * each check it holds.
  */
 export const Paused = Schema.Struct({
   pause: OrNull(Pause, "The store's pause; null where it is not paused."),

@@ -642,9 +642,9 @@ export const outputFields = (step: StepSpec) => Object.keys(step.output?.schema.
  */
 export const REFUSED: Record<string, string> = {
   workspace:
-    'every step of a run works in a worktree of its own, and a run ends with a branch, so no step runs in the repository\'s own checkout:' +
+    "every step of a run works in a worktree of its own, and a run ends with a branch, so no step runs in the repository's own checkout:" +
     ' `workspace: base` is gone, and `workspace: worktree` is what a step without the line already is. Delete the line: `nemia decide <run>`' +
-    ' says where the run\'s branch stands and how to merge it. A workflow that lands its runs ends with a wait node (`waitsFor:`) on a condition' +
+    " says where the run's branch stands and how to merge it. A workflow that lands its runs ends with a wait node (`waitsFor:`) on a condition" +
     ' its factory writes. A step that works in a folder the run makes says `place: folder`',
   guide:
     "the harness reads CLAUDE.md or AGENTS.md from the step's workspace on its own. Standing rules belong" +

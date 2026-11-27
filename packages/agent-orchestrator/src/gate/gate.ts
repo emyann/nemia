@@ -5,12 +5,7 @@
 import type { StepSpec } from '../step/step.ts';
 import { tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
-import {
-  approvalOf,
-  gatesOf,
-  hasGate,
-  standing,
-} from '../status/status.ts';
+import { approvalOf, gatesOf, hasGate, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';

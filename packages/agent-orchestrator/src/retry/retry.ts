@@ -142,8 +142,7 @@ function triedOn(
   const noneFiled = followers.length > 0 && !followers.some((s) => waitFiled(s, run.steps[s.name]));
   const sendsBack =
     settled &&
-    (status === 'awaiting approval' ||
-      (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled));
+    (status === 'awaiting approval' || (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled));
   const rechecks = blockedRechecks(run.steps[step.name], tried, phaseOf, tipOf);
   const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack, rechecks);
   const raise =
@@ -167,11 +166,8 @@ const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, 
   if (step.waitsFor !== undefined) return (tried === 'failed (check)' ? ['recheck'] : []) satisfies RetryMode[];
   if (rechecks) return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   if (tried === 'budget exhausted')
-    return (
-      settled && step.check ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh']
-    ) satisfies RetryMode[];
-  if (tried === 'failed (check)')
-    return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
+    return (settled && step.check ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh']) satisfies RetryMode[];
+  if (tried === 'failed (check)') return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
   return (ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : []) satisfies RetryMode[];
 };
@@ -644,7 +640,8 @@ const recheckWords = (status: StepStatus, modes: readonly RetryMode[]) =>
  * blocked step is `answerLines`', beside its question.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
- * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. A check that did not finish is offered `--recheck` first, past a budget or not,
+ * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. A check that did not finish is offered
+ * `--recheck` first, past a budget or not,
  * and so is a check whose refusal its step's `checkFailurePolicy:` names a person's (`personsRefusal`), its session continued beside it;
  * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
  * agent's try, a new Task, never its session continued, with no `--model` (`remoteRetryRefusal`).

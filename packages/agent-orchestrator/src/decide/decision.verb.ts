@@ -108,7 +108,8 @@ const answered = (read: DecisionRead | DecisionUnjudged) => read;
  * succeeded or been released is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight
  * (`decided`). Else the run is
  * decided (`decidedOf`). A run the cap on runs in flight holds is `running` with its slot (its `WF_MAX_RUNS` before any pass is `env`'s),
- * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`. Else what there is to decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
+ * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`. Else what there is to
+ * decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
  * a run still running has a step waiting on you, and every branch a step worked on when no terminal step has one (`branchesToRead`), never
  * the base branch of a run that cut worktrees, each read from the run's place on this read (`changesOf`). What the place could not say is
  * an `error` on its entry, never a failed read. A folder run has no repository to ask, and a run that worked on its base branch itself no
@@ -192,7 +193,8 @@ export const runDecision = Effect.fn('runDecision')(function* (id: string, how: 
 });
 
 /** What a run whose branches are already on its base says: its status and the branches merged. */
-const mergedWords = (run: Run, status: string, branches: readonly string[]) => `${status} — ${branches.join(', ')} merged into ${run.branch}`;
+const mergedWords = (run: Run, status: string, branches: readonly string[]) =>
+  `${status} — ${branches.join(', ')} merged into ${run.branch}`;
 
 /** What `branch` changed among `changes`, which `changesOf` gives for each branch it was asked: thrown, naming it, where none. */
 function changeOf(changes: readonly BranchChanges[], branch: string) {
@@ -204,7 +206,8 @@ function changeOf(changes: readonly BranchChanges[], branch: string) {
 /**
  * What each branch to read changed (`branchesToRead`, in the order the run's steps run, `namesInOrder`), what each branch the run awaits
  * changed, and where each result branch stands against the base (`Standing`), all off one read of the place (`changesOf`). Whether each
- * branch ahead merges onto the base is the decision's own trial at a decision (`collisions`), and a trial merge (`mergesRead`) at any other.
+ * branch ahead merges onto the base is the decision's own trial at a decision (`collisions`), and a trial merge (`mergesRead`) at any
+ * other.
  */
 const branchesOf = Effect.fnUntraced(function* (
   run: Run,

@@ -47,8 +47,7 @@ const inputsGivenSpec = spec<(run: InputsRun) => GivenInputs | null>({
     },
     worktreesGiven: {
       description: "Every step of an isolated repository run handed files or cards finds them in its worktree's given/inputs",
-      condition: ({ input: [run], output }) =>
-        !(!isFolderRun(run) && run.isolate === true && handedAny(run)) || output === 'given/inputs',
+      condition: ({ input: [run], output }) => !(!isFolderRun(run) && run.isolate === true && handedAny(run)) || output === 'given/inputs',
     },
   },
 });

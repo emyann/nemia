@@ -91,8 +91,7 @@ export function roundsDue(
       continue;
     }
     const sent =
-      askedRound(steps, step, run, { status, own, round }, closeoutOf, asks, spendOf) ??
-      mergeDue(steps, run, step, status, asks);
+      askedRound(steps, step, run, { status, own, round }, closeoutOf, asks, spendOf) ?? mergeDue(steps, run, step, status, asks);
     if (sent) due.push(sent);
   }
   return due;

@@ -130,7 +130,8 @@ function once(merged: (branch: string) => Merged) {
  * What is left for a person to do about this run (`Decision`). Pure. Read on `assess`'s inputs: a step a round due files again is held
  * on no budget (`roundSpans`).
  *
- * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, a step the next tick tries again and a loop going round again.
+ * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, a step the next tick tries again
+ * and a loop going round again.
  *
  * A run that worked directly on its base branch is never asked whether it merged: git's answer is always yes. Every result branch is
  * asked, not some — a fan-out that ends in two branches has not merged because one did — each once, and none after the first that is

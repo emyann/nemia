@@ -101,7 +101,8 @@ export const pausingWords = (sessions: number, leftMs: number) =>
 export type PauseHeld = { run: string; step: string };
 
 /**
- * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work. `stopping` once the engine was asked to stop it, and `resumed` while an ask
+ * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work. `stopping`
+ * once the engine was asked to stop it, and `resumed` while an ask
  * `nemia pause --now` wrote names it (`interrupted`), which runs a check again on the resume. A stop asked by another hand carries no
  * `resumed`. `calling` is the tool a session is in a call to, which a stop of the daemon waits for.
  */
@@ -387,7 +388,8 @@ const NOW_LINE = 'nemia pause --now --yes';
 
 /**
  * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
- * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), and the line that acts (`NOW_LINE`). With nothing at work, it says so.
+ * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), and the line that
+ * acts (`NOW_LINE`). With nothing at work, it says so.
  * @param interrupts Each task it would cut.
  * @param standing Whether a pause stands already, which it would keep; false where none is said.
  */

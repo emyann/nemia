@@ -323,7 +323,15 @@ describe('each key a step has: read as written, and refused blank, twice or with
     refuses('gate: twice', 'plan', 'gate: true\ngate: true', '`gate` is set twice'),
 
     ...['base', 'main', 'worktree'].map((word) =>
-      refuses(`workspace: ${word}`, 'ship', `after: review\nworkspace: ${word}`, '`workspace`', '`waitsFor:`', '`nemia decide <run>`', 'Delete the line'),
+      refuses(
+        `workspace: ${word}`,
+        'ship',
+        `after: review\nworkspace: ${word}`,
+        '`workspace`',
+        '`waitsFor:`',
+        '`nemia decide <run>`',
+        'Delete the line',
+      ),
     ),
 
     reads('place: folder', 'write', 'place: folder', { place: 'folder' }),

@@ -8,12 +8,7 @@ import { andList, checkTasksOf, type CloseoutAsked, type RepositoryRun, type Run
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/index.ts';
 import { modeWord, spentAsks, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
-import {
-  standing,
-  type Round,
-  type RoundAsk,
-  type SpendOf,
-} from '../status/status.ts';
+import { standing, type Round, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { gated, holdWord } from '../wait/wait.ts';
 import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';

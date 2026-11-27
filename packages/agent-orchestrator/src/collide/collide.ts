@@ -1,6 +1,7 @@
 /**
  * What a person reads at a run's decision before its branch is merged: whether its result branches merge onto the base branch as it is now,
- * and which runs in flight on the same base its branches collide with and in which files. The trial merges are the place's (`trialMerges`); this file asks for
+ * and which runs in flight on the same base its branches collide with and in which files. The trial merges are the place's
+ * (`trialMerges`); this file asks for
  * them in order (`trialsOf`) and words what they answer (`collisionsOf`). Pure.
  */
 import path from 'node:path';
@@ -79,12 +80,7 @@ function summary(onto: string, inFlight: readonly string[], colliding: readonly 
  * @param theirs The branches ahead of the base of the other runs in flight.
  * @param answer What the place's trial merges answered, in the order `trialsOf` asked them, and the commit each branch is at.
  */
-export function collisionsOf(
-  run: RepositoryRun,
-  ours: readonly string[],
-  theirs: readonly Theirs[],
-  answer: Trials,
-) {
+export function collisionsOf(run: RepositoryRun, ours: readonly string[], theirs: readonly Theirs[], answer: Trials) {
   const onto = run.branch;
   const word = (i: number) => mergeWordOf(answer.trials[i] ?? { unknown: 'the place answered no trial for it' });
   const base = ours.map((branch, i) => {

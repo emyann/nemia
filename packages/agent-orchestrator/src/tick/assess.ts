@@ -3,14 +3,7 @@
  * whether the run is finished and what stopped it (`stoppedOnWord`). Pure; the tick acts on it, and the verbs and the screens ask it.
  */
 import { retriesDue, type CheckKillOf, type Retry, type RetryAsk, type TipOf } from '../retry/index.ts';
-import {
-  roundSpans,
-  standing,
-  type BranchStanding,
-  type Round,
-  type RoundAsk,
-  type SpendOf,
-} from '../status/status.ts';
+import { roundSpans, standing, type BranchStanding, type Round, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { toDecide, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
@@ -251,9 +244,7 @@ const succeeded = (all: readonly StepStatus[]) =>
 /** The assessment as the store's pause leaves it (`Run.pause`): nothing due, and what was due named in `waitingOnPause`. Pure. */
 function underPause(run: Run, a: Assessment) {
   if (!run.pause) return a;
-  const steps = [
-    ...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step)]),
-  ];
+  const steps = [...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step)])];
   const checks = [...new Set([...a.check, ...a.retry.filter((r) => r.mode === 'recheck').map((r) => r.step)])];
   const waitingOnPause = steps.length ? { waitingOnPause: { steps, checks } } : {};
   return { ...a, ready: [], send: [], check: [], retry: [], round: [], ...waitingOnPause };

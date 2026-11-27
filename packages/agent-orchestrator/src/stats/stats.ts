@@ -13,7 +13,7 @@
 import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { checkTasksOf, isRepositoryRun, tryOf, type Run } from '../record/record.ts';
+import { checkTasksOf, tryOf, type Run } from '../record/record.ts';
 import { medianOf, p90Of } from '../costs/index.ts';
 import type { TryMemory } from '../out-of-memory/index.ts';
 import type { Closeout } from '../closeout/index.ts';

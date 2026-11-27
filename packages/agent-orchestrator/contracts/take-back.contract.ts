@@ -8,7 +8,8 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * What of a step a take-back is judged from, read off the run before anything is moved. `known`: the run and its workflow have the step.
- * `approved`: a person's approval of the try it is on stands (`approvalOf`). `filed`: anything of the step has a task — its session or its check.
+ * `approved`: a person's approval of the try it is on stands (`approvalOf`). `filed`: anything of the step has a task — its session or
+ * its check.
  */
 export type TakeBackPut = { known: boolean; approved: boolean; filed: boolean };
 

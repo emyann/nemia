@@ -469,8 +469,7 @@ function listedSteps(
     }
 
     const status = refiled.has(name) ? own : stands;
-    if (holdsTheRun(status) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
-      waitingOnYou.push(name);
+    if (holdsTheRun(status) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);

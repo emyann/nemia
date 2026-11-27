@@ -13,7 +13,7 @@
  *   browser, the writers among them, denies the one that runs a script in the page (`run-code.deny.yaml`).
  * - Every agent is refused an edit and a write of the store's factories, workflows and inbox, under the store the factory names
  *   (`storeRoot`), and none of its runs: a step writes its own run's folder.
- * - The two writers, Grace and Otto, take one list (`writers.deny.yaml`): a push, a forced branch delete, a kill by name, every `gh`, a
+ * - The one writer, Grace, takes a list (`writers.deny.yaml`): a push, a forced branch delete, a kill by name, every `gh`, a
  *   session started by hand, an edit of a harness's settings and GitHub's writes of a repository.
  *
  * What each rule asks of an agent is read from the files themselves, so a line dropped from one is refused on every agent that names it.
@@ -44,7 +44,7 @@ const STORE = '//srv/nemia-store';
 const READ_ONLY = ['agora', 'argus', 'iris', 'seldon'];
 
 /** The writers, whose fences refuse what no run of theirs may do. */
-const WRITERS = ['grace', 'otto'];
+const WRITERS = ['grace'];
 
 /** The lines of sdlc's fence file `file`, as shipped. */
 const linesOf = (file: string) => yaml.load(fs.readFileSync(path.join(SDLC, 'fences', file), 'utf8')) as string[];
@@ -155,7 +155,7 @@ const TREES = await rendered([
       'fences/read-only.deny.yaml': cut('Bash(git *--output*)', 'Bash(*=* nemia *)'),
       'fences/writers.deny.yaml': cut('Bash(git push:*)'),
       'fences/browser.deny.yaml': cut('mcp__playwright__browser_snapshot(filename:*)'),
-      'agents/otto/agent.yaml': cut('Edit(${{ parameters.storeRoot }}/inbox/**)'),
+      'agents/grace/agent.yaml': cut('Edit(${{ parameters.storeRoot }}/inbox/**)'),
     }),
     sets: [`storeRoot=${STORE}`],
   },
@@ -180,8 +180,7 @@ test('REFUSED: a line cut from a fence file is named on every agent that takes t
       ]),
       'agora: denies no mcp__playwright__browser_snapshot(filename:*)',
       'grace: denies no Bash(git push:*)',
-      'otto: denies no Bash(git push:*)',
-      `otto: denies no Edit(${STORE}/inbox/**)`,
+      `grace: denies no Edit(${STORE}/inbox/**)`,
       'seldon: denies no mcp__playwright__browser_snapshot(filename:*)',
     ].sort(),
   );
@@ -193,21 +192,21 @@ test('REFUSED: a deny over the runs, and a read-only agent in another mode or wi
   const planted = {
     ...fences,
     seldon: { ...seldon, mode: 'auto', skills: seldon.skills.filter((skill) => skill !== 'git') },
-    otto: { ...fences.otto, denied: [...fences.otto.denied, `Edit(${STORE}/runs/**)`] },
+    grace: { ...fences.grace, denied: [...fences.grace.denied, `Edit(${STORE}/runs/**)`] },
     iris: { ...fences.iris, allowed: [...fences.iris.allowed, 'Bash(gh pr view:*)'] },
   };
   assert.deepEqual(shortOf(planted, STORE), [
     'iris: allows gh, Bash(gh pr view:*)',
     'seldon: runs auto',
     'seldon: names no git skill',
-    `otto: denies its runs, Edit(${STORE}/runs/**)`,
+    `grace: denies its runs, Edit(${STORE}/runs/**)`,
   ]);
 });
 
-test("sdlc's six agents carry their fences: the read set and its denies, the browser's, the store's, and the writers' refusals", () => {
+test("sdlc's five agents carry their fences: the read set and its denies, the browser's, the store's, and the writers' refusals", () => {
   for (const way of ['shipped', 'github']) {
     const fences = fencesOf(way);
-    assert.deepEqual(Object.keys(fences).sort(), ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon'], way);
+    assert.deepEqual(Object.keys(fences).sort(), ['agora', 'argus', 'grace', 'iris', 'seldon'], way);
     assert.deepEqual(shortOf(fences, STORE), [], way);
     for (const [agent, { allowed, denied }] of Object.entries(fences))
       for (const [list, rules] of Object.entries({ allowed, denied }))

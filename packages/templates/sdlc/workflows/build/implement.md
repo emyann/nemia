@@ -68,8 +68,8 @@ not finish, the run waits on a person.
 
 **Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the
 landing refuses rather than lands: on GitHub, CI judges the commit your check pushes and nothing judges the merged tree afterwards —
-the landing's check is a receipt — so GitHub may call the pull request unmergeable; in this checkout, the landing stages your branch
-on the base as it is then, and a merge that conflicts or breaks the local check is taken back. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+the landing program merges at the head `ci` judged — so GitHub may call the pull request unmergeable; in this checkout, the landing program stages your branch
+on the base as it is then, runs the local check on the merged tree, and takes a merge that conflicts or breaks it back. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

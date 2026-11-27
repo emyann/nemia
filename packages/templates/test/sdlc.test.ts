@@ -19,7 +19,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { FACTORY_APPLY, loadWorkflows } from 'agent-orchestrator';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
-import { assess, composeBrief } from 'agent-orchestrator/run';
+import { assess } from 'agent-orchestrator/run';
 import { PERSONS_EXIT } from '../sdlc/carried/exec.ts';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, filesUnder, handled, nemia, rendered, SDLC, storeEnv } from './template.ts';
@@ -41,7 +41,6 @@ const TREES = await rendered([
       'landingRefresh=node x.ts cut',
       'landingDerives=a.json',
       'landingInstall=x install',
-      'landingCheckMemory=256Mi',
       'lightMemoryRequest=768Mi',
     ],
   },
@@ -101,9 +100,7 @@ const FILED = '${{ workspace }}';
 /** The steps whose check and note differ by way. */
 const WAYS = [
   ['build', 'implement'],
-  ['build', 'land'],
   ['quick', 'implement'],
-  ['quick', 'land'],
 ] as const;
 
 /** The opening of a check's branch on the rendered way `github`. */
@@ -146,7 +143,6 @@ test('applied with every parameter set, each is written where the template says,
   const tree = treeOf('set');
   const build = checkOf(tree, 'build', 'implement');
   assert.ok(build.includes('{ echo round; }'), build);
-  for (const workflow of ['build', 'quick']) assert.match(checkOf(tree, workflow, 'land'), ciCheck('gate'), `${workflow}/land's receipt`);
   for (const workflow of ['build', 'quick'])
     assert.ok(
       checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix"; fi && '),
@@ -155,10 +151,7 @@ test('applied with every parameter set, each is written where the template says,
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(true)), `${workflow}/${step} branches on GitHub:\n${check}`);
-    assert.ok(
-      check.includes('; else { echo local; }; fi'),
-      `and its other way is the local check the factory set (land's \`base-ci\`, after it, has none):\n${check}`,
-    );
+    assert.ok(check.includes('; else { echo local; }; fi'), `and its other way is the local check the factory set:\n${check}`);
     assert.match(stepIn(tree, workflow, step).body, answer(true), `${workflow}/${step}'s note opens with the way`);
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('a, b'));
@@ -208,24 +201,17 @@ test('on GitHub the round and the landing wait on the conditions the ci-watch pr
       ],
       `${workflow}/implement ends on the local check, then the ci condition`,
     );
-    const land = checksIn(set, workflow, 'land');
-    assert.deepEqual(
-      land.map((c) => [c.name, c.condition]),
-      [
-        ['ci', 'ci'],
-        ['receipt', undefined],
-        ['base-ci', 'base-ci'],
-      ],
-    );
-    for (const c of [...implement, ...land].filter((c) => c.run !== undefined))
+    const land = loaded('set', workflow).find((step) => step.name === 'land');
+    assert.deepEqual(land?.waitsFor, ['turn', 'ci', 'landed', 'base-ci'], `${workflow}/land waits on the four conditions`);
+    for (const c of implement.filter((c) => c.run !== undefined))
       assert.doesNotMatch(c.run ?? '', /pull-request\.ts" wait|landing\.ts" base-ci/, `${workflow}: ${c.name} waits on no CI`);
   }
   const plain = treeOf('plain');
   for (const workflow of ['build', 'quick'])
     assert.deepEqual(
-      [...checksIn(plain, workflow, 'implement'), ...checksIn(plain, workflow, 'land')].filter((c) => c.condition !== undefined),
+      checksIn(plain, workflow, 'implement').filter((c) => c.condition !== undefined),
       [],
-      `${workflow}: no condition is waited on where github is false`,
+      `${workflow}: the round waits on no condition where github is false`,
     );
 });
 
@@ -246,7 +232,6 @@ test('applied with no --set, each parameter takes its default', () => {
     assert.match(stepIn(tree, workflow, step).body, answer(false), `${workflow}/${step}'s note opens with the way`);
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('the top-level folders of the repository'));
-  assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
 });
 
 test("the factory's label rules reach the janitor's check and its filing as their flag, and Argus's note, either way", () => {
@@ -268,20 +253,23 @@ test("the factory's label rules reach the janitor's check and its filing as thei
   assert.ok(stepIn(treeOf('set'), 'janitor', 'argus').body.includes('\nwork=fix:fix\n'), "Argus's note quotes the rules");
 });
 
-test("the factory's landing refresh reaches land's merge as its three flags, and both reviews' notes name the paths it derives", () => {
-  const tree = treeOf('set');
-  for (const workflow of ['build', 'quick'])
-    assert.ok(
-      stepIn(tree, workflow, 'land').body.includes(' --refresh "node x.ts cut" --derives "a.json" --install "x install"'),
-      `${workflow}/land's merge carries the three flags`,
-    );
-  for (const workflow of ['build', 'quick'])
-    assert.ok(stepIn(tree, workflow, 'review').body.includes('`a.json`'), `${workflow}/review names the derived paths`);
-  const plain = stepIn(treeOf('plain'), 'build', 'land').body;
+test("the factory's landing refresh and local check reach the landing program as its flags, and both reviews' notes name the paths it derives", () => {
+  const program = programIn(treeOf('set'), 'land');
+  assert.deepEqual(program.writes, ['turn', 'landed']);
   assert.ok(
-    plain.includes(' --refresh "" --derives "" --install ""'),
-    'unset, each is given empty, which the merge takes as no refresh and no install',
+    program.run.includes(
+      'land.ts" --github true --check "gate" --refresh "node x.ts cut" --derives "a.json" --install "x install" --local-check \'echo local\'',
+    ),
+    program.run,
   );
+  for (const workflow of ['build', 'quick'])
+    assert.ok(stepIn(treeOf('set'), workflow, 'review').body.includes('`a.json`'), `${workflow}/review names the derived paths`);
+  const plain = programIn(treeOf('plain'), 'land').run;
+  assert.ok(
+    plain.includes('--github false --check "ci" --refresh "" --derives "" --install ""'),
+    'unset, each is given empty, which the program takes as no refresh and no install',
+  );
+  assert.ok(plain.includes('--local-check \'node "$WF_CARRIED_FILES/local-check.ts" --runner npm\''), plain);
 });
 
 test("build's and quick's implement try again on their own twice when their check refuses, either way, and land never does", () => {
@@ -303,16 +291,45 @@ test("build's and quick's implement and review load the github MCP server where 
   }
 });
 
-test("build's and quick's land check asks the memory the factory sets, and the daemon's default where it sets none", () => {
-  for (const workflow of ['build', 'quick']) {
-    assert.equal(loaded('set', workflow).find((step) => step.name === 'land')?.checkMemory, '256Mi', `set: ${workflow}/land`);
-    assert.equal(loaded('plain', workflow).find((step) => step.name === 'land')?.checkMemory, undefined, `plain: ${workflow}/land`);
-    assert.equal(
-      Object.hasOwn(stepIn(treeOf('plain'), workflow, 'land').front, 'checkMemory'),
-      false,
-      `plain: ${workflow}/land writes no line`,
-    );
-  }
+test('the land steps are wait nodes, with no session, no agent and no workspace, which load either way', () => {
+  for (const workflow of ['build', 'quick'])
+    for (const [name, waitsFor] of [
+      ['set', ['turn', 'ci', 'landed', 'base-ci']],
+      ['plain', ['landed']],
+    ] as const) {
+      const land = loaded(name, workflow).find((step) => step.name === 'land');
+      assert.deepEqual(land?.waitsFor, waitsFor, `${name}: ${workflow}/land`);
+      assert.equal(land?.agent, undefined, `${name}: ${workflow}/land has no agent`);
+      assert.notEqual(land?.workspace, 'base', `${name}: ${workflow}/land works on no base`);
+      assert.equal(stepIn(treeOf(name), workflow, 'land').body.trim(), '', `${name}: ${workflow}/land has no instruction`);
+    }
+});
+
+test('every condition the land steps wait on is written by exactly one program of the factory', () => {
+  const tree = treeOf('set');
+  const writers = (name: string) => ['ci-watch', 'land'].filter((program) => programIn(tree, program).writes.includes(name));
+  for (const workflow of ['build', 'quick'])
+    for (const name of loaded('set', workflow).find((step) => step.name === 'land')?.waitsFor ?? [])
+      assert.equal(writers(name).length, 1, `${workflow}/land waits on ${name}, written by ${writers(name).join(', ') || 'no program'}`);
+  assert.deepEqual(programIn(tree, 'land').writes, ['turn', 'landed']);
+  assert.deepEqual(programIn(tree, 'ci-watch').writes, ['ci', 'base-ci']);
+});
+
+test("the factory's local check holds no single quote, which the landing program is handed it inside", () => {
+  const manifest = fs.readFileSync(path.join(SDLC, 'nemia.yaml'), 'utf8');
+  const given = /localCheck:\n(?:.*\n)*?\s+default: (.*)\n/.exec(manifest)?.[1] ?? '';
+  assert.ok(given.includes('local-check.ts'), given);
+  assert.ok(!given.includes("'"), `the default of localCheck holds no single quote: ${given}`);
+  assert.ok(manifest.includes('holds no single quote'), "localCheck's description says so");
+});
+
+test('nemia.yaml hires five agents and no release engineer, and its parameters keep no memory for a land check', () => {
+  const manifest = fs.readFileSync(path.join(SDLC, 'nemia.yaml'), 'utf8');
+  assert.ok(!manifest.includes('landingCheckMemory'));
+  assert.match(manifest, /Five agents fill their steps/);
+  assert.ok(manifest.includes('--gate review'), 'the description says where a person approves before a landing');
+  assert.ok(!/^ {4}(build|quick)\/land:/m.test(manifest), 'no hire for a land step');
+  assert.ok(!/\botto\b/i.test(manifest));
 });
 
 test("the light steps' sessions ask the memory the factory sets, 1Gi where it sets none, and the daemon's default where it sets it empty", () => {
@@ -321,8 +338,6 @@ test("the light steps' sessions ask the memory the factory sets, 1Gi where it se
     ['front-door', 'answer'],
     ['intake', 'intake'],
     ['janitor', 'argus'],
-    ['build', 'land'],
-    ['quick', 'land'],
   ];
   for (const [workflow, step] of light) {
     const front = (name: string) => stepIn(treeOf(name), workflow, step).front;
@@ -330,14 +345,13 @@ test("the light steps' sessions ask the memory the factory sets, 1Gi where it se
     assert.equal(front('set').memoryRequest, '768Mi', `set: ${workflow}/${step}`);
     assert.equal(Object.hasOwn(front('own'), 'memoryRequest'), false, `own: ${workflow}/${step} writes no line`);
   }
-  for (const workflow of ['build', 'quick']) {
-    const asked = (name: string, step: string) => loaded(name, workflow).find((one) => one.name === step)?.memoryRequest;
-    assert.equal(asked('plain', 'land'), '1Gi', `plain: ${workflow}/land loads asking it`);
-    assert.equal(asked('set', 'land'), '768Mi', `set: ${workflow}/land loads asking it`);
-    assert.equal(asked('own', 'land'), undefined, `own: ${workflow}/land loads asking the default`);
+  for (const workflow of ['build', 'quick'])
     for (const step of workflow === 'build' ? ['design', 'implement', 'review'] : ['implement', 'review'])
-      assert.equal(asked('plain', step), undefined, `${workflow}/${step} asks the default`);
-  }
+      assert.equal(
+        loaded('plain', workflow).find((one) => one.name === step)?.memoryRequest,
+        undefined,
+        `${workflow}/${step} asks the default`,
+      );
 });
 
 /** The steps of `workflow` in the factory `name`'s tree, loaded as a start of it in the factory loads them: with the factory's hires. */
@@ -450,7 +464,7 @@ test("each step that writes its own output has its schema beside it, the templat
     "quick's implement, intake's intake and the front door's door and answer write their own output, and no other step",
   );
   for (const file of owned) assert.ok(fs.readFileSync(path.join(tree, file)).equals(fs.readFileSync(path.join(SDLC, file))), file);
-  for (const agent of ['agora', 'argus', 'iris', 'otto', 'seldon'])
+  for (const agent of ['agora', 'argus', 'iris', 'seldon'])
     assert.ok(
       fs
         .readFileSync(path.join(tree, 'workflows', 'agents', `${agent}.schema.json`))
@@ -557,13 +571,13 @@ for (const name of ['set', 'plain'])
     assert.deepEqual(intakePass(steps, 'change', true).send, ['to-quick'], 'and quick for one that settles its change');
   });
 
-test('the team is six agents, and Ada is none of them', () => {
+test('the team is five agents, and Ada is none of them', () => {
   const agents = fs
     .readdirSync(path.join(treeOf('set'), 'workflows', 'agents'))
     .filter((leaf) => leaf.endsWith('.md'))
     .map((leaf) => leaf.slice(0, -'.md'.length))
     .sort();
-  assert.deepEqual(agents, ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon']);
+  assert.deepEqual(agents, ['agora', 'argus', 'grace', 'iris', 'seldon']);
 });
 
 test("build's design, read with Seldon, declares the later steps' budgets as data: the budgets shape, expanded and required", () => {
@@ -692,12 +706,18 @@ test("each of sdlc's checks, either way, refuses with the variable it reads a fr
   assert.ok(read >= 8, `the checks that read a frozen folder were found: ${read}`);
 });
 
-test("quick's land step is told build's land note, rendered with the same values", () => {
+test('no hire names Otto, and the release engineer has no folder, skill or instruction left', () => {
   for (const name of ['set', 'plain']) {
-    const build = stepIn(treeOf(name), 'build', 'land').body;
-    assert.ok(build.includes('landing.ts'), `${name}: build's land note is read`);
-    assert.equal(stepIn(treeOf(name), 'quick', 'land').body, build, `${name}: quick/land`);
+    const wiring = JSON.parse(fs.readFileSync(path.join(treeOf(name), 'factory.json'), 'utf8')) as { hires: Record<string, string> };
+    assert.deepEqual(
+      Object.values(wiring.hires).filter((agent) => agent === 'otto'),
+      [],
+      name,
+    );
   }
+  assert.equal(fs.existsSync(path.join(SDLC, 'agents', 'otto')), false);
+  assert.equal(fs.existsSync(path.join(SDLC, 'skills', 'land-a-branch')), false);
+  assert.equal(fs.existsSync(path.join(SDLC, 'workflows', 'build', 'land.md')), false);
 });
 
 test("build's review loop ships its numbers: five rounds, the review's budget sized to them, implement's too", () => {
@@ -805,59 +825,27 @@ test("build's and quick's review weigh a moved base alike, by the reads that say
     assert.ok(build.includes(read), `the paragraph names ${read}`);
 });
 
-/** The heading under which a step's brief names the gates after it (`gatesAfterSection`), as quick's review note names it. */
-const GATES_AFTER = '## Gates after you';
-
-/** Quick's review brief, composed by the orchestrator as a run composes it, on a run started with the gates `gates`. */
-const quickReviewBrief = (gates: string[]) => {
-  const steps = [
-    { name: 'implement', after: [], body: 'build it' },
-    { name: 'review', after: ['implement'], body: 'judge it' },
-    { name: 'land', after: ['review'], body: 'land it' },
-  ];
-  const run: Parameters<typeof composeBrief>[1] = {
-    id: 'r-1',
-    repo: '/repo',
-    workspace: '/wt',
-    baseRef: 'abc123',
-    branch: 'main',
-    isolate: true,
-    brief: 'a card',
-    workflowDir: '/wf',
-    createdAt: '2026-01-01T00:00:00Z',
-    steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' }, land: { taskId: null } },
-    gates,
-  };
-  return composeBrief(steps[1], run, steps);
-};
+/** The paragraph of each review note that tells a gate on the review itself, which the run's brief cannot. */
+const GATE_AT_REVIEW = 'gates your step, `--gate review`';
 
 /** Where each review note's paragraph on a page claim opens, by workflow. */
 const PAGES_AT = { build: '**Check the outside pages the spec rests on.**', quick: '**A claim on a page you cannot read' } as const;
 
-describe("build's and quick's review notes say both cases of their land, and the run tells review which by the heading the notes name", () => {
+describe("build's and quick's review notes say what a gate at the review is, and a claim on a page stops the landing", () => {
   for (const workflow of ['build', 'quick'] as const)
     for (const name of ['set', 'plain'])
       test(`${workflow}, rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
         const note = stepIn(treeOf(name), workflow, 'review').body;
-        assert.ok(note.includes(`With no \`${GATES_AFTER}\`, your pass lands the change`), 'the case with no gate: the pass lands');
-        assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
-        assert.ok(note.includes('no reason to sign off `blocked`'), 'a card that waits on the person at its land is met by the gate');
-        assert.ok(!/^\*\*Your pass lands the change\.\*\*/m.test(note), 'no paragraph says the pass lands, whatever the gates');
+        assert.ok(note.includes(GATE_AT_REVIEW), 'a person who wants to read the change before it lands gates the review');
+        assert.ok(
+          !note.includes('## Gates after you'),
+          'a gate on the review is not told to it by its brief, so the note names no heading',
+        );
+        assert.ok(!/gate: land|--gate land/.test(note), 'no gate at land, which waits on conditions and is approved after the merge');
         assert.ok(note.includes(PAGES_AT[workflow]), 'the page claim paragraph opens where the test slices it');
         const pages = note.slice(note.indexOf(PAGES_AT[workflow]));
-        assert.ok(pages.includes(`With no \`${GATES_AFTER}\`, it stops the landing`), 'a page claim blocks where no gate follows');
-        assert.ok(pages.includes('With `land` named there, it goes at the top of your sign-off'), 'and goes to the person at land');
-        assert.ok(!/^\*\*A claim on a page you cannot read stops the landing\.\*\*/m.test(note), 'never stops it whatever the gates');
+        assert.ok(pages.includes('stops the landing'), 'a page claim blocks the review');
       });
-  test('a run started with `--gate land` tells review so under that heading, naming land', () => {
-    const gated = quickReviewBrief(['land']);
-    const section = gated.slice(gated.indexOf(GATES_AFTER));
-    assert.ok(gated.includes(GATES_AFTER), 'the heading is in the gated brief');
-    assert.ok(section.split('\n\n')[1]?.includes('`land`'), 'and names land');
-  });
-  test('a run with no gate tells review nothing of one', () => {
-    assert.equal(quickReviewBrief([]).includes(GATES_AFTER), false);
-  });
 });
 
 test("sdlc's wiring names quick for a first card, which lists an ending step, and the radius its parameters default to", () => {

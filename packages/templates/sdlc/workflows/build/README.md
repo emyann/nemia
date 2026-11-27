@@ -1,10 +1,10 @@
 # build
 
 Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora
-reviews it and sends it back while a finding is worth a round, five at most; its pass files the landing, which Otto makes with no gate,
+reviews it and sends it back while a finding is worth a round, five at most; its pass files the landing, which the landing program makes with no gate,
 as quick's does. A person decides on the spec, at design's gate; on a diff that the review and CI already passed, a person's approval
 of the landing would be a stamp. A person who wants to read the change before it lands says so at the run's start, `nemia start …
---gate land`, or by the card's own `gate: land`.
+--gate review`, or by the card's own `gate: review`: the review's pass then waits for them.
 A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 
 ```
@@ -13,8 +13,8 @@ design → implement ⇄ review → land
 
 Each script a step runs is read from the run's frozen carried files (`$WF_CARRIED_FILES`), the copy of the template's `carried/` folder
 the run took when it began, never from the tree it judges: a step's check runs `node "$WF_CARRIED_FILES/<script>.ts"`. The scripts live
-there once, since `quick` runs them too, with the helpers `landing.ts` and `pull-request.ts` share (`exec.ts`), the rules of a CI log
-(`ci-log.ts`) and the landing refresh (`refresh.ts`). Where `WF_CARRIED_FILES` is not set, the check names it on stderr and fails: a
+there once, since `quick` runs them too, with the helpers `land.ts` and `pull-request.ts` share (`exec.ts`), the rules of a CI log
+(`ci-log.ts`), the landing's reads (`landing.ts`) and the landing refresh (`refresh.ts`). Where `WF_CARRIED_FILES` is not set, the check names it on stderr and fails: a
 factory's scripts are not in the repository it works on, so there is nowhere else to read them from. This sdlc needs the Nemia it ships
 with: one that renders and freezes a template's carried folder and reads a `{ path }` item of a list.
 
@@ -27,13 +27,10 @@ notes of implement, review and land each open with the answer and hold a part fo
 - **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts`, `parts.ts` and
   the factory's own check, its `implementCheck` parameter, then the factory's `localCheck` parameter (by default `local-check.ts`, carried: the repository's `lint`, `typecheck` and `test` scripts, run by the package manager its `--runner` names, each where its `package.json` declares it, a package manager's init's
   placeholder test left out, and nothing where it has no `package.json`) on the round's tree; no
-  pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
-  place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
-  tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
+  pull request is opened. Land is the landing program's: it stages every result branch in one `git merge --no-ff --no-commit` in the repository's own checkout, once it is clean on the base, runs `localCheck` on the merged tree, and commits the merge on its exit 0 or takes it back and writes False. The message is the first line of the run's brief and one line per commit of the result. `localCheck` is the only judge, so it runs the tests.
 - **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes its branch and opens a pull request through the factory's `github` MCP server, its check runs
-  `roundCheck`, and the `ci` condition waits on the CI context `ciCheck` names, which the factory's `ci-watch` program writes; land merges that
-  pull request on GitHub; the land step's checks are the `ci` condition (CI at a head a landing refresh pushed), a receipt, then `base-ci`, a
-  condition too, the wait on the base branch's CI, which holds no checkout, so the checkout is given back to the next run's ending once the receipt passes.
+  `roundCheck`, and the `ci` condition waits on the CI context `ciCheck` names, which the factory's `ci-watch` program writes; the landing program merges that
+  pull request on GitHub; the land step waits on the conditions `turn`, `ci` (CI at the head that will be merged, refreshed or not), `landed` and `base-ci`, the wait on the base branch's CI.
   Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still judged by its context) and the `local` check runs the factory's `localCheck`, the program writing `ci` `True` within one pass, and the landing merges the pull request with no context: nothing waits on CI that will not come.
   The rest of this README, but where it says otherwise, is this way's.
 
@@ -96,46 +93,56 @@ a person's, naming each key the rules read, the values they take and the `nemia 
 request no rule labels would fail a check that reads its labels, and only the merge would find out. A pull request opened by hand is labelled by it too. The factory's `labelValues` parameter (`key=value` words, the values
 `pullRequestLabels` reads) refuses that same label earlier, when the card is filed or labelled, so the run never reaches the push with it.
 
-Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
-<id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the
-base branch, its head the commit the review read, `mergeable`, the CI context green at that commit, and no result branch of the run left
-out — then merges it with a merge commit whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never
-`--delete-branch`: GitHub deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only
-origin/<base>`). On a refusal he changes nothing and signs off `blocked` with the `nemia retry` line it printed. Where the factory names
-a refresh — `landingRefresh`, a command of its own that derives files from the tree, and `landingDerives`, the paths it owns, which the
-merge takes as `--refresh` and `--derives` — and the pull request's head lacks the base, the merge first refreshes the branch
-(`refresh.ts`, beside it): it merges the base into the branch in the run's worktree, runs there the factory's `landingInstall` first
-where it names one (`--install`), so the command reads the dependencies the merged tree names and not the branch's, the two sharing one
-time bound, then runs the command there, refuses and takes the merge back where anything is left unmerged, the install or the command
-fails, or the result differs from git's plain merge outside the derived paths, and
-otherwise commits it, pushes the branch with no force and leaves `refreshed.json` in the step's files, merging nothing yet. A refresh
-the command changed nothing of, on a merge that went clean, is taken back, and the merge goes on as before. So two runs that change one
-derived file side by side both land: the landed commit differs from the reviewed head only in the files `landingDerives` names. Land's
-check then merges a head so refreshed, where none is merged and `refreshed.json` names this run's open pull request at it: once the CI
-context reads green there, in the one read (the `ci` condition, before the receipt, waited for it; red or not over refuses, with the `nemia retry <run> review --message "…"` that sends the work back) and while it holds the
-base (a base that moved past it refuses with the land retry line), with `--match-head-commit <head>` and the session's subject and body,
-then fast-forwards the checkout. Past that, land's first check, `receipt`, is the receipt alone — the pull request `MERGED` with a merge commit reachable
-from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run with an equivalent patch on
-HEAD (`git cherry`, so a part taken as a commit of its own counts as taken) — which is what the run needs to record `landed` on the
-commit that landed. It runs no suite: CI judged the head the review read, and the merge commit's first parent is the base. Once it
-passed, the checkout is given back: the land step's third check, `base-ci`, is a condition and runs nothing, so another run's ending is
-filed into the checkout while it waits. The `ci-watch` program writes it, reading only GitHub and the repository's REST API, never the checkout. Where the
-factory's `landingWaitsOnCi` is true (the default), it reads the CI context at the merge commit on the base branch (`--wait-on-ci <true|false>` on the
-program's line); a merge commit whose tree is the head's `ci` judged is passed at once. Green is `True`. A red is first re-run, once, any red it judged, failing lines or not (`rerun.ts`):
-the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a restart never re-runs it twice; green the
-second time is `True`, naming the jobs re-run. Red still is `False`, which fails the step though the merge stands — nothing is taken back — naming
-the jobs that did not pass: red twice is a real break of the base, and the words say so and point at the merge commit's checks, where a person lands a
-fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, `base-ci` is `True` and says so. A
-merge whose own run was cancelled — a CI that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where
-GitHub's compare says it holds the merge: green there is `True`, naming the commit read and why; red there is `False` naming that commit; anything else is
-`Unknown`, the step waiting. Never reported stays `Unknown`, naming `landingWaitsOnCi`: a repository whose CI does not run on pushes to the base sets it false
-(`--set landingWaitsOnCi=false`), and `base-ci` is then `True` at once.
+Land is a wait node (`waitsFor:`): it runs no session, no command and no check of its own, and has no workspace and no budget. It passes once
+the conditions it names are each True for its try, which the factory's two programs write: `turn`, `ci`, `landed` and `base-ci` where `github`
+is true, and `landed` alone with no remote. The landing program (`land`, `programs/land/program.yaml`, `carried/land.ts`) lands the factory's
+runs one at a time and writes `turn` and `landed`; `ci-watch` writes `ci` and `base-ci`.
+
+- `turn` is the landing's one slot. Only one run at a time holds it True with `landed` undecided, the oldest run first; every other run's
+  land step waits, saying which run it is behind. Where the factory names a refresh — `landingRefresh`, a command of its own that derives
+  files from the tree, and `landingDerives`, the paths it owns — and the pull request's head lacks the base, the program refreshes the
+  head before it writes `turn` (`refresh.ts`): it merges the base into the branch in the run's worktree, runs there the factory's
+  `landingInstall` where it names one, so the command reads the dependencies the merged tree names, then the refresh, refuses and takes the
+  merge back where anything is left unmerged, the install or the command fails, or the result differs from git's plain merge outside the
+  derived paths, and otherwise commits it and pushes the branch with no force. So two runs that change one derived file side by side both
+  land: the landed commit differs from the reviewed head only in the files `landingDerives` names.
+- `ci` is CI at the head that will be merged, refreshed or not: the `ci-watch` program writes it, with its one re-run of a red that is not the
+  change's.
+- `landed` is the merge. On GitHub the program merges this run's own pull request with a merge commit (`gh pr merge --merge
+  --match-head-commit <head>`, never `--delete-branch`: GitHub deletes the head branch) whose message is the pull request's title and
+  description, then fast-forwards the repository's checkout where it is clean on the base and behind. It merges nothing but a pull request
+  that is the run's own — not a draft, based on the base branch, its head the tip of the run's result branch — mergeable, with the CI
+  context green at its head, holding the base where the factory refreshes, and leaving no result branch of the run out (`git cherry`, so a
+  part taken as a commit of its own counts as taken). With no remote it stages every result branch of the run in one `git merge --no-ff
+  --no-commit` in the repository's own checkout, which must be clean on the base with no merge in progress, runs `localCheck` on the merged
+  tree, and commits it, or takes it back and writes False. The message there is the first line of the run's brief as its subject and one
+  line per commit of the result branches as its body.
+- `base-ci` is `ci-watch`'s, and runs nothing in the checkout.
+
+The program is level-triggered: each pass reads the api, GitHub and git afresh and carries nothing between passes. A pull request already
+merged, by the program before a restart or by a person, reads as landed and nothing lands twice; a merge a stopped program left staged in
+the checkout is taken back and judged again; and a person can write any of the conditions by hand (`nemia condition`). While the program
+is down the waiting step says which program writes the condition. A False names what a person does, or the `nemia retry <run> land
+--recheck` that makes the next try. To approve before a landing, gate the review (`nemia start … --gate review`): the review's pass then
+waits for the person before the landing waits on anything.
+
+`base-ci`, where the factory's `landingWaitsOnCi` is true (the default), reads the CI context at the merge commit on the base branch
+(`--wait-on-ci <true|false>` on the program's line); a merge commit whose tree is the head's `ci` judged is passed at once. Green is `True`.
+A red is first re-run, once, any red it judged, failing lines or not (`rerun.ts`): the failed jobs of each red workflow run at the merge, only a
+run GitHub says is on its first attempt, so a restart never re-runs it twice; green the second time is `True`, naming the jobs re-run. Red
+still is `False`, which fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass: red twice is a
+real break of the base, and the words say so and point at the merge commit's checks, where a person lands a fix, then types `nemia retry
+<run> land`; where the base's tip holds the merge and the context is green there, `base-ci` is `True` and says so. A merge whose own run was
+cancelled — a CI that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's
+compare says it holds the merge: green there is `True`, naming the commit read and why; red there is `False` naming that commit; anything
+else is `Unknown`, the step waiting. Never reported stays `Unknown`, naming `landingWaitsOnCi`: a repository whose CI does not run on
+pushes to the base sets it false (`--set landingWaitsOnCi=false`), and `base-ci` is then `True` at once.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
 `<run>-probe-<label>` (`node "$WF_CARRIED_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder
 `$WF_ROOT/probes`, and says in its first message whether the person must act; it reaches the person's phone through Remote Control
 only with `--answer`, and the step then stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the
-run is live, naming `probe.ts stop`. Grace's and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a
+run is live, naming `probe.ts stop`. Grace's fence refuse a bare `claude --bg` or Remote Control, and an edit of a
 harness's trust or local settings anywhere.
 
 The implement step's check runs `parts.ts check` after it, read from the frozen files too: every other branch of the run
@@ -183,8 +190,7 @@ Review says in its summary whether the branch holds the base as it is then, and 
 can change the verdict: a file both changed whose hunks overlap or touch, a test of one side (or the change's code) reading what the other
 changed, a measure either side wrote over the other's files, or a merge that does not go clean; any other branch behind it notes, and lets
 the land go. On GitHub, its own `mergeable` and the required CI context stay the guard for the rest, and a base that moved under a green pull request makes the merge refuse rather than land; in this
-checkout, the land step's check runs `localCheck` on the merged tree, and a merge that conflicts or breaks it is taken back. Land's
-note says nothing of it: the ending signs off before the run executes its check. On a merge round (`## Merge` in the brief) the step
+checkout, the landing program runs `localCheck` on the merged tree, and a merge that conflicts or breaks it is taken back. On a merge round (`## Merge` in the brief) the step
 merges the commit the brief names instead.
 
 An intake run whose intent needs a design starts it: intake's ending, `next`, routes to `build` once the person approves it, and
@@ -237,5 +243,4 @@ the spec takes from it — and the review, which reads design (`input: design`),
 fields, as implement is. The review's fetch stays as narrow as it is: a gating reviewer that may fetch any page can be pointed at any
 page by the change it judges, and would read the page as it is then, not as design read it. Agora checks each claim against its
 passage. A claim it cannot check stops the landing: the review signs off `blocked`, naming each claim and its page, for a person to
-answer, since no gate follows it; on a run started with `--gate land`, it names the claim at the top of its sign-off instead, where the
-person who approves the landing reads it.
+answer.

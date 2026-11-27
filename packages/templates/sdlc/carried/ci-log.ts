@@ -1,7 +1,7 @@
 /**
  * The lines of a failing CI job's log that say whose it is, for `ci-watch.ts`'s reading of a red CI context, and how a check of a
  * commit reads — its name, whether it is over, its verdict, the latest run of each, whether a context's runs were all superseded, and the
- * jobs that did not pass as a refusal lists them — for that script and `landing.ts`'s receipt, and what the watcher says of a red at the
+ * jobs that did not pass as a refusal lists them — for that script and `land.ts`, and what the watcher says of a red at the
  * merge: pure,
  * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
  * with them: a run freezes the carried folder whole (`$WF_CARRIED_FILES`), so a script reads it there, as it is read here. It also

@@ -117,14 +117,12 @@ const turnWriteSpec = spec<(read: TurnRead) => TurnAct>({
       description:
         "The turn is given exactly where the run's pull request is merged already, or the slot is free and the run's own open head needs no refresh: the factory names none, or the head holds the base",
       condition: ({ input: [r], output }) =>
-        (output === 'pass') ===
-        (live(r) && (r.pull === 'merged' || (!r.held && openOurs(r) && (!r.refreshes || !r.lacksBase)))),
+        (output === 'pass') === (live(r) && (r.pull === 'merged' || (!r.held && openOurs(r) && (!r.refreshes || !r.lacksBase)))),
     },
     refreshesOnlyWithTheSlotFree: {
       description:
         "The head is refreshed exactly where the slot is free, the open pull request is the run's own, the factory names a refresh and the head lacks the base: two refreshed heads never wait on CI at once",
-      condition: ({ input: [r], output }) =>
-        (output === 'refresh') === (live(r) && !r.held && openOurs(r) && r.refreshes && r.lacksBase),
+      condition: ({ input: [r], output }) => (output === 'refresh') === (live(r) && !r.held && openOurs(r) && r.refreshes && r.lacksBase),
     },
     waitsBehindTheHolderOrForAPullRequest: {
       description: 'The step waits exactly where it is not merged and another run holds the slot, or no pull request of the run is open',
@@ -157,13 +155,11 @@ const landWriteSpec = spec<(read: LandRead) => LandAct>({
       description:
         "The pull request is merged exactly where it is open, the run's own, mergeable, green at its head, holding the base where the factory refreshes, and leaving no result branch out",
       condition: ({ input: [r], output }) =>
-        (output === 'merge') ===
-        (live(r) && r.pull === 'open' && r.ours && r.mergeable === 'yes' && r.green && r.current && !r.leftOut),
+        (output === 'merge') === (live(r) && r.pull === 'open' && r.ours && r.mergeable === 'yes' && r.green && r.current && !r.leftOut),
     },
     waitsWhileGitHubComputesWhetherItMerges: {
       description: "The step waits exactly where the run's own open pull request is not yet computed mergeable or not",
-      condition: ({ input: [r], output }) =>
-        (output === 'wait') === (live(r) && r.pull === 'open' && r.ours && r.mergeable === 'unknown'),
+      condition: ({ input: [r], output }) => (output === 'wait') === (live(r) && r.pull === 'open' && r.ours && r.mergeable === 'unknown'),
     },
     neverMergesTwice: {
       description: 'Nothing is merged where a pull request of the run is merged already, whatever way',

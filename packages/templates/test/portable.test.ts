@@ -105,7 +105,7 @@ const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITOR
   );
 
 /** The skills that are the team's own, which sdlc carries. */
-const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'land-a-branch', 'read-the-stats', 'groom-the-inbox'];
+const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'read-the-stats', 'groom-the-inbox'];
 
 /** The skills an agent may name: its own, the place's, and the interview Nemia ships. */
 const ROLE_SKILLS = [...OWN_SKILLS, 'git', 'grilling'];
@@ -115,7 +115,6 @@ const STEP_HOLDS: Record<string, string> = {
   design: 'spec',
   implement: 'pull request',
   review: 'diff',
-  land: 'landing.ts',
   argus: 'nemia stats',
   next: 'nemia route',
   'to-build': 'workflow: build',
@@ -145,6 +144,8 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^carried\/ci-write\.ts$/, () => 'export const conditionDue'],
   [/^carried\/exec\.ts$/, () => 'export function run'],
   [/^carried\/refresh\.ts$/, () => 'export function refresh'],
+  [/^carried\/landing\.ts$/, () => 'export function standing'],
+  [/^carried\/land-write\.ts$/, () => 'export const turnWrite'],
   [/^carried\/rerun\.ts$/, () => 'export function rerunOnce'],
   [/^(?:carried|workflows\/[\w-]+)\/[\w-]+\.ts$/, (file) => `node ${path.basename(file)}`],
   [/^workflows\/[\w-]+\/[\w-]+\.md$/, (file) => STEP_HOLDS[path.basename(file, '.md')] ?? 'a step the guard knows'],
@@ -253,6 +254,6 @@ test('REFUSED: an agent that names a skill not its role’s, or an MCP server', 
 
 test("each agent of sdlc names only its role's skills, and no MCP server", () => {
   const files = sdlc();
-  assert.equal([...files.keys()].filter((file) => file.endsWith('/agent.yaml')).length, 6, 'the six agents are read');
+  assert.equal([...files.keys()].filter((file) => file.endsWith('/agent.yaml')).length, 5, 'the five agents are read');
   assert.deepEqual(foreign(files), []);
 });

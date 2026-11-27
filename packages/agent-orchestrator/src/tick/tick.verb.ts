@@ -117,7 +117,7 @@ export type Pass = {
   forgetting?: ForgettingLine[];
   /**
    * The store's pause as the pass read it (`readPause`), while one stands; each task still finishing under it, read off the views the
-   * runtime reported on this pass (`finishingOf`); and each check it holds, a landing with its merge staged among them (`heldRead`): the
+   * runtime reported on this pass (`finishingOf`); and each check it holds (`heldRead`): the
    * pass admitted no queued task and started no queued card, and filed nothing new of any run (`assess`). Absent while the store is not
    * paused.
    */
@@ -432,7 +432,7 @@ const informed = Effect.fnUntraced(function* (
 });
 
 /**
- * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stalled waits, each run's landing read through the
+ * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stalled waits, each run's wait read through the
  * pass's `released` and its phase as the pass judged it; none of either where the inbox does not read.
  */
 const inboxOfPass = (runs: readonly Run[], released: RunReleased, { done }: Judging) =>

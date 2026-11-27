@@ -122,7 +122,7 @@ const workflowFixture = (name: string) => ({
         { name: 'land', kind: 'step' },
       ],
     },
-    steps: [listedStep('implement', [], []), listedStep('land', ['implement'], ['landed'])],
+    steps: [listedStep('implement', [], []), listedStep('land', ['implement'], ['merged'])],
     schemas: [],
     folderTeam: false,
     error: null,

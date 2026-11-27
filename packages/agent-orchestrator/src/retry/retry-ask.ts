@@ -119,7 +119,7 @@ const upgradeTry = (t: unknown) => {
  * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`, none for a wait node's, which
  * files no task. Or `round`: the step's loop went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the
  * loop was filed again on the round it is on, for its target to merge the base (`nemia refresh --base`), which no round counts
- * (`roundIn`). Or `back`: a try a run sent back with its work, which only a record written before the landing left the core holds.
+ * (`roundIn`). Or `back`: a try a run sent back with its work, which only a record written before the core stopped landing runs holds.
  */
 export type EarlierTry = {
   taskId: string | null;

@@ -1,6 +1,6 @@
 /**
  * The store handed from a daemon started by hand to the login service, as a person restarts the daemon by hand: the store paused with no
- * timeout, so nothing new is filed and the jobs run on, checks included — a landing's wait on CI among them — each on the runtime's
+ * timeout, so nothing new is filed and the jobs run on, checks included, each on the runtime's
  * worker, which outlives the daemon, its result read by the next; the daemon's own sessions held at their next call and their calls in
  * flight waited for up to the timeout, the daemon of the confirmed pid stopped by SIGTERM — which writes `stoppedAt`, its holder parking
  * each session for the next — the service started once the system says its unit no longer runs the stopped daemon (`unitRunning`: the
@@ -105,7 +105,7 @@ const timeoutSaid = (ms: number) => (ms < 1_000 ? `${ms} ms` : timeoutWords(ms))
  * Waits until no session living in the daemon is in a tool call (`calls`), saying how many are and in how long they are cut
  * (`pausingWords`) each time either changes; at most the host's `timeoutMs`, past which it says which call it gives up on and goes on to
  * the signal, since the daemon's own holder cuts a call that never ends and the next holder resumes that session told which did not
- * finish. A job is not waited for, nor a check, a landing's included: each runs on through the restart on its worker.
+ * finish. A job is not waited for, nor a check: each runs on through the restart on its worker.
  */
 const called = (host: TakeoverHost) =>
   Effect.gen(function* () {

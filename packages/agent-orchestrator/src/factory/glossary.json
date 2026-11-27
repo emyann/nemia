@@ -141,7 +141,7 @@
     },
     {
       "term": "First workflow",
-      "meaning": "the workflow a first card on a factory runs in (`firstWorkflow`): kept as the radius is, rendered from the manifest's `spec.firstWorkflow`, which the template's check refuses where it names no workflow of the template (`firstWorkflowRefusals`, in `packages/agent-orchestrator/src/template/check.ts`). Served on the factory's `spec.firstWorkflow`; the board starts its welcome card there and gates it at the workflow's listed ending step.",
+      "meaning": "the workflow a first card on a factory runs in (`firstWorkflow`): kept as the radius is, rendered from the manifest's `spec.firstWorkflow`, which the template's check refuses where it names no workflow of the template (`firstWorkflowRefusals`, in `packages/agent-orchestrator/src/template/check.ts`). Served on the factory's `spec.firstWorkflow`; the board starts its welcome card there and gates it at the step before the workflow's first wait node.",
       "type": "Factory"
     },
     {

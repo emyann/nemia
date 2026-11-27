@@ -7,10 +7,10 @@
  * What each run holds:
  * - `tides`, a repository run frozen while the lists were `disallow:` and `allow:` (`FORMER_KEYS`), its agent's harness prompt under
  *   `systemPrompt: own` and frozen before an agent's denies were kept apart (`agentDenies`), a codex step whose sandbox is the former
- *   `permissionMode`, and an ending frozen as `workspace: main` with `background:`, a key no step has now, its agent on `systemPrompt:
+ *   `permissionMode`, and a last step frozen as `workspace: main` with `background:`, two keys no step has now, its agent on `systemPrompt:
  *   no-coding`. It has filed nothing, and its folder is gone, so a pass files it from what it froze.
- * - `notes`, a repository run that froze no workflow, its steps read off its folder (`workflows/notes`, whose ending says `workspace:
- *   main`), with an earlier try under the former `then`, one whose cause is the former `nudge`, a check, a hand-off, a landing and a
+ * - `notes`, a repository run that froze no workflow, its steps read off its folder (`workflows/notes`), with an earlier try
+ * under the former `then`, one whose cause is the former `nudge`, a check, a hand-off and a
  *   held slot. Its tasks are the engine's as they stood, filed and settled before the walk.
  * - `drafts`, a folder run whose one step says the former `workspace: folder`, a list under its former name beside the new one on the
  *   step and in its agent's `given`, its agent's harness prompt as `systemPrompt: default`, and a key on the record and one on the step
@@ -180,11 +180,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       [['implement'], [], ['write']],
       'the unfiled runs file their first step, and the run that froze no workflow files nothing it has already run',
     );
-    assert.equal(
-      report.runs.find((a) => a.run.id === 'notes')?.status,
-      'succeeded',
-      'and is judged on its tries, its check and its landing',
-    );
+    assert.equal(report.runs.find((a) => a.run.id === 'notes')?.status, 'succeeded', 'and is judged on its tries and its check');
     const implement = b.tasks.get('tides-implement')!.spec.config;
     assert.deepEqual(
       [implement?.disallowedTools, implement?.allowedTools],
@@ -212,7 +208,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       ],
     );
     assert.equal(holdsAny(implement, 'disallow', 'allow') || holdsAny(implement.agent, 'systemPrompt'), false, 'no former name written');
-    assert.deepEqual([review.permissionMode, ship.workspace], ['bypassPermissions', 'base']);
+    assert.deepEqual([review.permissionMode, holdsAny(ship, 'workspace')], ['bypassPermissions', false]);
     const drafts = written('drafts');
     const [write] = drafts.workflow;
     assert.deepEqual([write.place, holdsAny(write, 'workspace', 'disallow')], ['folder', false]);

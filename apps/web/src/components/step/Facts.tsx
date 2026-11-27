@@ -72,8 +72,8 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 }
 
 /**
- * The trial merges an ending's decision read (`Collisions`), in the run's Decide section: the runs in flight on the base and the semantic
- * conflict, in the gate's words, which a landing that failed its check waits at no gate to show.
+ * The trial merges a decision read (`Collisions`), in the run's Decide section: the runs in flight on the base and the runs whose
+ * branch collides with this one.
  */
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (

@@ -159,11 +159,9 @@ export const checkEnvOf = (
 });
 
 /**
- * The install an ending's check runs first where the merge asks for packages the checkout lacks. `npm install` rather than `npm ci`,
- * which empties `node_modules` under a dev server running from the checkout; `--no-save`, so npm writes neither `package.json` nor
- * `package-lock.json`, which the merge owns, so the working tree still matches the staged merge. A clone Nemia keeps is installed with the
- * same arguments before its worktrees are cut (`keepCheckoutInstalled`, `worktree.store.ts`), for the same reasons: a check or a session
- * may be running in it, and `follow` fast-forwards a working tree npm left clean.
+ * The install a clone Nemia keeps gets before its worktrees are cut (`keepCheckoutInstalled`, `worktree.store.ts`). `npm install` rather
+ * than `npm ci`, which empties `node_modules` under a check or a session that may be running in it; `--no-save`, so npm writes neither
+ * `package.json` nor `package-lock.json`, and `follow` fast-forwards a working tree npm left clean.
  */
 export const INSTALL_ARGS = ['install', '--no-save', '--no-audit', '--no-fund'] as const;
 

@@ -258,7 +258,7 @@ function statusRefusal(c: Judged) {
 
 /**
  * `--recheck` where no check failed; and on a step ended at its
- * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
+ * budget with no check to run, its session retry with `--budget` named instead.
  */
 /**
  * `--check <name>` naming no refused check of the step: a step judged by one check, whose recheck runs it whole, or a name that is no check

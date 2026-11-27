@@ -33,7 +33,8 @@ const loaded = async (canvas: HTMLElement, kind?: string) => {
 
 /**
  * Quick offered, nothing measured yet: the cost line says the estimate. Picking a suggestion fills the card, and Start files it labelled
- * as the first card, in quick, then starts it gated at its landing and opens the run's page. The estimate shows before the stats are read,
+ * as the first card, in quick, then starts it gated at its last step before the wait and opens the run's page. The estimate
+ * shows before the stats are read,
  * so Start is pressed once its name says the gates its workflow's listing gives, the read that enables it.
  */
 export const Estimate: Story = {

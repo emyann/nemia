@@ -1,7 +1,7 @@
 # packages/agent-orchestrator — the in-process `nemia` (`wf`, its alias)
 
 Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
-run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
+run slots, worktrees, where a run's branch stands, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
 
 The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): every store verb is its command, whose words are
@@ -284,7 +284,7 @@ of its kind, never from an older file that looks alike:
 
 ## Checks and worktrees
 
-- **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: the ending's check runs on the merged tree with
+- **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: a check on a merged tree, which a step's own command runs, has
   none.
 - **A check's stdout and stderr are the runtime's, each kept whole**, read through the engine's `output` (`checkStreams` in
   `views/views.verb.ts`): `reported` reads the whole stdout, a person the tail of each; the engine's `logs` is a tail, read only for

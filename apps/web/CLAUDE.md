@@ -305,8 +305,7 @@ here.
   window's step less the open rail (`sm`→`@md`, `md`→`@lg`, `lg`→`@3xl`, `xl`→`@5xl`), a `max-` one written as its complement (Tailwind
   writes no named `@max-`); a window breakpoint stays only where `KEPT` says why (the bar, a portaled sheet), held by
   `test/page-room.test.ts`. The Overview's strip wraps by its frames' own widths (`components/frame/OverviewStrip.tsx`).
-- An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
-  the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
+- An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves, the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
   phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
 - A class string two features share is `lib/classes.ts`'s, never a feature component's export. Its control strings (the buttons,
   `TEXTAREA`, `POPOVER`) are retiring for the kit's parts and no file gains an import of one; the floor's frame (`FLOOR_BOX`) stays.

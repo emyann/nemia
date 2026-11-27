@@ -38,14 +38,14 @@ const endingOf = (steps: readonly ListedStep[]) => steps.find((step) => step.spe
 const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => readonly string[]>({
   ensures: {
     gatedAtTheEnding: {
-      description: 'A first run is gated at its workflow’s ending, the step that lands, so the person approves what lands',
+      description: 'A first run is gated at its workflow’s ending, the step that works on the base, so the person approves what reaches it',
       condition: ({ input: [steps], output }) => {
         const ending = steps === undefined ? undefined : endingOf(steps);
         return ending === undefined || (output.length === 1 && output.at(0) === ending);
       },
     },
     ungatedWithNoEnding: {
-      description: 'A workflow with no ending, or one whose steps were not read, is started with no gate: nothing of it lands',
+      description: 'A workflow with no ending, or one whose steps were not read, is started with no gate: nothing of it works on the base',
       condition: ({ input: [steps], output }) => (steps !== undefined && endingOf(steps) !== undefined) || output.length === 0,
     },
   },
@@ -54,40 +54,40 @@ const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => read
 /** `firstGatesOf`'s type, which src/lib/firstCard.ts takes: no workflow's name, only its steps as the factory lists them. */
 export type FirstGatesOf = Implementation<typeof firstGatesOfSpec>;
 
-/** What the stats say of the landed runs of a workflow: how many landed, and the mean cost and wall time of one, null where unmeasured. */
-export type LandedMeasure = {
-  readonly landed: number | null;
-  readonly costPerLanded: number | null;
-  readonly timePerLanded: number | null;
+/** What the stats say of the merged runs of a workflow: how many merged, and the mean cost and wall time of one, null where unmeasured. */
+export type MergedMeasure = {
+  readonly merged: number | null;
+  readonly costPerMerged: number | null;
+  readonly timePerMerged: number | null;
 };
 
 /** About how long a run takes, in milliseconds, and about what it costs, in dollars at the harness's API prices. */
 export type RunCost = { readonly ms: number; readonly dollars: number };
 
-/** The cost line's figures: measured on this store's landed runs, or the stated estimate where it holds none. */
+/** The cost line's figures: measured on this store's merged runs, or the stated estimate where it holds none. */
 export type CostLine = { readonly kind: 'measured' | 'estimate' } & RunCost;
 
-/** Whether the stats measured a landed run's cost and time. */
-const measured = (m: LandedMeasure) => m.landed !== null && m.landed > 0 && m.costPerLanded !== null && m.timePerLanded !== null;
+/** Whether the stats measured a merged run's cost and time. */
+const measured = (m: MergedMeasure) => m.merged !== null && m.merged > 0 && m.costPerMerged !== null && m.timePerMerged !== null;
 
 /** Whether `n` is a number a figure can be compared by: absent, or no NaN (JSON carries none, and the estimate is a constant). */
 const figure = (n: number | null) => n === null || !Number.isNaN(n);
 
-const costLineOfSpec = spec<(stats: LandedMeasure | undefined, estimate: RunCost) => CostLine>({
+const costLineOfSpec = spec<(stats: MergedMeasure | undefined, estimate: RunCost) => CostLine>({
   requires: ({ input: [stats, estimate] }) =>
     figure(estimate.ms) &&
     figure(estimate.dollars) &&
-    (stats === undefined || (figure(stats.landed) && figure(stats.costPerLanded) && figure(stats.timePerLanded))),
+    (stats === undefined || (figure(stats.merged) && figure(stats.costPerMerged) && figure(stats.timePerMerged))),
   ensures: {
-    measuredWhereTheStoreHasLanded: {
-      description: 'Where this store has landed runs of the workflow, the line says what one cost and took here, never a guess',
+    measuredWhereTheStoreHasMerged: {
+      description: 'Where this store has merged runs of the workflow, the line says what one cost and took here, never a guess',
       condition: ({ input: [stats], output }) =>
         stats === undefined ||
         !measured(stats) ||
-        (output.kind === 'measured' && output.dollars === stats.costPerLanded && output.ms === stats.timePerLanded),
+        (output.kind === 'measured' && output.dollars === stats.costPerMerged && output.ms === stats.timePerMerged),
     },
-    estimateWhereNothingLanded: {
-      description: 'With no landed run measured, or no stats read, the line says the stated estimate, and says it is one',
+    estimateWhereNothingMerged: {
+      description: 'With no merged run measured, or no stats read, the line says the stated estimate, and says it is one',
       condition: ({ input: [stats, estimate], output }) =>
         (stats !== undefined && measured(stats)) ||
         (output.kind === 'estimate' && output.dollars === estimate.dollars && output.ms === estimate.ms),
@@ -100,18 +100,18 @@ export type CostLineOf = Implementation<typeof costLineOfSpec>;
 
 /**
  * A run as the hints read it: whether it is the welcome's first card's (its label), whether any of its steps is filed, whether it waits
- * on the person at a gate now, whether it landed, and whether it ended.
+ * on the person at a gate now, whether it succeeded, and whether it ended otherwise (failed or cancelled).
  */
 export type FirstRunRead = {
   readonly first: boolean;
   readonly filed: boolean;
   readonly waitsOnYou: boolean;
-  readonly landed: boolean;
+  readonly succeeded: boolean;
   readonly ended: boolean;
 };
 
-/** The four beats of a first run, one hint each: your card, the steps at work, the gate that waits on you, landed. */
-export type FirstBeat = 'card' | 'steps' | 'gate' | 'landed';
+/** The four beats of a first run, one hint each: your card, the steps at work, the gate that waits on you, succeeded. */
+export type FirstBeat = 'card' | 'steps' | 'gate' | 'succeeded';
 
 const firstBeatOfSpec = spec<(run: FirstRunRead) => FirstBeat | null>({
   ensures: {
@@ -119,25 +119,27 @@ const firstBeatOfSpec = spec<(run: FirstRunRead) => FirstBeat | null>({
       description: "A run that is not the welcome's first card draws no hint",
       condition: ({ input: [run], output }) => run.first || output === null,
     },
-    landedSaysLanded: {
-      description: 'The first card landed: the landed hint, which leads to what is next',
-      condition: ({ input: [run], output }) => !run.first || !run.landed || output === 'landed',
+    succeededSaysSucceeded: {
+      description: 'The first card succeeded: the succeeded hint, which leads to what is next',
+      condition: ({ input: [run], output }) => !run.first || !run.succeeded || output === 'succeeded',
     },
-    endedUnlandedSaysNothing: {
-      description: 'A first run that ended without landing draws no hint: the run page says how it ended',
-      condition: ({ input: [run], output }) => !run.first || run.landed || !run.ended || output === null,
+    endedOtherwiseSaysNothing: {
+      description: 'A first run that ended without succeeding draws no hint: the run page says how it ended',
+      condition: ({ input: [run], output }) => !run.first || run.succeeded || !run.ended || output === null,
     },
     theGateWhileItWaits: {
       description: 'While the first run waits on the person at its gate, the hint is the gate: approving it is what moves it on',
-      condition: ({ input: [run], output }) => !run.first || run.landed || run.ended || !run.waitsOnYou || output === 'gate',
+      condition: ({ input: [run], output }) => !run.first || run.succeeded || run.ended || !run.waitsOnYou || output === 'gate',
     },
     theStepsOnceFiled: {
       description: 'Once a step is filed and nothing waits on the person, the hint is the steps at work',
-      condition: ({ input: [run], output }) => !run.first || run.landed || run.ended || run.waitsOnYou || !run.filed || output === 'steps',
+      condition: ({ input: [run], output }) =>
+        !run.first || run.succeeded || run.ended || run.waitsOnYou || !run.filed || output === 'steps',
     },
     theCardBeforeAnything: {
       description: 'Started and nothing filed yet, the hint is the card: what was asked, and that the daemon files it',
-      condition: ({ input: [run], output }) => !run.first || run.landed || run.ended || run.waitsOnYou || run.filed || output === 'card',
+      condition: ({ input: [run], output }) =>
+        !run.first || run.succeeded || run.ended || run.waitsOnYou || run.filed || output === 'card',
     },
   },
 });
@@ -165,7 +167,7 @@ const nextStepsOfSpec = spec<(factory: SetFactory) => readonly NextStep[]>({
     },
     githubOnlyAfterALocalFolder: {
       description:
-        'Connect GitHub is offered where the first volume was a folder of this machine and the template says how to land on a host, never to one who gave a repository by its address',
+        'Connect GitHub is offered where the first volume was a folder of this machine and the template says how to follow a host, never to one who gave a repository by its address',
       condition: ({ input: [factory], output }) => output.includes('github') === (factory.local && factory.follows),
     },
     inTheirOrder: {

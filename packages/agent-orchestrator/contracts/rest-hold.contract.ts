@@ -1,6 +1,6 @@
 /**
  * Whether a person's hold keeps a run out of rest (agent-orchestrator, src/rest/rest.ts): `holdKeepsOut`, the `hold` clause of
- * `restBlockers`. A hold is a clause because the pass of a held run reads other runs — whether those the hold names have landed — to
+ * `restBlockers`. A hold is a clause because the pass of a held run reads other runs — whether those the hold names have succeeded or been released — to
  * lift it (`liftHold`, tick/advance.verb.ts), and what moves with another run is no input the tick's memo watches. A cancelled run's
  * pass reads none of them: `liftHold` returns at once for it, and `waitedOn` (wait/wait.ts) names no run it is held until. Its hold
  * then moves nothing a pass reads, and keeps it out of rest no more than it keeps it from anything else: a cancelled run files nothing,

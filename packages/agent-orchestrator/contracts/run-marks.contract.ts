@@ -26,7 +26,7 @@ export type RunMark =
   | 'called-off-pruned-held';
 
 /**
- * What marks a run: a hold put (`hold`), a hold lifted by a person or by the pass once its runs landed (`lift`), a call-off (`cancel`),
+ * What marks a run: a hold put (`hold`), a hold lifted by a person or by the pass once its runs succeeded or were released (`lift`), a call-off (`cancel`),
  * its worktrees pruned (`prune`), and a prune taken back where nothing was removed (`unprune`).
  */
 export type RunMarkEvent = 'hold' | 'lift' | 'cancel' | 'prune' | 'unprune';

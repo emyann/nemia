@@ -4,8 +4,8 @@
  * selects, on the workflow the card names, else on the trigger's target; two triggers that would send a card naming no workflow to two
  * targets leave it waiting, a clash a person settles by changing a selector or the card's labels. A card queued by hand (`queued:`) is
  * its own queue's, which no trigger takes or pulls back; a card started, or one that does not read, is queued by none; a card naming no
- * factory is matched by no trigger; a card that waits on cards it names (`after:`) not all landed is queued by none, until the last of
- * them lands (`cardLanded`, contracts/card-landing.contract.ts).
+ * factory is matched by no trigger; a card that waits on cards it names (`after:`) not all released is queued by none, until the last of
+ * them releases its waiters (`cardReleased`, contracts/card-release.contract.ts).
  *
  * `matching` is the triggers whose selector selects the card's labels as a selector reads them (`cardLabels`, `selectsLabels`), every
  * factory's: whether a selector selects is the selector's own, proved and tested where it is written (src/watch/selector.ts).
@@ -24,7 +24,7 @@ export type CardTrigger = { readonly factory: string; readonly name: string; rea
 /**
  * An inbox card as a trigger reads it: the factory it names (null for none), the workflow it names by name (null for none), whether it
  * is queued by hand (`queued:`), whether a run's record names it (started), whether it reads as a card, and whether it waits on a card
- * its `after:` names that has not landed.
+ * its `after:` names that has not released its waiters.
  */
 export type TriggerCard = {
   readonly factory: string | null;
@@ -79,7 +79,7 @@ const cardTriggeredSpec = spec<(card: TriggerCard, matching: readonly CardTrigge
       condition: ({ input: [card], output }) => card.readable || output.kind === 'none',
     },
     waitingIsNeverQueued: {
-      description: 'A card that waits on a card it names that has not landed is queued by no trigger, nor said to clash',
+      description: 'A card that waits on a card it names that has not released its waiters is queued by no trigger, nor said to clash',
       condition: ({ input: [card], output }) => !card.waiting || output.kind === 'none',
     },
     noMatchNoQueue: {

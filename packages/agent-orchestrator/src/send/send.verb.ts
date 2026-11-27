@@ -252,6 +252,7 @@ const startChild = Effect.fnUntraced(function* (
     given?.files?.length && sameFactory(run, given)
       ? yield* cardFilesAt(yield* StoreRoot, { factory: given.namespace, files: given.files })
       : [];
+  const handed = given?.labels ?? labels;
   const started = yield* startRun({
     brief: childBrief(run, node, why, title, given),
     repo,
@@ -261,7 +262,7 @@ const startChild = Effect.fnUntraced(function* (
     startedBy: { run: run.id, node: node.name },
     ...(cardFiles.length ? { cardFiles } : {}),
     ...(run.factory ? { factory: run.factory } : {}),
-    labels: { card: given?.labels ?? labels },
+    labels: { card: handed },
   });
   return { child: started.id, leftOff: filesLeftOff(run, node, given) };
 });

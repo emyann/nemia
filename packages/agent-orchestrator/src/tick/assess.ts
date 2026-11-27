@@ -34,7 +34,7 @@ export type Assessment = {
    * nor a workflow node (`send`).
    */
   ready: string[];
-  /** Workflow nodes (`workflow:`) due their card, on the route taken and never sent. Send these: each files a card for its workflow. */
+  /** Workflow nodes (`workflow:`) due their run, on the route taken and never sent. Send these: each starts a run of its workflow. */
   send: string[];
   /** Steps that signed off with checks due: none filed yet, or one whose waits have all passed (`stepChecksDue`). File their checks. */
   check: string[];

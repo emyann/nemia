@@ -1,6 +1,6 @@
 /**
  * What `nemia ls` and `nemia decide` say of a run's routing (`routedRows`): a node off the route `skipped (<condition>: <route>)`, a
- * workflow node `sent → <card>`, a condition never filed its route, and the line that routes it by hand. Pure.
+ * workflow node `sent → <run>`, a condition never filed its route, and the line that routes it by hand. Pure.
  */
 import type { StepSpec } from '../../step/step.ts';
 import type { Closeout } from '../../closeout/index.ts';

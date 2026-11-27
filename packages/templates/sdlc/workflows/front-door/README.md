@@ -53,7 +53,7 @@ and which workflow the card needs (`RULES.md`, *Routing*). The person sends the 
 [--workflow <workflow>]` (the board's *Send on*, the port's `inbox_resend`), which sends on the latest run of the card's work: a card is
 started once, so it is filed again under a name of its own, `<run>-resent`, handed the blocked run, and the blocked run is cancelled. A run
 no card is behind is sent on the same way with `nemia resend <run> [--workflow <workflow>]`. Named, the workflow it needs runs it; left out, the
-card names none and keeps the labels the routed card took from the run, in the sprint and ready to work, so the door routes it again.
+card names none and keeps the labels the run's card had, in the sprint and ready to work, so the door routes it again.
 
 ## What an overlay can change
 

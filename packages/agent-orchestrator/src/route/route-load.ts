@@ -62,12 +62,12 @@ function conditionRefusal(c: StepSpec, steps: readonly StepSpec[], byName: Reado
   return conditionKeyRefusal(c) ?? (c.route?.kind === 'table' ? tableRefusal(c, c.route, byName) : undefined);
 }
 
-/** Why a workflow node does more than file its card: an agent, a workspace, a check or a gate. */
+/** Why a workflow node does more than start its run or file its card: an agent, a workspace, a check or a gate. */
 function workflowNodeRefusal(w: StepSpec) {
   if (w.workflow === undefined && w.card === undefined) return undefined;
   const extra = w.agent != null ? 'an agent' : w.check ? 'a check' : w.gate ? 'a gate' : undefined;
   if (extra === undefined) return undefined;
-  const files = w.workflow === undefined ? "files the run's card back to the inbox" : `files a card for ${w.workflow}`;
+  const files = w.workflow === undefined ? "files the run's card back to the inbox" : `starts a run of ${w.workflow}`;
   const line = w.workflow === undefined ? `card: ${w.card ?? 'backlog'}` : `workflow: ${w.workflow}`;
   return `${w.name}: \`${line}\` ${files} and does nothing else, and this node has ${extra}. Delete the line that gives it ${extra}; put the work on a step of its own before it.`;
 }

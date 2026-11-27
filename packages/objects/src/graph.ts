@@ -43,10 +43,10 @@ export type GraphEdge = typeof GraphEdge.Type;
 export const GraphNode = Schema.Struct({
   name: Schema.String.annotate({ description: "The node's name, its step's." }),
   kind: Schema.Literals(NODE_KINDS).annotate({
-    description: 'What the node is: a step, a condition that routes, or a workflow node that files a card for another workflow.',
+    description: 'What the node is: a step, a condition that routes, or a workflow node that starts a run of another workflow.',
   }),
   ends: Schema.optionalKey(Strings.annotate({ description: 'The routes of a condition on which the run ends.' })),
-  workflow: Schema.optionalKey(Schema.String.annotate({ description: 'The workflow a workflow node files a card for.' })),
+  workflow: Schema.optionalKey(Schema.String.annotate({ description: 'The workflow a workflow node starts a run of.' })),
 });
 export type GraphNode = typeof GraphNode.Type;
 

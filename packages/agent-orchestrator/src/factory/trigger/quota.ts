@@ -1,7 +1,7 @@
 /**
  * Whether a trigger can spend quota (`triggerQuota`, proved by `contracts/trigger-quota.contract.ts`): whether anything its target can
  * reach runs an agent, read off the steps of the workflows it reaches, never off what it matches now or when it next fires. The walk
- * (`reachedWorkflows`) starts at the target and follows each card node of a reached workflow to the workflow it files a card for,
+ * (`reachedWorkflows`) starts at the target and follows each card node of a reached workflow to the workflow it starts a run of,
  * resolved through the factory's offer, each workflow once; `card: backlog` files for none. A step is a session or a judge, which run an
  * agent, or a table or a script condition or a card node, which run none (`stepReach`). Pure: the caller reads each workflow's steps.
  */
@@ -25,7 +25,7 @@ export const stepReach = (step: ReachStep) => {
 };
 
 /**
- * The workflows a step of a reached workflow files a card for: its `workflow:`, except on a node that files back to the backlog.
+ * The workflows a step of a reached workflow starts a run of: its `workflow:`, except on a node that files back to the backlog.
  * @param step The step's card node keys.
  */
 const filesFor = (step: ReachStep) => (step.card === 'backlog' || step.workflow === undefined ? [] : [step.workflow]);

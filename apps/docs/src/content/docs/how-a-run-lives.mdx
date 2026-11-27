@@ -83,8 +83,7 @@ is queueing right now.
 A routing workflow passes work on with a **workflow node** (`workflow: build`). The node starts a run of the workflow it names, right
 away and without filing a card. The new run is handed the run that started it as context, and its brief is the title the node's
 condition gave. With `brief: card`, its brief is the run's own card as it was given (its body, labels and files), along with the route
-taken and the reason its condition gave. The run that started it never includes the new run's time or cost, and it ends as it does
-today. A run page links the two.
+taken and the reason its condition gave. The run that started it ends on its own, and its time and cost never include the new run's. A run page links the two.
 
 A card follows its work from run to run: its runs, its state and the cards that wait on it all cover the run it started and every run
 that run's nodes started. A card that waits on it is released only when the last of them succeeds. If a run went to the wrong

@@ -84,18 +84,21 @@ describe('a run no card started, waiting on its person at a gate, is sent on as 
     await assert.rejects(resend(b, id, 'triage'), refusedAs('Conflict'));
     assert.deepEqual([...cardNames(ROOT)], []);
   });
-  s.test('once it waits at its gate, it is filed as <run>-resent from its brief, queued on the workflow named, handed the run', async () => {
-    b.settle(`${id}-plan`, 'succeeded', SIGNED);
-    assert.deepEqual((await pass(b, id)).filed, [], 'held at its gate');
-    const done = await resend(b, id, 'triage');
-    assert.equal(done.card.name, `${id}-resent`);
-    assert.equal(done.card.workflow, 'triage');
-    assert.ok(done.card.queued !== undefined, 'queued');
-    assert.deepEqual(done.card.from, [id]);
-    assert.match(done.card.body ?? '', /add a flag/);
-    assert.equal(done.cancelled, id);
-    assert.deepEqual([...cardNames(ROOT)], [`${id}-resent`]);
-  });
+  s.test(
+    'once it waits at its gate, it is filed as <run>-resent from its brief, queued on the workflow named, handed the run',
+    async () => {
+      b.settle(`${id}-plan`, 'succeeded', SIGNED);
+      assert.deepEqual((await pass(b, id)).filed, [], 'held at its gate');
+      const done = await resend(b, id, 'triage');
+      assert.equal(done.card.name, `${id}-resent`);
+      assert.equal(done.card.workflow, 'triage');
+      assert.ok(done.card.queued !== undefined, 'queued');
+      assert.deepEqual(done.card.from, [id]);
+      assert.match(done.card.body ?? '', /add a flag/);
+      assert.equal(done.cancelled, id);
+      assert.deepEqual([...cardNames(ROOT)], [`${id}-resent`]);
+    },
+  );
   s.test('the run is cancelled, by who sent it on', () => {
     const run = runRecord(ROOT, id);
     assert.ok(run.cancelledAt !== undefined, 'cancelled');

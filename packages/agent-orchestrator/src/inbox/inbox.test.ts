@@ -375,12 +375,13 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
   );
 });
 
-test("a card whose run started a child through a node lists both runs in the order they were made, and stands where the child does", () => {
+test('a card whose run started a child through a node lists both runs in the order they were made, and stands where the child does', () => {
   const card = [{ file: 'parse-the-flag-1x2y.md', text: '---\nworkflow: dev\n---\nParse the flag.\n' }];
-  const runs = (parent: CardRun['phase'], child: CardRun['phase']): CardRun[] => [
-    { id: 'child-ef56', startedBy: { run: 'parent-ab12', node: 'handoff' }, createdAt: '2026-11-01T10:05:00.000Z', phase: child },
-    { id: 'parent-ab12', from: { inbox: 'parse-the-flag-1x2y' }, createdAt: '2026-11-01T10:00:00.000Z', phase: parent },
-  ];
+  const runs = (parent: CardRun['phase'], child: CardRun['phase']) =>
+    [
+      { id: 'child-ef56', startedBy: { run: 'parent-ab12', node: 'handoff' }, createdAt: '2026-11-01T10:05:00.000Z', phase: child },
+      { id: 'parent-ab12', from: { inbox: 'parse-the-flag-1x2y' }, createdAt: '2026-11-01T10:00:00.000Z', phase: parent },
+    ] satisfies CardRun[];
   const [running] = inboxListing(card, runs('succeeded', 'running'));
   assert.deepEqual(running?.startedAs, ['parent-ab12', 'child-ef56'], 'both, the parent first whatever order the store lists them');
   assert.equal(running?.state, 'running', "the child's phase while it runs, though the parent ended");

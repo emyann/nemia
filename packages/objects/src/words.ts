@@ -446,7 +446,7 @@ export const AGENT_SOURCE_PLACES = ['repository', 'library', 'harness', 'path'] 
 export type AgentSourcePlace = (typeof AGENT_SOURCE_PLACES)[number];
 
 /**
- * What a node of a workflow's graph is: a step, a condition that routes, a node that files a card for another workflow, a command run
+ * What a node of a workflow's graph is: a step, a condition that routes, a node that starts a run of another workflow, a command run
  * with no session, or a wait node that runs nothing and passes when its conditions are True.
  */
 export const NODE_KINDS = ['step', 'condition', 'workflow', 'command', 'wait'] as const;

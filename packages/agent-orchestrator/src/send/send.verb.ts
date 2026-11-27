@@ -65,9 +65,9 @@ const backlogCardName = (run: string, node: string) => `${run}-${node}-backlog`;
 const routeProducer = (condition: StepSpec) => (condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name);
 
 /**
- * The title a routed card opens with: the first line of the `title` its condition's producer signed off on, where its `output:` declares
- * one and it says one; else the first line of the run's brief, the run's own title.
- * @param run The run, whose brief and id title the card where the producer says none.
+ * The title the run a node starts opens with: the first line of the `title` its condition's producer signed off on, where its
+ * `output:` declares one and it says one; else the first line of the run's brief, the run's own title.
+ * @param run The run, whose brief and id title the run where the producer says none.
  * @param producer How the condition's producer signed off, or undefined where it has not.
  */
 function sentCardTitle(run: Run, producer: Closeout | undefined) {

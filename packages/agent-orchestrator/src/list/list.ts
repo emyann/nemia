@@ -230,7 +230,7 @@ const routes = (step: StepSpec) => step.routes !== undefined || step.workflow !=
 
 /**
  * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow
- * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
+ * node `sent → <run>`, a condition never filed its route and the line that routes it by hand.
  *
  * Each step's standing is the assessment's (`stepWords`, `assess` on the run's one read), so the listing stands no step itself and says
  * what the pass says; the routing is laid over it only where a step has a routing key a word reads (`routes:`, `workflow:`): with none,

@@ -53,7 +53,7 @@ const gaveOf = (step: StepView) => {
 /**
  * The run's steps as the box reads them, in the run's order: each final where no `after` or route edge leaves it (a loop's edge back
  * leads to no step after it), where it stands (`standsOf`), and whether it gave: its shown try's closeout, or, for a node that is no
- * plain step — a workflow node, which files a card, or a condition, which takes a route — what it did, which no session signs off.
+ * plain step — a workflow node, which starts a run, or a condition, which takes a route — what it did, which no session signs off.
  * @param view The run's detail: its graph, its steps, its calling off and its hold.
  */
 export function resultStepsOf(view: RunDetail) {

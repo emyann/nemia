@@ -357,7 +357,7 @@ function skippedNode(r: RunRead, step: StepSpec): boolean {
  * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
  * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it is recursive through `skippedNode`, whose type inference cannot give
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it is recursive through `skippedNode`, whose type cannot be inferred
 function doneStep(r: RunRead, step: StepSpec): boolean {
   const record = r.run.steps[step.name];
   if (record?.sent !== undefined) return true;

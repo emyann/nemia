@@ -10,13 +10,18 @@ import { cardWork, workRuns, type Worked } from './card-work.ts';
 const T = (minute: number) => `2026-11-01T10:${String(minute).padStart(2, '0')}:00.000Z`;
 
 /** A run started from the card `card`. */
-const fromCard = (id: string, card: string, minute: number): Worked => ({ id, from: { inbox: card }, createdAt: T(minute) });
+const fromCard = (id: string, card: string, minute: number) => ({ id, from: { inbox: card }, createdAt: T(minute) }) satisfies Worked;
 
 /** A run the node of `parent` started. */
-const byNode = (id: string, parent: string, minute: number): Worked => ({ id, startedBy: { run: parent }, createdAt: T(minute) });
+const byNode = (id: string, parent: string, minute: number) => ({ id, startedBy: { run: parent }, createdAt: T(minute) }) satisfies Worked;
 
 test("a card's work is the runs started from it and, below each, the runs its nodes started, in the order they were made", () => {
-  const runs = [byNode('child-b', 'root', 3), fromCard('other', 'another-card', 1), byNode('child-a', 'root', 2), fromCard('root', 'card-1', 0)];
+  const runs = [
+    byNode('child-b', 'root', 3),
+    fromCard('other', 'another-card', 1),
+    byNode('child-a', 'root', 2),
+    fromCard('root', 'card-1', 0),
+  ];
   assert.deepEqual(cardWork('card-1', workRuns(runs)), ['root', 'child-a', 'child-b'], 'the other card has none of it');
   assert.deepEqual(cardWork('another-card', workRuns(runs)), ['other']);
   assert.deepEqual(cardWork('none', workRuns(runs)), []);
@@ -30,7 +35,12 @@ test('a chain of workflow nodes is followed to its end, and a run made at the sa
 });
 
 test('a run that carries a card of its own is not the work of the run that started it, and a loop of startedBy belongs to no card', () => {
-  const runs = [fromCard('root', 'card-1', 0), { ...byNode('own', 'root', 1), from: { inbox: 'card-2' } }, byNode('x', 'y', 2), byNode('y', 'x', 3)];
+  const runs = [
+    fromCard('root', 'card-1', 0),
+    { ...byNode('own', 'root', 1), from: { inbox: 'card-2' } },
+    byNode('x', 'y', 2),
+    byNode('y', 'x', 3),
+  ];
   assert.deepEqual(cardWork('card-1', workRuns(runs)), ['root']);
   assert.deepEqual(cardWork('card-2', workRuns(runs)), ['own']);
 });

@@ -9,6 +9,7 @@
         "tools/coverage/{record,compare}.ts",
         "tools/release/{release,archive}.ts",
         "tools/store-measure/{report,loop}.ts",
+        "tools/touched/touched.ts",
         "tools/observe/profile/preload.ts",
         "tools/observe/render/{render,reap,hold}.ts"
       ]

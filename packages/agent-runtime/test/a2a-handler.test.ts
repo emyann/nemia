@@ -1248,6 +1248,13 @@ describe('a running session told words and stopped: the harness asked once, with
       ['observeFor', [{ name: 'ae/t-2/1' }]],
     ]);
   });
+  test('words to a session its harness looked for by name and could not read throw HarnessFailed, never a session not listed, and say is not asked', async () => {
+    const h = harness();
+    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    h.unread.add('ae/t-1/1');
+    await assert.rejects(h.handler.sendMessage(said('ae/t-1/1', 'hi'), ctx), (e) => e instanceof HarnessFailed);
+    assert.deepEqual(h.asked, [['observeFor', [{ name: 'ae/t-1/1' }]]]);
+  });
   test('words the harness could not deliver throw its words, unchanged', async () => {
     const h = harness({ sayFails: 'fake message s-1: inbox closed (exit 3)' });
     h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });

@@ -60,8 +60,11 @@ const frozenRun = (home: string, run: Run, steps: readonly StepSpec[]) =>
 /**
  * Whether every result branch of a run is on its base, as the tick's last reading of where the branches stand says (`standing.json`):
  * null for a run with no result branch, a folder run's among them, and where any of its branches was not read.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param git What reads the branches off the tick's last reading.
  */
-const mergedRun = (run: Run, steps: readonly StepSpec[], git: BranchReader) => {
+export const mergedRun = (run: Run, steps: readonly StepSpec[], git: BranchReader) => {
   const standings = standingsOf(run, steps, git);
   if (!standings.length || standings.some((s) => s.where === 'unread')) return null;
   return standings.every((s) => s.where === 'on');

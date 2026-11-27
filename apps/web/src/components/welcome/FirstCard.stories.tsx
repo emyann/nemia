@@ -56,7 +56,7 @@ export const Estimate: Story = {
     await waitFor(() => expect(ground?.getAttribute('data-at')).toBe(`/runs/${STARTED_RUN}`));
     await expect(filed.map((w) => w.route)).toEqual(['POST cards', 'POST start']);
     await expect(filed[0]?.body).toMatchObject({ workflow: 'quick', label: ['onboarding=first-card'] });
-    await expect(filed[1]?.body).toMatchObject({ workflow: 'quick', gates: ['land'] });
+    await expect(filed[1]?.body).toMatchObject({ workflow: 'quick', gates: ['implement'] });
   },
 };
 
@@ -86,7 +86,7 @@ export const NoQuick: Story = {
     filed.length = 0;
     await userEvent.click(start);
     await waitFor(() => expect(filed.map((w) => w.route)).toEqual(['POST cards', 'POST start']));
-    await expect(filed[1]?.body).toMatchObject({ workflow: 'build', gates: ['land'] });
+    await expect(filed[1]?.body).toMatchObject({ workflow: 'build', gates: ['implement'] });
   },
 };
 

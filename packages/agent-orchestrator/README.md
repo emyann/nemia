@@ -1996,6 +1996,7 @@ unfiles its loop. A new word is a state, or the typecheck refuses it; a new move
 edge some walk takes, or the replay refuses it.
 
 <!-- diagram:step:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/step-machine/step-machine.ts').then((m) => console.log(m.stepDiagram()))" -->
+```mermaid
 stateDiagram-v2
   [*] --> pending
   state "pending" as pending
@@ -2058,6 +2059,7 @@ stateDiagram-v2
   budget_exhausted --> checking: its check run on your word
   over_budget --> running: tried again, with a budget
   over_budget --> pending: a round on your word, with a budget
+```
 <!-- diagram:step:end -->
 
 ### Going round again: `loop:` and `rounds:`

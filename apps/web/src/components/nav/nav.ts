@@ -88,6 +88,17 @@ export function seatOf(path: string) {
  */
 export const seatFactory = (seat: Seat | undefined) => (seat?.level === 'factory' ? seat.factory : undefined);
 
+/**
+ * Whether the page at `path` is an Inbox's list, the store's or a factory's, and the factory it is of: the pages that file a card from
+ * their head. None for a card's page and for every other page.
+ * @param path The address of the page.
+ */
+export function inboxListOf(path: string) {
+  const found = /^\/(?:factories\/([^/]+)\/)?inbox\/?$/.exec(path);
+  if (!found) return undefined;
+  return found[1] === undefined ? {} : { factory: decodeURIComponent(found[1]) };
+}
+
 /** A destination of the rail: its key, its name and its icon. */
 type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
 

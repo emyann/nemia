@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Body, Button } from '@/components/ui/ds';
-import { CutField } from '@/components/look';
+import { CutTextField } from '@/components/look';
 import { checkSelector } from '@/lib/api/inbox';
 
 /**
@@ -40,24 +40,19 @@ export function SelectorField({
         );
       }}
     >
-      <CutField
+      <CutTextField
+        hideLabel
+        label="Filter by labels"
+        name="selector"
+        value={text}
+        placeholder="Filter by labels: team=core"
+        onChange={setText}
         end={
           <Button type="submit" size="xsmall" variant="tonal">
             Filter
           </Button>
         }
-      >
-        <Body size="medium" component="span" className="contents">
-          <input
-            aria-label="Filter by labels"
-            name="selector"
-            value={text}
-            placeholder="Filter by labels: team=core"
-            onChange={(event) => setText(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent py-1.5 pl-3.5 text-on-surface outline-none placeholder:text-on-surface-variant"
-          />
-        </Body>
-      </CutField>
+      />
       {refused === null ? null : (
         <Body size="small" role="alert" data-selector-refused className="m-0 text-failure">
           {refused}

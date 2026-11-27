@@ -367,6 +367,13 @@ const runFields = {
    */
   gates: Schema.optional(Schema.Array(StepName.OnRead)),
   /**
+   * The gated steps this run froze as the old ending, `workspace: base`, retired: their gate held before they were filed, so a step of
+   * them that was filed had been approved, and no gate holds it after it signs off (`atGate`). Taken from the frozen steps on read
+   * (`approvedFirstIn`), and kept on the record, since the frozen steps are written back without the retired word. Absent on a run that
+   * froze none, every run started since that ending was removed among them.
+   */
+  approvedFirst: Schema.optional(Schema.Array(StepName.OnRead)),
+  /**
    * The model each step this run names runs on, for this run alone, by the step's name, frozen at start: `nemia start --model
    * <step>=<model>`, and an inbox card's `model:`. Set on the step in `workflow` at start and on every revision the run takes after it
    * (`withModels`), so each filing reads it where it reads a step's `model:`; every other step runs on its agent's. Absent on a run given

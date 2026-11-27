@@ -15,7 +15,7 @@ import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
 import { closeoutRefusals } from '../src/question/question.ts';
 import { checksPhase } from '../src/check/checks-due.ts';
-import { approved, gated } from './laws.ts';
+import { approved, approvedBefore, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
 type Stands = (
@@ -94,14 +94,20 @@ const standingSpec = spec<Stands>({
     },
     aGateHoldsASignedStep: {
       description:
-        'A gated step that signed off on its own work awaits approval until the try it is on is approved, but where it asked for a round, or is held at its budget',
+        'A gated step that signed off on its own work awaits approval until the try it is on is approved, but where it asked for a round, was approved before it was filed, or is held at its budget',
       condition: ({ input: [step, run, , c], output }) =>
         !gated(step, run) ||
         (output.own !== 'verified' && output.own !== 'unverified') ||
         approved(run, step.name) ||
+        approvedBefore(run, step.name) ||
         askedAgain(step, run, c) ||
         output.status === 'awaiting approval' ||
         output.status === 'over budget',
+    },
+    anOldEndingIsNotHeldAfter: {
+      description:
+        'A step the run froze as the old ending, its gate held before it was filed, is not held again once it signs off: its approval came first',
+      condition: ({ input: [step, run], output }) => output.status !== 'awaiting approval' || !approvedBefore(run, step.name),
     },
     aRoundIsNotHeldAtTheGate: {
       description: 'A looping step that asked for another round is not held at its gate: the gate is on what comes after it',

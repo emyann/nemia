@@ -1,0 +1,24 @@
+{
+  "id": "shelved",
+  "repo": "@ROOT@/repo",
+  "workspace": "@ROOT@/repo",
+  "baseRef": "@BASE@",
+  "branch": "main",
+  "isolate": false,
+  "brief": "land the tide tables",
+  "workflowDir": "@ROOT@/workflows/landing",
+  "workflow": [
+    { "name": "review", "after": [], "body": "Read it." },
+    { "name": "land", "after": ["review"], "body": "Land it.", "gate": true, "workspace": "base" }
+  ],
+  "steps": {
+    "review": { "taskId": "shelved-review" },
+    "land": {
+      "taskId": "shelved-land-try2",
+      "workspace": "@ROOT@/repo",
+      "branch": "main",
+      "tries": [{ "taskId": "shelved-land", "cause": "continue" }]
+    }
+  },
+  "createdAt": "2026-11-13T00:00:00.000Z"
+}

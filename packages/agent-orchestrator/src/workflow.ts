@@ -93,6 +93,7 @@ export {
 } from './keys/index.ts';
 export type { DeniedAt } from './keys/index.ts';
 export {
+  approvedFirstIn,
   asNamed,
   codexModeLine,
   codexModeWritten,

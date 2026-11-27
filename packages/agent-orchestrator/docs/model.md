@@ -68,6 +68,7 @@ erDiagram
     object startedBy "optional"
     object scheduled "optional"
     list gates FK "optional"
+    list approvedFirst FK "optional"
     object models "optional"
     FactoryName factory FK "optional"
     list mounts "optional"
@@ -118,6 +119,7 @@ erDiagram
     object startedBy "optional"
     object scheduled "optional"
     list gates FK "optional"
+    list approvedFirst FK "optional"
     object models "optional"
     FactoryName factory FK "optional"
     list mounts "optional"
@@ -369,6 +371,7 @@ erDiagram
   Run ||--o{ RepositoryRun : after
   Run ||--o{ RepositoryRun : context
   WorkflowStep ||--o{ RepositoryRun : gates
+  WorkflowStep ||--o{ RepositoryRun : approvedFirst
   Factory ||--o{ RepositoryRun : factory
   RepositoryRun ||--o| Actor : cancelledBy
   RepositoryRun ||--o{ Step : steps
@@ -378,6 +381,7 @@ erDiagram
   Run ||--o{ FolderRun : after
   Run ||--o{ FolderRun : context
   WorkflowStep ||--o{ FolderRun : gates
+  WorkflowStep ||--o{ FolderRun : approvedFirst
   Factory ||--o{ FolderRun : factory
   FolderRun ||--o| Actor : cancelledBy
   FolderRun ||--o{ Step : steps

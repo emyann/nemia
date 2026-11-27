@@ -17,6 +17,8 @@ export const tryNow = (run: Run, name: string) => {
 };
 /** Whether a person approved the try a step is on. */
 export const approved = (run: Run, name: string) => (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
+/** Whether a step's gate was given before it was filed: the run froze it as the old ending (`approvedFirst`), and it was filed. */
+export const approvedBefore = (run: Run, name: string) => (run.approvedFirst ?? []).includes(name) && !!run.steps[name]?.taskId;
 
 /**
  * Whether a factory takes a change of its wiring, its names aside, as `wiringRefusal` judges it: a hire or a schedule only into a workflow

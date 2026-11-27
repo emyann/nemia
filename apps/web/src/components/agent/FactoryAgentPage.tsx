@@ -93,32 +93,28 @@ function Ring({ name, working }: { name: string; working: boolean }) {
 /** One row of the spec plate: its label and its value in the plate's numerals, and under them its pips, where it has them, and its note. */
 function Row({ row }: { row: PlateRow }) {
   return (
-    <div data-plate-row={row.label} className="flex flex-col gap-[3px] border-b border-current/35 pt-[7px] pb-2">
-      <div className="flex items-baseline gap-2">
-        <Label size="small" component="dt" className="w-[72px] shrink-0 uppercase">
+    <div data-plate-row={row.label} className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 border-b border-current/35 pt-[7px] pb-2">
+      <dt className="flex flex-col justify-between gap-[3px] pt-1">
+        <Label size="small" component="span" className="uppercase">
           {row.label}
         </Label>
-        <dd
-          data-plate-value
-          className="m-0 min-w-0 flex-1 truncate font-label text-[17px] leading-[22px] font-extrabold uppercase"
-          style={WIDE}
-        >
-          {row.value}
-        </dd>
-      </div>
-      <div className="flex items-center gap-2">
-        <span aria-hidden="true" data-pips={row.pips?.filled} className="flex w-[72px] shrink-0 gap-0.5">
+        <span aria-hidden="true" data-pips={row.pips?.filled} className="flex h-[18px] items-center gap-0.5">
           {row.pips &&
             Array.from({ length: row.pips.total }, (_, i) => (
               <span key={i} className={cn('h-[5px] flex-1', i < (row.pips?.filled ?? 0) ? 'bg-current' : 'bg-current/22')} />
             ))}
         </span>
+      </dt>
+      <dd className="m-0 flex min-w-0 flex-col gap-[3px]">
+        <span data-plate-value className="truncate font-label text-[17px] leading-[22px] font-extrabold uppercase" style={WIDE}>
+          {row.value}
+        </span>
         {row.note && (
-          <Body size="small" component="span" data-plate-note className="min-w-0 flex-1 truncate" title={row.note}>
+          <Body size="small" component="span" data-plate-note className="truncate" title={row.note}>
             {row.note}
           </Body>
         )}
-      </div>
+      </dd>
     </div>
   );
 }

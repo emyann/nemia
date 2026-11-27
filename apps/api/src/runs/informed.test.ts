@@ -171,7 +171,7 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
   const base = world.head(repo);
   const branch = `wf/${id}/implement`;
   world.branch(repo, branch, { 'a.txt': 'the work\n' });
-  const ending = { name: 'land', after: ['implement'], body: 'Land it.', harness: 'claude', workspace: 'base' };
+  const ending = { name: 'land', after: ['implement'], body: 'Land it.', harness: 'claude' };
   const run = {
     ...record(id, ['land']),
     repo,

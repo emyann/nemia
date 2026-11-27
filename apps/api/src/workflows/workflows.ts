@@ -387,7 +387,6 @@ const wiringOf = (step: StepSpec) => ({
   after: step.after,
   resume: step.resume ?? null,
   place: step.place ?? null,
-  workspace: step.workspace ?? null,
   slot: step.slot ?? null,
 });
 

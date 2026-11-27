@@ -145,7 +145,7 @@ test("the help of the commands this CLI still serves — the machine's and those
       '                               60s), and resume once the new daemon has completed its first pass;',
       '                               refused, naming the log, when that pass fails, and naming the command',
       '                               that starts the service when it is not running.',
-      '                               Jobs and checks, a landing waiting on CI among them, run on and are not',
+      '                               Jobs and checks run on and are not',
       '                               waited for; each session parks and resumes as the same try. Each wait is',
       "                               said on stderr as it waits. A pause a person put stands; the restart's",
       '                               own ends with the command: killed, the next pass of the daemon lifts it.',

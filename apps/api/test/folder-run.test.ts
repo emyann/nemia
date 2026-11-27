@@ -165,8 +165,8 @@ describe("a folder run read on the board: listed by its kind and place, its page
       const spec = specOf(object, 'write');
       assert.ok(spec, 'the run froze the spec of its step `write`');
       assert.deepEqual(
-        [spec.place, spec.workspace],
-        ['folder', null],
+        spec.place,
+        'folder',
         'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
       );
       assert.equal(

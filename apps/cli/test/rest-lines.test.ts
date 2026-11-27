@@ -18,7 +18,6 @@ const headline = (more: Partial<StatsHeadline> = {}) =>
     runs: 0,
     merged: null,
     rounds: null,
-    firstTry: null,
     costPerMerged: null,
     timePerMerged: null,
     tries: 0,
@@ -63,7 +62,6 @@ const group = (more: Partial<StatsGroup> = {}) =>
     },
     marks: [],
     tallies: [],
-    slowLandings: [],
     ...more,
   }) satisfies StatsGroup;
 
@@ -254,7 +252,7 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
   beforeAll(() => {
     empty = statsLine(stats());
   });
-  test('the recap line is one line, — where no round or landing was measured', () => {
+  test('the recap line is one line, — where no round was measured', () => {
     assert.equal(empty.split('\n').length, 1);
     assert.match(empty, /— \(—\) rounds/);
     assert.match(empty, /— \(—\) merged/);
@@ -363,16 +361,6 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
     hasLine(words, /^2026-09-09\s+triage\s+issues\.open\s+—\s+0$/);
     assert.ok(!words.some((l) => l.startsWith('2026-09-10  triage')), 'a day nothing happened on is left out');
     hasLine(words, /^all\s+triage\s+issues\s+3\s+2$/);
-  });
-  test('a slow landing is said under its header, and counted on the recap line within the last 14 days', () => {
-    const slow = { day: '2026-09-28', run: 'slow', step: 'land', try: 1, checkMs: 1_377_000, deadlineMs: 2_700_000, share: 1377 / 2700 };
-    const one = stats(group({ slowLandings: [slow] }));
-    hasLine(statsLines(one), /^landing checks over half their deadline: measure .* LANDING_CHECK_DEADLINE_SECONDS/);
-    hasLine(statsLines(one), /\bslow\s+land\s+1\s+22m57s\s+45m00s\s+51%/);
-    assert.match(statsLine(one), /, 1 landing check over half its deadline: measure again$/);
-    assert.match(statsLine(stats(group({ slowLandings: [slow, { ...slow, run: 'b' }] }))), /, 2 landing checks over half their deadline/);
-    assert.doesNotMatch(statsLine(stats(group({ slowLandings: [{ ...slow, day: '2026-09-01' }] }))), /over half/);
-    assert.ok(!statsLines(stats()).some((l) => l.startsWith('landing checks over half')));
   });
   test("each workflow step's memory peaks are said as quantities, — where none was measured, with when a peak is kept", () => {
     const MI = 1024 ** 2;

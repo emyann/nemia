@@ -199,7 +199,6 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}) =>
     resume: null,
     input: [],
     place: 'git',
-    workspace: null,
     writable: [],
     reads: [],
     slot: null,
@@ -495,11 +494,6 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         steps.find((s) => s.name === 'review')?.spec.budget,
         20,
         "the listing carries review's budget, so a put does not drop it",
-      );
-      assert.equal(
-        steps.find((s) => s.name === 'ship')?.spec.workspace,
-        'base',
-        "and ship's workspace, its former `main` read as `base`, so a put does not drop that either",
       );
       const res = await put('as-listed', { steps });
       assert.equal(res.status, 200, await res.clone().text());
@@ -1015,25 +1009,22 @@ describe('a former key on the board: listed and saved under the name it has now,
       'a save of the step writes the names the keys have, in its harness block',
     );
   });
-  test('a folder that says `workspace: folder` is listed with `place: folder`, a folder team, and a save writes `place:`; REFUSED: a page that sends `workspace: folder`, and a place that is not `git` or `folder` — nothing written', async () => {
+  test('a folder that says `workspace: folder` is listed with `place: folder`, a folder team, and a save writes `place:`; REFUSED: a place that is not `git` or `folder` — nothing written', async () => {
     const dir = path.join(STORE, 'placed');
     write(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite the note.\n');
     const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', `origin=user&${ON_REPO}`);
     const folder = listed.find((w) => w.name === 'placed' && w.from === 'user');
     assert.equal(folder?.folderTeam, true, 'the former spelling is still a folder team');
     const [step] = (await listedSteps('placed')) as [ListedStep];
-    assert.deepEqual([step.spec.place, step.spec.workspace], ['folder', null], 'listed under the key it has now');
+    assert.equal(step.spec.place, 'folder', 'listed under the key it has now');
 
     const before = snapshot(dir);
-    for (const spec of [
-      { ...step.spec, place: null, workspace: 'folder' },
-      { ...step.spec, place: 'cloud' },
-    ]) {
+    for (const spec of [{ ...step.spec, place: 'cloud' }]) {
       const refused = await put('placed', { steps: [{ ...step, spec }] });
       assert.equal(
         refused.status,
         400,
-        `place and workspace are closed words of StepKeys, refused at the door: ${await refused.clone().text()}`,
+        `place is a closed word of StepKeys, refused at the door: ${await refused.clone().text()}`,
       );
       assert.deepEqual(snapshot(dir), before, 'nothing written');
     }

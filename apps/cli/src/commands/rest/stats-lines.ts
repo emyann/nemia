@@ -1,7 +1,6 @@
 /**
  * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the tiles,
- * a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a row per
- * step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a
+ * a row per day, a row per change to what the runs froze, a row per step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a
  * row per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
  * number with nothing measured under it reads `—`, never 0. Pure.
  */
@@ -22,7 +21,6 @@ export type StatsRead = {
 const NONE = '—';
 
 const or = <T>(v: T | null, word: (v: T) => string) => (v === null ? NONE : word(v));
-const percent = (share: number) => `${Math.round(share * 100)}%`;
 const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toString();
 /** A rate per try to two decimals, or to one significant figure under 0.01, so a rate above 0 never reads as 0. */
 const perTry = (n: number) => `${n > 0 && n < 0.01 ? Number(n.toPrecision(1)) : Math.round(n * 100) / 100}/try`;
@@ -50,7 +48,6 @@ const wordsOf = (h: StatsHeadline) =>
     runs: String(h.runs),
     merged: or(h.merged, String),
     rounds: or(h.rounds, oneDecimal),
-    'first try': or(h.firstTry, percent),
     'cost/merged': or(h.costPerMerged, dollars),
     'time/merged': or(h.timePerMerged, durationWord),
     tries: String(h.tries),
@@ -79,19 +76,6 @@ function tileLines(g: StatsGroup) {
   return [
     `last 14 days (${last.from} → ${last.to}), against the 14 before (${before.from} → ${before.to})`,
     ...table(Object.entries(now).map(([name, word]) => [`  ${name}`, word, `(${then[name]})`])),
-  ];
-}
-
-/** A row per landing check that passed in more than half its deadline, under a line saying what to do; none where no check did. */
-function slowLandingLines(slow: StatsGroup['slowLandings']) {
-  if (!slow.length) return [];
-  return [
-    'landing checks over half their deadline: measure the passing landing checks again, then change LANDING_CHECK_DEADLINE_SECONDS and ' +
-      'its JSDoc (src/check/check.ts)',
-    ...table([
-      ['day', 'run', 'step', 'try', 'ran', 'deadline', 'share'],
-      ...slow.map((x) => [x.day, x.run, x.step, String(x.try), durationWord(x.checkMs), durationWord(x.deadlineMs), percent(x.share)]),
-    ]),
   ];
 }
 
@@ -245,7 +229,6 @@ export function statsLines(s: StatsRead) {
   return [
     ...(filtered.length ? [`only ${filtered.join(', ')}`] : []),
     ...tileLines(s.all),
-    ...block(slowLandingLines(s.all.slowLandings)),
     '',
     s.from ? `${s.from} → ${s.to}` : 'no try has ended, and no run has finished',
     ...groups,
@@ -261,18 +244,8 @@ export function statsLines(s: StatsRead) {
   ];
 }
 
-/** How many landing checks of the last 14 days passed in more than half their deadline, in words; none where none did. */
-function slowLandingWord(s: StatsRead) {
-  const { from, to } = s.all.tiles.last;
-  const n = s.all.slowLandings.filter((x) => x.day >= from && x.day <= to).length;
-  if (!n) return '';
-  return n === 1
-    ? ', 1 landing check over half its deadline: measure again'
-    : `, ${n} landing checks over half their deadline: measure again`;
-}
-
 /**
- * The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and the slow landings.
+ * The one line the morning recap quotes (`nemia stats --line`): the last 14 days, and the 14 before in brackets.
  * @param s The stats as the api answers them, whose tiles hold the last 14 days and the 14 before.
  */
 export function statsLine(s: StatsRead) {
@@ -280,9 +253,8 @@ export function statsLine(s: StatsRead) {
   const then = wordsOf(s.all.tiles.before);
   const was = (name: string) => `${now[name]} (${then[name]})`;
   return (
-    `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('merged')} merged, ${was('first try')} on the first try, ` +
+    `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('merged')} merged, ` +
     `${was('rounds')} rounds, ${was('cost/merged')} and ${was('time/merged')} per merged run, ${was('tries')} tries, ` +
-    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded` +
-    slowLandingWord(s)
+    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded`
   );
 }

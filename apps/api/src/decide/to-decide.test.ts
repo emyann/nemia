@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import type { RunDecision } from 'objects';
-import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
+import { listedOf as listed, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
@@ -179,14 +179,6 @@ describe("a run at its ending's gate: `to decide` says what the ending would do 
         ],
       );
       assert.deepEqual([detail.status.waitingOnYou, detail.status.waitingOnYouWords], [['ship'], ['approve ship']]);
-      assert.deepEqual(
-        detail.status.steps.map((s) => [s.name, specOf(detail, s.name)?.workspace ?? null]),
-        [
-          ['implement', null],
-          ['ship', 'base'],
-        ],
-        "the key the board tells an ending's gate from another gate by: the ending runs in the repository's own checkout, and the work does not",
-      );
       assert.deepEqual(
         detail.status.toDecide,
         {
@@ -652,7 +644,6 @@ test("at an ending's gate, once a pass has read where the branches stand, the de
     [['r-flight', 'wf/r-flight/implement', "conflicts with r-flight's wf/r-flight/implement in 1 file: src/c.ts"]],
   );
   assert.equal(collisions.said, 'collides with 1 of the 2 runs in flight on main: r-flight');
-  assert.equal(collisions.semantic, null);
   assert.deepEqual(
     standings.map((s) => s.merge),
     [{ clean: true, said: 'merges cleanly onto main' }],

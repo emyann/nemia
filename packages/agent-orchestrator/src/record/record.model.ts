@@ -1,5 +1,5 @@
 /**
- * Run-core's model: a run, its steps, their tries and rounds, and its landing, as Schemas at the context's door (decisions Q3–Q6).
+ * Run-core's model: a run, its steps, their tries and rounds, as Schemas at the context's door (decisions Q3–Q6).
  * A declaration in S1: no read path decodes through it yet; the Run door (S2) will.
  */
 import type { HeldReason } from '../filed/pictures/pictures.ts';
@@ -150,7 +150,6 @@ export const Round = Schema.Struct({
       try: TryNumber.OnRead,
       onto: Schema.String,
       sha: Schema.String,
-      landing: Schema.optional(Schema.Struct({ step: StepName.OnRead, check: TaskId.OnRead })),
     }),
   ),
 }).annotate({ identifier: 'Round' });

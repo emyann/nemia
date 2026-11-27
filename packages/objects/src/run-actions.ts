@@ -157,7 +157,7 @@ const CopiedInto = Schema.Struct({
  * workflow's name; the factory's folders it mounts read-only (`mounts`) and those some steps write (`writable`); its volumes, read-only
  * (`volumes`) and writable (`writableVolumes`); the harness settings it froze (`settings`); where it works (`workspace`); the inputs and
  * cards it copied, and where its workflow's and carried files were copied; the runs it waits on to succeed (`after`) and is
- * handed as context (`context`); the steps gated (`gated`) and the endings a person approves first (`ends`); each step's model for it
+ * handed as context (`context`); the steps gated (`gated`); each step's model for it
  * alone (`models`); its labels, and each key it did not inherit since the runs it names disagree on it (`labelsLeftOut`).
  */
 export const RunStartedFacts = Schema.Struct({
@@ -207,7 +207,6 @@ export const RunStartedFacts = Schema.Struct({
   }),
   context: Schema.optionalKey(Strings.annotate({ description: 'The runs it is handed as context.' })),
   gated: Schema.optionalKey(Strings.annotate({ description: 'The steps gated in it.' })),
-  ends: Schema.optionalKey(Strings.annotate({ description: 'Its endings a person approves first.' })),
   models: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.String).annotate({ description: "Each step's model for this run alone, step to model." }),
   ),

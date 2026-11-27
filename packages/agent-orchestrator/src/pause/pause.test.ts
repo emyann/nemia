@@ -148,7 +148,7 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
     );
     assert.deepEqual(pausedLines({ pause: null, finishing: [], parked: [], held: [] }), []);
   });
-  test('the pause once nothing finishes counts each check it holds back, staged or not, and names each', () => {
+  test('the pause once nothing finishes counts each check it holds back and names each', () => {
     assert.deepEqual(pausedLines({ pause: PAUSE, finishing: [], parked: [], held: [{ run: 'r-1', step: 'land' }] }), [
       'Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts, 1 check held; nemia resume resumes it',
       "   r-1's land has signed off, and its check waits on nemia resume",
@@ -169,7 +169,7 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
     assert.deepEqual(nowLines([{ run: 'r-1', step: 'implement', kind: 'session', taskId: 't1' }]), [
       'nemia pause --now would pause the store and cut 1 at work, each going on at nemia resume:',
       "   r-1's implement: its session, its call cut, going on as the same try",
-      `${NOW_COST} A landing that checks or merges is left to finish.`,
+      NOW_COST,
       'nemia pause --now --yes does it.',
     ]);
     names(NOW_COST, 'the same try', 'cut');
@@ -177,7 +177,7 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
     assert.match(nowLines([])[0], /stops nothing/);
     assert.equal(
       nowLines([], true)[0],
-      "nemia pause --now would keep the store's pause as it stands; nothing outside a landing is at work, so it stops nothing.",
+      "nemia pause --now would keep the store's pause as it stands; nothing is at work, so it stops nothing.",
     );
   });
 });

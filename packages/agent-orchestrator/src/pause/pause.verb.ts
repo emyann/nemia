@@ -100,7 +100,7 @@ export const pauseParked = Effect.fn('pauseParked')(function* (
  * Pauses the store at once: puts the pause (`putPause`), or keeps the one that stands as it was put — its since, its by and its why, so
  * `said` is then not written — and cuts its timeout to 0 (`cutPause`), and puts the sessions' drain at that timeout, which cuts every
  * session's tool call in flight at once: each session parks and goes on as the same try once the store is resumed, so it is asked no try
- * and no stop. For each check at work but a landing's (`interruptsOf`), it writes the ask that runs it again once the store is resumed,
+ * and no stop. For each check at work (`interruptsOf`), it writes the ask that runs it again once the store is resumed,
  * naming the task (`interrupted`), and only then asks the engine to stop it (`stopAsked`), so a stop is never taken with no ask to pick
  * it up. A check whose step already has an ask for that try is left at work (`skipped`). A stop the engine refuses — the task settled
  * since it was read — is passed over: the tick sets its ask aside (`pauseAskVoid`).

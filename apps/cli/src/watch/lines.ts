@@ -58,8 +58,8 @@ const sinceWords = ({ at, by, why }: NonNullable<Paused['pause']>) =>
   `since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''}`;
 
 /** How many checks the pause holds back: `, 2 checks held`, or nothing. */
-const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>) => {
-  const n = staged.length + held.length;
+const heldCount = ({ held }: Pick<Paused, 'held'>) => {
+  const n = held.length;
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
 

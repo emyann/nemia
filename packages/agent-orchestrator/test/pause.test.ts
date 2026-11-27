@@ -3,7 +3,7 @@
  * would stop and writes nothing; `nemia pause --yes` pauses as a plain pause does; a pass under it starts nothing — no step, try or check,
  * and no due schedule — while each working session stops at its current tool call's end, and `nemia watch --once`, `nemia start` and `nemia
  * up` say it; `nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0 so the sessions' drain cuts each session's
- * call, asks no session a try nor a stop, and asks each check at work but a landing's to stop, its ask on disk first, a step already asked
+ * call, asks no session a try nor a stop, and asks each check at work to stop, its ask on disk first, a step already asked
  * of left at work; and `nemia resume` lifts it and the drain, each session parked going on as the same try, the pass after running again
  * each check the pause stopped and starting the schedule's fire. The stand-in parks no session: its list says a session held at its hook
  * where the story parks it, as the runtime would under the drain.
@@ -46,7 +46,7 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
-import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
+import { startRun, tickRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../testing.ts';
 
 import { pauseFile, readPause } from '../src/pause/pause.store.ts';
@@ -130,7 +130,6 @@ describe("the store paused, then paused at once, then resumed: nothing new start
   let repo!: string;
   let ONE!: string;
   let CHECKED!: string;
-  let SHIP!: string;
   let stopping!: Board['e'];
   heldDate(Date.parse('2026-10-04T12:00:00Z'));
   beforeAll(async () => {
@@ -143,7 +142,6 @@ describe("the store paused, then paused at once, then resumed: nothing new start
     setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
     ONE = folder(['work']);
     CHECKED = folder(['work'], () => 'check: "true"\n');
-    SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\ncheck: "true"\n' : ''));
     stopping = {
       ...b.e,
       stop: (taskId: string) =>
@@ -172,7 +170,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
   const pass = () => stage.runWith(b.e, tickRun());
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
-  const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
+  const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'called', Run> = {} as never;
   const task = (name: keyof typeof runs, step = 'work') => runRecord(ROOT, runs[name].id).steps[step].taskId!;
   const checkOf = (name: keyof typeof runs) => runRecord(ROOT, runs[name].id).steps.work.check!.taskId;
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
@@ -202,25 +200,17 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
     },
   );
-  s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
+  s.test('a session and a check at work, a step a person already asked a try of, and one about to end', async () => {
     runs.session = await begun(ONE);
     runs.checking = await begun(CHECKED);
     runs.asked = await begun(ONE);
     runs.ended = await begun(ONE);
     runs.called = await begun(ONE);
-    const lands = fs.mkdtempSync(path.join(ROOT, 'lands-'));
-    world().repository(lands, {});
-    runs.landing = await begun(SHIP, { repo: lands, isolate: true });
     await pass();
-    for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'working');
+    for (const name of ['session', 'asked', 'ended', 'called'] as const) b.settle(task(name), 'working');
     b.settle(task('checking'), 'succeeded', SIGNED);
-    fs.writeFileSync(path.join(runRecord(ROOT, runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
-    b.settle(task('landing'), 'succeeded', SIGNED);
     await pass();
     b.settle(checkOf('checking'), 'working');
-    await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
-    await pass();
-    b.settle(task('landing', 'ship'), 'working');
     plantRecord(
       ROOT,
       retryAskKey(runs.asked.id, 'work', 2),
@@ -241,7 +231,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
           `${runs.ended.id} work session`,
           `${runs.asked.id} work session`,
         ].sort(),
-        'the landing is not among what it would stop, nor a run called off whose session still works',
+        'a run called off, whose session still works, is not among what it would stop',
       );
       assert.equal(fs.existsSync(pauseFile(ROOT)), false);
       assert.deepEqual([asksOf(runs.session.id), asksOf(runs.checking.id), stops], [[], [], []]);
@@ -272,8 +262,8 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       const standing = await stage.runWith(b.e, pausedRead());
       assert.match(
         pausedWords(standing) ?? '',
-        /^Pausing: 5 sessions finishing a tool call, cut now/,
-        "what still finishes: four sessions, the landing's and the session of a run called off, and a check; the clock is past the timeout, so their calls are being cut",
+        /^Pausing: 4 sessions finishing a tool call, cut now/,
+        "what still finishes: four sessions, the session of a run called off among them, and a check; the clock is past the timeout, so their calls are being cut",
       );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
     },
@@ -305,7 +295,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       assert.deepEqual(
         stops,
         [{ taskId: checkOf('checking'), askOnDisk: true }],
-        'the check stopped only once its ask is on disk; no session, nor the landing, is ever stopped',
+        'the check stopped only once its ask is on disk; no session is ever stopped',
       );
       assert.deepEqual(raced, [], 'no stop the engine refused');
       assert.deepEqual(
@@ -316,11 +306,6 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       assert.deepEqual(asksOf(runs.ended.id), [], 'nor is any other session');
       assert.equal(askOf(runs.checking.id, 'work', 2).mode, 'recheck', 'a check is run again');
       assert.equal(askOf(runs.asked.id, 'work', 2).mode, 'fresh', 'the try a person asked for stands');
-      assert.deepEqual(
-        asksOf(runs.landing.id).filter((f) => f.startsWith('retry-')),
-        [],
-        'a landing is asked no try',
-      );
       assert.equal(keysUnder(ROOT, asksPrefix(runs.called.id)).length > 0, false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
@@ -340,20 +325,18 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       );
       assert.deepEqual(of('checking', 'check'), { run: runs.checking.id, step: 'work', kind: 'check', stopping: true, resumed: true });
       assert.deepEqual(of('asked'), { run: runs.asked.id, step: 'work', kind: 'session', stopping: true });
-      assert.deepEqual(of('landing'), { run: runs.landing.id, step: 'ship', kind: 'session' }, "the landing's session finishes, unstopped");
     },
   );
   s.test(
-    'the check and the session asked of stopped and the landing ended, a pass under the pause files nothing — nor one a restarted daemon makes — and says Paused, the sessions parked',
+    'the check and the session asked of stopped, a pass under the pause files nothing — nor one a restarted daemon makes — and says Paused, the sessions parked',
     async () => {
       for (const id of [checkOf('checking'), task('asked')]) b.settle(id, 'stopped');
-      b.settle(task('landing', 'ship'), 'succeeded', SIGNED);
       await pass();
       await stage.runWith(b.e, tickRun({ memo: freshRestMemo() }));
       assert.deepEqual(b.filings, filings, 'nothing filed while paused, nor by a restarted daemon with no memo of runs at rest');
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "each pass puts the drain again at the pause's timeout, cut to 0");
       const words = pausedWords(await stage.runWith(b.e, pausedRead())) ?? '';
-      assert.match(words, /^Paused since /, 'Paused, once nothing outside a landing held is at work');
+      assert.match(words, /^Paused since /, 'Paused, once nothing held is at work');
     },
   );
   s.test('`nemia up` says the pause once across passes, again each time its words change, and resumed once', () => {
@@ -365,7 +348,6 @@ describe("the store paused, then paused at once, then resumed: nothing new start
         { run: 'r-2', step: 'b', kind: 'check' as const },
       ],
       parked: [],
-      staged: [],
       held: [],
     };
     const one = { ...two, finishing: two.finishing.slice(1) };

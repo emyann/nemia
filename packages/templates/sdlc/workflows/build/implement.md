@@ -23,19 +23,19 @@ Name its address in your `artifacts` as a value, `{"name": "pull request", "valu
 labels the factory's rules give the run's labels (`${{ parameters.pullRequestLabels }}`), each round, and refuses a draft, another base,
 two open pull requests, or a head that is not your commit, however the pull request was opened.
 
-Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
-(`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context — or, where neither the head nor the base branch declares a CI workflow under
-`.github/workflows` (`pull-request.ts declares-ci`), runs the local check (`${{ parameters.localCheck }}`) in its place: CI runs the repository's suite on that commit,
-and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
-and the tail of their log — the script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
-A red whose job's log names a line that failed it comes back after the first run, not re-run: the refusal says so, and names the
-lines it took as the change's; a failing line your change did not touch (a flaky test) you say so in your sign-off. Any other red
-context has been re-run once by then, its failed jobs, so its refusal names the jobs re-run and how each ended the second
-time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
-change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
+Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, and runs the repository's round check
+(`${{ parameters.roundCheck }}`); where neither the head nor the base branch declares a CI workflow under
+`.github/workflows` (`pull-request.ts declares-ci`), its `local` check runs the local check (`${{ parameters.localCheck }}`). Otherwise the factory's
+`ci-watch` program writes the `ci` condition your step then waits on: CI runs the repository's suite on that commit, and a red, cancelled or missing
+`${{ parameters.ciCheck }}` comes back as the condition's `False` or `Unknown`, with the head, the Actions URL and the failing jobs (no log
+lines: you read why through the GitHub server, below).
+A red whose job's log names a line that failed it is `False` after the first run, not re-run; a failing line your change did not touch (a
+flaky test) you say so in your sign-off. Any other red context has been re-run once by then, its failed jobs, read from GitHub's
+`run_attempt`: a job red twice is the change's. A step whose note says `ci` is `Unknown` asks nothing of the work: change nothing, and sign
+off as before; the next pass reads the re-run's own verdict and re-runs nothing again.
 
-**Don't wait on CI yourself.** Push and open the pull request, then sign off: your check waits on `${{ parameters.ciCheck }}` and
-hands you its verdict, the failing jobs and their log included. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
+**Don't wait on CI yourself.** Push and open the pull request, then sign off: your `ci` condition waits on `${{ parameters.ciCheck }}` and
+hands you its verdict, the failing jobs and the Actions address. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
 its slot and its context for nothing.
 
 **Read a red CI yourself where its lines do not say why.** Your step loads the factory's `github` server, and a red `${{ parameters.ciCheck }}` whose handed lines

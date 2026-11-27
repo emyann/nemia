@@ -35,12 +35,9 @@ import { checksPhase } from './checks-due.ts';
  * not hold a run for ever.
  *
  * A guard against a hang, not a budget, so it is set well above the slowest round check: the pictures, the probe, the push of the round's
- * commit, the typecheck, the lint, and last the wait on
- * GitHub's `ci` context, which carries a bound of its own (`WHOLE_SECONDS`, 2400 s in the `pull-request.ts` of the sdlc template's build)
- * so that a red or missing verdict comes back as the script's refusal in words — the Actions URL, the failing jobs, the retry line — and
- * not as a check this deadline killed. So the number is above the clauses before the wait plus the wait itself: with 3300 those clauses
- * have 900 s, which the templates' `pull-request.boundary.test.ts` holds against the script's number. The suite, the types, the lint,
- * the whole e2e and the build run in `ci`, on the pushed commit, and no longer here.
+ * commit, the typecheck, the lint and the repository-wide rules. What waits on a service (a CI verdict) is a condition a program writes,
+ * not a check this deadline bounds. The suite, the types, the lint, the whole e2e and the build run in `ci`, on the pushed commit, and
+ * no longer here.
  *
  * The history of the figure, which is where 3300 comes from and the only measurement anyone has made of it: it was measured from the
  * round checks' journals while the check still ran the suite and the e2e itself, and ran a mutant trial per rule a closeout named,
@@ -52,8 +49,7 @@ import { checksPhase } from './checks-due.ts';
  * tighter. Nobody has re-measured it: it is measured again, the same way, once a round check whose wait was short takes more than half
  * of this number.
  *
- * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a round's check pushes a commit and waits on GitHub, which a landing's does
- * not. A constant rather than a step key: every check of this repository's team is the same command family and none needs another number.
+ * A constant rather than a step key: every check of this repository's team is the same command family and none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 3300;
 
@@ -70,9 +66,6 @@ export const CHECK_DEADLINE_SECONDS = 3300;
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
  * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one command family of this repository's team lands, and a
  * round's check is measured on its own.
- *
- * A template's landing check may instead run no suite and wait on CI at the merge commit, up to a bound of its own; the template's tests
- * read this number from `agent-orchestrator/run` and hold that bound well under it.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 
@@ -354,8 +347,8 @@ export const checksContract = (checks: readonly CheckSpec[]) =>
  * pull request on GitHub and a factory that stages a local merge are both told this, and the recipe of either is its step's own note.
  * How to stage a merge, and what the session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its
  * place's skill (*Stage a landing*).
- * An ending of several checks (`checks:`) is told each by its name and line, and which of them use no checkout (`usesCheckout: false`):
- * they run after the checkout is given back to the next ending, and still judge the step.
+ * An ending of several checks (`checks:`) is told each by its name and line, and which of them are conditions, which run nothing
+ * in the checkout and still judge the step once their writer has written them.
  * @param checks The step's checks, as the run froze them, in its order.
  * @param words How the place stages a merge and what the session is denied, or undefined where the place says none.
  */
@@ -381,18 +374,18 @@ export const landingContract = (checks: readonly CheckSpec[], words?: LandingWor
 const landingChecksTold = (checks: readonly CheckSpec[]) => {
   const only = checks.length === 1 ? checks[0] : undefined;
   if (only) return [`Once you sign off, the run executes ${codeSpan(checkLine(only))} in this checkout, as it executes any step's check.`];
-  const free = checks.filter((c) => c.usesCheckout === false);
+  const free = checks.filter((c) => c.condition !== undefined);
   return [
     "Once you sign off, the run executes these checks in this checkout, as it executes any step's checks, each once those it waits on passed:",
     '',
     ...checks.map(
       (c) =>
-        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(checkLine(c))}${c.usesCheckout === false ? ' (uses no checkout)' : ''}`,
+        `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(checkLine(c))}${c.condition === undefined ? '' : ' (runs nothing here)'}`,
     ),
     '',
     ...(free.length
       ? [
-          `Once every other check has passed, the checkout is given back to the next run's ending while ${free.map((c) => codeSpan(c.name)).join(' and ')} still ${free.length > 1 ? 'run' : 'runs'}: ${free.length > 1 ? 'they read' : 'it reads'} nothing of it, and still ${free.length > 1 ? 'judge' : 'judges'} this step.`,
+          `Once every check that runs a command has passed, the checkout is given back to the next run's ending while ${free.map((c) => codeSpan(c.name)).join(' and ')} ${free.length > 1 ? 'wait' : 'waits'} to be written: ${free.length > 1 ? 'they run' : 'it runs'} nothing here, and still ${free.length > 1 ? 'judge' : 'judges'} this step.`,
         ]
       : []),
   ];

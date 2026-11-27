@@ -5,7 +5,9 @@
  * file of the folder that variable names. Held first on a scratch copy of sdlc with a step planted that names a script the carried folder
  * does not hold, then on sdlc as it ships: every script of either folder is run by a check or imported by one that is, so the lists are
  * the folders' own and a check moved or emptied cannot make the guard pass by reading nothing. A workflow's machine need (`spec.needs`)
- * is read as a check too, its own check and each fix's command, since the daemon runs them with the same two variables.
+ * is read as a check too, its own check and each fix's command, and so is a program's `run:` (`programs/<name>/program.yaml`), since the
+ * daemon
+ * runs them with the same two variables.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -46,7 +48,24 @@ const commandsOf = (manifest: Manifest | null) => [
 function checksOf(root: string) {
   const workflows = path.join(root, 'workflows');
   const defaults = defaultsOf(root);
-  return fs
+  const programs = path.join(root, 'programs');
+  const run = (name: string) =>
+    (yaml.load(fs.readFileSync(path.join(programs, name, 'program.yaml'), 'utf8')) as { spec?: { run?: unknown } } | null)?.spec?.run;
+  const programmed = (fs.existsSync(programs) ? fs.readdirSync(programs).sort() : []).flatMap((name) =>
+    typeof run(name) === 'string'
+      ? [
+          {
+            workflow: 'programs',
+            step: name,
+            scripts: [...withDefaults(String(run(name)), defaults).matchAll(FROZEN)].map(([, bare, braced, script]) => ({
+              folder: (bare ?? braced) === 'WF_CARRIED_FILES' ? 'carried' : 'programs',
+              name: script ?? '',
+            })),
+          },
+        ]
+      : [],
+  );
+  const checked = fs
     .readdirSync(workflows)
     .filter((name) => fs.existsSync(path.join(workflows, name, 'workflow.yaml')))
     .sort()
@@ -67,6 +86,7 @@ function checksOf(root: string) {
           : [],
       );
     });
+  return [...checked, ...programmed];
 }
 
 /** The default of each parameter the template `root` declares, by name, as its manifest writes it. */

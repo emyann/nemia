@@ -205,7 +205,7 @@ sessions' records by the factory of the run that filed each task). A person may 
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands — a pause with no timeout,
-so nothing new is filed and the jobs and the checks run on, untouched, a landing's wait on CI among them, and are not waited for — the daemon's own sessions (`restartPolicy:
+so nothing new is filed and the jobs and the checks run on, untouched, a landing's check among them, and are not waited for — the daemon's own sessions (`restartPolicy:
 'Always'`) held by the holder's drain and their calls in flight waited for up to the timeout (`--timeout <d>`, else the store's, `nemia
 pause-timeout`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
 has completed its first pass, which resumes each parked session as the same try on the release it runs — refused, naming its log,

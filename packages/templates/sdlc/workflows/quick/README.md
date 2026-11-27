@@ -44,8 +44,8 @@ repository. The sign-in with no terminal is not measured yet, as that section sa
 ## The implement step's check
 
 On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its
-`implementCheck` parameter, `pull-request.ts push`, `pull-request.ts declares-ci` and `pull-request.ts wait --check <name>`, in that order, and
-nothing else. Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
+`implementCheck` parameter, `pull-request.ts push` and `pull-request.ts declares-ci`, in that order, and
+nothing else, then the `ci` condition the factory's `ci-watch` program writes. Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still judged by its context) and the `local` check runs the factory's `localCheck`, the condition being written `True` within one pass, and the landing merges the pull request with no context: nothing waits on CI that will not come.
 Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
 workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
 `parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts` and `refresh.ts`, which they import — from its frozen carried files
@@ -70,8 +70,7 @@ with: one that renders and freezes a template's carried folder and reads a `{ pa
 5. `pull-request.ts`, the carried one `build` runs too: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
-   the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
-   parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log, at once where a red job's log names a line that failed it, the change's, saying so, and otherwise once it has re-run the failed jobs of a red one once (only a workflow run on its first attempt, within the same bound) and named each job re-run and how it ended the second time; where the context is still absent at half its start bound and the head has a run GitHub queued and never started, it dispatches that run's workflow once on the branch, as `build`'s README says; where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names the base's jobs that did not pass, and stays the try's.
+   the implement step's `open` already did when it created the pull request; CI itself is not waited on by a check: the `ci` condition waits on the context the factory names (its `ciCheck` parameter, `ci` by default) on that head, as `build`'s README says of the `ci-watch` program: it reads only the latest run of each check, writes `False` for a red with the Actions URL and the failing jobs, at once where a red job's log names a line that failed it, the change's, and otherwise once it has re-run the failed jobs of a red once (only a workflow run on its first attempt) and named each job re-run; it dispatches a run GitHub queued and never started once on the branch; and where the context is red on the base branch too, says so and names the base's jobs that did not pass.
 
 When the implement step's check refuses, at any clause and either way, the run tries implement again on its own, up to twice a round
 (`retries: 2`), continuing its session, each try under the step's `budget:`, and hands the try the check's verdict as data: the command,
@@ -86,9 +85,9 @@ sign-off spend no try and wait on a person at once, and so does a refusal after 
 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session
 runs the tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
-repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through the
-carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its checks are the receipt that the merge happened, then
-`base-ci`, which runs once the checkout is given back to the next run's ending —
+repository's suite on the commit the check pushed, and the `ci` condition waits on it. Land then merges that same pull request through the
+carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its checks are the `ci` condition, the receipt that the merge happened, then
+`base-ci`, a condition too, which holds no checkout, so it is given back to the next run's ending once the receipt passes —
 `build`'s land step to the letter (check, fence, budget, no gate, and its note, which is `build`'s own `land.md`, which the
 step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
 `landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, installs the merged tree's
@@ -96,7 +95,7 @@ dependencies where the factory names its `landingInstall`, derives those files a
 and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
 in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
 a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default),
-`base-ci` then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
+the `base-ci` condition is then written from the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
 first, any red it judged, failing lines or not, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
 cancelled or never reported too; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 

@@ -295,7 +295,6 @@ test("REFUSED at shipped defaults: implement's check, rendered, refuses a live p
       WF_RUN: 'r-1',
       WF_CLOSEOUT: closeout,
       WF_BASE_REF: base,
-      WF_CI_POLL_SECONDS: '0',
       ...more,
     };
     const r = spawnSync(cmd, args, { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });

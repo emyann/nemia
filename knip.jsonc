@@ -15,7 +15,7 @@
       ]
     },
     "packages/agent-runtime": {
-      // The bins the runtime spawns by path (`ae-worker.ts`, `ae-claude-job.ts`), and the fixtures its tests spawn by path.
+      // The bins the runtime spawns by path (`ae-worker.ts`, `ae-claude-job.ts`, `ae-mcp-headers.ts`), and the fixtures its tests spawn by path.
       "entry": ["bin/*.ts", "test/fixtures/**/*.ts"]
     },
     "packages/agent-orchestrator": {

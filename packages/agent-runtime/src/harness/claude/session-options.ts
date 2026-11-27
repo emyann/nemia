@@ -6,7 +6,8 @@
  *
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
  * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is still not declared on the SDK's type for
- * an HTTP server (`sdk.d.ts:1284-1300`), so the cast is what lets it through and no typecheck reads it. What it does is measured rather
+ * an HTTP server (`sdk.d.ts:1284-1300`), and nor is `headersHelper`, which Claude Code documents and `withTokenHelpers` lays on a server
+ * signed in to by a code, so the cast is what lets them through and no typecheck reads it. What it does is measured rather
  * than typed: on 0.3.308, and again on 0.3.316 (its schema re-read unchanged on 0.3.322, 0.3.323 and 0.3.325), the SDK's own schema
  * for an http server declares `oauth` and the server comes back with it echoed on `McpServerStatus.config` (`seam.ts`,
  * `docs/harness.md`). An SDK
@@ -23,7 +24,7 @@ import { memorylessSettings } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import { everyMcpServer } from '../mcp.ts';
-import { withTokens } from '../mcp-token.ts';
+import { withTokenHelpers } from '../mcp-token.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
 /** The options of `Options` this file sets: what `query()` is given, beside its prompt and the runner's own callbacks. */
@@ -197,7 +198,7 @@ const askedOf = (r: SpawnRequest) =>
 export const attachedOptions = (r: SpawnRequest) => {
   const c = r.config;
   const { extra, plugins, settings, systemPrompt } = extraOf(r.cwd, admittedFlags(c));
-  const servers = withTokens(everyMcpServer(r.cwd, c), r.mcpTokens);
+  const servers = withTokenHelpers(everyMcpServer(r.cwd, c), r.mcpTokenFiles);
   const window = c?.contextTokens;
   const windowed = window !== undefined && typeof settings === 'object';
   return {

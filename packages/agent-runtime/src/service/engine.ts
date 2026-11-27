@@ -432,8 +432,8 @@ export type EngineShape = {
   /**
    * A sign-in to `name`, a remote server with an OAuth client, started (`service/mcp-sign-in.ts`). The road is chosen from what its
    * provider advertises (`routeOf`): by a code (`route: 'device'`), answered at once with the code to type, the provider's page to
-   * type it at and when it stops being good, the engine polling the provider for the token, holding it in its own store and handing it
-   * to every session as the server's `Authorization` header, refreshed with no person present; or by the browser (`route: 'browser'`),
+   * type it at and when it stops being good, the engine polling the provider for the token, holding it in its own store and giving every
+   * session a `headersHelper` that reads it, refreshed with no person present; or by the browser (`route: 'browser'`),
    * Claude Code's own sign-in, answered with the address the person opens and when the sign-in stops waiting, which needs a callback
    * port. The sign-in is held in this engine's memory until the server reads `connected`, the person cancels it (`mcpSignOut`) or its
    * time passes. No task is touched and nothing is journalled.

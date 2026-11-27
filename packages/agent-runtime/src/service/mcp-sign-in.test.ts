@@ -346,9 +346,9 @@ describe('a person signs in by a code the provider takes, and their token is hel
       assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'connected' });
       const file = tokenFileOf(root, 'github', DEVICE_GITHUB);
       assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-      assert.equal(await heldToken(root, 'github', DEVICE_GITHUB), GRANTED);
+      assert.equal(await heldToken(tokenFileOf(root, 'github', DEVICE_GITHUB)), GRANTED);
       assert.equal(
-        await heldToken(root, 'github', { ...DEVICE_GITHUB, headers: { 'X-Other': '1' } }),
+        await heldToken(tokenFileOf(root, 'github', { ...DEVICE_GITHUB, headers: { 'X-Other': '1' } })),
         undefined,
         'a changed header finds no token',
       );

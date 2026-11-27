@@ -120,9 +120,10 @@ again above, and a look that failed says the state is unread, which is not an ab
 or holds an SDK session. Its road is chosen from what the server's provider advertises (`routeOf`, `agent-runtime/src/harness/mcp-device.ts`, RFCs 9728
 and 8414). **By a code** (the device grant, RFC 8628, where `oauth.clientId` is named and the provider offers it): the runtime asks the
 provider for a code, answers it with the page to type it at, polls in memory by the server's name, holds the token and its refresh in a
-file of its own under the engine's root (`harness/mcp-token.ts`, mode 0600), refreshes it before each spawn with no person present, and
-hands it to the session in the server's `Authorization` header (`SpawnRequest.mcpTokens`, a runner wrapper like telemetry, never the
-task's journalled `config`). **By the browser** (every other server): it holds a session asked `mcpAuthenticate` in memory by its
+file of its own under the engine's root (`harness/mcp-token.ts`, mode 0600), and refreshes it with no person present, under a lock, when
+the session's Claude Code reads it: the session is given the file's path and a `headersHelper` (`bin/ae-mcp-headers.ts`,
+`SpawnRequest.mcpTokenFiles`, a runner wrapper like telemetry, never the task's journalled `config`) that Claude Code runs at each
+connection and after a refused call, so a session that outlives its token reads the new one. **By the browser** (every other server): it holds a session asked `mcpAuthenticate` in memory by its
 callback port until the server reads `connected` — or until the person pastes the address their browser was sent back to, which
 `mcpSignInCallback` checks against the redirect the sign-in asked for (`callbackRefusal`, `agent-runtime/src/harness/mcp-callback.ts`)
 and hands to the held session's `mcpSubmitOAuthCallbackUrl` — and signs out through a `claude mcp add` then a `claude mcp remove --scope

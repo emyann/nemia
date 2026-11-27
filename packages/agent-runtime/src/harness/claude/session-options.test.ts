@@ -18,6 +18,7 @@ import path from 'node:path';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import { attachedOptions } from './session-options.ts';
+import { MCP_HEADERS_BIN } from '../mcp-token.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { ClaudeFlags } from './vocabulary.ts';
@@ -229,22 +230,29 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
-    name: 'a remote server with a token in `mcpTokens` is handed `Authorization: Bearer <token>` beside its own headers, one without is handed as before',
+    name: 'a remote server named in `mcpTokenFiles` is handed a `headersHelper` and no `Authorization`, one not named is handed as before',
     check: () => {
       const bare = scratch('ae-session-options-token-');
       const mcp = {
         github: { type: 'http' as const, url: 'https://api.githubcopilot.com/mcp/', headers: { 'X-MCP-Readonly': 'false' } },
         other: { type: 'http' as const, url: 'https://other.example/mcp' },
       };
-      const given = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare, config: { mcp }, mcpTokens: { github: 'planted-token' } });
+      const given = attachedOptions({
+        name: 'ae/t/1',
+        brief: 'work',
+        cwd: bare,
+        config: { mcp },
+        mcpTokenFiles: { github: '/store/github.json' },
+      });
       assert.deepEqual(given.mcpServers, {
-        github: { ...mcp.github, headers: { 'X-MCP-Readonly': 'false', Authorization: 'Bearer planted-token' } },
+        github: { ...mcp.github, headersHelper: `'${process.execPath}' '${MCP_HEADERS_BIN}' '/store/github.json'` },
         other: mcp.other,
       });
+      assert.equal(JSON.stringify(given.mcpServers).includes('Authorization'), false);
       assert.deepEqual(
         attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare, config: { mcp } }).mcpServers,
         mcp,
-        'no token, no header',
+        'no token file, no helper',
       );
     },
   },

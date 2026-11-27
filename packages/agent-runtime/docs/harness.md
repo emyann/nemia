@@ -496,12 +496,25 @@ advertises the device grant (RFC 8628) — read from its protected resource meta
 GitHub's at `https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/` and
 `https://github.com/.well-known/oauth-authorization-server/login/oauth` — the runtime asks the provider's device endpoint for a code with
 the client id alone, polls the token endpoint (adding 5 s on `slow_down`), holds the token and its refresh token in
-`<root>/mcp-tokens/<name>-<hash>.json` (mode 0600, the hash that of the server's `type`, `url` and `headers`), refreshes it before each
-spawn with the client id and no secret, and lays `Authorization: Bearer <token>` over the server's headers where it builds
-`Options.mcpServers` (`withTokens`) and in the state read. GitHub's doc lists no client secret for a device poll or for refreshing a
-device-flow token. The token is in the spawn's in-memory `mcpTokens`, never in the task's `config`, which is journalled. **Not
-measured:** that Claude Code, handed the header inline, connects to GitHub's server with it. The SDK spells `Options.mcpServers` onto the
-child's argv, so the token is in the process table while a session runs.
+`<root>/mcp-tokens/<name>-<hash>.json` (mode 0600, the hash that of the server's `type`, `url` and `headers`), refreshes it with the client
+id and no secret, and lays a `headersHelper` on the server where it builds `Options.mcpServers` (`withTokenHelpers`) and in the state read.
+GitHub's doc lists no client secret for a device poll or for refreshing a device-flow token.
+
+**A session that outlives its token (2026-11-27).** A GitHub App user token lives 8 hours (`expires_in` is always 28800), and using a
+refresh token ends both it and the old access token at once, so a refresh by any process ends the token of every session running with a
+fixed header: three step sessions of 63 to 70 minutes lost the server that way. So the session is given no token. Each remote server with
+a token held gets `headersHelper: '<node>' '<runtime>/bin/ae-mcp-headers.ts' '<token file>'` (`SpawnRequest.mcpTokenFiles`: paths only, never
+in `config`, a run file, a request file or argv). `code.claude.com/docs/en/mcp`, *Use dynamic headers for authentication*, says Claude Code
+runs the helper on each connection and reconnection with no cache, and on a tool call's 401 or 403 runs it again, reconnects and retries the
+call once; that the helper must print one JSON object of strings on stdout and is given up on after 10 seconds; that its `Authorization` is
+the server's credential, with no fall-back to OAuth; and that for a server from the SDK's `mcpServers` it runs in the session's working
+directory with no trust dialog. `headersHelper` is not declared on `McpHttpServerConfig` (`sdk.d.ts:1284-1300`), so it rides the cast `oauth`
+rides: re-measure it at each SDK bump. The helper refreshes a due token under `<file>.lock` (an exclusive create of `{pid, start, id}`; a lock
+whose holder is gone is broken; `refreshLockOf`, proved by `contracts/mcp-token.contract.ts`), reads the file again once it holds the lock,
+and bounds itself inside the 10 seconds (`HELPER_BOUNDS`). **Measured:** by `test/mcp-token-helper.boundary.test.ts`, that a call after
+expiry carries the refreshed token, with a stand-in that runs the helper as the docs say, and that the SDK passes the key onto `--mcp-config`.
+**Not measured:** the real Claude Code's re-run on a 401 and its acceptance of the key on an inline server; the first long session after this
+lands is that measurement, and a difference is written here.
 
 What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, and again on
 0.3.323 and 2.1.323, 2026-11-13, and on 0.3.325 and 2.1.325, 2026-11-14, with the same bodies, off the installed files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):

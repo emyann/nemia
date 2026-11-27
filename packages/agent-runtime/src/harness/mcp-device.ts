@@ -1,7 +1,7 @@
 /**
  * A remote MCP server signed in to by a code (RFC 8628): the provider's metadata read to choose the road, the code asked, the poll of
- * the token endpoint, and the refresh of a token. The runtime holds the token (`mcp-token.ts`) and hands it to each session in the
- * server's `headers`, which is the road the Agent SDK documents for a host that runs the OAuth flow itself.
+ * the token endpoint, and the refresh of a token. The runtime holds the token (`mcp-token.ts`) and lets each session read it through a
+ * `headersHelper` (`bin/ae-mcp-headers.ts`) that Claude Code runs at each connection, so a token that lapses or is replaced is read again.
  *
  * The three decisions — `signInRouteOf`, `pollOutcomeOf`, `tokenDueOf` — are proved by `contracts/mcp-device.contract.ts`. Nothing
  * here sends a client secret: GitHub's documentation lists none for a device flow's poll or its refresh, and a token that came by a
@@ -113,10 +113,10 @@ const bodyOf = (text: string) => {
 };
 
 /** One request to `url`, answered as an object with the status; the network failing throws, naming the address and not the body. */
-const asked = async (url: string, init: RequestInit) => {
+const asked = async (url: string, init: RequestInit, timeoutMs: number = REQUEST_MS) => {
   let response: Response;
   try {
-    response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_MS), redirect: 'error' });
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs), redirect: 'error' });
   } catch (e) {
     throw new Error(`${url} could not be reached: ${(e as Error).message}. Try again.`, { cause: e });
   }
@@ -251,9 +251,14 @@ export const pollOnce = async (tokenEndpoint: string, clientId: string, deviceCo
  * @param tokenEndpoint The provider's token endpoint, kept with the token.
  * @param clientId The server's OAuth client id, kept with the token.
  * @param refreshToken The refresh token held.
+ * @param timeoutMs How long the request may take before it is given up, `REQUEST_MS` where absent.
  */
-export const refreshOnce = async (tokenEndpoint: string, clientId: string, refreshToken: string) => {
-  const answered = await asked(tokenEndpoint, formOf({ client_id: clientId, grant_type: 'refresh_token', refresh_token: refreshToken }));
+export const refreshOnce = async (tokenEndpoint: string, clientId: string, refreshToken: string, timeoutMs?: number) => {
+  const answered = await asked(
+    tokenEndpoint,
+    formOf({ client_id: clientId, grant_type: 'refresh_token', refresh_token: refreshToken }),
+    timeoutMs,
+  );
   const { grant } = grantOf(answered.body);
   if (grant !== undefined) return grant;
   const error = textOf(answered.body.error);

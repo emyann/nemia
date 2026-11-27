@@ -10,7 +10,8 @@ export type CutChoice = { id: string; label: string };
 
 /** The surface a select or a combo box opens its choices on, and a choice in it. */
 export const CHOICES = 'min-w-(--trigger-width) overflow-auto rounded-shape-extra-small bg-surface-container py-2 shadow-elevation-2';
-export const CHOICE = 'flex min-h-10 cursor-default items-center gap-2 px-3 py-1.5 text-on-surface outline-none data-focused:bg-on-surface/8 data-selected:bg-secondary-container';
+export const CHOICE =
+  'flex min-h-10 cursor-default items-center gap-2 px-3 py-1.5 text-on-surface outline-none data-focused:bg-on-surface/8 data-selected:bg-secondary-container';
 
 /**
  * One choice among a few, in the look's one field, the cut field: the label above it, the chosen word in the field with a chevron, and

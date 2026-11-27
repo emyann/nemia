@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ArrowUpDown, LayoutGrid, List } from 'lucide-react';
-import type { CardLabelInUse } from 'objects';
 import { Chip, ChipGroup, Segment, SegmentedButton } from '@/components/ui/ds';
 import { CutSearch, type CutChip } from '@/components/look';
 import { CLOSED_PHASES, OPEN_PHASES, PHASE_WORDS, type InboxView } from '@/lib/inbox';
@@ -17,7 +16,10 @@ const labelChips = (selector: string | undefined) =>
     .filter((term) => term !== '')
     .map((term) => ({ id: term, label: term.replace('=', ': ') }));
 
-/** The segments' look in this toolbar: the kit swaps a chosen segment's icon for a check, which is hidden here, and the icon sits beside its word. */
+/**
+ * The segments' look in this toolbar: the kit swaps a chosen segment's icon for a check, which is hidden here, and the icon sits beside
+ * its word.
+ */
 const SEGMENT = { icon: 'hidden', label: 'flex items-center gap-2' } as const;
 
 /**
@@ -31,7 +33,7 @@ function SearchBar({
   onSearch,
 }: {
   view: InboxView;
-  labels: readonly CardLabelInUse[];
+  labels: InboxPage['labels'];
   onSearch: (patch: Partial<InboxView>) => void;
 }) {
   const [text, setText] = useState('');
@@ -48,7 +50,11 @@ function SearchBar({
       label="Search the cards"
       placeholder="Search the cards: words, labels"
       chips={chips}
-      onRemove={(id) => (id === 'q' ? onSearch({ q: undefined, older: undefined }) : onSearch({ l: label(picked.map((c) => c.id).filter((c) => c !== id)), older: undefined }))}
+      onRemove={(id) =>
+        id === 'q'
+          ? onSearch({ q: undefined, older: undefined })
+          : onSearch({ l: label(picked.map((c) => c.id).filter((c) => c !== id)), older: undefined })
+      }
       text={text}
       onText={setText}
       suggestions={suggestions}
@@ -77,7 +83,7 @@ export function InboxToolbar({
   onSearch,
 }: {
   view: InboxView;
-  labels: readonly CardLabelInUse[];
+  labels: InboxPage['labels'];
   layout: Layout;
   onLayout: (layout: Layout) => void;
   onSearch: (patch: Partial<InboxView>) => void;
@@ -142,10 +148,16 @@ export function InboxSides({
         onSelectionChange={(keys) => onSearch({ cards: keys.has('closed') ? 'closed' : undefined, state: undefined, older: undefined })}
       >
         <Segment id="open">
-          Open <span data-cards-count="open" className="font-mono">{open}</span>
+          Open{' '}
+          <span data-cards-count="open" className="font-mono">
+            {open}
+          </span>
         </Segment>
         <Segment id="closed">
-          Closed <span data-cards-count="closed" className="font-mono">{over}</span>
+          Closed{' '}
+          <span data-cards-count="closed" className="font-mono">
+            {over}
+          </span>
         </Segment>
       </SegmentedButton>
       <ChipGroup

@@ -86,4 +86,3 @@ test("a queued card's ghost says the repository its factory wires for its workfl
   assert.match(unwired, /title="[^"]*nemia factory attach pair dev --repo/, 'the attach on hover');
   assert.doesNotMatch(unwired, /daemon/);
 });
-

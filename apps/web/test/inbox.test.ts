@@ -18,7 +18,6 @@ import {
   chainsQuery,
   factoryInboxQuery,
   inboxPageQuery,
-  inboxSelectedQuery,
   queueCard,
   startCard,
   type CardState,
@@ -54,7 +53,6 @@ import {
   unassigned,
   unreadWorkflows,
   workflowKey,
-  type CardRefusal,
 } from '../src/lib/inbox.ts';
 import { apiAnswers } from './network.ts';
 
@@ -350,7 +348,8 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
     );
   });
   test('REFUSED: no Queue on a card that names no factory, or default', () => {
-    for (const factory of [null, 'default']) assert.equal(queueable(entry('loose', null, { factory, workflow: 'dev' })), false, String(factory));
+    for (const factory of [null, 'default'])
+      assert.equal(queueable(entry('loose', null, { factory, workflow: 'dev' })), false, String(factory));
   });
   test("REFUSED: no Queue on a card of a factory that names no workflow, one queued already, one a record says was started, or one that does not read — each a refusal of the package's", () => {
     const at = '2026-09-16T10:00:00.000Z';

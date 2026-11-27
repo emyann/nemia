@@ -23,8 +23,6 @@ export {
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox.ts';
 export { cardFileReplaced, fileLetGo } from './card-files.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';
-export { cardFieldTerm, fieldSelects, type FieldRead, type FieldTerm } from './card-field.ts';
-export { cardPhase } from './card-phase.ts';
+export { cardFieldTerm, fieldSelects, type FieldTerm } from './card-field.ts';
 export { cardOrderBy } from './card-order.ts';
 export { cardMatches, searchWords, searched } from './card-search.ts';
-export { chainOf } from './card-chain.ts';

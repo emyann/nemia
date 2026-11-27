@@ -43,7 +43,8 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
 }
 
 /**
- * The pager of the finished runs or of the cards: the rows this page shows, then Newer, where it stands, and Older (or the ends the sort names). Newer and Older keep the address
+ * The pager of the finished runs or of the cards: the rows this page shows, then Newer, where it stands, and Older (or the ends the sort
+ * names). Newer and Older keep the address
  * and change its trail alone (`trailSearch`): Older puts the page's `continue` on it, Newer takes its last token off; each is disabled
  * where it leads nowhere, and from a page past the last, Newer leads back.
  */

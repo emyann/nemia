@@ -1,5 +1,6 @@
 /**
- * `nemia inbox [--all] [--search <words>] [--phase <phase>] [--sort newest|oldest|name] [--limit <n>] [--continue <token>] [-l <key>=<value>]...
+ * `nemia inbox [--all] [--search <words>] [--phase <phase>] [--sort newest|oldest|name] [--limit <n>] [--continue <token>] [-l
+ * <key>=<value>]...
  * [--show-labels] [-L <key>]... [-o wide]`, its words parsed against `objects`' `INBOX_READ_WORDS`, read from the api: one page of the
  * cards, as the server prints them — the cards list (`GET /api/cards`, `labelSelector` given again for another label query) asked for its
  * `Table` (`TABLE_ACCEPT`), printed by `tableLines`. The cards in play are those the api is asked for (`fieldSelector`

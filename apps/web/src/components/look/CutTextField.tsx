@@ -38,7 +38,10 @@ export function CutTextField({
       </FieldLabel>
       <CutField end={end}>
         <Body size="medium" component="span" className="contents">
-          <Input placeholder={placeholder} className="min-w-0 flex-1 bg-transparent py-2 pl-3.5 text-on-surface outline-none placeholder:text-on-surface-variant" />
+          <Input
+            placeholder={placeholder}
+            className="min-w-0 flex-1 bg-transparent py-2 pl-3.5 text-on-surface outline-none placeholder:text-on-surface-variant"
+          />
         </Body>
       </CutField>
       {description && (

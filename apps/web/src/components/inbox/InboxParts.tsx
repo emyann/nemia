@@ -96,4 +96,3 @@ export function Refused({ refusal }: { refusal: CardRefusal }) {
     </div>
   );
 }
-

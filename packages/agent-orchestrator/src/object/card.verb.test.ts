@@ -404,7 +404,10 @@ test("a card's after: is served on its spec, and the cards of it not landed on i
   ]);
 });
 
-/** The five cards listed as the inbox reads them, each filed one minute after the one before it in `filed`'s order and in a phase of `phased`. */
+/**
+ * The five cards listed as the inbox reads them, each filed one minute after the one before it in `filed`'s order and in a phase of
+ * `phased`.
+ */
 const dated = (phased: Readonly<Record<string, 'blocked' | 'working' | 'done' | 'notStarted'>> = {}) =>
   Effect.map(listed, (l) =>
     l.map((entry) => ({

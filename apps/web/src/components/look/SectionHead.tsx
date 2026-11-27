@@ -35,7 +35,8 @@ function CountTag({
 }
 
 /**
- * A section's head, the one the pages of the board share: its count, in the mono face, and its word in small caps, on a cut tag in the section's colour; quiet at zero. */
+ * A section's head, the one the pages of the board share: its count, in the mono face, and its word in small caps, on a cut tag in the
+ * section's colour; quiet at zero. */
 export function SectionHead({ count, word, tone }: { count: number; word: string; tone: 'yours' | 'alive' | 'rest' }) {
   const drawn = count === 0 ? 'quiet' : tone;
   const tag = COUNT_TAG[drawn];
@@ -56,4 +57,3 @@ export function SectionHead({ count, word, tone }: { count: number; word: string
     </h2>
   );
 }
-

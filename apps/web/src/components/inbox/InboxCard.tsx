@@ -21,7 +21,9 @@ const whereOf = (entry: InboxEntry) =>
 /** Whether a card waits on one only a person can release, and is not queued: the artboard's stuck. */
 const stuckOf = (entry: InboxEntry) => entry.state === 'filed' && (entry.waits ?? []).some((w) => w.stalled);
 
-/** The tick's last try of a card's start, saying the repository its factory wires for the card's workflow, which the Card does not carry. */
+/**
+ * The tick's last try of a card's start, saying the repository its factory wires for the card's workflow, which the Card does not carry.
+ */
 function TriedHere({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
   const factories = useQuery(factoriesQuery).data;
   return <Tried entry={{ ...entry, factoryRepo: factoryRepoOf(entry, factories) }} />;
@@ -109,7 +111,11 @@ export function InboxCard({
   const stuck = stuckOf(entry);
   return (
     <CutFrame hue={tag?.frame ?? 'none'} size={compact ? 12 : 24} fill className="h-full w-full">
-      <article aria-label={`Card ${entry.name}`} data-card={entry.name} className={compact ? 'flex h-full flex-col gap-1.5 p-3' : 'flex h-full flex-col gap-2 p-4'}>
+      <article
+        aria-label={`Card ${entry.name}`}
+        data-card={entry.name}
+        className={compact ? 'flex h-full flex-col gap-1.5 p-3' : 'flex h-full flex-col gap-2 p-4'}
+      >
         <div className="flex items-center gap-2">
           <StateTag entry={entry} />
           <Body size="small" colorRole="on-surface-variant" component="span" title="Factory / workflow" className="min-w-0 flex-1 truncate">

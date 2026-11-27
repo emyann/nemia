@@ -46,7 +46,7 @@ const useRead = () => {
  * card queued shows no Start; its menu takes the start back. A card whose start was refused, or that waits on a card only a person can
  * release, shows Edit, which opens what to change. A card started shows Open run.
  */
-export function CardPrimary({
+function CardPrimary({
   entry,
   stuck,
   onSheet,
@@ -108,7 +108,7 @@ export function CardPrimary({
  * A card's menu, behind one button: Start now, ahead of its chain; Cancel start; Start chain…; Edit; Run it after…; Runs it reads…; Copy
  * its name; Send on; Remove: each where it applies to the card. `chain` is the cards of its chain where the page draws it whole.
  */
-export function CardMenu({
+function CardMenu({
   entry,
   chain,
   onSheet,
@@ -136,7 +136,9 @@ export function CardMenu({
   const waits = (entry.waits?.length ?? 0) > 0;
   const open = startable(entry);
   const items = [
-    ...(open && (waits || entry.state === 'queued') ? [{ id: 'now', label: 'Start now, ahead of its chain', onAction: () => onSheet('start') }] : []),
+    ...(open && (waits || entry.state === 'queued')
+      ? [{ id: 'now', label: 'Start now, ahead of its chain', onAction: () => onSheet('start') }]
+      : []),
     ...(open && entry.state === 'queued' ? [{ id: 'cancel', label: 'Cancel start', onAction: () => unqueue.mutate() }] : []),
     ...(open && chain !== null && chain.length > 1 ? [{ id: 'chain', label: 'Start chain…', onAction: () => onSheet('chain') }] : []),
     ...(open ? [{ id: 'edit', label: 'Edit', onAction: () => void navigate({ to: '/inbox/$name', params: { name: entry.name } }) }] : []),
@@ -150,7 +152,9 @@ export function CardMenu({
     <Menu
       placement="bottom end"
       offset={6}
-      triggerButton={<IconButton variant="standard" size="xsmall" icon={Ellipsis} aria-label={`More actions on ${entry.name}`} data-card-menu="" />}
+      triggerButton={
+        <IconButton variant="standard" size="xsmall" icon={Ellipsis} aria-label={`More actions on ${entry.name}`} data-card-menu="" />
+      }
       items={items}
     />
   );
@@ -161,7 +165,7 @@ export function CardMenu({
  * runs after, the runs it reads, the cards of its chain to start, or its sending on. `chain` is the cards of its chain, where the page
  * draws it whole. A start the api took opens the run's page.
  */
-export function CardSheet({
+function CardSheet({
   entry,
   chain,
   sheet,
@@ -183,9 +187,17 @@ export function CardSheet({
     <SideSheet variant="modal" title={sheet === null ? 'Card' : SHEETS[sheet](entry.name)} isOpen={sheet !== null} onClose={onClose}>
       {sheet === 'start' &&
         (unassigned(entry) ? (
-          <UnassignedStart entry={entry} onStarted={onStarted} onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })} />
+          <UnassignedStart
+            entry={entry}
+            onStarted={onStarted}
+            onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })}
+          />
         ) : (
-          <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })} />
+          <FactoryCardStart
+            entry={entry}
+            onStarted={onStarted}
+            onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })}
+          />
         ))}
       {sheet === 'after' && <AfterSheet entry={entry} onRefused={onRefused} />}
       {sheet === 'reads' && <ReadsSheet entry={entry} onRefused={onRefused} />}
@@ -195,7 +207,10 @@ export function CardSheet({
   );
 }
 
-/** The cards a card runs after, each with the key that takes it off, and a field that finds another by its words and adds it, each written at once. */
+/**
+ * The cards a card runs after, each with the key that takes it off, and a field that finds another by its words and adds it, each
+ * written at once.
+ */
 function AfterSheet({ entry, onRefused }: { entry: InboxEntry; onRefused: Refused }) {
   const read = useRead();
   const [text, setText] = useState('');
@@ -211,7 +226,9 @@ function AfterSheet({ entry, onRefused }: { entry: InboxEntry; onRefused: Refuse
     ...inboxPageQuery({ fieldSelector: 'status.inPlay=true', search: text, limit: 8 }),
     enabled: text.trim() !== '',
   }).data;
-  const suggestions = (found?.entries ?? []).filter((e) => e.name !== entry.name && !names.includes(e.name)).map((e) => ({ id: e.name, label: e.title ?? e.name, hint: e.name }));
+  const suggestions = (found?.entries ?? [])
+    .filter((e) => e.name !== entry.name && !names.includes(e.name))
+    .map((e) => ({ id: e.name, label: e.title ?? e.name, hint: e.name }));
   const change = (next: string[]) => {
     setNames(next);
     write.mutate(next);
@@ -240,7 +257,13 @@ function AfterSheet({ entry, onRefused }: { entry: InboxEntry; onRefused: Refuse
             <Body size="medium" component="span" className="font-mono">
               {name}
             </Body>
-            <IconButton size="xsmall" variant="standard" icon={X} aria-label={`Take ${name} off`} onPress={() => change(names.filter((n) => n !== name))} />
+            <IconButton
+              size="xsmall"
+              variant="standard"
+              icon={X}
+              aria-label={`Take ${name} off`}
+              onPress={() => change(names.filter((n) => n !== name))}
+            />
           </li>
         ))}
       </ul>
@@ -291,7 +314,7 @@ function ChainSheet({
   const read = useRead();
   const open = chain.filter((card) => startable(card) && card.state === 'filed' && queueable(card));
   const must = new Set<string>([entry.name]);
-  for (let again = true; again; ) {
+  for (let again = true; again;) {
     again = false;
     for (const card of open) {
       if (must.has(card.name)) continue;

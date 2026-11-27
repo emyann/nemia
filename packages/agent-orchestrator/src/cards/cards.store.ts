@@ -313,6 +313,17 @@ const rewriteOf = (open: Effect.Effect<Keyspace, Refusal>, now: () => string) =>
     })) satisfies CardDoorShape['cards']['rewrite'];
 
 /**
+ * A card's record as the door's entry: its file, text, filing time and revision; none for a record that does not read as a card.
+ * @param record The keyspace's record: its key under the cards, its value and its revision.
+ */
+const entryOf = (record: { readonly key: string; readonly value: string; readonly revision: number }) => {
+  const card = cardIn(record.value);
+  return Option.isNone(card)
+    ? []
+    : [{ file: `${record.key.slice(CARDS.length)}.md`, text: card.value.text, filedAt: card.value.filedAt, revision: record.revision }];
+};
+
+/**
  * The cards and tries of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it
  * answers no keyspace, so a store read is not a store made.
  * @param open Opens the keyspace the cards are held in, refused as opening it is.
@@ -337,19 +348,7 @@ export function cardRecords(
         Effect.gen(function* () {
           const keyspace = yield* held;
           if (keyspace === undefined) return [];
-          return (yield* keyspace.list(CARDS)).records.flatMap((record) => {
-            const card = cardIn(record.value);
-            return Option.isNone(card)
-              ? []
-              : [
-                  {
-                    file: `${record.key.slice(CARDS.length)}.md`,
-                    text: card.value.text,
-                    filedAt: card.value.filedAt,
-                    revision: record.revision,
-                  },
-                ];
-          });
+          return (yield* keyspace.list(CARDS)).records.flatMap(entryOf);
         }),
       head: () =>
         Effect.gen(function* () {

@@ -94,13 +94,13 @@ export function filedNamespace(body: string, factory?: string) {
 const described = <S extends Schema.Top>(schema: S, key: CardKey) => schema.annotate({ description: CARD_KEY_MEANINGS[key] });
 
 /** One file a card carries: the name its text and its run find it by, and the File it names. */
-export const CardFileNamed = Schema.Struct({
+const CardFileNamed = Schema.Struct({
   name: Schema.String.annotate({
     description: "The file's name in the card: what its text names it by, and its run's `inputs/` keeps it as.",
   }),
   file: Schema.String.annotate({ description: "The id of the File it names, file_…, kept in the card's namespace." }),
 }).annotate({ description: 'One file a card carries: its name in the card and the File it names.' });
-export type CardFileNamed = typeof CardFileNamed.Type;
+type CardFileNamed = typeof CardFileNamed.Type;
 
 /**
  * A file named to a card as it is filed or attached: the File by its id, uploaded to the card's namespace first, and the name it takes in
@@ -238,7 +238,8 @@ export const CardStatus = Schema.Struct({
       'Where the card stands as a person sorts cards, a summary of its state: notStarted, blocked, waiting, working while it is open; done, failed, cancelled once its run ended. Read on every pass, never written on the card.',
   }),
   followedBy: Schema.Array(Schema.String).annotate({
-    description: 'The cards whose `after:` names this one, by name: the reverse of `after:`. Read on every pass, never written on the card.',
+    description:
+      'The cards whose `after:` names this one, by name: the reverse of `after:`. Read on every pass, never written on the card.',
   }),
   chained: Schema.Boolean.annotate({
     description: 'Whether the card is in play and tied by an `after:` to another card in play, before it or after it.',
@@ -327,18 +328,18 @@ const CardListed = Schema.Struct({
 type CardListed = typeof CardListed.Type;
 
 /** One label in use among the cards: its key and value, and how many cards hold it. */
-export const CardLabelInUse = Schema.Struct({
+const CardLabelInUse = Schema.Struct({
   key: Schema.String.annotate({ description: 'The label key.' }),
   value: Schema.String.annotate({ description: 'The label value.' }),
   cards: describedNumber('How many cards of the list hold the label.'),
 }).annotate({ description: 'One label in use among the cards, and how many cards hold it.' });
-export type CardLabelInUse = typeof CardLabelInUse.Type;
+type CardLabelInUse = typeof CardLabelInUse.Type;
 
 /**
  * A CardList's metadata (`ListMeta`) and, beside it, how many cards are in each phase (`counts`) and which labels the cards hold
  * (`labelsInUse`), both counted over the cards of its namespace, labels and words, before its `fieldSelector` and its page.
  */
-export const CardListMeta = Schema.Struct({
+const CardListMeta = Schema.Struct({
   ...ListMeta.fields,
   counts: Schema.Struct(
     Object.fromEntries(CARD_PHASES.map((phase) => [phase, describedNumber(`How many cards are ${phase}.`)])) as Record<
@@ -350,13 +351,14 @@ export const CardListMeta = Schema.Struct({
       'How many cards are in each phase, counted over the cards of its namespace, labels and words, before its fieldSelector and its page.',
   }),
   labelsInUse: Schema.Array(CardLabelInUse).annotate({
-    description: 'Each label some card holds (a factory and a workflow read as labels), with how many cards hold it, counted as counts are.',
+    description:
+      'Each label some card holds (a factory and a workflow read as labels), with how many cards hold it, counted as counts are.',
   }),
 }).annotate({
   identifier: 'CardListMeta',
   description: "A page of cards' metadata: where the page stands, its counts per phase and the labels in use.",
 });
-export type CardListMeta = typeof CardListMeta.Type;
+type CardListMeta = typeof CardListMeta.Type;
 
 /** A page of the inbox's cards, each without its body. */
 export const CardList = Schema.Struct({ ...listOf('Card', CardListed).fields, metadata: CardListMeta });

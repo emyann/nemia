@@ -120,7 +120,11 @@ export const Chains: Story = {
       phase: 'blocked' as const,
       waits: [{ card: 'first-slice', kind: 'waiting' as const, state: 'filed' as const, stalled: false }],
     };
-    return drawn({ cards: [unstartedCard('decode-the-reads', FACTORY)], chains: [first, second], counts: { ...NONE, notStarted: 2, blocked: 1 } });
+    return drawn({
+      cards: [unstartedCard('decode-the-reads', FACTORY)],
+      chains: [first, second],
+      counts: { ...NONE, notStarted: 2, blocked: 1 },
+    });
   },
   play: async ({ canvasElement }) => {
     const chain = canvasElement.querySelector('[data-chain]');

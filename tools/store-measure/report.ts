@@ -39,8 +39,8 @@
  *   warm ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. A baseline taken before the
  *   CardList read `GET /api/inbox?all=true`, every card too, so a `--compare` sets the two reads of every card side by side.
  * - `cardPage`, `cardCounts`: the board's Inbox reads (`GET /api/cards`): a page of 25 cards, newest first, those in play and not chained
- *   (`?limit=25&orderBy=metadata.creationTimestamp desc&fieldSelector=status.inPlay=true,status.chained=false`), and a page of one card, for its
- *   counts (`?limit=1`), over apps as `inbox` is. The intent holds the first near a run page's cost, 0.15 s warm.
+ *   (`?limit=25&orderBy=metadata.creationTimestamp desc&fieldSelector=status.inPlay=true,status.chained=false`), and a page of one
+ *   card, for its counts (`?limit=1`), over apps as `inbox` is. The intent holds the first near a run page's cost, 0.15 s warm.
  * - `chatHistory`, `chatBeatBefore`, `chatFoldStep`: her chat, at the place the copy's level file names (`nemiaChatPlace`), each over an
  *   engine (`passEngine`) and reads (`ChatReads`: the informer and the filings an app keeps) built afresh for each cold call and kept for
  *   the warm ones. `chatHistory` is `chatHistory(place, {})`, what a reader lists on joining and what the board's dock read every 5 s
@@ -539,6 +539,25 @@ const factoryLists = async (ofFactory: OfFactory) => ({
   cardList: await ofFactory((f) => `/api/namespaces/${f}/cards?limit=500`),
 });
 
+/**
+ * The Inbox's reads: every card, as a fresh app and an app after a pass read it, and the board's page of cards and its page of one.
+ * @param fresh Builds an app afresh.
+ * @param passed Builds an app after a pass has filled its informer.
+ * @param get Reads a URL of an app.
+ * @param repeat How many cold reads each is measured over.
+ */
+const cardReads = async (
+  fresh: () => Promise<Built>,
+  passed: () => Promise<Built>,
+  get: (app: App, url: string) => Promise<unknown>,
+  repeat: number,
+) => ({
+  inbox: await overApps(fresh, (app) => get(app, INBOX_URL), repeat),
+  inboxAfterPass: await overApps(passed, (app) => get(app, INBOX_URL), repeat),
+  cardPage: await overApps(fresh, (app) => get(app, CARD_PAGE_URL), repeat),
+  cardCounts: await overApps(fresh, (app) => get(app, CARD_COUNTS_URL), repeat),
+});
+
 /** The measure on the copy at `root`: `wf`, the workflows' store, and `ae`, the runtime's. */
 async function measure(asked: Asked, root: string, fence: Fence) {
   const { wf, env } = copyEnvOf(root);
@@ -577,10 +596,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     tickPassInformed: null,
     runListAfterPass: await overApps(passed, (app) => get(app, '/api/runs'), repeat),
     openRunAfterPass: await objectOf(openRun, passed),
-    inbox: await overApps(fresh, (app) => get(app, INBOX_URL), repeat),
-    inboxAfterPass: await overApps(passed, (app) => get(app, INBOX_URL), repeat),
-    cardPage: await overApps(fresh, (app) => get(app, CARD_PAGE_URL), repeat),
-    cardCounts: await overApps(fresh, (app) => get(app, CARD_COUNTS_URL), repeat),
+    ...(await cardReads(fresh, passed, (app, url) => get(app, url), repeat)),
     chatHistory: null,
     chatBeatBefore: null,
     chatFoldStep: null,

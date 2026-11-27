@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { Search, X } from 'lucide-react';
 import { ComboBox, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
 import { Body, IconButton } from '@/components/ui/ds';
@@ -14,6 +14,52 @@ export type CutChip = { id: string; label: string };
 /** Whether the focus is somewhere a person types, where a `/` is a character. */
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+/** The `/` that focuses the bar: pressed on the page where nothing is typed, it puts the focus in `input`. */
+function useSlashFocus(input: RefObject<HTMLInputElement | null>) {
+  useEffect(() => {
+    const focus = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
+      event.preventDefault();
+      input.current?.focus();
+    };
+    document.addEventListener('keydown', focus);
+    return () => document.removeEventListener('keydown', focus);
+  }, [input]);
+}
+
+/** One chip of the bar: its words on the look's cut tag, and the key that takes it off. */
+function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) => void }) {
+  return (
+    <span data-chip={chip.id} className="inline-flex">
+      <CutTag edge>
+        <span className="inline-flex items-center gap-1 pl-2 text-on-surface">
+          <Body size="small" component="span">
+            {chip.label}
+          </Body>
+          <IconButton size="xsmall" variant="standard" icon={X} aria-label={`Take off ${chip.label}`} onPress={() => onRemove(chip.id)} />
+        </span>
+      </CutTag>
+    </span>
+  );
+}
+
+/**
+ * What a key does in the bar: Backspace on empty words takes the last chip off; Enter on words no suggestion is highlighted for keeps them.
+ * @param event The key pressed in the bar's input.
+ * @param bar What the bar holds: its words, its chips, and what it does to take one off or keep the words.
+ */
+function keyed(
+  event: ReactKeyboardEvent<HTMLInputElement>,
+  bar: { text: string; chips: readonly CutChip[]; onRemove: (id: string) => void; onSubmit: (text: string) => void },
+) {
+  const last = bar.chips.at(-1);
+  if (event.key === 'Backspace' && bar.text === '' && last !== undefined) bar.onRemove(last.id);
+  if (event.key === 'Enter' && event.currentTarget.getAttribute('aria-activedescendant') === null && bar.text.trim() !== '') {
+    event.preventDefault();
+    bar.onSubmit(bar.text.trim());
+  }
+}
 
 /**
  * The search bar: the look's cut field with a magnifier, the chips of what was picked, and the words being typed, with suggestions in a
@@ -45,15 +91,7 @@ export function CutSearch({
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const focus = (event: KeyboardEvent) => {
-      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
-      event.preventDefault();
-      input.current?.focus();
-    };
-    document.addEventListener('keydown', focus);
-    return () => document.removeEventListener('keydown', focus);
-  }, []);
+  useSlashFocus(input);
   return (
     <ComboBox
       aria-label={label}
@@ -73,30 +111,12 @@ export function CutSearch({
         <Body size="medium" component="span" className="flex flex-wrap items-center gap-2 py-1.5 pl-3.5 pr-4">
           <Search aria-hidden="true" size={16} className="shrink-0 text-on-surface-variant" />
           {chips.map((chip) => (
-            <span key={chip.id} data-chip={chip.id} className="inline-flex">
-              <CutTag edge>
-                <span className="inline-flex items-center gap-1 pl-2 text-on-surface">
-                  <Body size="small" component="span">
-                    {chip.label}
-                  </Body>
-                  <IconButton size="xsmall" variant="standard" icon={X} aria-label={`Take off ${chip.label}`} onPress={() => onRemove(chip.id)} />
-                </span>
-              </CutTag>
-            </span>
+            <SearchChip key={chip.id} chip={chip} onRemove={onRemove} />
           ))}
           <Input
             ref={input}
             placeholder={chips.length === 0 ? placeholder : undefined}
-            onKeyDown={(event) => {
-              if (event.key === 'Backspace' && text === '' && chips.length > 0) {
-                const last = chips.at(-1);
-                if (last !== undefined) onRemove(last.id);
-              }
-              if (event.key === 'Enter' && event.currentTarget.getAttribute('aria-activedescendant') === null && text.trim() !== '') {
-                event.preventDefault();
-                onSubmit(text.trim());
-              }
-            }}
+            onKeyDown={(event) => keyed(event, { text, chips, onRemove, onSubmit })}
             className="min-w-32 flex-1 bg-transparent py-1 text-on-surface outline-none placeholder:text-on-surface-variant"
           />
         </Body>

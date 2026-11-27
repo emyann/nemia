@@ -31,7 +31,6 @@ import {
   type Triggering,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
-import type { PlanFile } from '../plan/plan.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';

@@ -85,7 +85,9 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
         </section>
       )}
       <section aria-label="Cards" className="space-y-3">
-        {page.entries.length > 0 && <SectionHead count={page.entries.length + trail.length * INBOX_PAGE + page.remaining} word="Cards" tone="rest" />}
+        {page.entries.length > 0 && (
+          <SectionHead count={page.entries.length + trail.length * INBOX_PAGE + page.remaining} word="Cards" tone="rest" />
+        )}
         {none && <NoneShown filtered={filtered} factory={at.factory} />}
         {layout === 'grid' ? (
           <ul className="grid grid-cols-1 gap-4 @2xl/page:grid-cols-2 @5xl/page:grid-cols-3">

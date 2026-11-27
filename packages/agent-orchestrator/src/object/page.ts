@@ -81,7 +81,8 @@ export const badLimit = (limit: number | null) =>
   });
 
 /**
- * The page `asked` cuts of `sorted`, a list in its order by key (`nameOf`), ascending unless `descending`: it starts at the first object whose name is after the token's,
+ * The page `asked` cuts of `sorted`, a list in its order by key (`nameOf`), ascending unless `descending`: it starts at the first object
+ * whose name is after the token's,
  * so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage` within `bounds` (a list's,
  * `LIST_PAGE`, unless a test shortens them). `Invalid` for a limit `listPage` refuses or a token that does not decode.
  * @param sorted The list's objects, in its order by name.

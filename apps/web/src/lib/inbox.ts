@@ -188,7 +188,8 @@ export const queueOf = (entries: readonly InboxEntry[]) =>
  * otherwise, in the package's words.
  * @param entry The inbox's entry.
  */
-export const queueable = (entry: InboxEntry) => !unassigned(entry) && entry.state === 'filed' && entry.workflow !== null && entry.error === null;
+export const queueable = (entry: InboxEntry) =>
+  !unassigned(entry) && entry.state === 'filed' && entry.workflow !== null && entry.error === null;
 
 /**
  * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started
@@ -300,7 +301,10 @@ export const PHASE_WORDS: Readonly<Record<CardPhase, string>> = {
   cancelled: 'Cancelled',
 };
 
-/** What the Inbox page reads of its address: the factory its path names, its labels, words, order, side, state chip and the trail of its pages. */
+/**
+ * What the Inbox page reads of its address: the factory its path names, its labels, words, order, side, state chip and the trail of its
+ * pages.
+ */
 export type InboxView = {
   factory?: string;
   l?: string;
@@ -358,12 +362,24 @@ export function inboxAskedOf(view: InboxView) {
 }
 
 /** How a card is drawn: its one word, the meaning it takes, the form of the tag and what its hover says. */
-export type CardTag = { word: string; hue: Hue; form: 'container' | 'filled'; title: string; frame: 'yours' | 'alive' | 'failure' | 'none' };
+type CardTag = {
+  word: string;
+  hue: Hue;
+  form: 'container' | 'filled';
+  title: string;
+  frame: 'yours' | 'alive' | 'failure' | 'none';
+};
 
 /** The look a card has by the word its state is drawn with (`cardWord`): the table of the artboard's script. */
 const TAGS: Readonly<Record<string, CardTag>> = {
   blocked: { word: 'blocked', hue: 'grey', form: 'container', title: 'Started: it runs once the cards before it are done.', frame: 'none' },
-  refused: { word: 'refused', hue: 'failure', form: 'container', title: 'Its start was refused: edit the card, or cancel its start.', frame: 'failure' },
+  refused: {
+    word: 'refused',
+    hue: 'failure',
+    form: 'container',
+    title: 'Its start was refused: edit the card, or cancel its start.',
+    frame: 'failure',
+  },
   pending: { word: 'pending', hue: 'grey', form: 'container', title: 'Started: it waits for room to run.', frame: 'none' },
   working: { word: 'working', hue: 'alive', form: 'container', title: 'Its run is at work.', frame: 'alive' },
   waiting: { word: 'waiting', hue: 'yours', form: 'filled', title: 'Its run waits on you: open it to see what it asks.', frame: 'yours' },
@@ -408,8 +424,10 @@ export const cardTag = (entry: Pick<InboxEntry, 'state' | 'phase' | 'queued' | '
 export function chainsOf(entries: readonly InboxEntry[]) {
   const byName = new Map(entries.map((entry) => [entry.name, entry]));
   const before = new Map<string, string[]>();
-  for (const entry of entries) for (const next of entry.followedBy) if (byName.has(next)) before.set(next, [...(before.get(next) ?? []), entry.name]);
+  for (const entry of entries)
+    for (const next of entry.followedBy) if (byName.has(next)) before.set(next, [...(before.get(next) ?? []), entry.name]);
   const seen = new Set<string>();
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it calls itself, whose type inference cannot give
   const depth = (name: string, trail: ReadonlySet<string>): number =>
     trail.has(name) ? 0 : Math.max(-1, ...(before.get(name) ?? []).map((from) => depth(from, new Set([...trail, name])))) + 1;
   return entries.flatMap((entry) => {

@@ -52,7 +52,15 @@ const broken = {
   kind: 'Card',
   metadata: { name: 'broken', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'd2' },
   spec: {},
-  status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have', inPlay: true, phase: 'notStarted', followedBy: [], chained: false },
+  status: {
+    state: 'filed',
+    runs: [],
+    error: 'broken.md: a key it does not have',
+    inPlay: true,
+    phase: 'notStarted',
+    followedBy: [],
+    chained: false,
+  },
 } as const;
 
 test("the Api's get answers a card and its list a page of cards, every key kept, absent keys left absent; another kind refused", () => {

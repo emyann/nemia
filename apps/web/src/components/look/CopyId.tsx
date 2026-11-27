@@ -29,7 +29,8 @@ const PULLED = '-my-2 -ml-0.75';
 const ID = 'font-mono whitespace-nowrap text-on-surface-variant';
 
 /**
- * A run's id or a card's name, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve pixels across and
+ * A run's id or a card's name, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve
+ * pixels across and
  * seven from the id, which answers over 48 by 48 pixels where nothing around it clips or stands over it. Pressed, it says so for a
  * moment (`data-copied`), or that it could not. `short` shows the id's last four characters, quiet beside a run's title, which take
  * the hue of a session at work for that moment, and the whole id in the kit's tooltip, on hover and on focus; what is copied is always

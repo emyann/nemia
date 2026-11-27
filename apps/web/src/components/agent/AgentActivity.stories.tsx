@@ -33,7 +33,7 @@ export const None: Story = {
 
 /** One session: the run it works on as a link, and where its step is. */
 export const One: Story = {
-  args: { activity: { kind: 'one', row: rows[0]! } },
+  args: { activity: { kind: 'one', row: rows[0] } },
   play: async ({ canvasElement }) => {
     await waitFor(() => expect(within(canvasElement).getByRole('link', { name: 'Approve modal uses the step' })).toBeVisible());
   },

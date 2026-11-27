@@ -269,25 +269,32 @@ rm "$S"/node_modules; git worktree remove "$S"
   pause standing only until the daemon's next pass, which lifts it (the daemon's log says so); `nemia service status` shows whether
   a pause still stands. A start that leaves the unit with no process is refused (exit 2) saying the service is not running and naming
   `systemctl --user start <unit>`, which starts it; the restart's pause stands until that daemon's first pass lifts it.
-- **Main is fast-forwarded by the run**, not by hand: the landing merges the pull request on GitHub, then runs `git fetch origin && git
-  merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
-- **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`
-  line to type. Where it was the pull request — red `ci`, unmergeable, a head that moved past the review — send the work back to the
-  step that built it, with the refusal's words, without waiting to be asked, through the review, in `build` and `quick` alike:
-  `nemia retry <run> review --message "<what failed>"` (implement is verified and its follower filed, so a retry of it is refused); on
-  a run gated at land, by the gate's send-back, as *Send a landing back* says. Where it was the fast-forward that was declined, the owner's
-  checkout holds commits `origin/main` does not: bring it onto `origin/main` by hand, then `nemia retry <run> land`. On a run gated at
-  land, the next landing is approved again by whoever approved the first: an approval is for one try. On `build` and `quick` otherwise
-  there is nobody to approve: the work goes round the review once more, and its pass files the landing.
-- **A failed landing check:** the check is a receipt now, so a refusal says the merge did not happen as the step claimed — the pull
-  request not merged, a squash instead of a merge commit, a checkout the fast-forward did not reach, a branch of the run left out.
-  Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again. After the receipt, the step
-  waits on the condition `base-ci`, which the factory's `ci-watch` program writes from main's `ci` at the merge commit: a refusal that says main
+- **Main is fast-forwarded by the run**, not by hand: sdlc's landing program (`land`, which the factory runs beside `ci-watch`) merges the pull
+  request on GitHub, then runs `git fetch origin && git merge --ff-only origin/main` in the owner's checkout where it is clean on `main` and
+  behind it. Nothing is pushed afterwards, and GitHub deletes the head branch. Where the checkout is not clean on `main`, the merge stands and
+  the program says so in the condition's words; the next landing brings it up.
+- **A landing that failed:** nothing was merged and the checkout is untouched. The land step is a wait node: the landing program writes
+  `landed` False with the cause and what to do. Where it was the pull request — red `ci`, unmergeable, a head that moved past the review — the
+  person fixes the work on the run's branch, or cancels the run; `nemia retry <run> land --recheck` then makes the step's next try, which
+  reads GitHub and git again. Where it was the fast-forward that was declined, the owner's checkout holds commits `origin/main` does not: bring
+  it onto `origin/main` by hand, and the next landing does the rest. To approve before a landing, gate the review at the run's start
+  (`--gate review`); the next review's pass is approved again by whoever approved the first: an approval is for one try.
+- **A failed landing:** the landing program writes `turn` and `landed`, and says in the condition's words which read refused: a pull request that
+  is not the run's own, a draft, a head that is not the branch's tip, one that GitHub calls unmergeable, a result branch the head leaves out, a refresh that
+  failed. Read it and name the cause. A pull request merged by hand reads as landed: nothing is merged twice, and a restart of the program lands
+  nothing twice. A condition can be written by hand (`nemia condition <run> land <name> --status True`), and the program leaves it alone. After the merge,
+  the step waits on the condition `base-ci`, which the factory's `ci-watch` program writes from main's `ci` at the merge commit: a refusal that says main
   is red there means the merge stands and main turned red. Read the jobs it names: re-run them where CI failed on its own account (a
   timeout), or land a fix; then `nemia retry <run> land`, and the program writes `True` once main's tip holding the merge is green. A
   message that no `ci` was reported at the merge means CI does not run on pushes to main for that factory: apply it with `--set
   landingWaitsOnCi=false`. A condition that stays `Unknown` with no change in its message means the program is not running or cannot read
   GitHub: `nemia get programs -n <factory>` says whether it runs, and `gh auth status` on the daemon's machine whether its sign-in holds.
+- **Upgrading a factory onto sdlc 8.0.0 retires Otto's land step.** From 8.0.0 the land steps of `build` and `quick` have no session and no agent: the
+  `land` program lands each run, and Otto, his skill and his fence lines are gone. A run started on an earlier sdlc keeps Otto's land step in its frozen
+  files, and after the upgrade his hire is gone: let every such run finish, or cancel it, **before** `nemia factory upgrade <factory> --to 8.0.0`
+  (`nemia ls` says which runs are still on a land step). After it, remove from the factory's overlays whatever names `otto` or the parameter
+  `landingCheckMemory`, which sdlc no longer has, and keep `landingRefresh`, `landingDerives` and `landingInstall` (the program reads them). The
+  `localCheck` the program is handed holds no single quote.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it.
 
 ### A harness update
@@ -347,11 +354,8 @@ each asks is `WF_MEMORY_REQUEST` (a Kubernetes quantity, `2560Mi`), else its lim
 the machine, 1 GiB at least. A step that does not fit waits, and `nemia ls` says so in its note: `waits for memory: needs 6Gi, 2.5Gi
 free`. A server already installed keeps the settings its person wrote: nothing rewrites its unit. With a limit and no request, each
 session asks its whole limit, so a machine sized for its sessions' limits may admit fewer than `WF_MAX_CONCURRENT`. A step's check asks
-its step's `checkMemory:` where it names one: sdlc's land steps name the factory's `landingCheckMemory` parameter, empty by default, so a
-factory that lands on GitHub, whose landing's checks only read GitHub, sets it at its upgrade, `nemia factory upgrade <factory> --to
-<version> --set landingCheckMemory=256Mi`, and its landing's check is admitted while sessions wait. A step's sessions ask its
-`memoryRequest:` where it names one, apart from its limit: sdlc's light steps (front-door's door and answer, intake, the janitor's argus,
-and both lands), whose sessions run no test, build or typecheck, name the factory's `lightMemoryRequest` parameter, `1Gi` by default, so
+its step's `checkMemory:` where it names one. A step's sessions ask its
+`memoryRequest:` where it names one, apart from its limit: sdlc's light steps (front-door's door and answer, intake, the janitor's argus), whose sessions run no test, build or typecheck, name the factory's `lightMemoryRequest` parameter, `1Gi` by default, so
 a routing call is admitted while heavy sessions wait; `--set lightMemoryRequest=` asks the daemon's default again. Pick each number from
 the peaks measured, never by guess: `nemia stats` says, for each workflow step, the median, p90 and highest peak its sessions reached,
 what they asked and how many peaked above it, and a run's step page says each try's peak beside its request and limit. A peak is kept
@@ -540,7 +544,7 @@ English; never push or open a pull request unless asked.
 | A step could not read what it was pointed to | see *Empowering the agents* |
 | Two branches that merge cleanly but fail together | prose only: the operator's checks before a landing gate |
 | A conflict found at the landing gate has no direct way back to implement | prose only: send back through review with `again` |
-| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing merges the run's own green pull request (`packages/templates/sdlc/workflows/build/landing.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
+| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing program merges the run's own green pull request (`packages/templates/sdlc/carried/land.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
 
 ## What a supervisor agent needs
 

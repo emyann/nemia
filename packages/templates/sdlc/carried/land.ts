@@ -10,8 +10,9 @@
  *   brought up to the base first (`refresh.ts`, the factory's `--install` run before it) and pushed, so `ci` judges the head that lands.
  * - **`landed`** on GitHub (`landWrite`): the run's own pull request merged with a merge commit at its head, `gh pr merge --merge
  *   --match-head-commit`, its title and description the message, then the repository's checkout fast-forwarded where it is clean on the
- *   base and behind. Only a pull request that is the run's own, mergeable, green at its head, holding the base where the factory refreshes
- *   and leaving no result branch out is merged.
+ *   base and behind. Only a pull request that is the run's own, mergeable, green at its head, current where the factory refreshes (it
+ *   holds the base, or merging the base in changes nothing the refresh derives, tried again and taken back) and leaving no result branch
+ *   out is merged.
  * - **`landed`** with no remote (`localWrite`): the repository's own checkout, clean on the base, takes every result branch of the run in
  *   one `git merge --no-ff --no-commit`; the local check (`--local-check`) judges the merged tree and the merge is committed, or taken
  *   back and False written. The message: the subject is the first line of the run's brief, the body one line per commit of the result.
@@ -31,7 +32,7 @@ import { type Branch, type Pr, MERGEABLE, gh, greenAt, leftOut, origin, ownWhy, 
 import { conditionDue } from './ci-write.ts';
 import { Refusal, base, git, run, seconds, sleep } from './exec.ts';
 import { type Checkout, type Pull, landWrite, localWrite, turnWrite } from './land-write.ts';
-import { lacksBase, refresh } from './refresh.ts';
+import { lacksBase, refresh, refreshes } from './refresh.ts';
 
 /** A check of a step's current try as the api serves it, with the condition it waits on where it waits on one. */
 type ServedCheck = {
@@ -288,7 +289,7 @@ function whyNot(
   r: ReturnType<typeof readGithub>,
   mergeable: string,
   green: { ok: boolean; words: string },
-  current: boolean,
+  stale: string,
   left: ReturnType<typeof leftOut>,
 ) {
   if (r.found.pull === 'other') return 'why' in r.found ? r.found.why : 'the run has several pull requests';
@@ -299,7 +300,7 @@ function whyNot(
   if (mergeable !== MERGEABLE)
     return `GitHub says #${r.pr.number} is \`${r.pr.mergeable ?? 'unknown'}\`, not \`${MERGEABLE}\`: the branch is brought up to its base by a person, then ${retryLine(r.id).toLowerCase()}`;
   if (!green.ok) return `${green.words}, and only a green pull request lands`;
-  if (!current) return `\`${r.onto}\` moved past ${short(r.pr.headRefOid)}, the head ci judged, so it would not land as judged`;
+  if (stale) return stale;
   return `merging #${r.pr.number} would leave out ${withCommits(left)}, commits whose patch ${short(r.pr.headRefOid)} does not hold: a person merges them into \`${r.pr.headRefName}\` and pushes it`;
 }
 
@@ -313,13 +314,43 @@ function readLanded(served: ServedRun, given: Given) {
   const mergeable = (pr?.mergeable ?? '').toUpperCase();
   const judge = pr !== undefined && !merged && r.ours;
   const green = judge ? greenAt(pr, given.check) : { ok: false, words: 'there is no pull request to judge' };
-  const current = given.refresh === '' || !(judge && lacksBase(r.onto, pr.headRefOid, retryLine(r.id)));
-  return { r, head, left, mergeable, green, current };
+  const ready = judge && green.ok && mergeable === MERGEABLE && left.length === 0;
+  const stale = ready ? staleOf(r, pr, given) : '';
+  return { r, head, left, mergeable, green, current: stale === '', stale };
+}
+
+/**
+ * Why the head ci judged would not land as judged, or nothing where it would: where the factory names a refresh and the head lacks the
+ * base, the refresh is tried again and taken back (`refreshes`), and a trial that changes nothing lands the head as it is, GitHub's merge
+ * of it then holding the tree the refresh would have made. Read only where nothing else refuses the merge, since the trial runs the
+ * factory's install and command.
+ */
+function staleOf(r: ReturnType<typeof readGithub>, pr: Pr, given: Given) {
+  const retry = retryLine(r.id);
+  if (given.refresh === '' || !lacksBase(r.onto, pr.headRefOid, retry)) return '';
+  const moved = `\`${r.onto}\` moved past ${short(pr.headRefOid)}, the head ci judged`;
+  const asked = {
+    pr: pr.number,
+    branch: pr.headRefName,
+    tip: pr.headRefOid,
+    onto: r.onto,
+    command: given.refresh,
+    derives: given.derives,
+    install: given.install,
+    retry,
+  };
+  try {
+    if (!refreshes(asked)) return '';
+  } catch (err) {
+    if (!(err instanceof Refusal)) throw err;
+    return `${moved}, and the refresh could not be tried on it: ${err.message.split('\n')[0]}`;
+  }
+  return `${moved}, and merging it in changes what the refresh (\`${given.refresh}\`) derives, so it would not land as judged: the next turn refreshes it`;
 }
 
 /** What the program does for `landed` on GitHub, and the condition it writes. */
 function landedOn(served: ServedRun, waiting: ServedCheck, given: Given, due: boolean) {
-  const { r, head, left, mergeable, green, current } = readLanded(served, given);
+  const { r, head, left, mergeable, green, current, stale } = readLanded(served, given);
   const act = landWrite({
     due,
     decided: decidedIn(waiting),
@@ -338,7 +369,7 @@ function landedOn(served: ServedRun, waiting: ServedCheck, given: Given, due: bo
     };
   if (act === 'wait') return { status: 'Unknown' as const, message: `GitHub has not yet said whether #${r.pr?.number} can be merged` };
   if (act === 'merge') return mergedOn(served, r.pr!, r.onto);
-  return { status: 'False' as const, message: `${whyNot(r, mergeable, green, current, left)}. Nothing is merged.\n${retryLine(r.id)}` };
+  return { status: 'False' as const, message: `${whyNot(r, mergeable, green, stale, left)}. Nothing is merged.\n${retryLine(r.id)}` };
 }
 
 /** The repository's checkout read as the local landing needs it: ready, holding a merge of this run's, or a person's. */

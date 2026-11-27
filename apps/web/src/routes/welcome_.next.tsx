@@ -9,6 +9,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * run; no redirect. Its loader reads the milestones and the factories.
  */
 export const Route = createFileRoute('/welcome_/next')({
+  staticData: { frame: 'reading' },
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(milestonesQuery), context.queryClient.ensureQueryData(factoriesQuery)]),
   component: YouAreSet,

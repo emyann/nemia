@@ -47,7 +47,7 @@ export function FactoryStep() {
   };
   const done = screen === 'made' || screen === 'guide';
   return (
-    <article data-factory-step={screen} className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
+    <article data-factory-step={screen} className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <PageName>Your first factory</PageName>
         <p className="text-body-medium text-on-surface-variant">

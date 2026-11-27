@@ -135,3 +135,20 @@ export const OfACard: StoryObj<typeof CopyId> = {
     await expect(canvasElement.querySelector('button')).toHaveAccessibleName('Copy the card name decode-the-reads');
   },
 };
+
+/** A card name longer than its room, with `wrap`: the id breaks across lines and the control stays inside the box beside it. */
+export const Wraps: StoryObj = {
+  render: () => (
+    <div data-box style={{ width: '12rem' }}>
+      <CopyId id="tools-touched-runs-at-most-h-a599" of="card" wrap />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await document.fonts.ready;
+    const box = canvasElement.querySelector('[data-box]')!.getBoundingClientRect();
+    const button = canvasElement.querySelector('button')!.getBoundingClientRect();
+    const id = canvasElement.querySelector('[data-run-id]')!;
+    await expect(button.right).toBeLessThanOrEqual(box.right + 0.5);
+    await expect(id.getBoundingClientRect().height).toBeGreaterThan(parseFloat(getComputedStyle(id).lineHeight) * 1.5);
+  },
+};

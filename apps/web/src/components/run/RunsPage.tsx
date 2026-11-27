@@ -1,5 +1,6 @@
 import { useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { FrameGrid } from '@/components/frame/FrameGrid';
 import { FinishedTable } from './FinishedTable';
 import { FlightTable } from './FlightTable';
 import { WaitingCard } from './WaitingCard';
@@ -36,13 +37,15 @@ export const loadRuns = (client: QueryClient, at: RunsAt, firstPage: () => never
       }),
   ]);
 
-/** The page's frame, as wide as the window lets it, over the look's ground: what it holds; the top bar names it. */
+/** The page's frame, the grid's wide span, over the look's ground: what it holds; the top bar names it. */
 function Frame({ state, children }: { state: string; children: ReactNode }) {
   return (
-    <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
-      <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        {children}
-      </article>
+    <ScanLines className="min-h-full">
+      <FrameGrid span="wide">
+        <article data-runs-page={state} className="flex w-full flex-col gap-10">
+          {children}
+        </article>
+      </FrameGrid>
     </ScanLines>
   );
 }

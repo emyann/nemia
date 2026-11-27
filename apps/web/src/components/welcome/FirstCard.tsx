@@ -73,10 +73,7 @@ export function FirstCard() {
   const { pending, refused, start } = useFirstStart();
   const own = factories.filter((f) => !f.default);
   return (
-    <article
-      data-first-card={factory === undefined ? 'no-factory' : 'write'}
-      className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6"
-    >
+    <article data-first-card={factory === undefined ? 'no-factory' : 'write'} className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <PageName>What first?</PageName>
         <p className="text-body-medium text-on-surface-variant">

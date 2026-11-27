@@ -34,6 +34,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * preload, on a link's hover, reads none, since the page it would read for is not open.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
+  staticData: { frame: 'reading' },
   loader: async ({ context, params, cause }) => {
     const factories = await context.queryClient.ensureQueryData(factoriesQuery);
     if (factories.some((f) => f.name === params.factory && !f.default))
@@ -73,7 +74,7 @@ function SettingsPage() {
   const { data: factories } = useSuspenseQuery(factoriesQuery);
   const factory = factories.find((f) => f.name === name);
   return (
-    <article data-factory-settings={name} className="mx-auto flex max-w-3xl flex-col gap-8">
+    <article data-factory-settings={name} className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
         <Trail levels={[...factoryLevel(name), { name: 'Settings' }]} />
         <div className="flex flex-col gap-1">

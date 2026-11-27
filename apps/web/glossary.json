@@ -233,7 +233,16 @@
     },
     {
       "term": "Machine bar",
-      "meaning": "the frame's foot, across the window under the rail, the pane, the page and the sheet: the machine's gauges button (the daemon, the runs and sessions, the feed, Nemia's presence and the quota in short), the version, then the pause (`apps/web/src/components/frame/MachineBar.tsx`). It holds what the top bar held; the page's head holds the page's name alone."
+      "meaning": "the frame's foot, across the window's whole width under the rail, the pane, the page's column and the sheet, which alone scrolls: the machine's gauges button (the daemon, the runs and sessions, the feed, Nemia's presence and the quota in short), the version, then the pause (`apps/web/src/components/frame/MachineBar.tsx`). It holds what the top bar held; the page's head holds the page's name alone."
+    },
+    {
+      "term": "Frame grid",
+      "meaning": "the one grid every page's column lays out on, with the same edges and gutters (`--frame-gutter`) by the column's width: four, eight then twelve columns (`apps/web/src/components/frame/FrameGrid.tsx`)."
+    },
+    {
+      "term": "Page span",
+      "meaning": "how much of the frame grid a route takes, its `staticData.frame`: `wide` the whole of it, `reading` its left, its lines stopping at `--frame-measure` (48rem), `bleed` the whole column with no grid.",
+      "type": "PageSpan"
     },
     {
       "term": "Seat",

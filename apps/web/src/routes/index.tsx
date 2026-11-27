@@ -1,3 +1,4 @@
+import { FRAME_EDGE } from '../lib/classes';
 import { useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { DEFAULT_NAMESPACE } from 'objects';
@@ -46,7 +47,7 @@ export const Route = createFileRoute('/')({
         .then((factories) => Promise.all(answered(factories).map((name) => client.ensureQueryData(openRunsQuery(name))))),
     ]);
   },
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
   component: Factories,
   errorComponent: ({ error }) => <ReadTrouble what="the factories and their runs" error={error} className="p-4" />,
 });
@@ -65,7 +66,7 @@ function Factories() {
   const held = fallback !== undefined && holdsRuns(fallback);
   return (
     <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] flex-col gap-6 pt-5 @3xl/page:h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))]">
-      <div className="flex flex-col gap-4 px-3 @lg/page:px-6">
+      <div className={`flex flex-col gap-4 ${FRAME_EDGE}`}>
         <OverviewStrip />
       </div>
       <FactoriesCanvas blocks={openBlocks(factories, opens, held)} />

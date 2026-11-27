@@ -357,8 +357,11 @@ here.
   is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
 - The frame is a row over the machine bar (`components/frame/MachineBar.tsx`, `--frame-foot` tall: the gauges, the version, the
   pause): the store's rail (`components/frame/FrameRail.tsx`), a factory's pane on a page under its path
-  (`components/frame/FactoryPane.tsx`), the page's column, then the one side sheet; a full-window height subtracts `--frame-top` and
-  `--frame-foot` (`staleFrameHeights`, `lib/footer.ts`). Where a page sits — the store's level under a destination of the rail, or a
+  (`components/frame/FactoryPane.tsx`), the page's column, then the one side sheet; the shell is as tall as the window (`h-svh`) and the
+  page's column (`main[data-frame-page]`) is its one scroller, between a head and the bar that never scroll, so the window has no scroll
+  lane for a menu's lock to take and nothing moves when one opens; a full-window height subtracts `--frame-top` and `--frame-foot`
+  (`staleFrameHeights`, `lib/footer.ts`). A page takes the grid (`FrameGrid`, `--frame-gutter`, `--frame-measure`, edges `FRAME_EDGE`) by
+  its route's `staticData.frame` (`wide`, `reading`, `bleed`); none writes a centred `mx-auto max-w-*` of its own (`test/page-room.test.ts`). Where a page sits — the store's level under a destination of the rail, or a
   factory's under a place of its pane — is `seatOf` (`components/nav/nav.ts`), read from the path alone, through `useSeat`; a page's
   factory is a segment of its path, never `?factory=`, which `factoryRedirect` (`lib/factoryAddress.ts`, in the root's `beforeLoad`)
   sends to its path, and `test/factory-address.test.ts` refuses in any other file. A page both levels draw is one body under
@@ -539,6 +542,8 @@ e2e page*.
 - The copy control's glyph is the look's own, 12 pixels whatever size the kit hands it, and its button is pulled in around it
   (`look/CopyId.tsx`): its target reaches what stands 4 pixels over it, so a card's title is raised (`relative z-10`) to keep its box,
   and a row in flight keeps 16 pixels between its title and its id.
+- The window never scrolls: an e2e scrolls and measures `main[data-frame-page]` (`scrollFrame`, `frameScrolled`, `widthPast` of
+  `test/e2e/board.ts`), never `window.scrollY` or `documentElement.scrollWidth`; React Aria's overlays lock the root, which has no lane.
 - The e2e's Chromium hides every scroll bar, so no bar takes room or is in a picture: a bar is asserted and pictured in a browser from
   `launch('classic')` (bars that take room) or `launch('overlay')` (bars that float), `apps/web/test/e2e/visit.ts`.
 - The theme sets `scrollbar-color` on the root, which in Chromium hides every `::-webkit-scrollbar` rule: the board's `:root` reverts it

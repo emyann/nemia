@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
+import type { PageSpan } from './components/frame/FrameGrid';
 import { TokenPage } from './components/frame/TokenPage';
 import { tokenAsked } from './lib/api/read';
 import { claimLinkOnLoad } from './lib/linkClaim';
@@ -30,8 +31,8 @@ declare module '@tanstack/react-router' {
     router: typeof router;
   }
   interface StaticDataRouteOption {
-    /** The page takes the whole space beside the menu, rather than the reading column. */
-    fullBleed?: boolean;
+    /** How much of the frame's grid the page takes (`FrameGrid`); a page that says nothing takes `wide`. */
+    frame?: PageSpan;
     /** The page is Nemia's chat itself, so her docked face is not drawn over it. */
     ownsChat?: boolean;
   }

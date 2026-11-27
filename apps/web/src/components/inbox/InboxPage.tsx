@@ -8,7 +8,7 @@ import { trailOf } from '@/lib/finished';
 import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, TRAIL_MARK, type InboxView } from '@/lib/inbox';
 import { readStored, store } from '@/lib/stored';
 import { CardChain } from './CardChain';
-import { InboxCard, InboxCardRow } from './InboxCard';
+import { CARD_LEAST, InboxCard, InboxCardRow } from './InboxCard';
 import { InboxSides, InboxToolbar, type Layout } from './InboxToolbar';
 
 /** The key the browser keeps the layout under: Grid until a person picks List. */
@@ -64,7 +64,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
   const filtered = at.search !== undefined || at.l !== undefined || at.phase !== undefined;
   const none = page.entries.length === 0 && grouped.length === 0;
   return (
-    <article className="space-y-6">
+    <article className="flex flex-col gap-6">
       <InboxToolbar
         view={at}
         labels={page.labels}
@@ -77,14 +77,14 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
       />
       <InboxSides view={at} counts={page.counts} onSearch={onSearch} />
       {grouped.length > 0 && (
-        <section aria-label="Chains" className="space-y-3">
+        <section aria-label="Chains" className="flex flex-col gap-(--frame-gutter)">
           <SectionHead count={grouped.length} word={grouped.length === 1 ? 'Chain' : 'Chains'} tone="rest" />
           {grouped.map((columns) => (
             <CardChain key={columns[0]?.[0]?.name} members={columns} />
           ))}
         </section>
       )}
-      <section aria-label="Cards" className="space-y-3">
+      <section aria-label="Cards" className="flex flex-col gap-(--frame-gutter)">
         {page.entries.length > 0 && (
           <SectionHead
             count={page.entries.length + trail.length * INBOX_PAGE + page.remaining}
@@ -94,9 +94,12 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
         )}
         {none && <NoneShown filtered={filtered} factory={at.factory} />}
         {layout === 'grid' ? (
-          <ul className="grid grid-cols-1 gap-4 @2xl/page:grid-cols-2 @5xl/page:grid-cols-3">
+          <ul
+            className="grid gap-(--frame-gutter)"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${CARD_LEAST}), 1fr))` }}
+          >
             {page.entries.map((entry) => (
-              <li key={entry.file}>
+              <li key={entry.file} className="min-w-0">
                 <InboxCard entry={entry} />
               </li>
             ))}

@@ -9,6 +9,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * Next; no redirect. Its loader reads the factories' names and the milestones.
  */
 export const Route = createFileRoute('/welcome_/volume')({
+  staticData: { frame: 'reading' },
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(factoryNamesQuery), context.queryClient.ensureQueryData(milestonesQuery)]),
   component: () => <VolumeStep />,

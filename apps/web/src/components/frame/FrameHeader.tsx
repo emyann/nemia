@@ -15,7 +15,7 @@ export function FrameHeader({ path }: { path: string }) {
   const name = pageNameOf(path);
   const inbox = inboxListOf(path);
   return (
-    <header data-frame-header className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3">
+    <header data-frame-header className="z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3">
       {narrow && <MenuButton />}
       {narrow && <HerFace path={path} />}
       {name && <PageName>{name}</PageName>}

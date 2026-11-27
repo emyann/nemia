@@ -11,6 +11,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * and a name no factory has, ask for none.
  */
 export const Route = createFileRoute('/factories/$factory_/proposals/')({
+  staticData: { frame: 'reading' },
   loader: async ({ context, params }) => {
     const factories = await context.queryClient.ensureQueryData(factoriesQuery);
     if (factories.some((f) => f.name === params.factory && !f.default))
@@ -28,7 +29,7 @@ function ProposalsPage() {
   const { data: factories } = useSuspenseQuery(factoriesQuery);
   const factory = factories.find((f) => f.name === name);
   return (
-    <article data-proposals-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
+    <article data-proposals-page={name} className="flex flex-col gap-6">
       {factory === undefined ? (
         <p data-no-factory={name} className="text-body-medium text-on-surface-variant">
           No factory is named {name}: the factories are listed on the Factories page.

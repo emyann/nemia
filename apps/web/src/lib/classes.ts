@@ -19,3 +19,6 @@ export const FLOOR_BOX = 'overflow-hidden rounded border border-outline-variant'
 
 /** The floor of a run's page, one of the pages read most: ruled above and below and boxed by nothing, so a node on it is a first box. */
 export const FLOOR_RULED = 'overflow-hidden border-y border-outline-variant';
+
+/** The frame's left and right edge, the same on every page: the grid's own, the strip of tabs' and the Overview's. */
+export const FRAME_EDGE = 'px-3 @lg/page:px-6';

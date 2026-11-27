@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { openFold, partOf, photograph, themeOf } from '../board.ts';
+import { openFold, partOf, photograph, themeOf, widthPast } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -159,8 +159,8 @@ async function onPhone(page: Page, write: Locator) {
   await page.setViewportSize(PHONE);
   try {
     await settled(page);
-    const wide = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, phone: innerWidth }));
-    if (wide.page > wide.phone) throw new Refused(`the run's page fits a phone — it is ${wide.page}px on ${wide.phone}px`);
+    const past = await widthPast(page);
+    if (past > 0) throw new Refused(`the run's page fits a phone — it runs ${past}px past it`);
     await photograph(write, path.join(OUT, `told-layers-phone-${await themeOf(page)}.png`));
   } finally {
     if (was) await page.setViewportSize(was);

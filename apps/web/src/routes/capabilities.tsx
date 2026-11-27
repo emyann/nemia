@@ -6,6 +6,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What the repository of the default factory offers a step, on the repository its search names (`?repo=`). */
 export const Route = createFileRoute('/capabilities')({
+  staticData: { frame: 'reading' },
   validateSearch: pagePlaceOf,
   loaderDeps: ({ search }) => ({ repo: search.repo }),
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(capabilitiesQuery({ ...deps })),

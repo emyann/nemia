@@ -8,6 +8,7 @@ import {
   railPlace,
   litOf,
   trailLevel,
+  scrollFrame,
 } from '../board.ts';
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
@@ -53,12 +54,12 @@ export default {
     }
 
     await expectCardKeys(page, file, rich.name, { workflow: rich.workflow, model: rich.model });
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await scrollFrame(page, 'end');
     await expectUncovered(
       file.locator('section[aria-label="Keys"] tr[data-key]').last(),
       'the last key row is in the window with nothing over it once the page is scrolled to its end',
     );
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await scrollFrame(page, 0);
     await expectSource(file, body, `nemia get card ${rich.name}`, before ?? '');
     if (storedCard(rich.name) !== before)
       throw new Refused(`a card's page writes nothing — the card ${rich.name} changed while it was open`);

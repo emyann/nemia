@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf, widthPast } from '../board.ts';
 import { expectCount, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -90,12 +90,8 @@ export default {
     try {
       await page.setViewportSize(PHONE);
       await idle(page);
-      const wide = await page.evaluate(() => ({
-        scroll: document.documentElement.scrollWidth,
-        client: document.documentElement.clientWidth,
-      }));
-      if (wide.scroll > wide.client)
-        throw new Refused(`on a phone, the page does not scroll sideways — it is ${wide.scroll}px wide in ${wide.client}px`);
+      const past = await widthPast(page);
+      if (past > 0) throw new Refused(`on a phone, the page does not scroll sideways — it runs ${past}px past its window`);
       await expectOnePerRow(page);
       await settled(page);
       await photograph(page, path.join(OUT, `agent-cards-phone-${await themeOf(page)}.png`), { fullPage: true });

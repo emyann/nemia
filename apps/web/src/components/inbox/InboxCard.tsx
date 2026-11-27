@@ -11,6 +11,9 @@ import { Instant } from '../time/Instant';
 import { CardActions, CardLink } from './CardActions';
 import { Refused, Tried } from './InboxParts';
 
+/** The least width the inbox's grid gives a card: as many cards stand in a row as the column holds at this width. */
+export const CARD_LEAST = '20rem';
+
 /** How a card is drawn: in a grid, in a chain beside its neighbours (`compact`, which drops what the chain's lines say), or as a row. */
 export type CardSize = 'regular' | 'compact';
 
@@ -114,7 +117,7 @@ export function InboxCard({
       <article
         aria-label={`Card ${entry.name}`}
         data-card={entry.name}
-        className={compact ? 'flex h-full flex-col gap-1.5 p-3' : 'flex h-full flex-col gap-2 p-4'}
+        className={compact ? 'flex h-full min-w-0 flex-col gap-1.5 p-3' : 'flex h-full min-w-0 flex-col gap-2 p-4'}
       >
         <div className="flex items-center gap-2">
           <StateTag entry={entry} />
@@ -130,7 +133,7 @@ export function InboxCard({
         <Body size="medium" component="p" data-title className="font-medium break-words">
           <CardLink entry={entry} className="underline decoration-outline underline-offset-4 hover:decoration-current" />
         </Body>
-        <CopyId id={entry.name} short={compact} of="card" />
+        <CopyId id={entry.name} short={compact} of="card" wrap={!compact} />
         {!compact && <LabelValues labels={entry.labels} />}
         <Facts entry={entry} compact={compact} />
         {!compact && triedShown(entry) && <TriedHere entry={entry} />}

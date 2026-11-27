@@ -36,6 +36,7 @@ import {
   openAnswered,
   runListPath,
   tipsOf,
+  widthPast,
 } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectTwoDeep, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
@@ -1116,8 +1117,8 @@ async function narrow(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   try {
     await expectNone(async () => {
-      const [wide, window] = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
-      return wide <= window ? null : `the document is ${wide} wide in a window of ${window}`;
+      const past = await widthPast(page);
+      return past <= 0 ? null : `the page runs ${past}px past its window`;
     }, 'at 390 wide the page does not scroll sideways');
     const lefts = await section(page, 'waiting')
       .locator('article[data-run]')

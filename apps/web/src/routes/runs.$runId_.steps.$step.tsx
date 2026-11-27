@@ -17,7 +17,7 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
     if (home) throw redirect({ href: `${home}${location.searchStr}`, replace: true });
     return loaded;
   },
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
   component: Page,
   errorComponent: Failed,
 });

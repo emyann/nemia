@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { FRAME_EDGE } from '@/lib/classes';
 import { tabsOf } from '@/components/nav/nav';
 import { Tab, TabList, TabPanel, Tabs } from '@/components/ui/ds';
 
@@ -14,7 +15,7 @@ export function FrameTabs({ path, children }: { path: string; children: ReactNod
   if (tabs === undefined) return children;
   return (
     <Tabs selectedKey={path} keyboardActivation="manual" className="flex-1">
-      <div className="px-4">
+      <div className={FRAME_EDGE}>
         <TabList isScrollable aria-label="Settings">
           {tabs.map((tab) => (
             <Tab key={tab.to} id={tab.to} href={tab.to}>

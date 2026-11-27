@@ -4,12 +4,12 @@ import { expect, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import type { InboxEntry } from '@/lib/api/inbox';
 import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
-import { InboxCard, InboxCardRow, type CardSize } from './InboxCard';
+import { CARD_LEAST, InboxCard, InboxCardRow, type CardSize } from './InboxCard';
 
-/** A card drawn in `size`, or as a row where `row` is given, over a store that holds the factory `nemia`. */
-const drawn = (entry: InboxEntry, size: CardSize | undefined, row = false) => (
+/** A card drawn in `size`, or as a row where `row` is given, over a store that holds the factory `nemia`, `width` wide. */
+const drawn = (entry: InboxEntry, size: CardSize | undefined, row = false, width: number | string = row ? 920 : 340) => (
   <QueryClientProvider client={seeded([[factoriesQuery.queryKey, [factoryView(FACTORY)]]])}>
-    <div style={{ width: row ? 920 : 340 }}>
+    <div style={{ width }}>
       {row ? (
         <ul>
           <InboxCardRow entry={entry} />
@@ -146,5 +146,22 @@ export const Row: Story = {
   render: (args) => drawn(args.entry, args.size, true),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('listitem', { name: 'Card ship-it' })).toBeVisible();
+  },
+};
+
+/**
+ * The longest name the store holds, 28 characters and its 4-character tail, at the narrowest width the grid gives a card: nothing draws
+ * past the card.
+ */
+export const LongestName: Story = {
+  args: { entry: { ...unstartedCard('tools-touched-runs-at-most-h-a599', FACTORY), title: 'Touched runs at most half of a workspace' } },
+  render: (args) => drawn(args.entry, args.size, false, CARD_LEAST),
+  play: async ({ canvasElement }) => {
+    const card = within(canvasElement).getByRole('article', { name: 'Card tools-touched-runs-at-most-h-a599' });
+    const edge = card.getBoundingClientRect().right + 0.5;
+    const past = [...card.querySelectorAll('*')].filter((part) => part.getBoundingClientRect().right > edge);
+    await expect(past.map((part) => part.tagName)).toEqual([]);
+    const copy = within(card).getByRole('button', { name: 'Copy the card name tools-touched-runs-at-most-h-a599' });
+    await expect(copy.getBoundingClientRect().right).toBeLessThanOrEqual(edge);
   },
 };

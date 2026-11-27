@@ -227,7 +227,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   `design-system` job builds it on every push that reaches it or the board.
 - `docs/film/` — the README's one-minute film: a Hyperframes project outside every workspace, rendered by `npm run render` there (`docs/film/README.md`).
 - `tools/touched/` — `npm run touched`: the tests the branch's change reaches since `main-worktree/HEAD`, per workspace by `vitest
-  related --run`, never a whole suite (`--dry` lists them); a session's measure, held by `tools/guards/test/touched.boundary.test.ts`.
+  related --run`, never more than half of a workspace's test files (past it, that workspace runs none and exits 2; `--dry` lists them); a session's measure, held by `tools/guards/test/touched.boundary.test.ts`.
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/contracts/` — what `npm run contracts` runs (`prove.ts`): every contract proved by tsverify, in the legs `legs.ts` names, which

@@ -6,11 +6,13 @@
  * at a time, it asks Vitest's Node API which of the workspace's test files import a changed file of it (a changed test file is its
  * own), prints them, then runs exactly those, `vitest related --run <the workspace's changed files>`, under `nice`, in the
  * workspace's folder and under its own config (its seats, `pool: 'forks'`, `maxWorkers: 2`); in `apps/web` the `node` project alone.
- * It never runs a bare `vitest run`, a workspace with no changed file, nor every test file of one: a change that reaches them all (its
- * config, a seat) is said and left to CI. Named test files run alone, each one of a workspace the change touched, or are refused.
+ * It never runs a bare `vitest run`, a workspace with no changed file, nor more than half (`HALF`) of one's test files: a workspace
+ * whose change reaches more (its config, a seat, a widely imported module) runs none, is said with its count and the bound, and its
+ * exit is 2 while the others run. Named test files run alone, each one of a workspace the change touched, held to the same bound, or
+ * are refused. `--dry` decides the same and runs nothing.
  *
  * A session's measure, never the suite's or CI's. Exits 0 when what ran passed or nothing was due, 1 when a test file failed, 2 when
- * it was not asked what it runs.
+ * it was not asked what it runs or refused a workspace past the bound.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -223,9 +225,22 @@ const plannedFor = (argv: string[], repo: string) => {
 /** A share and the test files it is due, each from its workspace's folder. */
 type Due = { share: Share; tests: string[] };
 
+/** The bound on what one workspace runs: more than this share of its test files is refused, and none of them runs. */
+const HALF = 0.5;
+
+const pastHalf = (share: Share, due: number, total: number) => {
+  const bound = Math.floor(total * HALF);
+  if (due <= bound) return false;
+  const what = share.named ? 'the files named are' : 'its change reaches';
+  console.error(
+    `  ${share.dir}: refused, none run: ${what} ${due} of its ${total} test files, more than half (${bound}): run a chosen subset, npm run touched -- <test file>…, and leave the rest to CI`,
+  );
+  return true;
+};
+
 const dueOf = async (shares: Share[], repo: string, list: Reach['list']) => {
   const due: Due[] = [];
-  const wide: string[] = [];
+  const over: string[] = [];
   for (const share of shares) {
     const root = path.join(repo, share.dir);
     const files = share.files.map((file) => path.join(repo, file));
@@ -233,11 +248,8 @@ const dueOf = async (shares: Share[], repo: string, list: Reach['list']) => {
     const notTest = share.named ? files.find((file) => !found.total.includes(file)) : undefined;
     if (notTest) return refused(`${path.relative(repo, notTest)} is not a test file of ${share.dir}'s Vitest config: name one it runs`);
     const tests = found.due.map((file) => path.relative(root, file));
-    if (!share.named && found.due.length > 0 && found.due.length === found.total.length) {
-      console.log(
-        `  ${share.dir}: not run, its change reaches all ${found.total.length} of its test files (a config or a seat): CI runs them`,
-      );
-      wide.push(share.dir);
+    if (pastHalf(share, tests.length, found.total.length)) {
+      over.push(share.dir);
       continue;
     }
     const why = share.named ? 'named' : `related to ${share.files.length} changed files`;
@@ -245,7 +257,7 @@ const dueOf = async (shares: Share[], repo: string, list: Reach['list']) => {
     for (const test of tests) console.log(`    ${test}`);
     if (tests.length > 0) due.push({ share, tests });
   }
-  return { due, wide };
+  return { due, over };
 };
 
 const failedOf = (due: Due[], repo: string, reach: Reach) => {
@@ -287,23 +299,22 @@ export const main = async (argv: string[], given: Partial<Reach> = {}) => {
     console.log(`  outside every workspace, run by no import: ${plan.outside.join(', ')} (CI runs the tests that read them)`);
   const found = await dueOf(plan.shares, repo, reach.list);
   if (typeof found === 'number') return found;
-  const { due, wide } = found;
+  const { due, over } = found;
   const count = due.reduce((sum, { tests }) => sum + tests.length, 0);
-  const notRun = wide.length > 0 ? `; not run: ${wide.join(', ')}` : '';
+  const notRun = over.length > 0 ? `; refused, more than half of their tests: ${over.join(', ')}` : '';
+  const end = over.length > 0 ? 2 : 0;
   if (args.dry || count === 0) {
-    const what = args.dry
-      ? `dry, ${count} test files in ${due.length} workspaces would run, none ran`
-      : 'no test file reaches the change, nothing to run';
+    const what = args.dry ? `dry, ${count} test files in ${due.length} workspaces would run, none ran` : 'no test file to run';
     console.log(`touched: ${what}${notRun}`);
-    return 0;
+    return end;
   }
   const failed = failedOf(due, repo, reach);
   if (failed.length > 0) {
-    console.log(`touched: failed: ${failed.join(', ')}`);
+    console.log(`touched: failed: ${failed.join(', ')}${notRun}`);
     return 1;
   }
   console.log(`touched: passed, ${count} test files in ${due.length} workspaces${notRun}`);
-  return 0;
+  return end;
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) process.exitCode = await main(process.argv.slice(2));

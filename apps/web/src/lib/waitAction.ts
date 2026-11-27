@@ -1,8 +1,9 @@
-import type { ApproveStepOf } from '../../contracts/wait-action.contract.ts';
+import type { WaitActionOf } from '../../contracts/wait-action.contract.ts';
 
 /**
- * The step a waiting card's approval button names: the step of a run's wait at an approval's gate, none for any other wait and for a run
- * that waits on nobody.
+ * The button a waiting card holds: Approve for a run that waits at an approval's gate, Answer for one whose step waits on a person's
+ * answer, each with the step it names; none for any other wait, a wait of no step, and a run that waits on nobody.
  * @param wait What the run waits on a person for (`waitOf`), null where it waits on nobody.
  */
-export const approveStepOf: ApproveStepOf = (wait) => (wait !== null && wait.kind === 'approve' ? wait.step : null);
+export const waitActionOf: WaitActionOf = (wait) =>
+  wait !== null && wait.step !== null && (wait.kind === 'approve' || wait.kind === 'answer') ? { verb: wait.kind, step: wait.step } : null;

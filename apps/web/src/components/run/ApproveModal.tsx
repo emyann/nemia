@@ -5,8 +5,9 @@ import { IconButton, ModalDialog, Title } from '@/components/ui/ds';
 import { CutFrame, CutPress, type FrameHue } from '@/components/look';
 import { agentsQuery } from '@/lib/api/agents';
 import { useRunRead } from '@/lib/runView';
-import { approves } from '@/lib/words';
-import { GateAnswered } from '../gate/Gate';
+import { WAIT_ACTIONS } from '@/lib/words';
+import type { WaitAction as Action } from '../../../contracts/wait-action.contract.ts';
+import { Answered } from '../gate/Ask';
 import { StepPart } from '../step/part/StepPart';
 import { Unread } from '../step/StepBar';
 
@@ -32,8 +33,9 @@ function Framed({ hue, said, onClose, children }: { hue: FrameHue; said: string;
 }
 
 /**
- * The run `run` read once the modal opens, and the agents: the step's part at M, which holds the gate's own approve and send back, its
- * body drawn in the modal's one frame, in the step's hue, under the title `said` and its close.
+ * The run `run` read once the modal opens, and the agents: the step's part at M, which holds the gate's own approve and send back, or
+ * the step's questions and its answer, as the run's page offers them, its body drawn in the modal's one frame, in the step's hue, under
+ * the title `said` and its close.
  */
 function Opened({ run, step, said, onClose }: { run: string; step: string; said: string; onClose: () => void }) {
   const { view, error } = useRunRead(run);
@@ -60,23 +62,28 @@ function Opened({ run, step, said, onClose }: { run: string; step: string; said:
 }
 
 /**
- * A waiting card's button at an approval's gate, `Approve <step>`, and the modal it opens: the step's part at M, as the run's page draws
- * it, with the closeout it asks to approve, its questions, budgets, round and checks, ending in Approve and Send back, both the gate's
- * own. The part's own cut frame is the modal's one frame, the title and its close inside it: the kit's dialog draws no surface of its
- * own around it, and keeps the scrim, the focus trap and Escape. The modal closes once the api has taken either answer
- * (`GateAnswered`).
+ * A waiting card's button, `action`: its verb alone on its face, Approve or Answer, whatever the step's name, and the verb with the step
+ * as its name and its hover (`WAIT_ACTIONS`); and the modal it opens, named so too: the step's part at M, as the run's page draws it.
+ * At an approval's gate, the closeout it asks to approve, its questions, budgets, round and checks, ending in Approve and Send back, both
+ * the gate's own; at a step that waits on an answer, what it needs, its questions and the answer that asks its next try. The part's own
+ * cut frame is the modal's one frame, the title and its close inside it: the kit's dialog draws no surface of its own around it, and
+ * keeps the scrim, the focus trap and Escape. The modal closes once the api has taken the answer (`Answered`).
  * @param props.run The run's id.
- * @param props.step The name of the step that waits at its approval's gate.
+ * @param props.action What the button does, and the name of the step that waits.
  */
-export function ApproveAction({ run, step }: { run: { id: string }; step: string }) {
+export function WaitAction({ run, action }: { run: { id: string }; action: Action }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  const said = approves(step);
+  const { face, named } = WAIT_ACTIONS[action.verb];
+  const said = named(action.step);
+  const marked = action.verb === 'approve' ? { 'data-approve': action.step } : { 'data-answer': action.step };
   return (
     <>
-      <CutPress data-approve={step} onPress={() => setOpen(true)}>
-        {said}
-      </CutPress>
+      <span title={said} className="inline-flex">
+        <CutPress {...marked} aria-label={said} onPress={() => setOpen(true)}>
+          {face}
+        </CutPress>
+      </span>
       <ModalDialog
         isOpen={open}
         onClose={close}
@@ -84,9 +91,9 @@ export function ApproveAction({ run, step }: { run: { id: string }; step: string
         className="max-h-[calc(100dvh-2rem)] w-fit max-w-[calc(100vw-2rem)] min-w-0 overflow-visible rounded-none bg-transparent p-0 shadow-none"
       >
         {open && (
-          <GateAnswered.Provider value={close}>
-            <Opened run={run.id} step={step} said={said} onClose={close} />
-          </GateAnswered.Provider>
+          <Answered.Provider value={close}>
+            <Opened run={run.id} step={action.step} said={said} onClose={close} />
+          </Answered.Provider>
         )}
       </ModalDialog>
     </>

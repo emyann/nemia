@@ -43,11 +43,16 @@ export type StepView = RunStep & {
 };
 
 /**
- * A step with its checks laid and no task: a wait node, which runs no session, so "not filed yet" is not what it is.
+ * A step with no task that runs no session, so "not filed yet" is not what it is: one whose checks are laid with no session before
+ * them, or a wait node (`waitsFor:`), filed or not.
  *
- * @param step - the step's task, null where none is filed, and its check, null where none is laid.
+ * @param step - the step's task, null where none is filed, its check, null where none is laid, and its frozen spec, null where none.
  */
-export const runsNoSession = (step: { readonly taskId: string | null; readonly check?: unknown }) => !step.taskId && step.check != null;
+export const runsNoSession = (step: {
+  readonly taskId: string | null;
+  readonly check?: unknown;
+  readonly spec?: { readonly waitsFor?: readonly string[] } | null;
+}) => !step.taskId && (step.check != null || (step.spec?.waitsFor?.length ?? 0) > 0);
 
 /**
  * A run's detail, as its page, its bar and its previews draw it (`runDetailOf`): the run's view (`RunView`) with its lines, and each step

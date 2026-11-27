@@ -15,6 +15,7 @@ type CheckVerdict = NonNullable<StepCheck['verdict']>;
 import type { OfferCase } from './asks.ts';
 import type { Hue } from './meaning.ts';
 import type { StepState } from './status.ts';
+import type { WaitVerb } from '../../contracts/wait-action.contract.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
 export type Wait = { step: string | null; done: number };
@@ -42,10 +43,13 @@ export interface PersonWords {
 export const OPENS = 'Open the run';
 
 /**
- * What a waiting card's button says at an approval's gate: it approves the step that waits.
- * @param step The gated step's name.
+ * What a waiting card's button says, by what it does (`WaitVerb`): its verb alone on its face, so that no step's name widens it, and the
+ * verb with the step it is done to as its name to a screen reader, its hover and its modal's title.
  */
-export const approves = (step: string) => `Approve ${step}`;
+export const WAIT_ACTIONS = {
+  approve: { face: 'Approve', named: (step: string) => `Approve ${step}` },
+  answer: { face: 'Answer', named: (step: string) => `Answer ${step}` },
+} as const satisfies Record<WaitVerb, { face: string; named: (step: string) => string }>;
 
 /** A count up to twelve in a word, capitalised; in digits past it. */
 const COUNTED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];

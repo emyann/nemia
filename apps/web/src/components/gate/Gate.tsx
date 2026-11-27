@@ -1,10 +1,10 @@
-import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { useContext, useId, useState, type ReactNode } from 'react';
 import { type Question } from '../../lib/api/tries.ts';
 import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import type { StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
 import { cn } from '../../lib/utils';
-import { MODES, Refusal, useAsk } from './Ask';
+import { Answered, MODES, Refusal, useAsk } from './Ask';
 import { QuestionSeries, RecommendButton } from './Questions';
 import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
 import { when } from '../step/Facts';
@@ -14,12 +14,6 @@ import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type Gate
 import { Body, Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
 import { Pending, CutPress } from '@/components/look';
-
-/**
- * What a surface that holds a gate in a view of its own (the waiting card's modal) gives it to call once the api has taken an
- * approval or a send-back, so that the view closes on the answer; none where the gate stands on a page.
- */
-export const GateAnswered = createContext<(() => void) | null>(null);
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -76,17 +70,14 @@ export function Gate({
   const [draft, setDraft] = useState<Draft>({});
   const [amounts, setAmounts] = useState<Amounts>({});
   const field = useId();
-  const answered = useContext(GateAnswered);
+  const answered = useContext(Answered);
   const forget = () => {
     setDraft({});
     setAmounts({});
     answered?.();
   };
   const approval = useApprove(runId, step, { onApproved: forget });
-  const sendBack = useAsk(runId, step, () => {
-    setDraft({});
-    answered?.();
-  });
+  const sendBack = useAsk(runId, step, () => setDraft({}));
   const busy = approval.isPending || sendBack.isPending;
   const answering = { questions, draft, left: unanswered(questions, draft) };
   const budgeting = budgetsGiven(budgets, amounts);

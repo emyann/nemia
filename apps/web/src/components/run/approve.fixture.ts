@@ -3,7 +3,7 @@ import type { WaitingRun } from '@/lib/api/runs';
 /** The instant the stories' answer was read at. */
 export const AS_OF = new Date('2026-10-12T17:11:00.000Z');
 
-/** The codes and the words of a step verified by its check, and of one at its gate. */
+/** The codes and the words of a step verified by its check, of one at its gate, and of one that signed off blocked on a person's answer. */
 const VERIFIED = {
   phase: 'succeeded',
   reason: 'CheckPassed',
@@ -20,9 +20,17 @@ const APPROVAL = {
   message: 'awaiting approval',
   verdict: null,
 } as const;
+const BLOCKED = {
+  phase: 'waiting',
+  reason: 'AwaitingAnswer',
+  on: null,
+  via: 'closeout',
+  message: 'succeeded · BLOCKED',
+  verdict: null,
+} as const;
 
 /** A step of `RUN`, by its name and its codes, with nothing a person is asked. */
-const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number) => ({
+const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL | typeof BLOCKED, i: number) => ({
   name,
   ...codes,
   raise: null,
@@ -125,4 +133,31 @@ export const RUN: WaitingRun = {
   clock: null,
   stepCosts: null,
   waitingSince: '2026-10-12T16:40:00.000Z',
+};
+
+/** The step whose name runs long: longer than a narrow card's foot holds beside Open the run. */
+export const LONG_STEP = 'review-the-security-of-the-change';
+
+/** `RUN` with its last step, at its gate, named `LONG_STEP`: the button says Approve all the same. */
+export const LONG_APPROVAL: WaitingRun = {
+  ...RUN,
+  gates: [{ step: LONG_STEP }],
+  steps: [...RUN.steps.slice(0, 3), step(LONG_STEP, APPROVAL, 3)],
+  graph: {
+    roots: ['design'],
+    edges: [...RUN.graph.edges.filter((e) => e.to !== 'land'), { from: 'review', to: LONG_STEP, kind: 'after' }],
+  },
+  waitingOnYou: [LONG_STEP],
+  waitingOnYouWords: [`approve ${LONG_STEP}`],
+};
+
+/** `RUN` with its last step signed off blocked on a person's answer, at no gate: the button says Answer. */
+export const ANSWER: WaitingRun = {
+  ...RUN,
+  gates: [],
+  status: 'waiting',
+  reason: 'AwaitingAnswer',
+  via: 'closeout',
+  steps: [...RUN.steps.slice(0, 3), step('land', BLOCKED, 3)],
+  waitingOnYouWords: ['answer land'],
 };

@@ -2,17 +2,18 @@ import { Body, Card, Tag, Title } from '@/components/ui/ds';
 import type { ListedRun, WaitingRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
-import { approveStepOf } from '@/lib/waitAction';
+import { waitActionOf } from '@/lib/waitAction';
 import { waitOf } from '@/lib/runWords';
 import { ANY_WAIT, OPENS } from '@/lib/words';
-import { ApproveAction } from './ApproveModal';
+import { WaitAction } from './ApproveModal';
 import { previewBar } from '../step/StepPreview';
 import { CopyId, CutButton, CutFrame, CutTag, Run, TextLink } from '../look';
 
 /**
  * A run that waits on a person, as a card: the run part at lg (`Run`) — its meta line, its title, its step now and how long it has waited
  * on a person this time, its steps as its workflow's graph, each node a button that opens its step's sheet, its cost and Open run, the card
- * glowing yellow, and, at an approval's gate, `Approve <step>` beside it, which opens the gate in a modal; how many of `among`,
+ * glowing yellow, and, at an approval's gate or a step that waits on an answer, Approve or Answer beside it, which opens the step's part
+ * in a modal; how many of `among`,
  * the page's runs, wait on it, and each run its words name by its mark. It decides nothing and shows
  * no command: the run's page does. A run the list could not judge is a card of its own (`UnjudgedCard`).
  */
@@ -70,7 +71,7 @@ function UnjudgedCard({ run }: { run: UnjudgedRun }) {
 
 /** A waiting run judged: the run part at lg (`Run`), each node of its graph a button that opens its step's sheet. */
 function JudgedCard({ run, among, asOf }: { run: WaitingRun; among: readonly ListedRun[]; asOf: Date }) {
-  const step = approveStepOf(waitOf(run));
-  const action = step ? <ApproveAction run={run} step={step} /> : undefined;
+  const wait = waitActionOf(waitOf(run));
+  const action = wait ? <WaitAction run={run} action={wait} /> : undefined;
   return <Run run={run} size="lg" asOf={asOf} among={among} wrap={previewBar(run, asOf)} action={action} className="h-full" />;
 }

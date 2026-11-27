@@ -173,7 +173,7 @@ test('a condition of each eval, a node after it and a workflow node read as they
 
 test('a node frozen with the retired `card: given` reads as a node briefed by the card, and `card: routed` as one with the default brief', () => {
   const node = { name: 'to-build', after: ['triage'], body: '', when: ['web'], workflow: 'build' };
-  const briefed = decode(frozen({ ...node, brief: 'card' } as StepSpec));
+  const briefed = decode(frozen({ ...node, brief: 'card' }));
   assert.ok(Result.isSuccess(briefed) && briefed.success.brief === 'card', 'a node with `brief: card` reads as it was frozen');
   assert.ok(Result.isFailure(decode({ ...node, brief: 'body' })), 'a brief that is neither of its words is refused');
   const given = decode({ ...node, card: 'given' });

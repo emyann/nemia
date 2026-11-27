@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery, type QueryClie
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/ds';
 import { AgentForm } from './AgentForm';
-import { DefinitionTrail, AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from './AgentParts';
+import { DefinitionTrail, AgentFace, AgentRefused, FromBadge, UsedBy } from './AgentParts';
+import { personOf } from '@/lib/agentName';
 import { CustomInstructions } from '../step/CustomInstructions';
 import { AsWritten } from '../field/FilePage';
 import { TryAgent, TryYours } from './TryAgent';
@@ -21,7 +22,6 @@ import { keyFormQuery } from '@/lib/api/builder';
 import { modelsQuery } from '@/lib/api/models';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '@/lib/agents';
 import { invalidateAgents } from '@/lib/agentWrites';
-import { FACTORY_WAY } from '@/lib/factories';
 import type { PagePlace } from '@/lib/api/workflows';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { Pending } from '@/components/look';
@@ -184,12 +184,7 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
       </div>
       {agent.description && <p className="text-body-medium text-on-surface">{agent.description}</p>}
       <UsedBy listing={agent} />
-      {!mine && agent.from === 'factory' && (
-        <p data-read-only data-way="factory" className="text-body-small text-on-surface-variant">
-          A factory&apos;s own agents are read here, not written: {FACTORY_WAY}.
-        </p>
-      )}
-      {!mine && agent.from !== 'factory' && (
+      {!mine && (
         <p data-read-only className="text-body-small text-on-surface-variant">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}

@@ -185,9 +185,12 @@ export default {
       const picker = page.locator('[data-factory-picker]');
       await expectVisible(picker.getByText(TREED, { exact: true }), `the top bar says ${TREED} on the agent's page`);
       const agentPage = page.locator('article');
+      const readOnly = agentPage.locator('[data-read-only][data-way="factory"]', { hasText: 'Read only' });
+      await expectVisible(readOnly, `the tree's own ${TREE_AGENT.name} opens on its page in ${TREED}, read only`);
+      await readOnly.hover();
       await expectVisible(
-        agentPage.locator('[data-read-only][data-way="factory"]', { hasText: "the factory's way" }),
-        `the tree's own ${TREE_AGENT.name} opens on its page in ${TREED} and says a factory's own agent changes the factory's way`,
+        page.getByRole('tooltip').getByText(`belongs to factory ${TREED}, so it can't be edited here.`),
+        `and its hover says the factory ${TREED} owns it`,
       );
       await expectCount(agentPage.getByRole('button', { name: /^(Save|Remove…?)$/ }), 0, 'and offers no Save and no Remove');
       await expectCount(
@@ -202,10 +205,10 @@ export default {
         `linked to its page in ${TREED}`,
       );
       await expectVisible(
-        agentPage.locator(`[data-given-skill="${TREE_SKILL.name}"] [data-skill-from="factory"]`),
-        `its ${TREE_SKILL.name} is found in its tree, as a start in ${TREED} finds it, and said to be the factory's`,
+        agentPage.locator(`[data-skill-tile="${TREE_SKILL.name}"]`).locator('xpath=..').getByText(TREE_SKILL.description),
+        `its ${TREE_SKILL.name} is found in its tree, as a start in ${TREED} finds it, and says what it is for`,
       );
-      await expectCount(agentPage.locator('[data-skill-from="none"]'), 0, 'and no skill it gives reads as not found');
+      await expectCount(agentPage.getByText('Not found', { exact: true }), 0, 'and no skill it gives reads as not found');
       await shoot('agent');
 
       await goto(page, `/agents/skills/factory/${TREE_SKILL.name}?factory=${TREED}`);

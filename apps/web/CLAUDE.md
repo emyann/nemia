@@ -307,6 +307,10 @@ here.
   `test/page-room.test.ts`. The Overview's strip wraps by its frames' own widths (`components/frame/OverviewStrip.tsx`).
 - An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves, the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
   phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
+- The steps at work by an agent in the runs not finished have one writer, `stepsAtWorkOf` (`lib/atWork.ts`), which the Overview's strip and a
+  factory agent's page both read; what that page says an agent is doing is `activityOf`, proved by `contracts/agent-activity.contract.ts`, which
+  assumes the sort (`lib/longestFirst.ts`) that tsverify does not read, held on real rows by `test/agent-page.test.ts`. The kit dialog's cut-frame
+  shell is `CUT_MODAL` (`lib/classes.ts`).
 - A class string two features share is `lib/classes.ts`'s, never a feature component's export. Its control strings (the buttons,
   `TEXTAREA`, `POPOVER`) are retiring for the kit's parts and no file gains an import of one; the floor's frame (`FLOOR_BOX`) stays.
 - A followed stream's event is decoded by `streamDataOf` (`lib/api/stream.ts`); one that does not decode is an `UnreadAnswer`, which

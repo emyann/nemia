@@ -22,7 +22,7 @@ import {
 } from '@/lib/api/proposals';
 import { DELEGABLE } from '@/lib/proposals';
 import { Pending, Reading, ReadingLines } from '@/components/look';
-import { personOf } from '../agent/AgentParts';
+import { personOf } from '@/lib/agentName';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */

@@ -31,3 +31,33 @@ export const workflowStatsQuery = (workflow: string) =>
         (stats) => decoded('GET /api/stats', MergedSchema, stats).all.total,
       ),
   });
+
+/**
+ * The part of the stats the history reads: each change mark's day, kind and name. A copy that stays: `objects`' `Stats` carries `all` as
+ * JSON, so the board decodes the keys it draws from it.
+ */
+const MarksSchema = Schema.Struct({
+  all: Schema.Struct({
+    marks: Schema.Array(
+      Schema.Struct({
+        day: Schema.String,
+        kind: Schema.Literals(['step', 'agent', 'skill']),
+        name: Schema.String,
+      }),
+    ),
+  }),
+});
+
+/**
+ * The changes the stats marked for one agent of one factory: the days its file, its steps or its skills changed on.
+ * @param agent The agent's name.
+ * @param factory The factory the stats are kept to.
+ */
+export const agentMarksQuery = (agent: string, factory: string) =>
+  queryOptions({
+    queryKey: ['stats', 'agent', factory, agent],
+    queryFn: () =>
+      call((c) => c.server.stats({ query: { agent, ofFactory: factory } }), read(Stats)).then(
+        (stats) => decoded('GET /api/stats', MarksSchema, stats).all.marks,
+      ),
+  });

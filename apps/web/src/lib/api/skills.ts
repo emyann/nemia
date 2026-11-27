@@ -66,6 +66,12 @@ const skillsInQuery = (namespace: string) =>
       ) satisfies Promise<SkillPlace[]>,
   });
 
+/**
+ * Every skill of a factory's places, each with what it is for.
+ * @param factory The factory's name.
+ */
+export const factorySkillsQuery = (factory: string) => skillsInQuery(namespaceOf(factory));
+
 /** Every skill the picker lists, by place, in the default namespace. */
 export const skillsQuery = skillsInQuery(DEFAULT_NAMESPACE);
 

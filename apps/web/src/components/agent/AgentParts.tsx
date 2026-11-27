@@ -7,6 +7,7 @@ import { type AgentFill, type AgentListing, type AgentUser } from '../../lib/api
 import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
+import { personOf } from '../../lib/agentName';
 import { linkOptions } from '@tanstack/react-router';
 import { routeLink } from '../nav/routeLink';
 import { factoryLevel, Trail } from '../nav/Trail';
@@ -59,8 +60,9 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 /**
  * A node that names an agent, or a step it fills, linked to its step's page: `workflow › step`; a repository's, a factory's own, and a
  * step of yours a factory hires it into, in the factory and repository the page is in, the default factory reading no repository.
+ * @param props.user The node, by its origin, workflow and step.
  */
-function NodeLink({ user }: { user: AgentUser | AgentFill }) {
+export function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePagePlace();
   return (
     <RouteLink
@@ -78,8 +80,10 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
 /**
  * Each node that names an agent, then each step it fills in the factory read that none of those is, hired there or named elsewhere: a step
  * by its workflow and its name, since a factory's tree is read as a repository's where a node names it.
+ * @param props.usedBy The nodes that name the agent.
+ * @param props.fills The steps the agent fills in the factory read.
  */
-const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>) => {
+export const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>) => {
   const keyOf = (node: AgentUser | AgentFill) => `${node.workflow}/${node.step}`;
   const drawn = new Set(usedBy.map(keyOf));
   const filled = fills.filter((fill, i) => !drawn.has(keyOf(fill)) && fills.findIndex((other) => keyOf(other) === keyOf(fill)) === i);
@@ -178,17 +182,6 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
     </Body>
   );
 }
-
-/**
- * An agent's name as a person's: its file's name, first letter up and dashes as spaces — `reviewer` is Reviewer, `note-writer` Note
- * writer.
- *
- * @param name the agent's file name, its words joined by dashes
- */
-export const personOf = (name: string) => {
-  const spaced = name.replaceAll('-', ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-};
 
 const FACE = 'shrink-0 rounded-full bg-surface-container-highest';
 

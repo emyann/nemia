@@ -1,5 +1,6 @@
 import { defaultStringifySearch } from '@tanstack/react-router';
 import { BookOpen, Bot, ChartColumn, Factory, Hourglass, Library, type LucideIcon, Settings } from 'lucide-react';
+import { personOf } from '../../lib/agentName.ts';
 import { openRunsQuery } from '../../lib/api/runs.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -235,12 +236,14 @@ export function pickTo(path: string, search: Record<string, unknown>, factory: s
 /**
  * The name a page's head gives the page at `path`: under a factory's path its pane's place, at the store's level the page's own, the
  * rail's destination it sits under holding several (Waiting the runs and the inbox, Agents the agents and the workflows); none for an
- * address no route has.
+ * address no route has. A factory's agent's page is named by the agent, as a person's.
  *
  * @param path the address of the page
  */
 export function pageNameOf(path: string) {
   const seat = seatOf(path);
+  const agent = /^\/factories\/[^/]+\/agents\/([^/]+)\/?$/.exec(path);
+  if (agent) return personOf(decodeURIComponent(agent[1] ?? ''));
   if (seat?.level === 'factory') return PANE_PLACES.find((place) => place.id === seat.place)?.label;
   return seat && STORE_SEATS.find((one) => one.lights(path))?.name;
 }

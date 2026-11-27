@@ -1,7 +1,8 @@
 import type { AgentListing, AgentRoleKey } from '../../lib/api/agents.ts';
 import type { PagePlace } from '../../lib/api/workflows.ts';
 import { definitionLink } from '../../lib/factoryAddress';
-import { AgentFace, FromBadge, personOf, RouteLink, Skills, UsedBy } from './AgentParts';
+import { AgentFace, FromBadge, RouteLink, Skills, UsedBy } from './AgentParts';
+import { personOf } from '@/lib/agentName';
 import { FactoryTags } from '../factory/FactoryTag';
 
 /** The keys a character card shows, as its stats: what its sessions think with, how hard, and where they run. */

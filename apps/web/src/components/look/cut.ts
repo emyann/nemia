@@ -4,8 +4,8 @@
  * No file outside the look writes a cut (`test/look.test.ts`): it takes the part that draws one.
  */
 
-/** How long a cut is along each side, in pixels: a card's, a table's, a button's, a field's, a cue's. */
-export type CutSize = 28 | 24 | 12 | 10 | 9;
+/** How long a cut is along each side, in pixels: a card's, a table's, a panel's, a button's, a field's, a cue's. */
+export type CutSize = 28 | 24 | 16 | 12 | 10 | 9;
 
 /** Which corners a cut takes: the top-right and the bottom-left, as a card, a field or a button is cut, or the top-right alone, a tag's. */
 type Corners = 'two' | 'top-right';

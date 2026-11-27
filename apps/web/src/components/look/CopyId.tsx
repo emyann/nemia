@@ -8,6 +8,9 @@ import { useCopy, type CopySaid } from '@/lib/useCopy';
 /** What the copy control says to a screen reader once pressed. */
 const SAID: Record<CopySaid, string> = { copy: '', copied: 'Copied', failed: 'Could not copy: select the id and copy it' };
 
+/** What the id names, as the control's label says it. */
+const NOUN = { run: 'run id', card: 'card name', file: 'file path' } as const;
+
 /** How wide and tall the control's glyph is drawn, in pixels, whatever size the kit's button hands it. */
 const GLYPH = 12;
 
@@ -57,7 +60,7 @@ export function CopyId({
   id: string;
   short?: boolean;
   room?: number;
-  of?: 'run' | 'card';
+  of?: 'run' | 'card' | 'file';
   wrap?: boolean;
 }) {
   const { said, copy } = useCopy(id);
@@ -98,7 +101,7 @@ export function CopyId({
         size="xsmall"
         variant="standard"
         icon={copied ? COPIED : COPY}
-        aria-label={`Copy the ${of === 'run' ? 'run id' : 'card name'} ${id}`}
+        aria-label={`Copy the ${NOUN[of]} ${id}`}
         onPress={copy}
         className={cn(PULLED, wrap && 'shrink-0')}
       />

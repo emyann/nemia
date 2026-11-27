@@ -497,7 +497,8 @@ test("REFUSED: an agent of yours the try's fence does not reach says why in plac
 });
 
 test("an agent's face is drawn from its name, alive at all times: the same name the same face, another name another, named as a person is", async () => {
-  const { AgentFace, personOf } = await import('../src/components/agent/AgentParts.tsx');
+  const { AgentFace } = await import('../src/components/agent/AgentParts.tsx');
+  const { personOf } = await import('../src/lib/agentName.ts');
   const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 16 }));
   const iris = face('iris');
   assert.match(iris, /^<svg [^>]*>/, "an inline drawing, which Blobatar's stylesheet moves");

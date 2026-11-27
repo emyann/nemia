@@ -1,7 +1,8 @@
 import { useQuery, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { AgentCard } from './AgentCard';
-import { personOf, SkillLink } from './AgentParts';
+import { SkillLink } from './AgentParts';
+import { personOf } from '@/lib/agentName';
 import { ListFilter, NothingMatches } from '../filter/ListFilter';
 import { Button } from '@/components/ui/ds';
 import { agentsQuery, factoryAgentsQuery, type LibraryAgent } from '@/lib/api/agents';

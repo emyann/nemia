@@ -478,7 +478,6 @@ export const releasedThrough = (e: Engine, parents: Parents) =>
       Effect.orElseSucceed(() => false),
     )) satisfies RunReleased;
 
-/** A run's release that reads none: every run is read as not released, so a card that waits on a known card is never started for it. */
 /**
  * The inbox folder's entries, each with its parse as the informer keeps it (`cardsRead`): a card is parsed once per change of its text,
  * across passes and requests; with no informer, entries as read, parsed afresh by whoever lists them.
@@ -494,6 +493,7 @@ const entriesNow = Effect.fnUntraced(function* () {
   return yield* entriesRead((yield* Informer)?.cards, yield* setting('verifyRest'));
 });
 
+/** A run's release that reads none: every run is read as not released, so a card that waits on a known card is never started for it. */
 const NONE_RELEASED: RunReleased = () => Effect.succeed(false);
 
 /**

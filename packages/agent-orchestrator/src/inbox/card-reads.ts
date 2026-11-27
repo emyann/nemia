@@ -8,7 +8,7 @@ import type { CardReadKey, CardReadServed } from '../../contracts/card-reads.con
 import { cardOrWhy, type CardOrWhy } from './inbox.ts';
 
 /** A card's parse with the file and the text it was made of. */
-export type KeptCardRead = CardReadKey & { readonly read: CardOrWhy };
+type KeptCardRead = CardReadKey & { readonly read: CardOrWhy };
 
 /** The kept parses by card file, and how many parses were made (not served) since the memo began. */
 export type CardReads = { readonly kept: Map<string, KeptCardRead>; parsed: number };

@@ -1,12 +1,12 @@
 /**
- * The head of a step's part (`headOf`, lib/stepPart.ts): who the step is given, its word as a cut tag, its name with its tries and
- * rounds, and, from the modal's size up, its time, its session's five facts, its spend, its one note and its one action; whole,
- * its check and its gate besides. While the run's own answer is read, it says so in place of what it has not read.
+ * The head of a step's part (`headOf`, lib/stepPart.ts): who the step is given, or what a wait node waits on, its word as a cut tag, its
+ * name with its tries and rounds, and, from the modal's size up, its time, its session's five facts, its spend, its one note and its one
+ * action; whole, its check and its gate besides. While the run's own answer is read, it says so in place of what it has not read.
  */
 import { ChevronRight, Info, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { Avatar, Body, Label, Meter, Tag, Title } from '@/components/ui/ds';
 import { ink } from '@/lib/meaning';
-import type { CardNote, CardSpend, CardTime, PartHead as Head, PartSize } from '@/lib/stepPart';
+import type { CardNote, CardSpend, CardTime, PartHead as Head, PartSize, WaitOn } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
 import { CutTag, MeaningTag, Reading, ReadingLines, TextLink } from '../../look';
 
@@ -47,9 +47,45 @@ export function StateTag({ head }: { head: Head }) {
   );
 }
 
-/** The agent's avatar, name and role, and the step's word as a cut tag; `no agent`, with no avatar, where the step names none. */
+/**
+ * What a wait node waits on, in place of an agent: `waits on` and each condition in order, with its state's word once the step is filed.
+ * @param props.waits The conditions, as the head reads them.
+ */
+export function WaitsOn({ waits }: { waits: readonly WaitOn[] }) {
+  return (
+    <Body size="medium" component="span" data-step-waits className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+      <span className="text-on-surface-variant">waits on</span>
+      {waits.map((wait, i) => (
+        <span key={wait.name} data-waits-on={wait.name} data-condition-word={wait.word ?? undefined}>
+          <span className="font-mono font-medium">{wait.name}</span>
+          {wait.word && <span className="text-on-surface-variant"> {wait.word}</span>}
+          {i < waits.length - 1 && (
+            <span aria-hidden="true" className="text-on-surface-variant">
+              {' '}
+              ·
+            </span>
+          )}
+        </span>
+      ))}
+    </Body>
+  );
+}
+
+/**
+ * The agent's avatar, name and role, and the step's word as a cut tag; `no agent`, with no avatar, where the step names none; and for a
+ * wait node, which has no agent, the conditions it waits on.
+ */
 function Who({ head }: { head: Head }) {
   const who = head.who === 'none' ? null : head.who;
+  if (head.waits !== 'none')
+    return (
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <WaitsOn waits={head.waits} />
+        </div>
+        <StateTag head={head} />
+      </div>
+    );
   return (
     <div className="flex items-center gap-3">
       {who && (

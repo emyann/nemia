@@ -8,11 +8,11 @@ import { dropStoredAsks, OUT, storedAsks, storedRecordText } from '../world.ts';
 
 export default {
   /**
-   * Approving from the waiting card: the run at plan's gate has a button named `Approve plan` beside `Open the run`, which no other
-   * kind of wait gives. It opens a modal named for the step, holding what the gate asks — the closeout's summary and the gate itself —
-   * and Approve there answers the gate (one approval sent for the step, the modal gone with the answer). Taken back, the modal's Send back
-   * with words sends one retry carrying them, and the modal goes with the answer. Each file is taken back, so every page after this one
-   * reads the store as seeded.
+   * Approving from the waiting card: the run at plan's gate has a button named `Approve plan` beside `Open the run`, which only a
+   * wait at a gate gives (a wait on an answer gives `Answer <step>`, and every other kind of wait neither). It opens a modal named
+   * for the step, holding what the gate asks — the closeout's summary and the gate itself — and Approve there answers the gate (one
+   * approval sent for the step, the modal gone with the answer). Taken back, the modal's Send back with words sends one retry carrying
+   * them, and the modal goes with the answer. Each file is taken back, so every page after this one reads the store as seeded.
    */
   name: 'waiting-approve',
   route: '/runs',
@@ -31,17 +31,19 @@ export default {
     const cards = await page.locator('section[data-section="waiting"] article[data-run]').all();
     let others = 0;
     for (const other of cards) {
-      const approves = await other.locator('[data-approve]').count();
-      if (approves > 1) throw new Refused(`a waiting card holds one Approve button at most — one holds ${approves}`);
-      if (approves === 1) {
-        await expectCount(other.locator('[data-now-words]'), 0, 'a card that holds Approve leaves the words of its wait to it');
+      const actions = await other.locator('[data-approve], [data-answer]').count();
+      if (actions > 1) throw new Refused(`a waiting card holds one Approve or Answer button at most — one holds ${actions}`);
+      if (actions === 1) {
+        await expectCount(other.locator('[data-now-words]'), 0, 'a card that holds Approve or Answer leaves the words of its wait to it');
         continue;
       }
       others += 1;
       const said = ((await other.locator('[data-now-words]').first().textContent()) ?? '').trim().toLowerCase();
-      if (said.startsWith('approve ')) throw new Refused(`the card that says "${said}" holds its Approve button`);
+      if (said.startsWith('approve ') || said.startsWith('answer '))
+        throw new Refused(`the card that says "${said}" holds its Approve or Answer button`);
     }
-    if (others === 0) throw new Refused('a waiting card of another kind of wait stands beside the gate, to hold no Approve');
+    if (others === 0)
+      throw new Refused('a waiting card of another kind of wait stands beside the gate, to hold no button but Open the run');
 
     const modal = page.getByRole('dialog', { name: `Approve ${gated}`, exact: true });
     const gateOf = () => modal.locator(`section[aria-label="The gate of ${gated}"]`);

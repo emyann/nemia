@@ -208,8 +208,8 @@ async function secondGate(page: Page, open: OpenRuns) {
 
 /**
  * A waiting run's card says its meta line (its id's end, its whole id on hover), its title as a link, the yellow chip of the step it
- * waits on you at and the words of what is asked (`nowOf`), left to its Approve where it holds one, its own steps as a short rail,
- * each bar a button that opens its step's card, and one quiet button, which opens the run's page.
+ * waits on you at and the words of what is asked (`nowOf`), left to its Approve or Answer where it holds one, its own steps as a short
+ * rail, each bar a button that opens its step's card, and one quiet button, which opens the run's page.
  */
 async function cardSays(page: Page, run: WaitingRun) {
   const card = cardOf(page, run.id);
@@ -218,8 +218,9 @@ async function cardSays(page: Page, run: WaitingRun) {
   if (!now) throw new Refused(`${run.id}, which waits on you, has a step it is on now`);
   const chip = await card.locator('[data-now-word]').evaluate((tag) => `${tag.textContent} ${tag.getAttribute('data-tone')}`);
   if (chip !== `${now.step} yours`) throw new Refused(`the card of ${run.id} draws its step in the yellow chip — it draws ${chip}`);
-  const approvals = await card.locator('[data-approve]').count();
-  if (approvals > 0) await expectCount(card.locator('[data-now-words]'), 0, `the card of ${run.id} leaves what is asked to its Approve`);
+  const actions = await card.locator('[data-approve], [data-answer]').count();
+  if (actions > 0)
+    await expectCount(card.locator('[data-now-words]'), 0, `the card of ${run.id} leaves what is asked to its Approve or Answer`);
   else
     await expectTexts(
       card.locator('[data-now-words]'),
@@ -233,7 +234,11 @@ async function cardSays(page: Page, run: WaitingRun) {
   await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'its own steps as its graph');
   await expectCount(card.locator('[data-step-name]'), 0, 'a graph that names no step under its nodes');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
-  await expectCount(card.locator('[data-cut-button]'), 1 + approvals, 'and no other but Approve, where the run waits at an approval');
+  await expectCount(
+    card.locator('[data-cut-button]'),
+    1 + actions,
+    'and no other but Approve or Answer, where the run waits at an approval or on an answer',
+  );
   await expectCount(
     card.locator('button[data-step-bar]'),
     run.steps.length,
@@ -243,8 +248,8 @@ async function cardSays(page: Page, run: WaitingRun) {
   if (clocks > 1) throw new Refused(`the card of ${run.id} draws its clock once — it draws ${clocks}`);
   await expectCount(
     card.locator('button:not([data-step-bar])'),
-    1 + approvals + (run.cost && run.tokens ? 1 : 0) + clocks,
-    'and no control more than the copy of its id, Approve and the previews of its clock and its cost: nothing is decided from the list',
+    1 + actions + (run.cost && run.tokens ? 1 : 0) + clocks,
+    'and no control more than the copy of its id, Approve or Answer, and the previews of its clock and its cost: nothing is decided from the list',
   );
 }
 

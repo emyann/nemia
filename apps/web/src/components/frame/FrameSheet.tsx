@@ -41,7 +41,7 @@ export function FrameSheet({ path, feed }: { path: string; feed: FeedStatus }) {
       </SideSheet>
     );
   return (
-    <div data-frame-sheet={fold.sheet} data-sheet-shows={fold.shows} className="z-30 h-full shrink-0">
+    <div data-frame-sheet={fold.sheet} data-sheet-shows={fold.shows} className="z-30 shrink-0">
       <SideSheet variant="standard" isOpen={fold.sheet === 'docked'} className="h-full w-[400px] min-w-[400px] rounded-none bg-background">
         {fold.sheet === 'docked' && content}
       </SideSheet>

@@ -114,10 +114,7 @@ export function FactoryPane({
     <aside
       data-factory-pane={factory}
       aria-label={`The factory ${factory}`}
-      className={cn(
-        'flex shrink-0 flex-col gap-3 bg-surface-container-low p-3',
-        inDrawer ? 'w-full' : 'z-20 h-full w-[360px] overflow-y-auto',
-      )}
+      className={cn('flex shrink-0 flex-col gap-3 bg-surface-container-low p-3', inDrawer ? 'w-full' : 'z-20 w-[360px] overflow-y-auto')}
     >
       <div data-pane-head className="flex flex-col gap-3 rounded-shape-large bg-surface-container-high p-3">
         <FactoryPicker path={path} search={search} picked={factory} />

@@ -494,7 +494,7 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage) {
   await page.mouse.move(0, 0);
   await expectCount(page.locator('[data-slot="tooltip"] [data-step-glance]'), 0, 'no glance left open by a pointer resting on a bar');
   for (const [control, up, down, where] of controls) {
-    await control.scrollIntoViewIfNeeded();
+    await control.evaluate((button) => button.scrollIntoView({ block: 'center' }));
     const off = await missed(control, 23, up, down);
     if (off.length)
       throw new Refused(

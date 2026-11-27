@@ -8,7 +8,9 @@ import { CHOICE } from './CutSelect';
 /**
  * One line the search panel offers: the key it is picked by, its words, and what goes with them. `lead` is a mark before the words (a
  * state's dot); `words` are the typed letters its label shows in bold; `tail` is a short note after it in the mono face; `hint` is a
- * quiet count; `look: 'button'` draws it as a button; `keeps` leaves the panel open once it is picked.
+ * quiet count; `look: 'button'` draws it as a button; `keeps` leaves the panel open once it is picked. `key` says the label opens with
+ * a key and its colon, drawn quiet in the mono face (`chip` boxes it with its value); `chips` draw a set of such labels, each as a chip;
+ * `quiet` draws the line in the quiet ink.
  */
 export type CutSearchItem = {
   id: string;
@@ -19,6 +21,9 @@ export type CutSearchItem = {
   tail?: string;
   look?: 'button';
   keeps?: boolean;
+  key?: 'column' | 'chip';
+  chips?: readonly string[];
+  quiet?: boolean;
 };
 
 /** A group of the search panel: its title, a note under the title, and its lines. */
@@ -39,13 +44,70 @@ function Marked({ label, words }: { label: string; words: string | undefined }) 
   );
 }
 
+/** A label that opens with a key and its colon, as the key and the rest. */
+const keyOf = (label: string) => {
+  const at = label.indexOf(': ');
+  return at < 0 ? { key: '', rest: label } : { key: label.slice(0, at + 1), rest: label.slice(at + 2) };
+};
+
+/** The mono, quiet face a key is drawn in. */
+function Key({ children }: { children: string }) {
+  return (
+    <Body size="small" component="span" colorRole="on-surface-variant" className="shrink-0 font-mono">
+      {children}
+    </Body>
+  );
+}
+
+/** A label with a key, as the board draws it: the key in its own quiet column, or boxed with its value as a chip. */
+function Keyed({ item, label }: { item: CutSearchItem; label: string }) {
+  const { key, rest } = keyOf(label);
+  const value = (
+    <span>
+      <Marked label={rest} words={item.words} />
+    </span>
+  );
+  if (key === '') return <Marked label={label} words={item.words} />;
+  if (item.key === 'chip') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-shape-small border border-outline-variant px-2">
+        <Key>{key}</Key> {value}
+      </span>
+    );
+  }
+  return (
+    <>
+      <span className="inline-block w-28 shrink-0">
+        <Key>{key}</Key>
+      </span>
+      {value}
+    </>
+  );
+}
+
 /** A line of the panel as a person reads it: its mark, its words with the typed letters in bold, its tail and its hint. */
 function Line({ item }: { item: CutSearchItem }) {
+  const words = item.chips ? (
+    <span className="inline-flex flex-wrap gap-1">
+      {item.chips.map((chip) => (
+        <Keyed key={chip} item={{ ...item, key: 'chip' }} label={chip} />
+      ))}
+    </span>
+  ) : item.key ? (
+    <Keyed item={item} label={item.label} />
+  ) : (
+    <Marked label={item.label} words={item.words} />
+  );
   return (
     <>
       {item.lead}
-      <Body size="medium" component="span" className={cn('min-w-0 flex-1', item.look === 'button' ? 'text-center' : 'truncate')}>
-        <Marked label={item.label} words={item.words} />
+      <Body
+        size="medium"
+        component="span"
+        colorRole={item.quiet ? 'on-surface-variant' : undefined}
+        className={cn('min-w-0 flex-1', item.look === 'button' ? 'text-center' : item.chips ? '' : 'truncate')}
+      >
+        {words}
       </Body>
       {item.tail && (
         <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
@@ -85,9 +147,9 @@ function Foot() {
 export function CutSearchPanel({ sections }: { sections: readonly CutSearchSection[] }) {
   return (
     <div className="flex flex-col">
-      <ListBox items={sections} aria-label="Suggestions" className="max-h-80 overflow-auto outline-none">
+      <ListBox items={sections} aria-label="Suggestions" className="max-h-[28rem] overflow-auto outline-none">
         {(section: CutSearchSection) => (
-          <ListBoxSection id={section.id} className="pb-1">
+          <ListBoxSection id={section.id} className="pb-1 not-first:border-t not-first:border-outline-variant">
             {section.title && (
               <Header className="px-3 pt-2 pb-1">
                 <Body size="small" component="span" colorRole="on-surface-variant" className="block uppercase tracking-wide">

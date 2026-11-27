@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import { chainsQuery, inboxPageQuery, searchQuery, type InboxEntry, type InboxPage as Page } from '@/lib/api/inbox';
 import { everyFactory, suggestedAsk } from '@/lib/searchBar';
@@ -33,6 +33,7 @@ const drawn = ({
   remaining = 0,
   layout = 'grid',
   extra = [],
+  onSearch = () => undefined,
 }: {
   cards: readonly InboxEntry[];
   at?: InboxView;
@@ -41,6 +42,7 @@ const drawn = ({
   remaining?: number;
   layout?: 'grid' | 'list';
   extra?: ReadonlyArray<readonly [readonly unknown[], unknown]>;
+  onSearch?: (patch: Partial<InboxView>) => void;
 }) => {
   localStorage.setItem('nemia.inbox.layout', layout);
   const page: Page = {
@@ -63,7 +65,7 @@ const drawn = ({
       ])}
     >
       <div style={{ width: 1040 }}>
-        <InboxPage at={at} onSearch={() => undefined} />
+        <InboxPage at={at} onSearch={onSearch} />
       </div>
     </QueryClientProvider>
   );
@@ -76,7 +78,7 @@ const drawn = ({
 const meta: Meta<typeof InboxPage> = {
   title: 'Pages/Inbox',
   component: InboxPage,
-  args: { at: {}, onSearch: () => undefined },
+  args: { at: {}, onSearch: fn() },
 };
 export default meta;
 
@@ -171,10 +173,11 @@ export const NoMatch: Story = {
 
 /** A search a factory's label keeps to finds nothing there: it names the scope, says where a card does match, and offers both ways out. */
 export const NothingFound: Story = {
-  render: () => {
+  render: (args) => {
     const at: InboxView = { search: 'microvm', l: 'factory=globex' };
     return drawn({
       at,
+      onSearch: args.onSearch,
       cards: [],
       extra: [
         [
@@ -184,12 +187,15 @@ export const NothingFound: Story = {
       ],
     });
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ args, canvasElement, userEvent }) => {
     const page = within(canvasElement);
     await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No open card of globex matches “microvm”.');
     await expect(page.getByText('One open card of acme does.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Search closed cards' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Every factory' })).toBeVisible();
+    await userEvent.click(page.getByRole('button', { name: 'Search closed cards' }));
+    await expect(args.onSearch).toHaveBeenCalledWith(expect.objectContaining({ cards: 'closed' }));
+    await userEvent.click(page.getByRole('button', { name: 'Every factory' }));
+    await waitFor(() => expect(canvasElement.querySelector('[data-story-ground]')?.getAttribute('data-at')).toContain('search=microvm'));
+    await expect(canvasElement.querySelector('[data-story-ground]')?.getAttribute('data-at')).not.toContain('factory');
   },
 };
 

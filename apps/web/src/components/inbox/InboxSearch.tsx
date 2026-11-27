@@ -13,8 +13,10 @@ import {
   pickedPhase,
   recentOf,
   searchKeys,
+  scopeOf,
   suggestedAsk,
   viewOfRecent,
+  withoutFactory,
   type Offer,
 } from '@/lib/searchBar';
 import { cn } from '@/lib/utils';
@@ -44,6 +46,7 @@ function keyRows(keys: ReturnType<typeof searchKeys>) {
             ? undefined
             : `${one.values.length} ${one.values.length === 1 ? 'value' : 'values'}`,
       keeps: true,
+      key: 'column',
     } satisfies CutSearchItem;
   });
 }
@@ -57,6 +60,7 @@ function recentRows(sets: readonly string[]) {
         label: barChips(viewOfRecent(set))
           .map((chip) => chip.label)
           .join(' · '),
+        chips: barChips(viewOfRecent(set)).map((chip) => chip.label),
       }) satisfies CutSearchItem,
   );
 }
@@ -70,6 +74,7 @@ const offerRows = (offers: readonly Offer[], text: string) =>
         label: `${offer.key}: ${wordOf(offer.key, offer.value)}`,
         words: text.trim().includes(':') ? text.trim().split(':').slice(1).join(':').trim() : text.trim(),
         hint: `${offer.cards} ${offer.cards === 1 ? 'card' : 'cards'}`,
+        key: 'chip',
       }) satisfies CutSearchItem,
   );
 
@@ -100,6 +105,13 @@ const keyed = (text: string, keys: ReturnType<typeof searchKeys>) => {
   return text.includes(':') && keys.some((one) => one.key === key?.toLowerCase());
 };
 
+/** The ways out of words that find nothing: the other side of the inbox, and every factory where a factory kept the search. */
+const waysOut = (side: 'open' | 'closed', scoped: boolean) =>
+  [
+    { id: 'out:side', label: side === 'open' ? 'Search closed cards' : 'Search open cards', look: 'button' as const },
+    ...(scoped ? [{ id: 'out:every', label: 'Every factory', look: 'button' as const }] : []),
+  ] satisfies CutSearchItem[];
+
 /** What the panel holds: with nothing typed the keys and Recent; with words, the filters they match and the cards they find. */
 function panelOf({
   typed,
@@ -107,12 +119,16 @@ function panelOf({
   picked,
   recent,
   found,
+  side,
+  scoped,
 }: {
   typed: string;
   keys: ReturnType<typeof searchKeys>;
   picked: readonly string[];
   recent: readonly string[];
   found: InboxSearched | undefined;
+  side: 'open' | 'closed';
+  scoped: boolean;
 }) {
   if (typed === '') {
     return [
@@ -120,6 +136,7 @@ function panelOf({
       ...(recent.length === 0 ? [] : [{ id: 'recent', title: 'Recent', items: recentRows(recent) }]),
     ] satisfies CutSearchSection[];
   }
+  const offers = barOffers(keys, typed, picked);
   const shown =
     found === undefined || found.entries.length === 0
       ? []
@@ -129,13 +146,22 @@ function panelOf({
             title: 'Cards',
             items: [
               ...cardRows(found.entries, typed),
-              { id: 'all', label: `Show all ${found.total} ${found.total === 1 ? 'card' : 'cards'} matching “${typed}”` },
+              {
+                id: 'all',
+                label: `Show all ${found.total} ${found.total === 1 ? 'card' : 'cards'} matching “${typed}”`,
+                quiet: true,
+              },
             ],
           },
         ];
+  const nothing =
+    found !== undefined && found.total === 0 && offers.length === 0
+      ? [{ id: 'out', title: 'Nothing found', note: `No ${side} card matches “${typed}”.`, items: waysOut(side, scoped) }]
+      : [];
   return [
-    { id: 'filter', title: 'Filter', items: offerRows(barOffers(keys, typed, picked), typed) },
+    ...(offers.length === 0 ? [] : [{ id: 'filter', title: 'Filter', items: offerRows(offers, typed) }]),
     ...shown,
+    ...nothing,
   ] satisfies CutSearchSection[];
 }
 
@@ -176,11 +202,21 @@ export function InboxSearch({
     setRecent(kept);
     store(RECENT_KEY, kept.join('\n'));
   };
-  const submit = (words: string) => filters({ search: [view.search, words].filter(Boolean).join(' ') });
-  const sections = panelOf({ typed, keys, picked, recent, found: asking ? found : undefined });
+  const wordsWith = (words: string) => [view.search, words].filter(Boolean).join(' ');
+  const submit = (words: string) => filters({ search: wordsWith(words) });
+  const side = view.cards === 'closed' ? 'closed' : 'open';
+  const sections = panelOf({ typed, keys, picked, recent, found: asking ? found : undefined, side, scoped: scopeOf(view) !== undefined });
   const pick = (id: string) => {
     if (id.endsWith(':')) return setText(id);
     if (id === 'all') return submit(typed);
+    if (id === 'out:side') return filters({ search: wordsWith(typed), cards: side === 'open' ? 'closed' : undefined, phase: undefined });
+    if (id === 'out:every') {
+      setText('');
+      return void navigate({
+        to: '/inbox',
+        search: { search: wordsWith(typed), l: withoutFactory(view.l), cards: view.cards, phase: view.phase },
+      });
+    }
     if (id.startsWith('card:')) return void navigate({ to: '/inbox/$name', params: { name: id.slice('card:'.length) } });
     if (id.startsWith('recent:')) {
       const set = viewOfRecent(id.slice('recent:'.length));

@@ -28,7 +28,7 @@ function useSlashFocus(input: RefObject<HTMLInputElement | null>) {
 }
 
 /** One chip of the bar: its words on the look's cut tag, and the key that takes it off. */
-function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) => void }) {
+function SearchChip({ chip, onRemove, open }: { chip: CutChip; onRemove: (id: string) => void; open: boolean }) {
   return (
     <span data-chip={chip.id} className="inline-flex">
       <CutTag edge>
@@ -36,10 +36,24 @@ function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) 
           <Body size="small" component="span">
             {chip.label}
           </Body>
-          <IconButton size="xsmall" variant="standard" icon={X} aria-label={`Take off ${chip.label}`} onPress={() => onRemove(chip.id)} />
+          <IconButton
+            size="xsmall"
+            variant="standard"
+            icon={X}
+            aria-label={`Take off ${chip.label}`}
+            excludeFromTabOrder={open}
+            onPress={() => onRemove(chip.id)}
+          />
         </span>
       </CutTag>
     </span>
+  );
+}
+
+/** The key that takes every filter off; out of the tab order while the panel is open, which hides it from a screen reader. */
+function ClearKey({ open, onClear }: { open: boolean; onClear: () => void }) {
+  return (
+    <IconButton size="xsmall" variant="standard" icon={X} aria-label="Clear everything" excludeFromTabOrder={open} onPress={onClear} />
   );
 }
 
@@ -175,6 +189,7 @@ export function CutSearch({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
   const { picking, reopen, reopened, choose } = usePicks(sections, onPick);
   useSlashFocus(input);
   return (
@@ -183,13 +198,14 @@ export function CutSearch({
         <Body size="medium" component="span" className="flex flex-wrap items-center gap-2 py-1.5 pl-3.5 pr-4">
           <Search aria-hidden="true" size={16} className="shrink-0 text-on-surface-variant" />
           {chips.map((chip) => (
-            <SearchChip key={chip.id} chip={chip} onRemove={onRemove} />
+            <SearchChip key={chip.id} chip={chip} onRemove={onRemove} open={open} />
           ))}
           <ComboBox
             aria-label={label}
             allowsCustomValue
             allowsEmptyCollection
             menuTrigger="focus"
+            onOpenChange={setOpen}
             inputValue={text}
             onInputChange={(value) => {
               if (!picking.current || value !== '') onText(value);
@@ -213,9 +229,7 @@ export function CutSearch({
               <CutSearchPanel sections={sections} />
             </Popover>
           </ComboBox>
-          {onClear && (chips.length > 0 || text !== '') && (
-            <IconButton size="xsmall" variant="standard" icon={X} aria-label="Clear everything" onPress={onClear} />
-          )}
+          {onClear && (chips.length > 0 || text !== '') && <ClearKey open={open} onClear={onClear} />}
         </Body>
       </CutField>
     </div>

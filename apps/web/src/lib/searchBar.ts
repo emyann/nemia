@@ -188,3 +188,15 @@ export function withoutFactory(selector: string | undefined) {
  * @param asked The query the api's card list takes.
  */
 export const everyFactory = (asked: InboxAsked) => ({ ...asked, labelSelector: withoutFactory(asked.labelSelector) }) satisfies InboxAsked;
+
+/**
+ * The factory the filters keep a view to: the one its path names, else the one a `factory=` label picks.
+ * @param at What the page reads of its address.
+ */
+export const scopeOf = (at: Pick<InboxView, 'factory' | 'l'>) =>
+  at.factory ??
+  (at.l ?? '')
+    .split(',')
+    .find((term) => term.trim().startsWith('factory='))
+    ?.trim()
+    .slice('factory='.length);

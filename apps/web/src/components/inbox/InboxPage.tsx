@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Body, Button } from '@/components/ui/ds';
-import { Pager, SectionHead } from '@/components/look';
+import { Pager, SectionHead, TextLink } from '@/components/look';
 import { chainsQuery, inboxPageQuery, searchQuery } from '@/lib/api/inbox';
 import { trailOf } from '@/lib/finished';
 import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, TRAIL_MARK, type InboxView } from '@/lib/inbox';
-import { elsewhereLine, everyFactory, suggestedAsk, withoutFactory } from '@/lib/searchBar';
+import { elsewhereLine, everyFactory, scopeOf, suggestedAsk, withoutFactory } from '@/lib/searchBar';
 import { readStored, store } from '@/lib/stored';
 import { CardChain } from './CardChain';
 import { CARD_LEAST, InboxCard, InboxList } from './InboxCard';
@@ -17,15 +17,6 @@ const LAYOUT_KEY = 'nemia.inbox.layout';
 
 /** The layout kept in this browser: Grid the first time. */
 const keptLayout = () => readStored<Layout>(LAYOUT_KEY, (raw) => (raw === 'list' ? 'list' : raw === 'grid' ? 'grid' : undefined), 'grid');
-
-/** The factory the filters keep the page to: the one its path names, else the one a `factory=` label picks. */
-const scopeOf = (at: InboxView) =>
-  at.factory ??
-  (at.l ?? '')
-    .split(',')
-    .find((term) => term.trim().startsWith('factory='))
-    ?.trim()
-    .slice('factory='.length);
 
 /**
  * What the page says where the filters keep no card: which cards were searched, where some card does match, and the ways out: the other
@@ -94,15 +85,15 @@ function NoneShown({ factory }: { factory: string | undefined }) {
 }
 
 /** The line under the bar while a filter is set: how many cards the filters keep, and the key that takes every filter off. */
-function FilterLine({ total, onClear }: { total: number; onClear: () => void }) {
+function FilterLine({ total }: { total: number }) {
   return (
     <div data-filter-count className="flex items-center gap-3">
       <Body size="small" component="span" colorRole="on-surface-variant">
         {total} {total === 1 ? 'card' : 'cards'}
       </Body>
-      <Button variant="outlined" size="xsmall" onPress={onClear}>
+      <TextLink to="." search={(prev) => ({ ...prev, search: undefined, l: undefined, phase: undefined, older: undefined })} replace>
         Clear filters
-      </Button>
+      </TextLink>
     </div>
   );
 }
@@ -135,12 +126,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
         }}
         onSearch={onSearch}
       />
-      {filtered && (
-        <FilterLine
-          total={page.entries.length + trail.length * INBOX_PAGE + page.remaining}
-          onClear={() => onSearch({ search: undefined, l: undefined, phase: undefined, older: undefined })}
-        />
-      )}
+      {filtered && <FilterLine total={page.entries.length + trail.length * INBOX_PAGE + page.remaining} />}
       <InboxSides view={at} counts={page.counts} onSearch={onSearch} />
       {grouped.length > 0 && (
         <section aria-label="Chains" className="flex flex-col gap-(--frame-gutter)">

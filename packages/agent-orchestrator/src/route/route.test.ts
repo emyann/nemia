@@ -117,7 +117,6 @@ describe('load refuses a workflow whose routes do not close', () => {
           routes: ['web', 'docs'],
           route: { ...TABLE, table: { web: 'web', backend: 'web', docs: 'docs' } },
           ends: ['web', 'docs'],
-          workspace: 'base',
           gate: true,
         },
       ],

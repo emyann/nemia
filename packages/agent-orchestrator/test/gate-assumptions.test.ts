@@ -1,7 +1,7 @@
 /**
  * What the gate's contract (`contracts/gate.contract.ts`) assumes of code the verifier does not read holds of the real code: the run's
  * words (`runWords`) read a step `awaiting approval` only where it is gated, and only while the try it is on is unapproved — on a gated
- * table condition whose table answered, the same once approved, a filed gated step at its gate, an ending approved before it is filed,
+ * table condition whose table answered, the same once approved, a filed gated step at its gate,
  * and a workflow with no routing. `npm run contracts` proves `approvalRefusal` given these; this file is what makes them more than a claim.
  */
 import { test } from 'vitest';

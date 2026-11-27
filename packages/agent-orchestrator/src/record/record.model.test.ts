@@ -7,7 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { Landing, Run, RunId, StepName } from './record.model.ts';
+import { Run, RunId, StepName } from './record.model.ts';
 import { runId } from './record.store.ts';
 import { run } from '../../test/assessed.ts';
 
@@ -98,17 +98,6 @@ describe('a run is a repository run or a folder run, and a repository field on a
     ['REFUSED: a folder run that names a repository', { ...folder, repo: '/repo' }, false],
   ];
   for (const [what, value, ok] of rows) test(what, () => assert.equal(decodes(value), ok));
-});
-
-describe('a landing is one of a commit, an abort or nothing touched', () => {
-  const rows: Array<[unknown, boolean]> = [
-    [{ commit: 'fed789' }, true],
-    [{ aborted: 'the check refused', refusedOn: 'abc123' }, true],
-    [{ untouched: 'it stopped blocked' }, true],
-    [{}, false],
-    [{ commit: 'fed789', untouched: 'both' }, false],
-  ];
-  for (const [value, ok] of rows) test(JSON.stringify(value), () => assert.equal(Schema.is(Landing)(value), ok));
 });
 
 describe("a run's composed facts decode with the actor who acted and without one, as a store written before actors holds them", () => {

@@ -118,20 +118,6 @@ const saidIn = (n: number, again: unknown) => (name: string) =>
         : signedDone()
       : undefined) satisfies Closeout | undefined;
 
-/** `implement → ship`, the ending gated, in the repository's checkout, with a check (`landsOnCheck`). */
-const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
-const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'merge it', workspace: 'base', gate: true, check: 'npm test' };
-const LANDING_STEPS = [step('implement'), LANDER];
-/** ship filed, signed, its check filed: every phase given, the checkout's state given. */
-const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) =>
-  ({
-    ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
-    steps: {
-      implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
-      ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
-    },
-  }) satisfies Run;
-
 /** That `said` names each of `facts`, each after the one before it: the order a refusal says its reasons, then its fixes, in. */
 const inOrder = (said: string | null | undefined, ...facts: string[]) => {
   names(said, ...facts);
@@ -275,11 +261,10 @@ describe('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each ot
   });
 });
 
-describe('`forgetRefusal` says its reasons in one order — in flight, a merge staged, the gates, what is due, the asks, the runs stranded, the runs held — then each fix in the same order, and each in its plural', () => {
+describe('`forgetRefusal` says its reasons in one order — in flight, the gates, what is due, the asks, the runs stranded, the runs held — then each fix in the same order, and each in its plural', () => {
   const unsigned = run({ implement: 't1', review: null });
   let signed!: (id: string) => TaskPhase;
   const gatedRun = run({ plan: 't1', design: 't2', a: null, b: null }, { gates: ['plan', 'design'] });
-  let landed!: (id: string) => TaskPhase;
   beforeAll(() => {
     signed = phases({ t1: 'succeeded', t2: 'succeeded' });
   });
@@ -335,7 +320,6 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       [],
       undefined,
       undefined,
-      [],
       'prune',
     );
     inOrder(pruned, 'a and b are ready to be filed', 'Pruning', 'nemia cancel r-1', 'nemia prune r-1');
@@ -358,26 +342,6 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       forgetRefusal(LOOP, inRound(3), ALL_SUCCEEDED, [], saidIn(3, true), asked, undefined, [], [roundAskFor(4)]),
       "round 4 of review's loop is due",
       '(nemia retry --round)',
-    );
-  });
-  test('ending gates are filed themselves once approved; beside a gate of a step, each of the two said', () => {
-    const two = [step('implement'), { ...SHIP, after: ['implement'] }, { ...SHIP, name: 'land', after: ['implement'] }];
-    const endings = forgetRefusal(
-      two,
-      run({ implement: 't1', ship: null, land: null }),
-      phases({ t1: 'succeeded' }),
-      [],
-      signedDone,
-      asked,
-    );
-    inOrder(endings, 'ship and land wait at their gates', 'each is filed', 'nemia approve r-1 ship, nemia approve r-1 land');
-    lacks(endings, 'what waits on them');
-    const mixed: StepSpec[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
-    inOrder(
-      forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), signed, [], signedDone, asked),
-      'plan and ship wait at their gates',
-      'or what waits on it',
-      'nemia approve r-1 plan, nemia approve r-1 ship',
     );
   });
   test('in its plural: two asks taken back by one rm, two holds lifted each; cancelled, a hold is lifted and nothing waited for', () => {
@@ -410,35 +374,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
     inOrder(cancelled, 'h-1 and h-2 are held until it succeeds', 'nemia hold h-1 --off, nemia hold h-2 --off');
     lacks(cancelled, 'nemia decide');
   });
-  const closeoutOf = () => ({ ...signedDone(), output: { message: 'Add a flag' } }) satisfies Closeout;
-  const forget = (steps: readonly StepSpec[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
-    forgetRefusal(steps, r, landed, others, closeoutOf, () => false, none, asks, [], none, at, [], 'rm', 'ours');
-  test('a merge staged and not landed before an ask, a child and a hold, and its fix before theirs', () => {
-    landed = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded', 't-x': 'succeeded' });
-    inOrder(
-      forget(LANDING_STEPS, atLanding(), [child('c-1'), heldBy('h-1')], [askFor(5)]),
-      "ship's merge is staged in the repository's checkout (/repo)",
-      'try 5 of implement is asked for',
-      'c-1 waits on it',
-      'h-1 is held until it succeeds',
-      'nemia retry r-1 implement --off',
-      'The next tick lands it',
-      "what became of ship's merge",
-      'nemia cancel c-1',
-      'nemia hold h-1 --off',
-    );
-  });
-  test('a merge staged before a gate; a task in flight before a gate; a wait on runs and what is due before an ask', () => {
-    const x: StepSpec = { ...step('x', ['implement']), gate: true };
-    const r = atLanding({ gates: ['x'] });
-    inOrder(
-      forget([...LANDING_STEPS, x], { ...r, steps: { ...r.steps, x: { taskId: 't-x' } } }, [], []),
-      "ship's merge is staged",
-      'x waits at its gate',
-      'nemia approve r-1 x',
-      'nemia cancel r-1',
-      'The next tick lands it',
-    );
+  test('a task in flight before a gate; a wait on runs and what is due before an ask', () => {
     const fanIn = [step('plan'), step('design'), step('a', ['plan', 'design'])];
     inOrder(
       forgetRefusal(

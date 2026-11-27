@@ -18,7 +18,6 @@ const LOOPING = run({ implement: 't1', review: 't2' });
 const reads = (standing: Record<string, StepStatus>, goesRound = false) =>
   ({
     standingOf: (s) => ({ status: standing[s.name], own: standing[s.name] }),
-    stopped: () => false,
     goesRound: () => goesRound,
   }) satisfies MergeReads;
 

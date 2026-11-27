@@ -86,7 +86,7 @@ export const askOffLine = (id: string, ask: AskName) =>
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by its verb's `--off` (`offOf`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
- *   files what waits on it — Approve it, or call the run off first.
+ *   files what waits on it. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
  *   And a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
  *

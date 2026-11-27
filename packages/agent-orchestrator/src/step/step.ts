@@ -13,8 +13,7 @@ import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEY
 /**
  * One of a step's named checks, as the loader resolved it: its name (`[a-z][a-z0-9-]*`), the checks it waits on, each by name, none
  * where it waits on nothing, and what it is: a shell line it runs (`run`), or a condition it waits on (`condition`, a name some program
- * or person writes through the api: a readiness gate, whose writer is never the step's own session). A condition runs nothing, so on
- * an ending it holds no checkout: the checkout is given back once every check that runs a line has passed (`checksHoldCheckout`).
+ * or person writes through the api: a readiness gate, whose writer is never the step's own session). A condition runs nothing.
  */
 export type CheckSpec = {
   readonly name: string;

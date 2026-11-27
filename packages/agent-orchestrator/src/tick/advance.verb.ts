@@ -279,6 +279,10 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
  * read (`reads`), where its branches stand (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's
  * recheck of a blocked step is judged on), judged
  * by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ *
+ * @param reads The pass's one read of the run.
+ * @param standing Where the run's branches stand, as the pass read them.
+ * @param heads Where the branches are now, read once on demand; left out, a branch has no tip.
  */
 export const passAssessment = (reads: RunRead, standing: PassStanding, heads?: Heads) => {
   const tipOf = heads ? { tipOf: (branch: string) => heads()?.[branch] } : {};

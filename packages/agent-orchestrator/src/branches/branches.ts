@@ -86,7 +86,7 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
 
 /**
  * The commit each of a run's result `branches` is at, as `heads` has it — or, for one `heads` does not have, the tip the run last saw
- * (`tipsSeen`): what a merge in the repository's checkout is read as this run's by (`checkoutStatus`). Pure: `heads` is every branch of
+ * (`tipsSeen`). Pure: `heads` is every branch of
  * the repository and its commit as its caller read them, none where it read nothing.
  * @param run The run, by the tips it last saw.
  * @param branches Its result branches.

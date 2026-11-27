@@ -5,7 +5,7 @@ import { CutSearch } from './CutSearch';
 import { CutSearchPanel } from './CutSearchPanel';
 import { ON_PLAIN } from './stories.fixture';
 
-/** The panel of the search bar: groups with titles, lines with bold letters, and the keys it answers to at its foot. It opens from the bar. */
+/** The panel of the search bar: groups with titles and lines, and the keys it answers to at its foot. It opens from the bar. */
 const meta: Meta<typeof CutSearchPanel> = { title: 'Look/CutSearchPanel', component: CutSearchPanel };
 export default meta;
 

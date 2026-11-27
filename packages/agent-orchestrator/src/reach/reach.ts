@@ -1,7 +1,8 @@
 /**
  * Which gates a person's rules for `auto` can reach: read off each gated step as its workflow declares it, never off a run, so it says
  * whether a rule could ever approve that gate, and, given a run's facts, what keeps a rule from it now. A rule is judged on facts of the
- * gated step itself (`factsOf`, `facts.ts`), and some of them never hold at some gates: a step with no check never has one that passed. Pure; the laws are its contract's.
+ * gated step itself (`factsOf`, `facts.ts`), and some of them never hold at some gates: a step with no check never has one that
+ * passed. Pure; the laws are its contract's.
  */
 import type { SuggestedFor, Unmet, UnmetNow } from '../../contracts/reach.contract.ts';
 import { CONDITION_WORDS, CONDITIONS, type Condition, type Facts, type GateRule as PolicyRule } from '../auto/index.ts';

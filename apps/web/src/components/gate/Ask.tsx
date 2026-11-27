@@ -29,7 +29,8 @@ export const MODES: Record<RetryMode, string> = {
  * which answers a gate from the board.
  *
  * The request the api takes names the step at the gate, which a send-back asks again (`sendBackTo` in
- * agent-orchestrator). Its `answers` are a person's to the questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
+ * agent-orchestrator). Its `answers` are a person's to the questions the step's closeout asks, which the api checks and writes as
+ * the try's message, the `message` beside them their note.
  *
  * Sent in the run's namespace: `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
  *

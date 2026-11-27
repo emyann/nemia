@@ -14,9 +14,9 @@ import {
   cardQuery,
   dropCard,
   fileCard,
+  chainsQuery,
   factoryInboxQuery,
-  inboxAllQuery,
-  inboxSelectedQuery,
+  inboxPageQuery,
   queueCard,
   startCard,
   type CardState,
@@ -28,24 +28,22 @@ import {
   capLine,
   CARD_KIND,
   cardFiling,
-  cardLines,
   cardPlace,
-  cardsEnded,
-  cardsInPlay,
-  cardsSearch,
+  cardTag,
+  cardWord,
+  chainsOf,
+  chainsPulled,
+  inboxAskedOf,
+  inboxSearch,
+  INBOX_PAGE,
   factoriesOffered,
   factoryPreset,
   cardRepo,
   factoryRepoOf,
-  hasPage,
   inboxBadgeTitle,
   inPlay,
-  newestCardsFirst,
-  notStarted,
   ordinal,
   queueable,
-  queueNeedsFactory,
-  queuedWord,
   queueOf,
   startedCard,
   startPlace,
@@ -54,7 +52,6 @@ import {
   unassigned,
   unreadWorkflows,
   workflowKey,
-  type CardRefusal,
 } from '../src/lib/inbox.ts';
 import { apiAnswers } from './network.ts';
 
@@ -70,6 +67,9 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
     from: [],
     startedAs: [],
     state: 'filed',
+    phase: 'notStarted',
+    followedBy: [],
+    chained: false,
     error: null,
     filedAt,
     factoryRepo: null,
@@ -99,9 +99,6 @@ const WORKFLOWS = [
   listing('mine', 'user', '/home/me/.agent-workflows/workflows/mine'),
 ];
 
-/** An entry as the inbox lists it: a card by its name, a stray file by its own, which is its name too. */
-const entryOf = (name: string, card = true) => ({ name, file: card ? `${name}.md` : name });
-
 /** The api answering each request with `answer()`, for the length of the test: the requests the board sent. */
 function sending(t: { onTestFinished: (fn: () => void) => void }, answer: () => Response) {
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
@@ -119,119 +116,7 @@ const answered = (status: number, body: object | string, statusText = '') =>
     headers: { 'content-type': 'application/json' },
   });
 
-describe('newestCardsFirst, hasPage: the cards in order, a refusal on its own entry, and which entry has a page', () => {
-  test('the cards are listed newest first, by when each was filed, then by name; one whose time is not known goes last', () => {
-    const cards = [
-      entry('older-k2q9', '2026-09-15T10:00:00.000Z'),
-      entry('unknown-a1b2', null),
-      entry('newest-c3d4', '2026-09-16T09:00:00.000Z'),
-      entry('same-b-e5f6', '2026-09-15T12:00:00.000Z'),
-      entry('same-a-g7h8', '2026-09-15T12:00:00.000Z'),
-    ];
-    assert.deepEqual(
-      newestCardsFirst(cards).map((c) => c.name),
-      ['newest-c3d4', 'same-a-g7h8', 'same-b-e5f6', 'older-k2q9', 'unknown-a1b2'],
-    );
-    assert.deepEqual(cards.map((c) => c.name)[0], 'older-k2q9', 'the listing it was given is left as it was');
-  });
-  test("a refused start or drop stays on the page after the inbox is read again: on its card while the card is listed, and in the card's place once it is gone", () => {
-    const newest = entry('newest-c3d4', '2026-09-16T09:00:00.000Z');
-    const middle = entry('dropped-k2q9', '2026-09-15T12:00:00.000Z');
-    const oldest = entry('oldest-a1b2', '2026-09-15T10:00:00.000Z');
-    const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'], state: 'running' });
-    const refusals: CardRefusal[] = [
-      { entry: middle, action: 'start', message: 'no card dropped-k2q9 in the inbox.' },
-      { entry: oldest, action: 'remove', message: 'no card oldest-a1b2 in the inbox.' },
-      { entry: { ...kept, startedAs: [], state: 'filed' }, action: 'start', message: 'this card was started as started-run-e5f6.' },
-    ];
-    const line = (l: ReturnType<typeof cardLines>[number]) => [l.entry.name, l.gone ? 'gone' : 'listed', l.refusal?.action ?? null];
-
-    const lines = cardLines([newest, kept], refusals);
-    assert.deepEqual(
-      lines.map(line),
-      [
-        ['newest-c3d4', 'listed', null],
-        ['dropped-k2q9', 'gone', 'start'],
-        ['oldest-a1b2', 'gone', 'remove'],
-        ['started-e5f6', 'listed', 'start'],
-      ],
-      'read again after the answers: dropped-k2q9 and oldest-a1b2 are gone, started-e5f6 is still listed, as started',
-    );
-    assert.equal(lines[3].entry, kept, 'a card still listed is drawn as the inbox now lists it, not as it was refused');
-    assert.equal(lines[1].refusal!.message, 'no card dropped-k2q9 in the inbox.', "with the api's words");
-
-    assert.deepEqual(
-      cardLines([newest, middle, oldest, kept], refusals).map(line),
-      [
-        ['newest-c3d4', 'listed', null],
-        ['dropped-k2q9', 'listed', 'start'],
-        ['oldest-a1b2', 'listed', 'remove'],
-        ['started-e5f6', 'listed', 'start'],
-      ],
-      'before the inbox is read again, each refused card is still listed: its refusal on it, and no line of its own',
-    );
-    assert.deepEqual(
-      cardLines([newest, kept], []).map(line),
-      [
-        ['newest-c3d4', 'listed', null],
-        ['started-e5f6', 'listed', null],
-      ],
-      'with no refusal, only what the inbox lists',
-    );
-  });
-  test('REFUSED: a refusal is on the entry it is of, not on another of the same name — a card and a stray file beside it, notes.md and notes', () => {
-    const card = entry('notes', '2026-09-16T09:00:00.000Z');
-    const stray = entry('notes', '2026-09-16T08:00:00.000Z', { file: 'notes', title: null, error: 'notes: not a card.' });
-    const refused: CardRefusal = { entry: card, action: 'remove', message: 'notes.md could not be removed.' };
-    const lines = cardLines([card, stray], [refused]);
-    assert.deepEqual(
-      lines.map((l) => [l.entry.file, l.gone, l.refusal?.action ?? null]),
-      [
-        ['notes.md', false, 'remove'],
-        ['notes', false, null],
-      ],
-    );
-
-    const after = cardLines([stray], [refused]);
-    assert.deepEqual(
-      after.map((l) => [l.entry.file, l.gone, l.refusal?.action ?? null]),
-      [
-        ['notes.md', true, 'remove'],
-        ['notes', false, null],
-      ],
-      "the card dropped behind the page's back leaves its refusal in its place, with the stray still listed and clear of it",
-    );
-  });
-  test('an entry of the inbox has a page by the name the inbox lists it under: a card, one that does not read, and a stray file nothing else answers for', () => {
-    const listing = ['cache-the-views-k2q9', 'broken', 'with space'].map((name) => entryOf(name));
-    const strays = ['notes.txt', 'notes'].map((name) => entryOf(name, false));
-    const all = [...listing, ...strays];
-    for (const entry of all) assert.equal(hasPage(entry, all), true, entry.file);
-  });
-  test('REFUSED: no page for an entry whose name the api refuses — a folder, which the inbox lists as `sub/`, a name with a backslash, a hidden one or none', () => {
-    const refused = [
-      { name: 'sub/', file: 'sub' },
-      { name: 'a.md/', file: 'a.md' },
-      ...['a\\b', '.hidden', '', ' '].map((name) => entryOf(name, false)),
-    ];
-    for (const entry of refused) assert.equal(hasPage(entry, refused), false, JSON.stringify(entry.name));
-  });
-  test("REFUSED: no page for a stray file a card of the same name answers for — `/inbox/notes` is notes.md, and the stray would open another file's page", () => {
-    const card = entryOf('notes');
-    const stray = entryOf('notes', false);
-    assert.equal(hasPage(stray, [card, stray]), false, 'notes, beside notes.md');
-    assert.equal(hasPage(card, [card, stray]), true, 'and the card keeps the page, which is the one the api reads');
-    assert.equal(
-      hasPage(stray, [stray]),
-      true,
-      'notes, with no card beside it, is its own page: the api finds no card of that name, and answers with the file',
-    );
-    assert.equal(
-      hasPage(card, [card, entryOf('notes.txt', false)]),
-      true,
-      "a card's name is its file's, and one name is one file: nothing else takes a card's page away",
-    );
-  });
+describe('unreadWorkflows: the workflows a list leaves out', () => {
   test('the workflows a list leaves out are those that do not read, each with why', () => {
     const listed = [
       { name: 'dev', error: null },
@@ -255,7 +140,7 @@ const cardAnswer = (name: string, namespace = 'default') => ({
   kind: 'Card',
   metadata: { name, namespace, creationTimestamp: '2026-09-16T10:00:00.000Z', resourceVersion: 'v1' },
   spec: { body: 'Cache the views' },
-  status: { state: 'filed', runs: [], inPlay: true },
+  status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false },
 });
 /** Each request sent: its path, method, content type and body. */
 const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
@@ -423,8 +308,6 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
       '112th',
       '113th',
     ]);
-    assert.equal(queuedWord({ at: '2026-09-16T10:00:00.000Z', place: 2 }), 'queued · 2nd');
-    assert.equal(queuedWord({ at: '2026-09-16T10:00:00.000Z', place: null }), 'queued', 'a card a record says was started has no place');
   });
   test("the queue is every card with a place, in its place's order, whatever order the inbox lists them in — a refused card in its place, a started one not", () => {
     const at = '2026-09-16T10:00:00.000Z';
@@ -462,24 +345,10 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
       true,
       "its state says filed: the runs it names are links, never what decides it (the orchestrator's `state`)",
     );
-    assert.equal(queueNeedsFactory(entry('named', null, { factory: 'solo', workflow: 'dev' })), false);
   });
-  test('REFUSED: no Queue on a card that names no factory, or default — it says its factory is what it lacks, and no other card does', () => {
-    const at = '2026-09-16T10:00:00.000Z';
-    for (const factory of [null, 'default']) {
-      const loose = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory, ...extra });
-      assert.equal(queueable(loose('loose', { workflow: 'dev' })), false, String(factory));
-      assert.equal(queueNeedsFactory(loose('loose', { workflow: 'dev' })), true, String(factory));
-      assert.equal(queueNeedsFactory(loose('bare')), false, 'no workflow: Start gives it both');
-      assert.equal(
-        queueNeedsFactory(loose('queued', { workflow: 'dev', state: 'queued', queued: { at, place: 1 } })),
-        false,
-        'queued: Unqueue',
-      );
-      assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', state: 'running', startedAs: ['r-1'] })), false, 'started');
-      assert.equal(queueNeedsFactory(loose('ended', { workflow: 'dev', state: 'succeeded', startedAs: ['r-1'] })), false, 'ended');
-      assert.equal(queueNeedsFactory(loose('broken', { workflow: 'dev', error: 'broken.md: not a card.' })), false, 'unread');
-    }
+  test('REFUSED: no Queue on a card that names no factory, or default', () => {
+    for (const factory of [null, 'default'])
+      assert.equal(queueable(entry('loose', null, { factory, workflow: 'dev' })), false, String(factory));
   });
   test("REFUSED: no Queue on a card of a factory that names no workflow, one queued already, one a record says was started, or one that does not read — each a refusal of the package's", () => {
     const at = '2026-09-16T10:00:00.000Z';
@@ -584,7 +453,7 @@ const SOLO = { name: 'solo', repos: ['/r/a'] };
 
 const PAIR = { name: 'pair', repos: ['/r/a', '/r/b'] };
 
-describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and place, the filing box and the badge", () => {
+describe("cardPlace, cardFiling, factoriesOffered: a card's factory and place, the filing box and the badge", () => {
   test("a card's place: none in the default factory; else its factory, the workflow it names where offered, and the repository wired for it", () => {
     assert.equal(cardPlace(entry('a', null), FACTORIES, FILE_FACTORY), null);
     assert.equal(cardPlace(entry('a', null, { factory: 'default' }), FACTORIES, FILE_FACTORY), null);
@@ -619,29 +488,6 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
       },
     );
   });
-  test("REFUSED: the Inbox badge counts the picked factory's cards not yet started, queued ones too; never one started, nor one that does not read", () => {
-    const cards = [
-      entry('waits-a1', null, { factory: 'nemia' }),
-      entry('queued-b2', null, { factory: 'nemia', state: 'queued', queued: { at: '2026-10-01T00:00:00.000Z', place: 1 } }),
-      ...(['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped', 'cancelled'] as const).map((state) =>
-        entry(`started-${state}`, null, { factory: 'nemia', state, startedAs: ['r-1'] }),
-      ),
-      entry('started-g7', null, { factory: 'nemia', state: 'waiting' }),
-      entry('refused-h8', null, { factory: 'nemia', state: 'refused', queued: { at: '2026-10-01T00:00:00.000Z', place: 2 } }),
-      entry('broken-d4', null, { factory: 'nemia', error: 'the card has no front matter' }),
-      entry('hiring-e5', null, { factory: 'hiring' }),
-      entry('default-f6', null),
-    ];
-    const names = (picked: string | undefined) => notStarted(cards, picked).map((card) => card.name);
-    assert.deepEqual(names('nemia'), ['waits-a1', 'queued-b2', 'refused-h8'], 'never a card at any run phase, in flight or ended');
-    assert.deepEqual(
-      names(undefined),
-      ['waits-a1', 'queued-b2', 'refused-h8', 'hiring-e5', 'default-f6'],
-      'every factory under All factories',
-    );
-    assert.deepEqual(names('default'), ['default-f6'], "a card naming no factory is the default factory's");
-    assert.equal(names('quay').length, 0);
-  });
   test('every card state has its kind: its own three unstarted, a run in flight, a run ended — the in play the api lists', () => {
     const kinds: Record<CardState, 'unstarted' | 'in flight' | 'ended'> = {
       filed: 'unstarted',
@@ -661,21 +507,6 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
       assert.equal(startedCard({ state }), kinds[state] !== 'unstarted', `${state}: started`);
       assert.equal(inPlay({ state }), kinds[state] !== 'ended', `${state}: in play`);
     }
-  });
-  test('REFUSED: the cards in play and the ended ones split the list, each in its order, none in both and none left out', () => {
-    const cards = CARD_STATES.map((state, i) => entry(`card-${state}`, `2026-10-0${(i % 9) + 1}T00:00:00.000Z`, { state }));
-    const playing = cardsInPlay(cards).map((card) => card.state);
-    const ended = cardsEnded(cards).map((card) => card.state);
-    assert.deepEqual(playing, ['filed', 'queued', 'refused', 'pending', 'running', 'waiting']);
-    assert.deepEqual(ended, ['succeeded', 'failed', 'stopped', 'cancelled']);
-    const broken = entry('broken', null, { error: 'broken.md: not a card.' });
-    assert.deepEqual(cardsInPlay([broken]), [broken], 'an entry that does not read is filed, so in play');
-  });
-  test("the Inbox page's ?cards= keeps ended alone; any other value, or none, is in play", () => {
-    assert.deepEqual(cardsSearch({ cards: 'ended' }), { cards: 'ended' });
-    assert.deepEqual(cardsSearch({}), {});
-    assert.deepEqual(cardsSearch({ cards: 'in play' }), {});
-    assert.deepEqual(cardsSearch({ cards: ['ended'] }), {});
   });
   test("the Inbox badge's title says what it counts whole: in the factory picked, or in every factory", () => {
     assert.equal(inboxBadgeTitle(3, undefined), '3 cards not yet started, in every factory');
@@ -725,50 +556,6 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
     const gone = startPlace(entry('a', null), 'gone', FACTORIES, FILE_FACTORY);
     assert.ok(gone && 'why' in gone, 'a factory the store does not have says why');
   });
-  test('every card is read from GET /api/cards, a selector as labelSelector, under a key of its own beneath the inbox that no card page has', async (t) => {
-    const ended = cardObject({ metadata: { name: 'ended' }, spec: {}, status: { state: 'cancelled', runs: ['r-1'] } });
-    const sent = sending(t, () => answered(200, cardList(ended)));
-    const all = inboxAllQuery(undefined);
-    const read = (await (all.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((card) => card.state);
-    assert.deepEqual(read, ['cancelled'], 'a card whose run ended decodes');
-    await (inboxAllQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)();
-    assert.deepEqual(
-      sent.map((r) => r.url),
-      ['/api/cards?limit=500', '/api/cards?limit=500&labelSelector=team%3Dcore'],
-      "a selected read is one read: each queued place is the api's, among every card",
-    );
-    assert.equal(all.queryKey[0], factoryInboxQuery('pair').queryKey[0], "under ['inbox'], so every write and the feed read it again");
-    assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
-  });
-  test("a factory's Inbox reads its own namespace's cards, ended included, never every card of every factory", async (t) => {
-    const sent = sending(t, () => answered(200, cardList()));
-    const read = async (query: { queryFn?: unknown }) => (query.queryFn as () => Promise<InboxEntry[]>)();
-    await read(inboxAllQuery(undefined, 'pair'));
-    await read(inboxAllQuery('team=core', 'pair'));
-    await read(inboxAllQuery(undefined, 'default'));
-    const urls = sent.map((r) => new URL(r.url, 'http://board'));
-    assert.deepEqual(
-      urls.map((u) => u.pathname),
-      ['/api/namespaces/pair/cards', '/api/namespaces/pair/cards', '/api/namespaces/default/cards'],
-    );
-    assert.deepEqual(
-      urls.map((u) => u.searchParams.get('fieldSelector')),
-      [null, null, null],
-      'the ended cards are read too: the page splits them itself',
-    );
-    assert.deepEqual(
-      urls.map((u) => u.searchParams.get('labelSelector')),
-      [null, 'team=core', null],
-    );
-    const key = inboxAllQuery(undefined, 'pair').queryKey;
-    assert.equal(key[0], 'inbox', "under ['inbox'], so every write and the feed read it again");
-    assert.notDeepEqual(key, inboxAllQuery(undefined).queryKey, "the store's Inbox keeps its own key");
-    assert.notDeepEqual(key, factoryInboxQuery('pair').queryKey, "the floor's in-play read keeps its own key");
-    assert.notDeepEqual(key, inboxAllQuery(undefined, 'default').queryKey, 'each factory its own key');
-    assert.notDeepEqual(key, inboxAllQuery('team=core', 'pair').queryKey, 'each selector its own key');
-    assert.notDeepEqual(key, cardQuery('pair').queryKey, 'a card named as the factory keeps its page');
-    assert.deepEqual(inboxAllQuery(undefined).queryKey, ['inbox', { all: true }]);
-  });
   test("the floor's cards are its factory's in play, asked of the api, never every card of every factory", async (t) => {
     const sent = sending(t, () => answered(200, cardList()));
     await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<InboxEntry[]>)();
@@ -786,19 +573,22 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
     const key = factoryInboxQuery('pair').queryKey;
     assert.equal(key[0], 'inbox', "under ['inbox'], so every write and the feed read it again");
     assert.notDeepEqual(key, cardQuery('pair').queryKey, 'a card named as the factory keeps its page');
-    assert.notDeepEqual(key, inboxAllQuery(undefined).queryKey);
     assert.notDeepEqual(key, factoryInboxQuery('default').queryKey, 'each factory its own key');
   });
   test("a Card is the board's entry: its factory its namespace, its file its name, its place the one the api answers", () => {
     const queued = (name: string, at: string, place: number, namespace = 'pair') =>
-      cardObject({ metadata: { name, namespace }, spec: { queued: at }, status: { state: 'queued', runs: [], inPlay: true, place } });
+      cardObject({
+        metadata: { name, namespace },
+        spec: { queued: at },
+        status: { state: 'queued', runs: [], inPlay: true, place, phase: 'notStarted', followedBy: [], chained: false },
+      });
     const whole = cardList(
       queued('late', '2026-09-16T11:00:00.000Z', 3),
       queued('early-b', '2026-09-16T10:00:00.000Z', 2, 'default'),
       cardObject({
         metadata: { name: 'started' },
         spec: { queued: '2026-09-16T09:00:00.000Z' },
-        status: { state: 'running', runs: ['r-9'], inPlay: true },
+        status: { state: 'running', runs: ['r-9'], inPlay: true, phase: 'working', followedBy: [], chained: false },
       }),
     );
     const byName = new Map(entriesOf(whole).map((e) => [e.name, e]));
@@ -811,18 +601,6 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
     assert.equal(byName.get('late')?.factory, 'pair');
     assert.equal(byName.get('late')?.file, 'late.md');
     assert.deepEqual(cardEntryOf(cardObject({ metadata: { labels: { team: 'core' } } })).labels, { team: 'core' });
-  });
-  test("the in-play reads are the api's: a selector's in-play cards are asked in one read, and every card it answers kept", async (t) => {
-    const sent = sending(t, () =>
-      answered(200, cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state, inPlay: true } })))),
-    );
-    const kept = (await (inboxSelectedQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
-    assert.deepEqual(kept, [...CARD_STATES], 'the api filters, the board keeps what it answers');
-    assert.equal(sent.length, 1);
-    const url = new URL(sent[0]?.url ?? '', 'http://board');
-    assert.equal(url.pathname, '/api/cards');
-    assert.equal(url.searchParams.get('labelSelector'), 'team=core');
-    assert.equal(url.searchParams.get('fieldSelector'), 'status.inPlay=true');
   });
   test("each card state has a person's word, its sentence and a hue: a run called off is never said cancelled", () => {
     for (const state of CARD_STATES) {
@@ -870,4 +648,103 @@ test("cardRepo, factoryRepoOf: the repository a card's factory wires for its wor
   assert.equal(cardRepo(card('solo', 'good'), undefined), null, 'the factories unread');
   assert.equal(factoryRepoOf(card('pair', 'good'), factories), '/r/docs');
   assert.equal(factoryRepoOf(card('pair', 'other'), factories), null, 'a refusal is no repository');
+});
+
+describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in its address and asks of the api', () => {
+  test('the address keeps words, the older order, the closed side and a state of the side shown, and nothing else', () => {
+    assert.deepEqual(inboxSearch({}), {});
+    assert.deepEqual(inboxSearch({ search: '  reads ', sort: 'oldest', cards: 'closed', phase: 'done' }), {
+      search: 'reads',
+      sort: 'oldest',
+      cards: 'closed',
+      phase: 'done',
+    });
+    assert.deepEqual(inboxSearch({ sort: 'newest', cards: 'open', search: ' ' }), {}, 'the first look is the address without a key');
+  });
+  test('REFUSED: a state of the other side is no state, so an address that names one reads as All', () => {
+    assert.deepEqual(inboxSearch({ phase: 'done' }), {});
+    assert.deepEqual(inboxSearch({ cards: 'closed', state: 'working' }), { cards: 'closed' });
+    assert.deepEqual(inboxSearch({ state: 'nonsense' }), {});
+  });
+  test('the page asks the api for its side, its words, its labels, its order and its page; chains are pulled out only where nothing filters', () => {
+    assert.deepEqual(inboxAskedOf({}), {
+      fieldSelector: 'status.inPlay=true,status.chained=false',
+      orderBy: 'metadata.creationTimestamp desc',
+      limit: INBOX_PAGE,
+    });
+    assert.equal(chainsPulled({}), true);
+    assert.deepEqual(inboxAskedOf({ search: 'reads', l: 'team=core', sort: 'oldest', older: 'f.abc' }), {
+      fieldSelector: 'status.inPlay=true',
+      labelSelector: 'team=core',
+      search: 'reads',
+      orderBy: 'metadata.creationTimestamp',
+      limit: INBOX_PAGE,
+      continue: 'abc',
+    });
+    for (const view of [{ search: 'reads' }, { l: 'team=core' }, { phase: 'working' as const }, { cards: 'closed' as const }])
+      assert.equal(chainsPulled(view), false, JSON.stringify(view));
+    assert.equal(inboxAskedOf({ phase: 'working' }).fieldSelector, 'status.phase=working', 'a state is one flat page of that phase');
+    assert.equal(inboxAskedOf({ cards: 'closed' }).fieldSelector, 'status.inPlay=false');
+  });
+  test("a page is one read of the api, with its counts and the labels in use, and the floor's read carries the counts the pane says", async (t) => {
+    const sent = sending(t, () => answered(200, cardList()));
+    const asked = inboxAskedOf({ search: 'reads' });
+    const page = await (inboxPageQuery(asked, 'pair').queryFn as unknown as () => Promise<{ entries: unknown[]; next: string | null }>)();
+    assert.deepEqual([page.entries, page.next], [[], null]);
+    const floor = await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<{ counts: Record<string, number> }>)();
+    assert.equal(floor.counts.notStarted, 0);
+    const [first, second] = sent.map((r) => new URL(r.url, 'http://board'));
+    assert.equal(first?.pathname, '/api/namespaces/pair/cards');
+    assert.equal(first?.searchParams.get('search'), 'reads');
+    assert.equal(first?.searchParams.get('limit'), String(INBOX_PAGE));
+    assert.equal(second?.searchParams.get('fieldSelector'), 'status.inPlay=true', 'the floor is the one read of the pane');
+    assert.equal(sent.length, 2, 'one read each: no page past the first');
+    assert.equal(inboxPageQuery(asked).queryKey[0], 'inbox');
+    assert.notDeepEqual(inboxPageQuery(asked).queryKey, inboxPageQuery(asked, 'pair').queryKey, 'each factory its own key');
+    assert.notDeepEqual(inboxPageQuery(asked).queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
+  });
+  test('the chains are read whole: every page of the cards in chains still in play', async (t) => {
+    const sent = sending(t, () => answered(200, cardList()));
+    await (chainsQuery().queryFn as unknown as () => Promise<unknown>)();
+    assert.equal(new URL(sent[0]?.url ?? '', 'http://board').searchParams.get('fieldSelector'), 'status.inPlay=true,status.chained=true');
+  });
+});
+
+describe('cardTag, chainsOf: how a card is drawn and how chains are laid out', () => {
+  test("a card says one word: refused, stuck, blocked or pending where it is queued, else its run's phase, and none where it is filed and quiet", () => {
+    const at = '2026-09-16T10:00:00.000Z';
+    const wait = { card: 'before', kind: 'waiting' as const, stalled: false };
+    assert.equal(cardWord(entry('filed', at)), null);
+    assert.equal(cardWord(entry('refused', at, { state: 'refused', queued: { at, place: 1 } })), 'refused');
+    assert.equal(cardWord(entry('queued', at, { state: 'queued', queued: { at, place: 1 } })), 'pending');
+    assert.equal(cardWord(entry('chained', at, { state: 'queued', queued: { at, place: 1 }, waits: [wait] })), 'blocked');
+    assert.equal(cardWord(entry('stuck', at, { waits: [{ ...wait, stalled: true }] })), 'stuck');
+    assert.equal(cardWord(entry('working', at, { state: 'running', phase: 'working', startedAs: ['r-1'] })), 'working');
+    assert.equal(cardWord(entry('waiting', at, { state: 'waiting', phase: 'waiting', startedAs: ['r-1'] })), 'waiting');
+    assert.equal(cardWord(entry('done', at, { state: 'succeeded', phase: 'done', startedAs: ['r-1'] })), 'done');
+  });
+  test('REFUSED: the frame takes a colour only for working, waiting, refused and stuck; the others have none, and a card that says nothing has no tag', () => {
+    const at = '2026-09-16T10:00:00.000Z';
+    const frames = (extra: Partial<InboxEntry>) => cardTag(entry('x', at, extra))?.frame;
+    assert.equal(frames({ state: 'running', phase: 'working' }), 'alive');
+    assert.equal(frames({ state: 'waiting', phase: 'waiting' }), 'yours');
+    assert.equal(frames({ state: 'refused' }), 'failure');
+    assert.equal(frames({ waits: [{ card: 'a', kind: 'waiting', stalled: true }] }), 'yours');
+    assert.equal(frames({ state: 'succeeded', phase: 'done' }), 'none');
+    assert.equal(frames({ state: 'failed', phase: 'failed' }), 'none');
+    assert.equal(cardTag(entry('x', at)), null);
+  });
+  test('a chain is a set of cards joined by what they wait on, in columns by how many cards come before each', () => {
+    const at = '2026-09-16T10:00:00.000Z';
+    const link = (name: string, followedBy: string[]) => entry(name, at, { followedBy, chained: true });
+    const chains = chainsOf([link('a', ['b']), link('b', ['c']), link('c', []), link('d', ['e']), link('e', []), link('f', ['c'])]);
+    assert.deepEqual(
+      chains.map((columns) => columns.map((column) => column.map((card) => card.name))),
+      [
+        [['a', 'f'], ['b'], ['c']],
+        [['d'], ['e']],
+      ],
+    );
+    assert.deepEqual(chainsOf([]), []);
+  });
 });

@@ -173,7 +173,7 @@ export const firstCardStore = ({ workflows = ['build', 'quick'], origin, mergedR
         kind: 'Card',
         metadata: { name: 'first-card', namespace: ACME, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
         spec: { body: String(body.body) },
-        status: { state: 'filed', runs: [], inPlay: true, title: 'first card', file: 'first-card.md' },
+        status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false, title: 'first card', file: 'first-card.md' },
       };
       return HttpResponse.json(card, { status: 201 });
     }),

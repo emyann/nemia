@@ -33,6 +33,7 @@ const stuckTries = () => {
   const layer: CardDoorShape = {
     cards: {
       entries: () => Effect.succeed([]),
+      head: () => Effect.succeed(0),
       read: () => Effect.succeed(null),
       filedAt: () => Effect.succeed(null),
       revision: () => Effect.succeed(null),

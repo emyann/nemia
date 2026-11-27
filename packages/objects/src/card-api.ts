@@ -26,7 +26,7 @@ const CardListOrTable = [CardListObject, Table] as const;
 export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.get('listAll', '/api/cards', { query: cardListQuery, success: CardListOrTable, error: objectErrors }).annotate(
     OpenApi.Description,
-    "Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, and ?fieldSelector= those still in play or not. Answers a CardList, or the same page as a Table where the request asks for one.",
+    "Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, ?fieldSelector= those in a phase, in play or chained, ?orderBy= sorts them and ?search= keeps those whose title or name hold its words. Its metadata counts the cards per phase and lists the labels in use, counted before the fieldSelector and the page. Answers a CardList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
     params: namespaceParams,
@@ -35,7 +35,7 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists the inbox's cards of one namespace (a factory, default for cards that name none), a page at a time; ?labelSelector= and ?fieldSelector= keep those that match. Answers a CardList, or the same page as a Table where the request asks for one.",
+    "Lists the inbox's cards of one namespace (a factory, default for cards that name none), a page at a time; ?labelSelector=, ?fieldSelector= and ?search= keep those that match, ?orderBy= sorts them, and its metadata counts the cards per phase and lists the labels in use, counted before the fieldSelector and the page. Answers a CardList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', {
     params: cardParams,

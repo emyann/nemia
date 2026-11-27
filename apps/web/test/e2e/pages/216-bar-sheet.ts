@@ -177,9 +177,11 @@ async function pageField(page: Page) {
   await visit(page, `/inbox?bar=${OPEN}`);
   const bar = barOf(page);
   await expectVisible(bar, 'the bar opens on the Inbox');
-  const idea = page.locator('form[aria-label="File a card"]').getByRole('textbox', { name: 'An idea' });
+  const idea = page.getByRole('combobox', { name: 'Search the cards' });
   await idea.fill('a half-typed idea');
   await page.keyboard.press('Escape');
+  if (await idea.evaluate((el) => el === document.activeElement && el.getAttribute('aria-expanded') === 'true'))
+    await page.keyboard.press('Escape');
   await idle(page);
   await expectVisible(bar, 'Escape in a field of the page that holds text leaves the bar open');
   if (await idea.evaluate((el) => el === document.activeElement)) throw new Refused('and leaves the field');

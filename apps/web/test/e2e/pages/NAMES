@@ -99,13 +99,11 @@ unknown-address
 typefaces
 frame-reads
 factory-untrusted
-inbox-file
 finished-read
 runs-pages
 runs-states
 runs-error
 runs-bars
-inbox-file-places
 folder-skills
 stats
 waiting-bar
@@ -124,7 +122,6 @@ chat-asks-words
 labels
 step-ran-on
 factory-volumes
-inbox-in-play
 chat-permission
 chat-brought
 gate-budgets

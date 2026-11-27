@@ -9,8 +9,8 @@ import { runLinesQuery } from '@/lib/api/run';
 import { ReadRefusal, troubleOf } from '@/lib/api/read';
 import { trailOf } from '@/lib/finished';
 import { ink } from '@/lib/meaning';
-import { CutTag, MeaningTag, Reading, ScanLines } from '../look';
-import { Body, Button, Label, Skeleton, Tag } from '../ui/ds';
+import { Reading, ScanLines, SectionHead } from '../look';
+import { Body, Button, Skeleton } from '../ui/ds';
 import { judged } from '@/lib/api/judged';
 import { useBar } from '@/lib/useBar';
 
@@ -123,59 +123,6 @@ function Section({ name, head, foot, children }: { name: string; head: ReactNode
   );
 }
 
-/** How a section's count chip is drawn by its meaning: the kit's tag in the section's role, outlined and quiet where it holds none. */
-const COUNT_TAG = {
-  yours: { variant: 'filled', color: 'primary' },
-  alive: { variant: 'tonal', color: 'alive' },
-  rest: { variant: 'filled', color: 'neutral' },
-  quiet: { variant: 'outlined', color: 'neutral' },
-} as const;
-
-/** The count chip's tag: the look's tag in the meaning for a session at work, which the theme has no role for, else the kit's. */
-function CountTag({
-  count,
-  drawn,
-  tag,
-  children,
-}: {
-  count: number;
-  drawn: string;
-  tag: (typeof COUNT_TAG)[keyof typeof COUNT_TAG];
-  children: ReactNode;
-}) {
-  return tag.color === 'alive' ? (
-    <MeaningTag data-count-chip={count} data-count-tone={drawn} hue="alive" className="h-8 px-3">
-      {children}
-    </MeaningTag>
-  ) : (
-    <Tag data-count-chip={count} data-count-tone={drawn} variant={tag.variant} color={tag.color} className="h-8 px-3">
-      {children}
-    </Tag>
-  );
-}
-
-/** A section's head: its count, in the mono face, and its word in small caps, on a cut tag in the section's colour; quiet at zero. */
-function CountChip({ count, word, tone }: { count: number; word: string; tone: 'yours' | 'alive' | 'rest' }) {
-  const drawn = count === 0 ? 'quiet' : tone;
-  const tag = COUNT_TAG[drawn];
-  return (
-    <h2 className="m-0 flex">
-      <CutTag edge={drawn === 'quiet'}>
-        <CountTag count={count} drawn={drawn} tag={tag}>
-          <span className="inline-flex items-baseline gap-2.5">
-            <Body size="large" component="span" className="font-mono">
-              {count}
-            </Body>
-            <Label size="large" component="span" className="uppercase">
-              {word}
-            </Label>
-          </span>
-        </CountTag>
-      </CutTag>
-    </h2>
-  );
-}
-
 /** The outlined button that opens, and closes, the bar of the runs that wait on you in every factory. */
 function AcrossFactories() {
   const { open, toggle } = useBar();
@@ -222,12 +169,12 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
       <SelectorField key={at.l ?? ''} selector={at.l} onSelect={onLabel} />
       {open.waiting.length === 0 ? (
         <section data-section="waiting" className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <CountChip count={counts.waiting} word="Waiting on you" tone="yours" />
+          <SectionHead count={counts.waiting} word="Waiting on you" tone="yours" />
           <Nothing>Nothing waits on you.</Nothing>
           <AcrossFactories />
         </section>
       ) : (
-        <Section name="waiting" head={<CountChip count={counts.waiting} word="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
+        <Section name="waiting" head={<SectionHead count={counts.waiting} word="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
           <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
             {open.waiting.map((run) => (
               <WaitingCard key={run.id} run={run} among={among} asOf={asOf} />
@@ -235,14 +182,14 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
           </div>
         </Section>
       )}
-      <Section name="in-flight" head={<CountChip count={counts.inFlight} word="In flight" tone="alive" />}>
+      <Section name="in-flight" head={<SectionHead count={counts.inFlight} word="In flight" tone="alive" />}>
         {open.inFlight.length === 0 ? (
           <Nothing>Nothing is in flight.</Nothing>
         ) : (
           <FlightTable runs={open.inFlight} among={among} asOf={asOf} />
         )}
       </Section>
-      <Section name="finished" head={<CountChip count={counts.finished} word="Finished" tone="rest" />}>
+      <Section name="finished" head={<SectionHead count={counts.finished} word="Finished" tone="rest" />}>
         {finished.total === 0 && finished.runs.length === 0 ? (
           <Nothing>No run has finished yet.</Nothing>
         ) : (

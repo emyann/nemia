@@ -73,7 +73,12 @@ export const selectorsRefused = (selectors: readonly string[], what: string) => 
 };
 
 /** How a list reads an item it pages: the key it is sorted and paged by, and the labels its selectors read. */
-export type ListedBy<T> = { readonly key: (item: T) => string; readonly labels: (item: T) => Readonly<Record<string, string>> };
+export type ListedBy<T> = {
+  readonly key: (item: T) => string;
+  readonly labels: (item: T) => Readonly<Record<string, string>>;
+  /** Whether the list runs from the highest key down: its token then resumes after the last key in that order. */
+  readonly descending?: boolean;
+};
 
 /**
  * The page of `items` a list's query asks — the list page every list of objects cuts: those its label selectors keep, sorted by `by.key`
@@ -91,8 +96,8 @@ export const pageListed = <T>(items: readonly T[], query: Omit<ObjectQuery, 'nam
   const parsed = parseSelectors(selectors);
   const kept = items
     .filter((o) => selectsLabels(parsed, by.labels(o)))
-    .sort((a, b) => (by.key(a) < by.key(b) ? -1 : by.key(a) > by.key(b) ? 1 : 0));
-  const page = pageOf(kept, by.key, { limit: query.limit ?? null, continue: query.continue });
+    .sort((a, b) => (by.key(a) < by.key(b) ? -1 : by.key(a) > by.key(b) ? 1 : 0) * (by.descending === true ? -1 : 1));
+  const page = pageOf(kept, by.key, { limit: query.limit ?? null, continue: query.continue }, undefined, by.descending === true);
   return (page instanceof Invalid ? Effect.fail(page) : Effect.succeed(page)) satisfies Effect.Effect<Paged<T>, Invalid> as Effect.Effect<
     Paged<T>,
     Invalid

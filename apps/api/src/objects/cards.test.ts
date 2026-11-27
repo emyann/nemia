@@ -70,6 +70,26 @@ test("/api/cards lists every card, /api/namespaces/default/cards those of no fac
   assert.equal((await app.request('/api/namespaces/default/cards/no-such-card')).status, 404);
 });
 
+test('?orderBy= sorts a page, ?search= keeps the cards whose title or name hold its words, and each is in the list a client is answered', async () => {
+  const byName = await list('/api/namespaces/default/cards?orderBy=metadata.name%20desc&limit=2');
+  assert.deepEqual(
+    byName.body.items.map((c) => c.metadata.name),
+    ['c-5', 'c-4'],
+  );
+  const found = await list('/api/namespaces/default/cards?search=DO%20c-3');
+  assert.deepEqual(
+    found.body.items.map((c) => c.metadata.name),
+    ['c-3'],
+  );
+  assert.equal(found.body.metadata.counts.notStarted, 1, 'counted over the cards the words keep');
+});
+
+test('REFUSED: an orderBy, a search-less phase or a field selector term a card list does not take is 422', async () => {
+  for (const query of ['orderBy=title', 'fieldSelector=status.phase%3Dnope', 'orderBy=metadata.name,metadata.creationTimestamp']) {
+    assert.equal((await app.request(`/api/cards?${query}`)).status, 422, query);
+  }
+});
+
 test('?labelSelector= and the retired ?selector= select the same cards, and a malformed one is 422', async () => {
   const by = (await list('/api/cards?labelSelector=team%3Dcore')).body.items.map((c) => c.metadata.name);
   assert.deepEqual(by, ['c-2', 'c-4']);

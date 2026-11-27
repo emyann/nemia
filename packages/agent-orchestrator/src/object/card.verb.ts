@@ -11,14 +11,20 @@
  * Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
  */
 import { Effect } from 'effect';
-import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
+import { API_VERSION, CARD_PHASES, type Card, type CardList, type CardPhase, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import {
   CARD_IN_PLAY,
   cardInPlay,
+  cardFieldTerm,
   cardLabels,
-  cardPlaySelector,
+  cardMatches,
+  cardOrderBy,
+  fieldSelects,
+  type FieldTerm,
+  searched,
+  searchWords,
   INBOX_COLUMNS,
   inboxCells,
   type InboxListing,
@@ -34,12 +40,14 @@ export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { listOf, pageListed } from './listed.verb.ts';
+import { listOf, pageListed, selectorsRefused } from './listed.verb.ts';
+import { parseSelectors, selectsLabels } from '../watch/selector.ts';
 import { setting } from '../config/config.store.ts';
 
 /**
  * What a list of cards is asked: its namespace (none for every card), `?limit=`, `?continue=`, its label selectors, OR'd, and its
- * `?fieldSelector=`, the cards still in play or those whose run ended (`cardPlaySelector`), every card where it is empty or none.
+ * `?fieldSelector=`, comma-joined terms of `status.inPlay`, `status.chained` and `status.phase` (`cardFieldTerm`), every card where it is
+ * empty or none, its `?orderBy=` (`cardOrderBy`: by name where it is empty or none) and its `?search=` words (`cardMatches`).
  */
 export type CardQuery = {
   readonly namespace?: string | undefined;
@@ -47,6 +55,8 @@ export type CardQuery = {
   readonly continue?: string | undefined;
   readonly labelSelector?: readonly string[] | undefined;
   readonly fieldSelector?: string | undefined;
+  readonly orderBy?: string | undefined;
+  readonly search?: string | undefined;
 };
 
 /** The namespace of a listed card: its factory, or `default`. */
@@ -118,6 +128,9 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, 
       ...(error !== undefined ? { error } : {}),
       ...(files !== undefined && files.length ? { files } : {}),
       inPlay: CARD_IN_PLAY[l.state],
+      phase: l.phase,
+      followedBy: [...l.followedBy],
+      chained: l.chained,
       ...queueStatusOf(l),
       file: l.file,
       ...(source ? { source: text } : {}),
@@ -174,33 +187,84 @@ const filesOf = Effect.fnUntraced(function* (l: InboxListing, body: string) {
   );
 });
 
+/** The refusal of a field selector term that is none, naming the forms a card list takes. */
+const badTerm = (term: string) =>
+  new Invalid({
+    message: `fieldSelector term ${JSON.stringify(term)} is none a card list takes: give terms joined by commas, each status.inPlay=true|false, status.chained=true|false or status.phase=<${CARD_PHASES.join('|')}>, with = (or ==) or !=, or leave fieldSelector out for every card`,
+  });
+
+/** The refusal of an orderBy that is none, naming the forms a card list takes. */
+const badOrder = (orderBy: string) =>
+  new Invalid({
+    message: `orderBy ${JSON.stringify(orderBy)} is none a card list takes: give metadata.creationTimestamp or metadata.name, ascending, or followed by one space and desc, or leave orderBy out to order by name`,
+  });
+
 /**
- * The entries of `listing` that `fieldSelector` keeps: every one where it is empty or none, else those whose `cardInPlay` is what it
- * asks (`cardPlaySelector`); `Invalid` naming the forms it takes where it spells none.
+ * The key a list orders a card by and a token carries: what it is ordered by first, then its name, then its file, so ties break by name
+ * and a stray entry and a card of one name are two places of the list.
  */
-const inPlayKept = (listing: readonly InboxListing[], fieldSelector: string | undefined) => {
-  if (fieldSelector === undefined || fieldSelector === '') return listing;
-  const selector = cardPlaySelector(fieldSelector);
-  if (selector === null)
-    return new Invalid({
-      message: `fieldSelector ${fieldSelector} is none a card list takes: give status.inPlay=true (or ==true, !=false) for the cards in play, status.inPlay=false (or ==false, !=true) for those whose run ended, or an empty one for every card`,
-    });
-  return listing.filter((l) => cardInPlay(l) === selector.inPlay);
+const orderKeyOf = (field: 'metadata.creationTimestamp' | 'metadata.name') => (l: InboxListing) =>
+  field === 'metadata.name' ? keyOf(l) : `${l.filedAt}\n${keyOf(l)}`;
+
+/** How many cards of `kept` are in each phase. */
+const countsOf = (kept: readonly InboxListing[]) => {
+  const counts = Object.fromEntries(CARD_PHASES.map((phase) => [phase, 0])) as Record<CardPhase, number>;
+  for (const l of kept) counts[l.phase] += 1;
+  return counts;
+};
+
+/** Each label `kept` hold, by key then value, with how many cards hold it. */
+const labelsInUseOf = (kept: readonly InboxListing[]) => {
+  const held = new Map<string, { key: string; value: string; cards: number }>();
+  for (const l of kept)
+    for (const [key, value] of Object.entries(cardLabels(l))) {
+      const id = `${key}\n${value}`;
+      const was = held.get(id);
+      if (was === undefined) held.set(id, { key, value, cards: 1 });
+      else was.cards += 1;
+    }
+  return [...held.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
 };
 
 /**
- * A page of the cards `listing` holds (`CardList`): those of `query.namespace` (every card where none is given) that its field selector
- * (`inPlayKept`) and its label selectors keep, sorted by name, cut by its `limit` after its `continue`. `Invalid` for a selector, a limit
- * or a token that is not one.
+ * A page of the cards `listing` holds (`CardList`): those of `query.namespace` (every card where none is given) that its label selectors
+ * and its search words keep, counted by phase and by label in use (`metadata.counts`, `labelsInUse`), then those its field selector keeps,
+ * sorted by its order (by name unless `orderBy` says), cut by its `limit` after its `continue`. Objects are built for the page alone.
+ * `Invalid` for a selector, an order, a limit or a token that is not one.
  */
 export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly InboxListing[], query: CardQuery) {
   const { namespace } = query;
   const inNamespace = namespace === undefined ? listing : listing.filter((l) => namespaceOf(l) === namespace);
-  const kept = inPlayKept(inNamespace, query.fieldSelector);
-  if (kept instanceof Invalid) return yield* Effect.fail(kept);
-  const page = yield* pageListed(kept, query, 'card', { key: keyOf, labels: cardLabels });
+  const selectors = query.labelSelector ?? [];
+  const refused = selectorsRefused(selectors, 'card');
+  if (refused !== undefined) return yield* Effect.fail(refused);
+  const parsed = parseSelectors(selectors);
+  const terms: FieldTerm[] = [];
+  for (const text of (query.fieldSelector ?? '').split(',').filter((t) => t.trim() !== '')) {
+    const term = cardFieldTerm(text.trim());
+    if (term === null) return yield* Effect.fail(badTerm(text));
+    terms.push(term);
+  }
+  const order =
+    query.orderBy === undefined || query.orderBy.trim() === ''
+      ? { field: 'metadata.name' as const, descending: false }
+      : cardOrderBy(query.orderBy.trim().split(/\s+/).join(' '));
+  if (order === null) return yield* Effect.fail(badOrder(query.orderBy ?? ''));
+  const words = searchWords(query.search ?? '');
+  const kept = inNamespace.filter(
+    (l) => selectsLabels(parsed, cardLabels(l)) && cardMatches(words, searched({ name: l.name, title: l.title })),
+  );
+  const selected = kept.filter((l) => fieldSelects(terms, { inPlay: cardInPlay(l), chained: l.chained, phase: l.phase }));
+  const page = yield* pageListed(selected, { limit: query.limit, continue: query.continue }, 'card', {
+    key: orderKeyOf(order.field),
+    labels: cardLabels,
+    descending: order.descending,
+  });
   const items = (yield* Effect.forEach(page.items, (l) => objectOf(l))).filter((c): c is Card => c !== null);
-  const answered: CardList = listOf('Card', page, items);
+  const answered: CardList = {
+    ...listOf('Card', page, items),
+    metadata: { ...listOf('Card', page, items).metadata, counts: countsOf(kept), labelsInUse: labelsInUseOf(kept) },
+  };
   return answered;
 });
 

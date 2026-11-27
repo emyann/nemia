@@ -1,7 +1,8 @@
 import { PageName } from '@/components/look';
 import { HerFace, MenuButton } from './FrameRail';
 import { useFramePane } from './HerSheet';
-import { pageNameOf } from '../nav/nav';
+import { inboxListOf, pageNameOf } from '../nav/nav';
+import { NewCard } from '../inbox/NewCardSheet';
 
 /**
  * The page's head, across the top of the page's column, one line as tall as `--frame-top`: the page's name (`PageName`, `pageNameOf`), none
@@ -12,11 +13,17 @@ import { pageNameOf } from '../nav/nav';
 export function FrameHeader({ path }: { path: string }) {
   const { narrow } = useFramePane();
   const name = pageNameOf(path);
+  const inbox = inboxListOf(path);
   return (
     <header data-frame-header className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3">
       {narrow && <MenuButton />}
       {narrow && <HerFace path={path} />}
       {name && <PageName>{name}</PageName>}
+      {inbox && (
+        <span className="ml-auto self-end">
+          <NewCard factory={inbox.factory} />
+        </span>
+      )}
     </header>
   );
 }

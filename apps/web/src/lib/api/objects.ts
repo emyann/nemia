@@ -488,6 +488,18 @@ const Started = Schema.Struct({ id: Schema.String, card: Schema.String });
 /** What a list of cards is asked by: its labels, and whether each is still in play (`status.inPlay=true`). */
 type CardListQuery = { labelSelector?: string; fieldSelector?: string };
 
+/** What one page of the cards is asked: the labels, the field selector, the words, the order, and the page (`limit`, `continue`). */
+type CardPageQuery = CardListQuery & { search?: string; orderBy?: string; limit?: number; continue?: string };
+
+/** The query one page of the cards is sent with: each key given, the limit as the api takes it. */
+const cardPageQueryOf = (query: CardPageQuery) => ({
+  ...cardListQueryOf(query),
+  ...(query.search === undefined ? {} : { search: query.search }),
+  ...(query.orderBy === undefined ? {} : { orderBy: query.orderBy }),
+  ...(query.limit === undefined ? {} : { limit: String(query.limit) }),
+  ...(query.continue === undefined ? {} : { continue: query.continue }),
+});
+
 /** The query a list of cards is sent with: each key given. */
 const cardListQueryOf = (query: CardListQuery) => ({
   ...(query.labelSelector === undefined ? {} : { labelSelector: query.labelSelector }),
@@ -512,6 +524,15 @@ export const cards = {
         read(CardList),
       ),
     ),
+  /**
+   * One page of the cards of `namespace` (every namespace's for none) as the query asks it (`GET /api/cards`, or `GET
+   * /api/namespaces/:namespace/cards`): its labels, field selector, words and order, its `limit` and the `continue` of the page before;
+   * the list as it answers, its counts and the labels in use with it.
+   */
+  page: (namespace: string | undefined, query: CardPageQuery) =>
+    namespace === undefined
+      ? call((c) => c.cards.listAll({ query: cardPageQueryOf(query) }).pipe(Effect.flatMap(listed)), read(CardList))
+      : call((c) => c.cards.list({ params: { namespace }, query: cardPageQueryOf(query) }).pipe(Effect.flatMap(listed)), read(CardList)),
   /** A card, by its namespace and its name, with its file as written (`status.source`). */
   get: (namespace: string, name: string) => call((c) => c.cards.get({ params: { namespace, name } }), read(Card)),
   /** A card by its name alone, whichever namespace holds it, with its file as written (`GET /api/cards/:name`): a card's page's read. */

@@ -32,11 +32,22 @@ import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts
 import { DEFAULT_NAMESPACE, FILE_ID_PREFIX } from 'objects';
 import { claimKey } from '../runs/run-keys.ts';
 
+/** One card of the inbox as the door lists it: its file, its text, when it was filed and the revision of its record. */
+export type CardEntry = { file: string; text: string; filedAt: string; revision: number };
+
 /** The Card door's shape: the inbox's cards and the tick's tries of a queued card's start, each method answering an Effect. */
 export type CardDoorShape = {
   readonly cards: {
-    /** The inbox's cards, by their name and `.md` (`file`), sorted, each with its text. None when there is no card yet. */
-    readonly entries: () => Effect.Effect<Array<{ file: string; text: string }>, Refusal>;
+    /**
+     * The inbox's cards, by their name and `.md` (`file`), sorted, each with its text, when it was filed (`filedAt`) and the revision of
+     * its record, all from the one read of the keyspace. None when there is no card yet.
+     */
+    readonly entries: () => Effect.Effect<Array<CardEntry>, Refusal>;
+    /**
+     * The head of the keyspace the cards are held in: it moves on every write to a card, a try, a claim, a factory or a run's record, so
+     * a judgement of the inbox kept at one head is stale at another. Zero where there is no keyspace yet.
+     */
+    readonly head: () => Effect.Effect<number, Refusal>;
     /** The text of the card `name`, or null when it is not there. */
     readonly read: (name: CardName) => Effect.Effect<string | null, Refusal>;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
@@ -302,6 +313,17 @@ const rewriteOf = (open: Effect.Effect<Keyspace, Refusal>, now: () => string) =>
     })) satisfies CardDoorShape['cards']['rewrite'];
 
 /**
+ * A card's record as the door's entry: its file, text, filing time and revision; none for a record that does not read as a card.
+ * @param record The keyspace's record: its key under the cards, its value and its revision.
+ */
+const entryOf = (record: { readonly key: string; readonly value: string; readonly revision: number }) => {
+  const card = cardIn(record.value);
+  return Option.isNone(card)
+    ? []
+    : [{ file: `${record.key.slice(CARDS.length)}.md`, text: card.value.text, filedAt: card.value.filedAt, revision: record.revision }];
+};
+
+/**
  * The cards and tries of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it
  * answers no keyspace, so a store read is not a store made.
  * @param open Opens the keyspace the cards are held in, refused as opening it is.
@@ -326,10 +348,12 @@ export function cardRecords(
         Effect.gen(function* () {
           const keyspace = yield* held;
           if (keyspace === undefined) return [];
-          return (yield* keyspace.list(CARDS)).records.flatMap((record) => {
-            const card = cardIn(record.value);
-            return Option.isNone(card) ? [] : [{ file: `${record.key.slice(CARDS.length)}.md`, text: card.value.text }];
-          });
+          return (yield* keyspace.list(CARDS)).records.flatMap(entryOf);
+        }),
+      head: () =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          return keyspace === undefined ? 0 : yield* keyspace.head;
         }),
       read: (name) => Effect.map(recordOf(name), (r) => r?.text ?? null),
       filedAt: (name) => Effect.map(recordOf(name), (r) => r?.filedAt ?? null),

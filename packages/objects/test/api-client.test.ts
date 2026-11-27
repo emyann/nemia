@@ -154,7 +154,8 @@ test('a status the Api declares no error for is decoded into Answered: its statu
 });
 
 test('a list the api answers gzipped is asked for so and decoded whole, as the cli reads it', async () => {
-  const list = { apiVersion: 'nemia/v1', kind: 'CardList', metadata: {}, items: [] as unknown[] };
+  const counts = { notStarted: 0, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 };
+  const list = { apiVersion: 'nemia/v1', kind: 'CardList', metadata: { counts, labelsInUse: [] }, items: [] as unknown[] };
   answer = { status: 200, body: list, gzip: true };
   sent.length = 0;
   const exit = await Effect.runPromiseExit(

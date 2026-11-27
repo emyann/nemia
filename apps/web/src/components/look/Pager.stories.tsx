@@ -44,3 +44,13 @@ export const OnTheLastPage: StoryObj = {
     atRest();
   },
 };
+
+/** The pager of the cards, its ends following the sort: Newer and Older, or Older and Newer. */
+export const OfCards: StoryObj<typeof Pager> = {
+  args: { noun: 'Cards', trail: [], next: 'bmV4dA', count: 12, total: 30, size: 12, ends: ['Older', 'Newer'] },
+  render: (args) => <Pager {...args} />,
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-pager-rows]')).toHaveTextContent('Cards 1–12 of 30');
+    await expect(canvasElement.querySelector('[data-pager-older]')).toHaveTextContent('Newer');
+  },
+};

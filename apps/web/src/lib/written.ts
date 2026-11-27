@@ -1,7 +1,7 @@
 import { snackbar } from '@/components/ui/ds';
 
 /** A write whose thing leaves the page once it succeeds: a run removed, pruned or held, a card filed, a proposal declined. */
-type Written = 'removed' | 'pruned' | 'held' | 'filed' | 'declined';
+type Written = 'removed' | 'pruned' | 'held' | 'filed' | 'started' | 'declined';
 
 /** What each write says once it succeeded, naming the thing it wrote. */
 const WRITTEN: Record<Written, (name: string) => string> = {
@@ -9,6 +9,7 @@ const WRITTEN: Record<Written, (name: string) => string> = {
   pruned: (run) => `Run ${run} pruned`,
   held: (run) => `Run ${run} held`,
   filed: (card) => `Card ${card} filed`,
+  started: (card) => `Card ${card} will start`,
   declined: (proposal) => `Proposal ${proposal} declined`,
 };
 

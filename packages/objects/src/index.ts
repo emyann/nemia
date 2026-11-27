@@ -178,7 +178,7 @@ export {
   type CardState,
   type CardWaitKind,
 } from './card.ts';
-export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus, filedNamespace } from './card.ts';
+export { CARD_FILE_REF, CARD_PHASES, CardAttach, CardFileRef, CardFileStatus, filedNamespace, type CardPhase } from './card.ts';
 export {
   Factory,
   FactoryCommands,
@@ -779,7 +779,7 @@ export {
 } from './commands-definitions-agents.ts';
 export { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS } from './commands-library.ts';
 export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LINES_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
-export { CHECK_OUTPUT_WORDS } from './commands-reads.ts';
+export { CHECK_OUTPUT_WORDS, INBOX_SORTS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
 export { QUOTA_WORDS } from './commands-rest-reads.ts';

@@ -78,7 +78,7 @@ shape, where the kit's ground would fill the cut corner square, `CutTag` for a t
 with a cut corner, which takes off the border, ring and outline of what it holds and draws its own edge with `edge` (an outlined tag,
 a hairline) and its own focus ring in its cut, `CutBubble` for the agent's words in a cut bubble, `CutIconPress` for the kit's tonal
 icon button in a cut (a composer's send), `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
-`CutCue` for a cue in a small cut frame beside a face or in a header, `MeaningTag` for a tag in a meaning's colour at the kit Tag's metrics (a session at work, which the theme's ink `secondary` no longer says), `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, which keeps what it holds inside its diagonals and sets a control given as `end` in from its cut; `Plate` for a section's heading and `PageName` for
+`CutCue` for a cue in a small cut frame beside a face or in a header, `MeaningTag` for a tag in a meaning's colour at the kit Tag's metrics (a session at work, which the theme's ink `secondary` no longer says), `CutTextField`, `CutTextArea`, `CutSelect` and `CutComboBox` for a labelled text field, a text area, a select and a field that suggests, each in a cut (no raw `<input>`), `CutSearch` for the search bar (chips, suggestions, `/` to focus it), `SectionHead` for a section's head with its count tag, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, which keeps what it holds inside its diagonals and sets a control given as `end` in from its cut; `Plate` for a section's heading and `PageName` for
 a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
 `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
 `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
@@ -396,7 +396,8 @@ here.
 - `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory` and its `FactoryCommands` in one place (`factoryViewOf`,
   `lib/api/factories.ts`), which `factoriesQuery` reads together; a factory's schedules are read on its Settings alone
   (`factorySchedulesQuery`), and a floor asks its factory's cards in play of the api (`factoryInboxQuery`), never every card; a factory's
-  Inbox asks its own namespace's cards, ended included (`inboxAllQuery` with its factory), and only the store's Inbox reads every card.
+  Inbox asks one page of its own namespace's cards (`inboxPageQuery` with its factory, paged and counted by the api), and the reads that take every page are the Inbox's chains (`chainsQuery`), a floor's cards in play (`factoryInboxQuery`) and a label's cards in play
+  (`inboxSelectedQuery`), each over cards still in play alone.
   A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`

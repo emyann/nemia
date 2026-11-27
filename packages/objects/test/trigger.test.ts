@@ -68,9 +68,12 @@ test("a card's status carries the triggers that queue it and those it clashes on
     kind: 'Card',
     metadata: { name: 'fix', namespace: 'mill', creationTimestamp: '', resourceVersion: 'c1' },
     spec: { body: 'fix it' },
-    status: { state: 'queued', runs: [], inPlay: true, queuedBy: ['ready'] },
+    status: { state: 'queued', runs: [], inPlay: true, phase: 'working', followedBy: [], chained: false, queuedBy: ['ready'] },
   };
   assert.deepEqual(decode(card).status.queuedBy, ['ready']);
-  const waiting = { ...card, status: { state: 'filed', runs: [], inPlay: true, clash: ['a', 'b'] } };
+  const waiting = {
+    ...card,
+    status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false, clash: ['a', 'b'] },
+  };
   assert.deepEqual(decode(waiting).status.clash, ['a', 'b']);
 });

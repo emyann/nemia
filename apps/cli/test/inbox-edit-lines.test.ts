@@ -20,7 +20,7 @@ const aCard = (version: string, spec: Partial<Card['spec']> = {}, status: Partia
       resourceVersion: version,
     },
     spec: { body: 'Land it\n', ...spec },
-    status: { state: 'filed', runs: [], inPlay: true, ...status },
+    status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false, ...status },
   }) satisfies Card;
 
 const START = /next pass/;

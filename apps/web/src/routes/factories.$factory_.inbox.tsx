@@ -1,18 +1,23 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { InboxPage } from '../components/inbox/InboxPage';
-import { inboxAllQuery } from '../lib/api/inbox.ts';
+import { chainsQuery, inboxPageQuery } from '../lib/api/inbox.ts';
 import { labelSearch } from '../lib/api/labels.ts';
-import { cardsSearch } from '../lib/inbox';
+import { finishedSearch } from '../lib/finished';
+import { chainsPulled, inboxAskedOf, inboxSearch } from '../lib/inbox';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
- * The Inbox of the factory its path names, which reads that factory's cards alone (`inboxAllQuery` with its factory), its label selector
- * and which cards it lists in its search.
+ * The Inbox of the factory its path names, which reads that factory's cards alone (`inboxPageQuery` with its factory): its words, labels,
+ * order, side, state and page in its search.
  */
 export const Route = createFileRoute('/factories/$factory_/inbox')({
-  validateSearch: (search: Record<string, unknown>) => ({ ...labelSearch(search), ...cardsSearch(search) }),
-  loaderDeps: ({ search }) => ({ l: search.l }),
-  loader: ({ context, params, deps }) => context.queryClient.ensureQueryData(inboxAllQuery(deps.l, params.factory)),
+  validateSearch: (search: Record<string, unknown>) => ({ ...labelSearch(search), ...inboxSearch(search), ...finishedSearch(search) }),
+  loaderDeps: ({ search }) => ({ search }),
+  loader: ({ context, params, deps }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(inboxPageQuery(inboxAskedOf({ ...deps.search, factory: params.factory }), params.factory)),
+      chainsPulled(deps.search) ? context.queryClient.ensureQueryData(chainsQuery(params.factory)) : null,
+    ]),
   component: Page,
   errorComponent: ({ error }) => <ReadTrouble what="the inbox" error={error} />,
 });

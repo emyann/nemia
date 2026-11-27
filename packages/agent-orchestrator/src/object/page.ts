@@ -81,18 +81,26 @@ export const badLimit = (limit: number | null) =>
   });
 
 /**
- * The page `asked` cuts of `sorted`, a list in its order by name (`nameOf`): it starts at the first object whose name is after the token's,
+ * The page `asked` cuts of `sorted`, a list in its order by key (`nameOf`), ascending unless `descending`: it starts at the first object
+ * whose name is after the token's,
  * so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage` within `bounds` (a list's,
  * `LIST_PAGE`, unless a test shortens them). `Invalid` for a limit `listPage` refuses or a token that does not decode.
  * @param sorted The list's objects, in its order by name.
  * @param nameOf The name of an object, which the token carries and the list is sorted by.
  * @param asked The page asked: its limit and its continue token.
  * @param bounds The page sizes, `LIST_PAGE` where none is given.
+ * @param descending Whether `sorted` runs from the highest key down, and the page then starts at the first key below the token's.
  */
-export const pageOf = <T>(sorted: readonly T[], nameOf: (item: T) => string, asked: PageAsked, bounds: PageBounds = LIST_PAGE) => {
+export const pageOf = <T>(
+  sorted: readonly T[],
+  nameOf: (item: T) => string,
+  asked: PageAsked,
+  bounds: PageBounds = LIST_PAGE,
+  descending = false,
+) => {
   const after = asked.continue === undefined ? undefined : continuedAfter(asked.continue);
   if (after instanceof Invalid) return after satisfies Paged<T> | Invalid as Paged<T> | Invalid;
-  const found = after === undefined ? 0 : sorted.findIndex((item) => nameOf(item) > after);
+  const found = after === undefined ? 0 : sorted.findIndex((item) => (descending ? nameOf(item) < after : nameOf(item) > after));
   const start = found === -1 ? sorted.length : found;
   const cut = listPage(sorted.length, start, asked.limit, bounds);
   if ('refused' in cut) return badLimit(asked.limit) satisfies Paged<T> | Invalid as Paged<T> | Invalid;

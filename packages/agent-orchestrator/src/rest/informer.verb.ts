@@ -24,6 +24,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Context, Effect, Layer } from 'effect';
 import type { Engine } from '../runtime-client.ts';
+import type { InboxListing } from '../inbox/index.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
@@ -62,6 +63,11 @@ type Entry<T, O = unknown> = {
  * objects it served kept (`objectHits`).
  */
 export type InformerMemo<T = Judgement, O = RunObject> = {
+  /**
+   * The inbox as it was last judged (`inboxJudged`) and what it was judged on: the keyspace head and the pass now running. A cache of a
+   * pure function, never a source of truth: served only while its key holds, in memory alone, and empty after a restart.
+   */
+  inbox?: { key: string; listing: readonly InboxListing[] };
   cursor?: number;
   runs: Map<string, Entry<T, O>>;
   pass?: number;

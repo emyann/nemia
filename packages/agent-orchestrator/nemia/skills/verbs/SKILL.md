@@ -48,10 +48,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                each tool's words: tools.md#concluded
                                on the port: concluded
   nemia inbox
-                               the cards still in play: name, first line, workflow when set,
+                               a page of the cards still in play: name, first line, workflow when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-                               run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-                               their labels on each line; -o wide: every column
+                               run ended too; -l: the cards whose labels match; --search <words>: those
+                               whose title or name hold them; --phase <phase>: those in it; --sort
+                               newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+                               -L <key>: their labels on each line; -o wide: every column
                                each tool's words: tools.md#inbox, tools.md#inbox_card
                                on the port: inbox, inbox_card
   nemia factory

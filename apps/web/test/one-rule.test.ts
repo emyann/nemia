@@ -122,7 +122,7 @@ describe("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's count c
     assert.match(rail, /runs\.data\?\.counts\.waiting/);
     const page = read('components/run/RunsPage.tsx');
     assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
-    assert.match(page, /<CountChip count=\{counts\.waiting\}/);
+    assert.match(page, /<SectionHead count=\{counts\.waiting\}/);
   });
   test('the scan finds a reader of another query', () => {
     assert.equal(frameRunsRead('const counted = useQuery(openRunsQuery()).data;'), undefined);

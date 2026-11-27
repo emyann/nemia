@@ -52,8 +52,13 @@
       }
     },
     {
+      "term": "Card phase",
+      "meaning": "where a card stands as a person sorts cards, a summary of its state worked out on every read and never stored: notStarted (filed, nobody started it), blocked (held by cards of its after: that have not succeeded), waiting (on a person: its run waits on one, its queued start was refused, or a card it waits on can only be released by one), working (at work, or queued for room to run), then done, failed and cancelled once its run ended (a stopped run reads cancelled). The first four are open (`CardPhase`, `packages/objects/src/card.ts`).",
+      "type": "CardPhase"
+    },
+    {
       "term": "In play",
-      "meaning": "a card the inbox lists by default: filed, queued or refused, or started with a run that is pending, running or waiting. A card whose run ended is listed with nemia inbox --all, and behind the Inbox page's Ended filter.",
+      "meaning": "a card the inbox lists by default (Open on the Inbox page): filed, queued or refused, or started with a run that is pending, running or waiting. A card whose run ended is listed with nemia inbox --all, and under the Inbox page's Closed.",
       "type": "CardState",
       "see": {
         "label": "From a card to a branch",

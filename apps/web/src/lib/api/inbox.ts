@@ -12,6 +12,7 @@ import {
   type CardKey,
   type CardFileStatus,
   type CardList,
+  type CardPhase,
   type CardSpec,
   type CardState,
   type CardWait,
@@ -54,6 +55,14 @@ export type InboxEntry = {
   startedAs: string[];
   /** Its life, closed (`CardState`): what the page offers on it and how it draws it. */
   state: CardState;
+  /** Where the card stands as the Inbox's chips say it (`CardPhase`), closed. */
+  phase: CardPhase;
+  /** The cards whose `after:` names this one, by name: the ones it holds back. */
+  followedBy: string[];
+  /** The cards its `after:` names, by name, in the order written, those done already among them: absent for a card with none. */
+  after?: string[];
+  /** Whether the card is in a chain: it names a card in `after:`, or another card does. */
+  chained: boolean;
   error: string | null;
   filedAt: string | null;
   /**
@@ -103,6 +112,10 @@ export const entryOf = (card: CardList['items'][number]) => {
     ...(spec.gate !== undefined ? { gate: spec.gate } : {}),
     startedAs: [...status.runs],
     state: status.state,
+    phase: status.phase,
+    ...(spec.after?.length ? { after: [...spec.after] } : {}),
+    followedBy: [...status.followedBy],
+    chained: status.chained,
     error: status.error ?? null,
     filedAt: metadata.creationTimestamp,
     ...(spec.queued !== undefined
@@ -131,19 +144,6 @@ const IN_PLAY = 'status.inPlay=true';
 /** `selector` as the api is sent it: trimmed, and none for a blank one. */
 const pickedOf = (selector: string | undefined) => (selector === undefined || selector.trim() === '' ? undefined : selector.trim());
 
-/**
- * Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none: of every factory, or of `factory`'s
- * namespace alone where one is given.
- */
-const cardsListed = async (selector: string | undefined, factory: string | undefined) => {
-  const picked = pickedOf(selector);
-  const query = picked === undefined ? {} : { labelSelector: picked };
-  return factory === undefined ? cards.listAll(query) : cards.list(namespaceOf(factory), query);
-};
-
-/** Every card that `selector` takes, of every factory or of `factory`'s alone, as entries. */
-const cardsSelected = async (selector: string | undefined, factory: string | undefined) => entriesOf(await cardsListed(selector, factory));
-
 /** The cards of `selector` still in play, as the api keeps them (`?fieldSelector=status.inPlay=true`). */
 const inPlaySelected = async (selector: string | undefined) => {
   const picked = pickedOf(selector);
@@ -157,9 +157,10 @@ const inPlaySelected = async (selector: string | undefined) => {
 const INBOX_FRESH_MS = 10_000;
 
 /**
- * A factory's cards still in play, as the api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each
- * not yet started, and each whose run is pending, running or waiting — a card whose run ended is left out (`inboxAllQuery` lists it) —
- * each with its place in the queue of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
+ * A factory's cards still in play and how many cards each phase holds (the list's counts, which the pane's Inbox line reads), as the
+ * api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each not yet started, and each whose run
+ * is pending, running or waiting — a card whose run ended is left out (`inboxPageQuery` lists it) — each with its place in the queue
+ * of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
  * person files, drops or starts a card, here or at the command line. Read again on each visit once `INBOX_FRESH_MS` has passed since the
  * last read, and on a run's event on the workflow feed, which a queued card started is, and a run ending too. One key for every reader
  * of a factory's page (the factory pane's line, the floor's queue), so the page asks it once: the route's loader starts it, never
@@ -169,7 +170,10 @@ const INBOX_FRESH_MS = 10_000;
 export const factoryInboxQuery = (factory: string) =>
   queryOptions({
     queryKey: ['inbox', { factory }],
-    queryFn: async () => entriesOf(await cards.list(namespaceOf(factory), { fieldSelector: IN_PLAY })),
+    queryFn: async () => {
+      const list = await cards.list(namespaceOf(factory), { fieldSelector: IN_PLAY });
+      return { entries: entriesOf(list), counts: list.metadata.counts };
+    },
     staleTime: INBOX_FRESH_MS,
   });
 
@@ -184,18 +188,70 @@ export const inboxSelectedQuery = (selector: string | undefined) =>
   });
 
 /**
- * Every card of the inbox, its run ended or not, that `selector` takes by its labels, or every card for none: the Inbox page's read, which
- * splits them into in play and ended itself (`CARD_KIND`). The store's Inbox reads every factory's (`GET /api/cards`); a factory's Inbox
- * its own namespace's alone (`GET /api/namespaces/:namespace/cards`), each queued card's place still the one of the whole inbox. Under
- * `['inbox']`, read again with it; keyed by an object, which no card's name can be, so a card named `all` keeps its page's key
- * (`cardQuery`, `['inbox', name]`), and a factory's key is its own, apart from the floor's (`factoryInboxQuery`).
- * @param selector A label selector, `?labelSelector=`; undefined or blank for every card.
+ * What a page of the Inbox is asked: the labels, the field selector, the words, the order and the page, as the api's card list takes
+ * them (`inboxAskedOf`, lib/inbox.ts).
+ */
+export type InboxAsked = {
+  labelSelector?: string;
+  fieldSelector?: string;
+  search?: string;
+  orderBy?: string;
+  limit: number;
+  continue?: string;
+};
+
+/**
+ * One page of the Inbox: its entries, how many cards each phase holds among those the labels and words keep, the labels in use, and the
+ * next page.
+ */
+export type InboxPage = {
+  entries: InboxEntry[];
+  counts: CardList['metadata']['counts'];
+  labels: CardList['metadata']['labelsInUse'];
+  next: string | null;
+  /** How many cards follow this page. */
+  remaining: number;
+};
+
+/**
+ * One page of the cards as `asked` says, of every factory (`GET /api/cards`) or of `factory`'s alone: the Inbox page's read. Under
+ * `['inbox']`,
+ * read again with it; keyed by an object, which no card's name can be (`cardQuery`).
+ * @param asked The query the api's card list takes (`InboxAsked`).
  * @param factory The factory whose cards alone are read, by its name (`namespaceOf`); undefined for every factory's.
  */
-export const inboxAllQuery = (selector: string | undefined, factory?: string) =>
+export const inboxPageQuery = (asked: InboxAsked, factory?: string) =>
   queryOptions({
-    queryKey: ['inbox', factory === undefined ? { all: true } : { all: true, factory }, ...selectorKey(selector)],
-    queryFn: () => cardsSelected(selector, factory),
+    queryKey: ['inbox', { page: asked, factory }],
+    queryFn: async () => {
+      const list = await cards.page(factory === undefined ? undefined : namespaceOf(factory), asked);
+      const page = {
+        entries: entriesOf(list),
+        counts: list.metadata.counts,
+        labels: list.metadata.labelsInUse,
+        next: list.metadata.continue ?? null,
+        remaining: list.metadata.remainingItemCount ?? 0,
+      } satisfies InboxPage;
+      return page;
+    },
+    placeholderData: (previous) => previous,
+  });
+
+/** The field selector of the cards in chains still in play: the Inbox page's chains, which it reads whole. */
+const CHAINED_IN_PLAY = 'status.inPlay=true,status.chained=true';
+
+/**
+ * The cards in chains that are still in play, every page of them (the one read of the Inbox that is whole): the page draws each chain
+ * above its cards, each whole. Of every factory (`GET /api/cards`) or of `factory`'s alone.
+ * @param factory The factory whose cards alone are read, by its name; undefined for every factory's.
+ */
+export const chainsQuery = (factory?: string) =>
+  queryOptions({
+    queryKey: ['inbox', { chains: true, factory }],
+    queryFn: async () => {
+      const query = { fieldSelector: CHAINED_IN_PLAY };
+      return entriesOf(await (factory === undefined ? cards.listAll(query) : cards.list(namespaceOf(factory), query)));
+    },
   });
 
 /**
@@ -203,7 +259,7 @@ export const inboxAllQuery = (selector: string | undefined, factory?: string) =>
  * clause). The label filter's check before it writes the address.
  * @param selector The label selector to check, as a person typed it.
  */
-export const checkSelector = (selector: string) => cards.listAll({ labelSelector: selector.trim() });
+export const checkSelector = (selector: string) => cards.page(undefined, { labelSelector: selector.trim(), limit: 1 });
 
 /**
  * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of
@@ -323,19 +379,22 @@ export const cardFileUrl = (card: Pick<InboxEntry, 'factory'>, file: string) =>
  * Never a repository nor an origin: the factory places the card's run and finds its workflow by name. Resolves with the card's name;
  * rejects with the api's refusal in full — the package's words for an idea with nothing in it or a factory the store does not have, or the
  * api's own about the request or a workflow it has none of. `label`, where given, are the labels the card is filed with, each `key=value`,
- * which its run is started with too; `given`, the files it carries, each uploaded first to its namespace and named by its id.
+ * which its run is started with too; `after`, the cards it waits on, by name; `given`, the files it carries, each uploaded first to its
+ * namespace and named by its id.
  */
 export const fileCard = async ({
   factory,
   body,
   workflow,
   label,
+  after,
   given,
 }: {
   body: string;
   workflow?: string;
   factory?: string;
   label?: readonly string[];
+  after?: readonly string[];
   given?: readonly File[];
 }) => {
   const namespace = filedNamespace(body, factory);
@@ -345,6 +404,7 @@ export const fileCard = async ({
     body,
     ...(workflow === undefined ? {} : { workflow }),
     ...(label === undefined ? {} : { label }),
+    ...(after === undefined || after.length === 0 ? {} : { after }),
     ...(carried.length === 0 ? {} : { files: carried }),
   });
   return { name: filed.metadata.name };
@@ -438,6 +498,25 @@ export async function setCardFrom(card: CardRef, runs: readonly string[]) {
   const read = await cards.get(namespace, card.name);
   const { from: _, ...kept } = read.spec;
   const spec: CardSpec = runs.length ? { ...kept, from: [...runs] } : kept;
+  return cards.replace(namespace, card.name, {
+    metadata: { resourceVersion: read.metadata.resourceVersion, labels: { ...read.metadata.labels } },
+    spec,
+  });
+}
+
+/**
+ * Set the cards a card runs after, as the CLI's `inbox after <name> <card>...` does — or, with none, take its `after:` off: the card read
+ * as it now stands, then written whole (`cards.replace`) with its spec but `after`, its labels and the `resourceVersion` it was read at,
+ * so a card changed in between is refused, not overwritten. Resolves with the card as it now reads; rejects with the api's refusal in
+ * full: a card that is not there or was started, a name that is no card, a cycle, a card changed since it was read.
+ * @param card The card whose `after:` is set: its name and its factory.
+ * @param names The names of the cards it runs after; none takes the line off.
+ */
+export async function setCardAfter(card: CardRef, names: readonly string[]) {
+  const namespace = namespaceOf(card.factory);
+  const read = await cards.get(namespace, card.name);
+  const { after: _, ...kept } = read.spec;
+  const spec: CardSpec = names.length ? { ...kept, after: [...names] } : kept;
   return cards.replace(namespace, card.name, {
     metadata: { resourceVersion: read.metadata.resourceVersion, labels: { ...read.metadata.labels } },
     spec,

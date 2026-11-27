@@ -538,7 +538,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
     setFits((n) => n + 1);
   };
   const queue = useQuery({ ...factoryInboxQuery(factory.name), refetchInterval: 5_000 });
-  const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
+  const queued = queue.data ? queueOf(queuedIn(queue.data.entries, factory)) : [];
   const laned = queued.length > 0 && !machine;
   const wasLaned = useRef(laned);
   useEffect(() => {

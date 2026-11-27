@@ -338,7 +338,7 @@ describe("each family of writes: its answer decoded, an answer unread refused wi
     assert.deepEqual(
       spec.steps,
       [
-        { name: 'ship', keys: { agent: own?.spec.agent, slot: 'none', gate: true }, body: 'Land it.' },
+        { name: 'ship', keys: { agent: own?.spec.agent, place: 'git', slot: 'none', gate: true }, body: 'Land it.' },
         {
           name: 'note',
           keys: Object.fromEntries(Object.entries(bare.spec).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0))),

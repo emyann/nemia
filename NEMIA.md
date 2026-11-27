@@ -40,7 +40,7 @@ to the person as a card to start, fold into another or drop, with what its stats
   review --round`, or `nemia approve <run> review --message "<why>"`), and a landing that refused — whose words name what to fix, and which tries again
   with `nemia retry <run> land --recheck`. A person who wants to read a change before it lands says so when the run starts — `nemia start … --gate review`,
   or the card's own `gate:` line naming review — and then everything below holds for that run.
-- The review's gate (on a run gated at it) before a landing is approved only once the run's own pull request is green
+- The review's approval (on a run gated at it) before a landing is approved only once the run's own pull request is green
   and mergeable on GitHub: open it — its
   address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
   decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which

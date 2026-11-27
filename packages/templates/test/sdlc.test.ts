@@ -706,7 +706,7 @@ test("each of sdlc's checks, either way, refuses with the variable it reads a fr
   assert.ok(read >= 8, `the checks that read a frozen folder were found: ${read}`);
 });
 
-test('no hire names Otto, and the release engineer has no folder, skill or instruction left', () => {
+test('no hire names Otto, and the release engineer has no folder or skill left', () => {
   for (const name of ['set', 'plain']) {
     const wiring = JSON.parse(fs.readFileSync(path.join(treeOf(name), 'factory.json'), 'utf8')) as { hires: Record<string, string> };
     assert.deepEqual(
@@ -717,7 +717,6 @@ test('no hire names Otto, and the release engineer has no folder, skill or instr
   }
   assert.equal(fs.existsSync(path.join(SDLC, 'agents', 'otto')), false);
   assert.equal(fs.existsSync(path.join(SDLC, 'skills', 'land-a-branch')), false);
-  assert.equal(fs.existsSync(path.join(SDLC, 'workflows', 'build', 'land.md')), false);
 });
 
 test("build's review loop ships its numbers: five rounds, the review's budget sized to them, implement's too", () => {
@@ -848,14 +847,18 @@ describe("build's and quick's review notes say what a gate at the review is, and
       });
 });
 
-test("sdlc's wiring names quick for a first card, which lists an ending step, and the radius its parameters default to", () => {
+test("sdlc's wiring names quick for a first card, which lists no ending step now, and the radius its parameters default to", () => {
   const wiring = JSON.parse(fs.readFileSync(path.join(treeOf('plain'), 'factory.json'), 'utf8')) as {
     firstWorkflow?: string;
     radius?: { agentFacing: string[]; checkAffecting: string[]; lessons: string[] };
   };
   assert.equal(wiring.firstWorkflow, 'quick');
   const ending = loaded('plain', 'quick').filter((step) => step.workspace === 'base');
-  assert.equal(ending.length, 1, "quick's ending, the step the board gates a first card at");
+  assert.equal(
+    ending.length,
+    0,
+    "quick's land step waits on conditions in no checkout of its own, so the board has no ending step to gate",
+  );
   assert.ok(wiring.radius?.agentFacing.includes('**/CLAUDE.md'), JSON.stringify(wiring.radius));
   assert.ok(wiring.radius?.checkAffecting.includes('**/package.json'), JSON.stringify(wiring.radius));
   assert.ok(wiring.radius?.lessons.includes('docs/'), JSON.stringify(wiring.radius));

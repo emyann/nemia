@@ -402,7 +402,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
     });
   }
   const runner = a2aOps('fake', ops, async () => []);
-  return { ops, runner, sessions, unread, asked, acted: () => asked.filter(([verb]) => verb !== 'observe') };
+  return { ops, runner, sessions, unread, asked, acted: () => asked.filter(([verb]) => verb !== 'observe' && verb !== 'observeFor') };
 };
 
 /** A line of a session's conversation, as a driver reads it. */
@@ -568,7 +568,7 @@ describe('the conformance walk: each verb through the client reaches the driver 
     await Effect.runPromise(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'look again'));
     d.sessions.set(request.name, { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
     await Effect.runPromise(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'and again'));
-    assert.deepEqual(d.acted().slice(1), [
+    assert.deepEqual(d.asked.slice(1), [
       ['observeFor', [{ name: request.name }]],
       ['say', [{ name: request.name, sessionId: 's-1' }, 'look again']],
       ['observeFor', [{ name: request.name }]],

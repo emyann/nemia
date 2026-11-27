@@ -159,7 +159,7 @@ const harness = (
         }),
   };
   const handler = new HarnessHandler('fake', ops, async (id) => journal.get(id) ?? []);
-  const acted = () => asked.filter(([verb]) => verb !== 'observe');
+  const acted = () => asked.filter(([verb]) => verb !== 'observe' && verb !== 'observeFor');
   return { handler, sessions, unread, asked, acted, journal };
 };
 
@@ -770,7 +770,7 @@ describe("the card and the runtime's extension: each method offered as the drive
       [['ae/t-1/1', TaskState.TASK_STATE_WORKING]],
     );
     assert.deepEqual(unread, []);
-    assert.deepEqual(h.acted(), [['observeFor', expected]]);
+    assert.deepEqual(h.asked, [['observeFor', expected]]);
   });
   test('observeSessions answers the names the driver could not read, beside the Tasks it listed', async () => {
     const h = harness();
@@ -1212,13 +1212,12 @@ describe('a running session told words and stopped: the harness asked once, with
     const waiting = await h.handler.sendMessage(said('ae/t-2/1', 'go on', { contextId: '' }), ctx);
     assert.ok('status' in waiting);
     assert.equal(waiting.status.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'a session waiting on a person still takes words');
-    assert.deepEqual(h.acted(), [
+    assert.deepEqual(h.asked, [
       ['observeFor', [{ name: 'ae/t-1/1' }]],
       ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'look at the tests again']],
       ['observeFor', [{ name: 'ae/t-2/1' }]],
       ['say', [{ name: 'ae/t-2/1', sessionId: 's-2' }, 'go on']],
     ]);
-    assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 0, 'never the whole listing');
 
     const whole = harness({ noObserveFor: true });
     whole.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
@@ -1243,7 +1242,7 @@ describe('a running session told words and stopped: the harness asked once, with
       h.handler.sendMessage(said('ae/t-2/1', 'next', { contextId: '' }), ctx),
       refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (completed): it takes no more words.'),
     );
-    assert.deepEqual(h.acted(), [
+    assert.deepEqual(h.asked, [
       ['observeFor', [{ name: 'ae/t-1/1' }]],
       ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'next']],
       ['observeFor', [{ name: 'ae/t-2/1' }]],

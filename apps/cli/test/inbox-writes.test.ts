@@ -267,6 +267,19 @@ test('`nemia inbox resend` files a started card again as <run>-resent, queued on
   assert.ok(again.err.includes('r-sent-resent'), again.err);
 });
 
+test('`nemia resend` files a run no card started as <run>-resent, queued on the workflow named and handed the run', async () => {
+  plantRecord(store.root, runKey('r-loose'), JSON.stringify({ ...JSON.parse(RUN), id: 'r-loose' }));
+  plantMarker(store.root, 'r-loose', 'cancelled', '2026-11-05T01:00:00.000Z');
+  const sent = await store.nemia(['resend', 'r-loose', '--workflow', 'dev']);
+  ok(sent, 'resend');
+  assert.match(sent.out, /^r-loose-resent {2}filed from run r-loose$/m);
+  assert.match(sent.out, /^r-loose-resent {2}queued at \S+ on dev/m);
+  assert.match(cardOn(store.root, 'r-loose-resent') ?? '', /\nworkflow: dev\n/);
+  const again = await store.nemia(['resend', 'r-loose']);
+  assert.equal(again.code, 1, `sent on once, a Conflict, which the client exits 1 as every Conflict: ${again.err}`);
+  assert.ok(again.err.includes('r-loose-resent'), again.err);
+});
+
 test("REFUSED, exit 2, before anything is asked: a folder or a path to no file as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
   const before = cardNames(store.root);
   for (const [argv, named] of [
@@ -278,6 +291,8 @@ test("REFUSED, exit 2, before anything is asked: a folder or a path to no file a
     [['inbox', 'queue', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', 'dev', '--off'], /--off/],
     [['inbox', 'resend', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
+    [['resend', 'some-run', '--workflow', '/abs/dev'], /--workflow <name>/],
+    [['resend'], /nemia resend/],
     [['inbox', 'from', 'some-card'], /nemia inbox from/],
     [['inbox', 'edit', 'some-card', IDEAS], /nemia inbox edit/],
     [['label', 'inbox', 'some-card'], /key=value/],

@@ -9,7 +9,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TABLE_ACCEPT, type Card, type CardList, type CardResent, type Table } from 'objects';
+import { TABLE_ACCEPT, type Card, type CardList, type CardResent, type RunResent, type Table } from 'objects';
 import { app } from '../app.ts';
 
 const inbox = path.join(root, 'inbox');
@@ -402,4 +402,55 @@ test('POST a started card to resend: filed as <run>-resent in its namespace, han
   assert.equal((await post('/api/namespaces/a/cards/r-working/resend', {})).status, 404);
   assert.equal((await post('/api/namespaces/default/cards/r-working/resend', { workflow: 'a/b' })).status, 422);
   assert.ok(cardText(root, 'working-d4-resent') === null, 'nothing filed for a refused card');
+});
+
+test('POST a run no card started to resend: filed as <run>-resent from its brief, handed the run; REFUSED: in flight 409, from a card 422, unknown 404, a path 422', async (t) => {
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  const run = (id: string, more: object = {}) =>
+    plantRecord(
+      root,
+      runKey(id),
+      JSON.stringify({
+        id,
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'A loose brief',
+        workflowDir: '/code/app/workflows',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+        steps: { implement: { taskId: null } },
+        ...more,
+      }),
+    );
+  run('loose-e5');
+  plantMarker(root, 'loose-e5', 'cancelled', '2026-11-05T01:00:00.000Z');
+  run('working-f6');
+  run('carded-g7', { from: { inbox: 'some-card' } });
+  t.onTestFinished(() => {
+    dropRecord(root, cardKey('loose-e5-resent'));
+    for (const file of ['loose-e5.json', 'working-f6.json', 'carded-g7.json']) fs.rmSync(path.join(runs, file), { force: true });
+    dropMarker(root, 'loose-e5', 'cancelled');
+  });
+  const post = (url: string, body: unknown) => app.request(url, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  const sent = await post('/api/namespaces/default/runs/loose-e5/resend', { workflow: 'intake' });
+  assert.equal(sent.status, 201);
+  const answer = (await sent.json()) as typeof RunResent.Type;
+  assert.equal(answer.card.metadata.name, 'loose-e5-resent');
+  assert.equal(answer.card.spec.workflow, 'intake');
+  assert.deepEqual(answer.card.spec.from, ['loose-e5']);
+  assert.equal(answer.from.run, 'loose-e5');
+  assert.ok(cardText(root, 'loose-e5-resent') !== null);
+
+  assert.equal((await post('/api/namespaces/default/runs/loose-e5/resend', {})).status, 409, 'sent on once');
+  assert.equal((await post('/api/namespaces/default/runs/working-f6/resend', {})).status, 409, 'still at work');
+  assert.equal((await post('/api/namespaces/default/runs/carded-g7/resend', {})).status, 422, 'a card started it: send the card on');
+  assert.equal((await post('/api/namespaces/default/runs/no-such-h8/resend', {})).status, 404);
+  assert.equal((await post('/api/namespaces/default/runs/working-f6/resend', { workflow: 'a/b' })).status, 422);
+  assert.ok(cardText(root, 'working-f6-resent') === null, 'nothing filed for a refused run');
 });

@@ -78,8 +78,8 @@ export const resentLines = (sent: RunResent) => {
  */
 export async function resend(args: Args) {
   const name = runOf(args);
-  const namespace = await namespaceOfRun(RESEND_WORDS.name, name);
   const workflow = workflowNamed(textArg(args, 'workflow'), RESEND_WORDS.name, `nemia resend ${name}`);
+  const namespace = await namespaceOfRun(RESEND_WORDS.name, name);
   const payload = workflow === undefined ? {} : { workflow };
   said(resentLines(await asked(RESEND_WORDS.name, (c) => c.runs.resend({ params: { namespace, name }, payload }))));
   return 0;

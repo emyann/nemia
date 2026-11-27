@@ -2,16 +2,11 @@ import type { CardState, InboxEntry } from './api/inbox.ts';
 import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { WorkflowListing } from './api/workflows.ts';
-import { type CardWait, DEFAULT_NAMESPACE } from 'objects';
-import { shownIn, startRepo, type StartRepo } from './factories.ts';
-
-/**
- * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
- * then by name, so two filed in the same millisecond keep one order. An entry whose time is not known goes last.
- * @param entries The inbox's entries, as the api lists them.
- */
-export const newestCardsFirst = (entries: readonly InboxEntry[]) =>
-  [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
+import { type CardPhase, type CardWait, DEFAULT_NAMESPACE, INBOX_SORTS } from 'objects';
+import { startRepo, type StartRepo } from './factories.ts';
+import type { Hue } from './meaning.ts';
+import type { InboxAsked } from './api/inbox.ts';
+import { trailOf } from './finished.ts';
 
 /**
  * Where a card stands, by its state, one total table: `unstarted` its own three (filed, queued, refused), `in flight` a run pending,
@@ -44,69 +39,10 @@ export const startedCard = (entry: Pick<InboxEntry, 'state'>) => CARD_KIND[entry
 export const inPlay = (entry: Pick<InboxEntry, 'state'>) => CARD_KIND[entry.state] !== 'ended';
 
 /**
- * The cards still in play (`inPlay`), in their order: the Inbox page's In play, an entry that does not read as a card among them.
- * @param entries The inbox's entries, each with its state.
- */
-export const cardsInPlay = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]) => entries.filter(inPlay);
-
-/**
- * The cards whose run ended (`CARD_KIND` `ended`), in their order: the Inbox page's Ended.
- * @param entries The inbox's entries, each with its state.
- */
-export const cardsEnded = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]) => entries.filter((entry) => !inPlay(entry));
-
-/**
- * The Inbox page's `?cards=`: `ended` lists the cards whose run ended; absent, or any other value, the cards in play.
- * @param search The page's search, as the router parsed it.
- */
-export const cardsSearch = (search: Record<string, unknown>) =>
-  (search.cards === 'ended' ? { cards: 'ended' } : {}) satisfies { cards?: 'ended' };
-
-/** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
-const isCard = (entry: Pick<InboxEntry, 'file'>) => entry.file.endsWith('.md');
-
-/**
- * Whether an entry of the inbox has a page, `/inbox/<name>`, among the entries listed with it: whether its name is one the api takes (the
- * package's `inboxNameRefusal`). Every card's is, and a stray file's where nothing else answers to its name, but a folder's, which the
- * listing names `sub/`, and a file's with a backslash in it: the api would refuse the name the page asks for, and a link would open a
- * refusal of what the Inbox page has just listed.
- *
- * And not a stray file's where a card of that name is listed beside it: `/inbox/notes` is `notes.md`, which the api's card page reads
- * before a stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
- * @param entry The entry asked about: its name and its file.
- * @param entries Every entry listed with it, the entry among them.
- */
-export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]) =>
-  entry.name.trim() !== '' &&
-  !/[\\/\0]/.test(entry.name) &&
-  !entry.name.startsWith('.') &&
-  (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
-
-/**
  * A start, a drop, a queue or its taking back, or a `from:` set, the api refused: the card as the page listed it, what was asked, and the
  * api's words.
  */
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue' | 'from' | 'resend'; message: string };
-
-/**
- * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read
- * again after the refusal, no longer lists — dropped or started behind the page's back — in the place it was listed, so the refusal's
- * sentence stays where the person asked. A refusal of a card still listed is on that card, and on no line of its own.
- *
- * By the file, not the name: two entries may answer to one name — a card and a stray file beside it, `notes.md` and `notes` (`hasPage`) —
- * and a refusal is of the one the page asked about. Matched by name, a refused Remove of the card would draw its sentence under the stray
- * file too, which has no Remove to be refused.
- * @param entries The cards the inbox lists now.
- * @param refusals The refusals the page was given, each with the card as it was listed.
- */
-export function cardLines(entries: readonly InboxEntry[], refusals: readonly CardRefusal[]) {
-  const listed = new Set(entries.map((entry) => entry.file));
-  const gone = refusals.filter((r) => !listed.has(r.entry.file));
-  return newestCardsFirst([...entries, ...gone.map((r) => r.entry)]).map((entry) => {
-    const refusal = refusals.find((r) => r.entry.file === entry.file) ?? null;
-    return { entry, refusal, gone: !listed.has(entry.file) };
-  });
-}
 
 /**
  * A workflow as a pick is keyed: its source and its name, since the repository and yours may each have one of a name.
@@ -213,16 +149,6 @@ export function ordinal(n: number) {
 }
 
 /**
- * What a queued card says of its place and, where triggers queue it, of them: `queued · 2nd`, `queued by ready · 1st` — or `queued` alone
- * for one a record says was started, which has no place.
- * @param queued The card's queue record, with its place where it has one.
- */
-export const queuedWord = (queued: NonNullable<InboxEntry['queued']>) => {
-  const word = queued.by?.length ? `queued by ${queued.by.join(', ')}` : 'queued';
-  return queued.place ? `${word} · ${ordinal(queued.place)}` : word;
-};
-
-/**
  * The line of a card's waits on the cards of its `after:` not succeeded: each card, the card its work stands at where it is another, and
  * that
  * card's state, or that the store has no such card, or the cycle; and, where only a person can release one, `Needs you:` with the fix.
@@ -257,23 +183,13 @@ export const queueOf = (entries: readonly InboxEntry[]) =>
   entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
 
 /**
- * Whether a card could be queued were its factory not asked: it is `filed` — neither queued nor started — names a workflow, and reads.
- */
-const queueableButFactory = (entry: InboxEntry) => entry.state === 'filed' && entry.workflow !== null && entry.error === null;
-
-/**
  * Whether the page offers Queue on a card: it names a factory (`unassigned`) and a workflow — a queued card starts on its own, in the
  * factory and on the workflow it names — it reads, it is not queued, and no record says it was started. What the api would refuse
  * otherwise, in the package's words.
  * @param entry The inbox's entry.
  */
-export const queueable = (entry: InboxEntry) => !unassigned(entry) && queueableButFactory(entry);
-
-/**
- * Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one.
- * @param entry The inbox's entry.
- */
-export const queueNeedsFactory = (entry: InboxEntry) => unassigned(entry) && queueableButFactory(entry);
+export const queueable = (entry: InboxEntry) =>
+  !unassigned(entry) && entry.state === 'filed' && entry.workflow !== null && entry.error === null;
 
 /**
  * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started
@@ -358,22 +274,183 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
 }
 
 /**
- * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and whose
- * kind is `unstarted` (`CARD_KIND`: filed, queued or refused), never one whose run is in flight or ended; every factory's while `picked`
- * names none (`shownIn`), as the Inbox page lists them then.
- * @param entries The inbox's entries.
- * @param picked The factory picked, or undefined for every factory.
- */
-export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined) =>
-  shownIn(
-    entries.filter((entry) => entry.error === null && CARD_KIND[entry.state] === 'unstarted'),
-    picked,
-  );
-
-/**
  * What the Inbox badge's `count` is, said whole for its hover and a screen reader: in the factory `picked`, or in every factory.
  * @param count How many cards are not yet started.
  * @param picked The factory picked, or undefined for every factory.
  */
 export const inboxBadgeTitle = (count: number, picked: string | undefined) =>
   `${count} ${count === 1 ? 'card' : 'cards'} not yet started, ${picked === undefined ? 'in every factory' : `in ${picked}`}`;
+
+/** How many cards a page of the Inbox holds. */
+export const INBOX_PAGE = 12;
+
+/** The phases the Open side's chips name, in the order they are drawn: the cards in play. */
+export const OPEN_PHASES = ['waiting', 'working', 'blocked', 'notStarted'] as const satisfies readonly CardPhase[];
+
+/** The phases the Closed side's chips name, in the order they are drawn: the cards whose run is over. */
+export const CLOSED_PHASES = ['done', 'failed', 'cancelled'] as const satisfies readonly CardPhase[];
+
+/** Each phase in the words of its chip. */
+export const PHASE_WORDS: Readonly<Record<CardPhase, string>> = {
+  notStarted: 'Not started',
+  blocked: 'Blocked',
+  waiting: 'Waiting',
+  working: 'Working',
+  done: 'Done',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
+
+/**
+ * What the Inbox page reads of its address: the factory its path names, its labels, words, order, side, state chip and the trail of its
+ * pages.
+ */
+export type InboxView = {
+  factory?: string;
+  l?: string;
+  search?: string;
+  sort?: 'oldest';
+  cards?: 'closed';
+  phase?: CardPhase;
+  older?: string;
+};
+
+/**
+ * The Inbox page's own keys of its address: `?search=` the words searched, `?sort=oldest`, `?cards=closed` and `?phase=` one phase of the
+ * side shown; each kept only where it says something, so the address of the page as it opens has none. The labels (`?l=`) and the trail
+ * (`?older=`) are read apart.
+ * @param search The page's search, as the router parsed it.
+ */
+export function inboxSearch(search: Record<string, unknown>) {
+  const closed = search.cards === 'closed';
+  const phases: readonly CardPhase[] = closed ? CLOSED_PHASES : OPEN_PHASES;
+  const words = typeof search.search === 'string' ? search.search.trim() : '';
+  const phase = phases.find((one) => one === search.phase);
+  return {
+    ...(words === '' ? {} : { search: words }),
+    ...(search.sort === 'oldest' ? { sort: 'oldest' as const } : {}),
+    ...(closed ? { cards: 'closed' as const } : {}),
+    ...(phase === undefined ? {} : { phase }),
+  } satisfies Pick<InboxView, 'search' | 'sort' | 'cards' | 'phase'>;
+}
+
+/**
+ * Whether the page pulls the chains out above its cards: the Open side, every state, with no words and no labels. Any filter gives one flat
+ * page of the cards it keeps.
+ * @param view What the page reads of its address.
+ */
+export const chainsPulled = (view: Pick<InboxView, 'l' | 'search' | 'cards' | 'phase'>) =>
+  view.cards !== 'closed' && view.phase === undefined && view.search === undefined && view.l === undefined;
+
+/** What a card list's token wears on the address's trail, the mark the trail's tokens carry: the api's own token follows it. */
+export const TRAIL_MARK = 'f.';
+
+/**
+ * What the api's card list is asked for the page `view` shows: its side and state as a field selector, its labels and words, its order
+ * and the page its trail leads to. Cards in chains are left to the chains' own read (`chainsQuery`) where the page pulls them out.
+ * @param view What the page reads of its address.
+ */
+export function inboxAskedOf(view: InboxView) {
+  const side = view.cards === 'closed' ? 'status.inPlay=false' : 'status.inPlay=true';
+  const terms = view.phase !== undefined ? [`status.phase=${view.phase}`] : chainsPulled(view) ? [side, 'status.chained=false'] : [side];
+  const continued = trailOf(view).at(-1)?.slice(TRAIL_MARK.length);
+  return {
+    fieldSelector: terms.join(','),
+    ...(view.l === undefined ? {} : { labelSelector: view.l }),
+    ...(view.search === undefined ? {} : { search: view.search }),
+    orderBy: view.sort === 'oldest' ? INBOX_SORTS.oldest : INBOX_SORTS.newest,
+    limit: INBOX_PAGE,
+    ...(continued === undefined ? {} : { continue: continued }),
+  } satisfies InboxAsked;
+}
+
+/** How a card is drawn: its one word, the meaning it takes, the form of the tag and what its hover says. */
+type CardTag = {
+  word: string;
+  hue: Hue;
+  form: 'container' | 'filled';
+  title: string;
+  frame: 'yours' | 'alive' | 'failure' | 'none';
+};
+
+/** The look a card has by the word its state is drawn with (`cardWord`): the table of the artboard's script. */
+const TAGS: Readonly<Record<string, CardTag>> = {
+  blocked: { word: 'blocked', hue: 'grey', form: 'container', title: 'Started: it runs once the cards before it are done.', frame: 'none' },
+  refused: {
+    word: 'refused',
+    hue: 'failure',
+    form: 'container',
+    title: 'Its start was refused: edit the card, or cancel its start.',
+    frame: 'failure',
+  },
+  pending: { word: 'pending', hue: 'grey', form: 'container', title: 'Started: it waits for room to run.', frame: 'none' },
+  working: { word: 'working', hue: 'alive', form: 'container', title: 'Its run is at work.', frame: 'alive' },
+  waiting: { word: 'waiting', hue: 'yours', form: 'filled', title: 'Its run waits on you: open it to see what it asks.', frame: 'yours' },
+  done: { word: 'done', hue: 'sage', form: 'filled', title: 'Its run is done.', frame: 'none' },
+  failed: { word: 'failed', hue: 'failure', form: 'container', title: 'Its run failed.', frame: 'none' },
+  cancelled: { word: 'cancelled', hue: 'grey', form: 'container', title: 'Its run was called off.', frame: 'none' },
+  stuck: {
+    word: 'stuck',
+    hue: 'yours',
+    form: 'container',
+    title: 'A card it is chained after ended without succeeding: only you can release it.',
+    frame: 'yours',
+  },
+};
+
+/**
+ * The word a card is drawn with: `refused` for a start the package refused; `stuck` for a card not started that waits on one only a
+ * person can release; `blocked` for a card queued behind cards not done, and `pending` for one queued with none; else the phase of its
+ * run, none for a card filed and not queued, which says nothing.
+ * @param entry The card: its state, phase, queue record and waits.
+ */
+export function cardWord(entry: Pick<InboxEntry, 'state' | 'phase' | 'queued' | 'waits'>) {
+  if (entry.state === 'refused') return 'refused';
+  if (entry.phase !== 'notStarted' && entry.phase !== 'blocked') return entry.state === 'pending' ? 'pending' : entry.phase;
+  const waits = entry.waits ?? [];
+  if (entry.state === 'filed' && waits.some((w) => w.stalled)) return 'stuck';
+  if (entry.state === 'queued') return waits.length > 0 ? 'blocked' : 'pending';
+  return entry.phase === 'blocked' ? 'blocked' : null;
+}
+
+/**
+ * How a card is tagged and framed (`cardWord`), null for a card with nothing to say.
+ * @param entry The card: its state, phase, queue record and waits.
+ */
+export const cardTag = (entry: Pick<InboxEntry, 'state' | 'phase' | 'queued' | 'waits'>) => TAGS[cardWord(entry) ?? ''] ?? null;
+
+/**
+ * The cards in chains laid out: each chain a set of cards joined by what they wait on, its cards in columns by how many cards come
+ * before them, each column in the order of `entries`. A chain is a connected set; a card in none is not here.
+ * @param entries The cards in chains, as the chains' read gave them, each with the cards it holds back (`followedBy`).
+ */
+export function chainsOf(entries: readonly InboxEntry[]) {
+  const byName = new Map(entries.map((entry) => [entry.name, entry]));
+  const before = new Map<string, string[]>();
+  for (const entry of entries)
+    for (const next of entry.followedBy) if (byName.has(next)) before.set(next, [...(before.get(next) ?? []), entry.name]);
+  const seen = new Set<string>();
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it calls itself, whose type inference cannot give
+  const depth = (name: string, trail: ReadonlySet<string>): number =>
+    trail.has(name) ? 0 : Math.max(-1, ...(before.get(name) ?? []).map((from) => depth(from, new Set([...trail, name])))) + 1;
+  return entries.flatMap((entry) => {
+    if (seen.has(entry.name)) return [];
+    const members: InboxEntry[] = [];
+    const todo = [entry.name];
+    while (todo.length > 0) {
+      const name = todo.pop()!;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const here = byName.get(name);
+      if (here === undefined) continue;
+      members.push(here);
+      todo.push(...here.followedBy, ...(before.get(name) ?? []));
+    }
+    const columns: InboxEntry[][] = [];
+    for (const member of entries.filter((e) => members.includes(e))) {
+      const at = depth(member.name, new Set());
+      columns[at] = [...(columns[at] ?? []), member];
+    }
+    return [columns.filter((column) => column !== undefined)];
+  });
+}

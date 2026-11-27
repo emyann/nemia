@@ -6,7 +6,8 @@
  * recorded, what it did to GitHub as the calls of `gh`, and what it did to the checkout as git says.
  *
  * The pure decisions are proved by `contracts/land-write.contract.ts`; here is only that the program reads them from the world and acts on
- * them: two runs landed one at a time, a pull request merged by hand read as landed, a restart that lands nothing twice, a merge GitHub
+ * them: two runs landed one at a time, a head that lacks a base moved outside the derived paths merged as judged and one moved inside
+ * them refused, a pull request merged by hand read as landed, a restart that lands nothing twice, a merge GitHub
  * declines, the merge's message, a landing with no remote, one a stopped program left staged, and a condition written by hand. The
  * refresh the program makes before it gives a turn is `refresh.boundary.test.ts`'s.
  *
@@ -93,6 +94,52 @@ test('two runs are landed one at a time: the older takes the turn, the other wai
   assert.equal(merges[0].argv[5], refreshed, 'merged at the refreshed head ci judged');
 
   assert.notEqual(tipOf(w, 'r-2'), w.runs['r-2'].tip, 'r-2 is refreshed in the pass where r-1 landed, which frees the slot');
+});
+
+/** A refresh that derives the file as the branch has it, whatever the base's other files: a base moved elsewhere changes nothing of it. */
+const STEADY = { refresh: `printf '{ "v": 1 }\\n' > ${DERIVED} && git add ${DERIVED}`, derives: DERIVED };
+
+test('a head that lacks a base moved outside the derived paths is merged as ci judged it: the turn refreshes nothing, and landed merges', () => {
+  const w = world('clean');
+  const tip = w.runs['r-1'].tip;
+  const rules = [BASE_RULE, ...VIEWS, { when: 'pr list', out: JSON.stringify([listed('r-1', tip)]) }];
+  const turned = only(pass([run(w, 'r-1', '00')], rules, STEADY));
+  assert.deepEqual([turned.name, turned.status], ['turn', 'True']);
+  assert.ok(turned.message.includes('changed nothing the refresh derives'), turned.message);
+  assert.equal(gitIn(w.bare, 'rev-parse', resultOf('r-1')).trim(), tip, 'nothing is pushed');
+
+  const r = pass([run(w, 'r-1', '00', TURNED)], rules, STEADY);
+  const landed = only(r);
+  assert.deepEqual([landed.name, landed.status], ['landed', 'True'], landed.message);
+  const merges = asked(r.calls, 'pr', 'merge');
+  assert.equal(merges.length, 1);
+  assert.equal(merges[0].argv[5], tip, 'merged at the head ci judged');
+  assert.deepEqual(
+    stands(w.runs['r-1'].run),
+    { branch: resultOf('r-1'), head: tip, clean: true, merging: false },
+    'the trial is taken back',
+  );
+});
+
+test('REFUSED: a base that moves a derived path after the turn is not merged at the old head, and landed names the refresh', () => {
+  const w = world('clean');
+  const tip = w.runs['r-1'].tip;
+  const rules = [BASE_RULE, ...VIEWS, { when: 'pr list', out: JSON.stringify([listed('r-1', tip)]) }];
+  assert.equal(only(pass([run(w, 'r-1', '00')], rules, STEADY)).status, 'True');
+  commit(w.repo, { [DERIVED]: '{ "v": 2 }\n' }, 'a landing that moves the derived file');
+  gitIn(w.repo, 'push', '-q', 'origin', 'main');
+
+  const r = pass([run(w, 'r-1', '00', TURNED)], rules, STEADY);
+  const landed = only(r);
+  assert.deepEqual([landed.name, landed.status], ['landed', 'False']);
+  assert.ok(landed.message.includes(STEADY.refresh), `it names the refresh:\n${landed.message}`);
+  assert.equal(asked(r.calls, 'pr', 'merge').length, 0, 'nothing is merged');
+  assert.equal(gitIn(w.bare, 'rev-parse', resultOf('r-1')).trim(), tip, 'nothing is pushed');
+  assert.deepEqual(
+    stands(w.runs['r-1'].run),
+    { branch: resultOf('r-1'), head: tip, clean: true, merging: false },
+    'the trial is taken back',
+  );
 });
 
 test('a run whose pull request a person merged by hand reads as landed, and nothing is merged', () => {

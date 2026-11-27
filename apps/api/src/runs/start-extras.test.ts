@@ -77,8 +77,8 @@ test("POST /api/namespaces/acme/runs with models, gates and inputs starts a run 
   assert.deepEqual(fs.readFileSync(path.join(inputs, 'shot.png')), PNG);
   assert.deepEqual(
     [started.run?.models, started.run?.gated],
-    [{ implement: 'sonnet' }, ['implement']],
-    'what nemia start prints of it: its models and its gates',
+    [{ implement: 'sonnet' }, ['implement', 'ship']],
+    "what nemia start prints of it: its models, and its gates: the start's and the workflow's own",
   );
 });
 
@@ -92,10 +92,11 @@ test('POST /api/namespaces/acme/cards/:name/start with models starts a run whose
   assert.equal(started.run?.from, 'cache-card', 'what nemia start prints of it: the card it came from');
 });
 
-test('`noWorktree` reaches the start: a workflow that ends by merging its result branch is refused it, naming --no-worktree', async () => {
+test('`noWorktree` reaches the start: the run is filed to work where it is, in no worktree', async () => {
   const res = await post('runs', { workflow: 'dev', brief: 'Add a cache.', noWorktree: true });
-  assert.equal(res.status, 422, await res.clone().text());
-  assert.match(((await res.json()) as { error: string }).error, /--no-worktree/);
+  assert.equal(res.status, 201, await res.clone().text());
+  const started = (await res.json()) as { id: string };
+  assert.equal(runsNow(root).runs.read(started.id).isolate, false);
 });
 
 test('REFUSED: an input whose name holds a folder, and one sent both as text and as bytes, are refused, nothing started', async () => {

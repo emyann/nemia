@@ -14,7 +14,7 @@ import { placeOver, unreadBy } from '../../test/place-over.ts';
 
 /** A place none of whose verbs may be asked: each fails the test that asks it. */
 const UNASKED: Place = {
-  declared: { denyWhileLanding: [], say: {} as Place['declared']['say'] },
+  declared: { say: {} as Place['declared']['say'] },
   ask: (verb) => Effect.die(new Error(`${verb} was asked of a place this test answers itself`)),
   askNow: (verb) => assert.fail(`${verb} was asked of a place this test answers itself`),
 };
@@ -122,7 +122,7 @@ test('a verb stopped at its deadline says so in the deadline words, with what it
 
 test('a verb that threw says so in one sentence, naming the verb and what was thrown', () => {
   assert.equal(threwWords('make', new Error('also is not iterable')), 'make threw before it answered: also is not iterable');
-  assert.equal(threwWords('land', 'a string'), 'land threw before it answered: a string');
+  assert.equal(threwWords('open', 'a string'), 'open threw before it answered: a string');
 });
 
 test('what was thrown is said on one line, its last four lines and no more', () => {

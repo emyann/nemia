@@ -170,9 +170,8 @@ export const LS_WORDS = {
     "flight); what each step's tries and the run have cost, where measured;",
     'last, whether a nemia up ticks the store and when its last pass was;',
     'first, while the store is paused, Pausing: N finishing and each',
-    'session, check or landing at work, or Paused once none is, then each',
-    "check it holds, a landing with its merge staged in the repository's",
-    'own working tree (MERGE_HEAD) among them; a step whose check it holds',
+    'session or check at work, or Paused once none is, then each',
+    'check it holds; a step whose check it holds',
     'says waiting on the pause. -l: the runs whose labels match (team=core,',
     'given again for another); --show-labels: each run with its labels;',
     '-L <key>: that label beside each run, given again for another; -o',
@@ -194,33 +193,88 @@ const LABEL_COLUMN_TAKES = `${CLI} inbox -L takes the label key whose value each
 /** The refusal of a `-l` given nothing to match. */
 const INBOX_QUERY_TAKES = `${CLI} inbox -l takes what the cards' labels, workflow and factory are to match: ${SELECTOR_FLAG_FORM}`;
 
+/** The refusal of a `--sort` that is none of the three. */
+const INBOX_SORT_TAKES = `${CLI} inbox --sort takes newest, oldest or name: ${CLI} inbox --sort oldest`;
+
+/** The sorts `nemia inbox --sort` takes, and the `orderBy` each asks of the cards' list. */
+export const INBOX_SORTS = {
+  newest: 'metadata.creationTimestamp desc',
+  oldest: 'metadata.creationTimestamp',
+  name: 'metadata.name',
+} as const;
+
+/** The refusal of a `--sort` that is none of newest, oldest or name, or null. */
+const sortRefused = (args: Args) => {
+  const sort = textOf(args, 'sort');
+  return sort === undefined || sort in INBOX_SORTS ? null : `${INBOX_SORT_TAKES}, not ${sort}`;
+};
+
 /**
- * `nemia inbox`, the inbox's bare read: the cards in play, or every one with `--all`, as the server prints their table, and how to start,
- * queue or drop one. `nemia inbox --help` prints its manual, which says every form of the inbox.
+ * `nemia inbox`, the inbox's bare read: one page of the cards in play, or of every one with `--all`, as the server prints their table,
+ * and how to start, queue or drop one. `nemia inbox --help` prints its manual, which says every form of the inbox.
  */
 export const INBOX_READ_WORDS = {
   name: 'inbox',
   usage: '',
   help: [
-    'the cards still in play: name, first line, workflow when set,',
+    'a page of the cards still in play: name, first line, workflow when set,',
     'and started as <runId>, <phase> (nemia inbox --help); --all: those whose',
-    'run ended too; -l: the cards whose labels match; --show-labels, -L <key>:',
-    'their labels on each line; -o wide: every column',
+    'run ended too; -l: the cards whose labels match; --search <words>: those',
+    'whose title or name hold them; --phase <phase>: those in it; --sort',
+    'newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,',
+    '-L <key>: their labels on each line; -o wide: every column',
   ],
   spec: {
     positionals: [],
     flags: [
       { ...selectorFlag('nemia inbox'), takes: INBOX_QUERY_TAKES },
       { flag: '--all', kind: 'switch', key: 'all' },
+      {
+        flag: '--search',
+        kind: 'text',
+        key: 'search',
+        takes: `${CLI} inbox --search takes the words a card's title or name hold: ${CLI} inbox --search "release notes"`,
+        twice: `${CLI} inbox takes --search once.`,
+      },
+      {
+        flag: '--phase',
+        kind: 'text',
+        key: 'phase',
+        takes: `${CLI} inbox --phase takes a phase: notStarted, blocked, waiting, working, done, failed or cancelled`,
+        twice: `${CLI} inbox takes --phase once.`,
+        only: { side: 'cli', why: "it is sent as the list's fieldSelector, status.phase=<phase>" },
+      },
+      {
+        flag: '--sort',
+        kind: 'text',
+        key: 'sort',
+        takes: INBOX_SORT_TAKES,
+        twice: `${CLI} inbox takes --sort once.`,
+        only: { side: 'cli', why: "it is sent as the list's orderBy: newest, oldest or name" },
+      },
+      {
+        flag: '--limit',
+        kind: 'text',
+        key: 'limit',
+        takes: `${CLI} inbox --limit takes how many cards the page holds: ${CLI} inbox --limit 25`,
+        twice: `${CLI} inbox takes --limit once.`,
+      },
+      {
+        flag: '--continue',
+        kind: 'text',
+        key: 'continue',
+        takes: `${CLI} inbox --continue takes the token the page before it printed: ${CLI} inbox --continue <token>`,
+        twice: `${CLI} inbox takes --continue once.`,
+      },
       { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
       { flag: '-L', kind: 'text', key: 'labelColumns', many: true, takes: LABEL_COLUMN_TAKES },
       ...outputFlags('inbox'),
     ],
-    apart: (_value, flag) => (flag === '-L' ? LABEL_COLUMN_TAKES : INBOX_QUERY_TAKES),
+    apart: (_value, flag) => (flag === '-L' ? LABEL_COLUMN_TAKES : flag === '--sort' ? INBOX_SORT_TAKES : INBOX_QUERY_TAKES),
     unknown: (arg) =>
       `${CLI} inbox does not take ${arg}. It lists the inbox — ${CLI} inbox — files a card with ${CLI} inbox add "<idea>", queues one with ${CLI} inbox queue <name>, and drops one with ${CLI} inbox rm <name> (${CLI} inbox --help).`,
   },
-  check: (args) => outputRefused('inbox', args),
+  check: (args) => outputRefused('inbox', args) ?? sortRefused(args),
   writes: false,
   class: 'read',
   served: [

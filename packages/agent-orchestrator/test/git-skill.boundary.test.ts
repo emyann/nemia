@@ -59,25 +59,6 @@ function branched(dir: string, name: string, file: string, text: string) {
   return tip;
 }
 
-/** A repository with `wf/x/a` staged as a merge into main that conflicts on `f`; the branch's tip. */
-function conflicted(dir: string) {
-  const tip = branched(dir, 'wf/x/a', 'f', 'theirs\n');
-  fs.writeFileSync(path.join(dir, 'f'), 'ours\n');
-  git(dir, 'commit', '-q', '-am', 'main sets f');
-  assert.equal(gitOk(dir, 'merge', '--no-ff', '--no-commit', 'wf/x/a'), false, 'the merge conflicts');
-  return tip;
-}
-
-/** A repository with `wf/x/a` staged as a clean merge into main, not committed; the branch's tip. */
-function staged(dir: string) {
-  const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
-  git(dir, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
-  return tip;
-}
-
-/** Whether a merge is in progress in `dir`. */
-const merging = (dir: string) => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
-
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
 const run = <V extends PlaceVerb>(verb: V, request: object) => gitPlace({ env: ENV }).askNow(verb, request as never);
 
@@ -85,13 +66,6 @@ const run = <V extends PlaceVerb>(verb: V, request: object) => gitPlace({ env: E
 function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
   assert.ok('answer' in outcome, `an answer expected, got ${JSON.stringify(outcome)}`);
   return outcome.answer;
-}
-
-/** The file `open` names for a merge staged in the checkout `root`, or a failure where it names none. */
-function stagedOf(root: string) {
-  const { inProgressFile } = answerOf(run('open', { root, isolate: true }));
-  assert.ok(inProgressFile !== undefined, `open named no file of a merge in progress for ${root}`);
-  return inProgressFile;
 }
 
 /** The words of a refusal, or a failure naming what it was instead. */
@@ -106,8 +80,7 @@ function unreadOf(outcome: PlaceOutcome<PlaceVerb>) {
   return outcome.unread.said;
 }
 
-test('the place declares what a landing is denied, the commands that commit its merge, and its skill folder holds no script', () => {
-  assert.deepEqual(gitPlace().declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
+test('the place keeps its skill folder free of any script', () => {
   for (const gone of ['scripts', 'place.json']) assert.equal(fs.existsSync(path.join(GIT_SKILL, gone)), false, gone);
   assert.ok(fs.existsSync(path.join(GIT_SKILL, 'SKILL.md')), 'and it is still a skill');
 });
@@ -116,7 +89,7 @@ test('the place declares what a landing is denied, the commands that commit its 
  * The sections of the skill a read-only step cannot act on, each of which opens by saying whose it is and naming the section such a step
  * works from instead: committing, merging the base and landing all write the repository.
  */
-const WRITE_SECTIONS = ['Commit as you go', SKILL_SECTIONS.merge, 'Stage a landing'];
+const WRITE_SECTIONS = ['Commit as you go', SKILL_SECTIONS.merge];
 
 /** The read forms *Read what changed* names, each one a read-only step of any factory may type. */
 const READ_FORMS = [
@@ -177,44 +150,12 @@ test('REFUSED: an opener that points a direction rather than naming the section,
   assert.notEqual(directed, skill, 'each write section names the section a read-only step works from');
   for (const name of WRITE_SECTIONS)
     assert.ok(!openerOf(directed, name).includes(`*${SKILL_SECTIONS.read}*`), `${name}: a direction in place of the name`);
-  const forbidding = skill.replace(/^## Stage a landing\n\n[^\n]+/m, '## Stage a landing\n\nA read-only step never commits here.');
-  assert.notEqual(forbidding, skill, 'Stage a landing opens with one line');
-  assert.match(openerOf(forbidding, 'Stage a landing'), /\bnever\b/i);
+  const forbidding = skill.replace(/^## Commit as you go\n\n[^\n]+/m, '## Commit as you go\n\nA read-only step never commits here.');
+  assert.notEqual(forbidding, skill, 'Commit as you go opens with one line');
+  assert.match(openerOf(forbidding, 'Commit as you go'), /\bnever\b/i);
   const cut = skill.replace('`git blame', '`git praise');
   assert.notEqual(cut, skill, 'Read what changed names git blame');
   assert.ok(!sectionOf(cut, SKILL_SECTIONS.read).includes('`git blame'));
-});
-
-test("open names a linked worktree's own staged-merge file, under the git directory its .git file names, and no other's", () => {
-  const dir = repository();
-  branched(dir, 'wf/x/a', 'g', 'theirs\n');
-  const tree = path.join(scratch('wf-git-skill-tree-'), 'w');
-  git(dir, 'worktree', 'add', '-q', '-b', 'ship', tree, 'main');
-  const staged = stagedOf(tree);
-  assert.ok(!staged.startsWith(tree), `the file is not under the worktree's folder: ${staged}`);
-  assert.notEqual(staged, stagedOf(dir));
-  assert.equal(stagedOf(dir), path.join(dir, '.git', 'MERGE_HEAD'), "the checkout's own is its MERGE_HEAD");
-  assert.equal(fs.existsSync(staged), false);
-  git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
-  assert.equal(fs.existsSync(staged), true, 'there exactly while a merge is staged in that worktree');
-  git(tree, 'merge', '--abort');
-  assert.equal(fs.existsSync(staged), false);
-});
-
-test("the place's stage words, run as said with the checkout and the branches filled, stage a merge its status reads as ours", () => {
-  const dir = repository();
-  const a = branched(dir, 'wf/x/a', 'f', 'a\n');
-  const b = branched(dir, 'wf/x/b', 'g', 'b\n');
-  const said = gitPlace().declared.say.stage.replaceAll('{repo}', dir).replaceAll('{branches}', 'wf/x/a wf/x/b');
-  const ran = spawnSync('sh', ['-c', said], { env: ENV, encoding: 'utf8' });
-  assert.equal(ran.status, 0, ran.stderr);
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': a, 'wf/x/b': b } })), {
-    merging: 'ours',
-    conflicted: false,
-    missing: [],
-    tip: git(dir, 'rev-parse', 'HEAD'),
-  });
-  assert.equal(fs.existsSync(stagedOf(dir)), true, "and open's file says it");
 });
 
 test('REFUSED: open on no directory, on a directory that is no repository, and on a repository with no commit', () => {
@@ -300,9 +241,6 @@ const UNREAD: readonly { name: string; verb: PlaceVerb; request: object; field: 
     request: { repo: '/', base: 'main', branches: 'wf/r/a' },
     field: 'branches',
   },
-  { name: 'status whose tips are no object of strings', verb: 'status', request: { repo: '/', tips: ['wf/x/a'] }, field: 'tips' },
-  { name: 'land with an act it does not know', verb: 'land', request: { repo: '/', act: 'push' }, field: 'act' },
-  { name: 'land, a commit with no message', verb: 'land', request: { repo: '/', act: 'commit' }, field: 'message' },
   { name: 'trial with no repo', verb: 'trial', request: { trials: [] }, field: 'repo' },
   { name: 'trial whose pairs lack a branch', verb: 'trial', request: { repo: '/', trials: [{ onto: 'main' }] }, field: 'trials' },
   { name: 'inventory with no run', verb: 'inventory', request: { repo: '/', under: '/', base: 'main' }, field: 'run' },
@@ -346,46 +284,6 @@ test('REFUSED: handoff when a hook refuses the commit, in the hook words, and in
   );
 });
 
-test('status of a merge that conflicts: conflicted, read off the index even while a lock is held on it', () => {
-  const dir = repository();
-  const tip = conflicted(dir);
-  const head = git(dir, 'rev-parse', 'HEAD');
-  const want = { merging: 'ours', conflicted: true, missing: [], tip: head };
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), want);
-  const lock = path.join(dir, '.git', 'index.lock');
-  fs.writeFileSync(lock, '');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), want);
-  assert.ok(fs.existsSync(lock), 'the lock is still the one planted');
-});
-
-test('status writes nothing to the index of a checkout a person works in, where a diff would refresh it', () => {
-  const dir = repository();
-  const tip = conflicted(dir);
-  const later = new Date(Date.now() + 60_000);
-  fs.utimesSync(path.join(dir, 'g'), later, later);
-  const index = path.join(dir, '.git', 'index');
-  const before = fs.readFileSync(index);
-  assert.equal(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })).conflicted, true);
-  assert.deepEqual(fs.readFileSync(index), before);
-  git(dir, 'diff', '--quiet', 'HEAD', '--', 'g');
-  assert.notDeepEqual(fs.readFileSync(index), before, 'a diff does refresh it, so the comparison above can fail');
-});
-
-test('status reads a worktree, whose MERGE_HEAD is not under its own folder', () => {
-  const dir = repository();
-  const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
-  const tree = path.join(scratch('wf-git-skill-tree-'), 'w');
-  git(dir, 'worktree', 'add', '-q', '-b', 'ship', tree, 'main');
-  git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
-  assert.equal(answerOf(run('status', { repo: tree, tips: { 'wf/x/a': tip } })).merging, 'ours');
-  assert.equal(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })).merging, 'none');
-});
-
-test('REFUSED: status of a checkout that is no repository', () => {
-  const plain = scratch('wf-git-skill-plain-');
-  assert.equal(refusalOf(run('status', { repo: plain, tips: {} })), `${plain} is not a git repository, so no merge can be staged there`);
-});
-
 /**
  * The grace the deadline tests below give a stopped group (`AskOptions.graceMs`), shorter than the shipped `STOP_GRACE_MS` and above
  * what the cleaning shell takes on SIGTERM; and their first deadline, which a try that missed git reaching its hook or filter doubles.
@@ -409,32 +307,6 @@ function heldAsked<M extends { readonly marker: string }>(make: () => M, ask: (m
 
 /** The deadline's words, the first of them. */
 const stoppedAt = (deadlineMs: number) => `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped`;
-
-test('a land held past its deadline by a hook leaves the hook running nowhere, the merge staged, and the abort answers', (t) => {
-  const hooks: string[] = [];
-  t.onTestFinished(() => {
-    for (const hook of hooks) for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
-  });
-  const { outcome, deadlineMs, made } = heldAsked(
-    () => {
-      const dir = repository();
-      staged(dir);
-      const held = scratch('wf-git-held-');
-      const marker = path.join(held, 'in-the-hook');
-      const hook = path.join(held, 'hook.sh');
-      hooks.push(hook);
-      fs.writeFileSync(hook, `touch '${marker}'\nsleep 60\n`);
-      fs.writeFileSync(path.join(dir, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\nexec /bin/sh '${hook}'\n`, { mode: 0o755 });
-      return { dir, marker, hook };
-    },
-    ({ dir }, deadlineMs) =>
-      gitPlace({ env: ENV }).askNow('land', { repo: dir, act: 'commit', message: 'm' }, { deadlineMs, graceMs: GRACE_MS }),
-  );
-  assert.ok(unreadOf(outcome).startsWith(stoppedAt(deadlineMs)), unreadOf(outcome));
-  assert.deepEqual(running(made.hook), [], 'the hook runs no more');
-  assert.equal(merging(made.dir), true, 'the merge is still staged');
-  assert.deepEqual(answerOf(run('land', { repo: made.dir, act: 'abort' })), { aborted: true });
-});
 
 test('a handoff held past its deadline by a clean filter leaves no index.lock, and the next verb answers', (t) => {
   const filters: string[] = [];
@@ -462,12 +334,7 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
   assert.equal(fs.existsSync(path.join(dir, '.git', 'index.lock')), false, 'the lock is gone');
   assert.deepEqual(running(filter), [], 'the filter runs no more');
   git(dir, 'config', '--unset', 'filter.held.clean');
-  assert.deepEqual(answerOf(run('status', { repo: dir, tips: {} })), {
-    merging: 'none',
-    conflicted: false,
-    missing: [],
-    tip: git(dir, 'rev-parse', 'HEAD'),
-  });
+  assert.equal(typeof answerOf(run('open', { root: dir, isolate: true })).baseRef, 'string', 'the next verb answers');
 });
 
 /**
@@ -520,31 +387,6 @@ test('REFUSED: a group that ignores SIGTERM is killed once its grace is over, on
       'so a lock it held may be left',
   );
   assert.deepEqual(running(made.shell), [], 'the shell is killed');
-});
-
-test('land aborts a merge that conflicts, and leaves the checkout at ours', () => {
-  const dir = repository();
-  conflicted(dir);
-  const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('land', { repo: dir, act: 'abort' })), { aborted: true });
-  assert.equal(merging(dir), false);
-  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
-  assert.equal(fs.readFileSync(path.join(dir, 'f'), 'utf8'), 'ours\n');
-  assert.equal(git(dir, 'status', '--porcelain'), '');
-});
-
-test('REFUSED: land with no merge in progress, either act, and a commit git will not make, in its words', () => {
-  const dir = repository();
-  const head = git(dir, 'rev-parse', 'HEAD');
-  assert.equal(
-    refusalOf(run('land', { repo: dir, act: 'commit', message: 'm' })),
-    `no merge is in progress in ${dir}, so there is none to commit`,
-  );
-  assert.equal(refusalOf(run('land', { repo: dir, act: 'abort' })), `no merge is in progress in ${dir}, so there is none to abort`);
-  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
-  conflicted(dir);
-  assert.match(refusalOf(run('land', { repo: dir, act: 'commit', message: 'm' })), /unmerged/);
-  assert.equal(merging(dir), true, 'the merge is left for the abort');
 });
 
 /** Every ref of `dir` with its commit, HEAD and what the checkout and index hold: what a trial merge must leave as it was. */

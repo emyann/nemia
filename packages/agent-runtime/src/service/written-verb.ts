@@ -111,6 +111,26 @@ export const handedOver =
     );
 
 /**
+ * The sessions `harnessed` lists that a verb looks for `name` among: by that one name where its runner looks by name (`observeFor`),
+ * so what the look reads does not grow with every session the harness has run, and its whole listing (`observe`) otherwise. A name
+ * the look by name left unread fails the look, in the harness's words, as a listing that could not be read does.
+ * @param harnessed The harness the task runs on.
+ * @param name The session's name.
+ * @param harness The harness the task was filed on, for a runner that routes.
+ */
+const lookFor = (harnessed: Harnessed, name: string, harness: string | undefined) => {
+  const { observe, observeFor } = harnessed.runner;
+  if (!observeFor) return observe;
+  return observeFor([{ name, harness }]).pipe(
+    Effect.flatMap((o) =>
+      o.unread.has(name)
+        ? Effect.fail(new Error(o.unreadWhy?.get(name) ?? o.why?.join(' ') ?? `the look left \`${name}\` unread`))
+        : Effect.succeed(o.seen),
+    ),
+  );
+};
+
+/**
  * The session of `taskId`'s attempt in flight that `verb` is written to, reached over `ports`: refused, in this order, for a task the
  * store has no record of, a harness that does not declare the verb or has not its reach, a task with no attempt open
  * (`openAttemptOf`) and a session its harness does not list; a harness that could not be read is the verb's unsent. What the verb
@@ -133,7 +153,7 @@ export const sessionReached = <Refused, Unsent, Reach>(ports: WrittenPorts, verb
     const { last } = open;
     const name = nameFor(taskId, last.n);
     const observed = yield* ports
-      .go(harnessed.runner.observe)
+      .go(lookFor(harnessed, name, state.harness))
       .pipe(
         unsentOf(
           verb,

@@ -434,6 +434,27 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
   assert.match(gone.out, /nemia inbox --all/);
 });
 
+test("`nemia inbox` asks one page: --search, --phase, --sort and --limit are the list's own, and the last line names the next page", async () => {
+  const page = await nemia(['inbox', '--all', '--sort', 'name', '--limit', '1']);
+  assert.equal(page.code, 0, page.err);
+  assert.match(page.out, /^cache-the-views /m, 'by name the first card leads the page');
+  assert.doesNotMatch(page.out, /^(called-off|hold-the-reads) /m, 'and the page holds no more than the limit');
+  assert.match(
+    page.out,
+    /nemia inbox --all --sort name --limit 1 --continue \S+/,
+    'a page with more says where the next one is, asked with the words this one was',
+  );
+  assert.equal(page.out.split('\n').filter((line) => /^[a-z-]+ +/.test(line) && !line.startsWith('NAME')).length >= 1, true);
+  const found = await nemia(['inbox', '--all', '--search', 'HOLD', '--phase', 'waiting']);
+  assert.equal(found.code, 0, found.err);
+  assert.match(found.out, /^hold-the-reads /m, 'the words and the phase narrow the page');
+  assert.doesNotMatch(found.out, /^cache-the-views /m);
+  const none = await nemia(['inbox', '--search', 'no-such-words']);
+  assert.match(none.out, /no card of the inbox matches/);
+  const refused = await nemia(['inbox', '--sort', 'sideways']);
+  assert.notEqual(refused.code, 0, 'a sort of none of the three is refused');
+});
+
 test('`nemia inbox -l … -L <key>`: the cards either selector takes, each with a column of the key off its labels', async () => {
   const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs', '-L', 'team']);
   assert.equal(either.code, 0, either.err);

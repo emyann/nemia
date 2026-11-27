@@ -1,6 +1,6 @@
 /**
- * `nemia policy reach`, told as a person's story over a scratch store: a factory at auto with the tests' team attached (its `ship`, an
- * ending approved before it runs) and a workflow of one gated step with no check, read with nothing confirmed, then with a suggestion
+ * `nemia policy reach`, told as a person's story over a scratch store: a factory at auto with the tests' team attached (its `ship`, a gated
+ * step with no check) and a workflow of one gated step with no check, read with nothing confirmed, then with a suggestion
  * proposed and one confirmed; a workflow attached that does not load; a run's own gates, a gate added at its start among them, with what
  * keeps a rule now; and what the verb refuses. What reach decides off a step is `reach.test.ts`'s, and its laws its contract's.
  */
@@ -74,8 +74,8 @@ describe('`nemia policy reach`: which steps at their gate her rules can approve 
     const ship = read.gates.find((g) => g.step === 'ship');
     const draft = read.gates.find((g) => g.step === 'draft');
     assert.deepEqual(
-      ship?.misses.map((m) => [m.why, m.why === 'never-holds' ? m.because : null]),
-      [['never-holds', 'approved-before-it-runs']],
+      ship?.misses.map((m) => [m.why, m.why === 'never-holds' ? m.condition : null]),
+      [['never-holds', 'checked']],
     );
     assert.deepEqual(
       draft?.misses.map((m) => [m.why, m.why === 'never-holds' ? m.condition : null]),
@@ -122,7 +122,7 @@ describe('`nemia policy reach`: which steps at their gate her rules can approve 
   test("a run's own gates, one added at its start among them, with what keeps a rule that reaches one now", async () => {
     const workflow = [
       { name: 'build', after: [], body: 'Build it.', harness: 'codex', check: 'true' },
-      { name: 'ship', after: ['build'], body: 'Ship it.', harness: 'codex', workspace: 'base', gate: true },
+      { name: 'ship', after: ['build'], body: 'Ship it.', harness: 'codex', gate: true },
     ];
     await Effect.runPromise(
       Effect.provide(

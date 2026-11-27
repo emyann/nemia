@@ -9,7 +9,6 @@ import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import type { Served } from '../command/entry.verb.ts';
 import { CONCLUDED_WORDS } from 'objects';
-import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
@@ -18,7 +17,7 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { cardsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
-import { approvedFirst, gatesOf } from '../status/status.ts';
+import { gatesOf } from '../status/status.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
 import { modelsOf } from './models.ts';
 import { volumeMounts } from '../factory/volume/index.ts';
@@ -78,15 +77,6 @@ function volumesOf(run: Run) {
   };
 }
 
-/** The steps of a run just started that wait on a person: those gated (`held`), and the endings a person approves first (`ends`). */
-function gatesHeld(run: Run) {
-  const steps = startedSteps(run);
-  const ends = endingSteps(steps, run)
-    .filter((s) => approvedFirst(s, run))
-    .map((s) => s.name);
-  return { held: gatesOf(steps, run).filter((name) => !ends.includes(name)), ends };
-}
-
 /** `list` under `key` where it holds any, else nothing: a key an answer leaves out rather than send empty. */
 const some = <K extends string, V>(key: K, list: readonly V[] | undefined) =>
   list?.length ? ({ [key]: [...list] } as Record<K, V[]>) : {};
@@ -99,7 +89,6 @@ const some = <K extends string, V>(key: K, list: readonly V[] | undefined) =>
 export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>) {
   const steps = startedSteps(run);
   const { reads, writes } = volumesOf(run);
-  const { held, ends } = gatesHeld(run);
   const named = (map: Readonly<Record<string, string>> | undefined) =>
     map !== undefined && Object.keys(map).length ? { ...map } : undefined;
   const models = named(run.models);
@@ -133,8 +122,7 @@ export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>) {
     ...some('after', run.after),
     branch: run.branch ?? '',
     ...some('context', run.context),
-    ...some('gated', held),
-    ...some('ends', ends),
+    ...some('gated', gatesOf(steps, run)),
     ...(models !== undefined ? { models } : {}),
     ...(labels !== undefined ? { labels } : {}),
     ...some(

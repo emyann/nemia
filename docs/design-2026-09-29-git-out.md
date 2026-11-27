@@ -151,7 +151,7 @@ Today a git failure often reads as nothing. `diffStat` answers `''` (`branches.t
 below. `folderPlace` stays in code and answers each verb a folder has, which is most of them with nothing. `skillPlace(frozenDir)`, in
 `src/place/place.store.ts`, answers each by running the frozen script.
 
-The code calls a verb only where no plan of its own answers. `inherit`, `workspace: main` and `--no-worktree` (`isolate: false`) are
+The code calls a verb only where no plan of its own answers. `inherit`, the retired checkout workspace and `--no-worktree` (`isolate: false`) are
 worked out in code today with no git: the parent's workspace, the checkout, the checkout (`worktree.ts:369-379`). They stay that way.
 
 | verb | when the code calls it | request | answer (decoded) | replaces |
@@ -162,11 +162,11 @@ worked out in code today with no git: the parent's workspace, the checkout, the 
 | `report` | live, each time a decision is read: `nemia decide`, the api's decision, a declared file's branch (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62` |
 | `standing` | by the tick, each pass: one call per repository and frozen copy, over every result branch the store's records name there; written to a snapshot the api and `wf ls` read (below) | `{ repo, branches: [{ branch, tip?, baseRef }], base }` | `Standing { heads, branches: [{ branch, tip, onBase, pastBase, ahead }] }` | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`'s reads |
 | `status` | only while an ending that lands on its check holds the checkout (`landingOpen`) | `{ checkout, tips }` | `Status { merging, conflicted, missing[], head? }` | `mergeInProgress`, `mergeState` |
-| `land` | when `landingDue` says `commit` or `abort` | `{ checkout, act: 'commit', message }` or `{ checkout, act: 'abort' }` | `Landed { commit }` or `{ aborted: true }` | `commitMerge`, `abortMerge` |
+| `land` | when the retired landing decision says `commit` or `abort` | `{ checkout, act: 'commit', message }` or `{ checkout, act: 'abort' }` | `Landed { commit }` or `{ aborted: true }` | `commitMerge`, `abortMerge` |
 | `inventory` | `wf rm`, `wf prune` | `{ repo, under, prefix }`: the run's worktrees root and branch prefix | `Inventory { workspaces[], branches[] }` | the listings in `forget.ts` |
 | `remove` | `wf rm`, `wf prune`, after the pure refusals pass | `{ repo, workspaces[], branches[] }` | `Removed { removed[], left[], deleted[], kept[] }` | `worktree remove`, `worktree prune`, `branch -D` |
 
-The code still decides; the place only reports facts and acts when told. `landingDue` stays pure over `Status`. `shippedBy`
+The code still decides; the place only reports facts and acts when told. the retired landing decision stays pure over `Status`. `shippedBy`
 (`branches.ts:43-58`) becomes pure over `Standing`. `heldWorktree`, `branchFates` and `forgetRefusal` stay pure over `Inventory`.
 `parseWorktrees` moves into the skill, since it parses git's own output format.
 
@@ -212,7 +212,7 @@ What the skill declares to the machinery. It is decoded strictly at `wf start`, 
 ```
 
 - **`verbs`** is what the place can do. A workflow that needs a verb its place lacks is refused at `wf start`, naming the verb. An
-  ending with `workspace: main` and a `check:` needs `status` and `land`. A fork or fan-in in an isolated run needs `make`. This
+  ending with the retired checkout workspace and a `check:` needs `status` and `land`. A fork or fan-in in an isolated run needs `make`. This
   capability check replaces today's git-shaped refusals.
 - **`denyWhileLanding`** replaces `LANDING_DENIED` (`run.ts:768`), read by `filedDenies` from the frozen copy. `workspaceOf`'s
   refusal of a codex landing (`keys/keys.ts`) keeps its reason, since codex takes no deny list. It names the place's denies instead of
@@ -232,7 +232,7 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
   folder team nothing: its steps already say `workspace: folder` on every line.
 - **`workspace: folder`** becomes a former spelling of `place: folder`. It is still read, and `formerKeyLines` prints the rewrite, as it
   does for other renamed keys (`workflow-store.ts:155`). `workspace:` keeps `main`, the plan kind for an ending in the checkout.
-- **`--repo`**, `workspace: main` and `--no-worktree` with `place: folder` stay refused as today (`start.ts:201-208`), in the same words.
+- **`--repo`**, the retired checkout workspace and `--no-worktree` with `place: folder` stay refused as today (`start.ts:201-208`), in the same words.
 - The key reaches every reader of a step: `FrozenStepSchema` (a field per `StepKey`), the api's builder `KINDS` (`workflows/builder.ts:72`),
   `WorkflowStepSpec` and `specOf` (`workflows/workflows.ts`), and the web's `lib/builder.ts` `UNSET`.
 
@@ -281,7 +281,7 @@ compared. `placeDirOf` is the one answer to where a run's place runs from, and t
 ## The contracts
 
 Each is an Effect Schema struct in `src/place/place.store.ts`. Its type is re-exported from a pure `src/place/place.ts`, which the pure
-judgements (`landingDue`, `shippedBy`, `radius`) take. **The place's script always fills them. No agent ever does.**
+judgements (the retired landing decision, `shippedBy`, `radius`) take. **The place's script always fills them. No agent ever does.**
 
 | contract | fields | written by, where | read by |
 |---|---|---|---|
@@ -290,7 +290,7 @@ judgements (`landingDue`, `shippedBy`, `radius`) take. **The place's script alwa
 | `HandedOff` | `commit: string \| null` | the tick's note; `wf rm`'s `handedOff` | `wf rm`'s words |
 | `Changes` | `at: { baseRef, onto, tips }`; `files: [{ path, from?, status, added: int \| null, removed: int \| null }]` per branch; `diffs: { path: text }` for `diffOf`, per branch; `present: { path: 'file' \| 'directory' \| 'absent' }` per branch; `atBase: { path: text \| null }`; a branch git has not is in none of them | nobody: read live by each reader, when a decision is read (`changesOf`, `presentOn` in `branches/changes.store.ts`), and kept nowhere | `radius` (pure, from `files` and the npm workspaces it parses out of `atBase['package.json']`); `nemia decide`; the api's decision, through `changesOf` on `agent-orchestrator`; `workspaceArtifact`'s branch fallback |
 | `Standing` | `heads: { branch: commit }`; `branches: [{ branch, tip: string \| null, onBase: 'yes' \| 'no' \| 'unknown', pastBase: boolean \| null, ahead: int \| null }]` | the tick, each pass, to `WF_ROOT/standing.json`: one file, one writer, each repository's answer (or its unread words) with the time it was read; `tipsSeen` writes `run.tips` as today | in the tick, from its own call: `shippedBy`, `parentOf` and `runReady` (`--after`), the memo of runs at rest. From the snapshot, running nothing: `wf ls`, and the api's list, decision page and memo of runs at rest (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through a reader the package exports on `agent-orchestrator/run` |
-| `Status` | `merging: 'ours' \| 'other' \| 'none'`, `conflicted`, `missing: string[]`, `head?` | not stored | `landingDue`, `landingOpen`, `mainClaim` |
+| `Status` | `merging: 'ours' \| 'other' \| 'none'`, `conflicted`, `missing: string[]`, `head?` | not stored | the retired landing decision, `landingOpen`, the retired checkout claim |
 | `Landed` | `{ commit }` or `{ aborted: true }` | the tick, on the step's `landed` (as today) | `landedWords`, `wf ls`, the board |
 | `Inventory` | `workspaces: [{ path, step?, branch?, head?, detached, locked?, prunable, clean: boolean \| null, onBranch }]`; `branches: [{ branch, merged }]` | not stored | `heldWorktree`, `branchFates`, `forgetRefusal`, `pruneRefusal` |
 | `Removed` | `removed[]`, `left: [{ path, said }]`, `deleted[]`, `kept: [{ branch, said }]` | `wf rm`'s and `wf prune`'s answers | their words |
@@ -310,11 +310,11 @@ What the board and `wf decide` render:
 
 | guarantee today | kept by | what changes, what is lost |
 |---|---|---|
-| Nothing lands on the base branch unless the run's own check passed on the merged tree | **machinery**: `landingDue`, pure over `Status`; the check's numeric exit (`refusedCheck`); `land` `commit` or `abort` | The facts come from `status`, not from a stat and three git calls. The check is the workflow's command, as today. Nothing is lost. |
+| Nothing lands on the base branch unless the run's own check passed on the merged tree | **machinery**: the retired landing decision, pure over `Status`; the check's numeric exit (`refusedCheck`); `land` `commit` or `abort` | The facts come from `status`, not from a stat and three git calls. The check is the workflow's command, as today. Nothing is lost. |
 | A landing session cannot commit the merge before the check | **machinery**: `filedDenies` with `denyWhileLanding` from the frozen `place.json`; a commit made anyway is recorded (`onHead`) | The deny list is the skill's data, not our literal. It was already a prefix and not a sandbox, and the brief and the skill say it too. |
 | A run waits on another (`--after`) until that one has shipped | **machinery**: `runReady` and `parentOf` over `shippedBy`, pure over `Standing`; the tips `tipsSeen` recorded | An unread `standing` reads as not shipped, so the run waits, and the wait shows why. Before, git's silence read the same way, but nothing showed it. |
-| A step never works in the person's checkout unless it says `workspace: main` | **machinery**: `workspacePlan` decides; `make` is handed `at`, and a `Made.workspace` whose realpath is not `at`'s is refused as unread | New: the code checks the place's answer, where today it trusted its own `git worktree add`. |
-| Only one run's ending holds the checkout | **machinery**: `mainClaim`, `landingOpen` over `Status.merging` | `status` runs a process where `mergeInProgress` was a `stat`. It runs only while an ending holds the checkout, so at most one process per checkout per pass. |
+| A step never works in the person's checkout unless it says the retired checkout workspace | **machinery**: `workspacePlan` decides; `make` is handed `at`, and a `Made.workspace` whose realpath is not `at`'s is refused as unread | New: the code checks the place's answer, where today it trusted its own `git worktree add`. |
+| Only one run's ending holds the checkout | **machinery**: the retired checkout claim, `landingOpen` over `Status.merging` | `status` runs a process where `mergeInProgress` was a `stat`. It runs only while an ending holds the checkout, so at most one process per checkout per pass. |
 | A finished step's uncommitted work is not lost | **machinery**: `handoff` on each pass it is due, and before `wf rm` removes the workspace | Stays machinery: it is the net under the prose that says "commit as you go". |
 | `wf rm` removes nothing that holds work | **machinery**: `forgetRefusal`, `heldWorktree`, `branchFates`, pure over `Inventory` | The words that tell a person how to unlock or inspect a worktree come from `say`. |
 | A step commits its own work as it goes | **prose**: the git skill's SKILL.md | Already prose today (CLAUDE.md and the brief). It moves from `composeBrief`'s words into the skill. |
@@ -369,7 +369,7 @@ gone, not moved.
 | D. Briefs' words | C, 4b | `composeBrief`'s git sentences (`run.ts:5037`, `:5078`, `:5100`) and the landing section's (`check/check.ts:239-241`) come from `say` and the skill's prose. Done: a later step's look (`say.look`), an ending's look at each result branch (`say.results`, holes `{base}` and `{branch}`) and `nemia merge`'s sections (`say.merge` and `say.mergeUncommitted`, hole `{sha}`; `say.showMerge` and `say.lastMerge`, none) come from the run's place, read with the landing's words once per filing (`placeTold`); each key's holes are `SAY_HOLES` (`src/place/place.ts`), and a template naming another is refused where `readPlaceJson` reads it, so at `nemia start`. A brief told no words prints no command and names the skill's section (*Read what changed*, *Merge the base when a person asks*). The skill reaches a step by delivery (a): an agent that acts on git lists `git` in `skills:`, and `skillsFor` finds the package's place skills last; a folder team whose agent lists one is refused at start. The board's preview of a step to come is composed with the same words (`briefNow`). The prose "some sandboxes keep git read-only" and "unless git ignores it" stays: it names git, and gives no command. |
 | E. `inventory` and `remove` | 5 | `wf rm` and `wf prune` (`forget/forget.verb.ts`, `prune/prune.verb.ts`); `parseWorktrees` leaves the package. Done: both read a run's worktrees and branches by `inventory` (`{ repo, under, prefix, base }`, each worktree a `Held`), commit what one holds by `handoff`, and take them away by `remove`, never forced; the api's `DELETE /api/runs/:runId` and `POST …/prune` with them. An inventory refused or not heard refuses the verb in its words and touches nothing, never read as nothing left; a repository that is no longer there answers an empty one. The commands they print are the place's `say` (`attach`, `commit`, `inspect`, `orphans`, `unlock`). |
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
-| G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. As built: the reads and acts in `place/landing.store.ts` (`checkoutStatus`, `landThrough`, `mergeStaged`, `landingWords`); `open` answers `staged`, which `nemia start` records as `stagedFile`; the pause and the tick (`mergeStaged`), `mainClaim`, and `nemia rm` and `nemia prune` (`merging` in `prune/prune.verb.ts`) `stat` it (`stagedHere`), and for a record without one ask `status`, only while a landing is filed and not landed (`mainClaim`: while `landingOpen` holds); the brief's git words come from `say.stage`. |
+| G. The landing | 6 | `status` and `land` in the retired landing act and the retired checkout claim (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. As built: the reads and acts in `place/landing.store.ts` (`checkoutStatus`, `landThrough`, `mergeStaged`, `landingWords`); `open` answers `staged`, which `nemia start` records as `stagedFile`; the pause and the tick (`mergeStaged`), the retired checkout claim, and `nemia rm` and `nemia prune` (`merging` in `prune/prune.verb.ts`) `stat` it (`stagedHere`), and for a record without one ask `status`, only while a landing is filed and not landed (the retired checkout claim: while `landingOpen` holds); the brief's git words come from `say.stage`. |
 | H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, read live through `report` (no snapshot); `nemia merge`'s base off the trial's `at`; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
 | I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. Split in two: I1, the tick's pass asks one `standing` (`passStanding`) and writes the snapshot; I2, every reader but the tick: `nemia ls` and the board's list read the snapshot (`standingSnapshot`), printing its age when stale and "not read" with none, and a person's one-off verb — `decide`, `approve`, `rm`, `prune`, `start --after`, `hold`, the api's decision — asks `standing` live (`standingNow`, `standingLive`). `branchReader`, `oneByOne`, `isShipped`, `headsOf`, `refsOf` and `gitSays` left `src`, and `GIT_SITES` is empty. |
 | J. The api and the web | H, I | The api reads the snapshot `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`) through the package, and reads `report` live as card H left it, with no snapshot; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |

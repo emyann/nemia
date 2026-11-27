@@ -25,11 +25,8 @@ import { closeoutRefusals } from '../question/index.ts';
 import {
   aboveWord,
   approvalOf,
-  approvedUnfiled,
   capOf,
-  endingStopped,
   hasGate,
-  landsOnCheck,
   loopOf,
   loopOver,
   overBudget,
@@ -39,7 +36,6 @@ import {
   roundWord,
   spentWord,
   standing,
-  waitsAtGate,
   type Raise,
   type SpendOf,
 } from '../status/status.ts';
@@ -49,7 +45,6 @@ import { checkFailureAction, checksPhase } from '../check/index.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
-import { filedDenies, landedWords } from '../ending/ending.ts';
 import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';
 import { heldLater } from '../round/round.ts';
 import { answersOr } from '../question/index.ts';
@@ -75,11 +70,9 @@ const machineKilled = (checkKillOf: CheckKillOf, step: string) => checkKillOf(st
  * Only a try that is over and let nothing that waits on it run: its check did not pass, it ended without its
  * closeout, it signed off blocked, or its session failed or was stopped. `recheck` only where a check did not
  * pass, since nothing else has a check to run again — and on a step that signed off blocked after one, with nothing committed since
- * (`blockedRecheck`, off where its branch is now, `tipOf`), and never on an ending that lands on its check
- * (`landsOnCheck`): the run aborted the merge its check judged, so a recheck would judge the checkout
- * without it. And on a step with a `check:` whose session was ended at its budget (`budget exhausted`) once it
- * settled, its check never run: the work may be done — a land session cut off after its merge — and the check
- * reads the world with no session; but not on an ending whose staged merge the run took back. A step that
+ * (`blockedRecheck`, off where its branch is now, `tipOf`). And on a step with a `check:` whose session was ended at its budget
+ * (`budget exhausted`) once it settled, its check never run: the work may be done, and the check
+ * reads the world with no session. A step that
  * signed off blocked only once its session has settled: a session can outlive its closeout, and a try resuming
  * one still running would be two agents in one conversation.
  *
@@ -97,19 +90,10 @@ const machineKilled = (checkKillOf: CheckKillOf, step: string) => checkKillOf(st
  * step with a cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise`
  * marks only the steps a session of which must carry one.
  *
- * And a step whose work the run is parked on at an ending step's gate (`waitsAtGate`), with nothing after it filed: the ending has nothing
- * of its own to object to — it has not run — so a send-back there goes to the work, which is this step (`sendBackTo`).
- *
  * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on — which a step
  * nothing waits on never is: approved, it has handed on, since there is nothing left to file. A try of it is
  * a send-back from its gate (`sendsBack`) — `continue` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try
  * after it is on a try its approval does not name, so an approval given before the send-back is spent by it.
- *
- * And the looping step an ending waits on, once that ending has been filed and stopped on the base branch (`endingStopped`): a try of it
- * sends the work back from there through the folder's loop — the step filed again with what the person and the ending said, free to ask for
- * a round — and `back` names the endings whose try the pass that files it moves behind (`sentBack`), once every step after it that has been
- * filed is such an ending. Only a looping step: its `again: true` is what gives the work a round, and a folder with no loop before its
- * ending has no way back but a new run (`retryRefusal` says so).
  *
  * A condition (`routes:`) is tried only while none of its followers has been filed or sent its card: once one has, the route is
  * settled for the run, and a new answer would leave a branch that ran beside one a new route takes. A node never filed — skipped on a
@@ -127,7 +111,7 @@ export function retryable(...args: Parameters<typeof triedOn>) {
   const [step, run, , , , steps = []] = args;
   const tried = triedOn(...args);
   if (!routeSettled(step, run, steps)) return tried;
-  const { sendsBack: _, back: __, raise: ___, ...rest } = tried;
+  const { sendsBack: _, raise: __, ...rest } = tried;
   return { ...rest, modes: [] };
 }
 
@@ -156,24 +140,9 @@ function triedOn(
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => waitFiled(s, run.steps[s.name]));
-  const stopped = followers.filter((f) => waitFiled(f, run.steps[f.name]));
-  const back =
-    step.loop &&
-    satisfiesAfter(status) &&
-    stopped.length > 0 &&
-    stopped.every((f) => endingStopped(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf))
-      ? stopped.map((f) => f.name)
-      : undefined;
   const sendsBack =
     settled &&
-    (status === 'awaiting approval' ||
-      Boolean(back) ||
-      (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled) ||
-      (satisfiesAfter(status) &&
-        noneFiled &&
-        followers.some(
-          (f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf) || approvedUnfiled(f, run),
-        )));
+    (status === 'awaiting approval' || (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled));
   const rechecks = blockedRechecks(run.steps[step.name], tried, phaseOf, tipOf);
   const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack, rechecks);
   const raise =
@@ -183,14 +152,13 @@ function triedOn(
     ...codesOf(status, harnessAsks),
     modes,
     ...(sendsBack ? { sendsBack: true as const } : {}),
-    ...(sendsBack && back ? { back } : {}),
     ...(raise ? { raise } : {}),
-  } satisfies { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep;
+  } satisfies { status: StepStatus; modes: RetryMode[]; sendsBack?: true; raise?: Raise } & QualifiedStep;
 }
 
 /**
  * The ways a try of a step standing `tried` on its own work may be taken (`retryable`): `recheck` beside a session where a check did not
- * pass, or never ran on a session cut off at its budget, but on an ending whose merge the run aborted, and on a blocked step whose failed
+ * pass, or never ran on a session cut off at its budget, and on a blocked step whose failed
  * check may run again (`rechecks`, `blockedRecheck`); a session alone from any other end, or where its harness asks or its gate sends it
  * back (`other`).
  */
@@ -198,11 +166,8 @@ const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, 
   if (step.waitsFor !== undefined) return (tried === 'failed (check)' ? ['recheck'] : []) satisfies RetryMode[];
   if (rechecks) return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   if (tried === 'budget exhausted')
-    return (
-      settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh']
-    ) satisfies RetryMode[];
-  if (tried === 'failed (check)')
-    return (landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck']) satisfies RetryMode[];
+    return (settled && step.check ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh']) satisfies RetryMode[];
+  if (tried === 'failed (check)') return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
   return (ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : []) satisfies RetryMode[];
 };
@@ -214,12 +179,6 @@ const blockedRechecks = (
   phaseOf: (taskId: string) => TaskPhase,
   tipOf: TipOf | undefined,
 ) => tried === 'blocked' && blockedRecheck(blockedRecheckRead(record, true, phaseOf, tipOf)).recheck;
-
-/** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
-const landingAborted = (step: StepSpec, run: Run) => {
-  const landed = run.steps[step.name]?.landed;
-  return landsOnCheck(step, run) && landed !== undefined && 'aborted' in landed;
-};
 
 /**
  * A step's raise of its cap, judged from what its gatherer read (`stepRaise`): a try's, where its try carries one and may be taken, else a
@@ -476,9 +435,6 @@ export const pauseAsksVoid = (
  * while its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed
  * on.
  *
- * An ending the work is sent back from is not also tried: its own ask, written by hand beside the send-back, names the try the send-back
- * takes, and is spent by it (`spentAsks`).
- *
  * @param steps The run's steps.
  * @param run The run's record.
  * @param phaseOf The phase of a task by its id.
@@ -510,7 +466,7 @@ export function retriesDue(
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, via, sendsBack, back, raise } = retryable(
+    const { status, modes, via, sendsBack, raise } = retryable(
       step,
       run,
       phaseOf,
@@ -544,14 +500,13 @@ export function retriesDue(
         ...raisedBy(ask, raise),
         by: askedBy(ask),
         ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
-        ...(back && !unsettled ? { back } : {}),
       });
     } else {
       const own = ownRetry({ step, record, status, modes, steps }, { phaseOf, verdictOf, checkKillOf, askedCloseout, closeoutOf });
       if (own) due.push({ step: step.name, try: next, ...own });
     }
   }
-  return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
+  return due;
 }
 
 /**
@@ -646,7 +601,7 @@ function howOf(step: StepSpec, last: EarlierTry) {
   if (last.cause === 'recheck') return 'rechecked on your word';
   if (last.cause === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
   if (last.cause === 'merge') return 'merged the base, on your word (nemia refresh --base), the round unchanged';
-  return last.cause === 'back' ? 'sent back with the work, on your word' : 'continued on your word';
+  return 'continued on your word';
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */
@@ -657,12 +612,12 @@ const sessionNeeds = (raise: Raise | undefined) =>
 
 /**
  * The words of the offer to raise a step's cap past what it spent (`retryOffers`): its bare command, from `command`, what comes before it
- * in the sentence, from the step's state (`word`) and whether an ending may land again (`landAgain`), and what after, ending on `more`.
+ * in the sentence, from the step's state (`word`) and what after, ending on `more`.
  */
-const raiseWords = (command: string, word: string, raise: Raise, landAgain: string, more: string) =>
+const raiseWords = (command: string, word: string, raise: Raise, more: string) =>
   [
     `${command} --budget <amount>`,
-    `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${landAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
+    `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}. Raise its cap above ${aboveWord(raise)} and continue its session`,
     `  (--fresh, or --model <m>, for a new session${more})`,
   ] satisfies [string, string, string];
 
@@ -675,34 +630,6 @@ const recheckWords = (status: StepStatus, modes: readonly RetryMode[]) =>
       : '; --recheck runs its check again, and needs no --budget';
 
 /**
- * The words of the offer to send a step's work back when the endings after it (`back`) stopped on the base branch (`retryOffers`): its
- * bare command, from `command`, and what comes before it in the sentence.
- */
-const backWords = (command: string, step: string, back: string) =>
-  [
-    `${command} --message "<objection>"`,
-    `${back} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step} is filed again with your objection and what ${back} said, may ask for a round, and ${back} waits at its gate for a new approval`,
-  ] satisfies [string, string];
-
-/**
- * The words of the offer to an ending that lands on its check, whose merge the run aborted (`retryOffers`): its bare `command`, what comes
- * before it in the sentence and what after. Merge and check again when its check did not finish (`unfinished`), with nothing staged for
- * `--recheck` to judge; otherwise continue its session, told what happened (`happened`). Each with what a new session needs past a budget.
- */
-const abortedWords = (run: Run, command: string, unfinished: boolean, raise: Raise | undefined, happened: string) =>
-  (unfinished
-    ? [
-        command,
-        `its check did not finish, so the run aborted the merge and nothing merged into ${run.branch}. Merge and check again`,
-        sessionNeeds(raise),
-      ]
-    : [
-        command,
-        `${happened} Continue its session, told what happened`,
-        `  (--fresh, or --model <m>, for a new session${sessionNeeds(raise)})`,
-      ]) satisfies [string, string, string];
-
-/**
  * What `nemia decide` offers for each step a person may try again: the command, and what it does. Pure.
  *
  * A check that did not finish is said so, with `--recheck` first: the run spent no retry on it, and the work
@@ -713,11 +640,8 @@ const abortedWords = (run: Run, command: string, unfinished: boolean, raise: Rai
  * blocked step is `answerLines`', beside its question.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
- * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. The looping step an ending that stopped
- * on the base branch waits on is offered the send-back, which no gate line offers, and the ending a try to land again for what was not
- * the work.
- * An ending that lands on its check, whose merge the run aborted, is offered with why, and one whose check did not finish a merge again,
- * with nothing staged for `--recheck` to judge. Otherwise a check that did not finish is offered `--recheck` first, past a budget or not,
+ * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. A check that did not finish is offered
+ * `--recheck` first, past a budget or not,
  * and so is a check whose refusal its step's `checkFailurePolicy:` names a person's (`personsRefusal`), its session continued beside it;
  * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
  * agent's try, a new Task, never its session continued, with no `--model` (`remoteRetryRefusal`).
@@ -731,8 +655,6 @@ const abortedWords = (run: Run, command: string, unfinished: boolean, raise: Rai
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`.
  * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`,
  *   one that did not finish the recheck.
- * @param landingDenied What the run's place denies a landing session (`landingDenies`), read for a denied ending alone: a call it denies
- *   is said to be the step's own fence at work, and offered no rule.
  * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is offered
  *   `--recheck` first, since it is no verdict on the work.
  * @param tipOf Where each branch of the run is now (`blockedRecheck`): left out, unread.
@@ -746,7 +668,6 @@ export function retryOffers(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  landingDenied: () => readonly string[] = () => [],
   checkKillOf: CheckKillOf = () => undefined,
   tipOf: TipOf = () => undefined,
 ) {
@@ -756,32 +677,13 @@ export function retryOffers(
     const offer = (bare: string, before: string, after = '') =>
       lines.push({ step: step.name, command: bare, said: `${step.name}: ${before}:  ${bare}${after}` });
     const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf, tipOf);
-    const { status, modes, sendsBack, back } = tried;
+    const { status, modes, sendsBack } = tried;
     const reads = { phaseOf, closeoutOf, askedCloseout, verdictOf };
     const { raise: judged, retry: raise } = raiseGrounds(step, run, steps, reads, spendOf, tried);
     const command = `nemia retry ${run.id} ${step.name}`;
-    if (back) {
-      offer(...backWords(command, step.name, back.join(', ')));
-      continue;
-    }
     if (!modes.length || sendsBack) continue;
-    const landAgain = endingStopped(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
-      ? ' Land again, when what stopped it was not the work — a dirty checkout, a flaky test.'
-      : '';
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
     const record = run.steps[step.name];
-    if (landsOnCheck(step, run) && record?.landed && 'aborted' in record.landed) {
-      offer(
-        ...abortedWords(
-          run,
-          `${command}${raise ? ' --budget <amount>' : ''}`,
-          d.unfinishedCheck.includes(step.name),
-          raise,
-          `${status} — ${landedWords(run, record.landed)}.${landAgain}`,
-        ),
-      );
-      continue;
-    }
     const machine = machineOffered(step.name, status, modes, checkKillOf);
     const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, blockedOffered(status, modes), () =>
       personsOffered(step, status, modes, verdictOf),
@@ -792,11 +694,11 @@ export function retryOffers(
       const recheck = recheckWords(status, modes);
       const own = judged?.own;
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
-      offer(...raiseWords(command, word, raise, landAgain, `${spent}${recheck}`));
+      offer(...raiseWords(command, word, raise, `${spent}${recheck}`));
     } else if (status === 'denied') {
       offer(
         `${command} --fresh`,
-        `${deniedOffer(deniedOn(record, spendOf), { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: record?.workspace, runId: run.id })}${landAgain} A new session, told to do without it`,
+        `${deniedOffer(deniedOn(record, spendOf), step, { cwd: record?.workspace, runId: run.id })} A new session, told to do without it`,
         `  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
@@ -804,7 +706,7 @@ export function retryOffers(
     } else {
       offer(
         command,
-        `${status}.${landAgain} Continue its session, told what happened`,
+        `${status}. Continue its session, told what happened`,
         `  (--fresh, or --model <m>, for a new session${spent}${recheckWords(status, modes)})`,
       );
     }

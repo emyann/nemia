@@ -49,7 +49,9 @@
  */
 import { modelsOf, modelsText } from '../start/index.ts';
 import path from 'node:path';
-import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE, headline } from 'objects';
+import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE, headline, type CardPhase } from 'objects';
+import { cardPhase } from './card-phase.ts';
+import { chainOf } from './card-chain.ts';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { factoryNameRefusal, namedRepos, workflowNameRefusal, workflowRepo, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
@@ -449,6 +451,14 @@ export type InboxListing = {
   files?: CardFiles;
   /** Where the card is in its life (`cardState`): computed here once, its run's phase once started, and read as is above. */
   state: CardState;
+  /** Where the card stands as a person sorts cards (`cardPhase`), worked out from its state and its waits. */
+  phase: CardPhase;
+  /** When the card was filed, as an ISO time; empty on an entry that does not read as a card, which has none. */
+  filedAt: string;
+  /** The cards whose `after:` names this one (`chainOf`), by name. */
+  followedBy: string[];
+  /** Whether the card is in play and tied by an `after:` to another card in play (`chainOf`). */
+  chained: boolean;
   /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
   error: string | null;
   /**
@@ -553,7 +563,7 @@ export type Waiting = {
 };
 
 /** An entry as the inbox lists it before its runs' phases are read: everything but its `state` (`cardsListed`). */
-export type CardListing = Omit<InboxListing, 'state'>;
+export type CardListing = Omit<InboxListing, 'state' | 'phase' | 'filedAt' | 'followedBy' | 'chained'>;
 
 /**
  * What the card triggers read on a pass: every factory's (`everyCardTrigger`), and when a card was filed, by its name, which orders a
@@ -744,7 +754,7 @@ function statesOfWaits(listed: readonly CardListing[], runs: readonly Pick<Run, 
  *   none is handed.
  */
 export function inboxListing(
-  files: readonly PlanFile[],
+  files: readonly (PlanFile & { filedAt?: string })[],
   runs: readonly CardRun[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
@@ -753,10 +763,23 @@ export function inboxListing(
 ) {
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
   const phased = waiting && { look: waiting.look, phaseOf: (id: string) => phases.get(id) ?? waiting.phaseOf(id) };
-  return cardsListed(files, runs, tries, factories, triggering, phased).map((l) => ({
-    ...l,
-    state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
-  })) satisfies InboxListing[] as InboxListing[];
+  const filed = new Map(files.map((f) => [f.file, f.filedAt ?? ''] as const));
+  const stated = cardsListed(files, runs, tries, factories, triggering, phased).map((l) => {
+    const state: CardState = cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) });
+    return { ...l, state };
+  });
+  const linked = stated.map((l) => ({ name: l.name, after: l.after, inPlay: CARD_IN_PLAY[l.state] }));
+  return stated.map((l, i) => {
+    const place = chainOf(linked[i] as (typeof linked)[number], linked);
+    const waits = l.waits === undefined || l.waits.length === 0 ? 'none' : l.waits.some((w) => w.stalled) ? 'stalled' : 'held';
+    return {
+      ...l,
+      phase: cardPhase({ state: l.state, waits }),
+      filedAt: filed.get(l.file) ?? '',
+      followedBy: [...place.followedBy],
+      chained: place.chained,
+    };
+  }) satisfies InboxListing[] as InboxListing[];
 }
 
 /**

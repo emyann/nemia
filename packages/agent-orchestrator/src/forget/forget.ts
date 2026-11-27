@@ -8,24 +8,13 @@ import { andList, checkTasksOf, type CloseoutAsked, type RepositoryRun, type Run
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/index.ts';
 import { modeWord, spentAsks, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
-import {
-  approvedFirst,
-  landsOnCheck,
-  ownStatus,
-  resultOnBase,
-  standing,
-  type BranchStanding,
-  type Round,
-  type RoundAsk,
-  type SpendOf,
-} from '../status/status.ts';
-import { landingOpen } from '../ending/ending.ts';
+import { standing, type Round, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { gated, holdWord } from '../wait/wait.ts';
 import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
-import type { Held, MergeState } from '../place/place.ts';
+import type { Held } from '../place/place.ts';
 import { engineWords, type EngineForgetting } from './forgetting/forgetting.ts';
 
 /**
@@ -97,14 +86,11 @@ export const askOffLine = (id: string, ask: AskName) =>
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by its verb's `--off` (`offOf`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
- *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
+ *   files what waits on it. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
  *   And a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
- * - **an ending that lands on its check whose merge is not landed** (`landingOpen`), with nothing of it running, cancelled or not: a pass
- *   checks it and commits or aborts it, and with the record gone none would, and the merge would stay staged in the checkout.
  *
- * An ending that has not run whose result git already has (`resultOnBase`) is not named at its gate: its approval is refused
- * (`approvalRefusal`). A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers
+ * A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers
  * then, hold it too. A cancelled run never succeeds, so for a run held until it does, the fix named is lifting that hold.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
@@ -123,13 +109,8 @@ export const askOffLine = (id: string, ask: AskName) =>
  * @param roundAsks The asks for a round in the run's directory.
  * @param spendOf What a task's sessions cost, by its id, or undefined for a task nobody read.
  * @param offOf The command that takes an ask back (`askOffLine`).
- * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
- *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
  * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia
  * prune`.
- * @param merging Whose merge is in progress in the repository's checkout, as the run's place reads it (`merging` in prune.verb.ts), for an
- *   ending that lands on its check: one staged and not landed holds the run (`landingOpen`). Left out, the place is not asked, and only
- *   what the record and the engine say holds it.
  * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given
  * (`pruneAgain`).
  * @param checkKillOf What the kernel's OOM killer did to a step's current check, by the step's name, or undefined where it killed nothing.
@@ -146,9 +127,7 @@ export function forgetRefusal(
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
   offOf: (ask: AskName) => string = (a) => askOffLine(run.id, a),
-  standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
-  merging: MergeState['merging'] = 'none',
   command = `nemia ${verb} ${run.id}`,
   checkKillOf: CheckKillOf = () => undefined,
 ) {
@@ -166,9 +145,7 @@ export function forgetRefusal(
     roundAsks,
     spendOf,
     offOf,
-    standings,
     verb,
-    merging,
   };
   const c = factsOf(asked, others);
   const held = HELD.map((reason) => reason(c)).filter((words) => words !== undefined);
@@ -191,19 +168,16 @@ type Forgetting = {
   roundAsks: readonly RoundAsk[];
   spendOf: SpendOf;
   offOf: (ask: AskName) => string;
-  standings: readonly BranchStanding[];
   verb: 'rm' | 'prune';
-  merging: MergeState['merging'];
 };
 
 /**
- * The run read once for its reasons: its tasks in flight (`live`), its ending whose merge is not landed (`unlanded`), what a pass would
+ * The run read once for its reasons: its tasks in flight (`live`), what a pass would
  * file were it not waiting on runs (`ready`, `waits`), the steps at their gates, what is due, the asks no pass files, the runs that wait on
  * it (`stranded`) or are held until it succeeds (`holders`), and how a hold on it is said (`lifts`).
  */
 type Facts = Forgetting & {
   live: string[];
-  unlanded?: StepSpec;
   ready: string[];
   waits: boolean;
   atGates: string[];
@@ -235,7 +209,6 @@ function factsOf(f: Forgetting, others: readonly Run[]) {
             asks: f.asks,
             roundAsks: f.roundAsks,
             standings: [],
-            checkout: undefined,
           }),
           steps,
         }
@@ -244,7 +217,6 @@ function factsOf(f: Forgetting, others: readonly Run[]) {
   return {
     ...f,
     live,
-    unlanded: unlandedEnding(f, live),
     ready: judged?.a.ready ?? [],
     waits,
     atGates: judged ? gatesOf(f, judged.steps) : [],
@@ -278,28 +250,11 @@ function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   return live;
 }
 
-/**
- * The ending that lands on its check whose merge is not landed, with nothing of the run in flight — or undefined: one that holds the
- * checkout (`landingOpen`), or one that signed off done whose landing the run has not yet recorded (`checking`), whose checks may have
- * given the checkout back.
- */
-function unlandedEnding(f: Forgetting, live: readonly string[]) {
-  const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
-  const ending = steps?.find((s) => landsOnCheck(s, run));
-  const own = ending && steps ? ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) : undefined;
-  const unlanded = ending && own && !live.length && (own === 'checking' || landingOpen(ending, run, own, phaseOf, () => merging));
-  return unlanded ? ending : undefined;
-}
-
-/** The steps awaiting approval, but an ending whose result git already has and that never ran (`resultOnBase`). */
+/** The steps awaiting approval. */
 function gatesOf(f: Forgetting, steps: readonly StepSpec[]) {
-  const { run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf, standings } = f;
-  const takenByHand = (st: StepSpec) => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
+  const { run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf } = f;
   return steps
-    .filter(
-      (s) =>
-        standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval' && !takenByHand(s),
-    )
+    .filter((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval')
     .map((s) => s.name);
 }
 
@@ -368,15 +323,6 @@ const askNamed = (u: AskName) =>
 /** The run's tasks in flight. */
 const liveHeld = (c: Facts) => (c.live.length ? andList(c.live) : undefined);
 
-/** An ending's merge the run has not yet committed or aborted. */
-function unlandedHeld(c: Facts) {
-  const { unlanded: ending, run, merging } = c;
-  if (!ending) return undefined;
-  return merging === 'ours'
-    ? `${ending.name}'s merge is staged in the repository's checkout (${run.repo}), and the run has not yet committed or aborted it`
-    : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`;
-}
-
 /** What the run files once the runs it waits on have succeeded. */
 function waitsHeld(c: Facts) {
   const { run, ready, waits } = c;
@@ -385,14 +331,8 @@ function waitsHeld(c: Facts) {
   return `it waits on ${andList(after)}, and files ${andList(ready)} once ${after.length > 1 ? 'they have' : 'it has'} succeeded`;
 }
 
-/** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
-function gateFiles(atGates: readonly string[], run: Run) {
-  const one = atGates.length === 1;
-  if (atGates.every((name) => !run.steps[name]?.taskId)) return one ? 'it is filed' : 'each is filed';
-  return atGates.some((name) => !run.steps[name]?.taskId)
-    ? 'each is filed, or what waits on it is'
-    : `what waits on ${one ? 'it' : 'them'} is filed`;
-}
+/** What each step at its gate files once approved: what waits on it. */
+const gateFiles = (atGates: readonly string[]) => `what waits on ${atGates.length === 1 ? 'it' : 'them'} is filed`;
 
 /** The steps waiting at their gates, and the approvals that file them — once the hold lifts, on a held run. */
 function gatesHeld(c: Facts) {
@@ -400,7 +340,7 @@ function gatesHeld(c: Facts) {
   const { hold } = run;
   if (!atGates.length) return undefined;
   const one = atGates.length === 1;
-  const files = gateFiles(atGates, run);
+  const files = gateFiles(atGates);
   return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `nemia approve ${id} ${name}`).join(', ')}`}`;
 }
 
@@ -439,7 +379,7 @@ function holdersHeld(c: Facts) {
 }
 
 /** Why the run is held, each reason in the order a person is told it. */
-const HELD = [liveHeld, unlandedHeld, waitsHeld, gatesHeld, dueHeld, unheardHeld, strandedHeld, holdersHeld];
+const HELD = [liveHeld, waitsHeld, gatesHeld, dueHeld, unheardHeld, strandedHeld, holdersHeld];
 
 /** Wait for a cancelled run's tasks to settle — or cancel, which files nothing more, when anything is in flight or would be filed. */
 function cancelFix(c: Facts) {
@@ -458,13 +398,6 @@ function unheardFix(c: Facts) {
   const { unheard, again, offOf } = c;
   if (!unheard.length) return undefined;
   return `Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: ${[...new Set(unheard.map(offOf))].join(', ')}`;
-}
-
-/** Wait for the next tick to land the ending's merge. */
-function unlandedFix(c: Facts) {
-  const { unlanded: ending, again, id } = c;
-  if (!ending) return undefined;
-  return `The next tick lands it, cancelled or not: ${again} once nemia ls ${id} says what became of ${ending.name}'s merge`;
 }
 
 /** Let the runs that wait on this one start first, or call them off. */
@@ -487,7 +420,7 @@ function holdersFix(c: Facts) {
 }
 
 /** What to do about each reason, in the order a person is told it. */
-const FIXES = [cancelFix, unheardFix, unlandedFix, strandedFix, holdersFix];
+const FIXES = [cancelFix, unheardFix, strandedFix, holdersFix];
 
 /**
  * Why `nemia <verb>` touches nothing of the run `id`: its place did not read what the run left in `repo` — it refused, in its words, or

@@ -8,7 +8,7 @@
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
  * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
  * the runtime's: a task filed waits until a pass admits it, and none is admitted while the pause stands — what the engine's stand-in,
- * which has no pass that admits, cannot say, nor a landing whose journal does not read. The pause put, put at once and resumed, as a
+ * which has no pass that admits, cannot say. The pause put, put at once and resumed, as a
  * person tells it, is on the stand-ins in `test/pause.test.ts`. A store of its own, since
  * `tick` reads every run of its store: at `ROOT`, given as `ENV`.
  */
@@ -16,7 +16,7 @@ import { approvalKey, askNames, recordText, runKey, runRecord } from '../../test
 import { type Env, settingsOf, type StoreConfig } from '../config/config.store.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
-import { test, type TestContext } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +25,7 @@ import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../..
 import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import { scratch } from 'test-kit/scratch';
-import { testEngine, until, WAITED } from 'agent-runtime/testing';
+import { testEngine } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
@@ -98,9 +98,6 @@ const memoryJournal = (tasks: Tasks, starts: Map<string, number>) => {
   } satisfies AsyncJournal;
 };
 
-/** What no runtime writes: a `measured` whose responses are a word. */
-const MISWRITTEN = { kind: 'measured', at: '2026-10-04T00:00:00Z', attempt: 1, usage: { responses: 'three' } };
-
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag?' };
 
@@ -168,56 +165,20 @@ const rowOf = async (run: Run, step: string) => {
   return row as { message: string; note?: string; reason?: string; on?: string; verdict?: unknown };
 };
 
-/** Passes until `step` of `run` waits at its gate, as `nemia ls` lists it: the state an approval asks before it is taken. */
-const atGate = async (t: TestContext, run: Run, step: string) => {
-  let seen = 'not read yet';
-  await until(
-    t,
-    async () => {
-      seen = (await rowOf(run, step)).message;
-      if (seen === 'awaiting approval') return true;
-      await pass();
-      return false;
-    },
-    () => `${run.id}'s ${step} at its gate; it lists ${seen}`,
-    { everyMs: 50 },
-  );
-};
-
 const TWO = folder(['plan', 'work']);
 const ONE = folder(['work']);
 const CHECKED = folder(['work'], () => 'check: "true"\n');
-const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'harness: claude\ngate: true\nworkspace: base\ncheck: "true"\n' : ''));
-const LANDS = aRepo();
 
-/** A file left in the workspace of `run`'s step `work`, for the step at work there to hand off, as a session leaves its work. */
-const worked = (run: string) => {
-  const { workspace } = runRecord(ROOT, run).steps.work;
-  assert.ok(workspace, `${run} has a workspace`);
-  fs.writeFileSync(path.join(workspace, 'work.txt'), 'work\n');
-};
-
-/** The merge staged in `repo`'s checkout, uncommitted, as a landing's session leaves it for its check. */
-const staged = (repo: string) => {
-  stand().world.branch(repo, 'side', { 'side.txt': 'side\n' });
-  stand().world.stage(repo, 'side');
-};
-
-test('while the store is paused nothing new starts and the work goes on; the pass after the lift files what waits', WAITED, async (t) => {
+test('while the store is paused nothing new starts and the work goes on; the pass after the lift files what waits', async () => {
   const running = await begun(TWO);
   const checked = await begun(CHECKED);
   const refused = await begun(ONE);
   const gated = await begun(TWO, { gates: ['plan'] });
-  const landing = await begun(SHIP, { repo: LANDS, isolate: true });
   for (let k = 0; k < 6; k++) {
     await pass();
-    if (k === 0) worked(landing.id);
     h.signAll([running, checked], [refused]);
   }
-  await atGate(t, landing, 'ship');
-  await runWith(h.e, approveRun(landing.id, 'ship'));
   for (let k = 0; k < 3; k++) await pass();
-  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
   assert.ok(taskOf(running, 'plan') && taskOf(checked, 'work'), "running's plan and checked's work at work as the pause is put");
   assert.ok(taskOf(gated, 'plan') && !taskOf(gated, 'work'), "gated's plan signed, its work waiting at the gate");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's work signed blocked, on its first try");
@@ -233,7 +194,6 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   const { card } = addToInbox({ text: 'an idea queued meanwhile', workflow: path.basename(ONE) });
   queueInInbox(card.name);
   const before = h.spawned.length;
-  staged(LANDS);
 
   const first = await pass();
   const byStep = (a: Finishing, b: Finishing) => `${a.run}${a.step}`.localeCompare(`${b.run}${b.step}`);
@@ -242,41 +202,33 @@ test('while the store is paused nothing new starts and the work goes on; the pas
     [
       { run: running.id, step: 'plan', kind: 'session' },
       { run: checked.id, step: 'work', kind: 'session' },
-      { run: landing.id, step: 'ship', kind: 'session' },
     ] satisfies Finishing[]
   ).sort(byStep);
   assert.deepEqual(
     sorted(first.pause!),
-    { pause, finishing: atWork, parked: [], staged: [], held: [] },
-    'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled; no landing held yet',
+    { pause, finishing: atWork, parked: [], held: [] },
+    'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled',
   );
-  assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
+  assert.match(pausedLines(first.pause!)[0], /^Pausing: 2 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   const listedAtWork = (await runWith(h.e, runsListed())).paused!;
-  assert.deepEqual(
-    sorted(listedAtWork),
-    { pause, finishing: atWork, parked: [], staged: [], held: [] },
-    'nemia ls names each task still finishing',
-  );
+  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, parked: [], held: [] }, 'nemia ls names each task still finishing');
   assert.deepEqual(sorted(await runWith(h.e, pausedRead())), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
-  const repo = runRecord(ROOT, landing.id).repo!;
-  const held = [{ run: landing.id, step: 'ship', repo }];
   const checks = [{ run: checked.id, step: 'work' }];
   assert.deepEqual(
     last.pause,
-    { pause, finishing: [], parked: [], staged: held, held: checks },
-    "once what ran has finished, nothing finishes; the landing is held staged, and checked's check held, each named once",
+    { pause, finishing: [], parked: [], held: checks },
+    "once what ran has finished, nothing finishes; checked's check held, once",
   );
   assert.deepEqual(pausedLines(last.pause), [
     pausedWords(last.pause),
-    `   ${landing.id}'s ship has its merge staged in ${repo} (MERGE_HEAD), and its check waits on nemia resume`,
     `   ${checked.id}'s work has signed off, and its check waits on nemia resume`,
   ]);
-  assert.match(pausedLines(last.pause)[0], /^Paused since .* nothing new starts, 2 checks held; /);
+  assert.match(pausedLines(last.pause)[0], /^Paused since .* nothing new starts, 1 check held; /);
   const waits = await rowOf(checked, 'work');
   assert.notEqual(waits.message, 'checking', 'a check the pause keeps from being filed is not checking');
   assert.equal(waits.message, PAUSE_WAIT);
@@ -286,7 +238,6 @@ test('while the store is paused nothing new starts and the work goes on; the pas
     'its code says the pause holds it, and its check has no verdict yet',
   );
   assert.match(waits.note ?? '', /its check is filed on nemia resume/);
-  assert.equal((await rowOf(landing, 'ship')).message, PAUSE_WAIT, 'nor is the landing whose check it holds');
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task not admitted');
@@ -309,25 +260,10 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   const listed = await runWith(h.e, runsListed());
   assert.deepEqual(
     listed.paused,
-    { pause, finishing: [], parked: [], staged: held, held: checks },
-    'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
+    { pause, finishing: [], parked: [], held: checks },
+    'nemia ls names the pause and the check it holds, not filed',
   );
-  assert.equal(runRecord(ROOT, landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await runWith(h.e, pausedRead()), listed.paused, 'and the api reads the same');
-
-  const spoiled = h.tasks.get(taskOf(landing, 'ship')!)!;
-  spoiled.push(MISWRITTEN as never);
-  const unread = await pass();
-  assert.deepEqual(
-    unread.pause,
-    { pause, finishing: [], parked: [], staged: [], held: checks },
-    'a landing whose journal does not read is left out, and the pass goes on',
-  );
-  assert.ok(
-    unread.unreadable?.some((w) => w.startsWith(`${landing.id} is not advanced`)),
-    JSON.stringify(unread.unreadable),
-  );
-  spoiled.pop();
 
   resumePause(ROOT);
   const lifted = await pass();
@@ -350,9 +286,8 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
   assert.ok(taskOf(await born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
-  assert.ok(runRecord(ROOT, landing.id).steps.ship?.check, "landing's check filed");
   assert.equal((await runWith(h.e, runsListed())).paused, undefined, 'and nemia ls says no pause');
-  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], parked: [], staged: [], held: [] });
+  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], parked: [], held: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');

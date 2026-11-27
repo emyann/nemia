@@ -4,6 +4,7 @@
  * workflow's and the step's joined by a dot (`hireNamed`), and two steps whose names join to one found (`hiresCollided`); and its status
  * (`hireStatusOf`), off what the step's read says of it. Pure.
  */
+import type { HireRowError } from '../../../contracts/upgrade-apply.contract.ts';
 import type { HireStatus } from 'objects';
 import type { FillOriginOf, SettingOriginOf } from '../../../contracts/hire-origin.contract.ts';
 
@@ -93,3 +94,11 @@ export function hireStatusOf(read: HireRead, keys: readonly string[]) {
     ...(read.error === undefined ? {} : { error: read.error }),
   };
 }
+
+/**
+ * The error a Hire's row carries: that its step's own file and the factory both fill it, else, for a step the factory hires into, why the
+ * workflow does not read with the factory's hires, as a run of the factory reads it. Never the refusal of the read without the hires, which
+ * no run reads, nor a load error on a step that is hired no one.
+ * @param read What the step's read says: both filling it, whether it is hired, and why the read with the hires refused.
+ */
+export const hireRowError: HireRowError = (read) => read.bothFill ?? (read.hired ? read.filled : undefined);

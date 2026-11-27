@@ -91,16 +91,13 @@ const CHECKED = fs.mkdtempSync(path.join(ROOT, 'wf-checked-'));
 fs.writeFileSync(path.join(CHECKED, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 fs.writeFileSync(
   path.join(CHECKED, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
+  '---\nafter: work\nplace: git\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
 );
 
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
 const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
 fs.writeFileSync(path.join(ENDING, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
-fs.writeFileSync(
-  path.join(ENDING, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\nharness: codex\n---\nShip it.\n',
-);
+fs.writeFileSync(path.join(ENDING, 'ship.md'), '---\nafter: work\nplace: git\ngate: true\nharness: codex\n---\nShip it.\n');
 
 /** `work`, gated once it has run: its session signs off, and the step waits at its gate on a person, as a design's does. */
 const GATED = fs.mkdtempSync(path.join(ROOT, 'wf-gated-'));
@@ -194,7 +191,10 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
   fs.writeFileSync(path.join(at, `${id}.txt`), 'work\n');
   world().commit(at, `work of ${id}`);
   sign(id, outcome);
-  return ticked((pass) => !atWork(id) && answerOf(pass, id)?.status !== 'running', `${id} past its work`);
+  return ticked((pass) => {
+    if (atWork(id)) sign(id, outcome);
+    return !atWork(id) && answerOf(pass, id)?.status !== 'running';
+  }, `${id} past its work`);
 }
 
 /** A one-step run that succeeded, its branch merged into main by hand: finished, with no ending. */
@@ -205,19 +205,17 @@ async function merged(repo = aRepo()) {
   return run;
 }
 
-/** A run of `work → ship` landed by its ending: approved at its gate, its session merging the branch in the checkout and signing off. */
+/** A run of `work → ship` whose ending has signed off and is approved, its branch then merged by hand: finished, on its base. */
 async function land(id: string, repo: string) {
   await worked(id);
   return shipped(id, repo);
 }
 
-/** The ending of a run whose work is done: approved, its merge made in the checkout, signed off; passes until the run rests, landed. */
+/** The ending of a run whose work is done and signed off: approved, its branch merged by hand; passes until the run rests, succeeded. */
 async function shipped(id: string, repo: string) {
   await stage.runWith(engine(), approveRun(id, 'ship'));
-  await ticked(() => atWork(id), `${id}'s ending at work`);
   mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, `land ${id}`);
-  sign(id);
-  return ticked((pass) => rests(pass, id, 'succeeded'), `${id} landed and at rest`);
+  return ticked((pass) => rests(pass, id, 'succeeded'), `${id} merged and at rest`);
 }
 
 /** What `nemia ls` answers (`RunsListed`) over the stage's engine. */
@@ -424,28 +422,6 @@ describe(
         mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, 'by hand');
         const done = await sweep(await tick(), [id], memory);
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true], 'on its base now, it is finished');
-      },
-    );
-    s.test(
-      "REFUSED at shipped defaults: a finished run that stays, judged while another merge is staged in its repository's checkout, has the checkout's status asked off the loop",
-      async () => {
-        const { id, repo } = await started(CHECKED);
-        await worked(id);
-        await stage.runWith(engine(), cancelRun(id));
-        fs.writeFileSync(path.join(lane(id), 'left.txt'), 'not committed\n');
-        world().branch(repo, 'other', { 'other.txt': "another run's work\n" });
-        const pass = await ticked((p) => rests(p, id, 'cancelled'), 'cancelled at its gate, and at rest');
-        world().stage(repo, 'other');
-        assert.ok(fs.existsSync(runRecord(ROOT, id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
-
-        const done = await sweep(pass, [id], freshFreeMemory());
-        assert.deepEqual(
-          done.asked.filter((a) => a.verb === 'status').map((a) => a.door),
-          ['ask'],
-          'the checkout is read, once, and off the loop',
-        );
-        assert.deepEqual([done.freed, whole(id)], [[], true]);
-        world().takeBack(repo);
       },
     );
     s.test(

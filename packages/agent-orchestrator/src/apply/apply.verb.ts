@@ -18,7 +18,7 @@ import { objectWritten } from './write.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { readResolutions } from '../factory/applied/applied.store.ts';
 import { resolvedAgain, type ResolvedAgain } from '../factory/upgrade/index.ts';
-import { upgradeComposed } from '../factory/applied/applied.verb.ts';
+import { upgradeComposed, upgradeHeld } from '../factory/applied/applied.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** How a program reads the state of a proposal's run: as the tick judged it, or as its record says. */
@@ -55,25 +55,31 @@ const readAgain = (factory: string, object: ProposedObject) =>
     ? `nemia get ${RESOURCE_PLURALS.Factory} ${object.metadata.name}`
     : `nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}`;
 
-/** Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the lines that resolve them again; else none. */
-const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal) => {
-  const kept = readResolutions(place.home, factory);
-  return kept === undefined ? undefined : resolvedAgain(factory, proposal.metadata.name, kept.proposals ?? {}, kept.choices);
-};
+/**
+ * Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the line that proposes its owner again from the
+ * choices that still hold, none where one of its conflicts has lost its choice (`upgradeHeld`).
+ */
+const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal) =>
+  Effect.gen(function* () {
+    const kept = readResolutions(place.home, factory);
+    if (kept === undefined) return undefined;
+    const held = yield* Effect.provideService(upgradeHeld(factory), StoreRoot, place.home);
+    return resolvedAgain(factory, proposal.metadata.name, kept.proposals ?? {}, held?.choices ?? {}, held?.conflicts ?? []);
+  });
 
 /** What to do once the proposal cannot apply: resolve its owner's conflicts again where it is a resolution's, else `otherwise`. */
 const doNext = (again: ResolvedAgain | undefined, otherwise: string) =>
   again === undefined
     ? otherwise
-    : `it resolves the upgrade's conflicts of ${again.owner}, so resolve them again on what the tree holds now: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
+    : `it resolves the upgrade's conflicts of ${again.owner}, so propose it again on what the tree holds now, your choices kept: ${again.lines.join('; ') || 'a conflict of it changed, so resolve the conflicts nemia factory ls names again'}`;
 
 /**
  * The tree a Workflow of `proposal` is judged against as it is written: where it resolves an upgrade's conflicts (`resolutionOf`) and an
  * upgrade of `factory` is due, the tree that upgrade composes (`upgradeComposed`), whose clean merges land only once each conflict is
  * resolved; else none, the factory's tree as it is.
  */
-const composedFor = (place: ProposalPlace, factory: string, proposal: Proposal) =>
-  resolutionOf(place, factory, proposal) === undefined || !proposal.spec.objects.some((o) => o.kind === 'Workflow')
+const composedFor = (place: ProposalPlace, factory: string, proposal: Proposal, again: ResolvedAgain | undefined) =>
+  again === undefined || !proposal.spec.objects.some((o) => o.kind === 'Workflow')
     ? Effect.succeed(undefined)
     : Effect.provideService(upgradeComposed(factory), StoreRoot, place.home);
 
@@ -128,6 +134,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
   const proposal = yield* door.read(factory, name);
   if (proposal === undefined || proposal.status.phase !== 'approved') return proposal;
   const objects = yield* nowOf(place, factory, proposal.spec.objects);
+  const again = yield* resolutionOf(place, factory, proposal);
   const run = proposal.status.proposedBy.run;
   const action = proposalApply({
     at: proposal.spec.applyAt ?? 'approval',
@@ -144,7 +151,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
         factory,
         objects.filter((o) => !o.current).map((o) => o.object),
         action,
-        resolutionOf(place, factory, proposal),
+        again,
       ),
     );
   const before: ProposedObject[] = objects.flatMap(({ object, now }) =>
@@ -154,7 +161,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
   );
   const revisions: string[] = [];
   const written: string[] = [];
-  const against = yield* composedFor(place, factory, proposal);
+  const against = yield* composedFor(place, factory, proposal, again);
   for (const { object } of objects) {
     const wrote = yield* Effect.result(objectWritten(place, factory, object, against));
     if (wrote._tag === 'Failure')
@@ -164,7 +171,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
           before,
           revisions,
           written,
-          message: `${object.kind} ${object.metadata.name} was refused as it was written: ${wrote.failure.message} What is named in written stands; ${doNext(resolutionOf(place, factory, proposal), 'propose the rest again')}.`,
+          message: `${object.kind} ${object.metadata.name} was refused as it was written: ${wrote.failure.message} What is named in written stands; ${doNext(again, 'propose the rest again')}.`,
         }),
       );
     revisions.push(wrote.success);

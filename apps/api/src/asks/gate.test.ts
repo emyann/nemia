@@ -336,11 +336,8 @@ describe('a person approves a gate on the board: the need on the list and the de
       const run = await object();
       assert.deepEqual(
         run.status.gates,
-        [
-          { step: 'plan', at: 'after' },
-          { step: 'sketch', at: 'after' },
-        ],
-        "the start's gate and the step's own, in the order they run, each approved after its step",
+        [{ step: 'plan' }, { step: 'sketch' }],
+        "the start's gate and the step's own, in the order they run, each held after its step",
       );
       assert.deepEqual(
         run.status.steps.map(({ name, message, approve, gate }) => ({ name, message, approve, gate })),

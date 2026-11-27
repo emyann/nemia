@@ -1,116 +1,16 @@
 /**
- * The parts of an inbox card the Inbox page draws: its line under the title, its page's link, its state's chip and the runs it was started
- * as, a card gone, a tick's try and a refusal.
+ * The parts of an inbox card the Inbox page and a card's page draw: its state's chip and the runs it was started as, a tick's try and a
+ * refusal.
  */
-import { LabelTags } from '../field/Labels';
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { workflowNameOf } from '../../lib/api/workflows.ts';
 import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
-import {
-  clashWords,
-  waitWords,
-  hasPage,
-  queueable,
-  queuedWord,
-  queueNeedsFactory,
-  triedLine,
-  unassigned,
-  type CardRefusal,
-} from '../../lib/inbox';
+import { triedLine, type CardRefusal } from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';
 import { CARD_WORDS } from '../../lib/words';
 import { useNow } from '../../lib/useNow';
-import { FactoryTag } from '../factory/FactoryTag';
-import { Instant } from '../time/Instant';
-import { Body, Button } from '@/components/ui/ds';
-import { Pending } from '@/components/look';
-
-/**
- * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
- * that it has no factory yet, and never a tag; its workflow when it names one; an older card's `repo:`, retired and struck, since the
- * factory places the run and the line is read by nothing; and when it was filed. An entry that does not read as a card says nothing of a
- * factory.
- */
-export function CardMeta({ entry }: { entry: InboxEntry }) {
-  return (
-    <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-mono">{entry.name}</span>
-      {entry.error !== null ? null : unassigned(entry) ? (
-        <span data-unassigned title="It names no factory: Start gives it one.">
-          no factory yet
-        </span>
-      ) : (
-        <FactoryTag name={entry.factory!} linked />
-      )}
-      <LabelTags labels={entry.labels} />
-      {entry.workflow && (
-        <span data-workflow={entry.workflow} title={entry.workflow}>
-          workflow <span className="font-mono text-on-surface">{workflowNameOf(entry.workflow)}</span>
-        </span>
-      )}
-      {entry.repo && (
-        <s data-repo="retired" title="retired: the factory places the run" className="font-mono break-all">
-          {entry.repo}
-        </s>
-      )}
-      {entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />}
-    </Body>
-  );
-}
-
-/**
- * Why a card offers no Queue, for the card that would have one but for its factory (`queueNeedsFactory`), and the way to give it one;
- * nothing for any other card.
- */
-export function NoQueue({ entry }: { entry: InboxEntry }) {
-  if (!queueNeedsFactory(entry)) return null;
-  return (
-    <Body size="small" colorRole="on-surface-variant" data-no-queue>
-      No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
-    </Body>
-  );
-}
-
-/**
- * A card's Queue, offered where it may be queued (`queueable`), and its Unqueue, on a queued card; `onQueue` is told which, true for
- * taking it off, and both wait while `pending`.
- */
-export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; pending: boolean; onQueue: (off: boolean) => void }) {
-  return (
-    <>
-      {queueable(entry) && (
-        <span title="Start it on its own, in its factory and on its workflow, when a run slot frees" className="inline-flex">
-          <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={() => onQueue(false)}>
-            {pending ? 'Queueing…' : 'Queue'}
-          </Button>
-        </span>
-      )}
-      {entry.queued && entry.queued.by === undefined && (
-        <span title="Take it off the queue: it waits on you to start it" className="inline-flex">
-          <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={() => onQueue(true)}>
-            {pending ? 'Unqueueing…' : 'Unqueue'}
-          </Button>
-        </span>
-      )}
-    </>
-  );
-}
-
-/** An entry's words, linked to its page where it has one among the entries listed with it (`hasPage`). */
-export function PageLink({ entry, entries, children }: { entry: InboxEntry; entries: readonly InboxEntry[]; children: ReactNode }) {
-  if (!hasPage(entry, entries)) return <>{children}</>;
-  return (
-    <Link
-      to="/inbox/$name"
-      params={{ name: entry.name }}
-      className="underline decoration-outline underline-offset-4 hover:decoration-current"
-    >
-      {children}
-    </Link>
-  );
-}
+import { Body } from '@/components/ui/ds';
 
 /**
  * A card's state as a chip: its word (`CARD_WORDS`), drawn in its hue's tonal form, and its sentence on hover. `data-card-state` is the
@@ -157,36 +57,6 @@ export function StartedAs({ startedAs, state, after }: { startedAs: readonly str
 }
 
 /**
- * A card the inbox no longer lists, kept in its place for what its start or its drop was refused with: dropped or started behind the page's
- * back. Its first line and name, that it is gone, the refusal, and Dismiss, which takes the line away.
- */
-export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; refusal: CardRefusal; onDismiss: () => void }) {
-  return (
-    <li
-      aria-label={`Card ${entry.name}, no longer in the inbox`}
-      data-gone={entry.name}
-      className="space-y-3 rounded-lg border border-dashed border-outline p-4"
-    >
-      <div className="flex flex-wrap items-start gap-3 @md/page:flex-nowrap">
-        <div className="min-w-0 flex-1 space-y-1">
-          <p data-title className="font-medium break-words text-on-surface-variant">
-            {entry.title ?? entry.file}
-          </p>
-          <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="font-mono">{entry.name}</span>
-            <span>Gone from the inbox since this page listed it.</span>
-          </Body>
-        </div>
-        <Button variant="outlined" onPress={onDismiss} className="shrink-0">
-          Dismiss
-        </Button>
-      </div>
-      <Refused refusal={refusal} />
-    </li>
-  );
-}
-
-/**
  * The tick's last try of a queued card's start, which did not start it (`triedLine`): refused, in amber — it stays queued and waits for
  * you; failed otherwise, muted — the tick tries it again on the next pass.
  */
@@ -224,49 +94,5 @@ export function Refused({ refusal }: { refusal: CardRefusal }) {
         {refusal.message}
       </Body>
     </div>
-  );
-}
-
-/**
- * A card's place in the queue — its word, by whom where triggers queue it, and since when — and, on a card two triggers of its factory
- * would send to two workflows, the clash and what to change; on a card that waits on cards of its `after:` not succeeded, each, in the
- * failure's colours where only a person can release one.
- */
-export function CardQueue({ entry }: { entry: InboxEntry }) {
-  return (
-    <>
-      {entry.queued && (
-        <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-baseline gap-x-2">
-          <span
-            data-queued={entry.queued.place ?? ''}
-            className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
-          >
-            {queuedWord(entry.queued)}
-          </span>
-          <span>
-            since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
-          </span>
-        </Body>
-      )}
-      {entry.clash && (
-        <Body size="small" data-card-clash={entry.clash.join(' ')}>
-          {clashWords(entry.clash)}
-        </Body>
-      )}
-      {entry.waits?.length ? (
-        <Body
-          size="small"
-          data-card-waits={entry.waits.map((w) => w.card).join(' ')}
-          data-stalled={entry.waits.some((w) => w.stalled) ? 'true' : 'false'}
-          className={
-            entry.waits.some((w) => w.stalled)
-              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-on-failure-container'
-              : 'text-on-surface-variant'
-          }
-        >
-          {waitWords(entry.name, entry.waits)}
-        </Body>
-      ) : null}
-    </>
   );
 }

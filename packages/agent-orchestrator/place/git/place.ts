@@ -11,7 +11,6 @@ import { follow } from './verbs/follow.ts';
 import { handoff } from './verbs/handoff.ts';
 import { init } from './verbs/init.ts';
 import { inventory } from './verbs/inventory.ts';
-import { land } from './verbs/land.ts';
 import { make } from './verbs/make.ts';
 import { open } from './verbs/open.ts';
 import { remove } from './verbs/remove.ts';
@@ -19,7 +18,6 @@ import { report } from './verbs/report.ts';
 import { root } from './verbs/root.ts';
 import { seal } from './verbs/seal.ts';
 import { standing } from './verbs/standing.ts';
-import { status } from './verbs/status.ts';
 import { trial } from './verbs/trial.ts';
 import { STOP_GRACE_MS, type AskOptions, type Place } from '../../src/place/place.store.ts';
 import { PLACE_DEADLINE_MS, type PlaceRequests, type PlaceVerb } from '../../src/place/place.ts';
@@ -34,8 +32,6 @@ const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<
   report,
   standing,
   trial,
-  status,
-  land,
   inventory,
   remove,
   export: exported,

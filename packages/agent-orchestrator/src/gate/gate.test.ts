@@ -24,7 +24,6 @@ import {
   type Run,
   type TaskPhase,
 } from '../run.ts';
-import { gatesAt } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { gatesAfterSection } from '../brief/brief-sections.ts';
 import type { RetryAsk } from '../retry/retry-ask.ts';
@@ -68,23 +67,6 @@ describe('gatesOf, hasGate', () => {
   });
   test('a step neither gates is not gated', () => {
     assert.equal(hasGate(steps[1], { gates: ['plan'] }), false);
-  });
-});
-
-describe('gatesAt', () => {
-  const steps: StepSpec[] = [
-    { ...step('design'), gate: true },
-    step('implement', ['design']),
-    { ...step('land', ['implement']), workspace: 'base' },
-  ];
-  test('a step whose closeout waits is approved after it; an ending on the base branch, before it', () => {
-    assert.deepEqual(gatesAt(steps, { gates: ['land'] }), [
-      { step: 'design', at: 'after' },
-      { step: 'land', at: 'before' },
-    ]);
-  });
-  test('an ending no gate reaches is no gate at all', () => {
-    assert.deepEqual(gatesAt(steps, {}), [{ step: 'design', at: 'after' }]);
   });
 });
 
@@ -246,40 +228,6 @@ describe('gateLines', () => {
     ],
   ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
     test(row, () => assert.deepEqual(gateLines(PLANNED, r, p, signedDone, asked), expected));
-  }
-});
-
-describe('gateLines at an ending approved and not filed: the send-back of the work beside the approval, until a try of the work spends it', () => {
-  const ENDING: StepSpec[] = [step('implement'), { ...step('ship', ['implement']), workspace: 'base', gate: true }];
-  const given = { ...approval('ship', 1), work: { implement: 1 } };
-  const atShip = (extra: Partial<RepositoryRun> = {}) => run({ implement: 't1', ship: null }, extra);
-  for (const [row, r, p, expected] of [
-    [
-      'approved, nothing of it filed: the approval, and the send-back of the work it would act on',
-      atShip({ approvals: [given] }),
-      PLAN_DONE,
-      { ship: 'approved 23:10Z  — not filed yet; or send the work back:  nemia retry r-1 implement --message "<objection>"' },
-    ],
-    [
-      'an approval a file older code wrote, with no work named, counts as current, and offers no send-back: no try of the work would spend it',
-      atShip({ approvals: [approval('ship', 1)] }),
-      PLAN_DONE,
-      { ship: 'approved 23:10Z' },
-    ],
-    [
-      'on a held run, no send-back: the hold refuses a try until it lifts',
-      atShip({ approvals: [given], hold: { at: '2026-09-17T01:00:00.000Z', until: [] } }),
-      PLAN_DONE,
-      { ship: 'approved 23:10Z' },
-    ],
-    [
-      'filed, no send-back: the run has acted on the approval',
-      atShip({ approvals: [given], steps: { implement: { taskId: 't1' }, ship: { taskId: 't2' } } }),
-      phases({ t1: 'succeeded', t2: 'running' }),
-      { ship: 'approved 23:10Z' },
-    ],
-  ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
-    test(row, () => assert.deepEqual(gateLines(ENDING, r, p, signedDone, asked), expected));
   }
 });
 

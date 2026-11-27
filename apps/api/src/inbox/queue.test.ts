@@ -139,7 +139,7 @@ const asListed = (c: Card) => ({
 });
 
 /** The same keys of the package's own listing of a card. */
-const packageListed = (l: Omit<InboxListing, 'state'>) => ({
+const packageListed = (l: Omit<InboxListing, 'state' | 'phase' | 'filedAt' | 'followedBy' | 'chained'>) => ({
   name: l.name,
   title: l.title,
   workflow: l.workflow,

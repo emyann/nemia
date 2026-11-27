@@ -3,7 +3,8 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, STEP_KEYS, type StepSpec, WorkflowError } from '../step/step.ts';
+import type { WaitRefused } from '../../contracts/upgrade-apply.contract.ts';
+import { hasChecks, LOOP_REPLIES, stepChecks, stepPlace, STEP_KEYS, type StepSpec, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -110,7 +111,6 @@ export function validate(steps: readonly StepSpec[]) {
   }
 
   validateFolder(steps);
-  validateBaseWorkspace(steps);
   validateSlot(steps);
 
   const cycle = cycleRefusal(steps);
@@ -128,7 +128,6 @@ export function validate(steps: readonly StepSpec[]) {
  * routes or files a card.
  */
 const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
-  ['workspace', "it runs in its first parent's workspace"],
   ['check', 'its own exit code judges it'],
   ['checks', 'its own exit code judges it'],
   ['resume', 'it continues no session'],
@@ -144,6 +143,21 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
  * its conditions, laid by the loader.
  */
 const WAIT_TAKES: readonly string[] = ['name', 'body', 'after', 'when', 'gate', 'place', 'waitsFor', 'checks'];
+
+/**
+ * The keys of a step's frontmatter that a wait node cannot take, in the order the step names them, each once as the frontmatter
+ * holds it: none where the step names no `waitsFor`.
+ * @param keys the keys the step's frontmatter holds
+ */
+export const waitRefused: WaitRefused = (keys) => (keys.includes('waitsFor') ? keys.filter((key) => !WAIT_TAKES.includes(key)) : []);
+
+/**
+ * The sentence that refuses a key a wait node cannot take, naming the line to delete.
+ * @param step the step's name
+ * @param key the key it cannot take
+ */
+export const waitKeyRefusal = (step: string, key: string) =>
+  `${step}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${key}:\`. Delete the \`${key}:\` line, or the \`waitsFor:\` line to make it a step.`;
 
 /**
  * Refused: a command node (`run:`) with a key it cannot take (`COMMAND_REFUSED`), an instruction of its own, or no `agent:`. A command acts
@@ -180,11 +194,8 @@ function validateWaits(steps: readonly StepSpec[]) {
   const inLoop = new Set(steps.filter((s) => s.loop).flatMap((s) => loopSpan(steps, s)));
   for (const s of steps) {
     if (s.waitsFor === undefined) continue;
-    const refused = STEP_KEYS.find((key) => !WAIT_TAKES.includes(key) && s[key] !== undefined);
-    if (refused)
-      throw new WorkflowError(
-        `${s.name}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${refused}:\`. Delete the \`${refused}:\` line, or the \`waitsFor:\` line to make it a step.`,
-      );
+    const [refused] = waitRefused(STEP_KEYS.filter((key) => s[key] !== undefined));
+    if (refused !== undefined) throw new WorkflowError(waitKeyRefusal(s.name, refused));
     if (s.body.trim())
       throw new WorkflowError(
         `${s.name}: a wait node (\`waitsFor:\`) runs no session, so nothing reads an instruction: empty ${s.name}.md below its frontmatter, or delete \`waitsFor:\` to make it a step.`,
@@ -193,63 +204,6 @@ function validateWaits(steps: readonly StepSpec[]) {
       throw new WorkflowError(
         `${s.name}: a wait node (\`waitsFor:\`) cannot sit in a loop's span, since a round files its steps again and its conditions belong to one try. Move it after the loop.`,
       );
-  }
-}
-
-/**
- * Why nobody may file an ending's `check:` or `checks:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a
- * `loop:`, so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
- *
- * A `check:` there is the run's own: it runs the command on the merge the step staged and commits that merge onto the base branch on its
- * word (`landingDue`). Nothing may start that but a person's approval, or the pass of a step the ending waits on that can send the work
- * back — a review, which judges the work and files another round instead where it should not land. An ending with neither would land
- * whatever its session staged on nobody's word. The rule reads two steps, the ending and what it waits on, which is why it is here and
- * not in `workspaceOf`, given one step's keys.
- */
-function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
-  if (!hasChecks(s) || s.gate === true) return undefined;
-  if (s.after.some((name) => steps.some((x) => x.name === name && x.loop))) return undefined;
-  const waits = s.after.length ? `no step with a \`loop:\` (it waits on ${s.after.join(', ')})` : 'nothing';
-  const before = s.after.length === 1 ? s.after[0] : 'the step before it';
-  const said =
-    s.check === undefined
-      ? `\`checks:\` (${stepChecks(s)
-          .map((c) => c.name)
-          .join(', ')}) are commands`
-      : `\`check: ${s.check}\` is a command`;
-  return (
-    `, and ${said} the run executes there on the merge the step leaves staged, committing it onto the base` +
-    ` branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed,` +
-    ` and this step has no \`gate: true\` and waits on ${waits}. Add \`gate: true\`, give ${before} a \`loop:\` so that its pass files the` +
-    ` landing, or delete the \`${s.check === undefined ? 'checks:' : 'check:'}\` line.`
-  );
-}
-
-/**
- * The ways a step cannot run in the repository's own checkout (`workspace: base`): it is not the workflow's last step, or its `check:`
- * is nobody's to file (`unfilableCheck`). A wait node is left to `validateWaits`, which refuses its `workspace:`.
- *
- * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
- * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
- * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
- */
-function validateBaseWorkspace(steps: readonly StepSpec[]) {
-  for (const s of steps.filter((x) => x.waitsFor === undefined && endsOnBase(x))) {
-    const named = `${s.name}: \`workspace: base\` runs the step in the repository's own checkout`;
-    const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
-    if (waiting.length) {
-      throw new WorkflowError(
-        `${named}, and ${waiting.join(', ')} ${waiting.length > 1 ? 'wait' : 'waits'} on it — each would start from a checkout this step has changed, and none of them is where the run's work is. It is a workflow's last step: nothing may wait on it. Move ${waiting.join(', ')} before ${s.name}, or delete the line.`,
-      );
-    }
-    const beside = steps.filter((x) => x.name !== s.name && !steps.some((other) => other.after.includes(x.name))).map((x) => x.name);
-    if (beside.length) {
-      throw new WorkflowError(
-        `${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`,
-      );
-    }
-    const unfilable = unfilableCheck(steps, s);
-    if (unfilable) throw new WorkflowError(`${named}${unfilable}`);
   }
 }
 
@@ -486,8 +440,8 @@ export function terminalSteps(steps: readonly StepSpec[]) {
  * the name a run's own line of work is cut under, whose cut and the run's would claim one branch; a step named for another step's
  * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
  * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
- * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: base`), which would
- * merge a result branch the run does not have. And a judge whose fence writes (`judgeRefusal`), with its hire or with none: load left a
+ * work on, one that can run two steps at once (`fansOut`), which would share a directory. And a judge whose fence writes
+ * (`judgeRefusal`), with its hire or with none: load left a
  * judge with no agent and no fence of its own to a hire, and a set that has none runs it on its harness's default, which writes.
  *
  * Asked twice, of the same set: of the folder `nemia start` is given, which it refuses (`stepsToStart`), and of the folder a run that has
@@ -507,12 +461,6 @@ export function stepSetRefusal(steps: readonly StepSpec[], isolate: boolean) {
     return (
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.'
-    );
-  const ending = !isolate ? steps.find((s) => endsOnBase(s)) : undefined;
-  if (ending)
-    return (
-      `${ending.name}: \`workspace: base\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
-      `Either drop --no-worktree, or start a workflow whose last step is not an ending.`
     );
   const line = steps.find((s) => s.name === LINE_NAME);
   if (line)

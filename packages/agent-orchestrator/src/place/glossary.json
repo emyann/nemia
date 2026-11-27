@@ -33,16 +33,12 @@
     },
     {
       "term": "Repo",
-      "meaning": "the repository a run works on, by its path: what every request to the place names it, `status` and `land` included.",
+      "meaning": "the repository a run works on, by its path: what every request to the place names it.",
       "retired": [
         {
           "spelling": "checkout",
           "card": "decision 9: the place speaks its own words; git's stay in the adapter",
           "kept": [
-            {
-              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
-              "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
-            },
             {
               "path": "packages/agent-orchestrator/src/place/place.ts",
               "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
@@ -64,39 +60,8 @@
           "card": "decision 9: the place speaks its own words; git's stay in the adapter",
           "kept": [
             {
-              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
-              "why": "the port's memo of a repository's heads, off the contract, which `place-contract.test.ts` holds"
-            },
-            {
               "path": "packages/agent-orchestrator/src/place/place.store.ts",
               "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "term": "MergeState",
-      "meaning": "whose merge is in progress in the repo's own directory, `ours`, `other` or `none`, whether a path is unmerged, the result branches a commit would leave out, the repo's tip, and the first commit of the repo's line that holds every result tip asked about (`landedBy`).",
-      "type": "MergeState",
-      "retired": [
-        {
-          "spelling": "type Status",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
-        }
-      ]
-    },
-    {
-      "term": "In progress",
-      "meaning": "a merge begun in the repo and not yet committed or taken back; `inProgressFile` is the file whose presence says one is.",
-      "retired": [
-        {
-          "spelling": "staged",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter",
-          "kept": [
-            {
-              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
-              "why": "the record's `stagedFile`, the port's own inner name, off the contract"
             }
           ]
         }

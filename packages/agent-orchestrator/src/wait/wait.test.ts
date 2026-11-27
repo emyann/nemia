@@ -243,7 +243,6 @@ describe('REFUSED by name at `nemia start --after` (`afterRefusal`), read from t
     branch: undefined,
     isolate: undefined,
     placeSkill: undefined,
-    stagedFile: undefined,
   };
   const parents: Record<string, Pick<ParentRun, 'record'>> = {
     'a-1': { record: record('a-1') },

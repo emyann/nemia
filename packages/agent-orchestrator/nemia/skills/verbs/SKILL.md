@@ -48,10 +48,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                each tool's words: tools.md#concluded
                                on the port: concluded
   nemia inbox
-                               the cards still in play: name, first line, workflow when set,
+                               a page of the cards still in play: name, first line, workflow when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-                               run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-                               their labels on each line; -o wide: every column
+                               run ended too; -l: the cards whose labels match; --search <words>: those
+                               whose title or name hold them; --phase <phase>: those in it; --sort
+                               newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+                               -L <key>: their labels on each line; -o wide: every column
                                each tool's words: tools.md#inbox, tools.md#inbox_card
                                on the port: inbox, inbox_card
   nemia factory
@@ -105,9 +107,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                flight); what each step's tries and the run have cost, where measured;
                                last, whether a nemia up ticks the store and when its last pass was;
                                first, while the store is paused, Pausing: N finishing and each
-                               session, check or landing at work, or Paused once none is, then each
-                               check it holds, a landing with its merge staged in the repository's
-                               own working tree (MERGE_HEAD) among them; a step whose check it holds
+                               session or check at work, or Paused once none is, then each
+                               check it holds; a step whose check it holds
                                says waiting on the pause. -l: the runs whose labels match (team=core,
                                given again for another); --show-labels: each run with its labels;
                                -L <key>: that label beside each run, given again for another; -o
@@ -137,8 +138,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                on the port: logs
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
-                               acceptance of each loop: step, landings of the workspace: base step
-                               and on which try, cost and time per merged run, and each step's
+                               acceptance of each loop: step, cost and time per merged run,
+                               and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
                                --line: one line, for a recap; --json: the whole answer; -l: the
@@ -580,7 +581,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                check filed, no queued task admitted, no queued card started — and
                                every session, job or attached, parks at its tool call's end: a call
                                still in flight once the timeout has passed is cut. A check runs on, its
-                               end recorded; a landing whose check has ended commits or aborts.
+                               end recorded.
                                Pausing: N sessions finishing a tool call, cut in M min while they
                                do, Paused once none does; nemia ls says each step paused.
                                nemia start still writes a run, and approvals, retries and answers are
@@ -591,8 +592,8 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                (default: your OS user)
                                --timeout: how long a call in flight is given to end, for this pause
                                (90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout
-                               --now: pause at once, the board's Stop now — each step session at work,
-                               but a landing's, has its call cut at once and parks, going on as the
+                               --now: pause at once, the board's Stop now — each step session at work
+                               has its call cut at once and parks, going on as the
                                same try on nemia resume;
                                each check is asked to stop and run again. A pause that stands is kept.
                                --yes: with --now, act; without it, --now only says what it would
@@ -882,7 +883,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                60s), and resume once the new daemon has completed its first pass;
                                refused, naming the log, when that pass fails, and naming the command
                                that starts the service when it is not running.
-                               Jobs and checks, a landing waiting on CI among them, run on and are not
+                               Jobs and checks run on and are not
                                waited for; each session parks and resumes as the same try. Each wait is
                                said on stderr as it waits. A pause a person put stands; the restart's
                                own ends with the command: killed, the next pass of the daemon lifts it.

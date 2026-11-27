@@ -30,8 +30,6 @@ export {
   SLOTS,
   tokensOf,
   wordOf,
-  workspaceOf,
-  WORKSPACES,
   PLACES,
   placeNamed,
   placeRequired,

@@ -132,7 +132,6 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
   "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`. Before the refresh the program runs the
   factory's `landingInstall` in the same worktree, with the base's merge in progress, so the refresh reads the dependencies the merged
   tree names: the nemia factory's is `npm ci`, set at its upgrade, `nemia factory upgrade nemia --to <that version> --set "landingInstall=npm ci"`.
-  A workspace ending step (`workspace: base`) is still the core's, until its removal.
 
 ## Agents in this repository
 

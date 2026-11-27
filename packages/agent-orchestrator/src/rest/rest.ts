@@ -23,8 +23,8 @@ import type { HoldKeepsOut } from '../../contracts/rest-hold.contract.ts';
 export type RestFacts = {
   run: Pick<Run, 'workflow' | 'pruned' | 'hold' | 'assignee' | 'cancelledAt'>;
   status: Assessment['status'];
-  /** What the pass found due: a step to file, a check, a try, a round, or one waiting on the repository's checkout. */
-  due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout'>;
+  /** What the pass found due: a step to file, a check, a try, or a round. */
+  due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>;
   /** Whether the engine had settled every task of the run the pass read. A task at work, or waiting for a word, moves on its own. */
   settled: boolean;
   /** What the pass did: filed, checked, tried or looped anything, or wrote the record. */
@@ -37,13 +37,6 @@ export type RestFacts = {
    * nothing but a filing, which writes the record, makes a step's workspace again.
    */
   handOffDue: readonly string[];
-  /** Whether an ending that lands on its check has not written down how it landed: a merge in the checkout that is not its own waits. */
-  landingOwed: boolean;
-  /**
-   * Whether the pass read other runs' claims on the repository's checkout (`checkoutHold`): what they say moves with them, not with this
-   * run.
-   */
-  checkoutAsked: boolean;
   /** The runs it waits on (`waitsOf`): whether they succeeded is theirs. */
   waiting: readonly unknown[];
   /** Whether it counts against the cap on runs in flight, or the cap holds it: both read other runs. */
@@ -55,7 +48,7 @@ export type RestFacts = {
  * Whether a run is at rest after the pass that read `f`: it is not `running` — it succeeded, failed, was cancelled, or stopped on a
  * person, at a gate or on a question — or it is pruned; its workflow is frozen on its record (a record without one reads its folder,
  * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
- * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run
+ * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no run
  * waited on, no slot — nor the clock's: no assignee on a run nobody cancelled, whose time runs out with no input the memo watches. Pure.
  * @param f What the pass read of the run.
  */
@@ -81,7 +74,7 @@ const personFilesOut = (run: RestFacts['run']) => [
 ];
 
 /**
- * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
+ * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `handOffDue`, …):
  * none for a run at rest. What the tick's check of its memo names when a full pass finds a run not at rest, and what a count of a store's
  * runs by clause is made of. Pure.
  * @param f What the pass read of the run.
@@ -93,11 +86,9 @@ export function restBlockers(f: RestFacts) {
   out.push(...personFilesOut(f.run));
   if (!f.settled) out.push('settled');
   if (f.acted) out.push('acted');
-  for (const key of ['ready', 'check', 'retry', 'round', 'waitingOnCheckout'] as const) if (f.due[key].length) out.push(`due.${key}`);
+  for (const key of ['ready', 'check', 'retry', 'round'] as const) if (f.due[key].length) out.push(`due.${key}`);
   if (f.notes.length) out.push('notes');
   if (f.handOffDue.length) out.push('handOffDue');
-  if (f.landingOwed) out.push('landingOwed');
-  if (f.checkoutAsked) out.push('checkoutAsked');
   if (f.waiting.length) out.push('waiting');
   if (f.inFlight) out.push('inFlight');
   if (f.held) out.push('held');

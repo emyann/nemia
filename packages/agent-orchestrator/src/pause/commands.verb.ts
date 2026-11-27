@@ -67,12 +67,12 @@ export const RESUME: Served<{ pause: Pause }, ResumeInput> = {
     Effect.flatMap(StoreRoot, (home) => tried(() => ({ pause: resumePause(home, actor) }))).pipe(Effect.tap(() => sessionsDrained(null))),
 };
 
-/** The store's pause and the checks it holds, a landing with its merge staged among them (`pausedRead`), which the api alone serves. */
+/** The store's pause and the checks it holds (`pausedRead`), which the api alone serves. */
 export const PAUSED: Command<Paused> = {
   name: 'paused',
   served: [{ endpoint: 'server.paused' }],
   usage: '',
-  help: ["the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them"],
+  help: ["the store's pause, what finishes under it, and each check it holds"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
   class: 'read',
@@ -89,7 +89,7 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   name: 'pause now',
   served: [{ endpoint: 'server.pauseNow' }],
   usage: '',
-  help: ['what a pause at once would stop, each task at work but a landing, and what that costs'],
+  help: ['what a pause at once would stop, each task at work, and what that costs'],
   spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },
   writes: false,
   class: 'read',

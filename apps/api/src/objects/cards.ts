@@ -65,6 +65,8 @@ type ListQuery = {
   readonly labelSelector?: string | readonly string[];
   readonly selector?: string | readonly string[];
   readonly fieldSelector?: string;
+  readonly orderBy?: string;
+  readonly search?: string;
 };
 
 /** A page of the cards of `namespace` (every card for none) the query asks for: as a `Table` where the request asks for one. */
@@ -77,6 +79,8 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         continue: query.continue,
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
         fieldSelector: query.fieldSelector,
+        orderBy: query.orderBy,
+        search: query.search,
       };
       const listed: Promise<CardList | Table> = table
         ? s.inRequest(cardTable(s.e, howOf(s), asked))

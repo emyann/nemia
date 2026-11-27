@@ -6,7 +6,7 @@ description: The git place — a run's steps work in a git repository, each in a
 # Git
 
 Your workspace is a git worktree on a branch the run made for your step. What you commit there is your step's result: the steps after
-you start from it, and a person decides whether it lands.
+you start from it, and a person decides what is merged.
 
 ## Commit as you go
 
@@ -53,33 +53,18 @@ Your brief names the commit the person's trial merge read: merge that commit, ne
 
 - **A textual merge**: the work does not merge onto the base as text. `git merge <commit>`, resolve each conflict, keeping both meanings
   (what this change does, and what the base changed), and commit the merge.
-- **A semantic merge**: it merges as text, but the landing's check refused the merged tree. `git merge --no-ff --no-commit <commit>`, fix
+- **A semantic merge**: it merges as text, but a check refused the merged tree. `git merge --no-ff --no-commit <commit>`, fix
   what broke inside the merge before you commit it, so `git show --remerge-diff` of the merge commit shows the fix.
 
 Where both meanings cannot hold, change nothing more, and sign off blocked naming the choice. The step that reads the merge after you
 finds it with `git log --merges -1`.
-
-## Stage a landing
-
-This section is a step's that lands the run's result; a read-only step works from *Read what changed* instead.
-
-When your step lands the run's result on its base, in the repository's own checkout, you stage the merge and the run commits it:
-
-1. **Check the checkout**: on the base branch, nothing uncommitted, no merge in progress (`git status`). If it is not so, change nothing
-   and stop, saying what you found.
-2. **Stage the merge**: every result branch in one `git merge --no-ff --no-commit <branch>...`, as your brief says it.
-3. **When it conflicts**: list the conflicting files (`git diff --name-only --diff-filter=U`), then `git merge --abort`, and stop with
-   the list. Never resolve a conflict: the work goes back to be merged with its base by whoever made it.
-4. **When it is clean**: leave it staged. The run checks the merged tree, then commits the merge or takes it back; `git commit` and
-   `git merge --continue` are denied you, and a merge without `--no-commit` would commit it all the same.
 
 ## What the run asks of this place
 
 The run asks this place itself, in code beside this file (`place.ts`, `verbs/`): each question is a call that runs git, with no script
 and no process between, and you need not ask any of them. What each takes and answers:
 
-- `open` — the repository a run starts in: `{ "root", "isolate" }` answers `{ "repo", "baseRef", "branch", "staged" }`, `staged` the
-  file that is there while a merge is staged in that checkout, which the run reads with no process. With `isolate`, it refuses a
+- `open` — the repository a run starts in: `{ "root", "isolate" }` answers `{ "repo", "baseRef", "branch" }`. With `isolate`, it refuses a
   `.worktreeinclude` that is no file or has a line outside the repository, the repository itself or `.git`.
 - `follow` — the checkout brought up to its remote before a step of a run that cuts worktrees works from it: `{ "repo" }` answers
   `{ "state" }`. The truth is the upstream git names for the branch checked out (`git branch --set-upstream-to <remote>/<branch>`, as
@@ -95,7 +80,6 @@ and no process between, and you need not ask any of them. What each takes and an
   git with a `.gitignore` of `*` at its top; it answers `{ "workspace", "branch", "conflicts", "notes", "given" }`, `conflicts` the
   paths a merge left unmerged, `given` the `to` it copied to.
 - `handoff` — commit what a step left uncommitted: `{ "workspace", "step", "why" }` answers `{ "commit" }`, null when the tree is clean.
-- `status` — the merge staged in a checkout: `{ "checkout", "tips" }` answers `{ "merging", "conflicted", "missing", "head" }`.
 - `report` — what each result branch changed against a run's base, from git's object store: `{ "repo", "baseRef", "onto", "branches",
   "diffOf", "present", "atBase" }` answers `{ "at", "files", "diffs", "present", "atBase" }`.
 - `standing` — where result branches stand against the base they land on, in one listing of the repository's branches:
@@ -107,8 +91,6 @@ and no process between, and you need not ask any of them. What each takes and an
 - `trial` — whether branches merge, by a merge made in git's object store alone, which touches no checkout, index or ref:
   `{ "repo", "trials": [{ "onto", "branch" }] }` answers `{ "at", "trials" }`, the commit each `onto` names now and each trial in the
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.
-- `land` — commit the staged merge, or take it back: `{ "checkout", "act": "commit", "message" }` answers `{ "commit" }`, and
-  `{ "checkout", "act": "abort" }` answers `{ "aborted": true }`.
 - `inventory` — what a run left, read and touched not at all: `{ "repo", "under", "prefix", "base" }` answers `{ "workspaces",
   "branches" }`, each worktree git lists inside `under` with its HEAD, branch, lock, whether it is clean and what it holds uncommitted, and
   each branch under `refs/heads/<prefix>` with whether it is merged into `base`. A `repo` that is no directory answers both empty.

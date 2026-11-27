@@ -16,7 +16,7 @@ import { ranOnWords } from '@/lib/ranOn';
 import { runsNoSession, type RunDetail, type StepView } from '@/lib/runView';
 import { stepState } from '@/lib/status';
 import type { StepPartModel } from '@/lib/stepPart';
-import { Approved, endsTheRun, gateWord } from '../../gate/Gate';
+import { Approved, gateWord } from '../../gate/Gate';
 import { AsItCame, attemptsWord, CheckVerdictWords, tryLabel } from '../Closeout';
 import { DebugPanel } from '../DebugPanel';
 import { Checks, code, Facts, pathRow, readRows, specRows, spentRows, unreadRows, when } from '../Facts';
@@ -139,7 +139,7 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
         <Body size="small" colorRole="on-surface-variant" data-unfiled>
           {unfiledWords(step, run.cancelledAt === null)}
         </Body>
-        {step.gate && <Facts rows={[['gate', gateWord(step.gate, endsTheRun(step))]]} />}
+        {step.gate && <Facts rows={[['gate', gateWord(step.gate)]]} />}
       </>
     );
   const latest = step.attempts.latest;
@@ -164,7 +164,7 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
     ...spentRows(step),
     run.place === 'folder' ? ['folder', pathRow(step.workspace)] : ['branch', code(step.branch)],
     ['task', code(step.taskId)],
-    ...(step.gate ? ([['gate', gateWord(step.gate, endsTheRun(step))]] satisfies Array<[string, string]>) : []),
+    ...(step.gate ? ([['gate', gateWord(step.gate)]] satisfies Array<[string, string]>) : []),
     ...(step.denied ? ([['denied', deniedRow(step.denied.calls, cause)]] satisfies Array<[string, ReactNode]>) : []),
     ...unreadRows(step.sessionUnread),
   ];
@@ -223,7 +223,6 @@ function checkRead(run: RunDetail, step: StepView) {
 
 /** The step's detail, folded unless `open`, its folds within it too: what `PartDetail` says, of the try its part shows (`detail.shown`). */
 export function PartDetail({ run, step, detail, open = false }: { run: RunDetail; step: StepView; detail: Detail; open?: boolean }) {
-  const ends = endsTheRun(step);
   return (
     <section data-part-detail aria-label="Its detail" className="min-w-0 border-t border-outline-variant pt-2">
       <Fold name="detail" title="Detail" open={open}>
@@ -233,7 +232,7 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
         <StepFacts run={run} step={step} />
         {run.place === 'folder' && step.taskId !== null && <FolderFiles step={step} />}
         {step.check && <Checks check={step.check} checks={step.checks} read={checkRead(run, step)} />}
-        {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} ends={ends} budgets={step.gate.budgets} />}
+        {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} budgets={step.gate.budgets} />}
         <Fold name="spec" title="Its spec" open={open}>
           {detail.spec ? (
             <Facts rows={specRows(detail.spec, step.filed)} />

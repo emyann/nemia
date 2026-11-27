@@ -36,7 +36,7 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 const QUICK: Readonly<Record<string, string>> = {
   'implement.md': '---\nplace: git\nagent: implementer\ncheck: npm test\n---\n',
   'review.md': '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 3\n---\n',
-  'land.md': '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ncheck: npm test\n---\nLand the change.\n',
+  'land.md': '---\nafter: review\nplace: git\nagent: shipper\ncheck: npm test\n---\nLand the change.\n',
 };
 
 /** A copy of the tests' team with `quick/` planted beside its `dev/`, which `edit` may change: its `quick` folder. */

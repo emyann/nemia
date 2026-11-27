@@ -1,6 +1,6 @@
 /**
  * Whether a run's result branches still merge onto its base branch as the base is now, in a person's words: what a person reads before
- * approving an ending that merges, so a conflict is seen at the gate rather than as the ending's abort. The trial merges are the place's
+ * merging a result by hand, so a conflict is seen before the merge rather than in it. The trial merges are the place's
  * (`trialMerges`); this file words what they answer.
  */
 import type { TrialMerge } from '../place/place.ts';

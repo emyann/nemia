@@ -91,10 +91,6 @@ describe('choicesOf', () => {
       { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
     ]);
   });
-  test('a workflow whose step merges is offered no merge it nor drop it', () => {
-    const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as StepSpec[];
-    assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
-  });
   test('a direct run is offered to read it', () => {
     assert.deepEqual(choicesOf(STEPS, RUN, awaiting({ direct: true }), []), [
       {

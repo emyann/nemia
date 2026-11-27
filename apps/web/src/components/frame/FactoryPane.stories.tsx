@@ -7,7 +7,7 @@ import { factoryInboxQuery } from '@/lib/api/inbox';
 import { type ProposalRow, waitingProposalsQuery } from '@/lib/api/proposals';
 import { frameRunsQuery } from '../nav/nav';
 import { FactoryPane } from './FactoryPane';
-import { FACTORY, factoryView, openRuns, proposal, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
+import { FACTORY, factoryView, openRuns, proposal, seeded } from '../../../.storybook/fixtures/proposals';
 
 /** A proposal as its list's row, which the pane's read answers. */
 const rowOf = ({ metadata, spec, status }: Proposal) =>
@@ -41,7 +41,10 @@ const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0]
           { name: FACTORY, default: false },
         ],
       ],
-      [factoryInboxQuery(factory).queryKey, Array.from({ length: reads.cards }, (_, i) => unstartedCard(`card-${i + 1}`, factory))],
+      [
+        factoryInboxQuery(factory).queryKey,
+        { entries: [], counts: { notStarted: reads.cards, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 } },
+      ],
       [frameRunsQuery(path).queryKey, openRuns(reads.runs)],
       [waitingProposalsQuery(factory).queryKey, reads.waiting.map(rowOf)],
     ])}

@@ -168,7 +168,6 @@ const frozen = (name: string, agent: string, rounds: number | null = null) => ({
   model: null,
   effort: null,
   context: null,
-  workspace: null,
   place: null,
   resume: null,
   fence: null,
@@ -203,12 +202,9 @@ const GRAPH_OF = Object.fromEntries(
   (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => [workflow, chainOf(STEPS_OF[workflow])]),
 ) as Record<keyof typeof STEPS_OF, Run['status']['graph']>;
 
-/** Each workflow's gates: build's design, approved after it, and land, approved before it runs; quick's none. */
+/** Each workflow's gates: build's design, approved after it; quick's none. */
 const GATES_OF: Record<keyof typeof STEPS_OF, Run['status']['gates']> = {
-  build: [
-    { step: 'design', at: 'after' },
-    { step: 'land', at: 'before' },
-  ],
+  build: [{ step: 'design' }],
   quick: [],
 };
 
@@ -290,14 +286,19 @@ const LGLL = staged({
   status: IN_FLIGHT_STATE,
 });
 
-/** A land waiting on the checkout lgll's land holds, said and named (`baseHeldBy`). */
-const onLgll = () => ({
-  ...waitingOn('land', 'base', `waiting on the checkout (${LGLL.metadata.name}'s land has it)`),
-  baseHeldBy: { run: LGLL.metadata.name, step: 'land' },
-});
+/** A land waiting on lgll, which its run is told to wait on first. */
+const onLgll = () => waitingOn('land', 'run', `waiting on ${LGLL.metadata.name}`);
 
-/** The two runs whose land waits on the checkout, which lgll's land holds. */
-const ON_THE_CHECKOUT = [
+/** What a run that waits on lgll says of its wait. */
+const WAITS_ON_LGLL = {
+  runs: [{ run: LGLL.metadata.name, missing: false, cancelledAt: null, failed: false }],
+  word: `waiting on ${LGLL.metadata.name}`,
+  advice: '',
+  waitingOnYou: false,
+};
+
+/** The two runs whose land waits on lgll. */
+const WAITING_ON_LGLL = [
   staged({
     name: 'api-the-daemons-event-loop-answers-649a',
     brief: 'api: the daemon’s event loop answers a read within a few hundred milliseconds while its pass runs',
@@ -306,7 +307,7 @@ const ON_THE_CHECKOUT = [
     now: { land: onLgll() },
     minutes: 94,
     usd: 12.46,
-    status: IN_FLIGHT_STATE,
+    status: { ...IN_FLIGHT_STATE, waiting: WAITS_ON_LGLL },
   }),
   staged({
     name: 'board-the-parts-page-goes-5zt1',
@@ -316,7 +317,7 @@ const ON_THE_CHECKOUT = [
     now: { land: onLgll() },
     minutes: 93,
     usd: 18.51,
-    status: IN_FLIGHT_STATE,
+    status: { ...IN_FLIGHT_STATE, waiting: WAITS_ON_LGLL },
   }),
 ];
 
@@ -416,24 +417,6 @@ const OVER_ITS_CAP = staged({
   status: IN_FLIGHT_STATE,
 });
 
-/** A run whose land waits on lgll. */
-const ON_A_RUN: Run = (() => {
-  const waits = ON_THE_CHECKOUT[0];
-  return {
-    ...waits,
-    status: {
-      ...waits.status,
-      steps: waits.status.steps.map((s) => (s.name === 'land' ? waitingOn('land', 'run', `waiting on ${LGLL.metadata.name}`) : s)),
-      waiting: {
-        runs: [{ run: LGLL.metadata.name, missing: false, cancelledAt: null, failed: false }],
-        word: `waiting on ${LGLL.metadata.name}`,
-        advice: '',
-        waitingOnYou: false,
-      },
-    },
-  };
-})();
-
 /** A run whose implement waits for a run slot. */
 const FOR_A_SLOT = staged({
   name: 'factory-a-factorys-schedule-k2rq',
@@ -507,13 +490,12 @@ const FAILED_RUN = staged({
 /** The runs of the targets, each by its id's last four characters, as the api answers them: what a part's story and a page's assert on. */
 export const TARGET_RUNS = {
   lgll: LGLL,
-  '649a': ON_THE_CHECKOUT[0],
-  '5zt1': ON_THE_CHECKOUT[1],
+  '649a': WAITING_ON_LGLL[0],
+  '5zt1': WAITING_ON_LGLL[1],
   vqvd: VQVD,
   '72wy': ASKS,
   '1sw7': AT_WORK,
   wov8: OVER_ITS_CAP,
-  onLgll: ON_A_RUN,
   k2rq: FOR_A_SLOT,
   c7un: HELD,
   f41l: FAILED_RUN,
@@ -578,26 +560,26 @@ export const READS: Record<'1sw7' | '72wy' | 'vqvd', { steps: StepRead[] }> = {
 };
 
 /** The floor's runs: 1sw7 at work, a run waiting on lgll, one for a run slot, one held, and vqvd waiting on you, its land failed. */
-export const onTheFloor: RunList = listOf([VQVD, AT_WORK, ON_A_RUN, FOR_A_SLOT, HELD], { waiting: 1, inFlight: 4, finished: 0 });
+export const onTheFloor: RunList = listOf([VQVD, AT_WORK, WAITING_ON_LGLL[0], FOR_A_SLOT, HELD], { waiting: 1, inFlight: 4, finished: 0 });
 
 /** The runs in flight when nothing waits on you, as the list answers them: lgll being checked and two waiting on the checkout it holds. */
-export const inFlightList: RunList = listOf([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
+export const inFlightList: RunList = listOf([LGLL, ...WAITING_ON_LGLL], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
 
 /** The first page of the finished runs, five of 123, as the list answers it, its next page's token given. */
 export const finishedList: RunList = finishedOf({ waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
 
 /** Nothing waits on you: three runs in flight, lgll being checked and two waiting on the checkout it holds; five finished of 123. */
-export const nothingWaits = answering([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
+export const nothingWaits = answering([LGLL, ...WAITING_ON_LGLL], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
 
 /** The same, with one run waiting on you, its land failed its check. */
-export const oneWaits = answering([VQVD, LGLL, ...ON_THE_CHECKOUT], { waiting: 1, inFlight: 3, finished: FINISHED_COUNT });
+export const oneWaits = answering([VQVD, LGLL, ...WAITING_ON_LGLL], { waiting: 1, inFlight: 3, finished: FINISHED_COUNT });
 
 /**
  * A row in each state in flight, one waiting on lgll and one on the checkout lgll holds among them, and a card of each kind of wait on
  * you: one that asks questions, one whose check failed.
  */
 export const everyState = answering(
-  [ASKS, VQVD, AT_WORK, OVER_ITS_CAP, LGLL, ON_A_RUN, ON_THE_CHECKOUT[1], FOR_A_SLOT, HELD],
+  [ASKS, VQVD, AT_WORK, OVER_ITS_CAP, LGLL, WAITING_ON_LGLL[0], WAITING_ON_LGLL[1], FOR_A_SLOT, HELD],
   { waiting: 2, inFlight: 7, finished: FINISHED_COUNT },
 );
 

@@ -122,3 +122,16 @@ export const Lined: StoryObj = {
     </div>
   ),
 };
+
+/** A card's name, copied the same way: the control says it copies a card name, never a run id. */
+export const OfACard: StoryObj<typeof CopyId> = {
+  args: { id: 'decode-the-reads', of: 'card' },
+  render: (args) => (
+    <div style={ON_CARD}>
+      <CopyId {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('button')).toHaveAccessibleName('Copy the card name decode-the-reads');
+  },
+};

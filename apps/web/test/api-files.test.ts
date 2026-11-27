@@ -203,7 +203,7 @@ export function clientBreaks(texts: ReadonlyMap<string, string>, shapes: Readonl
 
 test("the board's source calls fetch in the objects' client alone, and spells no struct objects answers", () => {
   const shapes = objectsShapes();
-  assert.ok(shapes.size > 100 && shapes.has(shapeOf(['pause', 'finishing', 'parked', 'staged', 'held'])), `${shapes.size} shapes`);
+  assert.ok(shapes.size > 100 && shapes.has(shapeOf(['pause', 'finishing', 'parked', 'held'])), `${shapes.size} shapes`);
   const texts = sourceTexts();
   assert.ok(texts.has(CLIENT) && texts.has('src/routes/__root.tsx'), [...texts.keys()].slice(0, 5).join(', '));
   assert.deepEqual(clientBreaks(texts, shapes), []);
@@ -218,7 +218,7 @@ test('REFUSED: a fetch outside the client, bare or off an object, and a struct o
       'src/lib/api/quota.ts',
       'const Held = Schema.Struct({ run: Schema.String, inFlight: Schema.Number, cap: Schema.Number, word: Schema.String });',
     ],
-    ['src/lib/y.ts', "const Mine = Schema.Struct({ held: S, staged: S, parked: S, finishing: S, 'pause': S });"],
+    ['src/lib/y.ts', "const Mine = Schema.Struct({ held: S, parked: S, finishing: S, 'pause': S });"],
   ]);
   assert.deepEqual(
     clientBreaks(planted, shapes).map((f) => f.split(' ').slice(0, 2).join(' ')),

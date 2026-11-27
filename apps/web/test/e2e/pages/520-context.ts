@@ -192,23 +192,29 @@ async function onTheStartForm(page: Page, what: string) {
   await shoot(page, form, `picker-${what}`);
 }
 
-/** The inbox's bare card: no run read, then `landed` picked through Change and written, photographed as `what`, and taken back off. */
+/**
+ * The inbox's bare card: no run read, then `landed` picked through its menu's Runs it reads and written, photographed as `what`, and
+ * taken back off.
+ */
 async function onTheCard(page: Page, what: string) {
   const name = CARDS.bare.name;
-  const item = page.locator(`li[data-card="${name}"]`);
-  const from = item.locator('[data-card-from]');
-  await expectVisible(from.getByText('reads no run as context'), 'the card reads no run');
-  await from.getByRole('button', { name: 'Change' }).click();
-  const row = from.locator(`li[data-run="${DIAMOND.landed.id}"] label`);
+  const item = page.locator(`[data-card="${name}"]`);
+  await expectCount(item.locator('[data-card-reads]'), 0, 'the card reads no run');
   const pathname = `/api/namespaces/default/cards/${name}`;
+  await item.getByRole('button', { name: `More actions on ${name}` }).click();
+  await page.getByRole('menuitem', { name: 'Runs it reads…' }).click();
+  const sheet = page.getByRole('dialog');
+  const row = sheet.locator(`li[data-run="${DIAMOND.landed.id}"] label`);
   await Promise.all([answered(page, 'PUT', pathname), row.click()]);
-  await expectVisible(from.locator(`[data-from="${DIAMOND.landed.id}"]`), `the card reads ${DIAMOND.landed.id}, as its file says`);
-  await expectVisible(from.locator(`section[data-concluded="${DIAMOND.landed.id}"] [data-markdown]`), 'and what it would hand');
-  await from.scrollIntoViewIfNeeded();
-  await shoot(page, item, `card-${what}`);
+  await expectVisible(
+    sheet.locator(`section[data-concluded="${DIAMOND.landed.id}"] [data-markdown]`),
+    'the card reads landed, and what it would hand',
+  );
+  await shoot(page, sheet, `card-${what}`);
   await Promise.all([answered(page, 'PUT', pathname), row.click()]);
-  await expectVisible(from.getByText('reads no run as context'), 'taken back off, the card reads no run again');
-  await from.getByRole('button', { name: 'Done' }).click();
+  await expectCount(sheet.locator('section[data-concluded]'), 0, 'taken back off, the card reads no run again');
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expectCount(page.getByRole('dialog'), 0, 'its Close button closes the sheet, and no overlay is left over the page');
 }
 
 /**

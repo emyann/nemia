@@ -52,8 +52,7 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
 };
 
 /** A step of a row as the words read it: its name, its codes, and its check's verdict. */
-type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'> &
-  Partial<Pick<RunView['steps'][number], 'baseHeldBy'>>;
+type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
 type WaitingRow = Pick<RunView, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
@@ -179,14 +178,10 @@ type NowRow = Omit<WaitingRow, 'steps'> & {
 };
 
 /**
- * The words of a step that waits on a run or on the checkout: the run whose ending has the checkout (`baseHeldBy`), else the checkout
- * alone; the run it waits on, the first the store has, else a run that will not finish without a person.
+ * The words of a step that waits on a run: the run it waits on, the first the store has, else a run that will not finish without a
+ * person.
  */
-function runWaitWords(row: NowRow, on: WaitOn | null, step: CodedStep) {
-  if (on === 'base') {
-    const holder = step.baseHeldBy?.run;
-    return holder ? [NOW_WORDS.waitsOn, { run: holder }, NOW_WORDS.theCheckout] : [NOW_WORDS.checkout];
-  }
+function runWaitWords(row: NowRow) {
   const run = row.waiting?.runs.find((waited) => !waited.missing)?.run;
   return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
 }
@@ -216,14 +211,14 @@ function heldWords(holding: RunView['holding']) {
 }
 
 /**
- * The words of a step that waits on no person, by where it stands: being checked, a run or the checkout (`runWaitWords`), a run slot, a
+ * The words of a step that waits on no person, by where it stands: being checked, a run (`runWaitWords`), a run slot, a
  * hold and the run it waits until (the first not released), a failure's or a rest's rail word, and none at work or still to come.
  */
-function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null, step: CodedStep) {
+function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null) {
   const held = row.holding != null;
   if (stands === 'atWork') return state === 'checking' ? [PERSON.checking.rail] : [];
   if (stands === 'held') return heldWords(row.holding);
-  if (stands === 'waitsOnARun') return runWaitWords(row, on, step);
+  if (stands === 'waitsOnARun') return runWaitWords(row);
   if (stands === 'waitsForASlot') return [NOW_WORDS.slot];
   if (stands === 'failed' || stands === 'atRest') return [stateWordsOf(state, on, held).rail];
   return [];
@@ -289,7 +284,7 @@ export function nowOf(row: NowRow) {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words: asked ? askedWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on, step),
+    words: asked ? askedWords(row, wait, drawn) : waitWords(row, stands, drawn.state, drawn.on),
   };
 }
 

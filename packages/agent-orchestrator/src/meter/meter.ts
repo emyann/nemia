@@ -14,7 +14,7 @@ import type { DiskReading } from '../disk/disk.ts';
  * numbered in — one read of each folder a pass, shared by every run on it (`passRevisions`).
  * `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time.
  * `runtime`: the runtime's own pass, less its observe. `place`: every question asked of the place, a call each, the processes the place
- * starts to answer it and its time, whether it judged (where a branch stands) or acted (a worktree, a hand-off, a landing). `assess`: the
+ * starts to answer it and its time, whether it judged (where a branch stands) or acted (a worktree, a hand-off). `assess`: the
  * judgement, and any time not counted as another phase. `act`: filing, admitting, stopping, collecting a step's artifacts, and writing the
  * run's record, the feed and the ceilings.
  */

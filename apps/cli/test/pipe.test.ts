@@ -12,7 +12,10 @@ import { servedStore, write, type Said } from './served.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin');
 const CARDS = 1500;
-const LONG = 'x'.repeat(80);
+const LONG = 'x'.repeat(120);
+
+/** The page the reads ask: the most cards one page holds, since `nemia inbox` prints one page and names the next. */
+const PAGE = ['inbox', '--all', '--limit', '500'];
 const name = (i: number) => `card-${String(i).padStart(4, '0')}-${LONG}`;
 
 const store = await servedStore('nemia-cli-pipe-', (root) => {
@@ -42,16 +45,16 @@ const slowlyRead = (argv: readonly string[], bin = 'nemia', holdMs = 1000) =>
     run.on('close', (code) => resolve({ code, out, err }));
   }) satisfies Promise<Said>;
 
-test('`nemia inbox --all` and `wf inbox --all`, longer than a pipe holds, reach a slow reader whole, with exit 0', async () => {
-  const eager = await store.nemia(['inbox', '--all']);
+test('a page of `nemia inbox --all` and `wf inbox --all`, longer than a pipe holds, reach a slow reader whole, with exit 0', async () => {
+  const eager = await store.nemia(PAGE);
   assert.equal(eager.code, 0, eager.err);
   assert.ok(Buffer.byteLength(eager.out) > 2 * 64 * 1024, `the output outgrows a pipe: ${Buffer.byteLength(eager.out)} bytes`);
   for (const bin of ['nemia', 'wf']) {
-    const slow = await slowlyRead(['inbox', '--all'], bin);
+    const slow = await slowlyRead(PAGE, bin);
     assert.equal(slow.code, 0, slow.err);
     assert.deepEqual(firstWords(slow.out), firstWords(eager.out), `every line reached ${bin}'s slow reader`);
     assert.equal(slow.out.trimEnd().split('\n').at(-1), eager.out.trimEnd().split('\n').at(-1), 'down to the last line');
-    assert.match(slow.out, new RegExp(`^${name(CARDS - 1)} `, 'm'), 'the last card is there');
+    assert.match(slow.out, /more: nemia inbox --all --limit 500 --continue \S+/, 'and the line that names the next page');
   }
 });
 

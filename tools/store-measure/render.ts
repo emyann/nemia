@@ -25,6 +25,8 @@ export const MEASURES = [
   'openRunAfterPass',
   'inbox',
   'inboxAfterPass',
+  'cardPage',
+  'cardCounts',
   'chatHistory',
   'chatBeatBefore',
   'chatFoldStep',

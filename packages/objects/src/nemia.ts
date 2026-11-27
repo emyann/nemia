@@ -250,7 +250,6 @@ export const PolicyReachQuery = {
 const gateSiteFields = {
   workflow: Schema.String.annotate({ description: 'The workflow the step is in.' }),
   step: Schema.String.annotate({ description: "The step's name." }),
-  approvedFirst: Schema.Boolean.annotate({ description: 'Whether the step is approved before it runs.' }),
   hasCheck: Schema.Boolean.annotate({ description: 'Whether the step has a check.' }),
 };
 

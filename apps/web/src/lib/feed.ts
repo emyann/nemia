@@ -106,7 +106,7 @@ const OPEN = 'runs-open';
 const FINISHED = 'runs-finished';
 
 /**
- * The first word of every read of the inbox (`factoryInboxQuery`, `inboxAllQuery`, a selector's, a card's page): it stands for each of
+ * The first word of every read of the inbox (`factoryInboxQuery`, `inboxPageQuery`, `chainsQuery`, a card's page): it stands for each of
  * them.
  */
 const INBOX = 'inbox';

@@ -38,7 +38,8 @@ import { wire } from '../factory/wiring/wire.verb.ts';
 import { withoutEntry } from '../factory/wiring/index.ts';
 import { contentNow, treeDir, type ProposalPlace } from '../propose/current.verb.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
-import type { Entry } from '../factory/applied/applied.store.ts';
+import { treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';
+import { fillsOf } from '../factory/factory.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 
 /** An Agent's spec as the Agent door's draft. */
@@ -122,14 +123,20 @@ const agentsFoundIn = <A, E, R>(against: readonly Entry[] | undefined, program: 
  * `readme` as given where it opens with a frontmatter of its own, so a Workflow read as served and proposed back writes it byte for byte,
  * its instruction under the folder's frontmatter where it does not. A spec that gives `files` gives the whole set of the folder's other
  * text files, so one it leaves out is removed (`whole`); one that gives none leaves them as they are. Its steps are judged against the
- * agents of `against` where it is given (`agentsFoundIn`), the tree an upgrade composes, else against the factory's tree.
+ * agents and the hires of `against` where it is given (`agentsFoundIn`, the wiring its `factory.json` holds), the tree an
+ * upgrade composes, else
+ * against the factory's tree and its hires.
  */
 const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject, against?: readonly Entry[]) =>
   Effect.gen(function* () {
     const name = object.metadata.name;
     const holder = yield* treeDir(place.home, factory, 'workflows');
     const dir = yield* tried(() => workflowDirAt(path.join(holder, name)));
-    const { places, fills } = yield* factoryWriteOf(place.home, factory, name);
+    const written = yield* factoryWriteOf(place.home, factory, name);
+    const { places } = written;
+    const composed = against === undefined ? undefined : treeWiringOf(against);
+    const fills =
+      composed !== undefined && 'wiring' in composed ? { ...written.fills, agents: fillsOf(composed.wiring.hires, name) } : written.fills;
     const door = (yield* WorkflowDoor).workflows;
     if (verbOf(object) === 'delete') {
       yield* door.remove(dir, yield* digestNow(place, factory, object), [], places);

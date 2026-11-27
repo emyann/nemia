@@ -346,7 +346,6 @@ const sessionArgv = async (t: Parameters<typeof until>[0], agent: string, own = 
       runArtifacts: scratch('wf-mcp-artifacts-'),
       inbox: scratch('wf-mcp-inbox-'),
       own: {},
-      landingDenied: () => [],
     },
   );
   return withFakeClaude(async (args, claude) => {

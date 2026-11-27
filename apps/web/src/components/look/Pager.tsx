@@ -43,11 +43,25 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
 }
 
 /**
- * The pager of the finished runs: the rows this page shows, then Newer, where it stands, and Older. Newer and Older keep the address
+ * The pager of the finished runs or of the cards: the rows this page shows, then Newer, where it stands, and Older (or the ends the sort
+ * names). Newer and Older keep the address
  * and change its trail alone (`trailSearch`): Older puts the page's `continue` on it, Newer takes its last token off; each is disabled
  * where it leads nowhere, and from a page past the last, Newer leads back.
  */
-export function Pager({ trail, next, count, total, size }: PageAt) {
+export function Pager({
+  trail,
+  next,
+  count,
+  total,
+  size,
+  noun = 'Runs',
+  ends = ['Newer', 'Older'],
+}: PageAt & {
+  /** What the pager pages, in the plural and a capital: `Runs` or `Cards`. */
+  noun?: 'Runs' | 'Cards';
+  /** What the ends are called, back and forward, to follow the sort: Newer and Older, Older and Newer, or Previous and Next. */
+  ends?: readonly [string, string];
+}) {
   const at = { trail, next, count, total, size };
   return (
     <Body
@@ -57,16 +71,16 @@ export function Pager({ trail, next, count, total, size }: PageAt) {
       data-pager
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono"
     >
-      <span data-pager-rows>{rowsSaid(at)}</span>
-      <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
+      <span data-pager-rows>{rowsSaid(at, noun)}</span>
+      <div role="group" aria-label={noun === 'Runs' ? 'Pages of finished runs' : 'Pages of cards'} className="flex items-center gap-3">
         <PageButton trail={newerOf(at)} which="newer">
-          Newer
+          {ends[0]}
         </PageButton>
         <span data-pager-at className="uppercase">
           {pageSaid(at)}
         </span>
         <PageButton trail={olderTrailOf(at)} which="older">
-          Older
+          {ends[1]}
         </PageButton>
       </div>
     </Body>

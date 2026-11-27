@@ -22,7 +22,7 @@ import {
   type Factory,
 } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
-import { choicesApply, ownerKey, ownerOfKey, type MergeAt } from '../upgrade/index.ts';
+import { choicesApply, ownerKey, ownerOfKey, type Conflict, type MergeAt } from '../upgrade/index.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
@@ -197,6 +197,7 @@ const UpgradeSchema = Schema.Struct({
       base: SideSchema,
       ours: SideSchema,
       theirs: SideSchema,
+      message: Schema.optionalKey(Schema.String),
       proposal: Schema.optionalKey(ConflictProposalSchema),
     }),
   ),
@@ -384,6 +385,7 @@ const ResolutionsSchema = Schema.StructWithRest(
     base: Schema.optionalKey(Schema.String),
     choices: Schema.Record(Schema.String, Schema.Union([Schema.Literals(['ours', 'theirs']), Schema.Struct({ text: Schema.String })])),
     proposals: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    seen: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -421,6 +423,34 @@ export function readResolutions(home: string, name: string) {
  */
 export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt) =>
   (resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {}) satisfies Resolutions['choices'];
+
+/**
+ * The digest of a conflict's three sides: what a choice was made against, so that it holds only while the conflict reads the same.
+ * @param conflict The conflict: its address and its three sides, whole.
+ */
+export const conflictDigest = (conflict: Conflict) =>
+  createHash('sha256')
+    .update(JSON.stringify([conflict.at, conflict.base, conflict.ours, conflict.theirs]))
+    .digest('hex');
+
+/**
+ * The choices that still hold: those whose conflict is one of `conflicts` and whose side texts read now as they did when the choice was
+ * made (`seen`, the digest recorded for each). A choice with no digest recorded does not hold, and is asked again.
+ * @param choices The person's choices that apply to the merge, by a conflict's address.
+ * @param seen The digest of each conflict's sides when its choice was made (`conflictDigest`), by its address.
+ * @param conflicts The conflicts of the merge now.
+ */
+export const choicesHeld = (
+  choices: Resolutions['choices'],
+  seen: Readonly<Record<string, string>> | undefined,
+  conflicts: readonly Conflict[],
+) =>
+  Object.fromEntries(
+    Object.entries(choices).filter(([at]) => {
+      const conflict = conflicts.find((c) => c.at === at);
+      return conflict !== undefined && seen?.[at] === conflictDigest(conflict);
+    }),
+  ) satisfies Resolutions['choices'];
 
 /**
  * The proposals of `resolutions`, by the key of the owner each resolves (`ownerKey`), that resolve the merge `merge`: those recorded

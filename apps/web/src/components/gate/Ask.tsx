@@ -2,11 +2,18 @@
  * A person's ask of a step's next try, as the board's rows make it: the CLI `retry`'s ways, the button and box every ask is made with, the
  * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the ask of a loop's round (`useRound`).
  */
+import { createContext, useContext } from 'react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
 import { Body } from '@/components/ui/ds';
+
+/**
+ * What a surface that holds a step's gate or answer in a view of its own (the waiting card's modal) gives it to call once the api has taken
+ * a person's answer — an approval, a send-back, an ask of a try — so that the view closes on it; none where they stand on a page.
+ */
+export const Answered = createContext<(() => void) | null>(null);
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
@@ -21,9 +28,9 @@ export const MODES: Record<RetryMode, string> = {
  * would fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads,
  * which answers a gate from the board.
  *
- * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
- * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it. Its `answers` are a person's to the
- * questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
+ * The request the api takes names the step at the gate, which a send-back asks again (`sendBackTo` in
+ * agent-orchestrator). Its `answers` are a person's to the questions the step's closeout asks, which the api checks and writes as
+ * the try's message, the `message` beside them their note.
  *
  * Sent in the run's namespace: `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
  *
@@ -35,6 +42,7 @@ export const MODES: Record<RetryMode, string> = {
 export function useAsk(runId: string, step: string, onAsked: () => void, namespace?: string) {
   const queryClient = useQueryClient();
   const namespaceNow = useRunNamespace(runId, namespace);
+  const answered = useContext(Answered);
   return useMutation({
     mutationFn: ({
       step: to,
@@ -48,6 +56,7 @@ export function useAsk(runId: string, step: string, onAsked: () => void, namespa
     }) => namespaceNow().then((ns) => askTry(ns, runId, to ?? step, how)),
     onSuccess: () => {
       onAsked();
+      answered?.();
       void runsMoved(queryClient, runId);
     },
   });

@@ -3,20 +3,9 @@
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
 import type { StepSpec } from '../step/step.ts';
-import { andList, tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
+import { tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
-import {
-  approvalOf,
-  approvedFirst,
-  takeBackOf,
-  branchWord,
-  gatesOf,
-  hasGate,
-  notHandedOn,
-  resultOnBase,
-  standing,
-  sendBackTo,
-} from '../status/status.ts';
+import { approvalOf, gatesOf, hasGate, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -36,15 +25,13 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
     : null;
 
 /**
- * A second approval of the try a step is on: while it may still be sent back, the send-back (`sendsBack`, or `unfiledRefusal` for an
- * ending approved and not filed); else that it has handed on.
+ * A second approval of the try a step is on: while it may still be sent back, the send-back (`sendsBack`); else that it has handed on.
  */
 function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, given: Approval, sendsBack: true | undefined) {
   const { name } = step;
   const approved = `try ${tryOf(run, name)} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
   if (sendsBack)
     return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
-  if (approvedFirst(step, run) && !run.steps[name]?.taskId) return unfiledRefusal(step, run, approved, given);
   return handedOnWords(steps, name, run, approved, 'so there is nothing to approve, nor to send back');
 }
 
@@ -55,23 +42,6 @@ function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, g
 function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, approved: string, so: string) {
   const after = steps.some((s) => s.after.includes(name));
   return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, ${so}. See where the run stands: nemia ls ${run.id}.`;
-}
-
-/**
- * A second approval of an ending approved and not filed: it waits for the checkout, or the pass that files it, and its work may still
- * be sent back, which spends the approval (`approvedUnfiled`) — the run is neither held nor pruned here, which `approvalRefusal` refused
- * first. An approval an older nemia wrote names no work, and no send-back spends it: taken back first (`takeBackOf`), the work may be
- * sent back.
- */
-function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Approval) {
-  const back = sendBackTo(step, run).map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`);
-  const after =
-    given.work === undefined
-      ? ` ${takeBackOf(step, run, given)}`
-      : back.length
-        ? ` To send the work back instead, before it is filed: ${back.join(' or ')}.`
-        : '';
-  return `${approved}, and nothing of it has run: the run files it once it may — nemia ls ${run.id} says what it waits for.${after}`;
 }
 
 /**
@@ -89,11 +59,6 @@ function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Appro
  * with no words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why
  * and what to do instead.
  *
- * An ending approved before it is filed (`approvedFirst`) is judged on the work it would act on, not on its own closeout: refused while a
- * send-back of that work is asked for, which would change what is approved; while a step its gate waits on has not handed on
- * (`notHandedOn`, so the refusal and the gate agree, a looping step that asked for another round among them); and at its gate with its
- * result already on the base branch (`resultOnBase`), where nothing is left to merge.
- *
  * @param steps The workflow's steps.
  * @param run The run the step is of.
  * @param name The step to approve.
@@ -104,8 +69,6 @@ function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Appro
  * @param verdictOf A step's check verdict, by its name, or undefined where it has none; none for any step when not given.
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: a send-back already asked for.
  * @param spendOf What a try of a step has cost, by its task's id; nothing known when not given.
- * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
- *   not asked, and the gate alone speaks.
  */
 export const approvalRefusal: ApprovalRefusal = (
   steps,
@@ -118,7 +81,6 @@ export const approvalRefusal: ApprovalRefusal = (
   verdictOf = () => undefined,
   asks = [],
   spendOf = () => undefined,
-  standings = [],
 ) => {
   const command = `nemia approve ${run.id} ${name}`;
   const words = approvalWordsRefusal(message, command);
@@ -156,28 +118,6 @@ export const approvalRefusal: ApprovalRefusal = (
     runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf).get(name),
     () => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status,
   );
-  if (approvedFirst(step, run) && !run.steps[name].taskId) {
-    const back = asks.find((a) => step.after.includes(a.step));
-    if (back) {
-      return (
-        `try ${back.try} of ${back.step} is asked for (${modeWord(back)}, at ${back.at}), and ${name} acts on what it changes: approving now would take the result that ask objects to. ` +
-        `Approve ${name} once ${back.step} has signed off again — or, to take the result as it stands, take that ask back first: nemia retry ${run.id} ${back.step} --off.`
-      );
-    }
-    if (status !== 'awaiting approval') {
-      const unfinished = notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
-      return (
-        `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} handed on — ` +
-        `your approval is then what files it, and nothing of it runs before that. See where the run stands: nemia ls ${run.id}.`
-      );
-    }
-    if (resultOnBase(standings)) {
-      return (
-        `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. ` +
-        `Every branch of the run is merged — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
-      );
-    }
-  }
   if (status === 'awaiting approval') return null;
   return notAtItsGate(step, run, filed, status);
 };
@@ -261,8 +201,8 @@ type TakenBack = { approval: Approval } | { refused: string };
 
 /**
  * Whether `nemia approve <run> <name> --off` may take back the approval of step `name`: the approval it takes back, where the step stands
- * approved (`approvalOf`) — whether the approval names the work it approved or an older nemia wrote it with none — and nothing of it has
- * been filed, neither its session nor its check (an ending waiting on the checkout, held, or not yet ticked); else why not, in words that
+ * approved (`approvalOf`) and nothing of it has
+ * been filed, neither its session nor its check (held, or not yet ticked); else why not, in words that
  * name the fix (`refused`). The stop is `takeBackStop`'s; the words of a step that has handed on are a second approval's
  * (`handedOnWords`). Pure.
  * @param steps The workflow's steps.

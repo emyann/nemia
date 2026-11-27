@@ -23,7 +23,7 @@ import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { RunRead } from '../tick/told.verb.ts';
 import type { Decision, Merged } from '../decide/decide.ts';
-import { inFlight, type CheckoutHold } from '../cap/cap.ts';
+import { inFlight } from '../cap/cap.ts';
 import { type Assignee, isRepositoryRun, type Run } from '../record/record.ts';
 import { assigneeStanding, assigneeWord, type AssigneeStanding } from '../assignee/assignee.ts';
 import { asksOfAPerson, RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
@@ -62,7 +62,7 @@ export type RunStatus = Assessment['status'];
  * <step>`, or `nemia decide <run>` for the branches, which the board runs no more than `nemia ls` does.
  *
  * An approval carries what the Factory's card answers it with, off the record alone: `back`, the steps a send-back goes to (`sendBackTo`) —
- * the step itself once it has a task, and at an ending's gate, held before it is filed, the work it waits on — and `onto`, the base branch
+ * the step itself — and `onto`, the base branch
  * the run's result is on its way to. Neither asks git anything, so the list the Factory polls can carry them.
  */
 export type RunToDecide = (
@@ -403,9 +403,9 @@ type Judged = {
   roundDue: ReadonlySet<string>;
   /**
    * What the reading says beside each step's word: what its harness waits for (`waits`), what its try was denied (`denied`), and how many
-   * questions its closeout asks of a person it waits on (`asks`), and the run whose ending holds the checkout it waits on (`baseHeldBy`).
+   * questions its closeout asks of a person it waits on (`asks`).
    */
-  beside: ReadonlyMap<string, { waits?: string; denied?: string; asks?: number; baseHeldBy?: CheckoutHold }>;
+  beside: ReadonlyMap<string, { waits?: string; denied?: string; asks?: number }>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `nemia ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   waitingOnYouWords: string[];
@@ -493,7 +493,7 @@ const workFiled = (run: Run, steps: readonly StepSpec[]) =>
 
 /**
  * Where each of a run's result branches stands against the base branch, as `git` read it (`branchStandings`): what says a finished run
- * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
+ * with a branch ahead of the base is one nobody has decided (`toDecide`'s git kind).
  *
  * Asked of the branches `branchesAsked` names and of no other: those the tick's pass reads, of a run no longer running, nobody called off,
  * that cut worktrees of its own. Level-triggered, as the package is: read on the request that asks, off the tick's last reading, stored
@@ -636,7 +636,7 @@ export const judge = Effect.fn('judge')(function* (
     codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
-    beside: new Map(read.steps.map(({ name, waits, denied, asks, baseHeldBy }) => [name, { waits, denied, asks, baseHeldBy }])),
+    beside: new Map(read.steps.map(({ name, waits, denied, asks }) => [name, { waits, denied, asks }])),
     waitingOnYou,
     waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),

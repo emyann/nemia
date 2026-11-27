@@ -34,7 +34,6 @@ const filed = (step: StepSpec, t: { start?: StartFound; workspace?: string; run?
       runArtifacts: '/runs/r/artifacts',
       inbox: '/inbox',
       own: t.own ?? {},
-      landingDenied: () => [],
       ...(t.workspace === undefined ? {} : { workspace: t.workspace }),
       ...(t.start === undefined ? {} : { start: t.start }),
     },

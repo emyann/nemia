@@ -30,7 +30,7 @@
  * which finished steps hand their work off on a pass (`handOffDue`).
  */
 import path from 'node:path';
-import { endsOnBase, type StepSpec } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 import type { CheckoutInstallOf } from '../../contracts/checkout-install.contract.ts';
 import type { WorktreeDepsOf } from '../../contracts/worktree-deps.contract.ts';
@@ -320,8 +320,6 @@ export function depsLines(deps: Provisioned | undefined) {
  * and later its own check's litter, are in it. Handing the step off before its follower is filed is
  * enough, and `advance` does that in the same pass that files the follower.
  *
- * Never a step that works in the repository's own checkout (`workspace: base`): what lies in a person's
- * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
  * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
  * the next step's, and not this step's to sign.
  * @param steps The run's workflow.
@@ -331,7 +329,6 @@ export function depsLines(deps: Provisioned | undefined) {
 export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase) {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
-    .filter(([name]) => !endsOnBase(steps.find((s) => s.name === name) ?? {}))
     .filter(
       ([name, s]) =>
         s.taskId &&
@@ -377,19 +374,14 @@ export function downstreamOf(steps: readonly StepSpec[], name: string) {
  *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
  *     of their work combined. `after: a, b` means "wait for both" and "give me both". Nobody has
  *     to learn a new key for the thing they already asked for.
- *   - **main** — the one a step says rather than the shape: `workspace: base`, the repository's own
- *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
- *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
- *     theirs, and the step commits its own work as they would.
- *
+
  * Conflicts are not an error here. A merge that conflicts leaves the markers in place and the
  * step is told about it, because resolving them is exactly the work a fan-in step exists to do.
  */
 export type WorkspacePlan =
   | { kind: 'inherit'; from: string }
   | { kind: 'fork'; from: string | null }
-  | { kind: 'merge'; from: string; also: string[] }
-  | { kind: 'base' };
+  | { kind: 'merge'; from: string; also: string[] };
 
 /**
  * The directory inside a step's workspace that holds what the run copied in for it: `given/inputs` in a folder step's folder and in a
@@ -400,14 +392,12 @@ export const GIVEN = 'given';
 /**
  * Where a step finds the run's inputs copied into its own workspace, by the path from it, or null where none is copied: `given/inputs`
  * for a step of a folder run, and for one of a repository run that cuts worktrees, when the run was handed files or cards and the step
- * is not on the base. Never in a checkout a person works in: a step on the base, and every step of a repository run without isolation.
+ * Never in a checkout a person works in: every step of a repository run without isolation.
  * Read by the cut, which asks the copy (`folderPlace.make`, the place's `make` with `given`), and by the brief, which names it, so the
  * brief never names a copy nobody made. Proved by `contracts/inputs-given.contract.ts`.
  * @param run The run: its place, whether it cuts worktrees, and the files and cards it was handed.
- * @param plan How the step's workspace comes to be (`workspacePlan`): only whether it is the base is read.
  */
-export const inputsGiven: InputsGiven = (run, plan) => {
-  if (plan.kind === 'base') return null;
+export const inputsGiven: InputsGiven = (run) => {
   if (!run.inputs?.length && !run.cards?.length) return null;
   if (run.place?.kind !== 'folder' && run.isolate !== true) return null;
   return 'given/inputs';
@@ -440,8 +430,8 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * @param plan The step's workspace plan (`workspacePlan`).
  */
 export function givenPlan(run: Pick<Run, 'place' | 'isolate' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan) {
-  if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
-  const inputs = inputsGiven(run, plan);
+  if (placeOf(run) !== 'folder') return { inputs: null, from: [] };
+  const inputs = inputsGiven(run);
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
   return {
@@ -454,13 +444,12 @@ export function givenPlan(run: Pick<Run, 'place' | 'isolate' | 'inputs' | 'cards
 }
 
 /**
- * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: base`), never read off the shape; a fan-in
+ * Which workspace a step needs (`WorkspacePlan`). Pure. A fan-in
  * merges onto the first of its parents by name.
  * @param steps The workflow's steps.
  * @param step The step asked about.
  */
 export function workspacePlan(steps: readonly StepSpec[], step: StepSpec) {
-  if (endsOnBase(step)) return { kind: 'base' } satisfies WorkspacePlan;
   const [first, ...also] = [...step.after].sort();
   if (first === undefined) return { kind: 'fork', from: null } satisfies WorkspacePlan;
   if (also.length) return { kind: 'merge', from: first, also } satisfies WorkspacePlan;

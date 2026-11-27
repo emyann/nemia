@@ -20,6 +20,8 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
+import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { tryMemoryOf } from '../out-of-memory/index.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
@@ -56,13 +58,28 @@ const frozenRun = (home: string, run: Run, steps: readonly StepSpec[]) =>
   ) satisfies RunFrozen;
 
 /**
+ * Whether every result branch of a run is on its base, as the tick's last reading of where the branches stand says (`standing.json`):
+ * null for a run with no result branch, a folder run's among them, and where any of its branches was not read.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param git What reads the branches off the tick's last reading.
+ */
+export const mergedRun = (run: Run, steps: readonly StepSpec[], git: BranchReader) => {
+  const standings = standingsOf(run, steps, git);
+  if (!standings.length || standings.some((s) => s.where === 'unread')) return null;
+  return standings.every((s) => s.where === 'on');
+};
+
+/**
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
- * tasks had settled. Rejects with what a view rejected with, a journal that does not read among it.
+ * tasks had settled, and its branches are not waiting on a merge: a person's merge writes no record, so what reads `merged: false`
+ * is read again each call, and kept only once it is final. Rejects with what a view rejected with, a journal that does not read among it.
  */
 const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSpec[]) {
   const home = yield* StoreRoot;
   const { views } = yield* taskPhasesRead(run).pipe(over(e));
   const everyTry = yield* everyTryOf(e, run, views);
+  const merged = mergedRun(run, steps, standingReader(yield* standingSnapshot()));
   const settled = [...everyTry.values()].every((v) => Boolean(v.state.settled));
   const of = factsOf({
     run,
@@ -77,10 +94,10 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSp
     rulesOf: (step) => renderedSkillRules(home, run, step),
     appliesOf: (step) => renderedSkillApplies(home, run, step),
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
-    deadlineOf: (taskId) => everyTry.get(taskId)?.state.deadlineSeconds ?? null,
+    merged,
     memoryOf: (taskId) => tryMemoryOf(everyTry.get(taskId)?.state.attempts ?? []),
   });
-  return { ...of, settled };
+  return { ...of, settled: settled && merged !== false };
 });
 
 /** One run's facts, as `statsOf` takes them: what it froze, and its tries and its run, none where a journal of it does not read. */

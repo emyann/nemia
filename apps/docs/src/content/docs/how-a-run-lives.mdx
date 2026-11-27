@@ -1,6 +1,6 @@
 ---
 title: How a run lives
-description: From a card to a landing. On every pass, the orchestrator's tick and the runtime's engine each compare what was asked for with what is actually happening.
+description: From a card to a branch. On every pass, the orchestrator's tick and the runtime's engine each compare what was asked for with what is actually happening.
 ---
 
 A run is one execution of a workflow for a card. This page follows a run from the moment it starts to the moment its work is merged,
@@ -10,7 +10,7 @@ and shows what moves it forward at each point. Two loops do this work, one in ea
 
 - **The tick** is the orchestrator's loop. On each pass, it reads every run's record and what the runtime reports about each task.
   It asks one pure function what should happen to the run now (`assess`, in `packages/agent-orchestrator/src/tick/assess.ts`), and
-  does it: start a step, start a check, or commit a landing. Its pass is `tickRun` (`packages/agent-orchestrator/src/tick/tick.verb.ts`).
+  does it: start a step, start a check, or end a run. Its pass is `tickRun` (`packages/agent-orchestrator/src/tick/tick.verb.ts`).
 - **The engine** is the runtime's loop. On each pass, it reads each task's journal and what the harness reports about its session. It
   asks `decide` (`packages/agent-runtime/src/core/domain.ts`) for the one thing to do, and does it: admit, spawn, stop, or record an
   end.
@@ -24,7 +24,7 @@ orchestrator's, which judges every run on what the runtime just reported. There 
 mid-run and start it an hour later, it picks up exactly where things stand. A session that kept running while no daemon was ticking
 is found and judged.
 
-## From a card to a landing
+## From a card to a branch
 
 ```mermaid
 sequenceDiagram
@@ -48,8 +48,8 @@ sequenceDiagram
 ```
 
 1. **A card.** A short Markdown brief. It can wait in the inbox (`~/.agent-workflows/inbox/`) until someone starts it. Once started,
-   the card stays and shows its run's phase. The inbox lists the cards still in progress. To see cards whose run has ended, use a
-   filter (`nemia inbox --all`, or Ended on the Inbox page).
+   the card stays and shows its run's phase. The inbox lists the cards still open. To see cards whose run has ended, use a
+   filter (`nemia inbox --all`, or Closed on the Inbox page).
 2. **The start.** `nemia start` in a [factory](/factories/) writes the run's record. The record freezes the workflow folder as it is
    now, every step's agent and hire, and the check commands. Nothing the run does later reads the folder again.
 3. **The tick starts a step.** On its next pass, the tick finds a step whose `after` is satisfied. It submits that step's task to the
@@ -61,9 +61,8 @@ sequenceDiagram
    verdict.
 6. **What comes next.** The tick asks `assess` again. The answer is the next step, a retry if the check failed, a new round if a
    reviewer asked for one, or nothing while a [gate](/workflows/#a-gate) waits for a person.
-7. **The landing.** The last step stages a merge of the run's branch into the base branch, and signs off. The tick runs the check on
-   the merged code. On exit 0 it commits the merge; on anything else it aborts it (`landEnding`, in
-   `packages/agent-orchestrator/src/ending/ending.verb.ts`).
+7. **The end.** When the last step has passed, the run ends with its branch. `nemia decide <run>` says where the branch stands and
+   how to merge it. Merging it is up to the person or the workflow's own steps.
 
 ### A card a trigger starts
 

@@ -538,7 +538,6 @@ English; never push or open a pull request unless asked.
 | A gate quoting the agent's instructions instead of the decision | a gate quotes the step's own note |
 | Questions as unreadable Markdown | questions as data, answered by clicking |
 | A landing that could not land yet, left open | `nemia hold --until --why`, the reason shown on the board; work parked with no run to wait on, `nemia hold <run> --why`, lifted by `--off` alone |
-| A landing check killed by its deadline while passing | the landing check's own deadline (2700 s, `LANDING_CHECK_DEADLINE_SECONDS`); an over-half signal is an inbox card |
 | Chained runs not yet started plus queued landings made every pass re-read the store (196 MB a pass) | the journal cursor and once-per-pass reads (`a-tick-pass-reads-196-mb-of-aol7`) |
 | Every e2e pictured every page in two themes (about 85% of a landing) | the e2e asserts in dark only; the implementer pictures the change (`the-e2e-visits-its-two-theme-fuey`) |
 | A step could not read what it was pointed to | see *Empowering the agents* |

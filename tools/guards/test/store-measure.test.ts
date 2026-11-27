@@ -148,7 +148,7 @@ test('the place the measure reads through answers a read and refuses a write, ne
     }) as Place['askNow'],
   };
   const place = readOnlyPlace(under);
-  for (const verb of ['make', 'land', 'remove', 'handoff', 'open', 'export', 'seal'] as const)
+  for (const verb of ['make', 'remove', 'handoff', 'open', 'export', 'seal'] as const)
     assert.ok('refused' in place.askNow(verb, {} as never), `${verb} refused`);
   assert.deepEqual(asked, [], 'no write reached the place under it');
   assert.ok('answer' in place.askNow('standing', {} as never));
@@ -228,6 +228,8 @@ test('on an empty store the report counts no run and holds every measure, the ma
     'runListAfterPass',
     'inbox',
     'inboxAfterPass',
+    'cardPage',
+    'cardCounts',
     'chatHistory',
     'chatBeatBefore',
     'factoryList',

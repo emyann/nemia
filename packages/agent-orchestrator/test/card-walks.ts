@@ -43,12 +43,29 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       walk: ({ door }) => {
         filed(door, 'zeta-idea', aCard('Zeta'));
         filed(door, 'alpha-idea', aCard('Alpha', { workflow: 'build' }));
-        return done(door.cards.entries());
+        return done(door.cards.entries()).map(({ file, text, filedAt, revision }) => ({
+          file,
+          text,
+          filed: typeof filedAt === 'string',
+          revised: typeof revision === 'number',
+        }));
       },
       says: [
-        { file: 'alpha-idea.md', text: aCard('Alpha', { workflow: 'build' }) },
-        { file: 'zeta-idea.md', text: aCard('Zeta') },
+        { file: 'alpha-idea.md', text: aCard('Alpha', { workflow: 'build' }), filed: true, revised: true },
+        { file: 'zeta-idea.md', text: aCard('Zeta'), filed: true, revised: true },
       ],
+    },
+  ],
+  'cards.head': [
+    {
+      name: 'a number, which a card filed moves ahead',
+      walk: ({ door }) => {
+        const before = done(door.cards.head());
+        filed(door, 'an-idea');
+        const after = done(door.cards.head());
+        return { number: typeof before === 'number', ahead: after > before };
+      },
+      says: { number: true, ahead: true },
     },
   ],
   'cards.read': [

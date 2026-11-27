@@ -80,12 +80,13 @@ export const olderTrailOf = (at: Pick<PageAt, 'trail' | 'next' | 'count'>) =>
 /**
  * The rows a page shows, in words: `Runs 19–27 of 634`; that there is none; or, past the last page, that it shows none of them.
  * @param at The page as the pager reads it.
+ * @param noun What the pager pages: `Runs` or `Cards`.
  */
-export function rowsSaid(at: PageAt) {
-  if (at.total === 0 && at.count === 0) return 'No finished runs';
-  if (pastLast(at)) return `No run on this page, of ${at.total}`;
+export function rowsSaid(at: PageAt, noun: 'Runs' | 'Cards' = 'Runs') {
+  if (at.total === 0 && at.count === 0) return noun === 'Runs' ? 'No finished runs' : 'No cards';
+  if (pastLast(at)) return `No ${noun === 'Runs' ? 'run' : 'card'} on this page, of ${at.total}`;
   const first = at.trail.length * at.size + 1;
-  return `Runs ${first}–${first + at.count - 1} of ${at.total}`;
+  return `${noun} ${first}–${first + at.count - 1} of ${at.total}`;
 }
 
 /**

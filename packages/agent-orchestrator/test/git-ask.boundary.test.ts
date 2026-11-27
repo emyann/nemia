@@ -143,8 +143,8 @@ test('REFUSED: a git held past its deadline, asked while the process waits, is u
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
     assert.ok(said.startsWith(killedWords(deadlineMs)), said);
-    const next = PLACE.askNow('status', { repo: dir, tips: {} });
-    assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
+    const next = PLACE.askNow('open', { root: dir, isolate: true });
+    assert.ok('answer' in next, `the next question is answered: ${JSON.stringify(next)}`);
     return;
   }
 });
@@ -166,8 +166,8 @@ test('REFUSED: a git held past its deadline, asked off the loop, is unread in th
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone`);
     assert.ok(said.startsWith(killedWords(deadlineMs)), said);
-    const next = await Effect.runPromise(PLACE.ask('status', { repo: dir, tips: {} }));
-    assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
+    const next = await Effect.runPromise(PLACE.ask('open', { root: dir, isolate: true }));
+    assert.ok('answer' in next, `the next question is answered: ${JSON.stringify(next)}`);
     return;
   }
 });
@@ -213,7 +213,7 @@ test("the shipped place counts each question in the pass's place phase, and each
   const dir = repository();
   const asked = Effect.gen(function* () {
     const first = yield* builtinGitPlace.ask('seal', { tree: path.join(dir, 'no-such-tree') });
-    const second = builtinGitPlace.askNow('status', { repo: path.join(dir, 'no-such-checkout'), tips: {} });
+    const second = builtinGitPlace.askNow('open', { root: path.join(dir, 'no-such-checkout'), isolate: false });
     return [first, second];
   });
   const none = await Effect.runPromise(meteredPass(asked));

@@ -424,14 +424,6 @@ describe('retryRefusal: what `nemia retry` refuses, and what it says to do inste
     assert.equal(at(checked, failedRun()), null);
     const unchecked: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
     names(at(unchecked, failedRun()), '--recheck', 'no check', 'nemia retry r-1 implement --budget <amount>', '$3.02');
-    const ending: StepSpec[] = [{ ...step('implement'), check: 'npm test', budget: 3, workspace: 'base' }];
-    const aborted = run(
-      {},
-      { steps: { implement: { taskId: 't1', landed: { aborted: 'ended budget exhausted with its merge staged' } } } },
-    );
-    names(at(ending, aborted), '--recheck', 'took back the merge', 'nemia retry r-1 implement --budget <amount>');
-    const untouched = run({}, { steps: { implement: { taskId: 't1', landed: { untouched: 'nothing of it was staged' } } } });
-    assert.equal(at(ending, untouched), null, 'an ending that staged nothing — its merge made elsewhere — is rechecked');
   });
   test('a step the workflow does not have', () => {
     assert.match(refusalOf(onTry(), waiting, { mode: 'continue' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);

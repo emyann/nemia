@@ -4,7 +4,7 @@
  */
 
 /** `nemia inbox --help`: every form of the inbox, what a card is, and what is refused by name. */
-export const INBOX_MANUAL = `nemia inbox [--all]
+export const INBOX_MANUAL = `nemia inbox [--all] [--search <words>] [--phase <phase>] [--sort newest|oldest|name] [--limit <n>] [--continue <token>]
 nemia inbox -l <key>=<value>... [--all] [--show-labels] [-L <key>]...
 nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]...
 nemia inbox queue <name> [--workflow <w>] [--off]
@@ -36,7 +36,9 @@ only a person can release (a card the store does not know, a cycle, a run ended 
 needs you, with the fix: nemia inbox resend <card>, nemia release <run> for the run it waits on, nemia inbox edit <name> to change after:, or nemia start
 <name>, which starts it all the same and says which cards had not succeeded.
 
-  nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow when set,
+  nemia inbox       lists a page of the cards still in play (--limit <n> sets its size; the last line names the --continue
+                 token of the next page; --search keeps the cards whose title or name hold every word, --phase those in
+                 a phase, --sort orders them by when they were filed or by name): its name, the first line of its body, its workflow when set,
                  and started as <runId>, <phase> for a card a run's record says it was started as, the phase
                  its run is in now (waiting on you where it waits on a person): a started card stays in the inbox,
                  and is not started again. A card whose run ended (succeeded, failed, stopped, cancelled) is listed

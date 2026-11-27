@@ -220,9 +220,9 @@ describe("each family of writes: its answer decoded, an answer unread refused wi
       kind: 'Card',
       metadata: { name: 'a', namespace: 'default', creationTimestamp: 'now', resourceVersion: 'v' },
       spec: {},
-      status: { state: 'filed', runs: [], inPlay: true },
+      status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false },
     };
-    answering(t, { ...card, status: { state: 'parked', runs: [], inPlay: true } });
+    answering(t, { ...card, status: { state: 'parked', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false } });
     await assert.rejects(
       queueCard({ name: 'a', factory: null }),
       unread('POST /api/namespaces/default/cards/a/queue', 'status.state', 'is "parked", where the board reads', 'before asking again.'),
@@ -338,7 +338,7 @@ describe("each family of writes: its answer decoded, an answer unread refused wi
     assert.deepEqual(
       spec.steps,
       [
-        { name: 'ship', keys: { agent: own?.spec.agent, workspace: 'base', slot: 'none', gate: true }, body: 'Land it.' },
+        { name: 'ship', keys: { agent: own?.spec.agent, place: 'git', slot: 'none', gate: true }, body: 'Land it.' },
         {
           name: 'note',
           keys: Object.fromEntries(Object.entries(bare.spec).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0))),

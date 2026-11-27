@@ -177,7 +177,7 @@
     },
     {
       "term": "Label filter",
-      "meaning": "the field over the Inbox and the Runs (`SelectorField`, `apps/web/src/components/field/SelectorField.tsx`) that keeps the cards or the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
+      "meaning": "the field over the Runs (`SelectorField`, `apps/web/src/components/field/SelectorField.tsx`) that keeps the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
     },
     {
       "term": "Label page",
@@ -259,7 +259,7 @@
     },
     {
       "term": "First card",
-      "meaning": "the welcome's fourth milestone, `/welcome/card`: a card the person writes or picks among three fixed small changes, the cost of a small run said above Start (measured on this store's merged runs of the workflow, else a stated estimate), filed labelled `onboarding=first-card` and started in the workflow its factory names (`firstWorkflow`), gated at that workflow's ending step, or in a workflow of the factory's own choice where it names none it offers; the run's page then draws one hint a beat, read from the run as the api answers it (`firstWorkflowOf`, `costLineOf`, `firstBeatOf`, `apps/web/src/lib/firstCard.ts`, proved by `apps/web/contracts/first-card.contract.ts`; `FirstCard` and `FirstHint`, `apps/web/src/components/welcome/`).",
+      "meaning": "the welcome's fourth milestone, `/welcome/card`: a card the person writes or picks among three fixed small changes, the cost of a small run said above Start (measured on this store's merged runs of the workflow, else a stated estimate), filed labelled `onboarding=first-card` and started in the workflow its factory names (`firstWorkflow`), gated at the step before that workflow's first wait node, or in a workflow of the factory's own choice where it names none it offers; the run's page then draws one hint a beat, read from the run as the api answers it (`firstWorkflowOf`, `costLineOf`, `firstBeatOf`, `apps/web/src/lib/firstCard.ts`, proved by `apps/web/contracts/first-card.contract.ts`; `FirstCard` and `FirstHint`, `apps/web/src/components/welcome/`).",
       "type": "FirstBeat"
     },
     {

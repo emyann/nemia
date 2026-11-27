@@ -56,18 +56,14 @@ export {
   acceptanceOf,
   addSpend,
   approvalOf,
-  approvedFirst,
-  endsOnBase,
   askingTry,
   branchWord,
   budgetOf,
   budgetUsdFor,
   capOf,
-  endingStopped,
   gatesOf,
   hasGate,
   holdsOpenOn,
-  landsOnCheck,
   overBudget,
   owedFields,
   owesReplies,
@@ -76,14 +72,12 @@ export {
   roundOf,
   roundSpans,
   sendBackTo,
-  sentBack,
   spentAcceptances,
   spentApprovals,
   stepSpend,
   stepStatus,
   taskSpend,
   triedFrom,
-  unheld,
 } from './status/status.ts';
 export type { BranchStanding, Raise, Round, RoundAsk, Spend, SpendOf, TaskSpend } from './status/status.ts';
 export {
@@ -102,30 +96,15 @@ export {
   waitWord,
 } from './wait/wait.ts';
 export type { ParentRun, Wait } from './wait/wait.ts';
-export type { Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './pause/pause.ts';
+export type { Interrupt, Parked, Pause, Paused, PauseHeld } from './pause/pause.ts';
 export { artifactLines, artifactPlace, artifactsContract, HANDED_CLOSEOUT, sizeOf } from './artifacts/artifacts.ts';
 export { heldRefusal, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneRefusal, pruningBytes } from './forget/prune/prune.ts';
 export type { Pruning } from './forget/prune/prune.ts';
-export {
-  checkoutLine,
-  checkoutWord,
-  endingSteps,
-  filedDenies,
-  gateRefusal,
-  landedWords,
-  landingDue,
-  landingOpen,
-  merges,
-  ownNote,
-  toDecide,
-  toDecideWords,
-} from './ending/ending.ts';
-export type { Landing } from './ending/ending.ts';
-export type { MergeState } from './place/place.ts';
+export { endingSteps, gateRefusal, ownNote, toDecide, toDecideWords } from './ending/ending.ts';
 export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
-export { admissionOrder, ceilingLines, heldCheckouts, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
-export type { MainClaim, RunSlot } from './cap/cap.ts';
-export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/index.ts';
+export { admissionOrder, ceilingLines, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
+export type { RunSlot } from './cap/cap.ts';
+export { resultSteps, tipBranches, tipsSeen } from './branches/index.ts';
 export { cutName, GIVEN, givenPlan, handOffDue, LINE_NAME, workspacePlan } from './workspace/workspace.ts';
 export type { Given } from './workspace/workspace.ts';
 export { saidLines, saidWord, sayRefusal } from './say/say.ts';

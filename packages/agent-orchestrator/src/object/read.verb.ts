@@ -53,7 +53,7 @@ export type StepsReading = Judgement & {
   readonly releases: string;
   /**
    * The branch reader the run was judged through (`standingReader`, off `standing.json`): what a read beside the judgement — the cap's
-   * parents, the collisions at an ending, the branches a decision shows — asks, so it reads no other reading than the judgement did.
+   * parents, the collisions, the branches a decision shows — asks, so it reads no other reading than the judgement did.
    */
   readonly git: BranchReader;
 };

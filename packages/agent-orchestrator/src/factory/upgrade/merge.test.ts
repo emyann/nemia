@@ -20,6 +20,40 @@ function composed(...args: Parameters<typeof compose>) {
 /** A step file: its frontmatter, then its body. */
 const step = (head: string, body: string) => `---\nname: review\n${head}---\n${body}`;
 
+describe("a wait node's refused keys, in a workflow's step file: a conflict where only the tree's side holds one", () => {
+  const SHIP = 'workflows/dev/ship.md';
+  const file = (head: string) => ({ [SHIP]: `---\n${head}---\n` });
+  const base = tree(file('agent: closer\ngate: true\n'));
+  const theirs = tree(file('waitsFor: [shipped]\n'));
+  test('the template makes the step a wait node: each key only the tree holds that a wait node refuses is a conflict, with its reason', () => {
+    const ours = tree(file('agent: closer\ngate: true\ndisallowedTools: Bash(git push)\nbudget: 3\n'));
+    const merge = mergeTrees(base, ours, theirs);
+    assert.deepEqual(
+      merge.conflicts.map((c) => [c.at, c.theirs, c.message !== undefined]),
+      [
+        [`${SHIP}#disallowedTools`, null, true],
+        [`${SHIP}#budget`, null, true],
+      ],
+    );
+    assert.deepEqual(
+      composed(merge, { [`${SHIP}#disallowedTools`]: 'theirs', [`${SHIP}#budget`]: 'theirs' }),
+      file('waitsFor: [shipped]\n'),
+    );
+  });
+  test('a key a wait node takes, one the template holds too, and a step the template leaves a step, merge cleanly', () => {
+    const taken = mergeTrees(base, tree(file('agent: closer\ngate: true\nafter: review\n')), theirs);
+    assert.deepEqual(taken.conflicts, []);
+    const both = mergeTrees(base, tree(file('agent: closer\ngate: true\nbudget: 3\n')), tree(file('waitsFor: [shipped]\nbudget: 3\n')));
+    assert.deepEqual(both.conflicts, []);
+    const still = mergeTrees(
+      base,
+      tree(file('agent: closer\ngate: true\nbudget: 3\n')),
+      tree(file('agent: closer\ngate: true\nrounds: 2\n')),
+    );
+    assert.deepEqual(still.conflicts, []);
+  });
+});
+
 describe("a templated factory's tree merged three ways, row by row: by file, by key, by line, composed, ordered and planned", () => {
   test('a file one side changed is taken from it, the same change once, and a delete by the template where the tree kept base', () => {
     const base = tree({ 'a.md': 'a\n', 'b.md': 'b\n', 'c.md': 'c\n', 'd.md': 'd\n', 'e.md': 'e\n' });

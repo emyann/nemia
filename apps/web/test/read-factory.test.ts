@@ -7,7 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { cardQuery, inboxAllQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
+import { cardQuery, inboxPageQuery, type InboxCardPage, type InboxPage } from '../src/lib/api/inbox.ts';
 import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilities.ts';
 import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
 import { HEADER_MASK } from 'objects';
@@ -54,7 +54,8 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknow
   apiAnswers(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 }
 
-const readInbox = inboxAllQuery(undefined).queryFn as unknown as () => Promise<InboxEntry[]>;
+const readPage = inboxPageQuery({ limit: 12 }).queryFn as unknown as () => Promise<InboxPage>;
+const readInbox = async () => (await readPage()).entries;
 const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPage>;
 const readCapabilities = capabilitiesQuery({}).queryFn as unknown as () => Promise<Capabilities>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;

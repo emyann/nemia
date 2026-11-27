@@ -31,15 +31,17 @@ const UNFILLED = 'review';
 const withHires = (text: string, hires: Record<string, string>) => JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
+const cardIn = (page: Page, name: string) => page.locator(`[data-card="${name}"]`) satisfies Locator;
 
-/** Open the card's start on a fresh load of the Inbox. */
+/** Open the card's start, in the sheet its menu's Start now opens, on a fresh load of the Inbox: the sheet. */
 async function openStart(page: Page) {
   await page.goto(page.url(), { waitUntil: 'load' });
   await idle(page);
-  const item = cardIn(page, CARD);
-  await item.getByRole('button', { name: 'Start' }).click();
-  return item;
+  await cardIn(page, CARD)
+    .getByRole('button', { name: `More actions on ${CARD}` })
+    .click();
+  await page.getByRole('menuitem', { name: 'Start now, ahead of its chain' }).click();
+  return page.getByRole('dialog', { name: `Start ${CARD}` });
 }
 
 /**

@@ -39,6 +39,9 @@ export const inboxEntry = (extra: Partial<InboxEntry> = {}) =>
     from: [],
     startedAs: ['r-0'],
     state: 'succeeded',
+    phase: 'done',
+    followedBy: [],
+    chained: false,
     error: null,
     filedAt: '2026-09-30T05:00:00.000Z',
     queued: { at: '2026-09-30T05:01:00.000Z', place: 1 },
@@ -71,13 +74,22 @@ export const cardObject = (over: CardOver = {}) =>
       runs: ['r-0'],
       lastStart: { at: '2026-09-30T05:02:00.000Z', repo: '/work/repo', why: 'the workflow is gone', refused: true },
       title: 'Decode the reads',
+      phase: 'done',
+      followedBy: [],
+      chained: false,
       ...over.status,
       inPlay: over.status?.inPlay ?? false,
     },
   }) satisfies Card;
 
 /** A page of the inbox's cards holding `items`, the last. */
-export const cardList = (...items: Card[]) => ({ apiVersion: 'nemia/v1', kind: 'CardList', metadata: {}, items }) satisfies CardList;
+export const cardList = (...items: Card[]) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'CardList',
+    metadata: { counts: { notStarted: 0, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 }, labelsInUse: [] },
+    items,
+  }) satisfies CardList;
 
 /** What a Claude Code step gets, every list with a row and every null a value. */
 export const stepReach = (extra: Partial<StepReach> = {}) =>

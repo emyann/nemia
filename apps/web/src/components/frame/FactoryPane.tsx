@@ -4,7 +4,6 @@ import { Badge, Link, ListItem } from '@/components/ui/ds';
 import { factoryPlacesQuery } from '@/lib/api/factories';
 import { factoryInboxQuery } from '@/lib/api/inbox';
 import { waitingProposalsQuery } from '@/lib/api/proposals';
-import { notStarted } from '@/lib/inbox';
 import { cn } from '@/lib/utils';
 import { FactoryPicker } from '../factory/FactoryPicker';
 import { PaneStart } from '../factory/FactoryStart';
@@ -36,17 +35,17 @@ const countOf = (line: PlaceLine | undefined) =>
 
 /**
  * What a place of the pane says under its name: Runs how many wait on the person, off the frame's one count of the runs (`frameRunsQuery`),
- * and the Inbox how many of the factory's cards are not started, off the cards in play the floor reads too (`factoryInboxQuery`), each
- * count on its badge (`counted`); Proposals how many proposals wait on the person, asked of the api by phase as the rows of their Table
- * (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the default factory having none; none for
- * any other place, or before they are read.
+ * and the Inbox how many of the factory's cards are not started, off the counts by phase of the list the floor reads
+ * (`factoryInboxQuery`), each count on its badge (`counted`); Proposals how many proposals wait on the person, asked of the api by
+ * phase as the rows of their Table (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the
+ * default factory having none; none for any other place, or before they are read.
  */
 function usePlaceLines(path: string, factory: string) {
   const runs = useQuery(frameRunsQuery(path)).data;
   const inbox = useQuery(factoryInboxQuery(factory)).data;
   const place = useQuery(factoryPlacesQuery).data?.find((f) => f.name === factory);
   const proposals = useQuery({ ...waitingProposalsQuery(factory), enabled: place !== undefined && !place.default }).data;
-  const cards = inbox ? notStarted(inbox, factory).length : undefined;
+  const cards = inbox?.counts.notStarted;
   const waiting = place?.default ? 0 : proposals?.length;
   return {
     ...(runs && { runs: counted(runs.counts.waiting, 'waiting on you', 'nothing waits on you') }),

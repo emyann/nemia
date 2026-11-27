@@ -224,8 +224,7 @@ export const passStanding = Effect.fn('passStanding')(function* (runs: readonly 
 export const NOTHING_READ: PassStanding = { read: new Map() };
 
 /**
- * Every branch of a run's repository and its commit as `git` read them, what a `StatusMemo` reads a run's result tips off: none where
- * nothing of the repository was read.
+ * Every branch of a run's repository and its commit as `git` read them: none where nothing of the repository was read.
  * @param git The reader whose heads of a repository are taken.
  */
 export const headsOver = (git: BranchReader) => (run: RepositoryRun) => Object.fromEntries(git.heads(run.repo));

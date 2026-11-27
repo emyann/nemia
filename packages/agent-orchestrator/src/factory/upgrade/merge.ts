@@ -8,13 +8,17 @@
  * `nemia factory diff` prints it (`planLines`). Pure.
  */
 import { diff2Lines, diff3Lines, linesOf } from './lines.ts';
+import { waitKeyRefusal, waitRefused } from '../../workflow/index.ts';
 import type { BaseTemplateOf, MergeBaseOf, UnrelatedKey, UnrelatedSet } from '../../../contracts/switch.contract.ts';
 
 /** One file of a tree: its path in it, its bytes, and its mode where it keeps one. */
 export type TreeFile = { path: string; bytes: Buffer; mode?: number };
 
-/** A conflict: its address, and the text of each side over it, null where that side has none (a file deleted, a key absent). */
-export type Conflict = { at: string; base: string | null; ours: string | null; theirs: string | null };
+/**
+ * A conflict: its address, and the text of each side over it, null where that side has none (a file deleted, a key absent), and where the
+ * merge would have taken a side, the message saying why it asks instead.
+ */
+export type Conflict = { at: string; base: string | null; ours: string | null; theirs: string | null; message?: string };
 
 /** A person's choice for a conflict: one side's text, or text of their own. */
 export type Choice = 'ours' | 'theirs' | { text: string };
@@ -129,14 +133,40 @@ function keyOrder(ours: readonly string[], theirs: readonly string[]) {
   return order;
 }
 
-/** A frontmatter merged by key into `parts`, each conflict addressed `<path>#<key>`. */
+/** The path of a workflow's step file, `workflows/<workflow>/<step>.md`, README apart: its step's name, or undefined for any other file. */
+function stepOf(path: string) {
+  const [, name] = /^workflows\/[^/]+\/([^/]+)\.md$/.exec(path) ?? [];
+  return name === undefined || name === 'README' ? undefined : name;
+}
+
+/**
+ * A frontmatter merged by key into `parts`, each conflict addressed `<path>#<key>`. Where the merged head is a wait node, each key it
+ * refuses (`waitRefused`) that only the factory's side holds is a conflict too, with the refusal as its message: the template's side has
+ * none, so the merge would take the factory's line, and the upgrade would be refused after approval.
+ */
 function headParts(path: string, base: string, ours: string, theirs: string) {
   const [b, o, t] = [entriesOf(base), entriesOf(ours), entriesOf(theirs)];
+  const merged = keyOrder([...o.keys()], [...t.keys()]).map((key) => ({
+    key,
+    ...keyed(`${path}#${key}`, b.get(key), o.get(key), t.get(key), (x, y) => x === y),
+  }));
+  const step = stepOf(path);
+  const refused =
+    step === undefined
+      ? []
+      : waitRefused(merged.filter((m) => 'value' in m && m.value !== undefined && m.value !== '' && m.key !== '').map((m) => m.key));
   const parts: Part[] = [];
-  for (const key of keyOrder([...o.keys()], [...t.keys()])) {
-    const merged = keyed(`${path}#${key}`, b.get(key), o.get(key), t.get(key), (x, y) => x === y);
-    if ('value' in merged) parts.push(merged.value ?? '');
-    else parts.push({ at: merged.conflict, base: b.get(key) ?? null, ours: o.get(key) ?? null, theirs: t.get(key) ?? null });
+  for (const m of merged) {
+    if ('value' in m && step !== undefined && refused.includes(m.key) && !t.has(m.key))
+      parts.push({
+        at: `${path}#${m.key}`,
+        base: b.get(m.key) ?? null,
+        ours: o.get(m.key) ?? null,
+        theirs: null,
+        message: waitKeyRefusal(step, m.key),
+      });
+    else if ('value' in m) parts.push(m.value ?? '');
+    else parts.push({ at: m.conflict, base: b.get(m.key) ?? null, ours: o.get(m.key) ?? null, theirs: t.get(m.key) ?? null });
   }
   return parts;
 }
@@ -504,6 +534,7 @@ export const conflictCut = (conflict: Conflict, max = KEPT_LINES) => {
   const file = conflict.at.replace(/(#.*|:\d+-\d+)$/, '');
   return {
     at: conflict.at,
+    ...(conflict.message === undefined ? {} : { message: conflict.message }),
     base: cutSide(conflict.base, max, `applied/${file}`),
     ours: cutSide(conflict.ours, max, `tree/${file}`),
     theirs: cutSide(conflict.theirs, max, `${file} as the template renders it (nemia factory diff)`),
@@ -551,6 +582,7 @@ export function planLines(name: string, from: string, to: string, merge: TreeMer
   for (const conflict of merge.conflicts)
     lines.push(
       `  ${conflict.at}`,
+      ...(conflict.message === undefined ? [] : [`    ${conflict.message}`]),
       ...(merge.base === 'none' ? [] : sideLines('base', conflict.base)),
       ...sideLines('ours', conflict.ours),
       ...sideLines('theirs', conflict.theirs),

@@ -35,7 +35,6 @@ const aTry = (run: string, step: string, costUsd: number | null, more: Partial<T
   due: null,
   rules: null,
   tallies: [],
-  landingDeadlineMs: null,
   ...more,
 });
 
@@ -48,7 +47,6 @@ const aRun = (run: string, costUsd: number | null, more: Partial<RunFact> = {}) 
   agents: [null],
   rounds: [],
   merged: null,
-  firstTry: null,
   costUsd,
   wallMs: null,
   ...more,

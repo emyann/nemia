@@ -111,7 +111,6 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}) =>
     after: ['review'],
     resume: null,
     input: ['review'],
-    workspace: 'base',
     place: 'git',
     writable: [],
     reads: [],
@@ -165,7 +164,7 @@ export const workflow = (extra: Partial<WorkflowListing> = {}) =>
         name: 'ship',
         spec: stepSpec(),
         body: 'Land it.',
-        own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' },
+        own: { keys: ['place', 'slot', 'gate'], body: 'Land it.' },
         hired: null,
         layers: null,
         mcp: [],
@@ -188,9 +187,9 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}) =>
     dir: '/work/workflows/build',
     step: 'ship',
     body: 'Land it.',
-    source: '---\nplace: git\nworkspace: base\n---\nLand it.\n',
+    source: '---\nplace: git\ngate: true\n---\nLand it.\n',
     keys: [
-      { key: 'workspace', value: 'main', meaning: 'Where the step works.' },
+      { key: 'gate', value: 'true', meaning: 'Whether a person approves first.' },
       { key: 'model', value: null, meaning: 'The model.' },
     ],
     agentSkills: [skillEntry()],
@@ -220,7 +219,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}) =>
 export const keyForm = (extra: Partial<KeyForm> = {}) =>
   ({
     keys: [
-      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['base'], byHarness: null },
+      { key: 'place', meaning: 'Where the step works.', kind: 'choice', choices: ['folder'], byHarness: null },
       { key: 'slot', meaning: 'Whether the run takes a slot.', kind: 'choice', choices: ['none'], byHarness: null },
       { key: 'effort', meaning: 'How hard it thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'high'] } },
     ],
@@ -228,7 +227,7 @@ export const keyForm = (extra: Partial<KeyForm> = {}) =>
     roleKeys: ['harness', 'model', 'output'],
     policyKeys: ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
     agents: { otto: { harness: 'claude', gate: true, tools: ['Read'] }, bare: {} },
-    remote: { prefix: 'a2a:', refuses: ['tools', 'workspace'] },
+    remote: { prefix: 'a2a:', refuses: ['tools', 'place'] },
     ...extra,
   }) satisfies KeyForm;
 

@@ -2,7 +2,7 @@
  * The first card's reads and writes, and "You are set"'s, as the api answers them, for their stories (`Pages/Welcome first card`,
  * `Pages/You are set`), each typed by `objects`' own types so a key the api renames fails the typecheck here: the factory `acme` with the
  * workflows it offers and its first volume (`Factory`), its lines with and without the host its template follows (`FactoryCommands`),
- * each workflow it offers, an `implement` step then its ending step `land` (`Workflow`), the stats of a workflow's merged runs (`Stats`),
+ * each workflow it offers, an `implement` step then its wait node `land` (`Workflow`), the stats of a workflow's merged runs (`Stats`),
  * the quota, the milestones, a card filed (`Card`) and started (`CardStarted`). Each
  * story makes its own store (`firstCardStore`); `filed` holds what the page wrote, in order.
  */
@@ -90,10 +90,11 @@ const bodyOf = async (request: Request) => {
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 };
 
-/** A step of a listed workflow, every key unset but where it works: `base` for its ending step, which lands. */
-const listedStep = (name: string, workspace: 'base' | null) => ({
+/** A step of a listed workflow, every key unset but what it follows and what it waits on: a wait node, which lands what the step
+ * before it made. */
+const listedStep = (name: string, after: string[], waitsFor: string[]) => ({
   name,
-  spec: { ...UNSET, workspace },
+  spec: { ...UNSET, after, waitsFor },
   body: '',
   own: null,
   hired: null,
@@ -101,7 +102,7 @@ const listedStep = (name: string, workspace: 'base' | null) => ({
   mcp: [],
 });
 
-/** The workflow `name` as `acme` lists it on its repository: an `implement` step, then `land`, its ending step. */
+/** The workflow `name` as `acme` lists it on its repository: an `implement` step, then `land`, its wait node. */
 const workflowFixture = (name: string) => ({
   apiVersion: 'nemia/v1',
   kind: 'Workflow',
@@ -121,7 +122,7 @@ const workflowFixture = (name: string) => ({
         { name: 'land', kind: 'step' },
       ],
     },
-    steps: [listedStep('implement', null), listedStep('land', 'base')],
+    steps: [listedStep('implement', [], []), listedStep('land', ['implement'], ['merged'])],
     schemas: [],
     folderTeam: false,
     error: null,
@@ -172,7 +173,7 @@ export const firstCardStore = ({ workflows = ['build', 'quick'], origin, mergedR
         kind: 'Card',
         metadata: { name: 'first-card', namespace: ACME, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
         spec: { body: String(body.body) },
-        status: { state: 'filed', runs: [], inPlay: true, title: 'first card', file: 'first-card.md' },
+        status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false, title: 'first card', file: 'first-card.md' },
       };
       return HttpResponse.json(card, { status: 201 });
     }),

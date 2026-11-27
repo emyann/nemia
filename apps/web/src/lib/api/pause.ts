@@ -10,16 +10,13 @@ import { call, read, write } from './objects.ts';
 
 export type { Interrupt, Pause, Paused } from 'objects';
 
-/** A task still at work under the pause: a session, a check, or a landing's check; `stopping`, `resumed` and `calling` as it is. */
+/** A task still at work under the pause: a session or a check; `stopping`, `resumed` and `calling` as it is. */
 export type Finishing = Paused['finishing'][number];
 
 /** A session the pause has parked at a tool call's end, `after` its call or with its call `cut`. */
 export type Parked = Paused['parked'][number];
 
-/** A run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
-export type PauseStaged = Paused['staged'][number];
-
-/** A run whose step signed off, its check held by the pause, its merge not staged. */
+/** A run whose step signed off, its check held by the pause. */
 export type PauseHeld = Paused['held'][number];
 
 /**

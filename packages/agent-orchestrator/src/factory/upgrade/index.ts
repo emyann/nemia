@@ -26,6 +26,7 @@ export {
 export { choicesApply, sameVersionChange } from './same-version.ts';
 export {
   conflictOwners,
+  keptChoiceLine,
   ownerKey,
   ownerOfKey,
   resolutionOf,

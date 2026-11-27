@@ -168,24 +168,28 @@ Its arguments:
 
 ```text
   nemia inbox
-    the cards still in play: name, first line, workflow when set,
+    a page of the cards still in play: name, first line, workflow when set,
     and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-    run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-    their labels on each line; -o wide: every column
+    run ended too; -l: the cards whose labels match; --search <words>: those
+    whose title or name hold them; --phase <phase>: those in it; --sort
+    newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+    -L <key>: their labels on each line; -o wide: every column
 ```
 
-Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, and ?fieldSelector= those still in play or not. Answers a CardList, or the same page as a Table where the request asks for one.
+Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, ?fieldSelector= those in a phase, in play or chained, ?orderBy= sorts them and ?search= keeps those whose title or name hold its words. Its metadata counts the cards per phase and lists the labels in use, counted before the fieldSelector and the page. Answers a CardList, or the same page as a Table where the request asks for one.
 
 Calls `GET /api/cards`.
 
 Its arguments:
 
-- limit: The most items a page holds, a whole number from 1.
-- continue: The token the page before answered, to read the page after it; absent, the first page.
+- limit (--limit at a shell): The most items a page holds, a whole number from 1.
+- continue (--continue at a shell): The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector (-l at a shell): The retired spelling of labelSelector, read the same.
 - resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
-- fieldSelector: A fieldSelector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.
+- fieldSelector: A fieldSelector in Kubernetes' spelling, comma-joined terms that must all hold: status.inPlay=true|false, status.chained=true|false, status.phase=<notStarted|blocked|waiting|working|done|failed|cancelled>, each with =, == or !=; empty or absent, every card.
+- orderBy: How the cards are ordered: metadata.name (the default) or metadata.creationTimestamp, ascending, or with a trailing " desc" for descending. One field; ties are broken by name.
+- search (--search at a shell): Words a card's title or name must hold, each of them, whatever their case; empty or absent, every card.
 
 - On the port: Answers a line per item, as `inbox -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -195,10 +199,12 @@ Its arguments:
 
 ```text
   nemia inbox
-    the cards still in play: name, first line, workflow when set,
+    a page of the cards still in play: name, first line, workflow when set,
     and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-    run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-    their labels on each line; -o wide: every column
+    run ended too; -l: the cards whose labels match; --search <words>: those
+    whose title or name hold them; --phase <phase>: those in it; --sort
+    newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+    -L <key>: their labels on each line; -o wide: every column
 ```
 
 Reads one card by its name in any namespace, with its file as written. Answers the Card.
@@ -1330,9 +1336,8 @@ Its arguments:
     flight); what each step's tries and the run have cost, where measured;
     last, whether a nemia up ticks the store and when its last pass was;
     first, while the store is paused, Pausing: N finishing and each
-    session, check or landing at work, or Paused once none is, then each
-    check it holds, a landing with its merge staged in the repository's
-    own working tree (MERGE_HEAD) among them; a step whose check it holds
+    session or check at work, or Paused once none is, then each
+    check it holds; a step whose check it holds
     says waiting on the pause. -l: the runs whose labels match (team=core,
     given again for another); --show-labels: each run with its labels;
     -L <key>: that label beside each run, given again for another; -o
@@ -1364,9 +1369,8 @@ Its arguments:
     flight); what each step's tries and the run have cost, where measured;
     last, whether a nemia up ticks the store and when its last pass was;
     first, while the store is paused, Pausing: N finishing and each
-    session, check or landing at work, or Paused once none is, then each
-    check it holds, a landing with its merge staged in the repository's
-    own working tree (MERGE_HEAD) among them; a step whose check it holds
+    session or check at work, or Paused once none is, then each
+    check it holds; a step whose check it holds
     says waiting on the pause. -l: the runs whose labels match (team=core,
     given again for another); --show-labels: each run with its labels;
     -L <key>: that label beside each run, given again for another; -o
@@ -1529,8 +1533,8 @@ Its arguments:
 ```text
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
     what every run in the store adds up to, by UTC day: rounds to
-    acceptance of each loop: step, landings of the workspace: base step
-    and on which try, cost and time per merged run, and each step's
+    acceptance of each loop: step, cost and time per merged run,
+    and each step's
     tries, time, cost, checks and gate waits; first the last 14 days
     against the 14 before. A number nothing measured reads —, never 0.
     --line: one line, for a recap; --json: the whole answer; -l: the
@@ -2308,7 +2312,7 @@ Its arguments:
     check filed, no queued task admitted, no queued card started — and
     every session, job or attached, parks at its tool call's end: a call
     still in flight once the timeout has passed is cut. A check runs on, its
-    end recorded; a landing whose check has ended commits or aborts.
+    end recorded.
     Pausing: N sessions finishing a tool call, cut in M min while they
     do, Paused once none does; nemia ls says each step paused.
     nemia start still writes a run, and approvals, retries and answers are
@@ -2319,8 +2323,8 @@ Its arguments:
     (default: your OS user)
     --timeout: how long a call in flight is given to end, for this pause
     (90s, 10m, 2h; from 1s to 23h); default: the store's, nemia pause-timeout
-    --now: pause at once, the board's Stop now — each step session at work,
-    but a landing's, has its call cut at once and parks, going on as the
+    --now: pause at once, the board's Stop now — each step session at work
+    has its call cut at once and parks, going on as the
     same try on nemia resume;
     each check is asked to stop and run again. A pause that stands is kept.
     --yes: with --now, act; without it, --now only says what it would
@@ -2388,11 +2392,11 @@ Calls `DELETE /api/pause`.
 
 ```text
   nemia paused
-    the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them
+    the store's pause, what finishes under it, and each check it holds
     the port's alone: no `nemia` verb runs it at a shell
 ```
 
-Reads the store's pause, or null where none stands, with each task still finishing under it and each session, landing and check it holds. Answers Paused.
+Reads the store's pause, or null where none stands, with each task still finishing under it and each session and check it holds. Answers Paused.
 
 Calls `GET /api/pause`.
 
@@ -2400,11 +2404,11 @@ Calls `GET /api/pause`.
 
 ```text
   nemia pause now
-    what a pause at once would stop, each task at work but a landing, and what that costs
+    what a pause at once would stop, each task at work, and what that costs
     the port's alone: no `nemia` verb runs it at a shell
 ```
 
-Reads what a pause at once would cut, each task at work but a landing, and what that costs. Answers PauseNowRead.
+Reads what a pause at once would cut, each task at work, and what that costs. Answers PauseNowRead.
 
 Calls `GET /api/pause/now`.
 

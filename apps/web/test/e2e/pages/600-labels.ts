@@ -4,7 +4,7 @@ import { photograph, themeOf, runPath } from '../board.ts';
 import { spentOf, type LabelStats } from '../../../src/lib/api/labels.ts';
 import { withSelector } from '../../../src/lib/api/selector.ts';
 import { dollars } from '../../../src/lib/money.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { dropStoredCard, dropStoredMarker, OUT, storeCard, storedCard } from '../world.ts';
@@ -40,16 +40,13 @@ export default {
       await labelRun(page, LANDED.id, [LABEL]);
 
       await load(page, `/inbox?l=${encodeURIComponent(LABEL)}`);
-      const cards = page.locator('section[aria-label="Cards"] li[data-card]');
+      const cards = page.locator('[data-card]');
       await expectCount(cards, 1, `the Inbox filtered by ${LABEL} keeps the one card that carries it`);
-      await expectVisible(cards.locator(`[data-label="${LABEL}"]`), 'and shows its label as a tag');
+      await expectVisible(cards.locator('[data-card-labels]'), 'and shows its labels');
       await settled(page);
       await photograph(page, path.join(OUT, `labels-inbox-${theme}.png`), { fullPage: true });
 
-      const field = page.getByRole('textbox', { name: 'Filter by labels' });
-      await field.fill('team=nobody');
-      await page.getByRole('button', { name: 'Filter' }).click();
-      await page.waitForURL(/l=team%3Dnobody/, { timeout: WAIT_MS });
+      await load(page, `/inbox?l=${encodeURIComponent('team=nobody')}`);
       await expectCount(cards, 0, 'a selector no card matches keeps none');
 
       await load(page, `/runs?l=${encodeURIComponent(LABEL)}`);

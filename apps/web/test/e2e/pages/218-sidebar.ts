@@ -1,8 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { notStarted } from '../../../src/lib/inbox.ts';
-import { type CardList, DEFAULT_NAMESPACE, LIST_PAGE } from 'objects';
-import { entriesOf } from '../../../src/lib/api/inbox.ts';
+import { type CardList, DEFAULT_NAMESPACE } from 'objects';
+import { namespaceOf } from '../../../src/lib/api/namespace.ts';
 import { openAnswered, pick, pickedIn, photograph, placeOf, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
@@ -49,7 +48,8 @@ async function waitingIs(page: Page, where: string) {
 /** The pane's lines are `factory`'s own: Runs what waits on you there, the Inbox its cards not yet started, each count on its badge. */
 async function linesAre(page: Page, factory: string) {
   const open = await openAnswered(page, factory);
-  const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), factory).length;
+  const cards = (await answer<CardList>(page, `/api/namespaces/${encodeURIComponent(namespaceOf(factory))}/cards?limit=1`)).metadata.counts
+    .notStarted;
   await expectVisible(
     placeOf(page, 'Runs').getByText(open.counts.waiting ? `${open.counts.waiting} waiting on you` : 'nothing waits on you'),
     `${factory}'s Runs says what waits on you there`,

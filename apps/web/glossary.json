@@ -177,7 +177,7 @@
     },
     {
       "term": "Label filter",
-      "meaning": "the field over the Inbox and the Runs (`SelectorField`, `apps/web/src/components/field/SelectorField.tsx`) that keeps the cards or the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
+      "meaning": "the field over the Runs (`SelectorField`, `apps/web/src/components/field/SelectorField.tsx`) that keeps the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
     },
     {
       "term": "Label page",

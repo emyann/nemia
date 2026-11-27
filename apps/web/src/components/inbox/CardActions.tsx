@@ -133,12 +133,9 @@ function CardMenu({
     onSettled: read,
   });
   const navigate = useNavigate();
-  const waits = (entry.waits?.length ?? 0) > 0;
   const open = startable(entry);
   const items = [
-    ...(open && (waits || entry.state === 'queued')
-      ? [{ id: 'now', label: 'Start now, ahead of its chain', onAction: () => onSheet('start') }]
-      : []),
+    ...(open ? [{ id: 'now', label: 'Start now, ahead of its chain', onAction: () => onSheet('start') }] : []),
     ...(open && entry.state === 'queued' ? [{ id: 'cancel', label: 'Cancel start', onAction: () => unqueue.mutate() }] : []),
     ...(open && chain !== null && chain.length > 1 ? [{ id: 'chain', label: 'Start chain…', onAction: () => onSheet('chain') }] : []),
     ...(open ? [{ id: 'edit', label: 'Edit', onAction: () => void navigate({ to: '/inbox/$name', params: { name: entry.name } }) }] : []),

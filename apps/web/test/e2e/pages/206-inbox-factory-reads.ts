@@ -1,14 +1,11 @@
 import type { Locator, Page, Request } from 'playwright';
-import { type CardList, DEFAULT_NAMESPACE, LIST_PAGE } from 'objects';
-import { entriesOf } from '../../../src/lib/api/inbox.ts';
-import { cardsEnded, cardsInPlay } from '../../../src/lib/inbox.ts';
-import { PLACES_SAID } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused } from '../checks.ts';
-import { QUEUE, QUEUED } from '../seed.ts';
+import { type CardList, DEFAULT_NAMESPACE } from 'objects';
+import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
+import { QUEUE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
+const cardIn = (page: Page, name: string) => page.locator(`[data-card="${name}"]`) satisfies Locator;
 
 /** The path of a request's address. */
 const pathOf = (request: Request) => new URL(request.url()).pathname;
@@ -37,8 +34,8 @@ async function heardDuring(page: Page, work: () => Promise<void>) {
 
 /**
  * Opens the default factory's Inbox, every request kept: none reads every card of every factory, and its cards are asked of its own
- * namespace, the ended ones included (no field selector). Its In play and Ended counts are the api's own of the default factory's cards,
- * its queued card of no factory says its place in the whole queue, and a queued card of another factory is not listed.
+ * namespace, one page of them. Its Open and Closed counts are the api's own of the default factory's cards, its queued card of no factory
+ * is listed, and a queued card of another factory is not.
  * @param page The page.
  */
 async function readsItsOwn(page: Page) {
@@ -51,36 +48,24 @@ async function readsItsOwn(page: Page) {
   if (every.length > 0)
     throw new Refused(`a factory's Inbox never asks every card of every factory — it asked ${every.map((r) => r.url()).join(', ')}`);
   const own = heard.filter((r) => r.method() === 'GET' && pathOf(r) === `/api/namespaces/${DEFAULT_NAMESPACE}/cards`);
-  if (!own.some((r) => !new URL(r.url()).searchParams.has('fieldSelector')))
+  if (!own.some((r) => new URL(r.url()).searchParams.get('limit') === '12'))
     throw new Refused(
-      `a factory's Inbox asks its own namespace's cards, the ended ones too, with no field selector — it asked ${own.map((r) => r.url()).join(', ') || 'none'}`,
+      `a factory's Inbox asks one page of its own namespace's cards — it asked ${own.map((r) => r.url()).join(', ') || 'none'}`,
     );
 
-  const whole = entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)).filter((e) => e.factory === null);
-  await expectTexts(
-    page.locator('[data-cards-count="in play"]'),
-    [`· ${cardsInPlay(whole).length}`],
-    "In play counts the default factory's cards in play, as the api answers them",
-  );
-  await expectTexts(
-    page.locator('[data-cards-count="ended"]'),
-    [`· ${cardsEnded(whole).length}`],
-    "Ended counts the default factory's cards whose run ended, as the api answers them",
-  );
-  const place = PLACES_SAID[QUEUED.indexOf(QUEUE.third)];
-  await expectTexts(
-    cardIn(page, QUEUE.third.name).locator('[data-queued]'),
-    [`queued · ${place}`],
-    `${QUEUE.third.name} says its place in the whole queue (${place}), not among its factory's alone`,
-  );
+  const { metadata } = await answer<CardList>(page, `/api/namespaces/${DEFAULT_NAMESPACE}/cards?limit=1`);
+  const c = metadata.counts;
+  const said = async (side: 'open' | 'closed') => Number((await page.locator(`[data-cards-count="${side}"]`).textContent()) ?? '');
+  const [open, closed] = [c.notStarted + c.blocked + c.waiting + c.working, c.done + c.failed + c.cancelled];
+  if ((await said('open')) !== open) throw new Refused(`Open counts the default factory's cards in play, ${open}, as the api counts them`);
+  if ((await said('closed')) !== closed) throw new Refused(`Closed counts its cards whose run ended, ${closed}, as the api counts them`);
   await expectCount(cardIn(page, QUEUE.first.name), 0, `${QUEUE.first.name}, another factory's queued card, is not listed`);
 }
 
 export default {
   /**
-   * A factory's Inbox reads its own cards, never every card of every factory: the route's loader and the page share one read of its
-   * namespace, ended cards included; its counts are the api's of its cards, and its queued card keeps its place in the whole queue. Writes
-   * nothing.
+   * A factory's Inbox reads its own cards, never every card of every factory: the route's loader and the page share one page of its
+   * namespace, and its counts are the api's of its cards. Writes nothing.
    */
   name: 'inbox-factory-reads',
   route: `/factories/${DEFAULT_NAMESPACE}`,

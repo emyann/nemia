@@ -37,5 +37,15 @@ export const Two: Story = {
   play: async ({ canvasElement }) => {
     const chain = within(canvasElement).getByRole('list', { name: 'Chain of 2 cards' });
     await expect(within(chain).getByRole('article', { name: 'Card second-slice' })).toBeVisible();
+    await expect(within(canvasElement).getByRole('button', { name: 'Start chain…' })).toBeVisible();
+  },
+};
+
+/** Every card working or queued: nothing left to start, so no Start chain…, and the head still says where the chain stands. */
+export const Underway: Story = {
+  args: { members: [[{ ...FIRST, state: 'running', phase: 'working', startedAs: ['first-slice-r1'] }], [SECOND]] },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('2 cards · 1 working · 1 not started')).toBeVisible();
+    await expect(within(canvasElement).queryByRole('button', { name: 'Start chain…' })).toBeNull();
   },
 };

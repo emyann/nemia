@@ -27,6 +27,7 @@ import { type Factory } from '../src/lib/api/factories.ts';
 import {
   capLine,
   CARD_KIND,
+  chainOffered,
   cardFiling,
   cardPlace,
   cardTag,
@@ -344,6 +345,17 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
       queueable(entry('named', null, { factory: 'solo', workflow: 'dev', startedAs: ['r-1'] })),
       true,
       "its state says filed: the runs it names are links, never what decides it (the orchestrator's `state`)",
+    );
+  });
+  test('Start chain… offers the filed, queueable cards of a chain, and none of a chain whose cards are all working or queued', () => {
+    const at = '2026-09-16T10:00:00.000Z';
+    const solo = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory: 'solo', workflow: 'dev', ...extra });
+    const working = solo('frame', { state: 'running', startedAs: ['frame-r1'] });
+    const queued = solo('search', { state: 'queued', queued: { at, place: 1 } });
+    assert.deepEqual(chainOffered([working, queued]), []);
+    assert.deepEqual(
+      chainOffered([working, queued, solo('later')]).map((card) => card.name),
+      ['later'],
     );
   });
   test('REFUSED: no Queue on a card that names no factory, or default', () => {

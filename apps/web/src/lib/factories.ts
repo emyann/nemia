@@ -272,7 +272,7 @@ export { factoryIn, namespaceOf } from './api/namespace.ts';
  * Whether a run or a card is kept by the filter on the factory `filter` names (`namespaceOf`): every one is when it names none.
  * @param filter The factory's name the page filters by, or undefined where it filters by none.
  */
-export const keptBy = (filter: string | undefined) => (item: { factory: string | null }) =>
+const keptBy = (filter: string | undefined) => (item: { factory: string | null }) =>
   filter === undefined || namespaceOf(item.factory) === filter;
 
 /**

@@ -34,7 +34,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { dropStoredKey, dropStoredRun, storeAsk, storeFactory, storeRecord, storedFactory, storedKeys } from './world.ts';
+import { dropStoredRun, storeAsk, storeFactory, storeRecord, storedFactory } from './world.ts';
 
 export const FAKE = {
   id: 'give-the-board-a-look-e2e0',
@@ -1013,18 +1013,6 @@ export function onSeveralRepos(root: string) {
   return { second, back: () => storeFactory(FACTORIES.hiring.name, found) } satisfies { second: string; back: () => void };
 }
 
-/**
- * Leaves the seeded store with no factory on file: each factory's record taken out. Returns the function that files each back as it was.
- */
-export function noFactories() {
-  const prefix = '/registry/factories/';
-  const kept = storedKeys(prefix).map((key) => ({ key, name: key.slice(prefix.length), text: storedFactory(key.slice(prefix.length)) }));
-  for (const { key } of kept) dropStoredKey(key);
-  return (() => {
-    for (const { name, text } of kept) storeFactory(name, text);
-  }) satisfies () => void;
-}
-
 /** The diamond's runs, oldest first. */
 export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.landed, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
 
@@ -1690,7 +1678,7 @@ export const unfactoredWhy = () => {
  * A queued card's text, as `wf inbox queue` writes it: its workflow and its repository, then `queued:`, then its factory when it names
  * one.
  */
-export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string) =>
+const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string) =>
   `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n${factory ? `factory: ${factory}\n` : ''}---\n${card.body}\n`;
 
 /**

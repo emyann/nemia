@@ -196,7 +196,7 @@ checkout, the landing program runs `localCheck` on the merged tree, and a merge 
 merges the commit the brief names instead.
 
 An intake run whose intent needs a design starts it: intake's ending, `next`, routes to `build` once the person approves it, and
-its node `to-build` files a card with `workflow: build` and `from:` the intake run (the [intake](../intake/README.md) README). By
+its node `to-build` starts the run, handed the intake run as context (the [intake](../intake/README.md) README). By
 hand, start it after the intake run whose intent it builds: `nemia start "<the intent's title>" --workflows build --after
 <intake-run>`. Either way its first step, design, is told the intent under *From run*; the steps after it read the spec.
 

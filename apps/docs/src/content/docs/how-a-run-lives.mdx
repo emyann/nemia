@@ -76,15 +76,24 @@ If two triggers would send a card that names no workflow to two different workfl
 and the factory's settings name the triggers, until a selector or the card's labels change.
 
 A trigger spends quota only if its target can reach something that runs an agent: a session or a judge, in the target itself or in a
-workflow that one of its card nodes creates a card for. A target that reaches only scripts, table or script conditions, and card nodes
+workflow that one of its workflow nodes starts a run of. A target that reaches only scripts, table or script conditions, and card nodes
 costs nothing, however many cards the trigger queues. The factory's settings show which kind each trigger is, separately from what it
 is queueing right now.
 
-A routing workflow passes a card on with a **card node** (`card: given`). The node sends the run's own card, as it was given (its body
-and labels), to the workflow the node names, along with the route taken and the reason its condition gave. A card node can instead
-send the card back to the inbox, unqueued, with the label edits its `relabel:` lists (`card: backlog`). The edits use kubectl's syntax:
-`key=value` sets a key, and `key-` removes one. A label key can have a prefix, as in Kubernetes, such as sdlc/stage. sdlc's
-[front door](/sdlc/#its-workflows) is a routing workflow.
+A routing workflow passes work on with a **workflow node** (`workflow: build`). The node starts a run of the workflow it names, right
+away and without filing a card. The new run is handed the run that started it as context, and its brief is the title the node's
+condition gave. With `brief: card`, its brief is the run's own card as it was given (its body, labels and files), along with the route
+taken and the reason its condition gave. The run that started it never includes the new run's time or cost, and it ends as it does
+today. A run page links the two.
+
+A card follows its work from run to run: its runs, its state and the cards that wait on it all cover the run it started and every run
+that run's nodes started. A card that waits on it is released only when the last of them succeeds. If a run went to the wrong
+workflow, `nemia inbox resend <card>` sends the card on again from its latest run, and `nemia resend <run>` does the same for a run
+that has no card behind it.
+
+A **card node** can instead send the run's card back to the inbox, unqueued, with the label edits its `relabel:` lists
+(`card: backlog`). The edits use kubectl's syntax: `key=value` sets a key, and `key-` removes one. A label key can have a prefix, as in
+Kubernetes, such as sdlc/stage. sdlc's [front door](/sdlc/#its-workflows) is a routing workflow.
 
 ### A card that waits on others
 

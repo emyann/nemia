@@ -21,9 +21,9 @@ refined. Planning a later week ahead is `sdlc/stage=backlog` with `sdlc/sprint=w
 (`nemia label inbox <card> sdlc/stage=sprint --overwrite`). The door alone routes: no label routes a card past it.
 
 ```
-door ─ intake  → to-intake   (the card, as given, for intake)
-     ├ build   → to-build    (the card, as given, for build)
-     ├ quick   → to-quick    (the card, as given, for quick)
+door ─ intake  → to-intake   (starts intake, briefed by the card)
+     ├ build   → to-build    (starts build, briefed by the card)
+     ├ quick   → to-quick    (starts quick, briefed by the card)
      ├ answer  → answer      (Iris answers, changing nothing)
      └ backlog → backlog     (the card back to the backlog, unqueued)
 ```
@@ -31,9 +31,8 @@ door ─ intake  → to-intake   (the card, as given, for intake)
 - `door` is a judge (`route: judge`): a session on a fence that only reads (`Read`, `Grep`, `Glob`), which chooses one route by the
   *Routing* rules of the factory's `RULES.md` and says why in `reason`. Where it cannot tell, it signs off `blocked` with its question,
   and the run waits on a person; there is no gate otherwise.
-- `to-intake`, `to-build` and `to-quick` are card nodes (`card: given`): the one on the route taken files the run's own card, its body
-  and labels as they were, with `workflow:` its workflow, `from:` this run and the door's reason, which the factory starts as any card.
-  No agent runs on them.
+- `to-intake`, `to-build` and `to-quick` are workflow nodes (`brief: card`): the one on the route taken starts a run of its workflow, briefed with the run's own card, its
+  body, labels and files as they were, then the door's reason, and handed this run as context. No card is filed, and no agent runs on them.
 - `answer` is Iris answering a question that asks no change, on a fence that reads and searches the web, her answer the run's result.
 - `backlog` is a card node (`card: backlog`) that files the card back to the inbox naming no workflow and unqueued, with
   `relabel: [sdlc/stage=backlog]`: the card keeps its `sdlc/sprint` mark and its `sdlc/state`, and the trigger selects it no more until
@@ -48,10 +47,12 @@ cards it queues now.
 
 ## A card routed wrong
 
-The routed run is a run of its own. A step of it that finds its card is not what its workflow is for signs off `blocked`, saying so and
-which workflow the card needs (`RULES.md`, *Routing*). The person sends the card on with one command, `nemia inbox resend <card>
-[--workflow <workflow>]` (the board's *Send on*, the port's `inbox_resend`): a card is started once, so it is filed again under a name
-of its own, `<run>-resent`, handed the blocked run, and the blocked run is cancelled. Named, the workflow it needs runs it; left out, the
+The routed run is a run of its own, and the card follows it: the card's runs, its state and its waiters are those of its work, the door's
+run and the run it started. A step of the routed run that finds its card is not what its workflow is for signs off `blocked`, saying so
+and which workflow the card needs (`RULES.md`, *Routing*). The person sends the card on with one command, `nemia inbox resend <card>
+[--workflow <workflow>]` (the board's *Send on*, the port's `inbox_resend`), which sends on the latest run of the card's work: a card is
+started once, so it is filed again under a name of its own, `<run>-resent`, handed the blocked run, and the blocked run is cancelled. A run
+no card is behind is sent on the same way with `nemia resend <run> [--workflow <workflow>]`. Named, the workflow it needs runs it; left out, the
 card names none and keeps the labels the routed card took from the run, in the sprint and ready to work, so the door routes it again.
 
 ## What an overlay can change

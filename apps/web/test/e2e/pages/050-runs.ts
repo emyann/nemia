@@ -234,7 +234,11 @@ async function cardSays(page: Page, run: WaitingRun) {
   await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'its own steps as its graph');
   await expectCount(card.locator('[data-step-name]'), 0, 'a graph that names no step under its nodes');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
-  await expectCount(card.locator('[data-cut-button]'), 1 + approvals, 'and no other but Approve, where the run waits at an approval');
+  await expectCount(
+    card.locator('[data-cut-button]'),
+    1 + actions,
+    'and no other but Approve or Answer, where the run waits at an approval or on an answer',
+  );
   await expectCount(
     card.locator('button[data-step-bar]'),
     run.steps.length,
@@ -244,8 +248,8 @@ async function cardSays(page: Page, run: WaitingRun) {
   if (clocks > 1) throw new Refused(`the card of ${run.id} draws its clock once — it draws ${clocks}`);
   await expectCount(
     card.locator('button:not([data-step-bar])'),
-    1 + approvals + (run.cost && run.tokens ? 1 : 0) + clocks,
-    'and no control more than the copy of its id, Approve and the previews of its clock and its cost: nothing is decided from the list',
+    1 + actions + (run.cost && run.tokens ? 1 : 0) + clocks,
+    'and no control more than the copy of its id, Approve or Answer, and the previews of its clock and its cost: nothing is decided from the list',
   );
 }
 

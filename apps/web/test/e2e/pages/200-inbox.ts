@@ -53,7 +53,7 @@ async function searched(page: Page) {
   await idle(page);
   const kept = (await answered<CardList>(page, '/api/cards?limit=100&search=render')).items.map((card) => card.metadata.name);
   if (kept.length === 0) throw new Refused('the seed holds a card that says render, so the search keeps one');
-  await expectVisible(cardIn(page, kept[0]!), `the words keep ${kept[0]}`);
+  await expectVisible(cardIn(page, kept[0]), `the words keep ${kept[0]}`);
   await expectCount(cardsOf(page), kept.length, 'and only the cards the api keeps for them');
   await page.getByRole('button', { name: 'Take off “render”' }).click();
   await page.waitForURL((url) => !url.searchParams.has('q'), { timeout: WAIT_MS });
@@ -67,7 +67,7 @@ async function sorted(page: Page) {
   await page.getByRole('radio', { name: /^Oldest/ }).click();
   await page.waitForURL((url) => url.searchParams.get('sort') === 'oldest', { timeout: WAIT_MS });
   await idle(page);
-  await expectVisible(cardIn(page, oldest[0]!), `Oldest lists ${oldest[0]} first`);
+  await expectVisible(cardIn(page, oldest[0]), `Oldest lists ${oldest[0]} first`);
   const names = await namesOf(page);
   if (names[0] !== oldest[0]) throw new Refused(`Oldest puts ${oldest[0]} first — the page puts ${names[0]} first`);
   await page.getByRole('radio', { name: /^Newest/ }).click();

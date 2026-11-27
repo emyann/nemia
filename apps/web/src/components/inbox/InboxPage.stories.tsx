@@ -148,7 +148,7 @@ export const Closed: Story = {
 
 /** A search that keeps some cards: chains are not pulled out, and the words show as a chip in the bar. */
 export const Searched: Story = {
-  render: () => drawn({ at: { q: 'reads' }, cards: [OPEN[0]!], counts: { ...NONE, notStarted: 1 } }),
+  render: () => drawn({ at: { q: 'reads' }, cards: [OPEN[0]], counts: { ...NONE, notStarted: 1 } }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-chip="q"]')).not.toBeNull();
   },

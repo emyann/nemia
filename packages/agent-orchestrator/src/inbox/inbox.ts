@@ -764,10 +764,10 @@ export function inboxListing(
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
   const phased = waiting && { look: waiting.look, phaseOf: (id: string) => phases.get(id) ?? waiting.phaseOf(id) };
   const filed = new Map(files.map((f) => [f.file, f.filedAt ?? ''] as const));
-  const stated = cardsListed(files, runs, tries, factories, triggering, phased).map((l) => ({
-    ...l,
-    state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }) satisfies string as CardState,
-  }));
+  const stated = cardsListed(files, runs, tries, factories, triggering, phased).map((l) => {
+    const state: CardState = cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) });
+    return { ...l, state };
+  });
   const linked = stated.map((l) => ({ name: l.name, after: l.after, inPlay: CARD_IN_PLAY[l.state] }));
   return stated.map((l, i) => {
     const place = chainOf(linked[i] as (typeof linked)[number], linked);

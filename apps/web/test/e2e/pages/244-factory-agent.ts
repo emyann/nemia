@@ -24,7 +24,7 @@ function written() {
   const folder = path.join(store!, 'factories', FACTORY);
   const flow = path.join(folder, 'tree', 'workflows');
   const text = `---\nagent: ${AGENT.name}\nplace: folder\n---\nGuard the gate.\n`;
-  write(path.join(folder, 'tree', 'factory.json'), `${JSON.stringify({ workflows: [WORKFLOW.name] }, null, 2)}\n`);
+  write(path.join(folder, 'tree', 'factory.json'), `${JSON.stringify({ workflows: [WORKFLOW.name], hires: {} }, null, 2)}\n`);
   write(path.join(flow, WORKFLOW.name, `${WORKFLOW.step}.md`), text);
   write(
     path.join(flow, 'agents', `${AGENT.name}.md`),

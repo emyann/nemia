@@ -23,29 +23,28 @@ Name its address in your `artifacts` as a value, `{"name": "pull request", "valu
 labels the factory's rules give the run's labels (`${{ parameters.pullRequestLabels }}`), each round, and refuses a draft, another base,
 two open pull requests, or a head that is not your commit, however the pull request was opened.
 
-Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and waits on the
-`${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit, and a red, cancelled or missing
-`${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log — the
-script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
-A red whose job's log names a line that failed it comes back after the first run, not re-run: the refusal says so, and names the
-lines it took as the change's; a failing line your change did not touch (a flaky test) you say so in your sign-off. Any other red
-context has been re-run once by then, its failed jobs, so its refusal names the jobs re-run and how each ended the second
-time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
-change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
+Your check then pushes again through the same script, so CI's verdict is for the commit it judges, and the factory's `ci-watch` program
+writes the `ci` condition your step waits on: CI runs the repository's suite on that commit, and a red, cancelled or missing
+`${{ parameters.ciCheck }}` comes back as the condition's `False` or its `Unknown`, with the head, the Actions URL and the failing jobs
+(no log lines: you read why through the GitHub server, below).
+A red whose job's log names a line that failed it is `False` after the first run, not re-run; a failing line your change did not touch (a
+flaky test) you say so in your sign-off. Any other red context has been re-run once by then, its failed jobs, read from GitHub's `run_attempt`:
+a job red twice is the change's. A step whose note says `ci` is `Unknown` asks nothing of the work: change nothing, and sign off as before;
+the next pass reads the re-run's own verdict and re-runs nothing again.
 
-**Don't wait on CI yourself.** Push and open the pull request, then sign off: your check waits on `${{ parameters.ciCheck }}` and
-hands you its verdict, the failing jobs and their log included. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
+**Don't wait on CI yourself.** Push and open the pull request, then sign off: your `ci` condition waits on `${{ parameters.ciCheck }}` and
+hands you its verdict, the failing jobs and the Actions address. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
 its slot and its context for nothing.
 
 **Read a red CI yourself where its lines do not say why.** Your step loads the factory's `github` server, and a red `${{ parameters.ciCheck }}` whose handed lines
 do not explain the failure (a page's failure detail, a log the job printed past the tail, a job with no failing test) is read from the
 failed jobs themselves through it, read-only: `actions_list` the run's jobs, `actions_get` a run or a job, and `get_job_logs` the log of a
 failed job, each as `mcp__github__<tool>`. Your fence refuses its writes (`actions_run_trigger`: run, re-run, cancel, delete
-logs): the check re-runs what it re-runs.
+logs): the `ci-watch` program re-runs what it re-runs.
 
-**Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch and waits on CI: it
-runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push`, `pull-request.ts declares-ci` and `pull-request.ts wait`, in that order, and nothing else; where neither the head nor the base branch declares
-a CI workflow under `.github/workflows`, it runs the local check (`${{ parameters.localCheck }}`) in place of the wait. Run them yourself
+**Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch, and the `ci` condition waits on CI: it
+runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push` and `pull-request.ts declares-ci`, in that order, and nothing else; where neither the head nor the base branch declares
+a CI workflow under `.github/workflows`, its `local` check runs the local check (`${{ parameters.localCheck }}`) in place of the condition, which is then written `True`. Run them yourself
 before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
 lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
 is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red

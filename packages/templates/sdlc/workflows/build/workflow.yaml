@@ -6,7 +6,7 @@ metadata:
 spec:
   needs:
     - name: gh
-      message: "gh, the GitHub CLI, on the PATH, which pushes the run's branch, labels its pull request, waits on its checks and lands it: needed only where github is true"
+      message: "gh, the GitHub CLI, on the PATH, which pushes the run's branch, labels its pull request, watches its checks (the factory's ci-watch program) and lands it: needed only where github is true"
       check: "if [ \"${{ parameters.github }}\" = true ]; then command -v gh >/dev/null; fi"
       fixes:
         - message: "install the latest gh release for this machine into Nemia's tools folder, its sum checked against the release's checksums, with no sudo"
@@ -62,8 +62,11 @@ spec:
           run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" push --labels \"${{ parameters.pullRequestLabels }}\"; fi"
         - name: round
           run: "if [ \"${{ parameters.github }}\" = true ]; then { ${{ parameters.roundCheck }}; }; fi"
+        - name: local
+          run: "if [ \"${{ parameters.github }}\" = true ] && node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" declares-ci; then echo 'nemia ci: the CI context judges this head'; else { ${{ parameters.localCheck }}; }; fi"
         - name: ci
-          run: "if [ \"${{ parameters.github }}\" = true ]; then if node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" declares-ci; then node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" wait --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi; else { ${{ parameters.localCheck }}; }; fi"
+          condition: ci
+          enabled: "${{ parameters.github }}"
       overrides:
         mcp:
           - "${{ case(parameters.github, 'github', '') }}"
@@ -76,11 +79,14 @@ spec:
       workspace: base
       budget: 10
       checks:
+        - name: ci
+          condition: ci
+          enabled: "${{ parameters.github }}"
         - name: receipt
           run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi"
         - name: base-ci
-          run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" base-ci --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\" --wait-on-ci \"${{ parameters.landingWaitsOnCi }}\"; fi"
-          usesCheckout: false
+          condition: base-ci
+          enabled: "${{ parameters.github }}"
       checkMemory: "${{ parameters.landingCheckMemory }}"
       memoryRequest: "${{ parameters.lightMemoryRequest }}"
     - name: review

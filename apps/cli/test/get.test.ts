@@ -85,6 +85,16 @@ test('REFUSED: `-A` of a kind the api lists one namespace at a time exits 2 nami
   assert.match(refused.err, /-n <namespace>/);
 });
 
+test('`--field-selector` is sent on the list of runs, where the api reads it, and refused on any other kind', async () => {
+  const kept = await store.nemia(['get', 'runs', '-A', '--field-selector', 'status.state!=finished']);
+  assert.equal(kept.code, 0, kept.err);
+  const wrong = await store.nemia(['get', 'runs', '-A', '--field-selector', 'status.nope=1']);
+  assert.notEqual(wrong.code, 0, 'the api refuses a term it does not read, so it was sent');
+  const refused = await store.nemia(['get', 'cards', '--field-selector', 'status.state!=finished']);
+  assert.equal(refused.code, 2, refused.err);
+  assert.match(refused.err, /runs/);
+});
+
 test('`nemia get --help` is its own; `nemia get cards --local` is refused exit 2 by the route, naming the command without it', async () => {
   const help = await store.nemia(['get', '--help']);
   assert.equal(help.code, 0, help.err);

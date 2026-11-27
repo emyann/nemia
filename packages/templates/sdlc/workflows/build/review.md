@@ -20,10 +20,10 @@ and only it, then the part headed *Either way*.
 
 ### true — on GitHub
 
-The implement step's check ran the repository's round check (`${{ parameters.roundCheck }}`) on this round's tree, and waited on CI:
-GitHub's `${{ parameters.ciCheck }}` context judged the repository's suite on the commit implement pushed, and the check proved that
-commit is the one it judged. Your brief hands you its exit and the end of its output, that verdict in it; a check that did not pass is
-a finding, and so is a round whose suite nothing ran.
+The implement step's check ran the repository's round check (`${{ parameters.roundCheck }}`) on this round's tree, and waited on the
+condition `${{ parameters.ciCheck }}`, which the factory's `ci-watch` program writes from GitHub's context of that name: it judged the
+repository's suite on the commit implement pushed, and the check `push` proved that commit is the one it judged. Your brief hands you
+the checks' words, that verdict among them; a check that did not pass is a finding, and so is a round whose suite nothing ran.
 
 **Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `mcp__github__pull_request_read` with `get` (its state, mergeability, head, title and body), `get_status` and `get_check_runs`, `<n>` being the number that address ends on, with the repository's `owner` and `repo`. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
 the commit you are reviewing. You open, edit, merge and close none: those are refused you, and a person's.

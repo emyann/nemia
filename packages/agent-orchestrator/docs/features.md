@@ -6041,8 +6041,8 @@ refuses a slow round:
 4. A count of landings whose `push: main` run came back red — the number that says whether a merge queue is worth a card. A merge queue
    is named as the next follow-on in `docs/plan-github-ci.md`, §6, and is scheduled as nothing.
 
-The wait's bound starts at 1800 s for `ci` to be reported and 2400 s whole (`START_SECONDS`, `WHOLE_SECONDS` in `pull-request.ts`), to
-be re-measured once reading 3 is known.
+The `ci-watch` program polls for the contexts and has no bound of its own: a step waits on its condition until the watcher writes it,
+so a reading 3 sizes nothing in a script.
 
 What it leaves: the merge queue, and Nemia reading several named checks through a place's `checks` verb with `checks:` — both the next
 follow-on's, neither a card. And the receipt freezes `landing.ts` from `HEAD`, which after the fast-forward holds the run's own copy of

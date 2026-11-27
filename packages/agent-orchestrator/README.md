@@ -2265,25 +2265,22 @@ checks:
     enabled: false
 ```
 
-- **Each entry is `{ name, run, after?, enabled?, usesCheckout? }`.** `run:` is a shell line, as a GitHub Actions step's; a `name` is lower-case
+- **Each entry is `{ name, run | condition, after?, enabled? }`.** `run:` is a shell line, as a GitHub Actions step's, and `condition: <name>` in its place waits on a condition a program or a person writes; a `name` is lower-case
   words joined by `-`. A check with no `after:` waits on the one above it, so a plain list is a chain; `after: []` waits on nothing, and
   two such run side by side; `after: [a, b]` waits on both. `enabled: false` takes a check out and hands its waits on to the checks
-  that waited on it. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
+  that waited on it; a template writes it as `enabled: "${{ parameters.<name> }}"` for a boolean parameter, which a factory's apply renders as `true` or `false`. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
   off, and `check:` beside `checks:`.
-- **An ending may say a check uses no checkout: `usesCheckout: false`.** An ending (`workspace: base`) works in the repository's own
-  checkout, and holds it until every check that uses it has passed; a check with `usesCheckout: false` reads and writes nothing there,
-  as a wait on a CI service at the commit that landed does, so it runs after the checkout is given back to the next run's ending, with
-  nothing installed before it, and still judges the step (`checksHoldCheckout`, proved by `contracts/checkout-checks.contract.ts`).
-  Load refuses it on a step that is no ending. A shell line cannot be fenced to it: a check that says so and reads the checkout races
-  the next landing.
+- **A condition check holds no checkout.** An ending (`workspace: base`) works in the repository's own checkout, and holds it until every
+  check that runs a command there has passed; a `condition:` check runs nothing there, as a wait on a CI service at the commit that
+  landed does, so the checkout is given back to the next run's ending once the commands have passed, and the condition still judges the
+  step once its writer writes it (`checksHoldCheckout`, proved by `contracts/checkout-checks.contract.ts`).
 
   ```yaml
   checks:
     - name: receipt
       run: node land.ts receipt
     - name: base-ci
-      run: node land.ts base-ci
-      usesCheckout: false
+      condition: base-ci
   ```
 
 - **`check: <line>` is one check named `check`**, filed under the task id it always had, so a run started before `checks:` reads as it
@@ -2738,9 +2735,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   ending as a person's try does, and `wf ls` says so beside the try. A landing
   holds the checkout until it has landed or aborted, not only while its session runs: while its check runs on the
   merge, and while the merge is staged and not yet committed or aborted, so another run's ending is filed on the
-  first pass after that one — except for its checks with `usesCheckout: false`, which run after it is given back:
-  once every other check has passed and nothing of the run's is staged, another run's ending is filed while they
-  still run, and the first still records its own landing, or fails its step, on their word. Such a run is running, not waiting on anybody:
+  first pass after that one — except for its `condition:` checks, which wait after it is given back:
+  once every check that runs a command has passed and nothing of the run's is staged, another run's ending is filed while they
+  are still unwritten, and the first still records its own landing, or fails its step, on their word. Such a run is running, not waiting on anybody:
   the word that files its ending is given, so `wf decide` reads it as still running, nothing is `→ waiting on
   you`, and it keeps counting against the cap on runs in flight. A claim on that checkout is a promise that the
   pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
@@ -4279,7 +4276,7 @@ screen of the board.
   or `launchctl print`'s `pid`: the daemon lets the lease go before its process exits, and systemd answers a start of a unit still
   active as done and does nothing), and resumes the store once the new daemon has completed its first pass — never on a daemon that
   only ticks. It waits
-  on no check, a landing's wait on CI included: each runs on its worker through the restart, and the new daemon reads its result. The
+  on no check, a landing's check included: each runs on its worker through the restart, and the new daemon reads its result. The
   pause it puts and the drain it holds the sessions by each name the process that put them, so a restart killed while it waits leaves
   neither standing past the daemon's next pass (`liftLapsedPause`, `putDrain`). A new daemon that stops before that pass, or a lease that does
   not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused; where the unit then runs

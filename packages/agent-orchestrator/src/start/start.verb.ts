@@ -83,10 +83,10 @@ import { listedModels } from '../harness/models.store.ts';
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
  * against the agent hired, as if its file named it. Refused: first, a workflow the factory has not attached (`unattachedRefusal`), before
- * its folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
- * steps are filled by its hires; then every workflow node whose workflow the factory does not offer; and a hire into a step whose file
- * names its own agent (`parseWorkflow`). With no factory — the default —
- * every workflow is offered, and a step that names no agent is a plain session, as it always was.
+ * its folder is read, since a factory offers only its workflows; then every workflow node whose workflow the factory does not offer; then
+ * every step left with no agent (`unfilledRefusal`), since a factory's steps are filled by its hires; and a hire into a step whose file
+ * names its own agent (`parseWorkflow`). With no factory — the default — every workflow is offered, and a step that names no agent is a
+ * plain session, as it always was.
  *
  * The factory's rules are read here, once, with its hires (`factoryFills`), and handed to every step: the run freezes them with its
  * steps. Refused (`Invalid`), naming the file, before a run is written: a rules file that cannot be told — a link, anything that is no

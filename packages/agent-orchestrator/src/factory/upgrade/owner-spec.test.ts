@@ -46,30 +46,30 @@ describe('an owner as the choices compose it, row by row: a removal of the rules
   });
   describe('an agent the choices remove', () => {
     const wiring = (hires: Record<string, string>) => ({ 'factory.json': `${JSON.stringify({ workflows: ['flow'], hires }, null, 2)}\n` });
-    const agent = { kind: 'Agent', name: 'otto' } as const;
+    const agent = { kind: 'Agent', name: 'implementer' } as const;
     const merge = (theirs: Record<string, string>) =>
       mergeTrees(
-        tree({ ...wiring({ 'flow/land': 'otto' }), 'workflows/agents/otto.md': 'one\n' }),
-        tree({ ...wiring({ 'flow/land': 'otto' }), 'workflows/agents/otto.md': 'mine\n' }),
+        tree({ ...wiring({ 'flow/review': 'implementer' }), 'workflows/agents/implementer.md': 'one\n' }),
+        tree({ ...wiring({ 'flow/review': 'implementer' }), 'workflows/agents/implementer.md': 'mine\n' }),
         tree(theirs),
       );
-    const ours = tree({ ...wiring({ 'flow/land': 'otto' }), 'workflows/agents/otto.md': 'mine\n' });
+    const ours = tree({ ...wiring({ 'flow/review': 'implementer' }), 'workflows/agents/implementer.md': 'mine\n' });
     test('proposes a hire fired for each step the tree hires it into, then its removal', () => {
       const m = merge(wiring({}));
-      const at = 'workflows/agents/otto.md';
+      const at = 'workflows/agents/implementer.md';
       const objects = objectsOf('acme', agent, m, { [at]: 'theirs' }, texts(ours));
       assert.deepEqual(
         objects.map((o) => [o.kind, o.name]),
         [
-          ['Hire', 'flow.land'],
-          ['Agent', 'otto'],
+          ['Hire', 'flow.review'],
+          ['Agent', 'implementer'],
         ],
       );
     });
     test('is refused Invalid where the composed wiring still hires it', () => {
-      const m = merge({ ...wiring({ 'flow/land': 'otto' }) });
+      const m = merge({ ...wiring({ 'flow/review': 'implementer' }) });
       assert.throws(
-        () => objectsOf('acme', agent, m, { 'workflows/agents/otto.md': 'theirs' }, texts(ours)),
+        () => objectsOf('acme', agent, m, { 'workflows/agents/implementer.md': 'theirs' }, texts(ours)),
         (err: { _tag?: string }) => err._tag === 'Invalid',
       );
     });

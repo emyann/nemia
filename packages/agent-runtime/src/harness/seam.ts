@@ -70,13 +70,12 @@ export type SpawnRequest = {
    */
   telemetry?: Telemetry;
   /**
-   * The access token of each remote MCP server of the task signed in to by a code, by the server's name: set by an engine at each spawn
-   * (`tokened`, `mcp-token.ts`), never on `config`, which is journalled, and never in an attached session's run file
-   * (`keptRequest`). A job's request file (`<run>.request.json`, mode 0600, owner-only like the task's `config`) holds it for the bin to
-   * read. A harness that hands servers to its session lays each as the server's `Authorization` header (`withTokens`).
+   * The file the access token of each remote MCP server of the task signed in to by a code is held in, by the server's name: paths, never
+   * tokens, set by an engine at each spawn (`tokened`, `mcp-token.ts`), never on `config`, which is journalled. A harness that hands
+   * servers to its session lays each as a `headersHelper` that reads the current token from its file (`withTokenHelpers`).
    * Absent: no server has one.
    */
-  mcpTokens?: Readonly<Record<string, string>>;
+  mcpTokenFiles?: Readonly<Record<string, string>>;
 };
 
 /**

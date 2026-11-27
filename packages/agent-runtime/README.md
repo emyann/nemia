@@ -2219,7 +2219,7 @@ of pure code sits beside it.
 | `src/harness/mcp-callback.ts` | whether a pasted address completes a waiting MCP sign-in (`callbackRefusal`, proved by `contracts/mcp-callback.contract.ts`): read by `new URL` (`pastedOf`) and compared with the redirect the sign-in asked for, before the held session is handed it |
 | `src/harness/mcp-sign-in.ts` | a remote server signed in to and out of by the browser on Claude Code: a held session asked `mcpAuthenticate` and watched until `connected` (or handed a pasted callback, `submit`), and the sign-in cleared by an add, then `claude mcp remove --scope local`; no client secret is stored |
 | `src/harness/mcp-device.ts` | a remote server signed in to by a code (RFC 8628): its provider's metadata read to choose the road (`routeOf`), the code asked (`deviceCodeOf`), the poll (`pollOnce`) and the refresh (`refreshOnce`), each with the client id alone; its three decisions are proved by `contracts/mcp-device.contract.ts` |
-| `src/harness/mcp-token.ts` | the tokens of the servers signed in to by a code, one 0600 file each under the engine's root, and the runner wrapper `tokened` that hands each spawn the fresh ones on `SpawnRequest.mcpTokens`, laid as the server's `Authorization` header (`withTokens`) |
+| `src/harness/mcp-token.ts` | the tokens of the servers signed in to by a code, one 0600 file each under the engine's root, and the runner wrapper `tokened` that hands each spawn their files' paths on `SpawnRequest.mcpTokenFiles`, laid as each server's `headersHelper` (`withTokenHelpers`): `bin/ae-mcp-headers.ts`, which Claude Code runs at each connection and after a refused call, prints the current token, refreshed under a lock when due (`heldToken`); the lock's decision is proved by `contracts/mcp-token.contract.ts` |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
@@ -2329,6 +2329,7 @@ of pure code sits beside it.
 | `src/cli/compact.ts` | what `ae compact` is asked (`--yes` or nothing) and the lines it prints: per harness its captures, their bytes before and after, and each left with why |
 | `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with, and the sessions a pass left running (`runningText`) |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
+| `bin/ae-mcp-headers.ts` | the `headersHelper` of a server signed in to by a code: prints the current `Authorization` header from its token file, refreshed under a lock when due |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `bin/ae-claude-job.ts` | a Claude Code job's own process: one session on the Agent SDK's `query()`, built from the spawn request the runner wrote, printing each message as one line of the stream a job's readers read |
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |

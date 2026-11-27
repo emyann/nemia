@@ -20,7 +20,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
  */
 export type LockHolder = 'live' | 'gone' | 'unreadable';
 
-/** What the process that found the lock taken does: looks again later (`wait`), removes the lock (`break`), or hands the token as read (`stand`). */
+/** What the process that found the lock taken does: looks again (`wait`), removes it (`break`), or hands the token as read (`stand`). */
 export type LockStep = 'wait' | 'break' | 'stand';
 
 /** The largest wait or bound, in whole milliseconds, a clock gives: half of 2^53, so that no sum of two rounds. */
@@ -49,13 +49,11 @@ const refreshLockSpec = spec<(holder: LockHolder, waitedMs: number, boundMs: num
     },
     anUnreadableLockIsWaitedForWithinTheBound: {
       description: 'A lock not yet written is waited for within the bound, since its holder may be writing it',
-      condition: ({ input: [holder, waitedMs, boundMs], output }) =>
-        holder !== 'unreadable' || waitedMs >= boundMs || output === 'wait',
+      condition: ({ input: [holder, waitedMs, boundMs], output }) => holder !== 'unreadable' || waitedMs >= boundMs || output === 'wait',
     },
     anUnreadableLockIsBrokenPastTheBound: {
       description: 'A lock still unreadable past the bound was left by a process that died writing it, and is broken',
-      condition: ({ input: [holder, waitedMs, boundMs], output }) =>
-        holder !== 'unreadable' || waitedMs < boundMs || output === 'break',
+      condition: ({ input: [holder, waitedMs, boundMs], output }) => holder !== 'unreadable' || waitedMs < boundMs || output === 'break',
     },
   },
 });

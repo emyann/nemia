@@ -46,6 +46,12 @@ import readline from 'node:readline';
  * `$CLAUDE_CONFIG_DIR/projects/stand-in/<sessionId>.jsonl`, before the result. `id` is the session id it answers under, so two
  * sessions of one test process keep their transcripts apart.
  *
+ * `mcp` makes it act as Claude Code's MCP client for the remote servers its `--mcp-config` names (https://code.claude.com/docs/en/mcp,
+ * *Use dynamic headers for authentication*): `mcp.calls` times, once the file `mcp-call` appears in its folder, it posts to each such
+ * server's `url` with the server's static `headers`, then the JSON its `headersHelper` printed laid over them — the helper run by `sh -c`
+ * in the session's cwd with `CLAUDE_CODE_MCP_SERVER_NAME` and `CLAUDE_CODE_MCP_SERVER_URL`, given up on after 10 seconds. A 401 or 403
+ * runs the helper again and retries the call once. Each call's final status is a line of `mcp.jsonl`.
+ *
  * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
  * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
  * that turn instead, as Claude Code does for words pushed while a tool call runs: one result, listing every message it consumed on
@@ -90,6 +96,8 @@ type Plan = {
    * `left` of its folder: what a command a session ran leaves behind, which only its scope still holds.
    */
   leave?: boolean;
+  /** Call the remote MCP servers of `--mcp-config`, `calls` times, each once the file `mcp-call` appears. */
+  mcp?: { calls: number };
 };
 
 /**
@@ -274,6 +282,10 @@ const work = async () => {
       print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-next', content: 'ok' }] } });
     }
   }
+  for (let n = 0; n < (plan.mcp?.calls ?? 0); n++) {
+    await appears('mcp-call');
+    await mcpCalled();
+  }
   if (plan.stream && argv.includes('--include-partial-messages')) await streamed();
   if (plan.transcript) wrote();
   if (plan.hold) await appears('end');
@@ -293,6 +305,48 @@ const work = async () => {
     usage: { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 },
     ...(plan.output !== undefined ? { structured_output: plan.output } : {}),
   });
+};
+
+/** The JSON `helper` printed for `name`, run as Claude Code runs it: in a shell, in the cwd, killed at 10 s; `{}` on failure. */
+const helped = (helper: string, name: string, url: string) =>
+  new Promise<Record<string, string>>((resolve) => {
+    const child = spawn('sh', ['-c', helper], {
+      cwd: process.cwd(),
+      env: { ...process.env, CLAUDE_CODE_MCP_SERVER_NAME: name, CLAUDE_CODE_MCP_SERVER_URL: url },
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let out = '';
+    child.stdout.on('data', (d) => (out += String(d)));
+    const timer = setTimeout(() => child.kill('SIGKILL'), 10_000);
+    child.on('close', () => {
+      clearTimeout(timer);
+      try {
+        resolve(JSON.parse(out) as Record<string, string>);
+      } catch {
+        resolve({});
+      }
+    });
+  });
+
+/** One call to every remote server of `--mcp-config`, as Claude Code makes it, and each answer's status noted in `mcp.jsonl`. */
+const mcpCalled = async () => {
+  const config = JSON.parse(argv[argv.indexOf('--mcp-config') + 1] ?? '{}') as {
+    mcpServers?: Record<string, { url?: string; headers?: Record<string, string>; headersHelper?: string }>;
+  };
+  for (const [name, server] of Object.entries(config.mcpServers ?? {})) {
+    if (server.url === undefined) continue;
+    const post = async () =>
+      (
+        await fetch(server.url!, {
+          method: 'POST',
+          headers: { ...server.headers, ...(server.headersHelper === undefined ? {} : await helped(server.headersHelper, name, server.url!)) },
+          body: '{}',
+        })
+      ).status;
+    let status = await post();
+    if (status === 401 || status === 403) status = await post();
+    note('mcp.jsonl', { name, status });
+  }
 };
 
 /** The two pieces of text the stand-in writes, and the whole its transcript keeps. */

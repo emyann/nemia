@@ -23,7 +23,7 @@ const stepIn = (workflow: string, step: string, keys: string) => {
   fs.writeFileSync(file, `---\nplace: git\n${keys}---\nDo ${step}.\n`);
 };
 stepIn('sort', 'pick', 'routes: [make, later]\nroute: { script: pick.ts }\n');
-stepIn('sort', 'to-make', 'after: pick\nwhen: make\nworkflow: make\ncard: given\n');
+stepIn('sort', 'to-make', 'after: pick\nwhen: make\nworkflow: make\nbrief: card\n');
 stepIn('sort', 'back', 'after: pick\nwhen: later\ncard: backlog\nrelabel: ready-\n');
 stepIn('tidy', 'sweep', 'routes: [a, b]\nroute: { script: sweep.ts }\nends: [a, b]\n');
 stepIn('make', 'code', '');

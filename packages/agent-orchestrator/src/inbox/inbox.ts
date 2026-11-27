@@ -510,7 +510,7 @@ export { CARD_STATES };
 export type CardState = (typeof CARD_STATES)[number];
 
 /** A run as the inbox reads it: its id, the card it was started from, and its phase as the runs list judges it, read now. */
-export type CardRun = Pick<Run, 'id' | 'from'> & { phase: RunPhase };
+export type CardRun = Pick<Run, 'id' | 'from' | 'startedBy' | 'createdAt'> & { phase: RunPhase };
 
 /**
  * A listed entry's state, from what the listing read of it: the phase of its run when a record names it, whatever the card carries — the

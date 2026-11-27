@@ -296,6 +296,7 @@ const STEP: Shape = {
     ends: 'strings',
     when: 'strings',
     workflow: 'string',
+    brief: 'string',
     card: 'string',
     relabel: 'strings',
     waitsFor: 'strings',

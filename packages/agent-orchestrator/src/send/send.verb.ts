@@ -77,7 +77,7 @@ function sentCardTitle(run: Run, producer: Closeout | undefined) {
 }
 
 /**
- * The run's own card as it was given, which a `card: given` or `card: backlog` node files on: its body, its labels, its files and the
+ * The run's own card as it was given, which a `brief: card` or `card: backlog` node carries on: its body, its labels, its files and the
  * namespace that keeps them (its factory, `default` for none).
  */
 export type GivenCard = {

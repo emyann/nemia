@@ -180,9 +180,9 @@ describe('a step file reads route: in its three shapes, and refuses any other', 
     const c = parseWorkflow('triage', file('routes: [web, docs]\nroute: judge\nends: [docs]'));
     assert.deepEqual(c.ends, ['docs']);
   });
-  test('card: and relabel:, a given card for a workflow and a backlog node that edits labels; a blank relabel: is refused as any blank key, since a template renders an empty parameter as no line', () => {
-    const given = parseWorkflow('w', file('after: triage\nwhen: [web]\nworkflow: build\ncard: given'));
-    assert.deepEqual([given.workflow, given.card], ['build', 'given']);
+  test('brief: on a workflow node; card: and relabel:, a backlog node that edits labels; a blank relabel: is refused as any blank key, since a template renders an empty parameter as no line', () => {
+    const briefed = parseWorkflow('w', file('after: triage\nwhen: [web]\nworkflow: build\nbrief: card'));
+    assert.deepEqual([briefed.workflow, briefed.brief, briefed.card], ['build', 'card', undefined]);
     const back = parseWorkflow('b', file('after: triage\nwhen: [docs]\ncard: backlog\nrelabel: [team.example/stage=backlog, ready-]'));
     assert.deepEqual([back.card, back.workflow, back.relabel], ['backlog', undefined, ['team.example/stage=backlog', 'ready-']]);
     assert.throws(() => parseWorkflow('b', file("after: triage\nwhen: [docs]\ncard: backlog\nrelabel: ''")), WorkflowError);
@@ -201,9 +201,11 @@ describe('a step file reads route: in its three shapes, and refuses any other', 
     ['a workflow: that is no name', 'workflow: ../build'],
     ['a card: that is no word of its list', 'workflow: build\ncard: copied'],
     ['a backlog node that names a workflow', 'workflow: build\ncard: backlog'],
-    ['a given card that names no workflow', 'card: given'],
-    ['a routed card that names no workflow', 'card: routed'],
-    ['relabel: on a node that is no backlog', 'workflow: build\ncard: given\nrelabel: [ready-]'],
+    ['the retired card: given, which brief: card says now', 'workflow: build\ncard: given'],
+    ['the retired card: routed, which is the default now', 'workflow: build\ncard: routed'],
+    ['a brief: that is no word of its list', 'workflow: build\nbrief: copied'],
+    ['a brief: on a step with no workflow', 'brief: card'],
+    ['relabel: on a node that is no backlog', 'workflow: build\nrelabel: [ready-]'],
     ['relabel: with an item that is no edit', 'card: backlog\nrelabel: [ready]'],
     ['relabel: editing one key twice', 'card: backlog\nrelabel: [a=b, a-]'],
     ['relabel: setting a key Nemia sets itself', 'card: backlog\nrelabel: [workflow=build]'],
@@ -224,7 +226,7 @@ describe('a step file with the routing keys renders to a file that reads back as
     'routes: [web, docs]\nroute: { script: routes/pick.ts }',
     'routes: [web, docs]\nroute: judge',
     'after: triage\nwhen: [web]\nworkflow: build',
-    'after: triage\nwhen: [web]\nworkflow: build\ncard: given',
+    'after: triage\nwhen: [web]\nworkflow: build\nbrief: card',
     'after: triage\nwhen: [web]\ncard: backlog\nrelabel: [team.example/stage=backlog, ready-]',
   ]) {
     test(keys.split('\n').join('; '), () => {

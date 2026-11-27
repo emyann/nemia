@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import { brokenOn } from '@emyann/tsverify';
 import type { HarnessModels } from 'objects';
 import { longestFirstOf, type AtWorkRow } from '../contracts/agent-activity.contract.ts';
-import { activityOf } from '../src/lib/atWork.ts';
 import type { KeyForm } from '../src/lib/api/builder.ts';
 import type { SkillPlace } from '../src/lib/api/skills.ts';
 import {
@@ -194,14 +193,5 @@ describe('what the contract of an activity assumes of the sort', () => {
       brokenOn(longestFirstOf, [[rows]]).map((broken) => broken.law),
       [],
     );
-  });
-
-  test('every session of an agent is listed, the longest first, and another agent is left out', () => {
-    const rows = [row('a', '1', 3), row('b', '9', 99), row('a', '2', 40)];
-    const activity = activityOf(rows, 'a');
-    assert.equal(activity.kind, 'many');
-    assert.deepEqual(activity.kind === 'many' ? activity.rows.map((r) => r.run) : [], ['2', '1']);
-    assert.equal(activityOf(rows, 'b').kind, 'one');
-    assert.equal(activityOf(rows, 'c').kind, 'none');
   });
 });

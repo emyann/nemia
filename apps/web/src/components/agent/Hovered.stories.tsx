@@ -7,6 +7,13 @@ import { Hovered } from './Hovered';
 const meta: Meta<typeof Hovered> = {
   title: 'Frame/Hovered',
   component: Hovered,
+  decorators: [
+    (Story) => (
+      <div style={{ paddingBottom: 80, minWidth: 420 }}>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     said: 'Reviewer belongs to factory acme, so it can not be edited here.',
     children: (

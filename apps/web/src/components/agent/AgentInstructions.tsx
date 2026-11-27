@@ -53,7 +53,14 @@ export function AgentInstructions({ name, file, body }: { name: string; file: st
             <Body size="small" className="shrink-0 px-4 pb-3 font-mono text-on-surface-variant">
               {file} · {words} words
             </Body>
-            <Body size="large" component="div" className="mb-5 min-h-0 overflow-y-auto px-4">
+            <Body
+              size="large"
+              component="div"
+              tabIndex={0}
+              role="region"
+              aria-label="Instructions"
+              className="mb-5 min-h-0 overflow-y-auto px-4"
+            >
               <Markdown top>{body}</Markdown>
             </Body>
           </div>

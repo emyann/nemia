@@ -38,17 +38,11 @@ const UNSET = 'Not set';
 
 /**
  * The effort levels the model takes, as the harness lists them for it, else those the effort key's words allow the harness.
- * @param keys The agent's role keys.
  * @param keyForm The step form's keys; undefined while they load.
  * @param listed The model as its harness lists it, if it does.
  * @param harness The harness the agent runs on.
  */
-const levelsOf = (
-  keys: AgentListing['keys'],
-  keyForm: KeyForm | undefined,
-  listed: { efforts: readonly string[] | null } | undefined,
-  harness: string,
-) => {
+const levelsOf = (keyForm: KeyForm | undefined, listed: { efforts: readonly string[] | null } | undefined, harness: string) => {
   const field = keyForm?.keys.find((k) => k.key === 'effort');
   return listed?.efforts ?? field?.byHarness?.[harness] ?? field?.choices ?? [];
 };
@@ -64,7 +58,7 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
   const meaning = (key: AgentRoleKey) => keyForm?.keys.find((k) => k.key === key)?.meaning ?? null;
   const harness = keys.harness ?? keyForm?.defaultHarness ?? UNSET;
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
-  const levels = levelsOf(keys, keyForm, listed, harness);
+  const levels = levelsOf(keyForm, listed, harness);
   const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
   return [
     { label: 'Harness', value: harness, note: meaning('harness'), pips: null },

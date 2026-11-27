@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
 import { attachedFiles, attachedRun, lines, worked, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, dropStoredFactory, dropStoredRun, store, storeFactory, storeRecord } from '../world.ts';
+import { dropStoredFactory, dropStoredRun, store, storeFactory, storeRecord } from '../world.ts';
 
 /** The factory the page files, with its agent and its workflow in its own tree, on a repository that is not the checkout. */
 const FACTORY = 'sentinel-works';
@@ -116,7 +115,7 @@ export default {
    * A factory's own agent, read in its factory, is drawn read only: the frame's head names the agent as a person is named, its ring is lit
    * while a session of it is at work, and the line under its description names the run it works on, linked, with no Working section for
    * one session. A "Read only" tag says the factory owns it, the step it is hired into is a link, and Show all opens its instructions
-   * in a dialog named for it. Photographed in both themes.
+   * in a dialog named for it. The runner photographs it in both themes.
    */
   name: 'factory-agent',
   route: `/factories/${FACTORY}`,
@@ -137,8 +136,6 @@ export default {
       await expectVisible(page.getByRole('dialog', { name: "Sentinel's instructions" }), 'Show all opens its instructions in a dialog');
       await page.keyboard.press('Escape');
       await expectCount(page.getByRole('dialog'), 0, 'which Escape closes');
-      await settled(page);
-      await photograph(page, path.join(OUT, `factory-agent-${await themeOf(page)}.png`));
     } finally {
       takeBack();
       await goto(page, `/factories/${FACTORY}`).catch(() => undefined);

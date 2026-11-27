@@ -33,6 +33,7 @@ export const ROOTS = [
   'apps/cli/src',
   'apps/web/src/lib/api/read.ts',
   'apps/web/src/lib/api/runs.ts',
+  'apps/web/src/lib/atWork.ts',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/factoryStep.ts',
   'apps/web/src/lib/fieldWidget.ts',

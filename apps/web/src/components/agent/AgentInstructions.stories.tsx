@@ -21,12 +21,12 @@ export const Panel: Story = {
   },
 };
 
-/** Show all opens a dialog named for the agent, and Escape closes it. */
+/** Show all opens a dialog named for the agent, its file and word count under its title, and the whole of the instructions in it. */
 export const Opened: Story = {
+  tags: ['overlay'],
   play: async ({ canvasElement }) => {
     await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Show all' }));
-    await within(document.body).findByRole('dialog', { name: "Reviewer's instructions" });
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(within(document.body).queryByRole('dialog')).toBeNull());
+    const dialog = await within(document.body).findByRole('dialog', { name: "Reviewer's instructions" });
+    await waitFor(() => expect(within(dialog).getByText(/agents\/reviewer\.md · \d+ words/)).toBeVisible());
   },
 };

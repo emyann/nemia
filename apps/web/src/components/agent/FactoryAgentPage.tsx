@@ -20,7 +20,6 @@ import {
   plateOf,
   serverGroupsOf,
   skillGroupsOf,
-  type Mark,
   type PlateRow,
   type StepGives,
   type TileGroup,
@@ -170,6 +169,8 @@ function useAgentReads(agent: Listing, factory: string, idle: boolean) {
     stepsRead: pages.every((page) => !page.isPending),
     stepsFailed: pages.find((page) => page.error && !readGone(page.error))?.error,
     marks: marks.data ?? [],
+    marksPending: marks.isPending,
+    marksFailed: marks.error,
     ended: lastEndedOf(runs, agent.name),
   };
 }
@@ -282,8 +283,22 @@ function Steps({ agent, factory }: { agent: Listing; factory: string }) {
 }
 
 /** What changed in the agent, its steps and its skills, a sentence a day, the newest first; nothing is drawn while there is none. */
-function History({ marks }: { marks: readonly Mark[] }) {
-  const history = historyOf(marks);
+function History({ reads }: { reads: ReturnType<typeof useAgentReads> }) {
+  const history = historyOf(reads.marks);
+  if (reads.marksPending)
+    return (
+      <section aria-label="History" className="space-y-3">
+        <SectionHead count={0} word="History" tone="rest" />
+        <Waiting label="Reading its history…" />
+      </section>
+    );
+  if (reads.marksFailed)
+    return (
+      <section aria-label="History" className="space-y-3">
+        <SectionHead count={0} word="History" tone="rest" />
+        <ReadTrouble what="its history" error={reads.marksFailed} size="small" />
+      </section>
+    );
   if (history.length === 0) return null;
   return (
     <section aria-label="History" className="space-y-3">
@@ -361,7 +376,7 @@ export function FactoryAgentPage({ name, factory }: { name: string; factory: str
           <Spec agent={agent} />
           <Steps agent={agent} factory={factory} />
           <AgentInstructions name={name} file={`agents/${name}.md`} body={agent.body} />
-          <History marks={reads.marks} />
+          <History reads={reads} />
         </div>
         <div data-column="right" className="min-w-0 space-y-8">
           <WorkingSection activity={activity} />

@@ -3,11 +3,13 @@
  * through (visit.ts), in a process that exits as `npm run e2e` does. visit.test.ts runs it.
  *
  *   node test/e2e/broken-page.ts <console-error | failed-request | covered | store-removed | store-swept | none>
- *     <screenshots directory> [--photos [--light]] [--again]
+ *     <screenshots directory> [--photos [--light]] [--again] [--at <instant>]
  *
  * It visits in the dark theme, pictured by no one, as `npm run e2e` does; with `--photos`, the page pictured in the dark, as
  * `npm run e2e -- --photos` does, and with `--light` besides in light, then dark (`themesOf`). With `--again` it visits the page a
  * second time once the first passed, as a worker visits the next page it is handed: in the same process, through another `visitAll`.
+ * With `--at`, the clock the visits read where their browser is placed (`visitAll`'s `clock`) reads the instant given, an ISO date, as
+ * the first visit begins, and runs at the machine's pace from there; else it is the machine's own.
  * `none` breaks nothing, and must pass: otherwise the page itself is what fails, and a refusal of the
  * others proves nothing about the break; it takes a picture of its own too (`none-own-<theme>.png`), as a page of the app's does. The
  * page is painted for both themes, so the theme check passes and the break is what is left to fail. The two `store-` breaks break no
@@ -41,10 +43,33 @@ const [how = '', out, ...flags] = process.argv.slice(2);
 const photos = flags.includes('--photos');
 const light = flags.includes('--light');
 const again = flags.includes('--again');
-if (!(how in BREAKS) || !out || flags.some((flag) => !['--photos', '--light', '--again'].includes(flag)) || (light && !photos)) {
-  console.error(`usage: node broken-page.ts <${Object.keys(BREAKS).join(' | ')}> <screenshots directory> [--photos [--light]] [--again]`);
+const atGiven = flags.indexOf('--at');
+const at = atGiven < 0 ? undefined : Date.parse(flags[atGiven + 1] ?? '');
+const switches = atGiven < 0 ? flags : flags.toSpliced(atGiven, 2);
+if (
+  !(how in BREAKS) ||
+  !out ||
+  switches.some((flag) => !['--photos', '--light', '--again'].includes(flag)) ||
+  (light && !photos) ||
+  Number.isNaN(at)
+) {
+  console.error(
+    `usage: node broken-page.ts <${Object.keys(BREAKS).join(' | ')}> <screenshots directory> [--photos [--light]] [--again] [--at <ISO instant>]`,
+  );
   process.exit(2);
 }
+
+/** When the first visit read the clock, by `performance.now()`. */
+let begun: number | undefined;
+
+/** The clock the visits read: `at` at its first read and the machine's pace after it, or the machine's own where no `--at` is given. */
+const clock =
+  at === undefined
+    ? Date.now
+    : () => {
+        begun ??= performance.now();
+        return at + performance.now() - begun;
+      };
 
 const TEXT = 'A page for the e2e to look at';
 const PRESS = 'Press';
@@ -89,6 +114,7 @@ server.listen(0, '127.0.0.1', () => {
           store,
           themes: [...themesOf({ photos, light, contrast: false })],
           pictured: () => photos,
+          clock,
         });
         console.log(`e2e: timings ${JSON.stringify(timings)}`);
       }

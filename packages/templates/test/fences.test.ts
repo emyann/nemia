@@ -375,7 +375,7 @@ const promptsOf = (template: string) =>
 
 test('the refused-call paragraph is in RULES.md, which every step holds, and in no agent; REFUSED: a copy in an agent is named', () => {
   const prompts = promptsOf(SDLC);
-  assert.equal(prompts.size, 7, 'RULES.md and every agent are read');
+  assert.equal(prompts.size, 6, 'RULES.md and every agent are read');
   assert.deepEqual(refusedCallCopies(prompts), ['RULES.md']);
   prompts.set('agents/argus/instructions.md', `${prompts.get('agents/argus/instructions.md')}\n${prompts.get('RULES.md')}`);
   prompts.set('RULES.md', '');

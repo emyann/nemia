@@ -81,7 +81,10 @@ test('two runs are landed one at a time: the older takes the turn, the other wai
   const two = pass([run(w, 'r-1', '00', TURNED), run(w, 'r-2', '05', waiting)], pulls(refreshed, tipOf(w, 'r-2')), REFRESH);
   assert.deepEqual(
     two.written.map((it) => [it.run, it.name, it.status]),
-    [['r-1', 'landed', 'True']],
+    [
+      ['r-1', 'landed', 'True'],
+      ['r-2', 'turn', 'True'],
+    ],
     two.err,
   );
   const merges = asked(two.calls, 'pr', 'merge');
@@ -89,14 +92,7 @@ test('two runs are landed one at a time: the older takes the turn, the other wai
   assert.deepEqual(merges[0].argv.slice(0, 5), ['pr', 'merge', '7', '--merge', '--match-head-commit']);
   assert.equal(merges[0].argv[5], refreshed, 'merged at the refreshed head ci judged');
 
-  const done = { ...TURNED, landed: { status: 'True' as const, message: 'merged' } };
-  const three = pass([run(w, 'r-1', '00', done), run(w, 'r-2', '05', waiting)], pulls(refreshed, tipOf(w, 'r-2')), REFRESH);
-  assert.deepEqual(
-    three.written.map((it) => [it.run, it.name, it.status]),
-    [['r-2', 'turn', 'True']],
-    three.err,
-  );
-  assert.notEqual(tipOf(w, 'r-2'), w.runs['r-2'].tip, 'r-2 is refreshed once r-1 landed');
+  assert.notEqual(tipOf(w, 'r-2'), w.runs['r-2'].tip, 'r-2 is refreshed in the pass where r-1 landed, which frees the slot');
 });
 
 test('a run whose pull request a person merged by hand reads as landed, and nothing is merged', () => {

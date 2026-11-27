@@ -344,11 +344,11 @@ describe('landingOpen gives the checkout back once every check that runs a comma
 
 describe('landedWords says what the run did with the merge: the commit, or why none', () => {
   test('a commit, by its short sha', () =>
-    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run landed on main as 0123456'));
+    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run merged into main as 0123456'));
   test('an abort, with why', () =>
     assert.equal(
       landedWords({ branch: 'main' }, { aborted: 'its check refused the merge (exit 1)' }),
-      'nothing landed on main: its check refused the merge (exit 1)',
+      'nothing merged into main: its check refused the merge (exit 1)',
     ));
 });
 

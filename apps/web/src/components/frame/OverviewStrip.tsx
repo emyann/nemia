@@ -155,7 +155,7 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
           value={dollars(strip.spentUsd)}
           breakdown={strip.spentTokens && tokensBreakdown(strip.spentTokens, `${dollars(strip.spentUsd)} today`)}
         />
-        <Sticker hue="ink" label="Per landing">
+        <Sticker hue="ink" label="Per succeeded run">
           {dollars(strip.perLanding)}
         </Sticker>
         <Sticker hue="failure" label="Failed">

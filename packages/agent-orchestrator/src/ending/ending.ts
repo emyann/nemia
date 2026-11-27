@@ -235,7 +235,7 @@ export const landingOpen = (
 };
 
 /**
- * What the run did with an ending's merge — `the run landed on main as 1a2b3c4`, or why it made no commit — as the tick's
+ * What the run did with an ending's merge — `the run merged into main as 1a2b3c4`, or why it made no commit — as the tick's
  * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge
  * the run aborted (`retryLines`).
  * @param run The run's base branch.
@@ -243,9 +243,9 @@ export const landingOpen = (
  */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: LandingRecord) =>
   'commit' in landed
-    ? `the run landed on ${run.branch} as ${landed.commit.slice(0, 7)}`
+    ? `the run merged into ${run.branch} as ${landed.commit.slice(0, 7)}`
     : 'aborted' in landed
-      ? `nothing landed on ${run.branch}: ${landed.aborted}`
+      ? `nothing merged into ${run.branch}: ${landed.aborted}`
       : `${landed.untouched}: the run left the checkout as it found it`;
 
 /** The longest `landedWords` a `nemia ls` line prints: the reason for an abort can be the place's refusal, whole (`landThrough`). */

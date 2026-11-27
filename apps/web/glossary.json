@@ -30,16 +30,6 @@
       "type": "SkillSource",
       "retired": [
         {
-          "spelling": "landed",
-          "card": "run-core-say-succeeded-and-m-k9iy: a run succeeded and a branch is merged; landed is sdlc's word only",
-          "kept": [
-            {
-              "path": "apps/web/src/components/ui/ds",
-              "why": "the vendored design system kit, kept as shipped, says landed in its own English"
-            }
-          ]
-        },
-        {
           "spelling": "shipped",
           "card": "decision 13b: 'builtin' for what comes with the product"
         },
@@ -53,6 +43,16 @@
       "term": "Merged",
       "meaning": "a run's result is on its base, as the board says it: a context run not merged, the decision's `merge it`. A hold or a start waits until a run has succeeded or been released, never until a branch is merged.",
       "retired": [
+        {
+          "spelling": "landed",
+          "card": "run-core-say-succeeded-and-m-k9iy: a run succeeded and a branch is merged; landed is sdlc's word only",
+          "kept": [
+            {
+              "path": "apps/web/src/components/ui/ds",
+              "why": "the vendored design system kit, kept as shipped, says landed in its own English"
+            }
+          ]
+        },
         {
           "spelling": "shipped",
           "card": "decision 13a: 'landed' for a run's result on its base"

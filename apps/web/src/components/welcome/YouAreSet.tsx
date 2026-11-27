@@ -28,7 +28,7 @@ export function YouAreSet() {
   return (
     <article data-you-are-set={succeeded ? 'set' : 'not-yet'} className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
       <header className="flex flex-col gap-1">
-        <PageName>{succeeded ? 'You are set' : 'Not succeeded yet'}</PageName>
+        <PageName>{succeeded ? 'You are set' : 'Not there yet'}</PageName>
         <p className="text-body-medium text-on-surface-variant">
           {succeeded
             ? 'A card said what you wanted, a workflow did it in steps, and a gate waited on you before it finished. Next:'

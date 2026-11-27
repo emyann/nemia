@@ -88,7 +88,7 @@ async function expectStickers(strip: Locator, want: Strip) {
     ['In flight', String(want.inFlight)],
     ['Succeeded', String(want.succeeded)],
     ['Spent', dollars(want.spentUsd)],
-    ['Per landing', dollars(want.perLanding)],
+    ['Per succeeded run', dollars(want.perLanding)],
     ['Failed', String(want.failed)],
   ];
   for (const [label, value] of stickers)

@@ -888,7 +888,7 @@ const waitingOver = (
     phaseOf: (id: string) => phases[id],
   }) satisfies Waiting;
 
-describe('`after:` names the cards a card waits on: read, written back, listed with each card not landed, and passed over by the queue and the triggers', () => {
+describe('`after:` names the cards a card waits on: read, written back, listed with each card not released, and passed over by the queue and the triggers', () => {
   const A = '---\nworkflow: dev\nfactory: f\n---\nFirst.\n';
   const B = '---\nworkflow: dev\nfactory: f\nqueued: 2026-09-16T09:00:00.000Z\nafter: a-1x2y\n---\nSecond.\n';
   const files = [
@@ -908,7 +908,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     );
   });
 
-  test('a hand-queued card whose named card has not landed is listed waiting on it, at no place in the queue, and the tick starts none of it', () => {
+  test('a hand-queued card whose named card is not released is listed waiting on it, at no place in the queue, and the tick starts none of it', () => {
     const listing = inboxListing(files, [], new Map(), new Map(), undefined, waitingOver({ 'a-1x2y': {} }));
     const b = listing.find((l) => l.name === 'b-3z4w');
     assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'filed', stalled: false }]);
@@ -917,10 +917,10 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     assert.equal(nextQueued(listing, '/repo'), undefined);
   });
 
-  test('once the named card has landed, it waits on nothing and takes its place', () => {
-    const landed = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', released: true }] } }, { 'a-run': 'succeeded' });
+  test('once the named card is released, it waits on nothing and takes its place', () => {
+    const released = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', released: true }] } }, { 'a-run': 'succeeded' });
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];
-    const b = inboxListing(files, runs, new Map(), new Map(), undefined, landed).find((l) => l.name === 'b-3z4w');
+    const b = inboxListing(files, runs, new Map(), new Map(), undefined, released).find((l) => l.name === 'b-3z4w');
     assert.equal(b?.waits, undefined);
     assert.equal(b?.queued?.place, 1);
   });
@@ -944,7 +944,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     assert.equal(c.waits?.length, 1);
   });
 
-  test('a wait on a card whose run ended unlanded, on a name the store does not know, and on a cycle, is stalled', () => {
+  test('a wait on a card whose run ended unreleased, on a name the store does not know, and on a cycle, is stalled', () => {
     const ended = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', released: false }] } }, { 'a-run': 'failed' });
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'failed' }];
     const b = inboxListing(files, runs, new Map(), new Map(), undefined, ended).find((l) => l.name === 'b-3z4w');

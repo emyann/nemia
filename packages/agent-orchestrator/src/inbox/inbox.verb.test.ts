@@ -1,7 +1,7 @@
 /**
  * The queue's tick ignores what it cannot tidy, and says so: a stale try that cannot be removed is left for a later pass, and the
  * failure is logged at the unhandled level before it is ignored (`dropStaleTries`, `startQueued`). And it starts no card that waits on a
- * card of its `after:` not landed, and takes it on the pass after that card lands.
+ * card of its `after:` not released, and takes it on the pass after that card is released.
  */
 import { configGiven } from '../../test/config-given.ts';
 import { STORE } from '../../test/ambient.ts';
@@ -67,7 +67,7 @@ test('a stale try that cannot be removed is ignored, and logged first', async ()
   assert.match(logged[0]?.cause ?? '', /EACCES/, 'and the failure it ignored, as its cause');
 });
 
-test('a queued card that waits on a card whose run has not landed is not started; on the pass after that run lands, it is the card taken', async () => {
+test('a queued card that waits on a card whose run is not released is not started; on the pass after that run is released, it is the card taken', async () => {
   const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
   const pass = (released: boolean) =>
     Effect.runPromise(
@@ -82,10 +82,10 @@ test('a queued card that waits on a card whose run has not landed is not started
       }).pipe(Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env)))),
     );
   assert.equal(await pass(false), undefined, 'the card waits: nothing is taken');
-  assert.equal((await pass(true))?.card, 'b-3z4w', 'its card landed: the queue takes it');
+  assert.equal((await pass(true))?.card, 'b-3z4w', 'its card released: the queue takes it');
 });
 
-test("through the pass's landing read (`releasedThrough` over `Parents.read`), a queued card waits while its card's run has not released its waiters, and is taken once it has", async () => {
+test("through the pass's landing read (`releasedThrough` over `Parents.read`), a queued card waits while its card's run is not released its waiters, and is taken once it has", async () => {
   const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
   const pass = (released: boolean) =>
     Effect.runPromise(
@@ -102,7 +102,7 @@ test("through the pass's landing read (`releasedThrough` over `Parents.read`), a
         return yield* startQueued('/repo', [first], releasedThrough(engineOf(engine().layer), { read }));
       }).pipe(Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env)))),
     );
-  assert.equal(await pass(false), undefined, 'its run has not released its waiters: nothing is taken');
+  assert.equal(await pass(false), undefined, 'its run is not released its waiters: nothing is taken');
   assert.equal((await pass(true))?.card, 'b-3z4w', 'its run released its waiters: the queue takes it');
 });
 
@@ -121,8 +121,8 @@ test('`waitingOf` follows a card to the card a node of its run filed (`sent`) an
     { file: 'x-run-p7q8-resent.md', text: '---\nworkflow: dev\n---\nSent on.\n' },
   ];
   const asked: string[] = [];
-  const landed = (id: string) => Effect.sync(() => (asked.push(id), id === 'a2-run-m5n6'));
-  const waiting = Effect.runSync(waitingOf(files, [routed, onward, resent], landed));
+  const released = (id: string) => Effect.sync(() => (asked.push(id), id === 'a2-run-m5n6'));
+  const waiting = Effect.runSync(waitingOf(files, [routed, onward, resent], released));
   assert.ok(waiting, 'a card not started names cards in its after:, so they are read');
   assert.deepEqual(waiting.look('a-1x2y'), { known: true, runs: [{ id: 'a-run-k2q9', released: false }], onward: ['a2-3z4w'] });
   assert.deepEqual(waiting.look('a2-3z4w'), { known: true, runs: [{ id: 'a2-run-m5n6', released: true }], onward: [] });
@@ -130,5 +130,5 @@ test('`waitingOf` follows a card to the card a node of its run filed (`sent`) an
   assert.deepEqual(waiting.look('x-run-p7q8-resent'), { known: true, runs: [], onward: [] }, 'in the inbox, with no run of its own yet');
   assert.equal(waiting.look('gone-1a2b').known, false, 'neither in the inbox nor started from');
   assert.deepEqual([...asked].sort(), ['a-run-k2q9', 'a2-run-m5n6', 'x-run-p7q8'], 'each run read once');
-  assert.equal(Effect.runSync(waitingOf(files.slice(1), [routed], landed)), undefined, 'no card names one: nothing is read');
+  assert.equal(Effect.runSync(waitingOf(files.slice(1), [routed], released)), undefined, 'no card names one: nothing is read');
 });

@@ -487,7 +487,7 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
     },
   );
   s.test(
-    "a person's start of a card whose after: names a card not landed starts it all the same, answering the cards it had waited on",
+    "a person's start of a card whose after: names a card not released starts it all the same, answering the cards it had waited on",
     async () => {
       emptyInbox();
       const repo = aRepoWith('dev');

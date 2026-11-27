@@ -486,7 +486,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(mergeHead(repo), false);
   assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { commit: head });
   assert.ok(
-    landed.notes.includes(`ship: its check passed on the merge, and the run landed on main as ${head.slice(0, 7)}`),
+    landed.notes.includes(`ship: its check passed on the merge, and the run merged into main as ${head.slice(0, 7)}`),
     landed.notes.join('\n'),
   );
   assert.equal(landed.status, 'succeeded');
@@ -497,7 +497,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(shipLine.message, 'verified ✓');
   assert.equal(
     shipLine.note,
-    `the run landed on main as ${head.slice(0, 7)}`,
+    `the run merged into main as ${head.slice(0, 7)}`,
     'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
 });
@@ -518,10 +518,10 @@ for (const [said, exitCode, words] of [
       { aborted: words, ...(exitCode === undefined ? {} : { refusedOn: base }) },
       'the base `nemia refresh --base` reads, on a refusal alone',
     );
-    assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
+    assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing merged into main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, runRecord(ROOT, id)))).steps.find((s) => s.name === 'ship')!;
     assert.equal(shipLine.message, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
-    assert.equal(shipLine.note, `nothing landed on main: ${words}`, 'and why nothing landed');
+    assert.equal(shipLine.note, `nothing merged into main: ${words}`, 'and why nothing merged');
 
     const decided = await decidedOf(e, id, { place: builtinGitPlace, env: ENV });
     const printed = [...decided.offers, ...decided.commands.map((c) => c.command)];
@@ -532,7 +532,7 @@ for (const [said, exitCode, words] of [
     if (exitCode === undefined)
       assert.equal(
         line,
-        `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry ${id} ship`,
+        `ship: its check did not finish, so the run aborted the merge and nothing merged into main. Merge and check again:  nemia retry ${id} ship`,
       );
 
     await assert.rejects(runWith(e, retryRun(id, 'ship', { mode: 'recheck' })), (err: unknown) => {
@@ -608,7 +608,7 @@ test('REFUSED at shipped defaults: a merge the run is not to commit is aborted �
     const note = (await runWith(e, list(e, runRecord(ROOT, id)))).steps.find((s) => s.name === 'ship')!.note!;
     assert.match(
       note,
-      /^nothing landed on main: the place refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
+      /^nothing merged into main: the place refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
       "nemia ls prints them on the step's row, never a line break inside it",
     );
     assert.equal(mergeHead(repo), false);

@@ -995,7 +995,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       assert.equal(world().head(repo), base);
       assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { aborted: 'ship ended blocked with its merge staged' });
       assert.ok(
-        pass.notes.includes('ship: ship ended blocked with its merge staged, so the run aborted its merge; nothing landed on main'),
+        pass.notes.includes('ship: ship ended blocked with its merge staged, so the run aborted its merge; nothing merged into main'),
         pass.notes.join('\n'),
       );
     },
@@ -1033,7 +1033,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       const { id, decided, awaiting, d } = checked;
       assert.deepEqual([awaiting.unfinishedCheck, awaiting.failedCheck], [['ship'], []]);
       assert.deepEqual(decided.offers, [
-        `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry ${id} ship`,
+        `ship: its check did not finish, so the run aborted the merge and nothing merged into main. Merge and check again:  nemia retry ${id} ship`,
       ]);
       const check = decided.checks.ship;
       assert.deepEqual(check && [check.command, verdictWord(check.verdict), check.passed, check.stdout], [
@@ -1053,7 +1053,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       const { id, decided, awaiting, d, base } = checked;
       assert.deepEqual([awaiting.unfinishedCheck, awaiting.failedCheck], [[], ['ship']]);
       assert.deepEqual(decided.offers, [
-        `ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (--fresh, or --model <m>, for a new session)`,
+        `ship: failed (check) — nothing merged into main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (--fresh, or --model <m>, for a new session)`,
       ]);
       const check = decided.checks.ship;
       assert.deepEqual(check && [check.command, verdictWord(check.verdict), check.passed, check.stdout], [

@@ -45,7 +45,7 @@ const light = flags.includes('--light');
 const again = flags.includes('--again');
 const atGiven = flags.indexOf('--at');
 const at = atGiven < 0 ? undefined : Date.parse(flags[atGiven + 1] ?? '');
-const switches = atGiven < 0 ? flags : flags.toSpliced(atGiven, 2);
+const switches = atGiven < 0 ? flags : [...flags.slice(0, atGiven), ...flags.slice(atGiven + 2)];
 if (
   !(how in BREAKS) ||
   !out ||

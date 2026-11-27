@@ -128,8 +128,8 @@ const STORE_BOTTOM = [
  * then a step's workspace, cut by the place, a workflow folder written on the run store, the two reads, the folders and the factories, and
  * where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as the
  * place says, on the place (`changes.store.ts`), a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and where the
- * branches stood on the run store and the place (`standing.store.ts`), and a run's result branches (`branches.store.ts`), which a landing
- * reads beside its place (`landing.store.ts`); and the feed's file on the run store and the tally (`feed.store.ts`), whose one schema for a
+ * branches stood on the run store and the place (`standing.store.ts`), and a run's result branches (`branches.store.ts`). And
+ * the feed's file on the run store and the tally (`feed.store.ts`), whose one schema for a
  * line of it the deliverer's file decodes a kept digest with, so the two cannot drift; and the releases' folders, on no store file
  * (`release.store.ts`), which an archive's download and the store's floor are kept beside (`archive.store.ts`). No other store file is
  * imported by another, so the tree has no cycle; outside the store, the client and the controllers beneath the CLI alone import them.
@@ -953,7 +953,7 @@ test('REFUSED: a pure file that reaches the network or the machine, reads the en
 test("a place's code imports node built-ins, effect, its own files and what a place is alone, and one file of src imports it", () => {
   const sources = placeSources();
   assert.ok('place/git/git.ts' in sources, `the scan read ${Object.keys(sources).join(', ') || 'no file'}`);
-  assert.ok(sources['place/git/verbs/land.ts'].includes('place/git/git.ts'), 'and read their imports');
+  assert.ok(sources['place/git/verbs/seal.ts'].includes('place/git/git.ts'), 'and read their imports');
   assert.ok(sources['place/git/git.ts'].includes('src/place/place.store.ts'));
   assert.ok(packageSources()[PLACE_DOOR].includes('place/git/place.ts'), 'the door imports the git place');
   assert.deepEqual(placeBreaks(sources, packageSources()), []);
@@ -982,13 +982,13 @@ test("REFUSED: a place's file that imports a package, the rest of src or another
     'effect',
     'place/git/verbs/open.ts',
     'src/place/place.ts',
-    'contracts/landed-by.contract.ts',
+    'contracts/checkout-install.contract.ts',
   ])
     assert.deepEqual(placeBreaks(plant(m)), [], `${m} is let through`);
   for (const file of [
     'src/tick/tick.verb.ts',
     'src/place/place.store.ts',
-    'src/place/landing.store.ts',
+    'src/place/builtin.store.ts',
     'src/cli/main.ts',
     'bin/nemia.ts',
   ]) {

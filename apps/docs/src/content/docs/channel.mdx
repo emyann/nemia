@@ -54,7 +54,19 @@ Enterprise organization, an administrator must turn channels on first, with the 
 - **What it says about itself.** A tag with a `notice` attribute comes from the channel itself:
   - `skipped`: the lines beyond the cap.
   - `missed`: the saved position couldn't be resumed because the feed was replaced, so it started over from now.
-  - `down` and `up`: the API stopped responding, then responded again. It retries every second and loses no line.
+  - `down`: the channel lost the API. It says only what it saw, and never guesses a cause such as sleep, the network or the server.
+    If its own clock jumped (the channel did not run for a while), it says so with both times, for example "The channel did not run
+    from 9:22 PM to 9:52 PM (its clock jumped 30 min)". Otherwise it says it has had no answer from the API since a given time. It
+    retries every second and loses no line.
+  - `up`: the API answers again. The notice says how many lines were written in the meantime and after which `resource_version`.
+    It says whether the server's daemon restarted in that time ("restarted at 9:40 PM" or "did not restart"), as the feed's
+    `DaemonStarted` lines show, whatever the channel's selectors. It also lists each run and step among those lines that waits for a
+    person, one per line. If it can't read those lines from where it lost the API (for example, the feed was replaced in the
+    meantime), it says it can't tell whether the daemon restarted. Its attributes `caught_up`, `after`, `restarted` (`yes`, `no`, or
+    `unknown`) and `restarted_at` say the same for an agent.
+
+    Times are in the local time of the machine the channel runs on. When the channel can't tell the time zone, it uses UTC and says so.
+
   - `refused`: the API rejected a selector or a namespace. The channel stops with exit code 2 and explains why on stderr too.
 
 ## From any MCP client: the API's resources

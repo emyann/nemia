@@ -89,7 +89,10 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   notifications, a stdio MCP server Claude Code spawns. Its notifications are `objects`' Events, read off the Event list's watch
   (`?watch=true&resourceVersion=`), each by `channelNotice` (proved by `contracts/channel-notice.contract.ts`), and its Claude Code words
   (`claude/channel`, the notification's method, the instructions) stay in that file: no other file of the repository's layers says them
-  (`packages/agent-orchestrator/test/words.test.ts`). Its stdout is the MCP connection: it prints nothing there but its help.
+  (`packages/agent-orchestrator/test/words.test.ts`). Its stdout is the MCP connection: it prints nothing there but its help. What it
+  says of losing the api and reaching it again is `src/watch/channel-liveness.ts`, pure, each time handed in: only what it observed (a
+  stretch its own process did not run, no answer since a time, the `DaemonStarted` lines and those that wait on a person among what
+  was written meanwhile), never a cause it cannot see.
 - **`nemia decide` is a verb of the client's own** (`src/objects/decide.ts`, the untangle intent's Q14): it prints the screen of the
   api's one decide read model and, at a terminal, runs the `nemia` command a person picks as this client runs it; a `git` command it
   prints and never runs. The client judges nothing: `nemia apply -f`

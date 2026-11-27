@@ -43,7 +43,7 @@ const folderOf = (steps: Record<string, string>) => {
   return dir;
 };
 
-/** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
+/** A watcher's workflow: its one step in a worktree of the repository, outside the cap on runs, bridged, on a window of its own. */
 const FOLDER = folderOf({
   supervise: 'slot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
@@ -119,8 +119,8 @@ test('a step answered five times over keeps working: each answer a try of the sa
   const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
 
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-  assert.deepEqual(filings, [`${run.id}-supervise`], "filed once, in the repository's own checkout");
-  assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, repo);
+  assert.deepEqual(filings, [`${run.id}-supervise`], 'filed once');
+  assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, runRecord(ROOT, run.id).steps.supervise.workspace, "in the step's own worktree");
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.claude?.remoteControl, true, 'bridged, as `remote: true` says');
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.contextTokens, 200_000, 'capped, as `context: 200k` says');
 

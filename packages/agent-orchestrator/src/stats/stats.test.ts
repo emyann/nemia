@@ -298,7 +298,7 @@ const partly = (big: number) =>
       design: [{ end: at(1), cost: null }],
       implement: [{ end: at(2), cost: big }],
       review: [{ end: at(3), cost: big }],
-      land: [{ end: at(7), cost: big }],
+      land: [{ end: at(7), cost: big, check: 'passed' as const }],
     }),
     true,
   );
@@ -317,22 +317,27 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
     },
     { name: 'a workflow with no loop has no rounds', check: () => assert.deepEqual(factsOf(twoRounds('r3', noLoop)).runs[0].rounds, []) },
     {
-      name: 'a loop that has not ended accepted counts no rounds; an acceptance of the try the loop is on ends it',
+      name: 'a loop that has not ended accepted is no finished run; an acceptance of the try the loop is on ends it',
       check: () => {
         const r = readOf(
           'r-open',
           TEAM,
-          { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] },
+          {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          },
           {},
           true,
         );
-        assert.deepEqual(factsOf(r).runs[0].rounds, []);
+        assert.equal(factsOf(r).runs.length, 0, 'a loop that asked for another round nobody accepted has not finished');
         r.run.acceptances = [{ step: 'review', try: 1, at: at(4), message: 'enough' }];
         assert.deepEqual(factsOf(r).runs[0].rounds, [1]);
       },
     },
     {
-      name: 'an acceptance of an earlier try of the loop counts no rounds: the loop is on another try',
+      name: 'an acceptance of an earlier try of the loop finishes no run: the loop is on another try',
       check: () => {
         const r = readOf(
           'r-earlier',
@@ -341,12 +346,12 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
             design: [{ end: at(1) }],
             implement: [{ end: at(2), cause: 'round' }, { end: at(4) }],
             review: [{ end: at(3), cause: 'round' }, { end: at(5) }],
-            land: [{ end: at(7) }],
+            land: [{ end: at(7), check: 'passed' as const }],
           },
           { acceptances: [{ step: 'review', try: 1, at: at(4), message: 'enough' }] },
           true,
         );
-        assert.deepEqual(factsOf(r).runs[0].rounds, []);
+        assert.equal(factsOf(r).runs.length, 0, 'the loop is on another try, which nobody accepted');
       },
     },
     {
@@ -644,7 +649,12 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
 describe('`headlineOf`: the headline numbers of a set of facts, each mean over what was measured and null over nothing', () => {
   const headline = (...reads: ReturnType<typeof readOf>[]) => headlineOf(factsOfAll(...reads));
   const old = (id: string) =>
-    readOf(id, TEAM, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+    readOf(id, TEAM, {
+      design: [{ end: at(1) }],
+      implement: [{ end: at(2) }],
+      review: [{ end: at(3) }],
+      land: [{ end: at(7), check: 'passed' as const }],
+    });
   const deniedSteps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer', harness: 'codex' })];
   const deniedTries = {
     design: [
@@ -913,7 +923,12 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
       name: 'a day whose runs never recorded their landing has no landed count',
       check: () => {
         const old = (id: string) =>
-          readOf(id, TEAM, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+          readOf(id, TEAM, {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          });
         const s = statsOf(factsOfAll(old('old-1'), old('old-2')), { by: 'workflow' }, NOW);
         assert.equal(s.groups[0].days.find((d) => d.day === DAY)?.merged, null);
       },
@@ -1181,7 +1196,12 @@ describe('what `nemia stats` prints is made of: null where nothing was measured,
       name: "a day's landed is null where no run recorded it, not 0",
       check: () => {
         const old = (id: string) =>
-          readOf(id, TEAM, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+          readOf(id, TEAM, {
+            design: [{ end: at(1) }],
+            implement: [{ end: at(2) }],
+            review: [{ end: at(3) }],
+            land: [{ end: at(7), check: 'passed' as const }],
+          });
         const day = statsOfReads([old('old-1'), old('old-2')], { by: 'workflow' }).groups[0]?.days.find((d) => d.day === DAY);
         assert.deepEqual([day?.runs, day?.merged], [2, null]);
       },

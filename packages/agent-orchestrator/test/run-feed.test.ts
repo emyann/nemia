@@ -146,7 +146,7 @@ const folderOf = (steps: Record<string, string[]>) => {
 const GATED = folderOf({ plan: ['gate: true'], implement: ['after: plan'] });
 /** `plan → implement`, with no gate. */
 const UNGATED = folderOf({ plan: [], implement: ['after: plan'] });
-/** `implement → ship`, whose ending waits at its gate before it is filed, as a shipped `build` ends. */
+/** `implement → ship`, whose ending holds at its gate once it has signed off. */
 const ENDING = folderOf({ implement: [], ship: ['after: implement', 'gate: true'] });
 
 /** A run started on `workflowDir` in a repository of its own, its steps sharing its checkout unless `isolate`. */
@@ -1003,6 +1003,8 @@ describe('a run waiting on a person says what it waits on, never failed: an endi
     const branch = runRecord(ROOT, run.id).steps.implement.branch!;
     stage.place().world.branch(repo, branch, { 'work.txt': 'the work\n' });
     settle(task(run, 'implement'), 'succeeded', SIGNED);
+    await ticks(3);
+    settle(task(run, 'ship'), 'succeeded', SIGNED);
     await ticks(3);
     assert.equal(words(run.id, 'ship').at(-1), 'awaiting approval', 'ship waits at its gate, with work on the branch it left');
     const last = lines()

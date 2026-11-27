@@ -204,11 +204,6 @@ describe('REFUSED: a command node or a named check the run could not file as wri
       'file-notes:',
     ],
     [
-      'a command node with a workspace of its own',
-      { 'file-notes.md': '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts\n---\n' },
-      'file-notes:',
-    ],
-    [
       'a command node that names no agent',
       { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\n---\n' },
       'file-notes:',

@@ -674,58 +674,42 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
     const pruning = await runWith(h.e, prune(run.id, { unmerged: true }));
     assert.equal(pruning.kind, 'prunable', "the worktree left is prunable, not refused as right's hand-off still owed");
   });
-  st.test(
-    'a pass lists the store once: an ending waiting on the checkout and a refused queued card read no record of a finished run',
-    async () => {
-      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-      fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
-      fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nharness: codex\nafter: implement\ngate: true\n---\nship it\n');
-      const [first, second] = await s.started(2, dir, aRepo(), true);
-      for (const run of [first, second]) s.touched.add(run.id);
-      for (let k = 0; k < 8 && ![first, second].every((r) => s.memo.runs.has(r.id)); k++) {
-        await s.verified();
-        for (const run of [first, second]) {
-          const workspace = runRecord(ROOT, run.id).steps.implement?.workspace;
-          if (workspace) fs.writeFileSync(path.join(workspace, `${run.id}.ts`), 'export const done = true;\n');
-        }
-        await h.signAll(inFlight);
+  st.test('a pass lists the store once: a refused queued card reads no record of a finished run', async () => {
+    const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
+    const [first, second] = await s.started(2, dir, aRepo(), true);
+    for (const run of [first, second]) s.touched.add(run.id);
+    for (let k = 0; k < 8 && ![first, second].every((r) => s.memo.runs.has(r.id)); k++) {
+      await s.verified();
+      for (const run of [first, second]) {
+        const workspace = runRecord(ROOT, run.id).steps.implement?.workspace;
+        if (workspace) fs.writeFileSync(path.join(workspace, `${run.id}.ts`), 'export const done = true;\n');
       }
-      assert.ok(s.memo.runs.has(first.id) && s.memo.runs.has(second.id), 'both runs at rest at the gate of their ending');
-      await runWith(h.e, approveRun(first.id, 'ship', 'Merge it.'));
-      await s.verified();
-      assert.ok(runRecord(ROOT, first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
-      inFlight.push(first);
-      await runWith(h.e, approveRun(second.id, 'ship', 'Merge it too.'));
+      await h.signAll(inFlight);
+    }
+    assert.ok(s.memo.runs.has(first.id) && s.memo.runs.has(second.id), 'both runs finished and at rest');
 
-      const gone = folder('work');
-      const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: path.basename(gone) });
-      queueInInbox(card.name);
-      fs.rmSync(gone, { recursive: true });
-      const refused = await s.verified();
-      assert.ok(refused.queue && 'refused' in refused.queue, `the card's start refused (${JSON.stringify(refused.queue)})`);
+    const gone = folder('work');
+    const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: path.basename(gone) });
+    queueInInbox(card.name);
+    fs.rmSync(gone, { recursive: true });
+    const refused = await s.verified();
+    assert.ok(refused.queue && 'refused' in refused.queue, `the card's start refused (${JSON.stringify(refused.queue)})`);
 
-      await s.verified();
-      const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: false }));
-      const cost = pass.cost!;
-      const listed = listRuns(ROOT).length;
-      assert.ok(cost.rested >= FINISHED, `the finished runs answered from memory (${cost.rested})`);
-      assert.equal(
-        cost.records,
-        listed - cost.rested,
-        `only the records of the runs in flight read (${cost.records} of ${listed}): the checkout's claims and the queue are read off the pass's own listing`,
-      );
-      const waiting = pass.runs.find((a) => a.run.id === second.id)!;
-      assert.equal(runRecord(ROOT, second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
-      assert.equal(
-        waiting.feed.steps.find((step) => step.name === 'ship')?.word,
-        `waiting on the checkout (${first.id}'s ship has it)`,
-        "it waits on the first run's, in the checkout",
-      );
-      assert.equal(pass.queue, undefined, 'the refused card is not tried again');
-      const listing = readInbox().find((l) => l.name === card.name);
-      assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');
-    },
-  );
+    await s.verified();
+    const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: false }));
+    const cost = pass.cost!;
+    const listed = listRuns(ROOT).length;
+    assert.ok(cost.rested >= FINISHED, `the finished runs answered from memory (${cost.rested})`);
+    assert.equal(
+      cost.records,
+      listed - cost.rested,
+      `only the records of the runs in flight read (${cost.records} of ${listed}): the queue is read off the pass's own listing`,
+    );
+    assert.equal(pass.queue, undefined, 'the refused card is not tried again');
+    const listing = readInbox().find((l) => l.name === card.name);
+    assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');
+  });
 });
 
 /** An event the runtime appends to a task: what it cost. */

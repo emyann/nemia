@@ -229,7 +229,7 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
       const all = await answered(['--from', DAY, '--to', DAY]);
       assert.deepEqual(
         [all.all.total.runs, all.all.total.merged, all.all.total.rounds, all.all.total.costPerMerged, all.all.total.timePerMerged],
-        [1, 0, 1, null, null],
+        [1, null, 1, null, null],
       );
       assert.equal(all.all.total.tries, 4);
       const build = all.all.steps.find((row) => row.step === 'build');
@@ -254,7 +254,7 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
     const { all } = await answered(['--from', DAY, '--to', DAY]);
     assert.ok(all.tiles.before.to < all.tiles.last.from, 'the 14 days before end before the last 14 begin');
     const day = all.days.find((d) => d.day === DAY);
-    assert.deepEqual([day?.runs, day?.merged, day?.rounds, day?.costPerMerged, day?.timePerMerged], [1, 0, 1, null, null]);
+    assert.deepEqual([day?.runs, day?.merged, day?.rounds, day?.costPerMerged, day?.timePerMerged], [1, null, 1, null, null]);
     assert.deepEqual(all.marks, [], 'no run changed what it froze');
   });
   s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async () => {

@@ -63,6 +63,7 @@ export const TASK_HEADINGS = {
   "What <step>'s check <check> said": 'check',
   "What <step>'s check said": 'check',
   'What the check said': 'check',
+  'What the checks said': 'check',
   'Try <n>': 'run',
   'Round <n> of <cap>': 'run',
   'Round <n>, past rounds: <cap>': 'run',

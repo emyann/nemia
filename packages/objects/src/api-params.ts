@@ -56,16 +56,28 @@ export const factorySettingParams = {
 export const factoryOwnParams = { factory: Schema.String.annotate({ description: "The factory's name." }) };
 
 /**
- * The query of a list of cards: a list's (`listQuery`), and `fieldSelector`, the cards by whether they are still in play, in Kubernetes'
- * spelling: `status.inPlay=true` (or `==true`, `!=false`) the cards not started or whose run has not ended, `status.inPlay=false` those
- * whose run ended; an empty one, or none, every card. Any other is refused `Invalid`, naming the forms it takes.
+ * The query of a list of cards: a list's (`listQuery`), `fieldSelector` in Kubernetes' spelling (comma-joined terms, each `=`, `==` or
+ * `!=`, all of which must hold) of `status.inPlay`, `status.chained` (`true` or `false`) and `status.phase` (a card phase); `orderBy`, as
+ * AIP-132 spells `order_by` (one field, ` desc` for descending); and `search`, words matched in a card's title and name. Any other
+ * selector or order is refused `Invalid`, naming the forms it takes.
  */
 export const cardListQuery = {
   ...listQuery,
   fieldSelector: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "A fieldSelector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.",
+        "A fieldSelector in Kubernetes' spelling, comma-joined terms that must all hold: status.inPlay=true|false, status.chained=true|false, status.phase=<notStarted|blocked|waiting|working|done|failed|cancelled>, each with =, == or !=; empty or absent, every card.",
+    }),
+  ),
+  orderBy: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'How the cards are ordered: metadata.name (the default) or metadata.creationTimestamp, ascending, or with a trailing " desc" for descending. One field; ties are broken by name.',
+    }),
+  ),
+  search: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "Words a card's title or name must hold, each of them, whatever their case; empty or absent, every card.",
     }),
   ),
 };

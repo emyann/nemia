@@ -7,7 +7,7 @@
  * before this is asked of each term. Replaces `card-play-selector.contract.ts` (`cardPlaySelector`), whose one field it keeps.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { CardPhase } from './card-phase.contract.ts';
+import type { CardPhase } from 'objects';
 
 /** A field of the card a term reads that holds `true` or `false`. */
 export type CardFlagField = 'status.inPlay' | 'status.chained';
@@ -20,33 +20,46 @@ export type CardFieldTerm =
   | { readonly field: CardFlagField; readonly equals: boolean; readonly value: boolean }
   | { readonly field: 'status.phase'; readonly equals: boolean; readonly value: CardPhase };
 
-/** The words a phase is spelled with. */
-const PHASES: readonly string[] = ['notStarted', 'blocked', 'waiting', 'working', 'done', 'failed', 'cancelled'];
-
-/** The words a flag is spelled with. */
-const FLAGS: readonly string[] = ['true', 'false'];
-
 /** Whether `text` asks `field` to equal (`equals`) or differ from the value spelled `value`, in one of Kubernetes' spellings. */
 const spelled = (text: string, field: string, equals: boolean, value: string) =>
   equals ? text === field + '=' + value || text === field + '==' + value : text === field + '!=' + value;
 
-/** Whether `text` is a term of `field`, whose values are spelled `values`, in any of the three operators. */
-const termOf = (text: string, field: string, values: readonly string[]) =>
-  values.some((value) => spelled(text, field, true, value) || spelled(text, field, false, value));
+/** Whether `text` is a term of `field` with the value spelled `value`, in any of the three operators. */
+const termOf = (text: string, field: string, value: string) => spelled(text, field, true, value) || spelled(text, field, false, value);
+
+/** Whether `text` is a term of a flag `field`, with `true` or `false`. */
+const flagTerm = (text: string, field: string) => termOf(text, field, 'true') || termOf(text, field, 'false');
+
+/** Whether `text` is a term of `status.phase` with one of the seven phases. */
+const phaseTerm = (text: string) =>
+  termOf(text, 'status.phase', 'notStarted') ||
+  termOf(text, 'status.phase', 'blocked') ||
+  termOf(text, 'status.phase', 'waiting') ||
+  termOf(text, 'status.phase', 'working') ||
+  termOf(text, 'status.phase', 'done') ||
+  termOf(text, 'status.phase', 'failed') ||
+  termOf(text, 'status.phase', 'cancelled');
+
+/** The spelling of `value`, a flag or a phase. */
+const wordOf = (value: boolean | CardPhase) => (value === true ? 'true' : value === false ? 'false' : value);
 
 const cardFieldTermSpec = spec<(text: string) => CardFieldTerm | null>({
   ensures: {
-    eachSpellingTaken: {
-      description:
-        'status.inPlay or status.chained with true or false, or status.phase with a phase, after =, == or !=, is a term of the cards',
-      condition: ({ input: [text], output }) =>
-        !(termOf(text, 'status.inPlay', FLAGS) || termOf(text, 'status.chained', FLAGS) || termOf(text, 'status.phase', PHASES)) ||
-        output !== null,
+    inPlayTaken: {
+      description: 'status.inPlay with true or false, after =, == or !=, is a term of the cards',
+      condition: ({ input: [text], output }) => !flagTerm(text, 'status.inPlay') || output !== null,
+    },
+    chainedTaken: {
+      description: 'status.chained with true or false, after =, == or !=, is a term of the cards',
+      condition: ({ input: [text], output }) => !flagTerm(text, 'status.chained') || output !== null,
+    },
+    phaseTaken: {
+      description: 'status.phase with a phase, after =, == or !=, is a term of the cards',
+      condition: ({ input: [text], output }) => !phaseTerm(text) || output !== null,
     },
     readAsSpelled: {
       description: 'A term taken asks what its text spells: its field, = and == to equal the value named, != to differ from it',
-      condition: ({ input: [text], output }) =>
-        output === null || spelled(text, output.field, output.equals, String(output.value)),
+      condition: ({ input: [text], output }) => output === null || spelled(text, output.field, output.equals, wordOf(output.value)),
     },
   },
 });

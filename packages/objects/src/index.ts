@@ -164,8 +164,11 @@ export type {
 export {
   CARD_KEYS,
   CARD_KEY_MEANINGS,
+  CARD_PHASES,
   CARD_STATES,
   Card,
+  CardLabelInUse,
+  CardListMeta,
   CardFile,
   CardLastStart,
   CardList,
@@ -177,6 +180,7 @@ export {
   CARD_WAIT_KINDS,
   CardWait,
   type CardKey,
+  type CardPhase,
   type CardState,
   type CardWaitKind,
 } from './card.ts';

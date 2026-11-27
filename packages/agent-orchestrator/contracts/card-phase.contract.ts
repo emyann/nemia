@@ -5,14 +5,9 @@
  * `waiting` (it waits on a person: its run waits on one, its queued start was refused, or a card it waits on can only be released by
  * one), `working` (started and at work, or queued for room to run), `done`, `failed` and `cancelled` (its run ended; a run stopped by a
  * person reads `cancelled`). Open exactly when the card is in play. Pure.
- *
- * `CardPhase` moves to `objects` beside `CARD_STATES` (`CARD_PHASES`), and this contract then takes it from there by `import type`.
  */
-import type { CardState } from 'objects';
+import type { CardPhase, CardState } from 'objects';
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** Where a card stands as a person sorts cards: the four open words, then the three closed. */
-export type CardPhase = 'notStarted' | 'blocked' | 'waiting' | 'working' | 'done' | 'failed' | 'cancelled';
 
 /**
  * The cards of a card's `after:` that have not succeeded, as its phase reads them: `none`, it waits on none; `held`, it waits on some and

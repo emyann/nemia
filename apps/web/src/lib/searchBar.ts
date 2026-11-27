@@ -6,7 +6,8 @@
 import type { CardPhase } from 'objects';
 import type { KeptRecentOf } from '../../contracts/recent-filters.contract.ts';
 import type { LabelInUse, SearchKey, SearchKeysOf } from '../../contracts/search-keys.contract.ts';
-import { CLOSED_PHASES, OPEN_PHASES, PHASE_WORDS, type InboxView } from './inbox.ts';
+import type { InboxAsked } from './api/inbox.ts';
+import { CLOSED_PHASES, inboxAskedOf, OPEN_PHASES, PHASE_WORDS, type InboxView } from './inbox.ts';
 
 /** The keys every factory offers, after the labels its cards hold. */
 const FIXED: readonly string[] = ['factory', 'workflow', 'state'];
@@ -54,8 +55,7 @@ export const searchKeys: SearchKeysOf = (labels, counts) => [
  * @param recent The sets kept so far, newest first.
  * @param used The filter set just used, never empty: a use with no filter is not kept.
  */
-export const keptRecent: KeptRecentOf = (recent, used) =>
-  [used, ...recent.filter((one) => one !== used)].slice(0, RECENT);
+export const keptRecent: KeptRecentOf = (recent, used) => [used, ...recent.filter((one) => one !== used)].slice(0, RECENT);
 
 /**
  * A view's filters as one text: its words, labels, side and state, in that order, as an address writes them.
@@ -155,3 +155,36 @@ export function elsewhereLine(found: { total: number; factories: readonly string
   const of = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
   return `${found.total} ${cards} of ${of} ${found.total === 1 ? 'does' : 'do'}.`;
 }
+
+/** How many cards the bar's suggestions read. */
+export const SUGGESTED = 5;
+
+/**
+ * What the api's card list is asked for the cards the words typed in the bar would add: the page's own ask, with the words joined to
+ * the search kept, a few cards of it.
+ * @param view What the page reads of its address.
+ * @param text The words being typed.
+ */
+export const suggestedAsk = (view: InboxView, text: string) =>
+  ({
+    ...inboxAskedOf({ ...view, search: [view.search, text.trim()].filter(Boolean).join(' '), older: undefined }),
+    limit: SUGGESTED,
+  }) satisfies InboxAsked;
+
+/**
+ * `selector` without its `factory=` terms, which keep a read to one factory; undefined where none is left.
+ * @param selector A label selector, as the address keeps it.
+ */
+export function withoutFactory(selector: string | undefined) {
+  const terms = (selector ?? '')
+    .split(',')
+    .map((term) => term.trim())
+    .filter((term) => term !== '' && !term.startsWith('factory='));
+  return terms.length === 0 ? undefined : terms.join(',');
+}
+
+/**
+ * `asked` taken to every factory: with no `factory=` label among its labels, which would keep the read to one.
+ * @param asked The query the api's card list takes.
+ */
+export const everyFactory = (asked: InboxAsked) => ({ ...asked, labelSelector: withoutFactory(asked.labelSelector) }) satisfies InboxAsked;

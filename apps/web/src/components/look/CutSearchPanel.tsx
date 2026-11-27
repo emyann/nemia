@@ -74,8 +74,8 @@ function Foot() {
 }
 
 /**
- * The panel of the search bar: its groups, each with its title and lines, and the keys it answers to at its foot. It is the ComboBox's list,
- * so ↑ ↓ move between the lines and Enter picks one.
+ * The panel of the search bar: its groups, each with its title and lines, and the keys it answers to at its foot. It is the
+ * ComboBox's list, so ↑ ↓ move between the lines and Enter picks one.
  * @param sections The groups to draw, in order.
  */
 export function CutSearchPanel({ sections }: { sections: readonly CutSearchSection[] }) {

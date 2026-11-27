@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { Search, X } from 'lucide-react';
 import { ComboBox, ComboBoxStateContext, Input, Popover } from 'react-aria-components';
 import { Body, IconButton } from '@/components/ui/ds';
@@ -53,22 +53,24 @@ function BarInput({
   placeholder,
   bar,
   reopen,
+  onReopened,
 }: {
   input: RefObject<HTMLInputElement | null>;
   placeholder: string | undefined;
   bar: Parameters<typeof keyed>[1];
-  reopen: RefObject<boolean>;
+  reopen: boolean;
+  onReopened: () => void;
 }) {
   const state = useContext(ComboBoxStateContext);
   const kept = useRef(false);
   const open = state?.isOpen ?? false;
   useEffect(() => {
     if (open && kept.current) state?.close();
-    if (!open && reopen.current) {
-      reopen.current = false;
+    if (!open && reopen) {
+      onReopened();
       state?.open(null, 'manual');
     }
-  }, [open, state, reopen]);
+  }, [open, state, reopen, onReopened]);
   return (
     <Input
       ref={input}
@@ -138,7 +140,8 @@ export function CutSearch({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const bar = useRef<HTMLDivElement>(null);
-  const reopen = useRef(false);
+  const [reopen, setReopen] = useState(false);
+  const reopened = useCallback(() => setReopen(false), []);
   useSlashFocus(input);
   return (
     <div ref={bar} className={className}>
@@ -158,7 +161,7 @@ export function CutSearch({
             selectedKey={null}
             onSelectionChange={(key) => {
               if (key === null) return;
-              reopen.current = sections.some((section) => section.items.some((item) => item.id === String(key) && item.keeps));
+              setReopen(sections.some((section) => section.items.some((item) => item.id === String(key) && item.keeps)));
               onPick(String(key));
             }}
             items={sections}
@@ -169,6 +172,7 @@ export function CutSearch({
               placeholder={chips.length === 0 ? placeholder : undefined}
               bar={{ text, chips, onRemove, onSubmit }}
               reopen={reopen}
+              onReopened={reopened}
             />
             <Popover className={CHOICES} placement="bottom start" triggerRef={bar}>
               <CutSearchPanel sections={sections} />

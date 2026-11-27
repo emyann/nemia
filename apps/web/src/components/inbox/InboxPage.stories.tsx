@@ -2,7 +2,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
-import { chainsQuery, inboxPageQuery, type InboxEntry, type InboxPage as Page } from '@/lib/api/inbox';
+import { chainsQuery, inboxPageQuery, searchQuery, type InboxEntry, type InboxPage as Page } from '@/lib/api/inbox';
+import { everyFactory, suggestedAsk } from '@/lib/searchBar';
 import { inboxAskedOf, type InboxView } from '@/lib/inbox';
 import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
 import { InboxPage } from './InboxPage';
@@ -31,6 +32,7 @@ const drawn = ({
   counts = NONE,
   remaining = 0,
   layout = 'grid',
+  extra = [],
 }: {
   cards: readonly InboxEntry[];
   at?: InboxView;
@@ -38,6 +40,7 @@ const drawn = ({
   counts?: Page['counts'];
   remaining?: number;
   layout?: 'grid' | 'list';
+  extra?: ReadonlyArray<readonly [readonly unknown[], unknown]>;
 }) => {
   localStorage.setItem('nemia.inbox.layout', layout);
   const page: Page = {
@@ -56,6 +59,7 @@ const drawn = ({
         [factoriesQuery.queryKey, [factoryView(FACTORY)]],
         [inboxPageQuery(inboxAskedOf(at), at.factory).queryKey, page],
         [chainsQuery(at.factory).queryKey, [...chains]],
+        ...extra,
       ])}
     >
       <div style={{ width: 1040 }}>
@@ -154,11 +158,38 @@ export const Searched: Story = {
   },
 };
 
-/** A search that keeps no card: the line that says so and the way back. */
+/** A search that keeps no card: the count and Clear filters under the bar, and the page's own line with the way to the other side. */
 export const NoMatch: Story = {
   render: () => drawn({ at: { search: 'nothing' }, cards: [] }),
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No card matches.');
+    await expect(canvasElement.querySelector('[data-filter-count]')).toHaveTextContent('0 cards');
+    await expect(canvasElement.querySelector('[data-filter-count]')).toHaveTextContent('Clear filters');
+    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No open card matches “nothing”.');
+    await expect(within(canvasElement).getByRole('button', { name: 'Search closed cards' })).toBeVisible();
+  },
+};
+
+/** A search a factory's label keeps to finds nothing there: it names the scope, says where a card does match, and offers both ways out. */
+export const NothingFound: Story = {
+  render: () => {
+    const at: InboxView = { search: 'microvm', l: 'factory=pipao' };
+    return drawn({
+      at,
+      cards: [],
+      extra: [
+        [
+          searchQuery(everyFactory(suggestedAsk(at, '')), undefined).queryKey,
+          { entries: [unstartedCard('microvm-sandbox', 'nemia')], total: 1 },
+        ],
+      ],
+    });
+  },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No open card of pipao matches “microvm”.');
+    await expect(page.getByText('One open card of nemia does.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Search closed cards' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Every factory' })).toBeVisible();
   },
 };
 

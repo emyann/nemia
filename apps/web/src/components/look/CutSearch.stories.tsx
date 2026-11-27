@@ -102,7 +102,10 @@ export const Kept: Story = {
   },
 };
 
-/** The panel opens as the bar takes the focus: groups with their titles, a line with its dot, bold letters and tail, one drawn as a button, and a clear key. */
+/**
+ * The panel opens as the bar takes the focus: groups with titles, a line with a dot, bold letters and a tail, one drawn as a button,
+ * and a clear key.
+ */
 export const Groups: Story = {
   args: {
     label: 'Search the cards',
@@ -117,7 +120,12 @@ export const Groups: Story = {
           { id: 'all', label: 'Show all 14 cards matching “run-c”' },
         ],
       },
-      { id: 'out', title: 'Nothing else', note: 'One card of nemia does.', items: [{ id: 'every', label: 'Every factory', look: 'button' }] },
+      {
+        id: 'out',
+        title: 'Nothing else',
+        note: 'One card of nemia does.',
+        items: [{ id: 'every', label: 'Every factory', look: 'button' }],
+      },
     ],
     onRemove: fn(),
     onPick: fn(),

@@ -1,10 +1,10 @@
 /**
- * What the inbox's search bar keeps as Recent (`keptRecent`, src/lib/searchBar.ts): the last five distinct filter sets this browser used,
- * newest first, kept as the Grid / List choice is (`lib/stored.ts`). A filter set is said as one text, the address's filters it holds
- * written in one order (`recentOf`, src/lib/searchBar.ts), so two uses of the same filters are one entry. What is kept before holds no
- * set twice and no empty one, which the bar's own reading of the browser's text sees to. What the verifier does not reach (that older sets keep their order and that five are kept where there are five) is a test's
- * (`test/search-bar.test.ts`). Using a set puts it first; the
- * same set used again moves, never repeats; the caller keeps nothing for no filter at all (`used` is never empty).
+ * What the inbox's search bar keeps as Recent (`keptRecent`, src/lib/searchBar.ts): the last five distinct filter sets this browser
+ * used, newest first, kept as the Grid / List choice is (`lib/stored.ts`). A filter set is said as one text, the address's filters it
+ * holds written in one order (`recentOf`, src/lib/searchBar.ts), so two uses of the same filters are one entry. What is kept before
+ * holds no set twice and no empty one, which the bar's own reading of the browser's text sees to. What the verifier does not reach
+ * (that older sets keep their order, and that five are kept where there are five) is a test's (`test/search-bar.test.ts`). Using a set
+ * puts it first; the same set used again moves, never repeats; the caller keeps nothing for no filter at all (`used` is never empty).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

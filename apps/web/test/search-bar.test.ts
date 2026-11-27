@@ -18,7 +18,7 @@ const labels = [
 const keys = searchKeys(labels, counts);
 
 describe('searchKeys', () => {
-  test('each key offers the values its cards hold, with their counts, in the api\'s order', () => {
+  test("each key offers the values its cards hold, with their counts, in the api's order", () => {
     assert.deepEqual(
       keys.map((one) => one.key),
       ['area', 'work', 'factory', 'workflow', 'state'],
@@ -31,7 +31,10 @@ describe('searchKeys', () => {
   });
   test('state offers every phase with its count', () => {
     assert.equal(keys.at(-1)?.values.length, 7);
-    assert.deepEqual(keys.at(-1)?.values.find((value) => value.value === 'working'), { value: 'working', cards: 3 });
+    assert.deepEqual(
+      keys.at(-1)?.values.find((value) => value.value === 'working'),
+      { value: 'working', cards: 3 },
+    );
   });
   test('a factory whose cards hold no label offers exactly the three', () => {
     assert.deepEqual(

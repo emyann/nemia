@@ -11,14 +11,13 @@ import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Run, RunList } from './run.ts';
+import { RunResend, RunResent } from './card.ts';
 import { RunDecision } from './decide.ts';
 import {
   RunApprove,
   RunApproved,
   RunAsked,
   RunCancelled,
-  RunResend,
-  RunResent,
   RunConditionWrite,
   RunConditionWritten,
   RunAssign,

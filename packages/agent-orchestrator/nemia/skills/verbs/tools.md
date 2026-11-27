@@ -295,6 +295,25 @@ Its arguments:
 - name (<name> at a shell): The object's name, unique in its namespace for its kind.
 - workflow (--workflow at a shell): The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.
 
+## resend
+
+```text
+  nemia resend <runId> [--workflow <w>]
+    send a run that no card started on: file its brief as <run>-resent, handed
+    the run, queued on --workflow or, with none, for its factory's card triggers;
+    the run is cancelled when it waits on you. A run a card started: nemia inbox resend
+```
+
+Sends a run with no card behind it on: files its brief and labels as a card of its own, <run>-resent, handed the run, queued on the workflow the body names or, naming none, left for its factory's card triggers; then cancels the run when it waits on a person. Answers RunResent with a 201; a run started from a card, sent on already, or still at work is refused.
+
+Calls `POST /api/namespaces/:namespace/runs/:name/resend`.
+
+Its arguments:
+
+- namespace: The namespace, a run's factory (default for one that names none).
+- name: The run's name.
+- workflow (--workflow at a shell): The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.
+
 ## inbox_from
 
 ```text

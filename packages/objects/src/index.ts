@@ -43,8 +43,6 @@ export {
   RunRefresh,
   RunRefreshed,
   RunRemoved,
-  RunResend,
-  RunResent,
   RunRetry,
   RunRoute,
   RunRouted,
@@ -718,7 +716,7 @@ export {
   noEdits,
   runsNamed,
 } from './commands-inbox.ts';
-export { CardLabelLeftOut, CardQueue, CardResend, CardResent } from './card.ts';
+export { CardLabelLeftOut, CardQueue, CardResend, CardResent, RunResend, RunResent } from './card.ts';
 export {
   FACTORY_ADD_WORDS,
   FACTORY_ATTACH_WORDS,

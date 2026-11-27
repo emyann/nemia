@@ -95,13 +95,15 @@ export const FilterBy: Story = {
     await expect(rows[6]).toHaveTextContent('area: board · factory: globex');
     await userEvent.keyboard('{ArrowDown}{Enter}');
     await expect(bar).toHaveValue('area:');
+    await userEvent.keyboard('{Escape}');
   },
 };
 
 /** A key and a colon narrows the panel to that key's values, each with how many cards hold it; Esc closes it. */
 export const KeyNarrows: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }), 'area:');
+    await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }));
+    await userEvent.paste('area:');
     await waitFor(() => expect(panel().getAllByRole('option').length).toBe(3));
     for (const row of panel().getAllByRole('option')) await expect(row).toHaveTextContent(/^area: .+ cards?$/);
     await userEvent.keyboard('{Escape}');
@@ -112,7 +114,8 @@ export const KeyNarrows: Story = {
 /** Typing shows the filters the words match and the cards they find, then a line that keeps them as the search. */
 export const Typing: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
-    await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }), 'run-c');
+    await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }));
+    await userEvent.paste('run-c');
     await waitFor(() => expect(panel().getByText('Cards')).toBeVisible());
     await expect(panel().getByText('Filter')).toBeVisible();
     await expect(panel().getByRole('option', { name: /area: run-core/ })).toHaveTextContent('17 cards');
@@ -121,6 +124,7 @@ export const Typing: Story = {
     await expect(first.querySelector('b')).toHaveTextContent('run-c');
     await userEvent.click(panel().getByRole('option', { name: /Show all 2 cards matching “run-c”/ }));
     await expect(args.onSearch).toHaveBeenCalledWith(expect.objectContaining({ search: 'run-c' }));
+    await userEvent.keyboard('{Escape}');
   },
 };
 

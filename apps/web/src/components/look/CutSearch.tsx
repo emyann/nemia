@@ -54,12 +54,14 @@ function BarInput({
   bar,
   reopen,
   onReopened,
+  onChoose,
 }: {
   input: RefObject<HTMLInputElement | null>;
   placeholder: string | undefined;
   bar: Parameters<typeof keyed>[1];
   reopen: boolean;
   onReopened: () => void;
+  onChoose: (id: string) => void;
 }) {
   const state = useContext(ComboBoxStateContext);
   const kept = useRef(false);
@@ -79,8 +81,14 @@ function BarInput({
         kept.current = false;
       }}
       onKeyDown={(event) => {
-        keyed(event, bar);
-        if (!event.defaultPrevented) return;
+        const focused = state?.selectionManager.focusedKey;
+        if (event.key === 'Enter' && state?.isOpen && focused !== null && focused !== undefined) {
+          event.preventDefault();
+          onChoose(String(focused));
+          state.close();
+          return;
+        }
+        if (!keyed(event, bar)) return;
         kept.current = true;
         state?.close();
       }}
@@ -90,7 +98,8 @@ function BarInput({
 }
 
 /**
- * What a key does in the bar: Backspace on empty words takes the last chip off; Enter on words no suggestion is highlighted for keeps them.
+ * What a key does in the bar: Backspace on empty words takes the last chip off; Enter on words no suggestion is highlighted for keeps
+ * them, which is what it answers true for.
  * @param event The key pressed in the bar's input.
  * @param bar What the bar holds: its words, its chips, and what it does to take one off or keep the words.
  */
@@ -99,11 +108,37 @@ function keyed(
   bar: { text: string; chips: readonly CutChip[]; onRemove: (id: string) => void; onSubmit: (text: string) => void },
 ) {
   const last = bar.chips.at(-1);
-  if (event.key === 'Backspace' && bar.text === '' && last !== undefined) bar.onRemove(last.id);
+  if (event.key === 'Backspace' && bar.text === '' && last !== undefined) {
+    bar.onRemove(last.id);
+    return false;
+  }
   if (event.key === 'Enter' && event.currentTarget.getAttribute('aria-activedescendant') === null && bar.text.trim() !== '') {
     event.preventDefault();
     bar.onSubmit(bar.text.trim());
+    return true;
   }
+  return false;
+}
+
+/**
+ * What a pick does: it is `onPick`, and a line that keeps the panel open (`keeps`) has it open again (`reopen`, cleared by `reopened`);
+ * `picking` is true for the moment the ComboBox resets the input after a pick, which the caller does not take as typing.
+ * @param sections The groups the panel holds.
+ * @param onPick What picking a line does, given its id.
+ */
+function usePicks(sections: readonly CutSearchSection[], onPick: (id: string) => void) {
+  const picking = useRef(false);
+  const [reopen, setReopen] = useState(false);
+  const reopened = useCallback(() => setReopen(false), []);
+  const choose = (id: string) => {
+    picking.current = true;
+    queueMicrotask(() => {
+      picking.current = false;
+    });
+    setReopen(sections.some((section) => section.items.some((item) => item.id === id && item.keeps)));
+    onPick(id);
+  };
+  return { picking, reopen, reopened, choose };
 }
 
 /**
@@ -140,8 +175,7 @@ export function CutSearch({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const bar = useRef<HTMLDivElement>(null);
-  const [reopen, setReopen] = useState(false);
-  const reopened = useCallback(() => setReopen(false), []);
+  const { picking, reopen, reopened, choose } = usePicks(sections, onPick);
   useSlashFocus(input);
   return (
     <div ref={bar} className={className}>
@@ -157,12 +191,12 @@ export function CutSearch({
             allowsEmptyCollection
             menuTrigger="focus"
             inputValue={text}
-            onInputChange={onText}
+            onInputChange={(value) => {
+              if (!picking.current || value !== '') onText(value);
+            }}
             selectedKey={null}
             onSelectionChange={(key) => {
-              if (key === null) return;
-              setReopen(sections.some((section) => section.items.some((item) => item.id === String(key) && item.keeps)));
-              onPick(String(key));
+              if (key !== null) choose(String(key));
             }}
             items={sections}
             className="flex min-w-32 flex-1"
@@ -173,6 +207,7 @@ export function CutSearch({
               bar={{ text, chips, onRemove, onSubmit }}
               reopen={reopen}
               onReopened={reopened}
+              onChoose={choose}
             />
             <Popover className={CHOICES} placement="bottom start" triggerRef={bar}>
               <CutSearchPanel sections={sections} />

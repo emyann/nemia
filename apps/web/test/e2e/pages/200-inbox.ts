@@ -178,8 +178,8 @@ async function filedAndRemoved(page: Page, theme: string) {
 export default {
   /**
    * The Inbox: its counts as the api counts them, its search, a state picked in the bar, its sort, its layout kept in the browser,
-   * Closed in the address, `/` into the search bar, and a card filed from New card and taken off with Remove. Every write is taken back, so every page after this one, in
-   * either theme, reads the store as seeded.
+   * Closed in the address, `/` into the search bar, and a card filed from New card and taken off with Remove. Every write is taken
+   * back, so every page after this one, in either theme, reads the store as seeded.
    */
   name: 'inbox',
   route: '/inbox',

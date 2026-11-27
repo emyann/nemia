@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { Collection, Header, ListBox, ListBoxItem, ListBoxSection } from 'react-aria-components';
+import { useContext, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Collection, ComboBoxStateContext, Header, ListBox, ListBoxItem, ListBoxSection } from 'react-aria-components';
 import { Body } from '@/components/ui/ds';
 import { cn } from '@/lib/utils';
 import { CHOICE } from './CutSelect';
@@ -60,11 +61,17 @@ function Line({ item }: { item: CutSearchItem }) {
   );
 }
 
-/** The keys the panel says it answers to, drawn at its foot. */
+/** The keys the panel says it answers to, drawn at its foot while the panel is open. */
 function Foot() {
+  const open = useContext(ComboBoxStateContext)?.isOpen ?? false;
+  if (!open) return null;
   return (
     <Body size="small" component="div" colorRole="on-surface-variant" className="flex gap-4 border-t border-outline-variant px-3 pt-2 pb-1">
-      <span>↑ ↓ to move</span>
+      <span className="inline-flex items-center gap-1">
+        <ArrowUp aria-hidden="true" size={12} />
+        <ArrowDown aria-hidden="true" size={12} />
+        <span className="sr-only">Arrow keys</span> to move
+      </span>
       <span>Enter to pick</span>
       <span>Esc to close</span>
     </Body>
@@ -77,7 +84,7 @@ function Foot() {
  */
 export function CutSearchPanel({ sections }: { sections: readonly CutSearchSection[] }) {
   return (
-    <>
+    <div className="flex flex-col">
       <ListBox items={sections} aria-label="Suggestions" className="max-h-80 overflow-auto outline-none">
         {(section: CutSearchSection) => (
           <ListBoxSection id={section.id} className="pb-1">
@@ -108,6 +115,6 @@ export function CutSearchPanel({ sections }: { sections: readonly CutSearchSecti
         )}
       </ListBox>
       <Foot />
-    </>
+    </div>
   );
 }

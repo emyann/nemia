@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import {
   Engine,
+  RunnerError,
   refusalWords,
   type EngineOptions,
   type EngineShape,
@@ -21,6 +22,7 @@ import {
   type TickReport,
 } from '../src/index.ts';
 import { VERBS as LIFECYCLE_VERBS } from '../src/core/lifecycle.ts';
+import type { RunnerOps } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
@@ -553,6 +555,38 @@ describe("refusalWords and the failures beside the refusals: say's failure that 
     assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`say: ${unsent.message}`, undefined, undefined]);
     assert.ok(unsent.cause instanceof Error && plain.cause instanceof Error, 'each carries what failed');
     assert.equal(plain.cause.message, unsent.cause.message);
+  });
+  test("a harness that looks by name and could not read the session, leaving its name unread or failing whole, is say's unsent, never a session not listed, and the words are not handed over", async () => {
+    for (const looked of ['unread', 'failed'] as const) {
+      const sessions = new Map<string, Sighting>();
+      const heard: string[] = [];
+      const blind = { now: false };
+      const fake = asyncOps(fakeHarness(sessions, heard));
+      const harness: RunnerOps = {
+        ...fake,
+        observeFor: (expected) =>
+          blind.now && looked === 'failed'
+            ? Effect.fail(new RunnerError({ verb: 'observeFor', message: 'the registry is busy' }))
+            : Effect.succeed({
+                seen: blind.now ? new Map() : new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
+                unread: new Set(blind.now ? expected.map((e) => e.name) : []),
+              }),
+      };
+      const engine = builtEngine(
+        Engine.layer({
+          root: scratch('ae-verbs-'),
+          journal: asyncStore(memoryJournal()),
+          harnesses: { fake: harness },
+          defaultHarness: 'fake',
+        }),
+      );
+      await Effect.runPromise(engine.file({ brief: 'one', cwd: '/r', id: 'one' }));
+      await Effect.runPromise(engine.tick());
+      blind.now = true;
+      const unsent = await failure(Effect.runPromise(engine.say('one', 'hi')));
+      assert.equal(unsent._tag, 'SayUnsent', looked);
+      assert.deepEqual(heard, [], `${looked}: nothing said`);
+    }
   });
   test('interrupt is no lifecycle verb: it is on no VERBS entry, and a refusal of it journals nothing', async () => {
     const { effect, built } = engines();

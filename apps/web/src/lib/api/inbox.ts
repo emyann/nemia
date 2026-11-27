@@ -59,6 +59,8 @@ export type InboxEntry = {
   phase: CardPhase;
   /** The cards whose `after:` names this one, by name: the ones it holds back. */
   followedBy: string[];
+  /** The cards its `after:` names, by name, in the order written, those done already among them: absent for a card with none. */
+  after?: string[];
   /** Whether the card is in a chain: it names a card in `after:`, or another card does. */
   chained: boolean;
   error: string | null;
@@ -111,6 +113,7 @@ export const entryOf = (card: CardList['items'][number]) => {
     startedAs: [...status.runs],
     state: status.state,
     phase: status.phase,
+    ...(spec.after?.length ? { after: [...spec.after] } : {}),
     followedBy: [...status.followedBy],
     chained: status.chained,
     error: status.error ?? null,
@@ -256,7 +259,7 @@ export const chainsQuery = (factory?: string) =>
  * clause). The label filter's check before it writes the address.
  * @param selector The label selector to check, as a person typed it.
  */
-export const checkSelector = (selector: string) => cards.listAll({ labelSelector: selector.trim() });
+export const checkSelector = (selector: string) => cards.page(undefined, { labelSelector: selector.trim(), limit: 1 });
 
 /**
  * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of

@@ -454,6 +454,13 @@ test('orderBy sorts by when a card was filed, newest first with desc, and a toke
     ),
   );
   assert.deepEqual(names(byName), ['echo', 'delta', 'charlie', 'bravo', 'alpha']);
+  const spaced = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(), (l) => cardListOf(l, { orderBy: ' metadata.name   desc ' })),
+    ),
+  );
+  assert.deepEqual(names(spaced), names(byName), 'spaces around and between its words are insignificant (AIP-132)');
 });
 
 test('the counts and the labels in use are counted after the labels and the words, and before the field selector and the page', () => {

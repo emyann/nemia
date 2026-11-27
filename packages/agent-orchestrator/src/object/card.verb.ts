@@ -248,7 +248,7 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
   const order =
     query.orderBy === undefined || query.orderBy.trim() === ''
       ? { field: 'metadata.name' as const, descending: false }
-      : cardOrderBy(query.orderBy);
+      : cardOrderBy(query.orderBy.trim().split(/\s+/).join(' '));
   if (order === null) return yield* Effect.fail(badOrder(query.orderBy ?? ''));
   const words = searchWords(query.search ?? '');
   const kept = inNamespace.filter(

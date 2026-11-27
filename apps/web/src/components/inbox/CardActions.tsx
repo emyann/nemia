@@ -97,7 +97,7 @@ function CardPrimary({
       variant="outlined"
       size={size}
       isDisabled={queue.isPending}
-      onPress={() => (queueable(entry) ? queue.mutate() : onSheet('start'))}
+      onPress={() => (queueable(entry) && entry.waits !== undefined ? queue.mutate() : onSheet('start'))}
     >
       Start
     </Button>
@@ -217,8 +217,7 @@ function AfterSheet({ entry, onRefused }: { entry: InboxEntry; onRefused: Refuse
     onError: (error) => onRefused({ action: 'from', message: error.message }),
     onSettled: read,
   });
-  const before = (entry.waits ?? []).filter((w) => w.kind !== 'cycle').map((w) => w.card);
-  const [names, setNames] = useState(before);
+  const [names, setNames] = useState(entry.after ?? []);
   const found = useQuery({
     ...inboxPageQuery({ fieldSelector: 'status.inPlay=true', search: text, limit: 8 }),
     enabled: text.trim() !== '',
@@ -387,5 +386,41 @@ export function CardLink({ entry, className }: { entry: InboxEntry; className?: 
     <Link to="/inbox/$name" params={{ name: entry.name }} className={className}>
       {entry.title ?? entry.file}
     </Link>
+  );
+}
+
+/**
+ * The chain's own Start chain…, at the head of a chain drawn whole: the sheet that chooses which of its cards to queue (`ChainSheet`),
+ * asked about the card the chain leads toward. A refusal of the api is said in the sheet, in its words.
+ * @param chain The cards of the chain, each column's cards in order, the one it leads toward last.
+ */
+export function StartChain({ chain }: { chain: readonly InboxEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const last = chain.at(-1);
+  if (last === undefined) return null;
+  return (
+    <>
+      <Button variant="outlined" size="xsmall" onPress={() => setOpen(true)}>
+        Start chain…
+      </Button>
+      <SideSheet variant="modal" title={SHEETS.chain(last.name)} isOpen={open} onClose={() => setOpen(false)}>
+        {open && (
+          <>
+            <ChainSheet
+              entry={last}
+              chain={chain}
+              onClose={() => setOpen(false)}
+              onRefused={(r) => setRefusal(r === null ? null : r.message)}
+            />
+            {refusal !== null && (
+              <Body size="small" role="alert" className="mt-3 text-error">
+                {refusal}
+              </Body>
+            )}
+          </>
+        )}
+      </SideSheet>
+    </>
   );
 }

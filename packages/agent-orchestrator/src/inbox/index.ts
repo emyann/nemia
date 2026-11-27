@@ -20,6 +20,7 @@ export {
   queueOrder,
   startedRefusal,
 } from './inbox.ts';
+export type { CardPhase } from 'objects';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox.ts';
 export { cardFileReplaced, fileLetGo } from './card-files.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';

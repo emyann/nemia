@@ -61,7 +61,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
   const chains = useQuery({ ...chainsQuery(at.factory), enabled: pulled }).data;
   const trail = trailOf(at);
   const grouped = pulled && chains !== undefined ? chainsOf(chains) : [];
-  const filtered = at.q !== undefined || at.l !== undefined || at.state !== undefined;
+  const filtered = at.search !== undefined || at.l !== undefined || at.phase !== undefined;
   const none = page.entries.length === 0 && grouped.length === 0;
   return (
     <article className="space-y-6">
@@ -86,7 +86,11 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
       )}
       <section aria-label="Cards" className="space-y-3">
         {page.entries.length > 0 && (
-          <SectionHead count={page.entries.length + trail.length * INBOX_PAGE + page.remaining} word="Cards" tone="rest" />
+          <SectionHead
+            count={page.entries.length + trail.length * INBOX_PAGE + page.remaining}
+            word={page.entries.length + trail.length * INBOX_PAGE + page.remaining === 1 ? 'Card' : 'Cards'}
+            tone="rest"
+          />
         )}
         {none && <NoneShown filtered={filtered} factory={at.factory} />}
         {layout === 'grid' ? (

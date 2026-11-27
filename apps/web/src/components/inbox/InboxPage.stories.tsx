@@ -148,7 +148,7 @@ export const Closed: Story = {
 
 /** A search that keeps some cards: chains are not pulled out, and the words show as a chip in the bar. */
 export const Searched: Story = {
-  render: () => drawn({ at: { q: 'reads' }, cards: [OPEN[0]], counts: { ...NONE, notStarted: 1 } }),
+  render: () => drawn({ at: { search: 'reads' }, cards: [OPEN[0]], counts: { ...NONE, notStarted: 1 } }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-chip="q"]')).not.toBeNull();
   },
@@ -156,7 +156,7 @@ export const Searched: Story = {
 
 /** A search that keeps no card: the line that says so and the way back. */
 export const NoMatch: Story = {
-  render: () => drawn({ at: { q: 'nothing' }, cards: [] }),
+  render: () => drawn({ at: { search: 'nothing' }, cards: [] }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No card matches.');
   },

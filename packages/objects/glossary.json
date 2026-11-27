@@ -101,11 +101,6 @@
       "type": "RunState"
     },
     {
-      "term": "Card phase",
-      "meaning": "where a card stands as a person sorts cards, a summary of its state worked out on every read and never stored: notStarted (filed, nobody started it), blocked (held by cards of its after: that have not succeeded), waiting (on a person: its run waits on one, its queued start was refused, or a card it waits on can only be released by one), working (at work, or queued for room to run), then done, failed and cancelled once its run ended (a stopped run reads cancelled). The first four are open (`CardPhase`, `packages/objects/src/card.ts`).",
-      "type": "CardPhase"
-    },
-    {
       "term": "counts",
       "meaning": "how many runs of a list's namespace and labels are in each run state, on the metadata of a list asked by state (`RunListMeta`, `packages/objects/src/run.ts`), counted before its `fieldSelector` and its page."
     },

@@ -28,10 +28,19 @@ const selectorOf = (all: boolean, phase: string | undefined) =>
  * @param ended How many cards were left out for their run having ended.
  * @param narrowed Whether words or a phase were typed.
  * @param next The token of the next page, none on the last.
+ * @param typed The words that asked this page, each followed by a space, which the next page is asked with again: a token fits only the
+ *   selector and order it came from.
  */
-const inboxSaid = (listed: number, selector: readonly string[], ended: number, narrowed: boolean, next: string | undefined) =>
+const inboxSaid = (
+  listed: number,
+  selector: readonly string[],
+  ended: number,
+  narrowed: boolean,
+  next: string | undefined,
+  typed: string,
+) =>
   listed
-    ? `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>${next === undefined ? '' : `\nmore: nemia inbox --continue ${next}`}`
+    ? `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>${next === undefined ? '' : `\nmore: nemia inbox ${typed}--continue ${next}`}`
     : ended
       ? `no card in play${selector.length ? ` matches -l ${selector.join(' -l ')}` : ''}, and ${ended} whose run ended — list them with nemia inbox --all`
       : selector.length || narrowed
@@ -50,6 +59,16 @@ export async function inbox(args: Args) {
   const phase = textArg(args, 'phase');
   const sort = textArg(args, 'sort');
   const fieldSelector = selectorOf(all, phase);
+  const typed = [
+    ...(all ? ['--all'] : []),
+    ...(search === undefined ? [] : ['--search', JSON.stringify(search)]),
+    ...(phase === undefined ? [] : ['--phase', phase]),
+    ...(sort === undefined ? [] : ['--sort', sort]),
+    ...(textArg(args, 'limit') === undefined ? [] : ['--limit', String(textArg(args, 'limit'))]),
+    ...selector.flatMap((one) => ['-l', one]),
+  ]
+    .map((word) => `${word} `)
+    .join('');
   const query = {
     ...(selector.length ? { labelSelector: selector } : {}),
     ...(fieldSelector === '' ? {} : { fieldSelector }),
@@ -63,7 +82,7 @@ export async function inbox(args: Args) {
   const left = !all && table.rows.length === 0 && table.metadata.continue === undefined ? await endedCount(selector, search) : 0;
   const lines = tableLines(table, read.asked);
   const narrowed = search !== undefined || phase !== undefined;
-  for (const line of [...lines, inboxSaid(table.rows.length, selector, left, narrowed, table.metadata.continue)])
+  for (const line of [...lines, inboxSaid(table.rows.length, selector, left, narrowed, table.metadata.continue, typed)])
     process.stdout.write(`${line}\n`);
   return 0;
 }

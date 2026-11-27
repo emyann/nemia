@@ -653,16 +653,16 @@ test("cardRepo, factoryRepoOf: the repository a card's factory wires for its wor
 describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in its address and asks of the api', () => {
   test('the address keeps words, the older order, the closed side and a state of the side shown, and nothing else', () => {
     assert.deepEqual(inboxSearch({}), {});
-    assert.deepEqual(inboxSearch({ q: '  reads ', sort: 'oldest', cards: 'closed', state: 'done' }), {
-      q: 'reads',
+    assert.deepEqual(inboxSearch({ search: '  reads ', sort: 'oldest', cards: 'closed', phase: 'done' }), {
+      search: 'reads',
       sort: 'oldest',
       cards: 'closed',
-      state: 'done',
+      phase: 'done',
     });
-    assert.deepEqual(inboxSearch({ sort: 'newest', cards: 'open', q: ' ' }), {}, 'the first look is the address without a key');
+    assert.deepEqual(inboxSearch({ sort: 'newest', cards: 'open', search: ' ' }), {}, 'the first look is the address without a key');
   });
   test('REFUSED: a state of the other side is no state, so an address that names one reads as All', () => {
-    assert.deepEqual(inboxSearch({ state: 'done' }), {});
+    assert.deepEqual(inboxSearch({ phase: 'done' }), {});
     assert.deepEqual(inboxSearch({ cards: 'closed', state: 'working' }), { cards: 'closed' });
     assert.deepEqual(inboxSearch({ state: 'nonsense' }), {});
   });
@@ -673,7 +673,7 @@ describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in 
       limit: INBOX_PAGE,
     });
     assert.equal(chainsPulled({}), true);
-    assert.deepEqual(inboxAskedOf({ q: 'reads', l: 'team=core', sort: 'oldest', older: 'f.abc' }), {
+    assert.deepEqual(inboxAskedOf({ search: 'reads', l: 'team=core', sort: 'oldest', older: 'f.abc' }), {
       fieldSelector: 'status.inPlay=true',
       labelSelector: 'team=core',
       search: 'reads',
@@ -681,14 +681,14 @@ describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in 
       limit: INBOX_PAGE,
       continue: 'abc',
     });
-    for (const view of [{ q: 'reads' }, { l: 'team=core' }, { state: 'working' as const }, { cards: 'closed' as const }])
+    for (const view of [{ search: 'reads' }, { l: 'team=core' }, { phase: 'working' as const }, { cards: 'closed' as const }])
       assert.equal(chainsPulled(view), false, JSON.stringify(view));
-    assert.equal(inboxAskedOf({ state: 'working' }).fieldSelector, 'status.phase=working', 'a state is one flat page of that phase');
+    assert.equal(inboxAskedOf({ phase: 'working' }).fieldSelector, 'status.phase=working', 'a state is one flat page of that phase');
     assert.equal(inboxAskedOf({ cards: 'closed' }).fieldSelector, 'status.inPlay=false');
   });
   test("a page is one read of the api, with its counts and the labels in use, and the floor's read carries the counts the pane says", async (t) => {
     const sent = sending(t, () => answered(200, cardList()));
-    const asked = inboxAskedOf({ q: 'reads' });
+    const asked = inboxAskedOf({ search: 'reads' });
     const page = await (inboxPageQuery(asked, 'pair').queryFn as unknown as () => Promise<{ entries: unknown[]; next: string | null }>)();
     assert.deepEqual([page.entries, page.next], [[], null]);
     const floor = await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<{ counts: Record<string, number> }>)();

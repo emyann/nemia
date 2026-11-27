@@ -126,6 +126,8 @@ export const Stuck: Story = {
     await expect(canvasElement.querySelector('[data-card-state="stuck"]')).not.toBeNull();
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Edit' }));
     await waitFor(() => expect(within(document.body).getByRole('dialog', { name: 'Run third-slice after' })).toBeVisible());
+    await userEvent.click(within(document.body).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(within(document.body).queryByRole('dialog')).toBeNull());
   },
 };
 

@@ -397,7 +397,8 @@ here.
 - `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory` and its `FactoryCommands` in one place (`factoryViewOf`,
   `lib/api/factories.ts`), which `factoriesQuery` reads together; a factory's schedules are read on its Settings alone
   (`factorySchedulesQuery`), and a floor asks its factory's cards in play of the api (`factoryInboxQuery`), never every card; a factory's
-  Inbox asks one page of its own namespace's cards (`inboxPageQuery` with its factory, paged and counted by the api), and only the Inbox's chains read every page (`chainsQuery`).
+  Inbox asks one page of its own namespace's cards (`inboxPageQuery` with its factory, paged and counted by the api), and the reads that take every page are the Inbox's chains (`chainsQuery`), a floor's cards in play (`factoryInboxQuery`) and a label's cards in play
+  (`inboxSelectedQuery`), each over cards still in play alone.
   A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`

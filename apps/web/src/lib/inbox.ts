@@ -308,30 +308,30 @@ export const PHASE_WORDS: Readonly<Record<CardPhase, string>> = {
 export type InboxView = {
   factory?: string;
   l?: string;
-  q?: string;
+  search?: string;
   sort?: 'oldest';
   cards?: 'closed';
-  state?: CardPhase;
+  phase?: CardPhase;
   older?: string;
 };
 
 /**
- * The Inbox page's own keys of its address: `?q=` the words searched, `?sort=oldest`, `?cards=closed` and `?state=` one phase of the side
- * shown; each kept only where it says something, so the address of the page as it opens has none. The labels (`?l=`) and the trail
+ * The Inbox page's own keys of its address: `?search=` the words searched, `?sort=oldest`, `?cards=closed` and `?phase=` one phase of the
+ * side shown; each kept only where it says something, so the address of the page as it opens has none. The labels (`?l=`) and the trail
  * (`?older=`) are read apart.
  * @param search The page's search, as the router parsed it.
  */
 export function inboxSearch(search: Record<string, unknown>) {
   const closed = search.cards === 'closed';
   const phases: readonly CardPhase[] = closed ? CLOSED_PHASES : OPEN_PHASES;
-  const q = typeof search.q === 'string' ? search.q.trim() : '';
-  const state = phases.find((phase) => phase === search.state);
+  const words = typeof search.search === 'string' ? search.search.trim() : '';
+  const phase = phases.find((one) => one === search.phase);
   return {
-    ...(q === '' ? {} : { q }),
+    ...(words === '' ? {} : { search: words }),
     ...(search.sort === 'oldest' ? { sort: 'oldest' as const } : {}),
     ...(closed ? { cards: 'closed' as const } : {}),
-    ...(state === undefined ? {} : { state }),
-  } satisfies Pick<InboxView, 'q' | 'sort' | 'cards' | 'state'>;
+    ...(phase === undefined ? {} : { phase }),
+  } satisfies Pick<InboxView, 'search' | 'sort' | 'cards' | 'phase'>;
 }
 
 /**
@@ -339,8 +339,8 @@ export function inboxSearch(search: Record<string, unknown>) {
  * page of the cards it keeps.
  * @param view What the page reads of its address.
  */
-export const chainsPulled = (view: Pick<InboxView, 'l' | 'q' | 'cards' | 'state'>) =>
-  view.cards !== 'closed' && view.state === undefined && view.q === undefined && view.l === undefined;
+export const chainsPulled = (view: Pick<InboxView, 'l' | 'search' | 'cards' | 'phase'>) =>
+  view.cards !== 'closed' && view.phase === undefined && view.search === undefined && view.l === undefined;
 
 /** What a card list's token wears on the address's trail, the mark the trail's tokens carry: the api's own token follows it. */
 export const TRAIL_MARK = 'f.';
@@ -352,12 +352,12 @@ export const TRAIL_MARK = 'f.';
  */
 export function inboxAskedOf(view: InboxView) {
   const side = view.cards === 'closed' ? 'status.inPlay=false' : 'status.inPlay=true';
-  const terms = view.state !== undefined ? [`status.phase=${view.state}`] : chainsPulled(view) ? [side, 'status.chained=false'] : [side];
+  const terms = view.phase !== undefined ? [`status.phase=${view.phase}`] : chainsPulled(view) ? [side, 'status.chained=false'] : [side];
   const continued = trailOf(view).at(-1)?.slice(TRAIL_MARK.length);
   return {
     fieldSelector: terms.join(','),
     ...(view.l === undefined ? {} : { labelSelector: view.l }),
-    ...(view.q === undefined ? {} : { search: view.q }),
+    ...(view.search === undefined ? {} : { search: view.search }),
     orderBy: view.sort === 'oldest' ? INBOX_SORTS.oldest : INBOX_SORTS.newest,
     limit: INBOX_PAGE,
     ...(continued === undefined ? {} : { continue: continued }),

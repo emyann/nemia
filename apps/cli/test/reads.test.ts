@@ -439,7 +439,11 @@ test("`nemia inbox` asks one page: --search, --phase, --sort and --limit are the
   assert.equal(page.code, 0, page.err);
   assert.match(page.out, /^cache-the-views /m, 'by name the first card leads the page');
   assert.doesNotMatch(page.out, /^(called-off|hold-the-reads) /m, 'and the page holds no more than the limit');
-  assert.match(page.out, /nemia inbox --continue \S+/, 'a page with more says where the next one is');
+  assert.match(
+    page.out,
+    /nemia inbox --all --sort name --limit 1 --continue \S+/,
+    'a page with more says where the next one is, asked with the words this one was',
+  );
   assert.equal(page.out.split('\n').filter((line) => /^[a-z-]+ +/.test(line) && !line.startsWith('NAME')).length >= 1, true);
   const found = await nemia(['inbox', '--all', '--search', 'HOLD', '--phase', 'waiting']);
   assert.equal(found.code, 0, found.err);

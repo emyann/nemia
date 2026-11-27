@@ -38,7 +38,7 @@ export const Bare: Story = {
 
 /** A search and a label kept: each a chip in the bar. */
 export const Searched: Story = {
-  args: { view: { q: 'reads', l: 'area=board' } },
+  args: { view: { search: 'reads', l: 'area=board' } },
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-chip="q"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-chip="area=board"]')).not.toBeNull();

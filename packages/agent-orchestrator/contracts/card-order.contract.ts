@@ -3,8 +3,8 @@
  * (AIP-132): a field, ascending by default, ` desc` after it for descending, ` asc` allowed. One field of a closed list:
  * `metadata.creationTimestamp`, when the card was filed, and `metadata.name`. A card list orders by one field, and ties by name, so a
  * list of several fields is no order of it (null), which the list refuses `Invalid`, naming the forms it takes. An empty one is the
- * list's to read before this is asked, as by name. A departure from AIP-132, stated: its redundant spaces are not insignificant here,
- * the verifier reading no string split, so the one space is the only one taken.
+ * list's to read before this is asked, as by name. AIP-132's redundant spaces are insignificant, and the list keeps that: it trims the
+ * text and joins its words with one space (`cardListOf`) before it asks, the verifier reading no string split, so this takes the one space.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

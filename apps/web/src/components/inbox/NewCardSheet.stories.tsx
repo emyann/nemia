@@ -4,10 +4,10 @@ import { expect, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxPageQuery } from '@/lib/api/inbox';
 import { FACTORY, factoryView, seeded } from '../../../.storybook/fixtures/proposals';
-import { NewCard } from './NewCardSheet';
+import { NewCard, NewCardForm } from './NewCardSheet';
 
 /** The page's New card over a store that holds the factory `nemia` and two labels in use. */
-const drawn = (factory?: string) => (
+const drawn = (factory?: string, form = false) => (
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(FACTORY)]],
@@ -26,7 +26,13 @@ const drawn = (factory?: string) => (
       ],
     ])}
   >
-    <NewCard factory={factory} />
+    {form ? (
+      <div style={{ width: 448 }} className="bg-surface-container p-4">
+        <NewCardForm shown={factory} onDone={() => undefined} />
+      </div>
+    ) : (
+      <NewCard factory={factory} />
+    )}
   </QueryClientProvider>
 );
 
@@ -59,5 +65,19 @@ export const Open: Story = {
     await expect(within(sheet).getByRole('button', { name: 'File card' })).toBeDisabled();
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Title' }), 'Decode the reads');
     await expect(within(sheet).getByRole('button', { name: 'File card' })).toBeEnabled();
+  },
+};
+
+/** The sheet's whole form, drawn in a sheet's width: every field of a new card and the one filled press, File card. */
+export const Form: Story = {
+  args: { factory: FACTORY },
+  render: (args) => drawn(args.factory, true),
+  play: async ({ canvasElement }) => {
+    const form = within(canvasElement);
+    await waitFor(() => expect(form.getByRole('textbox', { name: 'Title' })).toBeVisible());
+    await expect(form.getByRole('textbox', { name: 'Details' })).toBeVisible();
+    await expect(form.getByRole('combobox', { name: 'Run it after' })).toBeVisible();
+    await expect(form.getByRole('combobox', { name: 'Labels' })).toBeVisible();
+    await expect(form.getByRole('button', { name: 'File card' })).toBeDisabled();
   },
 };

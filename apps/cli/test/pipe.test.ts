@@ -54,7 +54,7 @@ test('a page of `nemia inbox --all` and `wf inbox --all`, longer than a pipe hol
     assert.equal(slow.code, 0, slow.err);
     assert.deepEqual(firstWords(slow.out), firstWords(eager.out), `every line reached ${bin}'s slow reader`);
     assert.equal(slow.out.trimEnd().split('\n').at(-1), eager.out.trimEnd().split('\n').at(-1), 'down to the last line');
-    assert.match(slow.out, /more: nemia inbox --continue \S+/, 'and the line that names the next page');
+    assert.match(slow.out, /more: nemia inbox --all --continue \S+/, 'and the line that names the next page');
   }
 });
 

@@ -20,7 +20,7 @@ const labelChips = (selector: string | undefined) =>
  * The segments' look in this toolbar: the kit swaps a chosen segment's icon for a check, which is hidden here, and the icon sits beside
  * its word.
  */
-const SEGMENT = { icon: 'hidden', label: 'flex items-center gap-2' } as const;
+const SEGMENT = { icon: 'hidden', label: 'flex items-center gap-2 whitespace-nowrap' } as const;
 
 /**
  * The search bar of the Inbox: the chips of what was picked — the words searched and each label — and the words being typed, with the
@@ -38,7 +38,7 @@ function SearchBar({
 }) {
   const [text, setText] = useState('');
   const picked = labelChips(view.l);
-  const chips: CutChip[] = [...(view.q === undefined ? [] : [{ id: 'q', label: `“${view.q}”` }]), ...picked];
+  const chips: CutChip[] = [...(view.search === undefined ? [] : [{ id: 'q', label: `“${view.search}”` }]), ...picked];
   const word = text.trim().toLowerCase();
   const suggestions = labels
     .filter((l) => !picked.some((chip) => chip.id === `${l.key}=${l.value}`) && `${l.key}=${l.value}`.toLowerCase().includes(word))
@@ -52,7 +52,7 @@ function SearchBar({
       chips={chips}
       onRemove={(id) =>
         id === 'q'
-          ? onSearch({ q: undefined, older: undefined })
+          ? onSearch({ search: undefined, older: undefined })
           : onSearch({ l: label(picked.map((c) => c.id).filter((c) => c !== id)), older: undefined })
       }
       text={text}
@@ -64,9 +64,9 @@ function SearchBar({
       }}
       onSubmit={(words) => {
         setText('');
-        onSearch({ q: [view.q, words].filter(Boolean).join(' '), older: undefined });
+        onSearch({ search: [view.search, words].filter(Boolean).join(' '), older: undefined });
       }}
-      className="min-w-0 flex-1"
+      className="min-w-48 flex-1"
     />
   );
 }
@@ -89,7 +89,7 @@ export function InboxToolbar({
   onSearch: (patch: Partial<InboxView>) => void;
 }) {
   return (
-    <div data-inbox-toolbar className="flex flex-wrap items-start gap-3">
+    <div data-inbox-toolbar className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
       <SearchBar view={view} labels={labels} onSearch={onSearch} />
       <SegmentedButton
         aria-label="Sort"
@@ -97,10 +97,12 @@ export function InboxToolbar({
         selectedKeys={[view.sort ?? 'newest']}
         onSelectionChange={(keys) => onSearch({ sort: keys.has('oldest') ? 'oldest' : undefined, older: undefined })}
       >
-        <Segment id="newest" icon={ArrowUpDown} classNames={SEGMENT}>
+        <Segment id="newest" classNames={SEGMENT}>
+          <ArrowUpDown aria-hidden="true" size={16} />
           Newest
         </Segment>
-        <Segment id="oldest" icon={ArrowUpDown} classNames={SEGMENT}>
+        <Segment id="oldest" classNames={SEGMENT}>
+          <ArrowUpDown aria-hidden="true" size={16} />
           Oldest
         </Segment>
       </SegmentedButton>
@@ -110,10 +112,12 @@ export function InboxToolbar({
         selectedKeys={[layout]}
         onSelectionChange={(keys) => onLayout(keys.has('list') ? 'list' : 'grid')}
       >
-        <Segment id="grid" icon={LayoutGrid} classNames={SEGMENT}>
+        <Segment id="grid" classNames={SEGMENT}>
+          <LayoutGrid aria-hidden="true" size={16} />
           Grid
         </Segment>
-        <Segment id="list" icon={List} classNames={SEGMENT}>
+        <Segment id="list" classNames={SEGMENT}>
+          <List aria-hidden="true" size={16} />
           List
         </Segment>
       </SegmentedButton>
@@ -145,7 +149,7 @@ export function InboxSides({
         aria-label="Which cards"
         disallowEmptySelection
         selectedKeys={[closed ? 'closed' : 'open']}
-        onSelectionChange={(keys) => onSearch({ cards: keys.has('closed') ? 'closed' : undefined, state: undefined, older: undefined })}
+        onSelectionChange={(keys) => onSearch({ cards: keys.has('closed') ? 'closed' : undefined, phase: undefined, older: undefined })}
       >
         <Segment id="open">
           Open{' '}
@@ -164,10 +168,10 @@ export function InboxSides({
         aria-label="State"
         selectionMode="single"
         disallowEmptySelection
-        selectedKeys={[view.state ?? 'all']}
+        selectedKeys={[view.phase ?? 'all']}
         onSelectionChange={(keys) => {
           const [key] = [...keys];
-          onSearch({ state: phases.find((phase) => phase === key), older: undefined });
+          onSearch({ phase: phases.find((phase) => phase === key), older: undefined });
         }}
       >
         <Chip id="all" variant="filter">

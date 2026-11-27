@@ -49,14 +49,14 @@ async function searched(page: Page) {
   const bar = page.getByRole('combobox', { name: 'Search the cards' });
   await bar.fill('render');
   await bar.press('Enter');
-  await page.waitForURL((url) => url.searchParams.get('q') === 'render', { timeout: WAIT_MS });
+  await page.waitForURL((url) => url.searchParams.get('search') === 'render', { timeout: WAIT_MS });
   await idle(page);
   const kept = (await answered<CardList>(page, '/api/cards?limit=100&search=render')).items.map((card) => card.metadata.name);
   if (kept.length === 0) throw new Refused('the seed holds a card that says render, so the search keeps one');
   await expectVisible(cardIn(page, kept[0]), `the words keep ${kept[0]}`);
   await expectCount(cardsOf(page), kept.length, 'and only the cards the api keeps for them');
   await page.getByRole('button', { name: 'Take off “render”' }).click();
-  await page.waitForURL((url) => !url.searchParams.has('q'), { timeout: WAIT_MS });
+  await page.waitForURL((url) => !url.searchParams.has('search'), { timeout: WAIT_MS });
   await idle(page);
 }
 

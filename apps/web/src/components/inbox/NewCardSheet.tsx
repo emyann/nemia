@@ -154,7 +154,7 @@ function PlaceFields({
  * is filed. File card is the one filled press. `shown` is the factory the page is of, which the form starts on; `onDone` closes the
  * sheet. Filed, the snackbar names the card and offers Open; a refusal stays in the form, in the api's words.
  */
-function NewCardForm({ shown, onDone }: { shown: string | undefined; onDone: () => void }) {
+export function NewCardForm({ shown, onDone }: { shown: string | undefined; onDone: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const offered = factoriesOffered(useQuery(factoriesQuery).data ?? []);

@@ -120,7 +120,7 @@ function templates() {
     doc.spec.hires['dev/implement'] = 'reviewer';
   });
   fs.writeFileSync(path.join(other, RULES), 'Write the tests first.\n\nNever push.\n');
-  rewrite(other, 'workflows/dev/ship.md', 'Stage the merge', 'Stage, then check, the merge');
+  rewrite(other, 'workflows/dev/ship.md', 'Say what this run changed', 'Say, in plain words, what this run changed');
   return { team, other, repo } satisfies { team: string; other: string; repo: string };
 }
 

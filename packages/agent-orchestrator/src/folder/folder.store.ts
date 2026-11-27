@@ -407,12 +407,12 @@ const SYSTEM_PROMPT_WORDS: readonly string[] = [
 
 /**
  * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
- * its harness prompt under its name now or its former one, in the words each had (`FORMER_OWN_KEYS`), every other key kept.
+ * and `workspace`, a key retired (`retiredStepFields`), its harness prompt under its name now or its former one, in the words each had (`FORMER_OWN_KEYS`), every other key kept.
  */
 const StepAgentSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,
-    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, ...Object.keys(FORMER_KEYS)]))),
+    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, ...Object.keys(FORMER_KEYS), 'workspace']))),
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),

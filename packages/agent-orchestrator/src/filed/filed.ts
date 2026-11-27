@@ -3,6 +3,7 @@ import path from 'node:path';
 import { isObject } from 'effect/Predicate';
 import { modeOf, sessionContext, type StepSpec } from '../workflow.ts';
 import { isFolderTeam, sandboxed, writesNothing, writesOutsideByRule } from '../workflow/index.ts';
+import { fenceRules } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
@@ -97,8 +98,7 @@ export const filedConfig = <Own extends object>(
     contextTokens: sessionContext(step, steps),
     permissionMode: modeOf(step),
     tools: step.tools,
-    disallowedTools: withRules(step.disallowedTools, placed.rule, placed.denies),
-    allowedTools: withRules(step.allowedTools, placed.rule, []),
+    ...fenceRules(step, placed.rule, placed.denies),
     budgetUsd: t.budgetUsd,
     ...mountsOf(placed.mounts.map(mountOf)),
     ...serversOf(step, t.servers),
@@ -203,10 +203,6 @@ export const startOf = (step: StepSpec, workspace: string, found: StartFound | u
     addsFolders: declarationOf(step.harness ?? DEFAULT_HARNESS)?.can.includes('writableMount') === true,
     writes: !writesNothing(step),
   });
-
-/** A list of rules each read by `rule`, with `more` after them; undefined where there was no list and nothing more, as before. */
-const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]) =>
-  (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
 
 /**
  * A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's, which the

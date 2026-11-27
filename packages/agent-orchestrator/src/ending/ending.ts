@@ -101,3 +101,16 @@ export function gateRefusal(
   }
   return null;
 }
+
+/**
+ * The deny and allow rules a step is filed with: each read by `rule` as the place spells it, and the place's own denies after the step's;
+ * undefined where the step has no list and the place adds nothing. Pure.
+ * @param step The step filed: its own deny and allow lists.
+ * @param rule How the place reads one rule.
+ * @param denies What the place denies the step besides.
+ */
+export const fenceRules = (step: Pick<StepSpec, 'disallowedTools' | 'allowedTools'>, rule: (r: string) => string, denies: readonly string[]) => {
+  const read = (rules: readonly string[] | undefined, more: readonly string[]) =>
+    (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
+  return { disallowedTools: read(step.disallowedTools, denies), allowedTools: read(step.allowedTools, []) };
+};

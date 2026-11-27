@@ -239,7 +239,17 @@ describe("a finished run's decision: what its branch touched, the lesson, the di
         'awaiting',
         'collisions',
       ]);
-      assert.equal(body.collisions, null, 'a branch handed to a person to merge is at no ending: no collision is read');
+      assert.deepEqual(
+        body.collisions,
+        {
+          onto: 'main',
+          base: [{ branch: 'wf/r-d1/implement', clean: true, said: 'merges cleanly onto main' }],
+          inFlight: [],
+          colliding: [],
+          said: 'no other run is in flight on main',
+        },
+        'a branch handed to a person to merge is read against the base and the runs in flight on it',
+      );
       assert.deepEqual(
         body.awaiting,
         { branches: [branch], direct: false },

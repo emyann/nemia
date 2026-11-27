@@ -352,11 +352,10 @@ describe("the store paused, then paused at once, then resumed: nothing new start
     };
     const one = { ...two, finishing: two.finishing.slice(1) };
     const none = { ...two, finishing: [] };
-    const held = { ...none, staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }] };
-    const signed = { ...held, held: [{ run: 'r-4', step: 'land' }] };
+    const signed = { ...none, held: [{ run: 'r-4', step: 'land' }] };
     let said: string | undefined;
     const lines: string[] = [];
-    for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined]) {
+    for (const standing of [undefined, two, two, one, none, none, signed, signed, undefined, undefined]) {
       const now = pauseSaid(standing, said);
       lines.push(...now.lines);
       said = now.said;
@@ -365,10 +364,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       pausedWords(two),
       pausedWords(one),
       pausedWords(none),
-      pausedWords(held),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
       pausedWords(signed),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
       "   r-4's land has signed off, and its check waits on nemia resume",
       RESUMED,
     ]);

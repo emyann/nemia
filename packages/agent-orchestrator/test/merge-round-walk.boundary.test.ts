@@ -18,7 +18,7 @@ import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
-import { advanceRun, approveRun, list, mergeRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { advanceRun, list, mergeRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { roundOf } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -142,8 +142,8 @@ const loopingFolder = (rounds = 3) => {
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 
 /**
- * An ending stopped on its base branch: `implement ⇄ review → ship`, implement verified, review done with `again: false`, ship approved
- * at try 1, filed in the repository's own checkout, and signed off blocked — the work does not hold on the base branch as it is now.
+ * An ending stopped on its base branch: `implement ⇄ review → ship`, implement verified, review done with `again: false`, ship filed
+ * at try 1 and signed off blocked — the work does not hold on the base branch as it is now.
  */
 async function stoppedOnBase(dir = loopingFolder()) {
   const repo = aRepo();
@@ -161,8 +161,7 @@ async function stoppedOnBase(dir = loopingFolder()) {
     settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
     await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   }
-  await runWith(e, approveRun(run.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, run.id)))).filed, ['ship']);
+  assert.ok(runRecord(ROOT, run.id).steps.ship, 'ship is filed once review is done');
   settle(`${run.id}-ship`, 'succeeded', STOPPED);
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   return { repo, id: run.id, branch: work.branch!, ...b, base: git(repo, 'rev-parse', 'HEAD') };

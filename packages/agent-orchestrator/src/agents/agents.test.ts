@@ -254,7 +254,6 @@ const WIRING = [
   'resume',
   'input',
   'place',
-  'workspace',
   'writable',
   'reads',
   'slot',

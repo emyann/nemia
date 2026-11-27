@@ -335,8 +335,8 @@ describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and t
     await stage.runWith(stage.board().e, hold(id, []));
     agree(await readers(id));
   });
-  test('an ending at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
-    const id = await started(folder({ implement: [], land: ['after: implement', 'gate: true'] }));
+  test('a step at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
+    const id = await started(folder({ implement: ['gate: true'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await tick(id);
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue', message: 'not this way' }));

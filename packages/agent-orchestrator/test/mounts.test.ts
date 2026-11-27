@@ -36,7 +36,7 @@ import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
-import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
+import { advanceRun, retryRun, startRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, hireAgentAt, plantFactory } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
@@ -264,7 +264,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
       names(round.brief, '`template-draft.md`');
     },
   );
-  s.test('the ending, filed once a person approves it, reads what implement and review handed over and writes none of it', async () => {
+  s.test('the ending reads what implement and review handed over and writes none of it', async () => {
     const b = stage.board();
     const wt = runRecord(ROOT, id).steps.implement.workspace!;
     fs.writeFileSync(path.join(wt, 'flag.txt'), 'the flag\n');
@@ -276,8 +276,6 @@ describe('mounts on every filing: a factory run whose implement writes one folde
     await pass(id);
     await pass(id);
     b.settle(runRecord(ROOT, id).steps.review.taskId!, 'succeeded', reviewed(false));
-    await pass(id);
-    await stage.runWith(b.e, approveRun(id, 'ship'));
     await pass(id);
     const config = filedFor(id, 'ship').config as Filed;
     for (const by of ['implement', 'review']) {

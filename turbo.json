@@ -16,6 +16,10 @@
       "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/cli/**", "$TURBO_ROOT$/apps/api/**"]
     },
+    "design-system#test": {
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/src/components/**"]
+    },
     "cli#test": {
       "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/**"]

@@ -60,6 +60,34 @@ async function searched(page: Page) {
   await idle(page);
 }
 
+/**
+ * A state picked in the bar is the state chips' own filter: `state:` offers the phases, the one picked sets `?phase=`, selects the same
+ * chip under Open and Closed and shows as a chip in the bar, and taking the bar's chip off selects All again.
+ */
+async function stated(page: Page) {
+  const bar = page.getByRole('combobox', { name: 'Search the cards' });
+  await bar.fill('state:');
+  const offered = page.getByRole('option').filter({ hasNotText: /\b0 cards$/ });
+  await expectVisible(offered.first(), 'state: offers the phases that hold cards');
+  const word = ((await offered.first().textContent()) ?? '')
+    .replace(/^state:\s*/, '')
+    .replace(/\s*\d+ cards?$/, '')
+    .trim();
+  await offered.first().click();
+  await page.waitForURL((url) => url.searchParams.has('phase'), { timeout: WAIT_MS });
+  await idle(page);
+  const selected = page.locator('[aria-label="State"] [role="radio"][aria-checked="true"]');
+  const chip = ((await selected.textContent()) ?? '').toLowerCase();
+  if (!chip.startsWith(word.toLowerCase()))
+    throw new Refused(`the state picked in the bar is the chip selected — ${word}; the chip says ${chip}`);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /^Take off state: / }).click();
+  await page.waitForURL((url) => !url.searchParams.has('phase'), { timeout: WAIT_MS });
+  await idle(page);
+  const all = ((await selected.textContent()) ?? '').toLowerCase();
+  if (!all.startsWith('all')) throw new Refused(`taking the bar's state off selects All again — the chip says ${all}`);
+}
+
 /** The sort: Oldest puts the oldest first, kept in the address; Newest is the address without it. */
 async function sorted(page: Page) {
   const newest = await firstOf(page, 'metadata.creationTimestamp desc');
@@ -108,6 +136,7 @@ async function slash(page: Page) {
   await page.keyboard.press('/');
   const focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null);
   if (focused !== 'Search the cards') throw new Refused(`/ focuses the search bar — the focus is on ${JSON.stringify(focused)}`);
+  await page.keyboard.press('Escape');
 }
 
 /** A card filed from New card, listed at once, and taken off with Remove from its menu; the store is as it was after. */
@@ -149,9 +178,9 @@ async function filedAndRemoved(page: Page, theme: string) {
 
 export default {
   /**
-   * The Inbox: its counts as the api counts them, its search, its sort, its layout kept in the browser, Closed in the address, `/` into the
-   * search bar, and a card filed from New card and taken off with Remove. Every write is taken back, so every page after this one, in
-   * either theme, reads the store as seeded.
+   * The Inbox: its counts as the api counts them, its search, a state picked in the bar, its sort, its layout kept in the browser,
+   * Closed in the address, `/` into the search bar, and a card filed from New card and taken off with Remove. Every write is taken
+   * back, so every page after this one, in either theme, reads the store as seeded.
    */
   name: 'inbox',
   route: '/inbox',
@@ -164,6 +193,7 @@ export default {
     await photograph(page, path.join(OUT, `inbox-${theme}.png`), { fullPage: true });
     await sides(page);
     await searched(page);
+    await stated(page);
     await sorted(page);
     await laidOut(page);
     await slash(page);

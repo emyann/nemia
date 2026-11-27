@@ -237,6 +237,30 @@ export const inboxPageQuery = (asked: InboxAsked, factory?: string) =>
     placeholderData: (previous) => previous,
   });
 
+/** What the bar's suggestions read: a few cards the words match, how many cards match in all, and the factory each card is in. */
+export type InboxSearched = { entries: InboxEntry[]; total: number };
+
+/**
+ * A few cards of the Inbox as `asked` says (its `limit` the few), and how many match in all: the cards the page's own ask would list with
+ * the words typed so far, which the bar offers and counts. Under `['inbox']`; read again with it, and what was drawn stays until the next
+ * read comes.
+ * @param asked The query the api's card list takes (`InboxAsked`).
+ * @param factory The factory whose cards alone are read, by its name (`namespaceOf`); undefined for every factory's.
+ */
+export const searchQuery = (asked: InboxAsked, factory?: string) =>
+  queryOptions({
+    queryKey: ['inbox', { search: asked, factory }],
+    queryFn: async () => {
+      const list = await cards.page(factory === undefined ? undefined : namespaceOf(factory), asked);
+      const found = {
+        entries: entriesOf(list),
+        total: list.items.length + (list.metadata.remainingItemCount ?? 0),
+      } satisfies InboxSearched;
+      return found;
+    },
+    placeholderData: (previous) => previous,
+  });
+
 /** The field selector of the cards in chains still in play: the Inbox page's chains, which it reads whole. */
 const CHAINED_IN_PLAY = 'status.inPlay=true,status.chained=true';
 

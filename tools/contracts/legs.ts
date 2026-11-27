@@ -43,6 +43,7 @@ export const ROOTS = [
   'apps/web/src/lib/question-draft',
   'apps/web/src/lib/runResult.ts',
   'apps/web/src/lib/runSays.ts',
+  'apps/web/src/lib/searchBar.ts',
   'apps/web/src/lib/setup.ts',
   'apps/web/src/lib/startInputs.ts',
   'apps/web/src/lib/stepMark.ts',

@@ -127,8 +127,10 @@ describe('a run a card started is refused Invalid, naming the card to send on in
     plantCard(ROOT, 'parse-the-flag-k2q9', '---\nworkflow: deliver\n---\nParse the flag.\n');
     const id = (await stage.runPlaced(startFromInbox({ name: 'parse-the-flag-k2q9', callerRepo: repo }))).run.id;
     await pass(b, id);
+    const before = [...cardNames(ROOT)];
     await assert.rejects(resend(b, id, 'triage'), refusedAs('Invalid'));
-    assert.deepEqual([...cardNames(ROOT)], ['parse-the-flag-k2q9']);
+    assert.deepEqual([...cardNames(ROOT)], before);
+    assert.ok(before.includes('parse-the-flag-k2q9'), 'the card that started it is still filed');
     assert.equal(runRecord(ROOT, id).cancelledAt, undefined);
   });
 });

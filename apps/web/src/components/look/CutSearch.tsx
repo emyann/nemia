@@ -2,7 +2,6 @@ import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefOb
 import { Search, X } from 'lucide-react';
 import { ComboBox, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
 import { Body, IconButton } from '@/components/ui/ds';
-import { cn } from '@/lib/utils';
 import { CutField } from './CutField';
 import { CutTag } from './CutTag';
 import { CHOICE, CHOICES } from './CutSelect';

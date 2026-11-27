@@ -229,4 +229,9 @@ test('a run whose land step has not reached the condition is left alone, and a p
   notDue.status.steps[1].status = 'queued';
   const r = pass([notDue], [BASE_RULE, { when: 'pr list', out: '[]' }]);
   assert.deepEqual([r.written, r.calls], [[], []]);
+
+  const unread = pass([], [], { unreadable: true });
+  assert.equal(unread.code, 0, 'a pass that cannot read the runs does not stop the program');
+  assert.ok(unread.err.includes('nemia land:'), unread.err);
+  assert.deepEqual(unread.written, []);
 });

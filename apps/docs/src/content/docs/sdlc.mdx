@@ -201,7 +201,7 @@ Once the daemon has rendered the factory, its tree is yours to change. Four comm
   form of `gh` except a tool's help. Allowing `gh` in your settings would reach every read-only agent, so leave it out.
 - **Commit before a landing.** In both modes, the landing runs in your checkout, on your base branch. It refuses a checkout with
   uncommitted changes before merging anything, and leaves those changes as they are. On GitHub, the program only fast-forwards your checkout
-  where it is clean and leaves it as it is otherwise. In your checkout, the program waits and says what is in the way, without staging anything. Commit the changes or set them aside, then retry the step. A run starts from your checkout's last commit, so
+  where it is clean and leaves it as it is otherwise. In your checkout, the landing waits and says what is in the way, without staging anything. Commit the changes or set them aside, and it carries on by itself. A run starts from your checkout's last commit, so
   uncommitted work isn't included.
 
 ## Sources

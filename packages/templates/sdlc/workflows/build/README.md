@@ -132,7 +132,7 @@ A red is first re-run, once, any red it judged, failing lines or not (`rerun.ts`
 run GitHub says is on its first attempt, so a restart never re-runs it twice; green the second time is `True`, naming the jobs re-run. Red
 still is `False`, which fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass: red twice is a
 real break of the base, and the words say so and point at the merge commit's checks, where a person lands a fix, then types `nemia retry
-<run> land`; where the base's tip holds the merge and the context is green there, `base-ci` is `True` and says so. A merge whose own run was
+<run> land --recheck`; where the base's tip holds the merge and the context is green there, `base-ci` is `True` and says so. A merge whose own run was
 cancelled — a CI that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's
 compare says it holds the merge: green there is `True`, naming the commit read and why; red there is `False` naming that commit; anything
 else is `Unknown`, the step waiting. Never reported stays `Unknown`, naming `landingWaitsOnCi`: a repository whose CI does not run on

@@ -18,7 +18,10 @@ export const SCRIPT = path.join(import.meta.dirname, '..', 'sdlc', 'carried', 'l
 const NEMIA = `#!${process.execPath}
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
-if (argv[0] === 'get') {
+if (argv[0] === 'get' && process.env.NEMIA_UNREADABLE) {
+  process.stderr.write('the api is not there');
+  process.exit(1);
+} else if (argv[0] === 'get') {
   process.stdout.write(fs.readFileSync(process.env.NEMIA_RUNS, 'utf8'));
 } else {
   fs.appendFileSync(process.env.NEMIA_LOG, JSON.stringify(argv) + '\\n');
@@ -79,7 +82,14 @@ export function served(
 }
 
 /** The flags the program is started with, by their names; the ones not given are the factory's defaults. */
-export type Flags = { github?: boolean; refresh?: string; derives?: string; install?: string; localCheck?: string };
+export type Flags = {
+  github?: boolean;
+  refresh?: string;
+  derives?: string;
+  install?: string;
+  localCheck?: string;
+  unreadable?: boolean;
+};
 
 /** The `gh` stub's rule for `gh repo view`, which names the base. */
 export const BASE_RULE = { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) } satisfies Rule;
@@ -131,6 +141,7 @@ export function pass(runs: unknown[], rules: readonly Rule[], flags: Flags = {},
       GIT_COMMITTER_EMAIL: 't@t',
       NEMIA_RUNS: file,
       NEMIA_LOG: log,
+      ...(flags.unreadable ? { NEMIA_UNREADABLE: '1' } : {}),
       ...stub.env(),
     },
     encoding: 'utf8',

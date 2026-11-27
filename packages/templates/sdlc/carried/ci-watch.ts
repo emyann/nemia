@@ -711,7 +711,7 @@ function mergeWaitSaid({ pr, oid, at, check, ours, ci }: MergeReading) {
 function mergeSaid(a: Asked, act: Act, r: MergeReading) {
   const { pr, oid, at, check, entries, ours, tip } = r;
   const l: Landing = { number: pr.number, url: pr.url, oid, onto: pr.baseRefName, check };
-  const retry = `  Then: nemia retry ${a.id} ${a.step.name}`;
+  const retry = `  Then: nemia retry ${a.id} ${a.step.name} --recheck`;
   if (act === 'pass') return { status: 'True' as const, message: mergePassSaid(r) };
   if (act === 'rerun') {
     const again = rerunOnce(ours, a.cwd);

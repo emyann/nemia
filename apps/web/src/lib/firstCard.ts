@@ -70,7 +70,7 @@ export const firstBeatOf: FirstBeatOf = (run) => {
 
 /**
  * The run as the hints read it: the first card's where it carries `FIRST_CARD_LABEL`, a step filed, at a gate, landed — succeeded with
- * an ending step (`workspace: base`), which is what lands; a run of a workflow with none lands nothing — or ended.
+ * an ending step (`workspace: base`) or a wait node, which is what lands; a run of a workflow with none lands nothing — or ended.
  * @param run The run's view, as its page reads it.
  */
 export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>) => {
@@ -79,7 +79,8 @@ export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>) =>
     first: run.labels[key] === value,
     filed: run.steps.some((step) => step.filed !== null),
     waitsOnYou: run.status === 'awaiting approval',
-    landed: run.status === 'succeeded' && run.steps.some((step) => step.spec?.workspace === 'base'),
+    landed:
+      run.status === 'succeeded' && run.steps.some((step) => step.spec?.workspace === 'base' || (step.spec?.waitsFor?.length ?? 0) > 0),
     ended: run.status === 'failed' || run.status === 'cancelled',
   };
 };
@@ -94,11 +95,11 @@ export const nextStepsOf: NextStepsOf = (factory) =>
 
 /**
  * The gates a first card's run is started with, so it waits on the person before what it does lands: the workflow's ending step
- * (`workspace: base`) where its listing has one, else none.
+ * (`workspace: base`) where its listing has one, else the step before the first wait node, which lands what that step approved, else none.
  * @param steps The workflow's steps as the factory lists it; undefined where they were not read.
  */
-export const firstGatesOf: FirstGatesOf = (steps) =>
-  (steps ?? [])
-    .filter((step) => step.spec.workspace === 'base')
-    .map((step) => step.name)
-    .slice(0, 1);
+export const firstGatesOf: FirstGatesOf = (steps) => {
+  const ending = (steps ?? []).find((step) => step.spec.workspace === 'base')?.name;
+  const gate = ending ?? (steps ?? []).find((step) => (step.spec.waitsFor?.length ?? 0) > 0)?.spec.after?.at(0);
+  return gate === undefined ? [] : [gate];
+};

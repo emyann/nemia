@@ -94,6 +94,7 @@ const specStepOf = (s: StepSpec) => ({
   tools: s.tools ?? null,
   deadlineSeconds: s.deadlineSeconds ?? null,
   ...(s.agent?.name !== undefined ? { agent: s.agent.name } : {}),
+  ...(s.waitsFor ? { waitsFor: [...s.waitsFor] } : {}),
   ...(s.output ? { fields: declaredFields(s) } : {}),
 });
 

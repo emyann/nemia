@@ -285,7 +285,7 @@ rm "$S"/node_modules; git worktree remove "$S"
   nothing twice. A condition can be written by hand (`nemia condition <run> land <name> --status True`), and the program leaves it alone. After the merge,
   the step waits on the condition `base-ci`, which the factory's `ci-watch` program writes from main's `ci` at the merge commit: a refusal that says main
   is red there means the merge stands and main turned red. Read the jobs it names: re-run them where CI failed on its own account (a
-  timeout), or land a fix; then `nemia retry <run> land`, and the program writes `True` once main's tip holding the merge is green. A
+  timeout), or land a fix; then `nemia retry <run> land --recheck`, and the program writes `True` once main's tip holding the merge is green. A
   message that no `ci` was reported at the merge means CI does not run on pushes to main for that factory: apply it with `--set
   landingWaitsOnCi=false`. A condition that stays `Unknown` with no change in its message means the program is not running or cannot read
   GitHub: `nemia get programs -n <factory>` says whether it runs, and `gh auth status` on the daemon's machine whether its sign-in holds.
@@ -544,7 +544,7 @@ English; never push or open a pull request unless asked.
 | A step could not read what it was pointed to | see *Empowering the agents* |
 | Two branches that merge cleanly but fail together | prose only: the operator's checks before a landing gate |
 | A conflict found at the landing gate has no direct way back to implement | prose only: send back through review with `again` |
-| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing program merges the run's own green pull request (`packages/templates/sdlc/carried/land.ts`), `ci` required on its head, and fast-forwards the checkout; the check is a receipt |
+| A landing staged in the owner's checkout judged a tree no CI had seen, and main was pushed by hand after it | the landing program merges the run's own green pull request (`packages/templates/sdlc/carried/land.ts`), `ci` required on its head, and fast-forwards the checkout; the land step runs no check, it waits on the program's conditions |
 
 ## What a supervisor agent needs
 

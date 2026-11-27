@@ -38,26 +38,6 @@ export const startedCard = (entry: Pick<InboxEntry, 'state'>) => CARD_KIND[entry
  */
 export const inPlay = (entry: Pick<InboxEntry, 'state'>) => CARD_KIND[entry.state] !== 'ended';
 
-/** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
-const isCard = (entry: Pick<InboxEntry, 'file'>) => entry.file.endsWith('.md');
-
-/**
- * Whether an entry of the inbox has a page, `/inbox/<name>`, among the entries listed with it: whether its name is one the api takes (the
- * package's `inboxNameRefusal`). Every card's is, and a stray file's where nothing else answers to its name, but a folder's, which the
- * listing names `sub/`, and a file's with a backslash in it: the api would refuse the name the page asks for, and a link would open a
- * refusal of what the Inbox page has just listed.
- *
- * And not a stray file's where a card of that name is listed beside it: `/inbox/notes` is `notes.md`, which the api's card page reads
- * before a stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
- * @param entry The entry asked about: its name and its file.
- * @param entries Every entry listed with it, the entry among them.
- */
-export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]) =>
-  entry.name.trim() !== '' &&
-  !/[\\/\0]/.test(entry.name) &&
-  !entry.name.startsWith('.') &&
-  (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
-
 /**
  * A start, a drop, a queue or its taking back, or a `from:` set, the api refused: the card as the page listed it, what was asked, and the
  * api's words.
@@ -169,16 +149,6 @@ export function ordinal(n: number) {
 }
 
 /**
- * What a queued card says of its place and, where triggers queue it, of them: `queued · 2nd`, `queued by ready · 1st` — or `queued` alone
- * for one a record says was started, which has no place.
- * @param queued The card's queue record, with its place where it has one.
- */
-export const queuedWord = (queued: NonNullable<InboxEntry['queued']>) => {
-  const word = queued.by?.length ? `queued by ${queued.by.join(', ')}` : 'queued';
-  return queued.place ? `${word} · ${ordinal(queued.place)}` : word;
-};
-
-/**
  * The line of a card's waits on the cards of its `after:` not succeeded: each card, the card its work stands at where it is another, and
  * that
  * card's state, or that the store has no such card, or the cycle; and, where only a person can release one, `Needs you:` with the fix.
@@ -213,23 +183,12 @@ export const queueOf = (entries: readonly InboxEntry[]) =>
   entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
 
 /**
- * Whether a card could be queued were its factory not asked: it is `filed` — neither queued nor started — names a workflow, and reads.
- */
-const queueableButFactory = (entry: InboxEntry) => entry.state === 'filed' && entry.workflow !== null && entry.error === null;
-
-/**
  * Whether the page offers Queue on a card: it names a factory (`unassigned`) and a workflow — a queued card starts on its own, in the
  * factory and on the workflow it names — it reads, it is not queued, and no record says it was started. What the api would refuse
  * otherwise, in the package's words.
  * @param entry The inbox's entry.
  */
-export const queueable = (entry: InboxEntry) => !unassigned(entry) && queueableButFactory(entry);
-
-/**
- * Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one.
- * @param entry The inbox's entry.
- */
-export const queueNeedsFactory = (entry: InboxEntry) => unassigned(entry) && queueableButFactory(entry);
+export const queueable = (entry: InboxEntry) => !unassigned(entry) && entry.state === 'filed' && entry.workflow !== null && entry.error === null;
 
 /**
  * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started

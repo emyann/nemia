@@ -6,7 +6,7 @@ import { CopyId, CutFrame, CutTag, MeaningTag } from '@/components/look';
 import { factoriesQuery } from '@/lib/api/factories';
 import { workflowNameOf } from '@/lib/api/workflows';
 import type { InboxEntry } from '@/lib/api/inbox';
-import { cardTag, factoryRepoOf, triedShown, type CardRefusal } from '@/lib/inbox';
+import { cardTag, clashWords, factoryRepoOf, triedShown, waitWords, type CardRefusal } from '@/lib/inbox';
 import { Instant } from '../time/Instant';
 import { CardActions, CardLink } from './CardActions';
 import { Refused, Tried } from './InboxParts';
@@ -70,7 +70,12 @@ function Facts({ entry, compact }: { entry: InboxEntry; compact: boolean }) {
       )}
       {waits && !compact && (
         <Body size="small" colorRole="on-surface-variant" data-card-waits>
-          {stuckOf(entry) ? 'A card before it ended without succeeding: edit what it runs after, or cancel its start.' : 'Runs once the cards before it are done.'}
+          {stuckOf(entry) ? waitWords(entry.name, entry.waits ?? []) : 'Runs once the cards before it are done.'}
+        </Body>
+      )}
+      {entry.clash && (
+        <Body size="small" data-card-clash={entry.clash.join(' ')}>
+          {clashWords(entry.clash)}
         </Body>
       )}
       {entry.error !== null && (

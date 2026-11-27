@@ -246,7 +246,7 @@ export function StepGraph({
   );
 }
 
-/** The graph's lines under its nodes, and each gate's tick on the side of its step its approval is, yellow where that step waits on you. */
+/** The graph's lines under its nodes, and each gate's tick after its step, yellow where that step waits on you. */
 function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: ReadonlyMap<string, { mark: StepMark }> }) {
   return (
     <svg

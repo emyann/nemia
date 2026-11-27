@@ -120,7 +120,6 @@ export function validate(steps: readonly StepSpec[]) {
   validateLoops(steps);
   validateRoutes(steps);
   validateCommands(steps);
-  validateBaseChecks(steps);
 }
 
 /**
@@ -193,21 +192,6 @@ function validateWaits(steps: readonly StepSpec[]) {
     if (inLoop.has(s.name))
       throw new WorkflowError(
         `${s.name}: a wait node (\`waitsFor:\`) cannot sit in a loop's span, since a round files its steps again and its conditions belong to one try. Move it after the loop.`,
-      );
-  }
-}
-
-/**
- * Refused: a check that says it uses no checkout (`usesCheckout: false`) on a step that is no ending. Only an ending works in the
- * repository's own checkout, which a check gives back to the next ending by saying so; a step in a worktree the run owns holds nothing.
- */
-function validateBaseChecks(steps: readonly StepSpec[]) {
-  for (const s of steps) {
-    if (endsOnBase(s)) continue;
-    const free = stepChecks(s).find((c) => c.usesCheckout === false);
-    if (free)
-      throw new WorkflowError(
-        `${s.name}: the check \`${free.name}\` says \`usesCheckout: false\`, which gives the repository's own checkout back to the next ending, and this step is no ending (\`workspace: base\`): it works in a worktree of its own and holds no checkout. Delete the line.`,
       );
   }
 }

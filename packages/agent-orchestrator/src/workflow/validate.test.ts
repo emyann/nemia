@@ -320,7 +320,7 @@ const ROWS: Row[] = [
     naming: ['ship: ', '`workspace: base`', '`checks:` (receipt)', '(it waits on review)', 'Add `gate: true`'],
   },
   {
-    row: 'base: an ending with two checks, one using no checkout',
+    row: 'base: an ending with two checks, one a condition',
     run: () =>
       validate(
         ending(false, true).map((s) =>
@@ -330,21 +330,12 @@ const ROWS: Row[] = [
                 check: undefined,
                 checks: [
                   { name: 'receipt', run: 'npm test', after: [] },
-                  { name: 'base-ci', run: 'npm run wait', after: ['receipt'], usesCheckout: false as const },
+                  { name: 'base-ci', condition: 'base-ci', after: ['receipt'] },
                 ],
               }
             : s,
         ),
       ),
-  },
-  {
-    row: 'base: REFUSED, usesCheckout: false on a step that is no ending',
-    run: () =>
-      validate([
-        { ...step('implement'), checks: [{ name: 'wait', run: 'npm run wait', after: [], usesCheckout: false as const }] },
-        step('review', ['implement']),
-      ]),
-    naming: ['implement: ', '`wait`', '`usesCheckout: false`', 'Delete the line'],
   },
   { row: "base: a check after a loop (quick's shape)", run: () => validate(ending(true, false)) },
   { row: "base: a gated check (build's shape)", run: () => validate(ending(false, true)) },

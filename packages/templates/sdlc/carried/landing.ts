@@ -1,10 +1,10 @@
 /**
  * `node landing.ts <verb>` — the acts a landing is made of, which no agent may type: the merge of this run's own pull request on GitHub,
- * the receipt that it happened, and the wait on the base branch's CI at the commit that landed. A Bash prefix rule cannot tell
+ * and the receipt that it happened. A Bash prefix rule cannot tell
  * `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole to the agents that land, so the act is this script, read from the run's
  * frozen carried files (`$WF_CARRIED_FILES`) and run with `node`, as `pull-request.ts` carries the push and the pull request. It imports
- * `ci-log.ts`, beside it, for how a check of a commit reads, `exec.ts`, for how a command is run and CI waited on, and `rerun.ts`, for the
- * one re-run of a red, as `pull-request.ts` does, and `refresh.ts`, for the landing refresh: the run freezes the carried folder whole, so
+ * `ci-log.ts`, beside it, for how a check of a commit reads, `exec.ts`, for how a command is run, and `refresh.ts`, for the landing
+ * refresh: the run freezes the carried folder whole, so
  * a script may import a sibling it holds. It is told the name of the CI context it reads (`--check <name>`), since that name is the
  * repository's, never the script's.
  *
@@ -31,38 +31,19 @@
  *   `landingDerives` names**, since review reads a head that no longer lands as is: the refreshed head is git's plain merge of the
  *   reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the derived paths, and a refresh with any other
  *   difference, any path left unmerged, or an install or a command that exits non-zero is refused and taken back, nothing pushed.
- * - `receipt --run <id> --check <name>`, the land step's first check, which uses the checkout: it refuses unless the pull request is
+ * - `receipt --run <id> --check <name>`, the land step's check that runs in the checkout (after the `ci` condition): it refuses unless
+ * the pull request is
  *   `MERGED` with a merge commit that is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every
  *   commit of every `wf/<id>/*` branch has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record
  *   `landed: {commit}` on the commit that landed. Where none is merged, it first reads `refreshed.json` in `WF_ARTIFACTS` (the land
- *   step's files folder): where it names this run's open pull request at its head, the receipt merges it — once the CI context is green
- *   at that head (red refuses, naming the jobs and the `nemia retry <id> review --message "…"` that sends the work back), and only while
+ *   step's files folder): where it names this run's open pull request at its head, the receipt merges it — once the CI context reads green
+ *   at that head, once, the `ci` condition having waited for it (red or not over refuses, naming the jobs and the `nemia retry <id>
+ *   review --message "…"` that sends the work back), and only while
  *   the head holds `origin/<base>` (a base that moved past it refuses with the land step's retry line) — by `gh pr merge --merge
  *   --match-head-commit <head>` with the subject and body the session gave, and fast-forwards the checkout, then receipts as above. It
  *   waits on nothing at the merge commit: that is `base-ci`'s, once the checkout is given back.
- * - `base-ci --run <id> --check <name> --wait-on-ci <true|false>`, the land step's second check, which says it uses no checkout
- *   (`usesCheckout: false`), so it runs while another run's landing may be working there: it reads nothing of the working tree, index or
- *   HEAD and fetches nothing — only GitHub, and the git objects the receipt's fast-forward brought here. Where `--wait-on-ci` is `false`
- *   (the factory's `landingWaitsOnCi`) it reads nothing and passes, saying so. Otherwise it reads the run's one merged pull request and
- *   its merge commit, passes saying so where neither the merge commit's tree nor its first parent's declares a CI workflow
- *   (`declaresCi`), and where `refreshed.json` names that pull request at a head whose tree the merge commit has (the receipt waited
- *   there already), and else
- *   waits on the CI context `--check` names at the merge commit on the base branch, read over REST (its check runs and its status
- *   contexts; the combined `state` is never a verdict): 1800 s for it to be reported
- *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the check's own
- *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
- *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is green there,
- *   which passes and says so — but only once the failed jobs of each red Actions run at the merge were re-run, once, by the rule
- *   `pull-request.ts`'s wait keeps (`rerun.ts`, which both import: only while GitHub says the run's `run_attempt` is 1, so a retry of the
- *   land step never re-runs it twice), and waited on within the same bound: a green second time passes, naming the jobs re-run and how
- *   each ended; red again refuses, naming them too and saying the base is broken, not flaky, with the merge commit's checks to read.
- *   A merge whose own run was cancelled (a CI's pending run replaced by a newer push's) or never reported is
- *   read at the base's tip where it holds the merge, by GitHub's compare (`ahead` or `identical`): green there passes, saying which
- *   commit was read and why, red there refuses naming that commit, and anything else waits on. A read of GitHub that fails — `gh` timing
- *   out, exiting non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing
- *   there refuses, naming the last error. Still running at the bound, or never reported (CI may not run on pushes to the base: the
- *   factory then sets `landingWaitsOnCi` false), refuses. A refusal there takes nothing back: the merge stands, the land step fails, and
- *   the retry reads GitHub again.
+ * The wait on the base branch's CI at the commit that landed is no verb of this script: it is the condition `base-ci`, which `ci-watch.ts`,
+ * sdlc's program, writes (`pull-request.ts`'s round has `ci` the same way), so the checkout is given back once the receipt passes.
  *
  * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1 on
  * stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty checkout,
@@ -73,28 +54,9 @@
  * one is — and refuses where none is merged.
  */
 import fs from 'node:fs';
-import {
-  type Landing,
-  NOT_FAILED,
-  PASSED,
-  type Seen,
-  declaresCi,
-  greenLater,
-  latest,
-  listing,
-  named,
-  noVerdict,
-  pending,
-  reddened,
-  seenOf,
-  stands,
-  superseded,
-  unfinished,
-  verdict,
-} from './ci-log.ts';
-import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, seconds, sleep } from './exec.ts';
+import { NOT_FAILED, PASSED, declaresCi, latest, listing, named, pending, seenOf, superseded, verdict } from './ci-log.ts';
+import { Refusal, authed, base, git, noGh, run } from './exec.ts';
 import { type Refreshed, bodyFileOf, lacksBase, recorded, refresh } from './refresh.ts';
-import { type Rerun, redTwice, rerunOnce, rerunSaid, seenAfter } from './rerun.ts';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
 const MERGEABLE = 'MERGEABLE';
@@ -529,7 +491,7 @@ function receipt(args: string[]) {
   origin();
   authed(MERGING);
   const onto = base('the landing', gh);
-  const { before, all, merged } = takenFresh(id, onto, check, Date.now());
+  const { before, all, merged } = takenFresh(id, onto, check);
   const { pr, oid } = mergeOf(id, all, merged);
   const branch = settled();
   onBase(branch, onto);
@@ -553,41 +515,17 @@ function receipt(args: string[]) {
 }
 
 /**
- * `base-ci`: the CI context `--check` names at the run's merge commit on the base branch, waited out (`ciAt`). It reads nothing of the
- * checkout's working tree, index or HEAD, and fetches nothing: GitHub, and the git objects the receipt's fast-forward brought here.
- */
-function baseCi(args: string[]) {
-  const opts = options('base-ci', args, ['--run', '--check', '--wait-on-ci']);
-  const [id, check, waits] = [opts['--run'], opts['--check'], waitsOf(opts['--wait-on-ci'])];
-  if (!waits) return [`\`${check}\` at the merge on the base branch was not waited on: the factory's \`landingWaitsOnCi\` is false`];
-  origin();
-  authed(MERGING);
-  const onto = base('the landing', gh);
-  const began = Date.now();
-  const { all, merged } = standing(id);
-  const { pr, oid } = mergeOf(id, all, merged);
-  if (!ciAtCommit(oid, `${oid}^1`)) return [noCi(oid, 'nothing will report a context on the base branch')];
-  const record = recorded(process.env.WF_ARTIFACTS);
-  if (record?.pr === pr.number && treeOf(oid) === treeOf(record.head))
-    return [
-      `\`${check}\` at ${oid.slice(0, 12)} was not waited on again: it has the same tree as ${record.head.slice(0, 12)}, ` +
-        'the refreshed head it passed at',
-    ];
-  return ciAt(pr, oid, onto, check, id, began);
-}
-
-/**
  * Where this run's pull requests stand once a head the land step's session refreshed is merged: none merged and `refreshed.json` in
  * `WF_ARTIFACTS` naming this run's open pull request at its head, it is merged here (`mergedFresh`) and the pull requests read again,
  * what that said in `before`; otherwise they are read once and nothing is merged.
  */
-function takenFresh(id: string, onto: string, check: string, began: number) {
+function takenFresh(id: string, onto: string, check: string) {
   const now = standing(id);
   if (now.merged.length > 1) throw new Refusal(twoMerged(now.merged, id));
   const record = now.merged.length === 0 ? recorded(process.env.WF_ARTIFACTS) : undefined;
   const fresh = record && now.open.find((pr) => pr.number === record.pr && pr.headRefOid === record.head);
   if (!record || !fresh) return { before: [], all: now.all, merged: now.merged };
-  const before = mergedFresh(fresh, record, onto, check, id, began);
+  const before = mergedFresh(fresh, record, onto, check, id);
   const after = standing(id);
   return { before, all: after.all, merged: after.merged };
 }
@@ -617,18 +555,14 @@ function mergeOf(id: string, all: readonly Pr[], merged: readonly Pr[]) {
   return { pr, oid };
 }
 
-/** The tree of the commit `sha`. */
-const treeOf = (sha: string) => git(`the tree of ${sha.slice(0, 12)}`, 'rev-parse', `${sha}^{tree}`);
-
 /**
  * The merge of `pr`, whose head the land step's session refreshed (`record`): once `check` is green at that head, and only while it
- * holds the base, merged at that head with the subject and body the session gave, and the checkout fast-forwarded onto it. The wait
- * here runs on the clock that began at `began`, inside the receipt's own deadline.
+ * holds the base, merged at that head with the subject and body the session gave, and the checkout fast-forwarded onto it.
  */
-function mergedFresh(pr: Pr, record: Refreshed, onto: string, check: string, id: string, began: number) {
+function mergedFresh(pr: Pr, record: Refreshed, onto: string, check: string, id: string) {
   onBase(settled(), onto);
   holds(pr, onto, id);
-  const said = greenAtHead(pr, check, id, began);
+  const said = greenAtHead(pr, check, id);
   holds(pr, onto, id);
   const body = bodyFileOf(record.body);
   try {
@@ -670,42 +604,34 @@ function holds(pr: Pr, onto: string, id: string) {
 }
 
 /**
- * The CI context `check` at `pr`'s refreshed head, waited out on the clock that began at `began`: a line where it passed; a refusal
- * where it is red, naming the jobs and sending the work back to review, or where it never came or never finished within the bounds.
+ * The CI context `check` at `pr`'s refreshed head, read once: the `ci` condition, which `ci-watch.ts` writes before this check runs,
+ * judged it, and a read here only makes sure. A line where it passed; a refusal where it is red, naming the jobs and sending the work back
+ * to review, or where it is not over or not reported, which the condition's writer says.
  */
-function greenAtHead(pr: Pr, check: string, id: string, began: number) {
+function greenAtHead(pr: Pr, check: string, id: string) {
   const head = pr.headRefOid;
   if (!ciAtCommit(head, pr.baseRefName)) return noCi(head, "the refresh is judged by the factory's local check of the round before it");
-  const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
-  const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
-  const l: Landing = { number: pr.number, url: pr.url, oid: head, onto: pr.headRefName, check };
-  for (;;) {
-    const { entries, unread } = readAt(head);
-    const ours = named(latest(entries), check);
-    const seen = unread === undefined && !(ours.length && superseded(ours)) ? seenOf(ours) : 'pending';
-    if (seen === 'passed') return `\`${check}\` passed at ${head.slice(0, 12)}, the head the landing refreshed #${pr.number} to`;
-    if (seen === 'failed')
-      throw new Refusal(
-        [
-          `\`${check}\` is red at ${head.slice(0, 12)}, the base merged into #${pr.number} at the landing, so nothing is merged. The jobs ` +
-            'that did not pass:',
-          ...listing(entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)))),
-          '  The work goes back to be fixed on the branch:',
-          `  Then: nemia retry ${id} review --message "\`${check}\` is red at ${head.slice(0, 12)}, the base merged in at the landing"`,
-        ].join('\n'),
-      );
-    const bound = unread === undefined && ours.length === 0 && !entries.some(pending) ? start : whole;
-    if (Date.now() - began >= bound * 1000)
-      throw new Refusal([unfinished(l, entries, bound, unread), '  Nothing is merged.', retryLine(id)].join('\n'));
-    sleep(seconds('WF_CI_POLL_SECONDS', POLL_SECONDS));
-  }
-}
-
-/** Whether `base-ci` waits on CI at the merge, from `--wait-on-ci`; refuses a value that is neither `true` nor `false`. */
-function waitsOf(value: string) {
-  if (value === 'true' || value === 'false') return value === 'true';
+  const { entries, unread } = readAt(head);
+  if (unread !== undefined)
+    throw new Refusal(
+      `\`${check}\` at ${head.slice(0, 12)} could not be read from GitHub: ${unread}\n  Nothing is merged.\n${retryLine(id)}`,
+    );
+  const ours = named(latest(entries), check);
+  const seen = ours.length && superseded(ours) ? 'pending' : seenOf(ours);
+  if (seen === 'passed') return `\`${check}\` passed at ${head.slice(0, 12)}, the head the landing refreshed #${pr.number} to`;
+  if (seen === 'failed')
+    throw new Refusal(
+      [
+        `\`${check}\` is red at ${head.slice(0, 12)}, the base merged into #${pr.number} at the landing, so nothing is merged. The jobs ` +
+          'that did not pass:',
+        ...listing(entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)))),
+        '  The work goes back to be fixed on the branch:',
+        `  Then: nemia retry ${id} review --message "\`${check}\` is red at ${head.slice(0, 12)}, the base merged in at the landing"`,
+      ].join('\n'),
+    );
   throw new Refusal(
-    `\`--wait-on-ci ${value}\` is neither true nor false: give the factory's \`landingWaitsOnCi\`, as the land step's check does`,
+    `\`${check}\` at ${head.slice(0, 12)} is ${seen === 'absent' ? 'not reported' : 'not over'} yet, and the \`ci\` condition passes only once ` +
+      `it is green there: nothing is merged.\n${retryLine(id)}`,
   );
 }
 
@@ -751,94 +677,15 @@ function readAt(sha: string) {
   }
 }
 
-/**
- * The CI context `check` at `oid`, the merge of `pr` on `onto`, waited out within the bounds: the lines where it passed, a refusal where
- * it did not, never came, or never finished (`judgedAt`). A context that sums up other jobs is reported only once they end, so while any
- * check at the merge runs it has the whole bound, not the start's. A red is re-run once first (`rerun.ts`), within the same bound, and
- * every line after says what was re-run and how it ended.
- */
-function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string, began = Date.now()) {
-  const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
-  const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
-  const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
-  const l: Landing = { number: pr.number, url: pr.url, oid, onto, check };
-  const again: Again = { asked: false };
-  for (;;) {
-    const { entries: all, unread } = readAt(oid);
-    const entries = latest(all);
-    const ours = named(entries, check);
-    const said = unread === undefined ? judgedAt(l, entries, ours, id, again) : undefined;
-    if (said) return [...rerunSaid(again.rerun, entries).map((line) => line.trim()), said];
-    const bound = unread === undefined && ours.length === 0 && !entries.some(pending) ? start : whole;
-    if (Date.now() - began >= bound * 1000)
-      throw new Refusal([unfinished(l, entries, bound, unread), ...rerunSaid(again.rerun, entries), stands(l), retryLine(id)].join('\n'));
-    sleep(poll);
-  }
-}
-
-/** `base-ci`'s one re-run of a red at the merge, carried across the polls of one wait: whether it was asked, and what it re-ran. */
-type Again = { asked: boolean; rerun?: Rerun<Entry> };
-
-/**
- * The merge's checks read once: a line where `ours` passed — the second time, where a red was re-run — or where they are red or carry no
- * verdict of their own (`superseded`: never reported, or every run cancelled, as a CI does whose pending run a newer push replaced) and
- * the base's tip that holds the merge (`later`) passed; none, to wait on, where a red at the merge was just re-run (`again`, once a
- * wait, and only a run on its first attempt) or a job re-run still shows its first time; a refusal where the merge is red and was not
- * re-run, or red again after it, and the tip did not pass, or the merge has no verdict and the tip is red; none, to wait on, where neither
- * has a verdict yet.
- */
-function judgedAt(l: Landing, entries: readonly Entry[], ours: readonly Entry[], id: string, again: Again) {
-  const seen = seenAfter(again.rerun, entries, ours);
-  if (seen === 'passed') return `\`${l.check}\` passed on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge commit`;
-  const none = superseded(ours) ? noVerdict(ours) : undefined;
-  if (seen !== 'failed' && none === undefined) return undefined;
-  const tip = later(l.oid, l.onto, l.check);
-  if (tip?.seen === 'passed') return greenLater(l, tip.sha, none);
-  if (none === undefined) {
-    if (!again.asked) {
-      again.asked = true;
-      again.rerun = rerunOnce(ours, entries);
-      if (again.rerun?.runs.length) return undefined;
-    }
-    const twice = redTwice(again.rerun, entries);
-    throw new Refusal([...reddened(l, l.oid, entries, undefined, rerunSaid(again.rerun, entries), twice), retryLine(id)].join('\n'));
-  }
-  if (tip?.seen === 'failed') throw new Refusal([...reddened(l, tip.sha, tip.entries, none), retryLine(id)].join('\n'));
-  return undefined;
-}
-
-/**
- * The base's tip where it holds `oid`, by GitHub's compare (`ahead` or `identical`, never the order of commits), with how `check` reads
- * there, a context with no verdict of its own (`superseded`) read as `absent`; read once a call. None where the tip is `oid` itself,
- * does not hold it, or cannot be read.
- */
-function later(oid: string, onto: string, check: string) {
-  try {
-    const sha = api<{ sha?: string }>(`commits/${onto}`).sha;
-    if (!sha || sha === oid) return undefined satisfies { sha: string; entries: Entry[]; seen: Seen } | undefined;
-    const compared = api<{ status?: string }>(`compare/${oid}...${sha}`).status;
-    if (compared !== 'ahead' && compared !== 'identical')
-      return undefined satisfies { sha: string; entries: Entry[]; seen: Seen } | undefined;
-    const entries = entriesAt(sha);
-    const ours = named(entries, check);
-    return { sha, entries, seen: superseded(ours) ? 'absent' : seenOf(ours) } satisfies
-      | { sha: string; entries: Entry[]; seen: Seen }
-      | undefined;
-  } catch (err) {
-    if (err instanceof Refusal) return undefined satisfies { sha: string; entries: Entry[]; seen: Seen } | undefined;
-    throw err;
-  }
-}
-
 /** The verbs, by name. */
-const VERBS: Record<string, (args: string[]) => string[]> = { merge, receipt, 'base-ci': baseCi };
+const VERBS: Record<string, (args: string[]) => string[]> = { merge, receipt };
 
 /** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr, each line under the one tag a landing prints. */
 function main() {
   const [verb = '', ...args] = process.argv.slice(2);
   const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
   try {
-    if (!act) throw new Refusal(`\`${verb}\` is no verb: give merge, receipt or base-ci`);
+    if (!act) throw new Refusal(`\`${verb}\` is no verb: give merge or receipt`);
     for (const line of act(args)) process.stdout.write(`nemia land: ${line}\n`);
     return 0;
   } catch (err) {

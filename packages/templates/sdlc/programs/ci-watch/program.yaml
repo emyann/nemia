@@ -1,0 +1,8 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Program
+metadata:
+  name: ci-watch
+  description: Watches GitHub's CI for every waiting run of the factory with gh's sign-in, and writes the conditions `ci` (CI at the head of a run's pull request) and `base-ci` (CI at the merge commit on the base branch) that the implement and land steps wait on. It polls, re-runs a red that is not the change's once, and dispatches a run GitHub queued and never started.
+spec:
+  run: node "$WF_CARRIED_FILES/ci-watch.ts" --check "${{ parameters.ciCheck }}" --wait-on-ci "${{ parameters.landingWaitsOnCi }}"
+  writes: [ci, base-ci]

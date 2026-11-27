@@ -650,7 +650,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so;
  * any other's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
- * with no verdict (`checkArgv`'s `unprovisioned`); a check with `usesCheckout: false` reads nothing of the checkout and runs nothing first.
+ * with no verdict (`checkArgv`'s `unprovisioned`).
  * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run, and records the commit the step's
  * branch was at as the pass read it (`CheckTask.tip`), which a recheck of a blocked step compares against (`blockedRecheck`).
  */
@@ -718,7 +718,7 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
   const files = artifactsDir(home, run, name);
   fs.mkdirSync(files, { recursive: true });
   const lands = isRepositoryRun(run) && landsOnCheck(step, run);
-  const firstThing = check.usesCheckout === false ? undefined : yield* checkFirst(f, name, lands, workspace);
+  const firstThing = yield* checkFirst(f, name, lands, workspace);
   const closeout = f.reads.signedOff(name);
   const env = {
     ...checkEnvOf(run, step, {

@@ -1,6 +1,6 @@
 /**
- * What `landing.ts` and `pull-request.ts` both do to run a command and wait on GitHub, said once: the refusal they are both refused by,
- * a bounded call of `git` or `gh`, the wait's bounds on CI and its sleep, and the two reads of `gh` they make the same way. Each script
+ * What `landing.ts`, `pull-request.ts` and `ci-watch.ts` all do to run a command, said once: the refusal they are refused by, a bounded
+ * call of `git` or `gh`, a sleep, and the two reads of `gh` they make the same way. Each script
  * keeps beside its own code what it does differently on purpose (its `gh`, how it parses a read, its `origin`, its pull requests). It
  * imports `node:child_process` alone: the run freezes the carried folder whole (`$WF_CARRIED_FILES`), so it is beside them wherever
  * they run.
@@ -24,30 +24,12 @@ export const BOUND = 120_000;
 /** The most bytes a command may print before it is cut off: a test job's whole log runs past `spawnSync`'s default of 1 MiB. */
 const OUTPUT_BYTES = 64 * 1024 * 1024;
 
-/**
- * How long the CI context has to be reported at all, in seconds: on the pull request's head, a queue longer than this is a refusal a
- * `--recheck` answers; at the merge commit, a context never reported is most often a CI that does not run on pushes to the base.
- * `WF_CI_START_SECONDS` lowers it for a test, on its own, so the two stages of the wait are told apart by a fixture.
- */
-export const START_SECONDS = 1800;
-
-/**
- * How long the whole wait on CI may take, in seconds, the start included (and, on the head, the one re-run of a red, sharing this one
- * clock); `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under the deadline of the check that runs the wait — the round
- * check's, which the clauses before it share, or the landing check's — or the engine would kill the wait and the person would get no
- * refusal in words.
- */
-export const WHOLE_SECONDS = 2400;
-
-/** How long the wait sleeps between two reads of the checks, in seconds; `WF_CI_POLL_SECONDS` lowers it for a test. */
-export const POLL_SECONDS = 15;
-
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 export type Ran = { status: number | null; out: string; err: string; missing: boolean };
 
-/** Run `cmd` with `args`, bounded in time and in what it prints, reading nothing from stdin. */
-export function run(cmd: string, args: string[]) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
+/** Run `cmd` with `args`, bounded in time and in what it prints, reading nothing from stdin, in `cwd` where one is given. */
+export function run(cmd: string, args: string[], cwd?: string) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES, cwd });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }
@@ -65,7 +47,7 @@ export function seconds(name: string, fallback: number) {
   return Number.isFinite(said) && said >= 0 ? said : fallback;
 }
 
-/** Sleep `secs` seconds, the thread held, so the poll is one process and no timer outlives it. */
+/** Sleep `secs` seconds, the thread held, so a loop is one process and no timer outlives it. */
 export function sleep(secs: number) {
   if (secs <= 0) return;
   const held = new Int32Array(new SharedArrayBuffer(4));

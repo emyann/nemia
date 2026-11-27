@@ -776,10 +776,8 @@ const PINNED: Record<string, string[]> = {
   ],
   'agent-orchestrator/run': [
     'BY_CAP',
-    'CHECK_DEADLINE_SECONDS',
     'GIVEN',
     'HANDED_CLOSEOUT',
-    'LANDING_CHECK_DEADLINE_SECONDS',
     'LINE_NAME',
     'PRECEDENCE',
     'SIGNOFF',

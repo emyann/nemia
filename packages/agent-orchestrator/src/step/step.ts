@@ -13,17 +13,13 @@ import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEY
 /**
  * One of a step's named checks, as the loader resolved it: its name (`[a-z][a-z0-9-]*`), the checks it waits on, each by name, none
  * where it waits on nothing, and what it is: a shell line it runs (`run`), or a condition it waits on (`condition`, a name some program
- * or person writes through the api: a readiness gate, whose writer is never the step's own session). `usesCheckout: false`, on an
- * ending's check that runs a line alone, says the check reads and writes nothing of the repository's own checkout: the checkout is
- * given back once every check that uses it has passed (`checksHoldCheckout`). Absent, the check uses the step's workspace.
+ * or person writes through the api: a readiness gate, whose writer is never the step's own session). A condition runs nothing, so on
+ * an ending it holds no checkout: the checkout is given back once every check that runs a line has passed (`checksHoldCheckout`).
  */
 export type CheckSpec = {
   readonly name: string;
   readonly after: readonly string[];
-} & (
-  | { readonly run: string; readonly usesCheckout?: false; readonly condition?: undefined }
-  | { readonly condition: string; readonly run?: undefined; readonly usesCheckout?: undefined }
-);
+} & ({ readonly run: string; readonly condition?: undefined } | { readonly condition: string; readonly run?: undefined });
 
 /**
  * What a check is as a person reads it: its shell line, or `condition: <name>` for one that waits on a condition.
@@ -598,7 +594,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   checks:
-    "the step's named checks, a YAML list of `{ name, run, after, enabled, usesCheckout }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, `usesCheckout: false` on an ending gives the checkout back before it runs, `condition: <name>` in place of `run:` waits on a condition its writer writes True for the step's try, and the step is verified once every one exits 0 or is written True",
+    "the step's named checks, a YAML list of `{ name, run or condition, after, enabled }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, `condition: <name>` in place of `run:` waits on a condition its writer writes True for the step's try, and the step is verified once every one exits 0 or is written True",
   run: "a command node's shell line: the node runs it with no agent session, signs off `done` on exit 0 with an answer its `output:` decodes, and `failed` on any other exit",
   checkMemory:
     "the memory the step's check asks of the machine, a container's request — `256Mi`: the check is admitted by it and keeps the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",

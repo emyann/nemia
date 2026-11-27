@@ -4,13 +4,13 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, with no gate unless the run is started with one at land."
 spec:
-  version: 6.1.0
+  version: 7.0.0
   rules:
     path: RULES.md
   parameters:
     github:
       type: boolean
-      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request through the factory's github MCP server, which the factory adds and signs in (the github-server need), and the review step reads it through the same server; its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true. It follows the factory's first writable volume: true where that volume is cloned from github.com, false where it is a folder of the machine or another host's clone; a later volume leaves it as it is. Where neither the pull request's head nor the base branch declares a CI workflow in .github/workflows, the implement step's check runs localCheck in place of the wait, and the landing merges with no context."
+      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request through the factory's github MCP server, which the factory adds and signs in (the github-server need), and the review step reads it through the same server; its check runs roundCheck, the factory's ci-watch program writes the CI context ciCheck names as a condition the step waits on, and the landing merges that pull request on GitHub; set it with --set github=true. It follows the factory's first writable volume: true where that volume is cloned from github.com, false where it is a folder of the machine or another host's clone; a later volume leaves it as it is. Where neither the pull request's head nor the base branch declares a CI workflow in .github/workflows, the implement step's local check runs localCheck and the program writes the condition True, and the landing merges with no context."
       default: false
       whenOrigin: github.com
     localCheck:
@@ -19,11 +19,11 @@ spec:
       default: node "$WF_CARRIED_FILES/local-check.ts" --runner npm
     ciCheck:
       type: string
-      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the land step's base-ci check then waits on it at the merge commit on the base branch. Read only where github is true."
+      description: "The CI status context branch protection requires of the base branch, which the ci-watch program watches for the implement step and the land step, and the landing merges on; where landingWaitsOnCi is true, the base-ci condition then reads it at the merge commit on the base branch. Read only where github is true."
       default: ci
     landingWaitsOnCi:
       type: boolean
-      description: "Whether the land step's base-ci check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red; it runs once the checkout is given back to the next run's ending. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
+      description: "Whether the land step's base-ci condition, where github is true, is written from the CI context ciCheck names at the merge commit on the base branch (by the ci-watch program), and fails the step where the merge turned the base red; it holds no checkout, so the checkout is given back to the next run's ending once the receipt passes. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
       default: true
     landingRefresh:
       type: string
@@ -39,7 +39,7 @@ spec:
       default: ""
     landingCheckMemory:
       type: string
-      description: "The memory the land step's check asks of the machine, a Kubernetes quantity such as 256Mi, by which the daemon admits it while the check holds the repository's checkout: set it where github is true, where the check only waits on GitHub and needs little. The check keeps the daemon's default limit. Empty (the default) asks the daemon's default request, which a check that runs localCheck on the merged tree needs."
+      description: "The memory the land step's check asks of the machine, a Kubernetes quantity such as 256Mi, by which the daemon admits it while the check holds the repository's checkout: set it where github is true, where the land step's checks only read GitHub and need little. The check keeps the daemon's default limit. Empty (the default) asks the daemon's default request, which a check that runs localCheck on the merged tree needs."
       default: ""
     lightMemoryRequest:
       type: string
@@ -47,7 +47,7 @@ spec:
       default: 1Gi
     roundCheck:
       type: string
-      description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."
+      description: "The command the implement step's check runs on each round's tree before CI judges, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."
       default: npm run --if-present lint && npm run --if-present typecheck
     implementCheck:
       type: string

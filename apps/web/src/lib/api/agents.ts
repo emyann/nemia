@@ -165,6 +165,17 @@ export const agentsQuery = queryOptions({
 });
 
 /**
+ * The factory `factory`'s own agents, the origin `factory` of its namespace — its template's and its tree's `agents/` folder — each
+ * with the steps of its workflows that name it, read from disk on each request.
+ * @param factory The factory's name.
+ */
+export const factoryAgentsQuery = (factory: string) =>
+  queryOptions({
+    queryKey: ['agents', 'factory', factory],
+    queryFn: async () => (await served.list(namespaceOf(factory), { origin: 'factory' })).map(agentRowOf),
+  });
+
+/**
  * One agent, read from disk now, from the origin `from`, in `place`'s factory on its repository (none: the default namespace):
  * `agentQuery`'s read, for a page that must read it past the cache.
  * @param from The origin it is read from (`yours`, `repo`, `factory`); a word no origin has reads with none.

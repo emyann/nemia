@@ -121,6 +121,7 @@ export const TheCard: StoryObj<typeof meta> = {
     await expect(items.map((item) => item.textContent)).toEqual(['Open', 'Open conversation']);
 
     await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(within(canvasElement.ownerDocument.body).queryByRole('menu')).toBeNull());
 
     const streams = await streamsOf(async () => {
       await pick(canvasElement, 'Open conversation');

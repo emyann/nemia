@@ -72,8 +72,7 @@ const activityOfSpec = spec<(rows: readonly AtWorkRow[], agent: string) => Activ
     },
     oneIsItsStep: {
       description: 'The one session said is a step at work given to the agent',
-      condition: ({ input: [rows, agent], output }) =>
-        output.kind !== 'one' || (output.row.agent === agent && given(rows, output.row)),
+      condition: ({ input: [rows, agent], output }) => output.kind !== 'one' || (output.row.agent === agent && given(rows, output.row)),
     },
     manyListsEach: {
       description: 'Several sessions list as many rows as steps at work are given to the agent',

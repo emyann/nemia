@@ -4,6 +4,7 @@ import { XIcon } from 'lucide-react';
 import { IconButton, ModalDialog, Title } from '@/components/ui/ds';
 import { CutFrame, CutPress, type FrameHue } from '@/components/look';
 import { agentsQuery } from '@/lib/api/agents';
+import { CUT_MODAL } from '@/lib/classes';
 import { useRunRead } from '@/lib/runView';
 import { WAIT_ACTIONS } from '@/lib/words';
 import type { WaitAction as Action } from '../../../contracts/wait-action.contract.ts';
@@ -88,7 +89,7 @@ export function WaitAction({ run, action }: { run: { id: string }; action: Actio
         isOpen={open}
         onClose={close}
         title={said}
-        className="max-h-[calc(100dvh-2rem)] w-fit max-w-[calc(100vw-2rem)] min-w-0 overflow-visible rounded-none bg-transparent p-0 shadow-none"
+        className={CUT_MODAL}
       >
         {open && (
           <Answered.Provider value={close}>

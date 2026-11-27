@@ -22,3 +22,7 @@ export const FLOOR_RULED = 'overflow-hidden border-y border-outline-variant';
 
 /** The frame's left and right edge, the same on every page: the grid's own, the strip of tabs' and the Overview's. */
 export const FRAME_EDGE = 'px-3 @lg/page:px-6';
+
+/** The kit dialog's shell for a cut frame: it draws no surface of its own, and keeps the scrim, the focus trap and Escape. */
+export const CUT_MODAL =
+  'max-h-[calc(100dvh-2rem)] w-fit max-w-[calc(100vw-2rem)] min-w-0 overflow-visible rounded-none bg-transparent p-0 shadow-none';

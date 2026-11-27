@@ -6,12 +6,11 @@ import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { QuotaWindow } from './api/quota.ts';
 import type { FinishedRun, OpenRuns } from './api/runs.ts';
-import { agentOf, judged, sinceOf, type RunView } from './api/judged.ts';
+import { judged, type RunView } from './api/judged.ts';
 import type { TokenCounts } from './breakdown.ts';
-import { titleOf } from './factory.ts';
+import { stepsAtWorkOf, working } from './atWork.ts';
 import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
-import { stepState } from './status.ts';
 
 /** The rows of agents at work the strip shows before it says how many more there are. */
 const ROWS_SHOWN = 3;
@@ -115,35 +114,6 @@ const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>) => {
   return { count: atWork.size, hired: all.size || null };
 };
 
-/** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
-const working = (run: RunView, step: RunView['steps'][number]) => {
-  const state = stepState(step, false, run.holding != null);
-  return state === 'working' || state === 'checking';
-};
-
-/** The steps of `open` at work by an agent, longest first. */
-const rowsOf = (open: readonly RunView[], now: number) =>
-  open
-    .flatMap((run) =>
-      run.steps.flatMap((step) => {
-        const agent = agentOf(step);
-        const since = sinceOf(step);
-        if (agent === null || since === null || !working(run, step)) return [];
-        const minutes = Math.max(0, Math.floor((now - Date.parse(since)) / 60_000));
-        return [
-          {
-            agent,
-            step: step.name,
-            run: run.id,
-            title: titleOf(run),
-            minutes,
-            atWork: durationWords(minutes * 60_000, 'minute'),
-          },
-        ];
-      }),
-    )
-    .sort((a, b) => b.minutes - a.minutes || a.run.localeCompare(b.run) || a.step.localeCompare(b.step));
-
 /** The sessions at work in `open`: each step working or checking, a held run's that a hold did not stop among them. */
 const sessionsOf = (open: readonly RunView[]) => open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
 
@@ -163,7 +133,14 @@ export function stripOf(given: StripIn) {
   const priced = succeeded.filter((run) => run.cost !== null);
   const open: RunView[] = [...waiting, ...flying];
   const worked = [...open.filter((run) => workedToday(run, given.dayStart)), ...finishedToday];
-  const rows = rowsOf(open, given.now);
+  const rows = stepsAtWorkOf(open, given.now).map(({ agent, step, run, title, minutes }) => ({
+    agent,
+    step,
+    run,
+    title,
+    minutes,
+    atWork: durationWords(minutes * 60_000, 'minute'),
+  }));
   return {
     waitsOnYou: given.open.waiting.length,
     inFlight: given.open.inFlight.length,

@@ -4,7 +4,7 @@
  * same read. Data, never the lines a screen prints: each sentence it carries is the package's own, without a screen's label.
  */
 import { Schema } from 'effect';
-import { BaseHold, RunHolding, RunWaiting, StepUsed } from './run.ts';
+import { RunHolding, RunWaiting, StepUsed } from './run.ts';
 import { DECIDE_LABELS, LESSON_STATES } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -195,7 +195,7 @@ const collisionBranch = Schema.String.annotate({ description: 'The branch ahead 
 
 /**
  * At an ending's decision: whether each branch ahead merges onto the base (`onto`), the other runs in flight on it, each branch of theirs
- * one of ours does not merge onto cleanly, the landing check that refused the merged tree though it merges (`semantic`), and the whole in
+ * one of ours does not merge onto cleanly, and the whole in
  * one line (`Collisions`, collide.ts).
  */
 export const Collisions = Schema.Struct({
@@ -212,17 +212,6 @@ export const Collisions = Schema.Struct({
   inFlight: Strings.annotate({ description: 'The other runs in flight on the same base.' }),
   colliding: List(Collision).annotate({
     description: 'Each branch of another run that a branch of this run does not merge onto cleanly, and that in words.',
-  }),
-  semantic: Schema.NullOr(
-    Schema.Struct({
-      step: Schema.String.annotate({ description: 'The step whose check refused the merged tree.' }),
-      check: Schema.String.annotate({ description: 'The landing check that refused it.' }),
-      sha: Schema.String.annotate({ description: 'The commit of the merged tree it refused.' }),
-      said: Schema.String.annotate({ description: 'What it said, in words.' }),
-    }),
-  ).annotate({
-    description:
-      'The landing check that refused the merged tree though it merges: its step, the check, the commit and the words; null where none did.',
   }),
   said: Schema.String.annotate({ description: 'The whole of it in one line.' }),
 }).annotate({
@@ -279,7 +268,7 @@ export type StepQuestions = typeof StepQuestions.Type;
 /**
  * What there is to decide about a run: where each result branch stands, what each branch read touched, the lesson, the check-affecting
  * diffs, what each filed step consumed and their total, the run's cost and OVER BUDGET line (each the package's words without a screen's
- * label), the commands, the run whose ending holds the base this run's ending waits on (`baseHeldBy`), what the finished run awaits
+ * label), the commands, what the finished run awaits
  * (`direct` for one that worked on its base branch itself; null for a run still running with a step waiting on you), and the collisions
  * read at an ending's decision; and the questions each step waiting on you asks now (`questions`, a step that asks none left out, and
  * absent where none asks or from a decision read before them), which `answers` names back by title and label.
@@ -297,7 +286,6 @@ export const Decidable = Schema.Struct({
   cost: Schema.NullOr(Schema.String).annotate({ description: "The run's cost, in the package's words; null where none was measured." }),
   overBudget: Schema.NullOr(Schema.String).annotate({ description: 'The line saying the run is over its budget; null where it is not.' }),
   commands: List(DecideCommand).annotate({ description: 'The commands nemia decide offers for the run.' }),
-  baseHeldBy: Schema.optionalKey(BaseHold),
   awaiting: Schema.NullOr(
     Schema.Struct({
       branches: Strings.annotate({ description: 'The result branches it awaits.' }),

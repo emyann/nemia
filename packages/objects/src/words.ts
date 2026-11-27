@@ -50,19 +50,10 @@ export type RunOutcome = (typeof RUN_OUTCOMES)[number];
  * person's
  * hold that names no run, which a person alone lifts (`hold`).
  */
-export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
+export const WAIT_ON = ['run', 'limit', 'pause', 'hold'] as const;
 
 /** One of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];
-
-/**
- * Where a gate's approval is, beside its step: `after`, the step runs and its closeout waits for the approval before anything after it is
- * filed; `before`, the step is approved before it runs (an ending on the base branch).
- */
-export const GATE_AT = ['after', 'before'] as const;
-
-/** One of `GATE_AT`. */
-export type GateAt = (typeof GATE_AT)[number];
 
 /** Where a person is asked for an answer (reason `AwaitingAnswer`): by the session itself (`session`), or by the closeout (`closeout`). */
 export const ANSWER_VIA = ['session', 'closeout'] as const;
@@ -807,11 +798,11 @@ export type DecideLabel = (typeof DECIDE_LABELS)[number];
 export const LESSON_STATES = ['written', 'nothing', 'unknown'] as const;
 export type LessonState = (typeof LESSON_STATES)[number];
 
-/** What still finishes under a pause: a step's session, its check, or a landing. */
-export const FINISHING_KINDS = ['session', 'check', 'landing'] as const;
+/** What still finishes under a pause: a step's session or its check. */
+export const FINISHING_KINDS = ['session', 'check'] as const;
 export type FinishingKind = (typeof FINISHING_KINDS)[number];
 
-/** What a pause at once cuts: a step's session or its check, never a landing. */
+/** What a pause at once cuts: a step's session or its check. */
 export const INTERRUPT_KINDS = ['session', 'check'] as const;
 export type InterruptKind = (typeof INTERRUPT_KINDS)[number];
 

@@ -192,15 +192,14 @@ export const Interrupt = Schema.Struct({
 export type Interrupt = typeof Interrupt.Type;
 
 /**
- * `GET /api/pause`: the store's pause or null; each task still finishing under it; each session it parked at a tool call's end; each
- * landing it holds with its merge staged; and each other check it holds.
+ * `GET /api/pause`: the store's pause or null; each task still finishing under it; and each session it parked at a tool call's end; and each check it holds.
  */
 export const Paused = Schema.Struct({
   pause: OrNull(Pause, "The store's pause; null where it is not paused."),
   finishing: Schema.Array(
     Schema.Struct({
       ...RunStep,
-      kind: Schema.Literals(FINISHING_KINDS).annotate({ description: 'What is finishing: a session, a check or a landing.' }),
+      kind: Schema.Literals(FINISHING_KINDS).annotate({ description: 'What is finishing: a session or a check.' }),
       stopping: Schema.optionalKey(Schema.Literal(true).annotate({ description: 'True where it is being stopped; absent otherwise.' })),
       resumed: Schema.optionalKey(Schema.Literal(true).annotate({ description: 'True where it was resumed; absent otherwise.' })),
       calling: Schema.optionalKey(Schema.String.annotate({ description: 'The tool call it waits on; absent where none.' })),
@@ -213,14 +212,11 @@ export const Paused = Schema.Struct({
       cut: Schema.optionalKey(Schema.String.annotate({ description: 'The tool call that was cut; absent where none.' })),
     }),
   ).annotate({ description: "Each session the pause parked at a tool call's end." }),
-  staged: Schema.Array(
-    Schema.Struct({ ...RunStep, repo: Schema.String.annotate({ description: 'The repository the merge is staged in.' }) }),
-  ).annotate({ description: 'Each landing the pause holds with its merge staged.' }),
-  held: Schema.Array(Schema.Struct(RunStep)).annotate({ description: 'Each other check the pause holds.' }),
+  held: Schema.Array(Schema.Struct(RunStep)).annotate({ description: 'Each check the pause holds.' }),
 });
 export type Paused = typeof Paused.Type;
 
-/** `GET /api/pause/now`: what a pause at once would cut, each task at work but a landing, and the sentence of what that costs. */
+/** `GET /api/pause/now`: what a pause at once would cut, each task at work, and the sentence of what that costs. */
 export const PauseNowRead = Schema.Struct({
   interrupts: Schema.Array(Interrupt).annotate({ description: 'Each task a pause at once would cut.' }),
   cost: Schema.String.annotate({ description: 'The sentence of what that costs.' }),
@@ -325,7 +321,7 @@ export const Stats = Schema.Struct({
   filters: Schema.Record(Schema.String, Schema.String).annotate({
     description: 'The filters the facts were kept by, each a name and its value.',
   }),
-  all: Json("Every run's group: its headline, days, steps, tiles, marks, tallies and slow landings, as the board reads it."),
+  all: Json("Every run's group: its headline, days, steps, tiles, marks, tallies, as the board reads it."),
   groups: Schema.Array(Schema.Unknown).annotate({
     description: 'Each group of runs the rows go by, under its key, as the board reads it.',
   }),
@@ -584,11 +580,11 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   ),
   HttpApiEndpoint.get('paused', '/api/pause', { success: Paused, error: [Missing, ...readErrors] }).annotate(
     OpenApi.Description,
-    "Reads the store's pause, or null where none stands, with each task still finishing under it and each session, landing and check it holds. Answers Paused.",
+    "Reads the store's pause, or null where none stands, with each task still finishing under it and each session and check it holds. Answers Paused.",
   ),
   HttpApiEndpoint.get('pauseNow', '/api/pause/now', { success: PauseNowRead, error: [Missing, ...readErrors] }).annotate(
     OpenApi.Description,
-    'Reads what a pause at once would cut, each task at work but a landing, and what that costs. Answers PauseNowRead.',
+    'Reads what a pause at once would cut, each task at work, and what that costs. Answers PauseNowRead.',
   ),
   HttpApiEndpoint.get('pauseTimeout', '/api/pause/timeout', { success: PauseTimeoutAnswer, error: readErrors }).annotate(
     OpenApi.Description,

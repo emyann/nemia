@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { attachedFiles, attachedRun, lines, worked, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, dropStoredFactory, dropStoredRun, store, storeFactory, storeRecord } from '../world.ts';
@@ -23,7 +23,7 @@ const RUN = { id: 'watch-the-gate-e2e44', title: 'Watch the gate', sessionId: '4
 function written() {
   const folder = path.join(store!, 'factories', FACTORY);
   const flow = path.join(folder, 'tree', 'workflows');
-  const text = `---\nagent: ${AGENT.name}\nplace: git\n---\nGuard the gate.\n`;
+  const text = `---\nagent: ${AGENT.name}\nplace: folder\n---\nGuard the gate.\n`;
   write(path.join(folder, 'tree', 'factory.json'), `${JSON.stringify({ workflows: [WORKFLOW.name] }, null, 2)}\n`);
   write(path.join(flow, WORKFLOW.name, `${WORKFLOW.step}.md`), text);
   write(
@@ -100,6 +100,17 @@ const goto = async (page: Page, to: string) => {
   await idle(page);
 };
 
+/** What the page says, in a line: where its body did not draw, the words it shows in its place. */
+const drawn = async (page: Page) =>
+  (
+    await page
+      .locator('body')
+      .innerText()
+      .catch(() => '')
+  )
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+
 export default {
   /**
    * A factory's own agent, read in its factory, is drawn read only: the frame's head names the agent as a person is named, its ring is lit
@@ -114,6 +125,9 @@ export default {
     try {
       await goto(page, `/factories/${FACTORY}/agents/${AGENT.name}`);
       await expectVisible(page.getByRole('heading', { level: 1, name: 'Sentinel', exact: true }), "the frame's head names the agent");
+      await expectVisible(page.locator('article'), 'the page draws its body').catch(async (refused: unknown) => {
+        throw new Refused(`${refused instanceof Error ? refused.message : 'the page draws its body'}, and it says: "${await drawn(page)}"`);
+      });
       await expectVisible(page.locator('[data-read-only][data-way="factory"]', { hasText: 'Read only' }), 'and it is said to be read only');
       await expectVisible(page.locator('[data-ring="alive"]'), 'its ring is lit while its session is at work');
       await expectVisible(page.getByRole('link', { name: RUN.title, exact: true }), 'and the run it works on is a link');

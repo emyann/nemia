@@ -46,9 +46,8 @@ export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in
- * flight (`limit`), the base branch the run merges into, while another run merges there (`base`), the store's pause (`pause`), or a
- * person's
- * hold that names no run, which a person alone lifts (`hold`).
+ * flight (`limit`), the store's pause (`pause`), or a
+ * person's hold that names no run, which a person alone lifts (`hold`).
  */
 export const WAIT_ON = ['run', 'limit', 'pause', 'hold'] as const;
 

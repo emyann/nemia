@@ -815,12 +815,12 @@
     },
     {
       "term": "Waiting on",
-      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
+      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit or the pause), phase pending; an assessment names the steps waiting on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
       "type": "WaitOn",
       "retired": [
         {
           "spelling": "heldByCheckout",
-          "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+          "card": "4b: a step waiting on the checkout, which a run no longer takes"
         }
       ]
     },

@@ -16,6 +16,10 @@
  * the index, the worktree having been clean before the merge) and refuse, nothing pushed. A merge that went clean and that the command
  * changed nothing of is taken back too and the head stands as it was. Otherwise the merge is committed and pushed to the branch with no
  * force (`git push origin <sha>:refs/heads/<branch>`).
+ *
+ * `land.ts` asks the same trial again for the condition `landed` (`refreshes`), where the base moved past the head `ci` judged: a trial
+ * that goes clean and changes nothing says GitHub's merge of that head lands the tree the refresh would have made, so it is merged as it
+ * is; any other is taken back, nothing pushed, and the head refused.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -178,11 +182,13 @@ function pushed(at: string, a: Asked) {
 }
 
 /**
- * The refresh of `a`'s branch, which lacks the base: the head it pushed, or none where the trial went clean and changed nothing, the head
- * then standing as it was. Refuses as `tried` does, and a worktree a person is working in.
+ * The base merged into `a`'s branch in the worktree that has it checked out (a scratch one where none has), the factory's install and
+ * command run, and the result bounded by `tried`: then `then` given the worktree, with the merge still in progress, and whether the
+ * result is git's plain merge, gone clean. Takes the merge back where `tried` refused or `then` threw, and removes a scratch worktree.
  * @param a The pull request, its branch and tip, the base, and the factory's install, command and derived paths.
+ * @param then What is done with the trial: committed and pushed, or read and taken back.
  */
-export function refresh(a: Asked) {
+function trial<T>(a: Asked, then: (at: string, same: boolean) => T) {
   const held = checkedOut(a.branch);
   if (held) quiet(held, a.branch, a.retry);
   const at = held ?? path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-refresh-')), 'tree');
@@ -190,23 +196,50 @@ export function refresh(a: Asked) {
   try {
     const merged = run('git', ['-C', at, 'merge', '-q', '--no-ff', '--no-commit', `origin/${a.onto}`]);
     if (!merging(at)) throw new Refusal(`\`git merge origin/${a.onto}\` did not start in \`${at}\`: ${merged.err}\n${a.retry}`);
-    let same: boolean;
     try {
-      same = tried(at, a, install(at, a));
+      return then(at, tried(at, a, install(at, a)));
     } catch (err) {
-      run('git', ['-C', at, 'merge', '--abort']);
+      if (merging(at)) run('git', ['-C', at, 'merge', '--abort']);
       run('git', ['-C', at, 'reset', '-q', '--hard']);
       throw err;
     }
-    if (same) {
-      run('git', ['-C', at, 'merge', '--abort']);
-      return undefined;
-    }
-    return pushed(at, a);
   } finally {
     if (!held) {
       run('git', ['worktree', 'remove', '--force', at]);
       fs.rmSync(path.dirname(at), { recursive: true, force: true });
     }
   }
+}
+
+/** The trial in `at` taken back, the worktree on the reviewed tip as it was: what an install or a command wrote reset too. */
+const takenBack = (at: string) => {
+  run('git', ['-C', at, 'merge', '--abort']);
+  run('git', ['-C', at, 'reset', '-q', '--hard']);
+};
+
+/**
+ * The refresh of `a`'s branch, which lacks the base: the head it pushed, or none where the trial went clean and changed nothing, the head
+ * then standing as it was. Refuses as `tried` does, and a worktree a person is working in.
+ * @param a The pull request, its branch and tip, the base, and the factory's install, command and derived paths.
+ */
+export function refresh(a: Asked) {
+  return trial(a, (at, same) => {
+    if (!same) return pushed(at, a);
+    takenBack(at);
+    return undefined;
+  });
+}
+
+/**
+ * Whether the refresh of `a`'s branch, which lacks the base, would change anything: false where merging the base goes clean and the
+ * factory's command derives nothing new, so git's plain merge of the head and the base, the tree GitHub's merge commit holds, is the tree
+ * the refresh would make. The trial is always taken back and nothing is pushed. Refuses as `tried` does, and a worktree a person is
+ * working in.
+ * @param a The pull request, its branch and tip, the base, and the factory's install, command and derived paths.
+ */
+export function refreshes(a: Asked) {
+  return trial(a, (at, same) => {
+    takenBack(at);
+    return !same;
+  });
 }

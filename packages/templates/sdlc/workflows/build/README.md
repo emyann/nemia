@@ -112,8 +112,10 @@ runs one at a time and writes `turn` and `landed`; `ci-watch` writes `ci` and `b
   --match-head-commit <head>`, never `--delete-branch`: GitHub deletes the head branch) whose message is the pull request's title and
   description, then fast-forwards the repository's checkout where it is clean on the base and behind. It merges nothing but a pull request
   that is the run's own — not a draft, based on the base branch, its head the tip of the run's result branch — mergeable, with the CI
-  context green at its head, holding the base where the factory refreshes, and leaving no result branch of the run out (`git cherry`, so a
-  part taken as a commit of its own counts as taken). With no remote it stages every result branch of the run in one `git merge --no-ff
+  context green at its head, current where the factory refreshes, and leaving no result branch of the run out (`git cherry`, so a
+  part taken as a commit of its own counts as taken). Current means the head holds the base, or, where the base moved past it, that the
+  refresh tried again on it and taken back changes nothing: GitHub's merge of the head then holds the tree the refresh would have made.
+  Otherwise `landed` refuses, and the next turn refreshes the head. With no remote it stages every result branch of the run in one `git merge --no-ff
   --no-commit` in the repository's own checkout, which must be clean on the base with no merge in progress, runs `localCheck` on the merged
   tree, and commits it, or takes it back and writes False. The message there is the first line of the run's brief as its subject and one
   line per commit of the result branches as its body.

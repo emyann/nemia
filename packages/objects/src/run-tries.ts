@@ -192,7 +192,9 @@ export const StepTry = Schema.Struct({
     description: 'Why it was moved behind, as a code; null for the current try.',
   }),
   current: Schema.Boolean.annotate({ description: "Whether it is the step's current try." }),
-  taskId: NullString.annotate({ description: 'Its task; null while none was filed.' }),
+  taskId: NullString.annotate({
+    description: 'Its task; null while none was filed, and always for a try of a wait node, which runs no session.',
+  }),
   note: NullString.annotate({ description: 'What nemia ls prints beside it; null where nothing.' }),
   phase: StepPhase.annotate({ description: 'Where it is in its life, as a code: the phase its reason stands in.' }),
   reason: StepReason.annotate({ description: 'Why it is in its phase, as a code.' }),

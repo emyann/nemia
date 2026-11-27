@@ -57,6 +57,7 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
 import type { RaiseBy } from 'objects';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
+import { waitFiled } from '../wait-node/index.ts';
 
 /**
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory`, read by `checkKills` in
@@ -133,7 +134,7 @@ export function retryable(...args: Parameters<typeof triedOn>) {
 /** Whether a condition's route is settled for the run: one of the nodes after it has been filed, or sent its card. */
 const routeSettled = (step: StepSpec, run: Run, steps: readonly StepSpec[]) =>
   step.routes !== undefined &&
-  steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
+  steps.some((s) => s.after.includes(step.name) && (waitFiled(s, run.steps[s.name]) || Boolean(run.steps[s.name]?.sent)));
 
 /** `retryable` but for a condition's settled route: the ways a try of the step may be taken, off its own word. */
 function triedOn(
@@ -154,8 +155,8 @@ function triedOn(
   const harnessAsks = status === 'running' && Boolean(taskId && harnessBlocked(taskId)) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
-  const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
-  const stopped = followers.filter((f) => run.steps[f.name]?.taskId);
+  const noneFiled = followers.length > 0 && !followers.some((s) => waitFiled(s, run.steps[s.name]));
+  const stopped = followers.filter((f) => waitFiled(f, run.steps[f.name]));
   const back =
     step.loop &&
     satisfiesAfter(status) &&
@@ -194,6 +195,7 @@ function triedOn(
  * back (`other`).
  */
 const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean, rechecks: boolean) => {
+  if (step.waitsFor !== undefined) return (tried === 'failed (check)' ? ['recheck'] : []) satisfies RetryMode[];
   if (rechecks) return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   if (tried === 'budget exhausted')
     return (
@@ -520,8 +522,8 @@ export function retriesDue(
       verdictOf,
       tipOf,
     );
-    if (!record?.taskId) continue;
-    const phase = phaseOf(record.taskId);
+    if (!record || !waitFiled(step, record)) continue;
+    const phase = record.taskId ? phaseOf(record.taskId) : 'unknown';
     const unsettled = phase === 'pending' || phase === 'running';
     const ways = unsettled ? STOPPED_FIRST : modes;
     if (!ways.length) continue;

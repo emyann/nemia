@@ -114,6 +114,12 @@ const checkEnds = (name: string, checkId: string, phase: TaskPhase, verdict: Ver
     `${name}'s check ${checkId} ended ${phase}, ${verdict}`,
     (w) => ({ ...w, phase: { ...w.phase, [checkId]: phase }, verdict: { ...w.verdict, [name]: verdict } }),
   ] satisfies Move;
+/** A wait node filed: no task, its check laid with the id its condition's check will be filed under. */
+const layChecks = (name: string, checkId: string) =>
+  [
+    `${name}'s checks laid, ${checkId}`,
+    (w) => withRecord(w, name, { ...recordOf(w, name), taskId: null, check: { taskId: checkId, tasks: { ready: checkId } } }),
+  ] satisfies Move;
 const approve = (name: string, n: number) =>
   [
     `${name} approved, try ${n}`,
@@ -198,6 +204,9 @@ const BLOCKED: Closeout = { outcome: 'blocked', summary: 'stuck', artifacts: [],
 /** A step with no check and no gate. */
 const PLAIN = [step('implement')];
 const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }];
+const WAITING: StepSpec[] = [
+  { ...step('ready'), body: '', waitsFor: ['ready'], checks: [{ name: 'ready', condition: 'ready', after: [] }] },
+];
 const GATED: StepSpec[] = [{ ...step('implement'), gate: true }];
 const GATED_CHECKED: StepSpec[] = [{ ...step('implement'), gate: true, check: 'npm test' }];
 const DENYING: StepSpec[] = [{ ...step('implement'), denials: 'fail' }];
@@ -278,6 +287,14 @@ const WALKS: Walk[] = [
     settle('s1', 'succeeded'),
   ),
   walk('plain', 'implement', PLAIN, ...works('implement', 'i1')),
+  walk(
+    'a wait node, its conditions written True',
+    'ready',
+    WAITING,
+    layChecks('ready', 'c1'),
+    fileCheck('ready', 'c1'),
+    checkEnds('ready', 'c1', 'succeeded', 0),
+  ),
   walk(
     'checked, passed',
     'implement',

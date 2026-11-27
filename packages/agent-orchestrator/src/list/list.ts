@@ -43,6 +43,7 @@ import { neverApproved } from '../forget/prune/prune.ts';
 import { staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
 import type { QueuedFor } from 'objects';
+import { waitFiled } from '../wait-node/index.ts';
 import type { ScheduleListed } from '../factory/schedule/schedule.ts';
 
 export type Listing = {
@@ -483,8 +484,8 @@ function listedSteps(
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
     const { status: stoodAs, own } = stoodOf(step);
-    const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
-    if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
+    const stands: StepStatus = notFiled(run, step) && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
+    if (notFiled(run, step) && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), baseHeldBy: checkout, branch };
       return { name, ...unfiled(step, waiting, held, assessed.waitingOnNeeds), branch };
@@ -537,6 +538,9 @@ function listedSteps(
     ...(decide ? { toDecide: decide } : {}),
   };
 }
+
+/** Whether nothing of a step is filed for its try: no task, and for a wait node, which files none, no checks laid (`waitFiled`). */
+const notFiled = (run: Pick<Run, 'steps'>, step: StepSpec) => !waitFiled(step, run.steps[step.name]);
 
 /**
  * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on the needs

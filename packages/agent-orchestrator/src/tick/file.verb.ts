@@ -83,6 +83,7 @@ import { sessionTokenFor, stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
+import { isWaitNode, waitCheck, waitRecord } from '../wait-node/index.ts';
 import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
@@ -256,6 +257,28 @@ export const tryFiled = (
 });
 
 /**
+ * File a recheck due: the step's check run again, as the same task's next try. A wait node's try has no task, so its checks are laid
+ * anew for the try it is now on, as the loader lays them (`waitCheck`). A person's recheck of one check (`--check`) files that check
+ * itself.
+ * @param f The pass's filing.
+ * @param r The try to file.
+ * @param out The steps tried and rechecked on this pass.
+ * @param said The note that says the try.
+ */
+const fileRecheck = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried, said: string) {
+  const { run } = f;
+  const step = stepNamed(f, r.step);
+  const record = recordNamed(run, r.step);
+  out.tried.push(r.step);
+  f.notes.push(said);
+  const next = keptChecks(f, step, nextTry(record, r), record.check, r.check);
+  run.steps[r.step] = isWaitNode(step) && !next.check ? { ...next, check: waitCheck(run, step, (next.tries?.length ?? 0) + 1) } : next;
+  out.rechecked.push(r.step);
+  const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
+  if (only) yield* fileOneCheck(f, r.step, only);
+});
+
+/**
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
  * nothing but the note where the engine refuses the close or the answer it needs. A person's recheck of one check (`--check`) files that
  * check itself: the others' tasks are kept, a refused one among them, and the pass files no check of a step one of whose checks stands
@@ -268,15 +291,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (!(yield* f.mayFile)) return;
   const record = recordNamed(run, r.step);
   const said = tryWord(r, step);
-  if (r.mode === 'recheck') {
-    out.tried.push(r.step);
-    notes.push(said);
-    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check, r.check);
-    out.rechecked.push(r.step);
-    const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
-    if (only) yield* fileOneCheck(f, r.step, only);
-    return;
-  }
+  if (r.mode === 'recheck') return yield* fileRecheck(f, r, out, said);
   const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
   const held = heldAnswered(f, r, step, record);
   const answers = held !== undefined;
@@ -785,6 +800,22 @@ const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, lands: 
 });
 
 /**
+ * Lay the record of each ready wait node, until the pass may file no more: no task is filed, its checks are laid (`waitRecord`) and the
+ * pass that files any step's checks files its conditions. Answers with the nodes laid; the caller files the rest.
+ */
+const fileWaits = Effect.fn('fileWaits')(function* (f: Filing, ready: readonly string[]) {
+  const laid: string[] = [];
+  for (const name of ready) {
+    const step = stepNamed(f, name);
+    if (!isWaitNode(step)) continue;
+    if (!(yield* f.mayFile)) break;
+    f.run.steps[name] = waitRecord(f.run, step);
+    laid.push(name);
+  }
+  return laid;
+});
+
+/**
  * File the ready steps (`due.ready`), in order, until the pass may file no more, each in the workspace cut for it: answers with the
  * steps filed. A run that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it
  * (`Filing.heads`), and keeps it where the pass did not; and a run that waited on runs or was handed runs as context reads what they
@@ -799,7 +830,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready))];
+  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready)), ...(yield* fileWaits(f, ready))];
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);

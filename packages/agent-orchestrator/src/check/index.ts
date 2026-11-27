@@ -9,6 +9,7 @@ export {
   CHECK_RESULTS,
   CHECK_TAIL_LINES,
   checkArgv,
+  checkedWord,
   checkContract,
   checksContract,
   checkEnvOf,
@@ -45,4 +46,4 @@ export {
   type CheckFailurePolicy,
 } from './check-policy.ts';
 export { checksDue, checksPhase, currentCheckTask, decidingCheckTask, standingOf, stepChecksDue } from './checks-due.ts';
-export { checksOf, checksWritten } from './checks-plan.ts';
+export { checksOf, checksWritten, waitChecksOf } from './checks-plan.ts';

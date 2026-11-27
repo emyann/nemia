@@ -63,10 +63,11 @@ const TryCause = Schema.Literals(TRY_CAUSES).annotate({ identifier: 'TryCause' }
 
 /**
  * A try behind a step's current one (`EarlierTry`): the task it ran as, its check, how it ended, and what a person gave the try
- * after it. Numbered by its place in the step's `tries`, from 1 (`tryOf`, record.ts:363): the record writes no number.
+ * after it, none for a wait node's, which files no task. Numbered by its place in the step's `tries`, from 1 (`tryOf`, record.ts:363): the
+ * record writes no number.
  */
 export const Try = Schema.Struct({
-  taskId: TaskId.OnRead,
+  taskId: Schema.NullOr(TaskId.OnRead),
   check: Schema.optional(CheckTask),
   cause: TryCause,
   model: Schema.optional(Schema.String),
@@ -190,7 +191,7 @@ const tasksInOrder = (step: Step) => [...(step.tries ?? []).map((t) => t.taskId)
 const triesNamed = Schema.makeFilter((run: { id: string; steps: Readonly<Record<string, Step>> }) => {
   for (const [name, step] of Object.entries(run.steps)) {
     const tasks = tasksInOrder(step);
-    const at = tasks.findIndex((task, i) => task !== stepTaskId(run, name, i + 1) && (i === 0 || task !== tasks[i - 1]));
+    const at = tasks.findIndex((task, i) => task !== null && task !== stepTaskId(run, name, i + 1) && (i === 0 || task !== tasks[i - 1]));
     if (at !== -1)
       return `step ${name}'s try ${at + 1} ran as ${tasks[at]}, which is neither ${stepTaskId(run, name, at + 1)} nor the task of the try before it: a step's tries are filed under stepTaskId (record.ts:401) — put back the try its tries are missing, or the task id it was filed under`;
   }

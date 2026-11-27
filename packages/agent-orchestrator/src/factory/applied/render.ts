@@ -264,6 +264,7 @@ const STEP_WORDS = [
   'workflow',
   'card',
   'relabel',
+  'waitsFor',
   'retries',
   'deadlineSeconds',
   'memory',

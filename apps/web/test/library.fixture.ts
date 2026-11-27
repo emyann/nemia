@@ -148,6 +148,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}) =>
     workflow: null,
     card: null,
     relabel: null,
+    waitsFor: null,
     ...extra,
   }) satisfies WorkflowStepSpec;
 

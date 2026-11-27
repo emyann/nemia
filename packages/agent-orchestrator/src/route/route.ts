@@ -65,9 +65,17 @@ export type { NodeKind };
  * What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), a command (`run:`), or a step.
  * @param step The step read: its `routes`, its `workflow` and `card`, and its `run`.
  */
-export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card' | 'run'>) => {
+export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card' | 'run' | 'waitsFor'>) => {
   const kind: NodeKind =
-    step.routes !== undefined ? 'condition' : isCardNode(step) ? 'workflow' : step.run !== undefined ? 'command' : 'step';
+    step.routes !== undefined
+      ? 'condition'
+      : isCardNode(step)
+        ? 'workflow'
+        : step.run !== undefined
+          ? 'command'
+          : step.waitsFor !== undefined
+            ? 'wait'
+            : 'step';
   return kind;
 };
 

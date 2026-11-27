@@ -5,7 +5,7 @@
  * money's `money/money.ts`'s, and a person's route for a try `route/person-route.ts`'s. Pure, and read by nearly every other part of the
  * run's judgement; it reads the record alone.
  */
-import { onItsCheck, type Verdict } from '../check/index.ts';
+import { checkedWord, onItsCheck, type Verdict } from '../check/index.ts';
 import { DEFAULT_ROUNDS, endsOnBase, hasChecks, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
@@ -35,6 +35,7 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
+import { waitFiled } from '../wait-node/index.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -383,7 +384,7 @@ export function sentBack(record: StepRecord) {
  * @param step The step.
  * @param run The run's record.
  */
-export const sendBackTo = (step: StepSpec, run: Run) => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+export const sendBackTo = (step: StepSpec, run: Run) => (waitFiled(step, run.steps[step.name]) ? [step.name] : [...step.after]);
 
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
@@ -592,7 +593,7 @@ function held(
 ) {
   const record = run.steps[step.name];
   const taskId = record?.taskId;
-  if (!taskId) return false;
+  if (!taskId || step.waitsFor !== undefined) return false;
   if (own === 'denied' || own === 'stopped' || own === 'failed' || own === 'unsigned') return Boolean(overBudget(step, run, spendOf));
   if (own === 'failed (check)' && !(record.check && checkRefused(record.check, phaseOf, verdictOf(step.name)))) return false;
   if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
@@ -649,6 +650,12 @@ const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: read
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
 export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
+  if (step.waitsFor !== undefined) return waitStanding(step, run.steps[step.name], phaseOf);
+  return sessionStanding(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+};
+
+/** Where a step that runs a session or a command stands on its own work (`ownStatus`). Pure. */
+const sessionStanding: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
@@ -666,6 +673,16 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   return judgedStatus(step, run, st, said, phaseOf, closeoutOf);
 };
+
+/**
+ * Where a wait node stands: `pending` while nothing of it is filed (`waitFiled`), then on its checks alone, which are its conditions: it
+ * runs no session and no command, so no other word is its. Pure.
+ * @param step The wait node.
+ * @param st The step's record, or undefined where the run has none of it.
+ * @param phaseOf The phase of a task, by its id.
+ */
+const waitStanding = (step: StepSpec, st: StepRecord | undefined, phaseOf: (taskId: string) => TaskPhase) =>
+  (waitFiled(step, st) ? checkedWord(st?.check, phaseOf) : 'pending') satisfies StepStatus;
 
 /**
  * Where a step stands on its checks (`onItsCheck`), `exhausted` where they passed but its loop asked another round past its cap.
@@ -812,7 +829,7 @@ export const addSpend = (spends: ReadonlyArray<Spend | undefined>) =>
  * @param record The step's record, or undefined where the run has none of it.
  */
 export const sessionTasks = (record: StepRecord | undefined) => [
-  ...new Set([...(record?.tries ?? []).map((t) => t.taskId), ...(record?.taskId ? [record.taskId] : [])]),
+  ...new Set([...(record?.tries ?? []).flatMap((t) => (t.taskId ? [t.taskId] : [])), ...(record?.taskId ? [record.taskId] : [])]),
 ];
 
 /**
@@ -839,6 +856,7 @@ export const runSpend = (run: Run, spendOf: SpendOf) => addSpend(Object.keys(run
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
 export function overBudget(step: StepSpec, run: Run, spendOf: SpendOf) {
+  if (step.waitsFor !== undefined) return undefined;
   const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);

@@ -7,6 +7,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { fansOut, isFolderTeam, loopSpan, orderSteps, terminalSteps, validate } from './validate.ts';
 import { parseWorkflow } from './step-file.ts';
+import { nodeKind } from '../route/route.ts';
 import { parseFolder } from '../folder/folder.ts';
 import { sessionContext } from '../keys/index.ts';
 import { DEFAULT_ROUNDS, stepPlace, WorkflowError, type StepSpec } from '../step/step.ts';
@@ -576,4 +577,64 @@ test('`isFolderTeam` and `stepPlace`: a team works in folders when every step sa
   assert.equal(isFolderTeam(team(undefined)), false, 'a step frozen on a record before the key is a git step');
   assert.equal(stepPlace({ place: undefined }), 'git');
   assert.equal(stepPlace({ place: 'folder' }), 'folder');
+});
+
+describe('a wait node (`waitsFor:`): what loads, and what it refuses at load, naming its step', () => {
+  const work = parseWorkflow('work', '---\nplace: git\n---\ndo it\n');
+  const ready = parseWorkflow('ready', '---\nafter: work\nwaitsFor: [ready, approved]\n---\n');
+
+  test('loads with no instruction and no place, its conditions laid as checks that wait on nothing', () => {
+    validate([work, ready]);
+    assert.deepEqual(ready.checks, [
+      { name: 'ready', condition: 'ready', after: [] },
+      { name: 'approved', condition: 'approved', after: [] },
+    ]);
+    assert.equal(ready.agent, undefined);
+  });
+
+  test('is a node of kind wait, and not a step that runs', () => {
+    assert.equal(nodeKind(ready), 'wait');
+    assert.equal(nodeKind(work), 'step');
+  });
+
+  const REFUSED: ReadonlyArray<[string, Partial<StepSpec>]> = [
+    ['agent', { agent: 'implementer' as never }],
+    ['run', { run: 'true' }],
+    ['check', { check: 'true' }],
+    ['checkFailurePolicy', { checkFailurePolicy: {} as never }],
+    ['resume', { resume: 'work' }],
+    ['workspace', { workspace: 'base' }],
+    ['retries', { retries: 1 }],
+    ['budget', { budget: 1 }],
+    ['loop', { loop: 'work' }],
+    ['routes', { routes: ['a', 'b'] }],
+    ['output', { output: { file: 'x.json', schema: {} as never } }],
+    ['body', { body: 'wait for it' }],
+  ];
+  for (const [key, over] of REFUSED)
+    test(`refuses ${key}, naming the step and the line to delete`, () => {
+      assert.throws(
+        () => validate([work, { ...ready, ...over }]),
+        (e: unknown) => {
+          assert.ok(e instanceof WorkflowError, String(e));
+          assert.equal(e.exitCode, 2, e.message);
+          assert.ok(e.message.startsWith('ready: '), e.message);
+          assert.ok(e.message.includes('waitsFor'), e.message);
+          return true;
+        },
+      );
+    });
+
+  test('refuses an empty list, a name that is no word and a name twice, and `checks:` beside it, as the file is read', () => {
+    for (const lines of ['waitsFor: []', 'waitsFor: [Not A Word]', 'waitsFor: [ready, ready]', 'waitsFor: [ready]\ncheck: true'])
+      assert.throws(() => parseWorkflow('ready', `---\nafter: work\n${lines}\n---\n`), WorkflowError, lines);
+  });
+
+  test('refuses a wait node inside a loop’s span', () => {
+    const inside = looping('review', ['ready'], 'work');
+    assert.throws(
+      () => validate([work, ready, inside]),
+      (e: unknown) => e instanceof WorkflowError && e.message.includes('ready'),
+    );
+  });
 });

@@ -447,6 +447,7 @@ const routingOf = (step: StepSpec) => ({
   workflow: step.workflow ?? null,
   card: step.card ?? null,
   relabel: step.relabel ?? null,
+  waitsFor: step.waitsFor ?? null,
 });
 
 /**

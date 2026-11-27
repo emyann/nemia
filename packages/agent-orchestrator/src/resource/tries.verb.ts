@@ -337,7 +337,8 @@ export function triesOf(
   };
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
   const earlierSaid = (t: EarlierTry, i: number) => {
-    const word = turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
+    const word =
+      t.taskId === null || turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
     const { reason, on, via } = ENGINE_REASON[word];
     return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word };
   };

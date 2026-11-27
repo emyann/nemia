@@ -188,7 +188,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * modules that touch no disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 223, effect: 15 },
+  'agent-orchestrator/run': { all: 225, effect: 15 },
   'agent-orchestrator/workflow': { all: 159, effect: 15 },
 };
 

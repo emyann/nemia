@@ -2,7 +2,7 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: quick
-  description: "Build a change a card settles, on main, with no spec: Grace plans and builds it in one session, Agora reads it as a second engineer would, and Otto lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between the work and the base branch."
+  description: "Build a change a card settles, on main, with no spec: Grace plans and builds it in one session, Agora reads it as a second engineer would, and the landing program lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between the work and the base branch."
 spec:
   needs:
     - name: gh
@@ -65,24 +65,14 @@ spec:
         claude:
           context: 400k
     - name: land
-      instruction:
-        path: workflows/build/land.md
       after:
         - review
       place: git
-      workspace: base
-      budget: 10
-      checks:
-        - name: ci
-          condition: ci
-          enabled: "${{ parameters.github }}"
-        - name: receipt
-          run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi"
-        - name: base-ci
-          condition: base-ci
-          enabled: "${{ parameters.github }}"
-      checkMemory: "${{ parameters.landingCheckMemory }}"
-      memoryRequest: "${{ parameters.lightMemoryRequest }}"
+      waitsFor:
+        - "${{ case(parameters.github, 'turn', '') }}"
+        - "${{ case(parameters.github, 'ci', '') }}"
+        - landed
+        - "${{ case(parameters.github, 'base-ci', '') }}"
     - name: review
       after:
         - implement

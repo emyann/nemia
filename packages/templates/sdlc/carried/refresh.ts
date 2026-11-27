@@ -1,24 +1,21 @@
 /**
- * The landing refresh, which `landing.ts merge` runs where the factory names a command that derives files of its own (`--refresh
- * <cmd>`, the paths it owns `--derives <paths>`) and the run's pull request lacks the base: two runs that change one derived file side
- * by side (a version, a digest) would otherwise meet at the landing as a conflict no review can answer, since what the second must
- * write depends on what the first landed. So the base is merged into the run's branch here, in the worktree that has the branch checked
- * out (a scratch one, removed after, where none has), the factory's install is run in it by `sh -c` where it names one (`--install
- * <cmd>`), so the dependencies are the merged tree's and not the branch's (or none, in a scratch worktree), then the factory's command
- * by `sh -c` to derive its files again from the merged tree, the two sharing one bound, and the result is pushed for CI to judge; the
- * land step's check (`landing.ts receipt`) merges it once CI is green there.
- * A file of its own, beside `landing.ts`, since the refresh is a concept of its own and the landing is near the 800 lines a file stops
- * at; it imports `exec.ts` alone, as a carried script may import a sibling the run froze with it.
+ * The landing refresh, which `land.ts`, sdlc's landing program, runs for the condition `turn` where the factory names a command that
+ * derives files of its own (`--refresh <cmd>`, the paths it owns `--derives <paths>`) and the run's pull request lacks the base: two
+ * runs that change one derived file side by side (a version, a digest) would otherwise meet at the landing as a conflict no review can
+ * answer, since what the second must write depends on what the first landed. So the base is merged into the run's branch here, in the
+ * worktree that has the branch checked out (a scratch one, removed after, where none has), the factory's install is run in it by `sh -c`
+ * where it names one (`--install <cmd>`), so the dependencies are the merged tree's and not the branch's (or none, in a scratch worktree),
+ * then the factory's command by `sh -c` to derive its files again from the merged tree, the two sharing one bound, and the result is
+ * pushed for CI to judge; the condition `ci` waits on it, and the program merges it once the condition `landed` is due. It imports
+ * `exec.ts` alone, as a carried script may import a sibling the run froze with it.
  *
  * The bound is mechanical, since the review read a head that no longer lands as is: the head pushed is git's plain merge of the reviewed
  * head and the base (`git merge-tree --write-tree`), differing from it only in the paths `--derives` names. An install or a command that
  * exits non-zero (its stderr quoted), a path left unmerged, a change it left out of the index, and a difference from the plain merge
  * outside those paths each take the merge back (`git merge --abort`, then `git reset --hard` of what an install or a command wrote out of
  * the index, the worktree having been clean before the merge) and refuse, nothing pushed. A merge that went clean and that the command
- * changed nothing of is taken back too and the landing merges as it did before the refresh. Otherwise the merge is committed, pushed to the
- * branch with no force (`git push origin <sha>:refs/heads/<branch>`), and recorded for the check in `refreshed.json` in the step's files
- * folder (`$WF_STEP_FILES`, which the check is given as `WF_ARTIFACTS`), the merge commit's body copied in whole so the check's merge reads
- * what the session wrote even where its file has since changed.
+ * changed nothing of is taken back too and the head stands as it was. Otherwise the merge is committed and pushed to the branch with no
+ * force (`git push origin <sha>:refs/heads/<branch>`).
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,17 +23,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Refusal, git, run } from './exec.ts';
 
-/** The record the refresh leaves for the land step's check, in the step's files folder. */
-export const RECORD = 'refreshed.json';
-
-/**
- * A refresh as the check reads it: the pull request, the head pushed, the head the review read, and the merge commit's subject and
- * body as the session gave them, with the file the body was read from.
- */
-export type Refreshed = { pr: number; head: string; reviewed: string; subject: string; bodyFile: string; body: string };
-
-/** What the merge verb hands the refresh: the pull request at the reviewed tip of `branch`, the base, the factory's command and paths. */
-export type Asked = {
+/** What the program hands the refresh: the pull request at the reviewed tip of `branch`, the base, the factory's command and paths. */
+type Asked = {
   pr: number;
   branch: string;
   tip: string;
@@ -45,16 +33,11 @@ export type Asked = {
   derives: string;
   /** The factory's command that installs the merged tree's dependencies before `command`, or empty where it names none. */
   install: string;
-  subject: string;
-  bodyFile: string;
   /** The line a person types to run the land step again, which a refusal ends with. */
   retry: string;
 };
 
-/**
- * How long the factory's install and command may run together, in milliseconds: the session that types the merge has ten minutes a
- * call, and the merge's fetch, its reads of GitHub and its push take some of them.
- */
+/** How long the factory's install and command may run together, in milliseconds. */
 const COMMAND_BOUND = 300_000;
 
 /** The most bytes the command may print before it is cut off. */
@@ -195,17 +178,11 @@ function pushed(at: string, a: Asked) {
 }
 
 /**
- * The refresh of `a`'s branch, which lacks the base: the lines it says where it pushed a refreshed head, or none where the trial went
- * clean and changed nothing, the landing then merging as before. Refuses as `tried` does, and a worktree a person is working in.
+ * The refresh of `a`'s branch, which lacks the base: the head it pushed, or none where the trial went clean and changed nothing, the head
+ * then standing as it was. Refuses as `tried` does, and a worktree a person is working in.
+ * @param a The pull request, its branch and tip, the base, and the factory's install, command and derived paths.
  */
 export function refresh(a: Asked) {
-  const files = process.env.WF_STEP_FILES;
-  if (!files || !fs.existsSync(files))
-    throw new Refusal(
-      `\`WF_STEP_FILES\` names no folder, and a refresh leaves its record there for the land step's check: run the merge from the ` +
-        `land step's session, which is given it.\n${a.retry}`,
-    );
-  const body = fs.readFileSync(a.bodyFile, 'utf8');
   const held = checkedOut(a.branch);
   if (held) quiet(held, a.branch, a.retry);
   const at = held ?? path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-refresh-')), 'tree');
@@ -225,42 +202,11 @@ export function refresh(a: Asked) {
       run('git', ['-C', at, 'merge', '--abort']);
       return undefined;
     }
-    const head = pushed(at, a);
-    const record: Refreshed = { pr: a.pr, head, reviewed: a.tip, subject: a.subject, bodyFile: a.bodyFile, body };
-    fs.writeFileSync(path.join(files, RECORD), `${JSON.stringify(record, null, 2)}\n`);
-    return [
-      `\`${a.branch}\` lacked \`${a.onto}\`: the base is merged into it and the factory's refresh (\`${a.command}\`) derived again ` +
-        `what it owns (${a.derives || 'nothing'}), the rest git's plain merge`,
-      `${head.slice(0, 12)} is pushed to \`${a.branch}\`, and #${a.pr} is not merged yet: this step's check merges it once CI is ` +
-        `green at ${head.slice(0, 12)} (recorded in ${path.join(files, RECORD)}). Sign off done.`,
-    ];
+    return pushed(at, a);
   } finally {
     if (!held) {
       run('git', ['worktree', 'remove', '--force', at]);
       fs.rmSync(path.dirname(at), { recursive: true, force: true });
     }
   }
-}
-
-/** The refresh recorded in `dir` (the check's `WF_ARTIFACTS`), or none where there is no record or it does not parse as one. */
-export function recorded(dir: string | undefined) {
-  if (!dir) return undefined;
-  const file = path.join(dir, RECORD);
-  if (!fs.existsSync(file)) return undefined;
-  try {
-    const it = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Refreshed>;
-    return typeof it.pr === 'number' && typeof it.head === 'string' && typeof it.subject === 'string' && typeof it.body === 'string'
-      ? (it as Refreshed)
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** `body` written to a file of a scratch folder, for `gh pr merge --body-file`: its path, and the removal of the folder. */
-export function bodyFileOf(body: string) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-land-body-'));
-  const file = path.join(dir, 'merge-body.md');
-  fs.writeFileSync(file, body);
-  return { file, done: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }

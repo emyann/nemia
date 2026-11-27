@@ -1,0 +1,8 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Program
+metadata:
+  name: land
+  description: Lands the factory's runs one at a time, with no session. It gives each waiting run its turn, brings its pull request up to the base where the factory names a refresh, merges the pull request once CI is green (or, with no remote, merges the result in the repository's own checkout after the local check), and writes the conditions `turn` and `landed` that the land steps wait on.
+spec:
+  run: node "$WF_CARRIED_FILES/land.ts" --github ${{ parameters.github }} --check "${{ parameters.ciCheck }}" --refresh "${{ parameters.landingRefresh }}" --derives "${{ parameters.landingDerives }}" --install "${{ parameters.landingInstall }}" --local-check '${{ parameters.localCheck }}'
+  writes: [turn, landed]

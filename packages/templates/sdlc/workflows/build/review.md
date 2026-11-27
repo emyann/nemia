@@ -1,18 +1,14 @@
 Judge what was asked and what the diff does. The steps before you each left their whole closeout in their folder's `closeout.json`:
 its summary and body are that step's own account, to check against the change, never taken as the answer to a finding.
 
-**Whether a person reads the change after you is your brief's to say**, under `## Gates after you`: the run names there each step
-after you at which it waits on a person's approval, and leaves the heading out where there is none. A person reads the spec at
-design's gate; the landing has no gate of its own, and a person puts one back on a run with `--gate land` at its start, or `gate:
-land` on its card.
+**Whether a person reads the change after you is not in your brief**: the run's gates are told to the steps before them, and a gate
+on your own step is not. A person reads the spec at design's gate; the landing has no gate of its own (it is the landing program's,
+with no session), and a person who wants to read the change before it lands gates your step, `--gate review` at the run's start, or
+`gate: review` on its card. So word your sign-off for a person who may read it before anything merges. Once you sign off without
+asking again, and any gate on you is approved, the run files `land`, which the landing program makes: on GitHub it merges this run's
+pull request; in this checkout, it merges its branch.
 
-- **With no `## Gates after you`, your pass lands the change.** Once you sign off without asking again, the run files `land`, which
-  merges the change into the base branch — on GitHub, this run's pull request; in this checkout, its branch — and nobody reads the
-  change between your word and the merge.
-- **With `land` named there, a person approves the land after your pass**: your pass files `land`, and it waits for their `nemia
-  approve` before it merges anything. Judge and word your sign-off for the person who reads it there.
-
-In both, `again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
+`again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
 step: what comes after you is the workflow's, never yours.
 
 Does this factory judge and land its work on GitHub? **${{ parameters.github }}**. Follow the part below headed with that answer,
@@ -64,7 +60,7 @@ file of `${{ parameters.landingDerives }}` is no finding of reasons one, three a
 those files alone conflict: the landing merges the base into the branch and derives them again, and refuses a result that differs from
 git's plain merge anywhere else. A conflict in any other file still is one. Any other branch behind is no finding: say in your summary
 the base, how far behind, and each file both changed whose hunks are apart, and let the land go.
-On GitHub, nothing runs the suite on the merged tree — the landing's check is a receipt, and the base's own
+On GitHub, nothing runs the suite on the merged tree — the landing program merges what `ci` judged, and the base's own
 `${{ parameters.ciCheck }}` at the merge commit catches a break only after it lands — so what covers the rest is GitHub's own
 `mergeable` on the pull request and the `${{ parameters.ciCheck }}` context required of the commit you read: a base that moved under a
 green pull request makes the landing refuse rather than land. In this checkout, the landing's check runs the local check
@@ -77,10 +73,8 @@ are each page outside the repository the spec rests on, as design read it: its a
 claims the spec takes from it. Check each claim of the spec and of the change that rests on such a page against its passage. A claim
 with no passage there, on a page your fence refuses:
 
-- **With no `## Gates after you`, it stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
-  `needs` naming each claim and its page, and a person answers with `nemia retry <run> review --message "<what the page says>"`.
-- **With `land` named there, it goes at the top of your sign-off**, each claim and its page, where the person who approves the land
-  reads it before anything merges: it is no reason to sign off `blocked`.
+A claim with no passage there stops the landing: sign off `blocked`, with `needs` naming each claim and its page, and a person answers with
+`nemia retry <run> review --message "<what the page says>"`.
 
 **A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
 propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`

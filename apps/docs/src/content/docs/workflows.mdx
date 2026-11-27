@@ -187,7 +187,7 @@ no line set, or with caps at or under it, nothing is shown. The line doesn't cut
 The `sdlc` template's `build` is a workflow, `packages/templates/sdlc/workflows/build/`: design, then implement, then review (which
 loops back to implement), then land. Its steps are `packages/templates/sdlc/workflows/build/design.md` (gated),
 `packages/templates/sdlc/workflows/build/implement.md` (with a check), `packages/templates/sdlc/workflows/build/review.md`
-(`loop: implement`, five rounds), and `packages/templates/sdlc/workflows/build/land.md` (in the checkout, started by the review's pass,
+(`loop: implement`, five rounds), and `packages/templates/sdlc/workflows/build/workflow.yaml` (its `land` step, which waits on the landing program's conditions, started by the review's pass,
 with no gate). A factory copies it from the template as its own. It isn't built into Nemia.
 
 ## Sources

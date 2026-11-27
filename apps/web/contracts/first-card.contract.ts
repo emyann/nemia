@@ -29,24 +29,42 @@ const firstWorkflowOfSpec = spec<(offered: readonly string[], declared: string |
 /** `firstWorkflowOf`'s type, which src/lib/firstCard.ts takes. */
 export type FirstWorkflowOf = Implementation<typeof firstWorkflowOfSpec>;
 
-/** A step of a workflow as the factory's listing of it says it: its name, and the workspace it works in (`base` for an ending). */
-export type ListedStep = { readonly name: string; readonly spec: { readonly workspace?: string | null } };
+/**
+ * A step of a workflow as the factory's listing of it says it: its name, the workspace it works in (`base` for an ending), the steps it
+ * follows and the conditions it waits on (a wait node, which runs nothing and lands what the steps before it made).
+ */
+export type ListedStep = {
+  readonly name: string;
+  readonly spec: {
+    readonly workspace?: string | null;
+    readonly after?: readonly string[] | null;
+    readonly waitsFor?: readonly string[] | null;
+  };
+};
 
-/** The name of the first step of `steps` that works on the base (`workspace: base`), the workflow's ending; undefined where none does. */
-const endingOf = (steps: readonly ListedStep[]) => steps.find((step) => step.spec.workspace === 'base')?.name;
+/** Whether `step` is a wait node: it waits on at least one condition. */
+const waits = (step: ListedStep) => (step.spec.waitsFor?.length ?? 0) > 0;
+
+/**
+ * The step a first run is gated at, so the person approves what lands: the first step that works on the base (`workspace: base`), the
+ * workflow's ending, else the step before the first wait node, which lands what that step approved; undefined where neither is there.
+ */
+const gateOf = (steps: readonly ListedStep[]) =>
+  steps.find((step) => step.spec.workspace === 'base')?.name ?? steps.find(waits)?.spec.after?.at(0);
 
 const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => readonly string[]>({
   ensures: {
-    gatedAtTheEnding: {
-      description: 'A first run is gated at its workflow’s ending, the step that works on the base, so the person approves what reaches it',
+    gatedWhereItLands: {
+      description:
+        'A first run is gated at its workflow’s ending, the step that lands, or the step before the wait node that lands it, so the person approves what lands',
       condition: ({ input: [steps], output }) => {
-        const ending = steps === undefined ? undefined : endingOf(steps);
-        return ending === undefined || (output.length === 1 && output.at(0) === ending);
+        const gate = steps === undefined ? undefined : gateOf(steps);
+        return gate === undefined || (output.length === 1 && output.at(0) === gate);
       },
     },
-    ungatedWithNoEnding: {
-      description: 'A workflow with no ending, or one whose steps were not read, is started with no gate: nothing of it works on the base',
-      condition: ({ input: [steps], output }) => (steps !== undefined && endingOf(steps) !== undefined) || output.length === 0,
+    ungatedWithNothingThatLands: {
+      description: 'A workflow with no ending or wait node to land at, or one whose steps were not read, is started with no gate',
+      condition: ({ input: [steps], output }) => (steps !== undefined && gateOf(steps) !== undefined) || output.length === 0,
     },
   },
 });

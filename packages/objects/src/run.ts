@@ -154,6 +154,12 @@ export const RunSpecStep = Schema.Struct({
     description: 'How many seconds its session may run before it is stopped (deadlineSeconds:); null where unset.',
   }),
   agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent the step is given, by name; absent for a step given none.' })),
+  waitsFor: Schema.optionalKey(
+    Strings.annotate({
+      description:
+        'The conditions a wait node waits on (waitsFor:), the step running nothing and passing once each is written; absent for any other step.',
+    }),
+  ),
   /**
    * The fields of its declared output, in its schema's order, each with the shape its `x-shape` marked (`FIELD_SHAPES`, null where none);
    * absent for a step that declares none, or frozen before the run kept them.

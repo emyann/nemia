@@ -4,7 +4,7 @@
  * session token. It writes the two conditions the steps of `build` and `quick` wait on, so no check waits on CI:
  *
  * - `ci`, CI at the head of the run's pull request: `<name>` is the CI context branch protection requires of the base branch (`ciCheck`).
- *   The round's `ci` (implement) and the land step's, at a head the landing refreshed.
+ *   The round's `ci` (implement) and the land step's, at the head the landing program will merge, refreshed or not.
  * - `base-ci`, CI at the merge commit the run landed as on the base branch, where `--wait-on-ci` is true (`landingWaitsOnCi`).
  *
  * Every pass (`WF_CI_WATCH_SECONDS`, 30 s) it lists the factory's runs not finished (`nemia get runs --field-selector
@@ -89,7 +89,7 @@ type ServedStep = {
 };
 
 /** A served run, as far as the watcher reads one. */
-type ServedRun = { metadata: { name: string }; status: { steps: ServedStep[] } };
+type ServedRun = { metadata: { name: string }; spec?: { repo: string | null }; status: { steps: ServedStep[] } };
 
 /** What the watcher writes of a condition: its status and the words with it. */
 type Written = { status: 'True' | 'False' | 'Unknown'; message: string };
@@ -444,7 +444,7 @@ type Asked = { id: string; step: ServedStep; tried: number; cwd: string; branch:
 
 /**
  * The commit the run's result branch is at, as git reads it in the step's own workspace, where that workspace is on the branch;
- * undefined where the step works elsewhere (the land step, in the repository's own checkout, on the base).
+ * undefined where the step works elsewhere (the land step, a wait node, which has no workspace of its own).
  */
 function tipOf(a: Asked) {
   if (a.step.branch !== a.branch) return undefined;
@@ -711,7 +711,7 @@ function mergeWaitSaid({ pr, oid, at, check, ours, ci }: MergeReading) {
 function mergeSaid(a: Asked, act: Act, r: MergeReading) {
   const { pr, oid, at, check, entries, ours, tip } = r;
   const l: Landing = { number: pr.number, url: pr.url, oid, onto: pr.baseRefName, check };
-  const retry = `  Then: nemia retry ${a.id} ${a.step.name}`;
+  const retry = `  Then: nemia retry ${a.id} ${a.step.name} --recheck`;
   if (act === 'pass') return { status: 'True' as const, message: mergePassSaid(r) };
   if (act === 'rerun') {
     const again = rerunOnce(ours, a.cwd);
@@ -735,6 +735,15 @@ const checksOf = (step: ServedStep) => step.checks ?? (step.check ? [step.check]
 /** The result branch of the run: the branch of the first of its steps on one of `wf/<id>/…`. */
 const branchOfRun = (r: ServedRun) =>
   r.status.steps.find((s) => s.branch !== null && s.branch.startsWith(`wf/${r.metadata.name}/`))?.branch ?? undefined;
+
+/**
+ * The folder `gh` resolves the run's repository from where a step has none of its own (the land step, a wait node): the workspace of the
+ * run's first step on one of its result branches, else the repository's own checkout.
+ */
+const folderOfRun = (r: ServedRun) =>
+  r.status.steps.find((s) => s.workspace !== null && s.branch?.startsWith(`wf/${r.metadata.name}/`))?.workspace ??
+  r.spec?.repo ??
+  undefined;
 
 /** Writes `written` as the condition `name` of the step's try, unless the api serves just that already. */
 function write(a: Asked, served: ServedStepCheck, name: string, written: Written) {
@@ -788,12 +797,13 @@ function passOver(served: ServedRun, check: string, waits: boolean) {
       const waiting = checks.find((c) => c.condition?.name === name);
       const due = conditionDue(step.status === 'checking', waiting !== undefined, aheadOf(checks, name));
       if (!waiting || !due) continue;
-      if (!branch || !step.workspace) {
+      const cwd = step.workspace ?? folderOfRun(served);
+      if (!branch || !cwd) {
         process.stderr.write(`nemia ci-watch: ${served.metadata.name} ${step.name}: no result branch or workspace to read GitHub from\n`);
         continue;
       }
       const tried = step.current?.try ?? waiting.condition?.try ?? 1;
-      settle({ id: served.metadata.name, step, tried, cwd: step.workspace, branch }, waiting, name, check, waits);
+      settle({ id: served.metadata.name, step, tried, cwd, branch }, waiting, name, check, waits);
     }
   }
 }

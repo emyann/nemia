@@ -94,11 +94,11 @@ export const nextStepsOf: NextStepsOf = (factory) =>
 
 /**
  * The gates a first card's run is started with, so it waits on the person before what it does lands: the workflow's ending step
- * (`workspace: base`) where its listing has one, else none.
+ * (`workspace: base`) where its listing has one, else the step before the first wait node, which lands what that step approved, else none.
  * @param steps The workflow's steps as the factory lists it; undefined where they were not read.
  */
-export const firstGatesOf: FirstGatesOf = (steps) =>
-  (steps ?? [])
-    .filter((step) => step.spec.workspace === 'base')
-    .map((step) => step.name)
-    .slice(0, 1);
+export const firstGatesOf: FirstGatesOf = (steps) => {
+  const ending = (steps ?? []).find((step) => step.spec.workspace === 'base')?.name;
+  const gate = ending ?? (steps ?? []).find((step) => (step.spec.waitsFor?.length ?? 0) > 0)?.spec.after?.at(0);
+  return gate === undefined ? [] : [gate];
+};

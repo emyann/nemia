@@ -47,8 +47,8 @@ runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `imp
 a CI workflow under `.github/workflows`, its `local` check runs the local check (`${{ parameters.localCheck }}`) in place of the condition, which is then written `True`. Run them yourself
 before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
 lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
-is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red
-`${{ parameters.ciCheck }}` comes back to you, with what the check said; a landing refuses before anything is merged — a pull request
+is the last thing any suite reads: the landing program merges that same commit. A red
+`${{ parameters.ciCheck }}` comes back to you, with what the check said; the landing program refuses before anything is merged — a pull request
 GitHub calls unmergeable, a `${{ parameters.ciCheck }}` no longer green — and nothing landed.
 
 ### false — in this checkout
@@ -78,9 +78,8 @@ person's, once your tries are spent, never a line for your `needs`. Past the ret
 not finish, the run waits on a person.
 
 This is a quick build: no spec was written for you. You are handed a card, and a review reads your plan and your change — Agora's,
-read-only, which asks for another round or passes. Its pass lands the change: unless your brief names `land` under `## Gates after
-you` (the run started with `--gate land`, or a card's `gate: land`), there is no person's gate after it, so the review is the one
-reader between your work and the base branch.
+read-only, which asks for another round or passes. Its pass lands the change: unless the run was started with a gate on the review (`--gate review`, or a card's `gate: review`), there is no
+person's gate after it, so the review is the one reader between your work and the base branch.
 
 **Write your plan first**, before you build: what changes, where, and what proves it, in a few lines. It goes in your closeout's `plan`,
 as you wrote it, corrected where the work proved it wrong. Then build it, with the tests that prove it.
@@ -95,8 +94,8 @@ tests to make it look smaller: the review reads every line.
 
 **Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the
 landing refuses rather than lands: on GitHub, CI judges the commit your check pushes and nothing judges the merged tree afterwards —
-the landing's check is a receipt — so GitHub may call the pull request unmergeable; in this checkout, the landing stages your branch
-on the base as it is then, and a merge that conflicts or breaks the local check is taken back. The measure counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+the landing program merges at the head `ci` judged — so GitHub may call the pull request unmergeable; in this checkout, the landing program stages your branch
+on the base as it is then, runs the local check on the merged tree, and takes a merge that conflicts or breaks it back. The measure counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

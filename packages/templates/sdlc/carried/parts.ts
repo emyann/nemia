@@ -1,7 +1,7 @@
 /**
  * `node parts.ts <verb>` — the door through which the step that builds a run's change settles the other branches of its run before it
  * signs off: every `wf/<run>/<part>` beside its own `wf/<run>/<leaf>` is taken into its branch or declared replaced, so the landing,
- * which refuses a result branch the pull request leaves out (`landing.ts`), finds none. A part is judged as the landing judges it, by
+ * which refuses a result branch the pull request leaves out (`land.ts`), finds none. A part is judged as the landing judges it, by
  * patch and not by ancestry (`git cherry <HEAD> <tip>`, whose `+` lines are the commits whose patch `HEAD` has no equivalent of): a part
  * taken as a commit of its own is never an ancestor of `HEAD`, yet nothing of it is left out.
  *

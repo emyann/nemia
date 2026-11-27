@@ -25,10 +25,9 @@ factory's file records that name. Its folder is in the templates workspace, `pac
 | Seldon | software architect     |
 | Grace  | lead software engineer |
 | Agora  | code reviewer          |
-| Otto   | release engineer       |
 | Argus  | janitor                |
 
-Seldon, Agora, Iris, and Argus read the repository and never write to it. Grace and Otto write to it, and can't push. Every agent's
+Seldon, Agora, Iris, and Argus read the repository and never write to it. Grace writes to it, and can't push. Every agent's
 fence blocks edits to your store's factories, workflows, and inbox.
 
 ## Its workflows
@@ -39,7 +38,7 @@ fence blocks edits to your store's factories, workflows, and inbox.
   backlog. She only asks you when she can't tell.
 - **intake** turns an idea into an intent, with Iris asking you about anything it leaves open.
 - **build** takes an intent to your base branch: a design you approve, an implementation in rounds, then a review whose approval lands
-  it, with no gate at the landing.
+  it, with no gate at the landing. To approve before it lands, start the run with `--gate review`.
 - **quick** takes a card that fully specifies its change to your base branch: an implementation, then a review whose approval lands
   it, with no gate.
 - **janitor** runs on demand. It reads the factory's stats and adds what it proposes as cards to your inbox, without starting any.
@@ -129,9 +128,11 @@ too, for a factory that works on more than one repository or reads a folder (`:r
 ## In your checkout, the default
 
 When github is false, nothing is pushed and no pull request is opened. Implement's check runs localCheck on each round's code. To
-land, the land step stages every branch of the run's result as one merge in your repository's own checkout, without committing. The
-run then runs localCheck on the merged code. If it passes, the run commits the merge to your base branch. If it fails, the run undoes
-the merge. A merge that conflicts is aborted, and the work goes back. localCheck is the only check here, so make sure it runs your
+land, sdlc's landing program stages every branch of the run's result as one merge in your repository's own checkout, without committing.
+It then runs localCheck on the merged code. If it passes, the program commits the merge to your base branch, with the first line of the
+run's brief as its subject and the result's commit subjects as its body. If it fails, the program undoes the merge and the land step
+fails with the output. A merge that conflicts is undone the same way. The command is handed to the program inside single quotes, so it
+holds none. localCheck is the only check here, so make sure it runs your
 tests.
 
 ## Before you apply it on GitHub
@@ -199,9 +200,8 @@ Once the daemon has rendered the factory, its tree is yours to change. Four comm
   6.0.0, Agora reads the pull request it reviews on GitHub through the factory's `github` MCP server, and the four agents deny every
   form of `gh` except a tool's help. Allowing `gh` in your settings would reach every read-only agent, so leave it out.
 - **Commit before a landing.** In both modes, the landing runs in your checkout, on your base branch. It refuses a checkout with
-  uncommitted changes before merging anything, and leaves those changes as they are. On GitHub, its script rejects changes to tracked
-  files. In your checkout, the land step checks first, as the git place's _Stage a landing_ explains, and stops,
-  marked blocked, without staging anything. Commit the changes or set them aside, then retry the step. A run starts from your checkout's last commit, so
+  uncommitted changes before merging anything, and leaves those changes as they are. On GitHub, the program only fast-forwards your checkout
+  where it is clean and leaves it as it is otherwise. In your checkout, the landing waits and says what is in the way, without staging anything. Commit the changes or set them aside, and it carries on by itself. A run starts from your checkout's last commit, so
   uncommitted work isn't included.
 
 ## Sources
@@ -211,5 +211,5 @@ This page is based on `packages/templates/CLAUDE.md`, `packages/templates/sdlc/n
 `packages/agent-orchestrator/src/template/door/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Moving onto it from
 another template_ is based on `packages/agent-orchestrator/src/factory/upgrade/merge.ts`. _Fit it to your repository_ is based on
 `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
-`packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/carried/landing.ts`,
-`packages/templates/sdlc/workflows/build/land.md`, and `packages/agent-orchestrator/place/git/SKILL.md`.
+`packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/carried/land.ts`,
+`packages/templates/sdlc/workflows/build/workflow.yaml`, and `packages/agent-orchestrator/place/git/SKILL.md`.

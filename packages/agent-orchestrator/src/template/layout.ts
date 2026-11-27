@@ -299,6 +299,7 @@ const STEP: Shape = {
     workflow: 'string',
     card: 'string',
     relabel: 'strings',
+    waitsFor: 'strings',
     retries: 'number',
     checkFailurePolicy: 'policy',
     deadlineSeconds: 'number',

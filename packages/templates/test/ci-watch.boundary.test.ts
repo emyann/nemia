@@ -334,6 +334,7 @@ test('base-ci: green at the merge commit writes True; red after a re-run writes 
     [['base-ci', 'False']],
   );
   assert.match(red.written[0]?.message ?? '', /turned the base branch red/);
+  assert.match(red.written[0]?.message ?? '', /Then: nemia retry \S+ land --recheck$/m, 'a wait node takes only a recheck');
   assert.equal(asked(red.calls, 'run rerun').length, 0, 'a run past its first attempt is not re-run again');
 });
 

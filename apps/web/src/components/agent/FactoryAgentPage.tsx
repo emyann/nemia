@@ -143,7 +143,7 @@ type Listing = Awaited<ReturnType<typeof readAgent>>;
 function useAgentReads(agent: Listing, factory: string, idle: boolean) {
   const pages = useQueries({
     queries: nodesOf(agent).map((node) => ({
-      ...stepQuery(node.from, node.workflow, node.step, { factory }),
+      ...stepQuery('factory', node.workflow, node.step, { factory }),
       retry: (tries: number, error: unknown) => !readGone(error) && tries < 3,
     })),
   });

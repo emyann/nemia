@@ -23,7 +23,7 @@ const RUN = { id: 'watch-the-gate-e2e44', title: 'Watch the gate', sessionId: '4
 function written() {
   const folder = path.join(store!, 'factories', FACTORY);
   const flow = path.join(folder, 'tree', 'workflows');
-  const text = `---\nagent: ${AGENT.name}\nplace: folder\n---\nGuard the gate.\n`;
+  const text = `---\nagent: ${AGENT.name}\nplace: git\n---\nGuard the gate.\n`;
   write(path.join(folder, 'tree', 'factory.json'), `${JSON.stringify({ workflows: [WORKFLOW.name] }, null, 2)}\n`);
   write(path.join(flow, WORKFLOW.name, `${WORKFLOW.step}.md`), text);
   write(

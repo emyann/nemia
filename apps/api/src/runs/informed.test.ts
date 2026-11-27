@@ -163,7 +163,7 @@ test("the run's status phase and reason are its row's in the list: one judgement
   }
 });
 
-test('F6: the decision and the run object read one judgement: a run awaiting its ending is served from the informer, and both move once a pass reads a hand merge', async () => {
+test('F6: the decision and the run object read one judgement: a run whose branch is ahead is served from the informer, and both move once a pass reads a hand merge', async () => {
   const id = 'r-informed-merged';
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   const world = stand().world;
@@ -171,13 +171,11 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
   const base = world.head(repo);
   const branch = `wf/${id}/implement`;
   world.branch(repo, branch, { 'a.txt': 'the work\n' });
-  const ending = { name: 'land', after: ['implement'], body: 'Land it.', harness: 'claude' };
   const run = {
-    ...record(id, ['land']),
+    ...record(id),
     repo,
     workspace: repo,
     baseRef: base,
-    workflow: [...record(id).workflow, ending],
     steps: { implement: { taskId: `t-${id}`, branch } },
   };
   plantRecord(root, runKey(id), JSON.stringify(run));
@@ -202,7 +200,7 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     assert.deepEqual(
       await saidBoth(),
       { decision: true, object: true },
-      'a run whose branch is ahead, its ending gated, is one to decide, for both',
+      'a run whose branch is ahead and unmerged is one to decide, for both',
     );
     assert.ok(informer().runs.has(id), 'the decision is judged through the informer, which keeps the run at rest');
     world.stage(repo, branch);

@@ -113,12 +113,22 @@ export const gateWords = (run: Run, step: string) => {
 };
 
 /**
+ * Whether a step's gate was given before it was filed: the run froze it as the old ending (`approvedFirst`, `workspace: base`, retired),
+ * whose gate held before the step ran, and it was filed, which only an approval did. Pure.
+ * @param run The run's record.
+ * @param step The step's name.
+ */
+export const approvedBefore = (run: Run, step: string) => Boolean(run.approvedFirst?.includes(step) && run.steps[step]?.taskId);
+
+/**
  * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not
  * approved for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate
- * holds it: the round is its loop's, and the gate is on what comes after. Pure.
+ * holds it: the round is its loop's, and the gate is on what comes after. A step of the old ending approved before it was filed
+ * (`approvedBefore`) is not held again: a later try of it is that act again, though its approval names a try it is past. Pure.
  */
 function atGate(step: StepSpec, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined) {
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
+  if (approvedBefore(run, step.name)) return false;
   if (askedAgain(step, run, closeoutOf)) return false;
   return !approvalOf(run, step.name);
 }

@@ -32,6 +32,7 @@ import { personConditions, unconditioned, withConditions } from '../condition/co
 
 import { RETRY_MODES, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
+import { approvedFirstIn } from '../former/former.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
@@ -440,8 +441,9 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
  * A run's record as its text reads, bare: nothing a person owns beside it, and whatever it carries under their keys dropped, the store's
  * pause's, the run's labels and what was said before a step was filed (`pause`, `labels`, `saidBefore`, which the Run door composes)
  * with them. The frozen steps are read under the names their keys have now (`asNamed`), and written back under them, in their place among
- * the record's keys; a try's former `then` is read as its `cause` (`upgradeTries`), and a step's record written before `declared` was kept
- * is given it where its schema has not moved (`keptDeclared`). Counted as one record read (`countRecord`), its bytes as read (`countRead`).
+ * the record's keys, a gated step frozen as the old ending kept as `approvedFirst` (`approvedFirstIn`); a try's former `then` is read
+ * as its `cause` (`upgradeTries`), and a step's record written before `declared` was kept is given it where its schema has not moved
+ * (`keptDeclared`). Counted as one record read (`countRecord`), its bytes as read (`countRead`).
  * Refused: a record that does not read as a run (`UnreadableRecord`).
  * @param id The run's id.
  * @param text The record's text.
@@ -476,7 +478,9 @@ export const recordIn = (id: string, text: string, where: string) =>
     ])
       delete read[key];
     const { workflow, ...unfrozen } = read;
-    return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;
+    if (!workflow) return unfrozen satisfies Run;
+    const approvedFirst = approvedFirstIn(read);
+    return keptDeclared({ ...read, ...(approvedFirst.length ? { approvedFirst } : {}), workflow: workflow.map(asNamed) }) satisfies Run;
   });
 
 /**

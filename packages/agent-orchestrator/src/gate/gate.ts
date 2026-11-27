@@ -5,7 +5,7 @@
 import type { StepSpec } from '../step/step.ts';
 import { tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
-import { approvalOf, gatesOf, hasGate, standing } from '../status/status.ts';
+import { approvalOf, approvedBefore, gatesOf, hasGate, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -56,8 +56,8 @@ function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, appro
  * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that
  * is not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on,
  * each said so; a send-back already asked for — the try after this one, which would spend an approval of this one at once — or one asked
- * with no words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why
- * and what to do instead.
+ * with no words, which no tick files (`heard`), named with how to take it back; a step of the old ending approved before it was filed
+ * (`approvedBefore`), and a step that has not signed off, each status with why and what to do instead (`notAtItsGate`).
  *
  * @param steps The workflow's steps.
  * @param run The run the step is of.
@@ -134,11 +134,14 @@ function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => Ste
 
 /**
  * Why a gated step that does not wait at its gate is not approved, by the word the run reads for it (`status`), in words that name what
- * to do instead. A table condition never filed (`filed` false) says it in a condition's words: its producer not signed off, its table
- * answering no route, off the route taken. Pure.
+ * to do instead; a step of the old ending approved before it was filed (`approvedBefore`) says so first. A table condition never filed
+ * (`filed` false) says it in a condition's words: its producer not signed off, its table answering no route, off the route taken. Pure.
  */
 function notAtItsGate(step: StepSpec, run: Run, filed: boolean, status: StepStatus) {
   const { name } = step;
+  if (approvedBefore(run, name)) {
+    return `${name} was approved before it was filed: the run froze it as the old ending, whose gate held before the step ran, so there is nothing to approve. See where the run stands: nemia ls ${run.id}.`;
+  }
   if (step.route?.kind === 'table' && !filed) {
     const producer = firstPiece(step.route.from, '.');
     const said: Partial<Record<StepStatus, string>> = {

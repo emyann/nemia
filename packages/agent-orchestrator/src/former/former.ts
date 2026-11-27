@@ -600,3 +600,20 @@ export function asNamed(step: FrozenStep) {
   };
   return { ...fields, agent } satisfies StepSpec as StepSpec;
 }
+
+/**
+ * The gated steps a record froze as the old ending (`workspace: base`, retired), with those it already keeps (`approvedFirst`): a step
+ * whose gate held before it was filed, so its closeout waits for no approval. Read before `asNamed` drops the retired word, so the record
+ * written back keeps the fact. None on a record that froze none. Pure.
+ * @param record The record as its text reads: its frozen steps, the gates it was started with, and the steps it already keeps.
+ */
+export function approvedFirstIn(record: {
+  workflow?: ReadonlyArray<Pick<StepSpec, 'name' | 'gate'>>;
+  gates?: readonly string[];
+  approvedFirst?: readonly string[];
+}) {
+  const frozen = (record.workflow ?? []).filter(
+    (step) => Reflect.get(step, 'workspace') === 'base' && (step.gate === true || Boolean(record.gates?.includes(step.name))),
+  );
+  return [...new Set([...(record.approvedFirst ?? []), ...frozen.map((step) => step.name)])];
+}

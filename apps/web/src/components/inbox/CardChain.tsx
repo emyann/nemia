@@ -12,6 +12,21 @@ const COUNTED = ['working', 'waiting', 'stuck', 'refused', 'failed', 'pending', 
 type Wire = { from: string; to: string; x1: number; y1: number; x2: number; y2: number };
 
 /**
+ * Each wait among `cards`, once, as the card waited on and the card that waits: a card a card names in its `after`, or one that names
+ * it in its `followedBy`, which the chains' read gives from the other side.
+ * @param cards The chain's cards.
+ */
+function waitsOf(cards: readonly InboxEntry[]) {
+  const names = new Set(cards.map((card) => card.name));
+  const pairs = new Map<string, { from: string; to: string }>();
+  for (const card of cards) {
+    for (const before of card.after ?? []) if (names.has(before)) pairs.set(`${before}>${card.name}`, { from: before, to: card.name });
+    for (const next of card.followedBy) if (names.has(next)) pairs.set(`${card.name}>${next}`, { from: card.name, to: next });
+  }
+  return [...pairs.values()];
+}
+
+/**
  * The ends of a chain, each card that no other card of it waits on, as a person reads them: one title, two joined by `and`, three as a
  * list, and past three the first two and how many more.
  * @param ends The chain's cards that nothing of it waits on, in the chain's order.
@@ -37,32 +52,29 @@ function countsOf(cards: readonly InboxEntry[]) {
 }
 
 /**
- * Where each wait of the chain is drawn, read from the cards' boxes in `chain`: one wire per card of the chain a card names in its
- * `after`, from the waited-on card's right edge to the waiting card's left edge, each at its card's middle.
+ * Where each wait of the chain is drawn, read from the cards' boxes in `chain`: one wire per wait, from the waited-on card's right edge
+ * to the waiting card's left edge, each at its card's middle.
  * @param chain The element that holds the chain's columns and its wires.
- * @param cards The chain's cards.
+ * @param waits The chain's waits (`waitsOf`).
  */
-function wiresIn(chain: HTMLElement, cards: readonly InboxEntry[]) {
+function wiresIn(chain: HTMLElement, waits: readonly { from: string; to: string }[]) {
   const origin = chain.getBoundingClientRect();
   const boxes = new Map(
     [...chain.querySelectorAll<HTMLElement>('[data-chain-card]')].map((el) => [el.dataset.chainCard, el.getBoundingClientRect()]),
   );
-  return cards.flatMap((card) =>
-    (card.after ?? []).flatMap((before) => {
-      const from = boxes.get(before);
-      const to = boxes.get(card.name);
-      if (from === undefined || to === undefined) return [];
-      const wire: Wire = {
-        from: before,
-        to: card.name,
-        x1: from.right - origin.left,
-        y1: from.top + from.height / 2 - origin.top,
-        x2: to.left - origin.left,
-        y2: to.top + to.height / 2 - origin.top,
-      };
-      return [wire];
-    }),
-  );
+  return waits.flatMap((wait) => {
+    const from = boxes.get(wait.from);
+    const to = boxes.get(wait.to);
+    if (from === undefined || to === undefined) return [];
+    const wire: Wire = {
+      ...wait,
+      x1: from.right - origin.left,
+      y1: from.top + from.height / 2 - origin.top,
+      x2: to.left - origin.left,
+      y2: to.top + to.height / 2 - origin.top,
+    };
+    return [wire];
+  });
 }
 
 /**
@@ -82,7 +94,8 @@ function pathOf({ x1, y1, x2, y2 }: Wire) {
  */
 export function CardChain({ members }: { members: readonly (readonly InboxEntry[])[] }) {
   const cards = members.flat();
-  const waitedOn = new Set(cards.flatMap((card) => card.after ?? []));
+  const waits = waitsOf(cards);
+  const waitedOn = new Set(waits.map((wait) => wait.from));
   const ends = cards.filter((card) => !waitedOn.has(card.name));
   const chain = useRef<HTMLDivElement>(null);
   const [wires, setWires] = useState<readonly Wire[]>([]);
@@ -91,7 +104,7 @@ export function CardChain({ members }: { members: readonly (readonly InboxEntry[
     if (!el) return;
     const read = () =>
       setWires((was) => {
-        const now = wiresIn(el, cards);
+        const now = wiresIn(el, waits);
         return JSON.stringify(now) === JSON.stringify(was) ? was : now;
       });
     read();
@@ -99,7 +112,7 @@ export function CardChain({ members }: { members: readonly (readonly InboxEntry[
     observer.observe(el);
     for (const card of el.querySelectorAll('[data-chain-card]')) observer.observe(card);
     return () => observer.disconnect();
-  }, [cards]);
+  }, [waits]);
   return (
     <div data-chain={cards[0]?.name} className="space-y-2">
       <div data-chain-head className="flex flex-wrap items-center gap-3">

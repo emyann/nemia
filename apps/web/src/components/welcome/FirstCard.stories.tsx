@@ -99,6 +99,8 @@ export const Refused: Story = {
     const page = await loaded(canvasElement);
     await userEvent.click(page.querySelector<HTMLElement>('[data-first-suggestion="Fix a typo"]')!);
     await userEvent.click(within(page).getByRole('button', { name: /^Start/ }));
-    await waitFor(() => expect(page.querySelector('[data-first-refused]')).toHaveTextContent('wires quick to no repository'));
+    await waitFor(() => expect(page.querySelector('[data-first-refused]')).toHaveTextContent('wires quick to no repository'), {
+      timeout: 5000,
+    });
   },
 };

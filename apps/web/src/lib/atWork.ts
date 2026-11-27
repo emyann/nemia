@@ -10,7 +10,11 @@ import { stepState } from './status.ts';
 
 export type { Activity, AtWorkRow };
 
-/** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
+/**
+ * Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`).
+ * @param run The run the step is of.
+ * @param step The step.
+ */
 export const working = (run: RunView, step: RunView['steps'][number]) => {
   const state = stepState(step, false, run.holding != null);
   return state === 'working' || state === 'checking';

@@ -88,7 +88,7 @@ describe("an agent page's plate and permissions", () => {
 
 describe("an agent page's history", () => {
   const marks: Mark[] = [
-    { day: '2026-11-26', kind: 'agent', name: 'agora' },
+    { day: '2026-11-26', kind: 'agent', name: 'reviewer' },
     { day: '2026-11-27', kind: 'step', name: 'review' },
     { day: '2026-11-27', kind: 'step', name: 'review' },
     { day: '2026-11-27', kind: 'skill', name: 'git' },
@@ -181,8 +181,8 @@ describe("an agent page's small counts", () => {
     const at = '2026-11-27T10:00:00.000Z';
     const [open] = atWorkSince(at);
     const run = summary([['review', 'running']], { id: 'r1' });
-    const step = { ...run.steps[0], spec: givenAgent('agora'), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] };
-    assert.equal(lastEndedOf([{ ...run, steps: [step] }], 'agora'), Date.parse(at));
+    const step = { ...run.steps[0], spec: givenAgent('reviewer'), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] };
+    assert.equal(lastEndedOf([{ ...run, steps: [step] }], 'reviewer'), Date.parse(at));
     assert.equal(lastEndedOf([{ ...run, steps: [step] }], 'other'), null);
   });
 });

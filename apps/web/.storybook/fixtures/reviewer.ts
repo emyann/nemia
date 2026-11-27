@@ -1,5 +1,5 @@
 /**
- * The factory agent page's reads for its stories (`Pages/Agent, a factory's`): Agora, the reviewer of the factory `nemia`, read only,
+ * The factory agent page's reads for its stories (`Pages/Agent, a factory's`): Reviewer, the reviewer of the factory `acme`, read only,
  * hired into the review step of two workflows, with its key form, models, steps, skills and marks, and the runs not finished that
  * hold none, one or four of its sessions at work. Each is typed by the board's own reads of `objects`.
  */
@@ -9,13 +9,12 @@ import type { KeyForm } from '../../src/lib/api/builder';
 import type { FinishedPage, OpenRuns } from '../../src/lib/api/runs';
 import type { SkillPlace } from '../../src/lib/api/skills';
 import { atWorkSince, givenAgent, listed, summary } from '../../test/run.fixture';
-import { FACTORY } from './proposals';
 
 /** The factory the stories read in. */
-export { FACTORY };
+export const FACTORY = 'acme';
 
 /** The agent's name. */
-export const AGORA = 'agora';
+export const REVIEWER = 'reviewer';
 
 /** Instructions as a file hard-wraps them: a paragraph's lines break where the file's do. */
 const BODY = `## Your role
@@ -55,7 +54,7 @@ Pass the change only when you would land it yourself.
 const skill = (name: string, description: string, from: SkillPlace['from'] = 'factory') => ({
   name,
   from,
-  dir: `/factories/nemia/skills/${name}`,
+  dir: `/factories/acme/skills/${name}`,
   entry: { id: name, name, description, tags: [] },
   error: null,
   preload: false,
@@ -68,7 +67,7 @@ const skill = (name: string, description: string, from: SkillPlace['from'] = 'fa
 export const skillPlaces: SkillPlace[] = [
   {
     from: 'factory',
-    dir: '/factories/nemia/skills',
+    dir: '/factories/acme/skills',
     skills: [
       skill('code-review', 'Reads a change along its standards and its spec.'),
       skill('look', 'Looks at a page as a person would, in both themes.'),
@@ -77,12 +76,12 @@ export const skillPlaces: SkillPlace[] = [
   },
 ];
 
-/** Agora, the factory's reviewer: read only, hired into the review step of two workflows. */
-export const agora: AgentListing & { factories: string[] } = {
-  name: AGORA,
+/** Reviewer, the factory's reviewer: read only, hired into the review step of two workflows. */
+export const reviewer: AgentListing & { factories: string[] } = {
+  name: REVIEWER,
   from: 'factory',
-  dir: '/factories/nemia/workflows/agents',
-  file: '/factories/nemia/workflows/agents/agora.md',
+  dir: '/factories/acme/workflows/agents',
+  file: '/factories/acme/workflows/agents/reviewer.md',
   role: 'Code reviewer',
   description: 'Use this when a change has been built and needs reading before it lands.',
   keys: {
@@ -94,7 +93,7 @@ export const agora: AgentListing & { factories: string[] } = {
     tools: 'Read, Grep, Glob, Bash',
     allowedTools: 'Bash(git diff *), Bash(git log *)',
     disallowedTools: 'Bash(git push *)',
-    output: 'agora.schema.json',
+    output: 'reviewer.schema.json',
   },
   body: BODY,
   schema: null,
@@ -107,15 +106,15 @@ export const agora: AgentListing & { factories: string[] } = {
     {
       name: 'code-review',
       from: 'factory',
-      foundIn: '/factories/nemia/skills/code-review',
+      foundIn: '/factories/acme/skills/code-review',
       entry: { id: 'code-review', name: 'code-review', description: 'Reads a change along its standards and its spec.', tags: [] },
       error: null,
       preload: false,
       cost: null,
     },
   ],
-  source: `---\nname: agora\n---\n${BODY}`,
-  version: 'agora-1',
+  source: `---\nname: reviewer\n---\n${BODY}`,
+  version: 'reviewer-1',
   usedBy: [],
   fills: [
     { from: 'factory', workflow: 'build', step: 'review', hired: false },
@@ -160,12 +159,12 @@ export const models: HarnessModels = {
 export const reviewStep = (workflow: 'build' | 'quick') => ({
   workflow,
   from: 'repo',
-  dir: `/factories/nemia/workflows/${workflow}`,
+  dir: `/factories/acme/workflows/${workflow}`,
   step: 'review',
   body: 'Read the change against its plan, and pass it or ask for another round.',
-  source: '---\nagent: agora\n---\nRead the change against its plan.\n',
+  source: '---\nagent: reviewer\n---\nRead the change against its plan.\n',
   keys: [
-    { key: 'agent', value: 'agora', meaning: 'what is attached to this node to do its work' },
+    { key: 'agent', value: 'reviewer', meaning: 'what is attached to this node to do its work' },
     { key: 'mcp', value: 'playwright', meaning: 'the MCP servers its sessions load' },
   ],
   agentSkills: null,
@@ -187,7 +186,7 @@ export const reviewStep = (workflow: 'build' | 'quick') => ({
   hiredIn: [],
   hiring: { refused: null, agents: [] },
   skillsFrom: [
-    { name: 'look', from: 'repo', foundIn: '/factories/nemia/skills/look' },
+    { name: 'look', from: 'repo', foundIn: '/factories/acme/skills/look' },
     { name: 'tsverify', from: 'builtin', foundIn: null },
   ],
   recentRuns: [],
@@ -198,14 +197,14 @@ export const marks = [
   { day: '2026-11-27', kind: 'step', name: 'review' },
   { day: '2026-11-27', kind: 'step', name: 'review' },
   { day: '2026-11-27', kind: 'skill', name: 'git' },
-  { day: '2026-11-26', kind: 'agent', name: AGORA },
+  { day: '2026-11-26', kind: 'agent', name: REVIEWER },
 ] as const;
 
 /** An instant `minutes` ago, half a minute over, so the page's whole minutes say `minutes` until the story has run for thirty seconds. */
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000 - 30_000).toISOString();
 
 /**
- * A run in flight whose review step is at work by Agora, since `minutes` ago.
+ * A run in flight whose review step is at work by Reviewer, since `minutes` ago.
  * @param id The run's id.
  * @param title The run's title, the first line of its brief.
  * @param minutes How long the session has been at work.
@@ -220,7 +219,7 @@ const atWork = (id: string, title: string, minutes: number, workflow: 'build' | 
     steps: [
       {
         ...review,
-        spec: givenAgent(AGORA),
+        spec: givenAgent(REVIEWER),
         timeline: atWorkSince(ago(minutes)),
         current: { try: 1, round, phase: 'running', reason: 'Running', outcome: null, verdict: null },
       },
@@ -235,10 +234,10 @@ const atWork = (id: string, title: string, minutes: number, workflow: 'build' | 
 export const open = (runs: OpenRuns['inFlight']) =>
   ({ asOf: '2026-11-27T10:00:00.000Z', counts: { waiting: 0, inFlight: runs.length, finished: 0 }, waiting: [], inFlight: runs }) satisfies OpenRuns;
 
-/** None of Agora's sessions at work. */
+/** None of Reviewer's sessions at work. */
 export const idle = open([]);
 
-/** One session of Agora at work, on the review of a card. */
+/** One session of Reviewer at work, on the review of a card. */
 export const one = open([atWork('r-7k2m-quick', 'board: The approve modal uses the step’s card', 2, 'quick')]);
 
 /** Four sessions at work, the second of its third review round, in no order of their minutes. */
@@ -249,7 +248,7 @@ export const four = open([
   atWork('r-3i4j-y5z6', 'api: Stats answer by factory', 31),
 ]);
 
-/** The first page of the finished runs, the last of which had a session of Agora end 51 minutes ago. */
+/** The first page of the finished runs, the last of which had a session of Reviewer end 51 minutes ago. */
 export const finished: FinishedPage = {
   asOf: '2026-11-27T10:00:00.000Z',
   total: 1,
@@ -261,7 +260,7 @@ export const finished: FinishedPage = {
       const [open] = atWorkSince(at);
       return {
         ...run,
-        steps: [{ ...review, spec: givenAgent(AGORA), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] }],
+        steps: [{ ...review, spec: givenAgent(REVIEWER), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] }],
         wallMs: 0,
         finishedAt: at,
         outcome: 'succeeded' as const,

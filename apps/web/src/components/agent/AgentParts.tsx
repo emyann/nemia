@@ -80,7 +80,8 @@ export function NodeLink({ user }: { user: AgentUser | AgentFill }) {
 /**
  * Each node that names an agent, then each step it fills in the factory read that none of those is, hired there or named elsewhere: a step
  * by its workflow and its name, since a factory's tree is read as a repository's where a node names it.
- * @param listing The agent, by the nodes that name it and the steps it fills.
+ * @param props.usedBy The nodes that name the agent.
+ * @param props.fills The steps the agent fills in the factory read.
  */
 export const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>) => {
   const keyOf = (node: AgentUser | AgentFill) => `${node.workflow}/${node.step}`;

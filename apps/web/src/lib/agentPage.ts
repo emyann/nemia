@@ -23,6 +23,16 @@ export type PlateRow = {
   pips: { total: number; filled: number } | null;
 };
 
+/** The key of the agent's file that says how its session asks before it acts, by the start of its name. */
+const MODE = /^permission/;
+
+/**
+ * The value of the key of `keys` whose name matches `key`, as the file writes it; undefined where none is set.
+ * @param keys The agent's role keys.
+ * @param key The pattern the key's name matches.
+ */
+const valueOf = (keys: AgentListing['keys'], key: RegExp) => Object.entries(keys).find(([name]) => key.test(name))?.[1];
+
 /** What the plate says where a key is unset. */
 const UNSET = 'Not set';
 
@@ -65,10 +75,17 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
       note: meaning('effort'),
       pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
-    { label: 'Mode', value: keys.permissionMode ?? UNSET, note: meaning('permissionMode'), pips: null },
+    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: keyForm?.keys.find((k) => MODE.test(k.key))?.meaning ?? null, pips: null },
     { label: 'Context', value: keys.context ?? UNSET, note: meaning('context'), pips: null },
   ] satisfies PlateRow[];
 }
+
+/** Each permission count: its label, the key of the agent's file it counts, and what the count says on hover. */
+const PERMISSIONS = [
+  { label: 'Tools', key: /^tools$/, said: 'The tools it is given. None named means every tool.' },
+  { label: 'Allowed', key: /^allowed/, said: 'The calls it may make without asking.' },
+  { label: 'Denied', key: /^disallowed/, said: 'The calls it may never make.' },
+] as const;
 
 /**
  * The three permission counts: the tools it names, those it may use with no ask and those it may not, each with what it counts, said
@@ -76,11 +93,11 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
  * @param keys The agent's role keys, as its file writes them.
  */
 export const permissionsOf = (keys: AgentListing['keys']) =>
-  [
-    { label: 'Tools', count: skillList(keys.tools ?? '').length, said: 'The tools it is given. None named means every tool.' },
-    { label: 'Allowed', count: skillList(keys.allowedTools ?? '').length, said: 'The calls it may make without asking.' },
-    { label: 'Denied', count: skillList(keys.disallowedTools ?? '').length, said: 'The calls it may never make.' },
-  ] as const;
+  PERMISSIONS.map(({ label, key, said }) => ({
+    label,
+    count: skillList(valueOf(keys, key) ?? '').length,
+    said,
+  }));
 
 /**
  * A mark's day as the page says it: day and month, in UTC, the zone the marks are named in (`27 Nov`).

@@ -11,8 +11,8 @@ import { agentMarksQuery } from '@/lib/api/stats';
 import { stepQuery } from '@/lib/api/workflows';
 import { FactoryAgentPage } from './FactoryAgentPage';
 import {
-  agora,
-  AGORA,
+  reviewer,
+  REVIEWER,
   FACTORY,
   finished,
   four,
@@ -23,7 +23,7 @@ import {
   one,
   reviewStep,
   skillPlaces,
-} from '../../../.storybook/fixtures/agora';
+} from '../../../.storybook/fixtures/reviewer';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /** The page with its reads seeded, the runs not finished being what the story is about. */
@@ -32,7 +32,7 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
   const page = (
     <QueryClientProvider
       client={seeded([
-        [agentQuery('factory', AGORA, place).queryKey, agora],
+        [agentQuery('factory', REVIEWER, place).queryKey, reviewer],
         [keyFormQuery.queryKey, keyForm],
         [modelsQuery.queryKey, models],
         [openRunsQuery(FACTORY).queryKey, runs],
@@ -40,11 +40,11 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
         [stepQuery('factory', 'build', 'review', place).queryKey, reviewStep('build')],
         [stepQuery('factory', 'quick', 'review', place).queryKey, reviewStep('quick')],
         [factorySkillsQuery(FACTORY).queryKey, skillPlaces],
-        [agentMarksQuery(AGORA, FACTORY).queryKey, marks],
+        [agentMarksQuery(REVIEWER, FACTORY).queryKey, marks],
       ])}
     >
       <Suspense>
-        <FactoryAgentPage name={AGORA} factory={FACTORY} />
+        <FactoryAgentPage name={REVIEWER} factory={FACTORY} />
       </Suspense>
     </QueryClientProvider>
   );
@@ -124,8 +124,8 @@ export const Instructions: Story = {
     const page = within(canvasElement);
     const show = await page.findByRole('button', { name: 'Show all' });
     await userEvent.click(show);
-    const dialog = await within(document.body).findByRole('dialog', { name: "Agora's instructions" });
-    await waitFor(() => expect(within(dialog).getByText(/agents\/agora\.md · \d+ words/)).toBeVisible());
+    const dialog = await within(document.body).findByRole('dialog', { name: "Reviewer's instructions" });
+    await waitFor(() => expect(within(dialog).getByText(/agents\/reviewer\.md · \d+ words/)).toBeVisible());
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     await userEvent.tab();
     await userEvent.tab();

@@ -530,6 +530,8 @@ export const LANDED = {
   id: 'it-landed-itself-e2e13',
   title: 'It landed itself',
   steps: ['implement', 'review'],
+  /** The step whose gate was approved. */
+  ending: 'review',
   branch: 'wf/it-landed-itself-e2e13/implement',
   /** What `wf prune` freed once it landed: the one worktree its implement and review worked in, as a `node_modules` makes one. */
   prunedBytes: 1.5 * 1024 ** 3,

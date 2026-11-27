@@ -8,7 +8,7 @@ import type { PageSpec } from '../visit.ts';
 import { dropStoredRun, OUT, store, storedRecords, storeRecord } from '../world.ts';
 
 /**
- * A run no seed keeps: an ending whose gated step, the step a send-back goes to and the base branch all have long names, four steps and
+ * A run no seed keeps: a gated last step, a step before it and the base branch that all have long names, four steps and
  * one of them asking — the card the seeded names never draw, whose gate line would wrap to three rows and reach over the card beneath. The
  * `factory-gate-long-names` page writes it (`seedLongNames`), lays the floor out, measures, and takes it back (the paths returned).
  */
@@ -36,7 +36,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
   const { id, ending, back, onto, asks } = LONG_NAMES;
   const [implement, notes] = LONG_NAMES.steps;
   const dir = path.join(root, 'workflow-long-names');
-  const says = 'Merge this run onto the release branch, or abort on any failure.';
+  const says = 'Look at what the review handed on, and approve it or send it back.';
   const workflow = [
     { name: implement, after: [], body: 'Implement what was asked.', harness: 'claude' },
     { name: notes, after: [implement], body: 'Write the migration notes.', harness: 'claude' },
@@ -69,6 +69,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
   signedOff(implement, 3, 2.5, { outcome: 'done', summary: 'Implemented it.', needs: null, artifacts: [] });
   signedOff(notes, 2.4, 2, { outcome: 'blocked', summary: 'Wrote half the notes.', needs: asks, artifacts: [] });
   signedOff(back, 2.4, 1.5, { outcome: 'done', summary: 'Reviewed it: nothing to change.', needs: null, artifacts: [] });
+  signedOff(ending, 1.4, 1, { outcome: 'done', summary: 'Ready to ship.', needs: null, artifacts: [] });
   storeRecord(
     id,
     JSON.stringify(
@@ -79,7 +80,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
         baseRef: '19c9365',
         branch: onto,
         isolate: true,
-        brief: `${LONG_NAMES.title}\n\nA run the factory-gate-long-names page writes and takes back: its names are long, one step asks, and the ending waits at its gate.`,
+        brief: `${LONG_NAMES.title}\n\nA run the factory-gate-long-names page writes and takes back: its names are long, one step asks, and its last step waits at its gate.`,
         workflowDir: dir,
         workflow,
         createdAt,
@@ -87,19 +88,19 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
           [implement]: { taskId: `${id}-${implement}`, workspace: lane, branch },
           [notes]: { taskId: `${id}-${notes}`, workspace: path.join(root, 'worktrees', id, notes), branch: `wf/${id}/${notes}` },
           [back]: { taskId: `${id}-${back}`, workspace: lane, branch },
-          [ending]: { taskId: null },
+          [ending]: { taskId: `${id}-${ending}`, workspace: lane, branch },
         },
       },
       null,
       2,
     ),
   );
-  return [dir, ...[implement, notes, back].map(task)] satisfies string[];
+  return [dir, ...[implement, notes, back, ending].map(task)] satisfies string[];
 }
 
 export default {
   /**
-   * The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
+   * The gate's card with the names the seed never has: a gated step and a base branch that do not fit a line, four
    * steps, one asking. The run is dated before every run in the store, so the grid, oldest first, puts it at the top of its column with
    * the default floor's cards beneath it, whatever runs join or leave that floor. Its gate line holds one row, the rest on hover; its graph
    * has a node a step, each a button named whole; opened, it has a tile a step, each named whole; and the card stays clear of
@@ -109,7 +110,7 @@ export default {
   name: 'factory-gate-long-names',
   route: '/factories/default',
   expect: async (page) => {
-    const { id, ending, back, onto } = LONG_NAMES;
+    const { id, ending, back } = LONG_NAMES;
     const notes = LONG_NAMES.steps[1];
     const oldest = Math.min(
       ...storedRecords()
@@ -134,7 +135,7 @@ export default {
         throw new Refused(`a card lies beneath ${id} in its column, to measure it against, or the measure proves nothing`);
       await expectClearOfEachOther(page);
       const line = card.locator(`[data-gate-line="${ending}"]`);
-      const whole = `approve to run ${ending} on ${onto}, or send ${back} back`;
+      const whole = `approve what ${ending} handed on, or send it back`;
       await expectVisible(line, `the card has ${ending}'s gate line`);
       const title = await line.getAttribute('title');
       if (!title?.includes(whole)) throw new Refused(`the gate line is whole on hover — its title is ${JSON.stringify(title)}`);
@@ -171,8 +172,8 @@ export default {
         await expectCount(card.locator(`[data-named="${name}"]`).getByTitle(name, { exact: true }), 1, `and under it, whole on hover`);
       }
       await expectVisible(
-        card.locator(`[data-gate-line="${ending}"][title^="approve to run ${ending}"]`),
-        'the opened card says approving the ending runs it',
+        card.locator(`[data-gate-line="${ending}"][title^="approve what ${ending} handed on"]`),
+        'the opened card says approving takes what the step handed on',
       );
       await expectClearOfEachOther(page);
       await page.getByRole('button', { name: 'Reset layout' }).click();

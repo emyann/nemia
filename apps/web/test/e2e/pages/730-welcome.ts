@@ -249,12 +249,12 @@ function rendered(name: string, workflows: readonly string[]) {
   const quick = path.join(tree, 'workflows', FIRST_WORKFLOW);
   fs.mkdirSync(quick, { recursive: true });
   fs.writeFileSync(path.join(quick, 'implement.md'), '---\nplace: git\nharness: claude\n---\nBuild the change.\n');
-  fs.writeFileSync(path.join(quick, 'land.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nLand it.\n');
+  fs.writeFileSync(path.join(quick, 'land.md'), '---\nafter: implement\nwaitsFor: [landed]\n---\n');
 }
 
 /**
  * The first card, at `/welcome/card` for the factory made: a suggestion taken, the cost line drawn above Start, and Start filing the
- * card through the real api, labelled as the first card, then starting it in quick gated at its landing, the start answered here with a
+ * card through the real api, labelled as the first card, then starting it in quick gated before it lands, the start answered here with a
  * seeded run at a gate, whose page the board opens. The card filed is answered back in `filed`.
  */
 async function startsTheFirstCard(page: Page, filed: string[]) {

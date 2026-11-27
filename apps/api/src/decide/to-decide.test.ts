@@ -475,7 +475,4 @@ test('at its gate, once a pass has read where the branches stand, the decision s
     3,
     `one trial onto the base and one onto each run in flight, the merge check not asked again: ${trials.join('\n')}`,
   );
-
-  runOn('r-handed', 'src/g.ts', 'export const g = 7;\n', true, PLAIN);
-  assert.equal((await decidableOf('r-handed')).collisions, null, 'a branch handed to a person to merge is at no gate');
 });

@@ -83,7 +83,7 @@ export async function tipOf(user: User, trigger: Element) {
  *
  * The arrows start once the page has drawn a frame after the row took the focus. The Tab press may focus a field at the page's top and
  * scroll the window there, and the row's focus scrolls it back: the browser fires the scroll event of both at its next frame, and a
- * React Aria tooltip closes on any scroll around its trigger (`useCloseOnScroll`), so a tooltip opened before that frame was closed by it
+ * React Aria tooltip closes on any scroll around its trigger, so a tooltip opened before that frame was closed by it
  * and opened by nothing again (RunsPage's Nothing Waits, one CI run in twenty-five). A frame's scroll events fire before its animation
  * frame callbacks.
  * @param user The user the play function is handed.

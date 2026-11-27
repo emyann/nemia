@@ -851,7 +851,7 @@ test("a card is parsed once per change, across passes: a changed card is served 
   const c = addToInbox({ text: 'Charlie card' });
   const fileOf = (added: { card: { name: string } }) => `${added.card.name}.md`;
   const memo = informerMemo();
-  const titles = async () => (await judgedInbox(memo)).map((l) => l.title).sort();
+  const titles = async () => (await judgedInbox(memo)).map((l) => l.title ?? '').sort((x, y) => x.localeCompare(y));
   assert.deepEqual(await titles(), ['Alpha card', 'Bravo card', 'Charlie card']);
   assert.equal(memo.cards.parsed, 3, 'each card is parsed once');
   const kept = [...memo.cards.kept.values()][0];

@@ -280,6 +280,7 @@
   --frame-lines: 0px;
   --frame-foot: 2.25rem;
   --frame-measure: 48rem;
+  --frame-gutter: 1rem;
 }
 
 /*

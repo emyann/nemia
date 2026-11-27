@@ -116,7 +116,7 @@ function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[], column
         );
       }
     }
-    if (file !== FRAME && text.includes('@container/page')) {
+    if (file !== FRAME && !file.endsWith('.stories.tsx') && text.includes('@container/page')) {
       refused.push(`${file}: '@container/page' is the frame's main alone (${FRAME}); query it with '@<size>/page:' instead`);
     }
   }

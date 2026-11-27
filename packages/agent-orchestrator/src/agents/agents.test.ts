@@ -277,6 +277,7 @@ const WIRING = [
   'when',
   'ends',
   'workflow',
+  'brief',
   'card',
   'relabel',
 ];

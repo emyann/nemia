@@ -95,7 +95,7 @@ test("a judge's brief names each route's targets, and the route it ends on", () 
   assert.ok(plan && triage);
   const brief = composeBrief(triage, run({ plan: 't-plan', triage: null }), JUDGED);
   assert.match(brief, /`web`: the step build-web: Build the web change\./);
-  assert.match(brief, /`backend`: a card for the workflow backend \(to-backend: Hand the backend change on\.\)/);
+  assert.match(brief, /`backend`: a run of the workflow backend \(to-backend: Hand the backend change on\.\)/);
   assert.match(brief, /`docs`: ends the run/);
   assert.doesNotMatch(composeBrief(plan, run({ plan: null }), JUDGED), /routes you choose between/);
 });
@@ -111,7 +111,7 @@ test("a judge's brief describes a workflow it routes to by that workflow's READM
   assert.deepEqual(Object.keys(targets), ['backend']);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   const brief = composeBrief(triage, r, JUDGED, ...none, { targets });
-  assert.match(brief, /a card for the workflow backend \(to-backend: Build a backend change to main\.\)/);
+  assert.match(brief, /a run of the workflow backend \(to-backend: Build a backend change to main\.\)/);
 });
 
 test('a judge load left to a hire is refused at start while nothing hired it, and taken once a read-only agent is', () => {

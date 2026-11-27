@@ -101,6 +101,7 @@ const PLACED = new Set<string>([
   'checkFailurePolicy',
   'checks',
   'workflow',
+  'brief',
   'card',
   ...ROUTE_LISTS,
   ...WORDS,

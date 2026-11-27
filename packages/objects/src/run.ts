@@ -192,12 +192,12 @@ export const RunSpec = Schema.Struct({
   from: Schema.NullOr(Schema.Struct({ inbox: Schema.String.annotate({ description: "The inbox card's id." }) })).annotate({
     description: 'The inbox card it was started from; null for none.',
   }),
-  startedBy: Schema.NullOr(
+  startedBy: Schema.optionalKey(Schema.NullOr(
     Schema.Struct({
       run: Schema.String.annotate({ description: 'The id of the run whose workflow node started this run.' }),
       node: Schema.String.annotate({ description: "The workflow node's name in that run." }),
     }),
-  ).annotate({ description: 'The run and the workflow node that started it directly; null for a run started any other way.' }),
+  )).annotate({ description: 'The run and the workflow node that started it directly; null for a run started any other way, absent on a run served before it had this.' }),
 }).annotate({
   identifier: 'RunSpec',
   description: 'What the run was asked to do: its brief, its workflow, and where it works. Never changes.',

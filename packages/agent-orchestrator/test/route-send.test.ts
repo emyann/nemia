@@ -273,6 +273,9 @@ describe("a gated table condition on the tests' team: its producer signs off, a 
     const t = teardowns();
     repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stage.place().world.repository(repo, { 'a.txt': 'one\n' });
+    const dev = path.join(repo, 'workflows', 'dev');
+    fs.mkdirSync(dev, { recursive: true });
+    fs.writeFileSync(path.join(dev, 'implement.md'), '---\nplace: git\n---\nbuild it\n');
     run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: path.join(TEAM, 'triage'), gates: ['triage'] }));
     id = run.id;
     return t.end;
@@ -294,10 +297,11 @@ describe("a gated table condition on the tests' team: its producer signs off, a 
     await stage.main(['approve', id, 'triage']);
     assert.ok(runRecord(ROOT, id).approvals?.some((a) => a.step === 'triage' && a.try === 1));
   });
-  s.test('the next pass files build-web and sends handoff its card', async () => {
+  s.test('the next pass files build-web and starts the run of handoff', async () => {
     const after = await pass(id);
     assert.ok(after.filed.includes('build-web'), JSON.stringify(after.filed));
-    assert.ok(runRecord(ROOT, id).steps.handoff?.sent !== undefined);
+    const sent = runRecord(ROOT, id).steps.handoff?.sent;
+    assert.ok(sent !== undefined && 'run' in sent, JSON.stringify(runRecord(ROOT, id).steps.handoff));
     assert.equal((await words(id))['build-backend'], 'skipped (triage: web)');
   });
   s.test('a second approval is refused, as the try is already approved', async () => {

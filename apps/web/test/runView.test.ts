@@ -9,7 +9,7 @@ import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import type { RunLines } from '../src/lib/api/run.ts';
-import { runDetailOf } from '../src/lib/runView.ts';
+import { runDetailOf, runsNoSession } from '../src/lib/runView.ts';
 import { stepStamp } from '../src/lib/lifecyclePath.ts';
 
 /** The time of no task yet, as a run's timeline totals it. */
@@ -306,5 +306,23 @@ describe("stepStamp: a step's tries and told are read again when it moves, and w
   test('REFUSED: what it cost, and what a person said to it, move no stamp', () => {
     assert.equal(stepStamp({ ...step, spent: { usd: 1, measured: 1, unmeasured: 0, said: '$1.00' } }), stamp);
     assert.equal(stepStamp({ ...step, said: [{ at: '2026-11-02T10:01:00.000Z', attempt: 1, text: 'hello' }] }), stamp);
+  });
+});
+
+describe('runsNoSession: a step with no task that runs no session, so the board does not say it is not filed yet', () => {
+  test('a wait node runs no session, before its conditions are laid and after', () => {
+    const wait = { spec: { waitsFor: ['turn', 'ci', 'merged', 'base-ci'] } };
+    assert.equal(runsNoSession({ taskId: null, check: null, ...wait }), true);
+    assert.equal(runsNoSession({ taskId: null, check: { name: 'turn' }, ...wait }), true);
+  });
+
+  test('a step whose checks are laid with no task runs no session', () => {
+    assert.equal(runsNoSession({ taskId: null, check: { name: 'check' }, spec: null }), true);
+  });
+
+  test('REFUSED: a session step not filed yet, and any step with a task', () => {
+    assert.equal(runsNoSession({ taskId: null, check: null, spec: { waitsFor: [] } }), false);
+    assert.equal(runsNoSession({ taskId: null, check: null, spec: null }), false);
+    assert.equal(runsNoSession({ taskId: 't-1', check: null, spec: { waitsFor: ['ci'] } }), false);
   });
 });

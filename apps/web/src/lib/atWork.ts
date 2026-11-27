@@ -6,6 +6,7 @@ import type { Activity, ActivityOf, AtWorkRow } from '../../contracts/agent-acti
 import { agentOf, sinceOf, type RunView } from './api/judged.ts';
 import { titleOf } from './factory.ts';
 import { longestFirst } from './longestFirst.ts';
+import { ownRows } from './ownRows.ts';
 import { stepState } from './status.ts';
 
 export type { Activity, AtWorkRow };
@@ -54,9 +55,9 @@ export const stepsAtWorkOf = (open: readonly RunView[], now: number) =>
  * @param agent The agent's name; only the steps given to it count.
  */
 export const activityOf: ActivityOf = (rows, agent) => {
-  const mine = rows.filter((row) => row.agent === agent);
+  const mine = ownRows(rows, agent);
+  if (mine.length === 0) return { kind: 'none' };
   const first = mine.at(0);
-  if (first === undefined) return { kind: 'none' };
-  if (mine.length === 1) return { kind: 'one', row: first };
+  if (mine.length === 1 && first !== undefined) return { kind: 'one', row: first };
   return { kind: 'many', rows: longestFirst(mine) };
 };

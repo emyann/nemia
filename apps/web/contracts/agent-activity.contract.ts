@@ -5,6 +5,7 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { longestFirst } from '../src/lib/longestFirst.ts';
+import { ownRows } from '../src/lib/ownRows.ts';
 
 /**
  * One step at work in a run not finished, as the page reads it (implement makes these in src/lib/atWork.ts from the open runs, the
@@ -54,7 +55,7 @@ export const longestFirstOf = assume(longestFirst, {
 });
 
 /** The rows of `rows` that are the agent's. */
-const theirs = (rows: readonly AtWorkRow[], agent: string) => rows.filter((row) => row.agent === agent);
+const theirs = (rows: readonly AtWorkRow[], agent: string) => ownRows(rows, agent);
 
 /** Whether `row` is a step of `rows`: the same run and the same step. */
 const given = (rows: readonly AtWorkRow[], row: AtWorkRow) => rows.some((r) => r.run === row.run && r.step === row.step);

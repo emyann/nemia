@@ -191,7 +191,7 @@ export const EveryState: Story = {
         (button) => button.getAttribute('aria-label') ?? button.textContent,
       );
     await expect(buttons('72wy'), 'the run whose design signed off blocked holds Answer').toEqual(['Answer design', 'Open the run']);
-    await expect(buttons('vqvd'), 'the run whose check refused holds Open the run alone').toEqual(['Open the run']);
+    await expect(buttons('vqvd'), 'vqvd, with nothing to answer from its card, holds Open the run alone').toEqual(['Open the run']);
   },
 };
 

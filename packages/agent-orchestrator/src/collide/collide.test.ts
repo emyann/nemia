@@ -1,24 +1,14 @@
 /**
- * The collisions an ending's decision reads (`collide.ts`): which runs are in flight beside a run (`othersInFlight`), the trials asked in
- * order (`trialsOf`), which ending reads them (`collisionsDue`), and what the place's answer says (`collisionsOf`), the semantic conflict
- * among it.
+ * The collisions a run's decision reads (`collide.ts`): which runs are in flight beside a run (`othersInFlight`), the trials asked in
+ * order (`trialsOf`), and what the place's answer says (`collisionsOf`).
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { collisionsDue, collisionsOf, othersInFlight, trialsOf } from './collide.ts';
+import { collisionsOf, othersInFlight, trialsOf } from './collide.ts';
 import type { RepositoryRun, Run } from '../record/record.ts';
-import type { StepSpec } from '../step/step.ts';
 import type { TrialMerge } from '../place/place.ts';
 
-const STEPS: StepSpec[] = [
-  { name: 'implement', after: [], body: 'Build it.' },
-  { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'base', check: 'npm test' },
-];
-
-/** The same shape with no gate anywhere, as `quick` is: its ending lands on its check all the same, filed by the review before it. */
-const UNGATED = () => ({ ...refused(SHA), gates: [] });
-
-/** A repository run `id` on /code/app's main, gated at its ship, with `more` over it. */
+/** A repository run `id` on /code/app's main, with `more` over it. */
 const run = (id: string, more: Partial<RepositoryRun> = {}) => ({
   id,
   workspace: '/code/app',
@@ -29,26 +19,12 @@ const run = (id: string, more: Partial<RepositoryRun> = {}) => ({
   baseRef: 'abc',
   branch: 'main',
   isolate: true,
-  gates: ['ship'],
   steps: { implement: { taskId: `t-${id}`, branch: `wf/${id}/implement` } },
   ...more,
 });
 
 const CLEAN: TrialMerge = { clean: true };
 const SHA = 'b'.repeat(40);
-
-/** `run` whose ship's landing was aborted, its check `t-check` having refused the merged tree on `refusedOn`. */
-const refused = (refusedOn: string | undefined, check = true) =>
-  run('r-1', {
-    steps: {
-      implement: { taskId: 't-r-1', branch: 'wf/r-1/implement' },
-      ship: {
-        taskId: 't-ship',
-        landed: { aborted: '2026-10-05T01:00:00.000Z', ...(refusedOn ? { refusedOn } : {}) },
-        ...(check ? { check: { taskId: 't-check' } } : {}),
-      },
-    },
-  });
 
 test('othersInFlight keeps each other run with worktrees on the same repository and base, a held one among them', () => {
   const ours = run('r-1');
@@ -94,50 +70,13 @@ test('trialsOf asks each of ours onto the base, then each of ours onto each bran
   );
 });
 
-test('collisionsDue reads the ending waiting at its gate, or one whose landing a check refused — gated or not', () => {
-  assert.equal(collisionsDue(STEPS, run('r-1'), { kind: 'approve', step: 'ship', says: null, filed: false }), 'ship');
-  assert.equal(collisionsDue(STEPS, refused(SHA), undefined), 'ship');
-  assert.equal(
-    collisionsDue(STEPS, UNGATED(), undefined),
-    'ship',
-    "an ungated ending lands on its check in the same way, so its refused merge owes the same trials: quick's land, filed by its review",
-  );
-  const held = { ...refused(SHA), hold: { at: '2026-10-05T02:00:00.000Z', until: ['r-0'] } };
-  assert.equal(
-    collisionsDue(STEPS, held, undefined),
-    'ship',
-    'a hold ends nothing: the held landing still owes its trials once the hold lifts',
-  );
-});
-
-test('REFUSED: collisionsDue for a result left to the person, an ending landed or untouched, a run called off or pruned', () => {
-  assert.equal(collisionsDue(STEPS, run('r-1'), { kind: 'result', branches: ['wf/r-1/implement'] }), undefined);
-  assert.equal(collisionsDue(STEPS, run('r-1'), undefined), undefined);
-  const landed = run('r-1', { steps: { ship: { taskId: 't-ship', landed: { commit: SHA } } } });
-  assert.equal(collisionsDue(STEPS, landed, undefined), undefined);
-  const untouched = run('r-1', { steps: { ship: { taskId: 't-ship', landed: { untouched: 'x' } } } });
-  assert.equal(collisionsDue(STEPS, untouched, undefined), undefined);
-  assert.equal(collisionsDue(STEPS, { ...refused(SHA), cancelledAt: '2026-10-05T02:00:00.000Z' }, undefined), undefined);
-  assert.equal(collisionsDue(STEPS, { ...refused(SHA), pruned: { at: 'x' } } as unknown as Run, undefined), undefined);
-  assert.equal(
-    collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], check: undefined }], refused(SHA), undefined),
-    undefined,
-    'an ending with no `check:` lands nothing: no check refused',
-  );
-  assert.equal(
-    collisionsDue([{ ...STEPS[0] }, { ...STEPS[1], workspace: undefined }], refused(SHA), undefined),
-    undefined,
-    'and a step of the work ends nothing on the base branch',
-  );
-});
-
 test('collisionsOf words the base, each run it collides with and in which files, and what git could not say', () => {
   const theirs = [
     { run: 'r-2', branch: 'wf/r-2/implement' },
     { run: 'r-3', branch: 'wf/r-3/implement' },
     { run: 'r-4', branch: 'wf/r-4/implement' },
   ];
-  const c = collisionsOf(run('r-1'), 'ship', ['wf/r-1/implement'], theirs, {
+  const c = collisionsOf(run('r-1'), ['wf/r-1/implement'], theirs, {
     at: { main: SHA },
     trials: [CLEAN, { clean: false, conflicts: ['src/a.ts', 'src/b.ts'] }, CLEAN, { unknown: 'fatal: not a valid object name' }],
   });
@@ -156,36 +95,13 @@ test('collisionsOf words the base, each run it collides with and in which files,
     ],
   );
   assert.equal(c.said, 'collides with 1 of the 3 runs in flight on main: r-2; whether it collides with r-4 is not known');
-  assert.equal(c.semantic, null);
 });
 
 test('collisionsOf says when it collides with none, and when no other run is in flight', () => {
   const one = [{ run: 'r-2', branch: 'wf/r-2/implement' }];
-  const none = collisionsOf(run('r-1'), 'ship', ['wf/r-1/implement'], one, { at: { main: SHA }, trials: [CLEAN, CLEAN] });
+  const none = collisionsOf(run('r-1'), ['wf/r-1/implement'], one, { at: { main: SHA }, trials: [CLEAN, CLEAN] });
   assert.deepEqual(none.colliding, []);
   assert.equal(none.said, 'collides with none of the 1 run in flight on main');
-  const alone = collisionsOf(run('r-1'), 'ship', ['wf/r-1/implement'], [], { at: { main: SHA }, trials: [CLEAN] });
+  const alone = collisionsOf(run('r-1'), ['wf/r-1/implement'], [], { at: { main: SHA }, trials: [CLEAN] });
   assert.equal(alone.said, 'no other run is in flight on main');
-});
-
-test("collisionsOf says the semantic conflict: a clean merge onto the base whose landing check refused the base's commit now", () => {
-  const c = collisionsOf(refused(SHA), 'ship', ['wf/r-1/implement'], [], { at: { main: SHA }, trials: [CLEAN] });
-  assert.deepEqual(c.semantic, {
-    step: 'ship',
-    check: 't-check',
-    sha: SHA,
-    said: "merges cleanly onto main, and ship's landing check refused the merged tree at bbbbbbb: a conflict of meaning, not of text",
-  });
-});
-
-test('REFUSED: no semantic conflict on a base moved since, a refusal on no commit, a check not kept, or a base that conflicts', () => {
-  const asked = (r: RepositoryRun, trial: TrialMerge, at: string | null = SHA) =>
-    collisionsOf(r, 'ship', ['wf/r-1/implement'], [], { at: { main: at }, trials: [trial] }).semantic;
-  assert.equal(asked(refused('c'.repeat(40)), CLEAN), null, 'the base moved since');
-  assert.equal(asked(refused(undefined), CLEAN), null, 'no commit refused');
-  assert.equal(asked(refused(SHA, false), CLEAN), null, 'no check kept');
-  assert.equal(asked(refused(SHA), { clean: false, conflicts: ['a'] }), null, 'the base conflicts');
-  assert.equal(asked(refused(SHA), { unknown: 'no' }), null, 'git could not say');
-  assert.equal(asked(refused(SHA), CLEAN, null), null, 'the place names no base');
-  assert.equal(collisionsOf(refused(SHA), undefined, ['wf/r-1/implement'], [], { at: { main: SHA }, trials: [CLEAN] }).semantic, null);
 });

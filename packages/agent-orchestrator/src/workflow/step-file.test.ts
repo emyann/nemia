@@ -844,7 +844,7 @@ describe('the former names a file may still say: read under the names they have 
       row: 'workspace: folder, read as place: folder and never written',
       run: () => {
         const former = fm('write', 'workspace: folder');
-        assert.deepEqual([former.place, former.workspace], ['folder', undefined]);
+        assert.equal(former.place, 'folder');
         assert.equal(renderStep(former), '---\nplace: folder\n---\nDo the work.\n');
         const attached = parseWorkflow(
           'write',
@@ -859,11 +859,6 @@ describe('the former names a file may still say: read under the names they have 
         ]);
         assert.equal(isFolderTeam(team), true, 'a team spelled the former way is still a folder team');
       },
-    },
-    {
-      row: 'REFUSED: renderStep handed workspace: folder',
-      run: () => renderStep({ ...fm('write', 'workspace: folder'), workspace: 'folder' as never }),
-      naming: ['write: ', '`workspace: folder`', 'former spelling', 'Send `place: folder`', 'reload it'],
     },
     ...['folder', 'git'].map((place) =>
       refuses(

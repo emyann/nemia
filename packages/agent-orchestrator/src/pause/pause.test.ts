@@ -107,16 +107,16 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
   test("a pause with a timeout says each session stops at its tool call's end; one put at once, that each is cut at once; one with none, that each runs on", () => {
     const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
     const timed = { ...PAUSE, timeoutMs: 600_000 };
-    for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
+    for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, held: [] }) ?? '']) {
       assert.match(words, /current tool call ends, cut once the timeout passes/);
       assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
     }
     const now = { ...PAUSE, timeoutMs: 0 };
-    for (const words of [pauseWords(now), pausedWords({ pause: now, finishing, staged: [], held: [] }) ?? '']) {
+    for (const words of [pauseWords(now), pausedWords({ pause: now, finishing, held: [] }) ?? '']) {
       assert.match(words, /each working session is cut at once/);
       assert.doesNotMatch(words, /tool call ends|once the timeout passes|runs on to its end/);
     }
-    for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
+    for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, held: [] }) ?? '']) {
       assert.match(words, /nothing new starts, and each working session runs on/);
       assert.doesNotMatch(words, /what runs finishes|tool call ends/);
     }
@@ -126,32 +126,30 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
       { run: 'r-1', step: 'implement', kind: 'session' },
       { run: 'r-2', step: 'review', kind: 'check' },
     ];
-    const staged = [{ run: 'r-3', step: 'ship', repo: '/repo' }];
-    const [line, ...rest] = pausedLines({ pause: PAUSE, finishing, parked: [], staged, held: [{ run: 'r-4', step: 'land' }] });
+    const [line, ...rest] = pausedLines({ pause: PAUSE, finishing, parked: [], held: [{ run: 'r-4', step: 'land' }] });
     assert.match(
       line ?? '',
-      /^Pausing: 2 finishing, 2 checks held — the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand; /,
+      /^Pausing: 2 finishing, 1 check held — the store is paused since 2026-10-04T12:00:00\.000Z by ann: merging by hand; /,
     );
     assert.match(line ?? '', /; nemia resume resumes it$/);
     assert.deepEqual(rest, [
       "   r-1's implement is finishing: its session is at work",
       "   r-2's review is finishing: its check runs",
-      "   r-3's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on nemia resume",
       "   r-4's land has signed off, and its check waits on nemia resume",
     ]);
     assert.match(
-      pausedWords({ pause: PAUSE, finishing: finishing.slice(1), staged: [], held: [] }) ?? '',
+      pausedWords({ pause: PAUSE, finishing: finishing.slice(1), held: [] }) ?? '',
       /^Pausing: 1 finishing — /,
       'one finishing is not Paused, and no check held is not said',
     );
     assert.equal(
-      pausedWords({ pause: { at: '', by: '' }, finishing: [], staged: [], held: [] }),
+      pausedWords({ pause: { at: '', by: '' }, finishing: [], held: [] }),
       'Paused since a time its file no longer says by someone its file no longer names — nothing runs and nothing new starts; nemia resume resumes it',
     );
-    assert.deepEqual(pausedLines({ pause: null, finishing: [], parked: [], staged: [], held: [] }), []);
+    assert.deepEqual(pausedLines({ pause: null, finishing: [], parked: [], held: [] }), []);
   });
   test('the pause once nothing finishes counts each check it holds back, staged or not, and names each', () => {
-    assert.deepEqual(pausedLines({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [{ run: 'r-1', step: 'land' }] }), [
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing: [], parked: [], held: [{ run: 'r-1', step: 'land' }] }), [
       'Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts, 1 check held; nemia resume resumes it',
       "   r-1's land has signed off, and its check waits on nemia resume",
     ]);
@@ -159,8 +157,10 @@ describe('the pause in words: as put, Pausing while some finish, Paused once non
       pausedWords({
         pause: PAUSE,
         finishing: [],
-        staged: [{ run: 'r-2', step: 'ship', repo: '/repo' }],
-        held: [{ run: 'r-1', step: 'land' }],
+        held: [
+          { run: 'r-1', step: 'land' },
+          { run: 'r-2', step: 'ship' },
+        ],
       }) ?? '',
       / nothing new starts, 2 checks held; /,
     );
@@ -201,10 +201,10 @@ const view = (
 });
 
 describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and how each is said', () => {
-  test('what finishes under the pause: a session at work, a check that runs, and an ending’s check as a landing', () => {
+  test('what finishes under the pause: a session at work, a check that runs, and the check of a step whose session is done', () => {
     const steps = [
       step('implement', [], { check: 'npm test' }),
-      step('ship', ['implement'], { gate: true, workspace: 'base', check: 'npm test' }),
+      step('ship', ['implement'], { gate: true, check: 'npm test' }),
     ];
     const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } }, ship: { taskId: 't2', check: { taskId: 'c2' } } });
     const views: Record<string, FinishingView> = {
@@ -218,7 +218,7 @@ describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and
       [
         { run: 'r-1', step: 'implement', kind: 'session' },
         { run: 'r-1', step: 'implement', kind: 'check' },
-        { run: 'r-1', step: 'ship', kind: 'landing' },
+        { run: 'r-1', step: 'ship', kind: 'check' },
       ],
     );
   });
@@ -249,7 +249,7 @@ describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and
     const other = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't0', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [other]);
     assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true }]);
-    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged: [], held: [] }).slice(1), [
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], held: [] }).slice(1), [
       "   r-1's implement is stopping: its session was asked to stop",
     ]);
   });
@@ -258,7 +258,7 @@ describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and
     const ask = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [ask]);
     assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }]);
-    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged: [], held: [] }).slice(1), [
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], held: [] }).slice(1), [
       "   r-1's implement is stopping: its session was asked to stop, and is tried again on nemia resume",
     ]);
   });
@@ -276,7 +276,7 @@ describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and
       { run: 'r-1', step: 'implement', kind: 'check' },
     ]);
     assert.deepEqual(callsOf({ finishing }), [finishing[0]]);
-    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged: [], held: [] }).slice(1), [
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], held: [] }).slice(1), [
       "   r-1's implement is finishing: its call to Bash runs",
       "   r-1's implement is finishing: its check runs",
     ]);
@@ -299,17 +299,6 @@ describe('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts,
         { run: 'r-1', step: 'review', kind: 'check', taskId: 'c2' },
       ],
     );
-  });
-  test('a pause at once leaves a landing to finish: the session and the check of a step in the own checkout', () => {
-    const ship = step('ship', [], { gate: true, workspace: 'base', check: 'npm test' });
-    const r = run({ ship: { taskId: 't1', check: { taskId: 'c1' } } });
-    const working = (id: string) => (id === 't1' || id === 'c1' ? view('working') : undefined);
-    assert.equal(
-      interruptsOf(r, [{ ...ship, workspace: undefined }], working).length,
-      2,
-      'the fixture: in a worktree, both are interrupted',
-    );
-    assert.deepEqual(interruptsOf(r, [ship], working), []);
   });
   test('a pause at once leaves a task already asked to stop, one queued for a slot, and one waiting on a person', () => {
     const steps = [step('implement')];
@@ -362,7 +351,7 @@ describe('a parked session under the pause: it finishes nothing, it is named par
       ],
     );
     assert.deepEqual(
-      pausedLines({ pause: PAUSE, finishing: [], parked: parkedAmong([r], (id) => views[id]), staged: [], held: [] }).slice(1),
+      pausedLines({ pause: PAUSE, finishing: [], parked: parkedAmong([r], (id) => views[id]), held: [] }).slice(1),
       ["   r-1's implement is paused after its call to Read", "   r-1's review is paused, its call to Bash cut"],
     );
   });
@@ -374,22 +363,22 @@ describe('a parked session under the pause: it finishes nothing, it is named par
       { run: 'r-3', step: 'c', kind: 'check' },
     ];
     const now = new Date(Date.parse(PAUSE.at) + 61_000);
-    const line = pausedWords({ pause: timed, finishing, staged: [], held: [{ run: 'r-4', step: 'land' }] }, now) ?? '';
+    const line = pausedWords({ pause: timed, finishing, held: [{ run: 'r-4', step: 'land' }] }, now) ?? '';
     assert.ok(line.startsWith('Pausing: 2 sessions finishing a tool call, cut in 9 min, 1 check held'), line);
     assert.match(
-      pausedWords({ pause: timed, finishing: [], staged: [], held: [] }, now) ?? '',
+      pausedWords({ pause: timed, finishing: [], held: [] }, now) ?? '',
       /^Paused since /,
       'Paused once nothing finishes',
     );
     assert.match(
-      pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }, now) ?? '',
+      pausedWords({ pause: PAUSE, finishing, held: [] }, now) ?? '',
       /^Pausing: 3 finishing/,
       'a pause with no timeout counts as before',
     );
-    const cut = pausedWords({ pause: { ...PAUSE, timeoutMs: 0 }, finishing, staged: [], held: [] }, now) ?? '';
+    const cut = pausedWords({ pause: { ...PAUSE, timeoutMs: 0 }, finishing, held: [] }, now) ?? '';
     assert.ok(cut.startsWith('Pausing: 2 sessions finishing a tool call, cut now'), cut);
     const past = new Date(Date.parse(PAUSE.at) + 600_000);
-    const due = pausedWords({ pause: timed, finishing, staged: [], held: [] }, past) ?? '';
+    const due = pausedWords({ pause: timed, finishing, held: [] }, past) ?? '';
     assert.ok(due.startsWith('Pausing: 2 sessions finishing a tool call, cut now'), due);
   });
   test('a timeout is digits and one unit, from 1s to 23h', () => {

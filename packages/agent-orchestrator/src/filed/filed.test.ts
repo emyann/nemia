@@ -31,7 +31,6 @@ const filed = (step: StepSpec, servers?: FactoryServers, labels?: Run['labels'])
       runArtifacts: '/runs/r/artifacts',
       inbox: '/inbox',
       own: {},
-      landingDenied: () => [],
       ...(servers === undefined ? {} : { servers }),
     },
   );
@@ -69,7 +68,6 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
         runArtifacts: '/runs/r/artifacts',
         inbox: '/inbox',
         own: {},
-        landingDenied: () => [],
         sessionToken: 'minted',
       },
     );
@@ -88,7 +86,7 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
       review,
       steps,
       { gates: [] },
-      { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
+      { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {} },
     );
     assert.deepEqual(
       config.mounts,
@@ -115,7 +113,6 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
         runArtifacts: '/runs (old)/r/artifacts',
         inbox: '/inbox',
         own: {},
-        landingDenied: () => [],
       },
     );
     assert.equal(Object.hasOwn(unruled, 'mounts'), false, 'a path no permission rule carries is not mounted: the step runs as it did');
@@ -144,7 +141,6 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
           inbox: '/inbox',
           workflowFiles: frozen,
           own: {},
-          landingDenied: () => [],
         },
       );
     assert.equal(WORKFLOW_FILES, 'WF_WORKFLOW_FILES');
@@ -181,7 +177,6 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
           workflowFiles: workflow,
           ...(carriedFiles === undefined ? {} : { carriedFiles }),
           own: {},
-          landingDenied: () => [],
         },
       );
     assert.equal(CARRIED_FILES, 'WF_CARRIED_FILES');
@@ -232,7 +227,6 @@ describe("filedConfig: a Claude Code step is given its factory's harness setting
         runArtifacts: '/runs/r/artifacts',
         inbox: '/inbox',
         own,
-        landingDenied: () => [],
       },
     );
   const settingsOf = (config: object) => {

@@ -4,7 +4,7 @@
  * but a run's that only its note said waits, and every entry of the table is one some word reaches.
  *
  * The fixtures are built from the code's own constants and word-builders wherever there is one — `SLOT_WAIT`, `slotWord`, `PAUSE_WAIT`,
- * `checkoutWord`, `waitWord`, `holdWord`, `waitingWords`, `REMOVED`, `DENIED` — and the statuses are keyed by their unions
+ * `waitWord`, `holdWord`, `waitingWords`, `REMOVED`, `DENIED` — and the statuses are keyed by their unions
  * (`Record<Assessment['status'], …>`, `Record<StepStatus, …>`), so a status added anywhere fails this file's typecheck rather than
  * falling silently to `Unknown`.
  */
@@ -31,7 +31,6 @@ import { FORMER_REASONS } from '../former-reason/former-reason.ts';
 import { codedStep, PHASE_OF, runCodes, STEP_REASONS, type AnswerVia, type QualifiedStep, type WaitOn } from '../phase/phase.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 import { PAUSE_WAIT, pausedWord, waitingWords } from '../list/list.ts';
-import { checkoutWord } from '../ending/ending.ts';
 import { holdWord, waitWord } from '../wait/wait.ts';
 import { FORMER_DEFAULT_WAKE, FORMER_NEMIA_WAKE, selectorsOfWake } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
@@ -103,7 +102,6 @@ const WAIT_WORDS: readonly Case[] = [
   { kind: 'Step', word: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
   { kind: 'Step', word: slotWord({ inFlight: 1, cap: 2 }), reason: 'Waiting', on: 'limit' },
   { kind: 'Step', word: PAUSE_WAIT, note: 'its check is filed on nemia resume', reason: 'Waiting', on: 'pause' },
-  { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'Waiting', on: 'base' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting', on: 'run' },
 ];

@@ -114,7 +114,7 @@ const SHIP_BODY = `${SHIPS}\n\nLook at the checkout first.`;
 /** A workflow that ends in a step acting on the base branch itself, gated: implement → ship. */
 const ENDING = [
   { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-  { name: 'ship', after: ['implement'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
+  { name: 'ship', after: ['implement'], body: SHIP_BODY, harness: 'claude', gate: true },
 ];
 /** A workflow that says nothing about what happens when the work is done: its branch is a person's. */
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
@@ -287,7 +287,7 @@ describe("the gate's commands are never empty, by what the ending waits on and w
     const wide = [
       { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
       { name: 'docs', after: [], body: 'Write the docs.', harness: 'codex' },
-      { name: 'ship', after: ['implement', 'docs'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
+      { name: 'ship', after: ['implement', 'docs'], body: SHIP_BODY, harness: 'claude', gate: true },
     ];
     branchOff(repo, `wf/${fan}/implement`, 'src/fan.ts', 'export const fan = 1;\n');
     signedOff(`${fan}-implement`, repo);
@@ -324,7 +324,7 @@ describe("the gate's commands are never empty, by what the ending waits on and w
       id: alone,
       repo,
       baseRef: base,
-      workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true }],
+      workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', gate: true }],
       steps: { ship: { taskId: null } },
     });
     process.env.WF_MAX_RUNS = '0';
@@ -363,7 +363,7 @@ describe("the gate's commands are never empty, by what the ending waits on and w
           },
         },
       },
-      { name: 'ship', after: ['review'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
+      { name: 'ship', after: ['review'], body: SHIP_BODY, harness: 'claude', gate: true },
     ];
     branchOff(repo, `wf/${id}/implement`, 'src/stopped.ts', 'export const stopped = 1;\n');
     signedOff(`${id}-implement`, repo);

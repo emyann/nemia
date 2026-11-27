@@ -300,7 +300,6 @@ test('the land steps are wait nodes, with no session, no agent and no workspace,
       const land = loaded(name, workflow).find((step) => step.name === 'land');
       assert.deepEqual(land?.waitsFor, waitsFor, `${name}: ${workflow}/land`);
       assert.equal(land?.agent, undefined, `${name}: ${workflow}/land has no agent`);
-      assert.notEqual(land?.workspace, 'base', `${name}: ${workflow}/land works on no base`);
       assert.equal(stepIn(treeOf(name), workflow, 'land').body.trim(), '', `${name}: ${workflow}/land has no instruction`);
     }
 });
@@ -556,7 +555,6 @@ const intakePass = (steps: ReturnType<typeof intakeOf>, handsOver: string, appro
     asks: [],
     roundAsks: [],
     standings: [],
-    checkout: undefined,
   };
   const a = assess(read);
   return { ready: a.ready, send: a.send, status: a.status };
@@ -847,18 +845,12 @@ describe("build's and quick's review notes say what a gate at the review is, and
       });
 });
 
-test("sdlc's wiring names quick for a first card, which lists no ending step now, and the radius its parameters default to", () => {
+test("sdlc's wiring names quick for a first card, and the radius its parameters default to", () => {
   const wiring = JSON.parse(fs.readFileSync(path.join(treeOf('plain'), 'factory.json'), 'utf8')) as {
     firstWorkflow?: string;
     radius?: { agentFacing: string[]; checkAffecting: string[]; lessons: string[] };
   };
   assert.equal(wiring.firstWorkflow, 'quick');
-  const ending = loaded('plain', 'quick').filter((step) => step.workspace === 'base');
-  assert.equal(
-    ending.length,
-    0,
-    "quick's land step waits on conditions in no checkout of its own, so the board has no ending step to gate",
-  );
   assert.ok(wiring.radius?.agentFacing.includes('**/CLAUDE.md'), JSON.stringify(wiring.radius));
   assert.ok(wiring.radius?.checkAffecting.includes('**/package.json'), JSON.stringify(wiring.radius));
   assert.ok(wiring.radius?.lessons.includes('docs/'), JSON.stringify(wiring.radius));

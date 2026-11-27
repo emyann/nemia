@@ -56,11 +56,11 @@ const frames = async (count: number) => {
 };
 
 /**
- * Has Chromium paint `ground` again whole, by giving it a ground of its own for two frames and taking it off. What a story drew is painted in its first
- * frame, and parts of it may be painted again later on their own (the grain under a cut frame's ground, `look/grain.css`, lands a frame
- * or so after it), and a diagonal at a fraction of a pixel comes out a shade apart when only a part of the page around it is painted
- * again: whether that late paint came before the picture was a race (Frame/OverviewStrip's Quiet Day, one pixel off in one CI run in
- * three). Painted again whole, the picture is the same whichever came first.
+ * Has Chromium paint `ground` again whole, by giving it a ground of its own for two frames and taking it off. What a story drew is
+ * painted in its first frame, and parts of it may be painted again later on their own (the grain under a cut frame's ground,
+ * `look/grain.css`, lands a frame or so after it), and a diagonal at a fraction of a pixel comes out a shade apart when only a part of
+ * the page around it is painted again: whether that late paint came before the picture was a race (Frame/OverviewStrip's Quiet Day,
+ * one pixel off in one CI run in three). Painted again whole, the picture is the same whichever came first.
  * @param ground The story's ground.
  */
 const repainted = async (ground: HTMLElement) => {

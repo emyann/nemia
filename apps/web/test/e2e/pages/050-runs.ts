@@ -472,9 +472,12 @@ const missed = (control: Locator, across: number, up: number, down: number) =>
         [cx, cy - above],
         [cx, cy + below],
       ];
-      return points.flatMap(([x, y]) =>
-        document.elementFromPoint(x, y)?.closest('button') === button ? [] : [`${Math.round(x - cx)},${Math.round(y - cy)}`],
-      );
+      return points.flatMap(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        if (hit?.closest('button') === button) return [];
+        const at = hit ? `${hit.tagName.toLowerCase()}.${hit.className.toString().slice(0, 60)}` : 'nothing';
+        return [`${Math.round(x - cx)},${Math.round(y - cy)} (${at})`];
+      });
     },
     [across, up, down] as const,
   ) satisfies Promise<string[]>;

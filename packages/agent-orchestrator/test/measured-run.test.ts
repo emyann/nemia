@@ -432,7 +432,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
       }),
     );
     const clock = clockOf(run, views, runSteps, [], Date.now());
-    assert.deepEqual(clock, { wallMs: 68 * MIN, sessionsMs: 34 * MIN, checksMs: 7 * MIN, personMs: 15 * MIN, slotMs: 12 * MIN, restMs: 0 });
+    assert.deepEqual(clock, { wallMs: 75 * MIN, sessionsMs: 34 * MIN, checksMs: 7 * MIN, personMs: 22 * MIN, slotMs: 12 * MIN, restMs: 0 });
     assert.equal(clock.sessionsMs + clock.checksMs + clock.personMs + clock.slotMs + clock.restMs, clock.wallMs);
     const tl = timeline(run, views, runSteps);
     const planStep = runSteps.find((x) => x.name === 'plan')!;

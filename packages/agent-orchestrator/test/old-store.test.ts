@@ -126,7 +126,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
     assert.deepEqual(
       [Reflect.get(ship, 'workspace'), Reflect.get(ship, 'background')],
       [undefined, true],
-      '`workspace: main` and `background:` still decode, and neither is kept',
+      '`workspace: main` and `background:` still decode; the retired `workspace` is dropped, and nothing reads `background`',
     );
 
     const notes = runRecord(ROOT, 'notes');

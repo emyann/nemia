@@ -530,11 +530,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       const branch = runRecord(ROOT, run.id).steps.review.branch!;
 
       const held = await decidable(run.id);
-      assert.deepEqual(
-        held.decided.toDecide,
-        { kind: 'approve', step: 'review', says: null, filed: true },
-        'signed off, waiting for your word',
-      );
+      assert.deepEqual(held.decided.toDecide, { kind: 'approve', step: 'review' }, 'signed off, waiting for your word');
       assert.ok(
         held.d.commands.some((x) => x.label === 'approve' && x.command === `nemia approve ${run.id} review`),
         JSON.stringify(held.d),
@@ -573,7 +569,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
 
       const { d, decided } = await decidable(run.id);
       assert.deepEqual(d.awaiting, { branches: ['main'], direct: true }, 'it worked directly on main: nothing to merge');
-      assert.deepEqual(decided.toDecide, { kind: 'approve', step: 'review', says: null, filed: true }, 'and still what to decide');
+      assert.deepEqual(decided.toDecide, { kind: 'approve', step: 'review' }, 'and still what to decide');
       assert.ok(
         d.commands.some((x) => x.label === 'approve' && x.command === `nemia approve ${run.id} review`),
         JSON.stringify(d),

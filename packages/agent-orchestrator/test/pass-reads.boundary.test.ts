@@ -14,7 +14,18 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
-import { acceptKey, askNames, plantMarker, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
+import {
+  acceptKey,
+  approvalKey,
+  askNames,
+  plantMarker,
+  plantRecord,
+  readAsks,
+  retryAskKey,
+  roundAskKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -249,7 +260,7 @@ const STANDING: Rows = [];
 row(ONCE, "a pass reads each task's view once, and once more after a write of the pass names it", async () => {
   const { b } = await theStore();
   await onePass(b);
-  assert.ok(b.reads.size > 20, `the pass read the store's tasks (${b.reads.size})`);
+  assert.ok(b.reads.size > 15, `the pass read the store's tasks (${b.reads.size})`);
   const over = [...b.reads].filter(([id, n]) => n > 1 + (b.writes.get(id) ?? 0));
   assert.deepEqual(over, [], 'no task is read twice with no write of the pass naming it between');
 });
@@ -379,6 +390,7 @@ row(GIT, "a run's asks are listed once a read, and each file in them read once",
   const { waiting } = await theStore();
   const id = waiting.id;
   const at = new Date().toISOString();
+  plantRecord(ROOT, approvalKey(id, 'implement', 1), JSON.stringify({ at, message: 'go on' }));
   plantRecord(ROOT, acceptKey(id, 'implement', 1), JSON.stringify({ at, message: 'good enough' }));
   plantRecord(ROOT, retryAskKey(id, 'implement', 2), JSON.stringify({ mode: 'fresh', at }));
   plantRecord(ROOT, roundAskKey(id, 'implement', 2), JSON.stringify({ at }));

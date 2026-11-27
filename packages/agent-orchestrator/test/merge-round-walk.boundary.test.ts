@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import type { TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
-import { TEAM, TEAM_DEV } from './team.ts';
+import { TEAM } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
@@ -22,18 +22,13 @@ import { advanceRun, list, mergeRun, startRun, runWith as runEngine, gitPlaceLay
 import { roundOf } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
 
-const ROOT = scratch('wf-ship-');
+const ROOT = scratch('wf-merge-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
-/**
- * The ending of the tests' team's `dev` (`team.ts`): the file a person reads, its keys and its agent. It names `agent: shipper`, so the
- * team's agents and skills are copied beside every folder this file makes under `ROOT`.
- */
-const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: true });
 fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 const git = (cwd: string, ...args: string[]) =>
@@ -111,10 +106,7 @@ const board = () => {
   return { e, tasks, filings, settle };
 };
 
-/**
- * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
- * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
- */
+/** `implement ⇄ review`: the loop a person merges the base into once it has handed on. */
 const loopingFolder = (rounds = 3) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
@@ -135,16 +127,12 @@ const loopingFolder = (rounds = 3) => {
       2,
     ),
   );
-  fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD);
   return dir;
 };
 
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 
-/**
- * An ending stopped on its base branch: `implement ⇄ review → ship`, implement verified, review done with `again: false`, ship filed
- * at try 1 and signed off blocked — the work does not hold on the base branch as it is now.
- */
+/** A loop that has handed on: `implement ⇄ review`, implement verified, review done with `again: false`. */
 async function stoppedOnBase(dir = loopingFolder()) {
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
@@ -161,18 +149,8 @@ async function stoppedOnBase(dir = loopingFolder()) {
     settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
     await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   }
-  assert.ok(runRecord(ROOT, run.id).steps.ship, 'ship is filed once review is done');
-  settle(`${run.id}-ship`, 'succeeded', STOPPED);
-  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   return { repo, id: run.id, branch: work.branch!, ...b, base: git(repo, 'rev-parse', 'HEAD') };
 }
-
-const STOPPED = {
-  outcome: 'blocked',
-  summary: 'main moved since the branch was cut: the trial merge conflicts in add.ts, so I aborted it',
-  artifacts: [],
-  needs: "the branch has to take main: add.ts conflicts with main's sub",
-};
 
 /** main moves under the run: a commit on the base branch that gives add.ts a `sub` of its own, which the branch's conflicts with. */
 const mainMoves = (repo: string) => {
@@ -205,11 +183,6 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
   );
   assert.equal(roundOf(run, 'review'), before, 'the round stays as it is');
   assert.equal(run.baseRef, sha, "the run's base moves to the commit merged");
-  assert.deepEqual(
-    run.steps.ship.tries?.map((t) => t.cause),
-    ['back'],
-    'the stopped ending is moved behind, to wait for the work',
-  );
   const brief = tasks.get(`${id}-implement-try2`)!.spec.brief;
   assert.match(brief, /^## Merge main\n/, 'the session continued is told the merge first');
   assert.ok(brief.includes(`    git merge ${sha}\n`), brief);

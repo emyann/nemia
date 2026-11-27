@@ -112,6 +112,7 @@ const unfiled = (name: string) => ({
   verdict: null,
   filed: null,
   taskId: null,
+  workspace: null,
   branch: null,
   files: [],
   filesError: null,

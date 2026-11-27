@@ -527,12 +527,12 @@ export type FrozenStep = Omit<StepSpec, 'agent'> & {
 
 /**
  * Whether a frozen step names no key by a former name (`FORMER_KEYS`): on its fields, in its agent's `keys` or in its agent's `given`; and
- * its agent holds no former `systemPrompt` (`FORMER_OWN_KEYS`); and it says no `workspace: 'folder'`, there or
+ * its agent holds no former `systemPrompt` (`FORMER_OWN_KEYS`); and it says no `workspace`, there (any) or
  * in its agent's `given`.
  */
 function isNamed(step: FrozenStep): step is StepSpec {
   if (step.agent && Object.hasOwn(step.agent, 'systemPrompt')) return false;
-  if (isFormerWorkspace(step.workspace) || isFormerWorkspace((step.agent?.given as Record<string, unknown> | undefined)?.workspace))
+  if (Object.hasOwn(step, 'workspace') || isFormerWorkspace((step.agent?.given as Record<string, unknown> | undefined)?.workspace))
     return false;
   return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
 }
@@ -560,9 +560,8 @@ function renamedFields(fields: object) {
       .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(fields, keyNamed(key)))
       .map(([key, value]) => [keyNamed(key), value]),
   );
-  if (renamed.workspace !== 'folder') return renamed;
-  const { workspace: _, ...rest } = renamed;
-  return { place: 'folder', ...rest };
+  const { workspace, ...rest } = renamed;
+  return workspace === 'folder' ? { place: 'folder', ...rest } : rest;
 }
 
 /**

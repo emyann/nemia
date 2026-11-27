@@ -6,7 +6,7 @@ import { Gate } from './Gate';
 const meta: Meta<typeof Gate> = {
   title: 'Run/Gate',
   component: Gate,
-  args: { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' },
+  args: { runId: 'r-1', step: 'plan', approveLine: 'approve r-1 plan' },
   render: (args) => (
     <div style={{ width: 420 }}>
       <Gate {...args} />

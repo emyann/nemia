@@ -29,7 +29,6 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/api/src/asks/gate.test.ts': 2,
   'apps/api/src/capabilities/capabilities.test.ts': 15,
   'apps/api/src/decide/decision.test.ts': 1,
-  'apps/api/src/decide/to-decide.test.ts': 1,
   'apps/api/src/factory/factories.test.ts': 1,
   'apps/api/src/gauges/feed.test.ts': 1,
   'apps/api/src/gauges/quota.test.ts': 1,

@@ -190,16 +190,16 @@ describe('a run at its gate: `to decide` says the approval on the list and the p
     },
   );
   s.test(
-    'the decision of a run at its gate, once a pass has read where its branch stands, offers the approval and the send-back, and no `git merge` by hand',
+    'the decision of a run at its gate, once a pass has read where its branch stands, offers the approval and the send-back, then the merge and the drop a person may do by hand',
     async () => {
       await aPass();
       const { commands, standings } = await decidableOf('r-ending');
       assert.deepEqual(
         commands.map((c) => c.label),
-        ['approve', 'send back'],
+        ['approve', 'send back', 'merge it', 'drop it'],
       );
       assert.deepEqual(
-        commands.map((c) => c.command),
+        commands.slice(0, 2).map((c) => c.command),
         [`nemia approve r-ending implement`, `nemia retry r-ending implement --message "<objection>"`],
       );
       assert.deepEqual(

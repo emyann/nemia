@@ -228,6 +228,16 @@ type Due = { share: Share; tests: string[] };
 /** The bound on what one workspace runs: more than this share of its test files is refused, and none of them runs. */
 const HALF = 0.5;
 
+const pastHalf = (share: Share, due: number, total: number) => {
+  const bound = Math.floor(total * HALF);
+  if (due <= bound) return false;
+  const what = share.named ? 'the files named are' : 'its change reaches';
+  console.error(
+    `  ${share.dir}: refused, none run: ${what} ${due} of its ${total} test files, more than half (${bound}): run a chosen subset, npm run touched -- <test file>…, and leave the rest to CI`,
+  );
+  return true;
+};
+
 const dueOf = async (shares: Share[], repo: string, list: Reach['list']) => {
   const due: Due[] = [];
   const over: string[] = [];
@@ -238,12 +248,7 @@ const dueOf = async (shares: Share[], repo: string, list: Reach['list']) => {
     const notTest = share.named ? files.find((file) => !found.total.includes(file)) : undefined;
     if (notTest) return refused(`${path.relative(repo, notTest)} is not a test file of ${share.dir}'s Vitest config: name one it runs`);
     const tests = found.due.map((file) => path.relative(root, file));
-    const bound = Math.floor(found.total.length * HALF);
-    if (tests.length > bound) {
-      const what = share.named ? 'the files named are' : 'its change reaches';
-      console.error(
-        `  ${share.dir}: refused, none run: ${what} ${tests.length} of its ${found.total.length} test files, more than half (${bound}): run a chosen subset, npm run touched -- <test file>…, and leave the rest to CI`,
-      );
+    if (pastHalf(share, tests.length, found.total.length)) {
       over.push(share.dir);
       continue;
     }

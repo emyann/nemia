@@ -391,8 +391,8 @@ export function CardLink({ entry, className }: { entry: InboxEntry; className?: 
 
 /**
  * The chain's own Start chain…, at the head of a chain drawn whole: the sheet that chooses which of its cards to queue (`ChainSheet`),
- * asked about the card the chain leads toward. A refusal of the api is said in the sheet, in its words.
- * @param chain The cards of the chain, each column's cards in order, the one it leads toward last.
+ * asked about the card the chain leads toward (the last of `chain`, the chain's cards). A refusal of the api is said in the sheet, in its
+ * words.
  */
 export function StartChain({ chain }: { chain: readonly InboxEntry[] }) {
   const [open, setOpen] = useState(false);

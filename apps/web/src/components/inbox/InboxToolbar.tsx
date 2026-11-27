@@ -89,7 +89,7 @@ export function InboxToolbar({
   onSearch: (patch: Partial<InboxView>) => void;
 }) {
   return (
-    <div data-inbox-toolbar className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+    <div data-inbox-toolbar className="flex flex-wrap items-start gap-3 @3xl/page:flex-nowrap">
       <SearchBar view={view} labels={labels} onSearch={onSearch} />
       <SegmentedButton
         aria-label="Sort"

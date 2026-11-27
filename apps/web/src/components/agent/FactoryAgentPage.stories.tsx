@@ -125,7 +125,7 @@ export const Instructions: Story = {
     const show = await page.findByRole('button', { name: 'Show all' });
     await userEvent.click(show);
     const dialog = await within(document.body).findByRole('dialog', { name: "Agora's instructions" });
-    await expect(within(dialog).getByText(/agents\/agora\.md · \d+ words/)).toBeVisible();
+    await waitFor(() => expect(within(dialog).getByText(/agents\/agora\.md · \d+ words/)).toBeVisible());
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     await userEvent.tab();
     await userEvent.tab();

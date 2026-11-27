@@ -257,7 +257,7 @@ export const finished: FinishedPage = {
     (() => {
       const run = summary([['review', 'succeeded']], { id: 'r-0z9y-8x7w', brief: 'cli: The inbox lists cards', labels: { workflow: 'quick' }, factory: FACTORY });
       const [review] = run.steps;
-      const at = ago(51);
+      const at = new Date(Date.now() - 51 * 60_000).toISOString();
       const [open] = atWorkSince(at);
       return {
         ...run,

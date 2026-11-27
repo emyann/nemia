@@ -1,5 +1,5 @@
 /**
- * What `landing.ts`, `pull-request.ts` and `ci-watch.ts` all do to run a command, said once: the refusal they are refused by, a bounded
+ * What `land.ts`, `pull-request.ts` and `ci-watch.ts` all do to run a command, said once: the refusal they are refused by, a bounded
  * call of `git` or `gh`, a sleep, and the two reads of `gh` they make the same way. Each script
  * keeps beside its own code what it does differently on purpose (its `gh`, how it parses a read, its `origin`, its pull requests). It
  * imports `node:child_process` alone: the run freezes the carried folder whole (`$WF_CARRIED_FILES`), so it is beside them wherever
@@ -60,7 +60,7 @@ export const noGh = (act: string) =>
 
 /**
  * `gh auth status` passing; refuses with the one command a person types when it does not, as `refused`: `pull-request.ts` passes its
- * person's refusal, which exits `PERSONS_EXIT` so the run tries the step no more on it, and `landing.ts`, which has no tries of its
+ * person's refusal, which exits `PERSONS_EXIT` so the run tries the step no more on it, and `land.ts`, which has no tries of its
  * own, the plain one.
  */
 export function authed(act: string, refused: typeof Refusal = Refusal) {

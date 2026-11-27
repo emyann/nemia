@@ -32,7 +32,6 @@ const KEPT_NAMES: Readonly<Record<string, string>> = {
 
 /** The output fields of a template that the core says too, in its own meaning, each with why. */
 const KEPT_FIELDS: Readonly<Record<string, string>> = {
-  message: "the landing's message: an ending's closeout carries it and the core commits the merge under it",
   read: "a harness's own read of a session's output, not a closeout's field",
   title: 'plain English: the title of a card the core files',
 };

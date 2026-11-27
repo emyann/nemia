@@ -1,7 +1,7 @@
 # quick
 
 Build a change a card settles, on main, with no spec: Grace plans and builds it in one session, Agora reads it as a second
-engineer would, and Otto lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between
+engineer would, and the landing program lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between
 the work and the base branch.
 
 ```
@@ -48,7 +48,7 @@ On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.
 nothing else, then the `ci` condition the factory's `ci-watch` program writes. Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still judged by its context) and the `local` check runs the factory's `localCheck`, the condition being written `True` within one pass, and the landing merges the pull request with no context: nothing waits on CI that will not come.
 Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
 workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
-`parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts` and `refresh.ts`, which they import — from its frozen carried files
+`parts.ts`, `pull-request.ts` and `land.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts`, `landing.ts` and `refresh.ts`, which they import — from its frozen carried files
 (`node "$WF_CARRIED_FILES/<script>.ts"`, the copy of the template's `carried/` folder), kept there once for both workflows. Where
 either variable is not set, the check names it on stderr and fails, running no clause after it. This sdlc needs the Nemia it ships
 with: one that renders and freezes a template's carried folder and reads a `{ path }` item of a list.
@@ -85,15 +85,11 @@ sign-off spend no try and wait on a person at once, and so does a refusal after 
 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session
 runs the tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
-repository's suite on the commit the check pushed, and the `ci` condition waits on it. Land then merges that same pull request through the
-carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its checks are the `ci` condition, the receipt that the merge happened, then
-`base-ci`, a condition too, which holds no checkout, so it is given back to the next run's ending once the receipt passes —
-`build`'s land step to the letter (check, fence, budget, no gate, and its note, which is `build`'s own `land.md`, which the
-step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
-`landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, installs the merged tree's
-dependencies where the factory names its `landingInstall`, derives those files again and pushes,
-and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
-in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
+repository's suite on the commit the check pushed, and the `ci` condition waits on it. Land then merges that same pull request, as `build`'s does: a wait node with no session, which waits on the conditions `turn`, `ci`, `landed` and
+`base-ci`, written by the landing program (`land.ts`) and `ci-watch`; the program fast-forwards the checkout once it merged. Where the factory
+names a refresh (`landingRefresh`, `landingDerives`) and the branch lacks the base, the program merges the base into the branch before it writes
+`turn`, installs the merged tree's dependencies where the factory names its `landingInstall`, derives those files again and pushes, and merges that
+head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
 a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default),
 the `base-ci` condition is then written from the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
 first, any red it judged, failing lines or not, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
@@ -127,24 +123,18 @@ files the review again with the objection. `nemia retry <run> implement` is refu
 
 Land has no gate: the pass that ends the review files it on the next tick, and there is nothing to approve — `nemia approve <run> land`
 is refused for a quick run, "land has no gate: what waits on it is filed once it has passed its check, with nobody's approval, so there
-is nothing to approve." The landing lands as `build`'s does — on GitHub, it merges this run's own green pull request and
-fast-forwards the checkout; in this checkout, it stages the merge, which the run commits once `localCheck` passes on it — and the run
-records the commit on its check's exit 0.
+is nothing to approve." The landing is the landing program's, as `build`'s is — on GitHub, it merges this run's own green pull request and fast-forwards the checkout; in this
+checkout, it merges the result and commits it once `localCheck` passes on the merged tree.
 
 A person who wants to read the change themselves before it lands puts the gate back for that run: `nemia start "<the card>"
---workflows quick --gate land`, or `gate: land` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
-landing then waits for `nemia approve <run> land`. Implement and review are told so, each under
-`## Gates after you` in its brief, which names every gate after the step and is left out where there is none: review's note says
-both cases, and a review of a gated run passes a card that waits on the person at its land, since that gate meets it.
+--workflows quick --gate review`, or `gate: review` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
+review's pass then waits for `nemia approve <run> review`, and the land step, which waits on conditions, is filed once it is approved. The
+review is not told of a gate on its own step, so its sign-off is worded for a person who may read it.
 
-**A landing that refuses**: nothing is merged and the checkout is untouched. In this checkout, a merge that conflicts is aborted by
-land, and one whose `localCheck` fails is taken back by the run: `nemia retry <run> review --message "<what failed>"` sends the work
-round the review's loop. On GitHub, where the pull request is red or unmergeable, the work goes
-back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
---message "<what failed>"` files the review again with those words, and it sends the work round implement or passes it, which files
-land again. Where it was the fast-forward that was declined, or anything else that was not the work, a person brings the checkout onto
-`origin/<base>` and lands again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
-itself — but an ending its review routes is filed by the tick, with no person in between.
+**A landing that refuses**: nothing is merged and, in this checkout, the merge is taken back. The land step then fails with the program's words
+(`nemia decide <run>` prints them): what refused it, what a person does about it, and the `nemia retry <run> land --recheck` that makes the
+step's next try once they have. Where the work itself must change, a person fixes it on the run's branch, or sends it back by instruction
+(`NEMIA.md`): no step is filed by itself.
 
 ## The closeouts
 

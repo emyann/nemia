@@ -37,10 +37,11 @@ holds what every change needs.
   `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`, `design-system`). Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on the condition `ci`, which sdlc's `ci-watch` program writes from GitHub's `ci` context, which runs on it every
-  job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing's checks run no suite at all — `ci` (the condition
-  again, at the head the land step refreshed), `receipt`, that the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`),
-  then the condition `base-ci`, which the same program writes from main's own `ci` at the merge commit, a check that holds no checkout, since a condition
-  runs nothing, and a landing that turns main red still fails its land step — so no step's suite reads the merged tree, and main's own `ci`
+  job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing runs no suite on GitHub at all: the land step is a wait node (no session, no
+  command) that waits on four conditions — `turn`, the landing's one slot, and `landed`, the merge of the pull request `ci` judged, which sdlc's
+  `land` program writes (`packages/templates/sdlc/carried/land.ts`); `ci`, which the `ci-watch` program writes from GitHub's `ci` context at the head that
+  will be merged, refreshed or not; and `base-ci`, which the same program writes from main's own `ci` at the merge commit, so a landing that turns main red
+  still fails its land step — so no step's suite reads the merged tree, and main's own `ci`
   is the last word on it. A failing test is the check's refusal, answered in the next try. Outside a run no check
   follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
@@ -113,29 +114,25 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
 
 - Pushing and opening a pull request are the person's, or done by their session when they ask, and `.claude/settings.json` denies
   none of it; a workflow step does neither (the home's *Git* standard).
-  What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
-  (`$WF_CARRIED_FILES`, the copy of the template's `carried/` folder the run took when it began, beside its workflow's; out of git while that is unset) and run with
-  `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/carried/pull-request.ts` pushes a run's own
-  branch (Grace opens or updates the pull request through the GitHub server, and its `push` check labels it and proves its head), and `packages/templates/sdlc/carried/landing.ts` merges that pull request
-  and fast-forwards the checkout (`build` and `quick` both run them, kept once there; `packages/templates/test/check-scripts.test.ts` holds every check to the folder its variable names). The
-  one exception to the rule is a run's ending step (a workflow's last step, `workspace: base`), filed once a person approves it — or,
-  where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `build` and `quick` land with no gate at all; an ending with a `check:` and
-  neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
-  anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
-  merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
-  `checks:`: the condition `ci`, `landing.ts receipt`, then the condition `base-ci` (written by the `ci-watch` program, which runs nothing in
-  the checkout, so it is free for the next run's ending while the condition waits), and records the commit that landed once all pass (`landingDue`).
-  Where the branch lacks the base and the factory names a refresh (sdlc's `landingRefresh` and `landingDerives`), the merge first
-  brings the base into the run's branch, derives the factory's files again (`packages/templates/sdlc/carried/refresh.ts`) and pushes,
-  merging nothing; the receipt merges that head once `ci` is green there. The landed commit differs from git's plain merge of the
-  reviewed head and the base only in the paths `landingDerives` names. This repository's command is `node packages/templates/released.ts
+  What a step may not type, the run does in its place: `packages/templates/sdlc/carried/pull-request.ts`, a frozen script read from the run's
+  frozen workflow files (`$WF_CARRIED_FILES`, the copy of the template's `carried/` folder the run took when it began; out of git while that is unset) and run
+  with `node`, pushes a run's own branch (Grace opens or updates the pull request through the GitHub server, and its `push` check labels it and proves its head),
+  and sdlc's landing is a program of the factory, not a step: `packages/templates/sdlc/programs/land/program.yaml` runs
+  `packages/templates/sdlc/carried/land.ts`, which lands the factory's runs one at a time with no session, on GitHub by merging the run's own green pull request
+  (`mergeable`, `ci` green at the head, no result branch left out) with a merge commit whose message is the pull request's title and description, and
+  fast-forwarding the checkout where it is clean on the base; with no remote, by merging the result in the repository's own checkout once the local check passes
+  on the merged tree (the subject is the first line of the run's brief, the body the result's commit subjects). A person who wants to approve before a landing gates
+  the review (`--gate review`). The program is level-triggered: a pull request already merged reads as landed, and a restart lands nothing twice
+  (`packages/templates/test/check-scripts.test.ts` still holds every check to the folder its variable names). Where the branch lacks the base and the
+  factory names a refresh (sdlc's `landingRefresh` and `landingDerives`), the program first brings the base into the run's branch, derives the factory's files
+  again (`packages/templates/sdlc/carried/refresh.ts`) and pushes, before it writes `turn`; `ci` then judges that head. The landed commit differs from git's plain
+  merge of the reviewed head and the base only in the paths `landingDerives` names. This repository's command is `node packages/templates/released.ts
   cut`, which cuts each template's version and record again from the base: the nemia factory takes them at its upgrade onto sdlc
   3.11.0, `nemia factory upgrade <factory> --to 3.11.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
-  "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`. Before the refresh the merge runs the
+  "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`. Before the refresh the program runs the
   factory's `landingInstall` in the same worktree, with the base's merge in progress, so the refresh reads the dependencies the merged
-  tree names (a base that added a package would otherwise fail `released.ts cut` on the branch's install, or on none in a scratch
-  worktree): the nemia factory's is `npm ci`, set at its upgrade onto the sdlc version this lands at, `nemia factory upgrade nemia
-  --to <that version> --set "landingInstall=npm ci"`.
+  tree names: the nemia factory's is `npm ci`, set at its upgrade, `nemia factory upgrade nemia --to <that version> --set "landingInstall=npm ci"`.
+  A workspace ending step (`workspace: base`) is still the core's, until its removal.
 
 ## Agents in this repository
 
@@ -148,7 +145,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
 - **Every agent of sdlc's team reads the repository through git**, and the rules that fence it are sdlc's own: the lines several agents
   share are in `packages/templates/sdlc/fences/`, each with its reason beside it — the read-only four's read set and what it would let
   git or gh write, run or read outside by (`read-only.allow.yaml`, `read-only.deny.yaml`), the writers' refusals (`writers.deny.yaml`,
-  Grace's and Otto's one list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
+  Grace's list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
   verb or a deny: a verb is added by asking what file it can be made to write and what program it can be made to run. The denies hold
   the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. None of the four allows a `gh` beyond a tool's help (Agora reads the pull request through the GitHub server); the four read a tool's own help and version, gh's by `gh help <core command>` (never `gh
   <command> --help`, which can run an alias or an extension) and claude's by exact lines measured safe (`help.allow.yaml`), while
@@ -207,7 +204,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   (`packages/templates/CLAUDE.md`). The nemia factory runs on it; its overlays (pictures, this repository's fences, checks and
   skills) live in the factory's own tree, out of git. sdlc's `agents/`: Iris (product engineer), Seldon (software architect), Grace
   (lead software engineer, who builds a card herself in one session and fills implement in `build` and `quick`), Agora (code
-  reviewer), Otto (release engineer), Argus (janitor). And five workflows: `front-door` (a raw card labelled for it, routed with no gate to the workflow it needs), `intake` (an idea to an intent), `build` (an intent to main,
+  reviewer), Argus (janitor). And five workflows: `front-door` (a raw card labelled for it, routed with no gate to the workflow it needs), `intake` (an idea to an intent), `build` (an intent to main,
   started `--after` the intake run: a spec a person approves, then implement and a review whose pass files an ungated land), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
   pass files an ungated land, as `packages/templates/sdlc/workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox
   cards, none started). The orchestrator never imports it: it finds a builtin template by path.

@@ -74,18 +74,26 @@ const ENVELOPE = [...Object.keys(CLOSEOUT_SCHEMA.properties), 'again', 'replies'
 
 /**
  * The names of the template folder `template` (under `packages/templates/`): its workflows, each workflow's steps (its `.md` files but a
- * README), its parameters, and the fields its outputs add to the envelope.
+ * README, and those its `workflow.yaml` lists: a wait node has no file), its parameters, and the fields its outputs add to the envelope.
  * @param template The template's folder name.
  */
 function wordsOf(template: string) {
   const folder = path.join(ROOT, 'packages', 'templates', template);
   const workflows = workflowsIn(path.join(folder, 'workflows'));
-  const steps = workflows.flatMap((w) =>
-    fs
-      .readdirSync(path.join(folder, 'workflows', w))
+  const steps = workflows.flatMap((w) => {
+    const dir = path.join(folder, 'workflows', w);
+    const files = fs
+      .readdirSync(dir)
       .filter((f) => f.endsWith('.md') && !/^readme\.md$/i.test(f))
-      .map((f) => f.slice(0, -3)),
-  );
+      .map((f) => f.slice(0, -3));
+    const listed = path.join(dir, 'workflow.yaml');
+    const declared = fs.existsSync(listed)
+      ? ((yaml.load(fs.readFileSync(listed, 'utf8')) as { spec?: { steps?: { name?: string }[] } } | null)?.spec?.steps ?? []).flatMap(
+          (step) => step.name ?? [],
+        )
+      : [];
+    return [...new Set([...files, ...declared])];
+  });
   const manifest = yaml.load(fs.readFileSync(path.join(folder, 'nemia.yaml'), 'utf8')) as {
     spec?: { parameters?: Record<string, unknown> };
   };

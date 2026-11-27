@@ -4,18 +4,13 @@ are its own account, to check against the change, and its `plan` — what it sai
 before the work — is a declared field you read there. A change that is not the card's is a finding; so is a plan the work went past
 without saying so.
 
-**Whether a person reads the change after you is your brief's to say**, under `## Gates after you`: the run names there each step
-after you at which it waits on a person's approval, and leaves the heading out where there is none. A person puts that gate back on a
-quick run with `--gate land` at its start, or `gate: land` on its card; this note was written before anyone chose.
+**Whether a person reads the change after you is not in your brief**: the run's gates are told to the steps before them, and a gate
+on your own step is not. A person who wants to read a quick run's change before it lands gates your step, `--gate review` at the run's
+start, or `gate: review` on its card; this note was written before anyone chose. So word your sign-off for a person who may read it
+before anything merges. Once you sign off without asking again, and any gate on you is approved, the run files `land`, which the
+landing program makes: on GitHub it merges this run's pull request; in this checkout, it merges its branch.
 
-- **With no `## Gates after you`, your pass lands the change.** There is no gate after you: once you sign off without asking again,
-  the run files `land`, which merges the change into the base branch — on GitHub, this run's pull request; in this checkout, its
-  branch — and nobody reads the change between your word and the merge.
-- **With `land` named there, a person approves the land after your pass**: your pass files `land`, and it waits for
-  their `nemia approve` before it merges anything. A card that says it waits on the person at its land is met by that gate: it is no
-  finding and no reason to sign off `blocked`. Judge and word your sign-off for the person who reads it there.
-
-In both, `again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
+`again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
 step: what comes after you is the workflow's, never yours.
 
 **A quick build has no size bound**: quick is for a card that needs no design, whatever its size, so read every file and every line
@@ -38,7 +33,7 @@ where a finding needs a run to stand on; run nothing that writes the workspace o
 the commit implement pushed, and its verdict is in the check you are handed.
 
 **Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `mcp__github__pull_request_read` with `get` (its state, mergeability, head, title and body), `get_status` and `get_check_runs`, `<n>` being the number that address ends on, with the repository's `owner` and `repo`. A red, cancelled or absent `${{ parameters.ciCheck }}` is a finding, as is a pull request whose head is not
-the commit you are reviewing. You open, edit, merge and close none: those are refused you, and Otto's.
+the commit you are reviewing. You open, edit, merge and close none: those are refused you.
 
 ### false — in this checkout
 
@@ -73,7 +68,7 @@ file of `${{ parameters.landingDerives }}` is no finding of reasons one, three a
 those files alone conflict: the landing merges the base into the branch and derives them again, and refuses a result that differs from
 git's plain merge anywhere else. A conflict in any other file still is one. Any other branch behind is no finding: say in your summary
 the base, how far behind, and each file both changed whose hunks are apart, and let the land go.
-On GitHub, nothing runs the suite on the merged tree — the landing's check is a receipt, and the base's own
+On GitHub, nothing runs the suite on the merged tree — the landing program merges what `ci` judged, and the base's own
 `${{ parameters.ciCheck }}` at the merge commit catches a break only after it lands — so what covers the rest is GitHub's own
 `mergeable` on the pull request and the `${{ parameters.ciCheck }}` context required of the commit you read: a base that moved under a
 green pull request makes the landing refuse rather than land. In this checkout, the landing's check runs the local check
@@ -84,10 +79,8 @@ names shows the base's landings with the change: read the change alone with `git
 **A claim on a page you cannot read waits for a person.** No design ran, so no step handed you a passage of any page outside the
 repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it:
 
-- **With no `## Gates after you`, it stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
-  `needs` naming each claim and its page, and a person answers with `nemia retry <run> review --message "<what the page says>"`.
-- **With `land` named there, it goes at the top of your sign-off**, each claim and its page, where the person who approves the land
-  reads it before anything merges: it is no reason to sign off `blocked`.
+It stops the landing: sign off `blocked`, with `needs` naming each claim and its page, and a person answers with
+`nemia retry <run> review --message "<what the page says>"`.
 
 A claim you could check, against the repository or a page your fence allows, is checked and is no reason to stop.
 

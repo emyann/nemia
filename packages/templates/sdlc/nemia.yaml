@@ -2,9 +2,9 @@ apiVersion: nemia.dev/v1alpha1
 kind: FactoryTemplate
 metadata:
   name: sdlc
-  description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, with no gate unless the run is started with one at land."
+  description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Five agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer and a janitor. A person decides at intake's end and on build's spec, and the front door asks only where it cannot tell; build and quick each land once their review passes, by the factory's landing program and with no session. To approve before a landing, gate the review: start the run with --gate review."
 spec:
-  version: 7.0.0
+  version: 8.0.0
   rules:
     path: RULES.md
   parameters:
@@ -15,7 +15,7 @@ spec:
       whenOrigin: github.com
     localCheck:
       type: string
-      description: "The command that judges the work where github is false, from the workspace's root: the implement step's check runs it on each round's tree, and the landing's check on the merged tree. It is the only judge there, so it runs the tests. Where github is true, it judges a round where neither the head nor the base branch declares a CI workflow. The default, carried local-check.ts, runs the repository's lint, typecheck and test scripts by the package manager its --runner names, each where its package.json declares it, leaving out the placeholder test a package manager's init writes, and runs nothing and passes where there is no package.json: it refuses nothing a repository of any kind does not refuse itself."
+      description: "The command that judges the work where github is false, from the workspace's root: the implement step's check runs it on each round's tree, and the landing program on the merged tree. It is the only judge there, so it runs the tests. Where github is true, it judges a round where neither the head nor the base branch declares a CI workflow. The default, carried local-check.ts, runs the repository's lint, typecheck and test scripts by the package manager its --runner names, each where its package.json declares it, leaving out the placeholder test a package manager's init writes, and runs nothing and passes where there is no package.json: it refuses nothing a repository of any kind does not refuse itself. The landing program is handed it inside a single-quoted shell word, so it holds no single quote."
       default: node "$WF_CARRIED_FILES/local-check.ts" --runner npm
     ciCheck:
       type: string
@@ -23,11 +23,11 @@ spec:
       default: ci
     landingWaitsOnCi:
       type: boolean
-      description: "Whether the land step's base-ci condition, where github is true, is written from the CI context ciCheck names at the merge commit on the base branch (by the ci-watch program), and fails the step where the merge turned the base red; it holds no checkout, so the checkout is given back to the next run's ending once the receipt passes. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
+      description: "Whether the land step's base-ci condition, where github is true, is written from the CI context ciCheck names at the merge commit on the base branch (by the ci-watch program), and fails the step where the merge turned the base red; it holds no checkout. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
       default: true
     landingRefresh:
       type: string
-      description: "A command of the factory's own that derives files of its own from the tree (a version, a digest), which the landing runs where the run's branch lacks the base: the landing merges the base into the branch in the run's worktree, runs it there from the worktree's root with the merge in progress, and pushes the result for CI to judge, the land step's check merging it once CI is green there. It resolves and git adds each file it derives, changes nothing else, and exits non-zero naming the fix where it cannot. A merge that differs from git's plain merge outside landingDerives is refused. Read only where github is true. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) refreshes nothing: a branch that lacks the base lands only where GitHub says it merges as it is."
+      description: "A command of the factory's own that derives files of its own from the tree (a version, a digest), which the landing program runs where the run's branch lacks the base: the landing merges the base into the branch in the run's worktree, runs it there from the worktree's root with the merge in progress, and pushes the result for CI to judge, the condition ci then judging that head, and the landing program merging it once CI is green there. It resolves and git adds each file it derives, changes nothing else, and exits non-zero naming the fix where it cannot. A merge that differs from git's plain merge outside landingDerives is refused. Read only where github is true. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) refreshes nothing: a branch that lacks the base lands only where GitHub says it merges as it is."
       default: ""
     landingDerives:
       type: string
@@ -35,15 +35,11 @@ spec:
       default: ""
     landingInstall:
       type: string
-      description: "A command of the factory's own that installs the repository's dependencies as the merged tree names them, which the landing runs where it refreshes a branch that lacks the base: from the worktree's root, with the merge of the base in progress, after the merge and before landingRefresh, on every refresh, the two sharing one time bound. Without it the refresh runs on what the worktree had installed, the branch's dependencies, or none at all in a scratch worktree where no worktree has the branch checked out. It changes no tracked file, and exits non-zero naming the fix where it cannot: a failed install is refused and the merge taken back, nothing pushed. Read only where github is true and landingRefresh is set. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) installs nothing."
-      default: ""
-    landingCheckMemory:
-      type: string
-      description: "The memory the land step's check asks of the machine, a Kubernetes quantity such as 256Mi, by which the daemon admits it while the check holds the repository's checkout: set it where github is true, where the land step's checks only read GitHub and need little. The check keeps the daemon's default limit. Empty (the default) asks the daemon's default request, which a check that runs localCheck on the merged tree needs."
+      description: "A command of the factory's own that installs the repository's dependencies as the merged tree names them, which the landing program runs where it refreshes a branch that lacks the base: from the worktree's root, with the merge of the base in progress, after the merge and before landingRefresh, on every refresh, the two sharing one time bound. Without it the refresh runs on what the worktree had installed, the branch's dependencies, or none at all in a scratch worktree where no worktree has the branch checked out. It changes no tracked file, and exits non-zero naming the fix where it cannot: a failed install is refused and the merge taken back, nothing pushed. Read only where github is true and landingRefresh is set. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) installs nothing."
       default: ""
     lightMemoryRequest:
       type: string
-      description: "The memory the sessions of the steps that run no test, build or typecheck ask of the machine, a Kubernetes quantity such as 1Gi, by which the daemon admits them: front-door's door and answer, intake's intake, janitor's argus, and build's and quick's land. Each session keeps its limit, the daemon's default. Read the peaks they reached (nemia stats, and a run's step page) before you set it. Empty asks the daemon's default request."
+      description: "The memory the sessions of the steps that run no test, build or typecheck ask of the machine, a Kubernetes quantity such as 1Gi, by which the daemon admits them: front-door's door and answer, intake's intake, janitor's argus. Each session keeps its limit, the daemon's default. Read the peaks they reached (nemia stats, and a run's step page) before you set it. Empty asks the daemon's default request."
       default: 1Gi
     roundCheck:
       type: string
@@ -96,7 +92,6 @@ spec:
   hires:
     build/design: seldon
     build/implement: grace
-    build/land: otto
     build/review: agora
     front-door/answer: iris
     front-door/door: iris
@@ -104,5 +99,4 @@ spec:
     janitor/argus: argus
     janitor/file-cards: argus
     quick/implement: grace
-    quick/land: otto
     quick/review: agora

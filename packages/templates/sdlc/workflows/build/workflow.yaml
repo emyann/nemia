@@ -2,7 +2,7 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: build
-  description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, five at most; its pass files the landing, which Otto makes with no gate, as quick's does. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
+  description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, five at most; its pass files the landing, which the landing program makes with no gate, as quick's does. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 spec:
   needs:
     - name: gh
@@ -76,19 +76,11 @@ spec:
       after:
         - review
       place: git
-      workspace: base
-      budget: 10
-      checks:
-        - name: ci
-          condition: ci
-          enabled: "${{ parameters.github }}"
-        - name: receipt
-          run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi"
-        - name: base-ci
-          condition: base-ci
-          enabled: "${{ parameters.github }}"
-      checkMemory: "${{ parameters.landingCheckMemory }}"
-      memoryRequest: "${{ parameters.lightMemoryRequest }}"
+      waitsFor:
+        - "${{ case(parameters.github, 'turn', '') }}"
+        - "${{ case(parameters.github, 'ci', '') }}"
+        - landed
+        - "${{ case(parameters.github, 'base-ci', '') }}"
     - name: review
       after:
         - implement

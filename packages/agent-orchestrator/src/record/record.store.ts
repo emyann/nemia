@@ -31,7 +31,8 @@ import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { personConditions, unconditioned, withConditions } from '../condition/condition.ts';
 
 import { RETRY_MODES, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
-import { approvedFirstIn, asNamed } from '../workflow.ts';
+import { asNamed } from '../workflow.ts';
+import { approvedFirstIn } from '../former/former.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';

@@ -56,6 +56,16 @@ const followed = [
   sse(`${transcriptPath(AT_WORK.id, 'design')}/stream`, () => undefined),
 ];
 
+/**
+ * Loads the conversation's own part before the story draws: the bar draws it lazily (`StepInspector`), and the first story of the file
+ * to open the conversation would otherwise wait on its module, fetched and transformed cold, past a read's wait, while the next found it
+ * loaded. Each story that opens it starts with it loaded, so what it waits on is what the conversation shows.
+ */
+const talkLoaded = async () => {
+  await import('./session/SessionTalk');
+  return {};
+};
+
 /** The bar's ⋯ menu in `canvas`, opened, and its item `label` pressed. */
 async function pick(canvas: HTMLElement, label: string) {
   await userEvent.click(within(canvas).getByRole('button', { name: 'More actions' }));
@@ -101,6 +111,7 @@ function Sheet({ children }: { children: ReactNode }) {
 export const TheCard: StoryObj<typeof meta> = {
   tags: ['network'],
   parameters: { at: AT, msw: { handlers: followed } },
+  loaders: [talkLoaded],
   render: () => (
     <Sheet>
       <StepPanel id={AT_WORK.id} name="design" run={AT_WORK} error={undefined} />
@@ -138,6 +149,7 @@ export const TheCard: StoryObj<typeof meta> = {
 export const ItsConversation: StoryObj<typeof meta> = {
   tags: ['network'],
   parameters: { at: AT, msw: { handlers: followed } },
+  loaders: [talkLoaded],
   render: () => (
     <Sheet>
       <StepPanel id={AT_WORK.id} name="design" run={AT_WORK} error={undefined} />

@@ -227,14 +227,14 @@ function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
 
 /**
  * The ways a step cannot run in the repository's own checkout (`workspace: base`): it is not the workflow's last step, or its `check:`
- * is nobody's to file (`unfilableCheck`).
+ * is nobody's to file (`unfilableCheck`). A wait node is left to `validateWaits`, which refuses its `workspace:`.
  *
  * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
  * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
  */
 function validateBaseWorkspace(steps: readonly StepSpec[]) {
-  for (const s of steps.filter((x) => endsOnBase(x))) {
+  for (const s of steps.filter((x) => x.waitsFor === undefined && endsOnBase(x))) {
     const named = `${s.name}: \`workspace: base\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
     if (waiting.length) {

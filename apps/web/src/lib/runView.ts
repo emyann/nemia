@@ -42,7 +42,11 @@ export type StepView = RunStep & {
   readonly shown: number | null;
 };
 
-/** A step with its checks laid and no task: a wait node, which runs no session, so "not filed yet" is not what it is. */
+/**
+ * A step with its checks laid and no task: a wait node, which runs no session, so "not filed yet" is not what it is.
+ *
+ * @param step - the step's task, null where none is filed, and its check, null where none is laid.
+ */
 export const runsNoSession = (step: { readonly taskId: string | null; readonly check?: unknown }) => !step.taskId && step.check != null;
 
 /**

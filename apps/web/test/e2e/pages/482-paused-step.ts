@@ -39,7 +39,6 @@ const PAUSED: Paused = {
   pause: { at: new Date().toISOString(), by: 'ann', why: 'restarting the daemon', timeoutMs: 600_000 },
   finishing: [],
   parked: [PARKED],
-  staged: [],
   held: [],
 };
 

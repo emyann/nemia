@@ -230,7 +230,7 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     const failed = [step('implement', { check: { verdict: { result: 'failed', exit: 1 } } as Step['check'] })];
     assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');
   });
-  test("the facts under a gate: the runs in flight on its base, each it collides with and in which files", () => {
+  test('the facts under a gate: the runs in flight on its base, each it collides with and in which files', () => {
     const conflict: Collision = {
       run: 'r-2',
       branch: 'wf/r-2/implement',

@@ -59,25 +59,6 @@ function branched(dir: string, name: string, file: string, text: string) {
   return tip;
 }
 
-/** A repository with `wf/x/a` staged as a merge into main that conflicts on `f`; the branch's tip. */
-function conflicted(dir: string) {
-  const tip = branched(dir, 'wf/x/a', 'f', 'theirs\n');
-  fs.writeFileSync(path.join(dir, 'f'), 'ours\n');
-  git(dir, 'commit', '-q', '-am', 'main sets f');
-  assert.equal(gitOk(dir, 'merge', '--no-ff', '--no-commit', 'wf/x/a'), false, 'the merge conflicts');
-  return tip;
-}
-
-/** A repository with `wf/x/a` staged as a clean merge into main, not committed; the branch's tip. */
-function staged(dir: string) {
-  const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
-  git(dir, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
-  return tip;
-}
-
-/** Whether a merge is in progress in `dir`. */
-const merging = (dir: string) => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
-
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
 const run = <V extends PlaceVerb>(verb: V, request: object) => gitPlace({ env: ENV }).askNow(verb, request as never);
 

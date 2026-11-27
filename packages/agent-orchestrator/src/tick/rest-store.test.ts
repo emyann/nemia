@@ -679,10 +679,7 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
     async () => {
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
-      fs.writeFileSync(
-        path.join(dir, 'ship.md'),
-        '---\nplace: git\nharness: codex\nafter: implement\ngate: true\n---\nship it\n',
-      );
+      fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nharness: codex\nafter: implement\ngate: true\n---\nship it\n');
       const [first, second] = await s.started(2, dir, aRepo(), true);
       for (const run of [first, second]) s.touched.add(run.id);
       for (let k = 0; k < 8 && ![first, second].every((r) => s.memo.runs.has(r.id)); k++) {

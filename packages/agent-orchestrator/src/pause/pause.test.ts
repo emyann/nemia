@@ -202,10 +202,7 @@ const view = (
 
 describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and how each is said', () => {
   test('what finishes under the pause: a session at work, a check that runs, and the check of a step whose session is done', () => {
-    const steps = [
-      step('implement', [], { check: 'npm test' }),
-      step('ship', ['implement'], { gate: true, check: 'npm test' }),
-    ];
+    const steps = [step('implement', [], { check: 'npm test' }), step('ship', ['implement'], { gate: true, check: 'npm test' })];
     const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } }, ship: { taskId: 't2', check: { taskId: 'c2' } } });
     const views: Record<string, FinishingView> = {
       t1: view('working'),
@@ -350,10 +347,10 @@ describe('a parked session under the pause: it finishes nothing, it is named par
         { run: 'r-1', step: 'review', cut: 'Bash' },
       ],
     );
-    assert.deepEqual(
-      pausedLines({ pause: PAUSE, finishing: [], parked: parkedAmong([r], (id) => views[id]), held: [] }).slice(1),
-      ["   r-1's implement is paused after its call to Read", "   r-1's review is paused, its call to Bash cut"],
-    );
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing: [], parked: parkedAmong([r], (id) => views[id]), held: [] }).slice(1), [
+      "   r-1's implement is paused after its call to Read",
+      "   r-1's review is paused, its call to Bash cut",
+    ]);
   });
   test('a timed pause says how many sessions finish a call and when they are cut, then Paused once none does', () => {
     const timed: Pause = { ...PAUSE, timeoutMs: 600_000 };
@@ -365,11 +362,7 @@ describe('a parked session under the pause: it finishes nothing, it is named par
     const now = new Date(Date.parse(PAUSE.at) + 61_000);
     const line = pausedWords({ pause: timed, finishing, held: [{ run: 'r-4', step: 'land' }] }, now) ?? '';
     assert.ok(line.startsWith('Pausing: 2 sessions finishing a tool call, cut in 9 min, 1 check held'), line);
-    assert.match(
-      pausedWords({ pause: timed, finishing: [], held: [] }, now) ?? '',
-      /^Paused since /,
-      'Paused once nothing finishes',
-    );
+    assert.match(pausedWords({ pause: timed, finishing: [], held: [] }, now) ?? '', /^Paused since /, 'Paused once nothing finishes');
     assert.match(
       pausedWords({ pause: PAUSE, finishing, held: [] }, now) ?? '',
       /^Pausing: 3 finishing/,

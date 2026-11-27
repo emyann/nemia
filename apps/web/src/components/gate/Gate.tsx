@@ -1,15 +1,9 @@
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { decisionQuery } from '../../lib/api/decision.ts';
 import { type Question } from '../../lib/api/tries.ts';
 import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
-import type { RunDetail, StepView } from '../../lib/runView';
+import type { StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
-import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
-import { stepAnchor } from '../../lib/asks';
-import { RouteLink } from '../agent/AgentParts';
-import { LINK } from '../step/Facts';
 import { MODES, Refusal, useAsk } from './Ask';
 import { QuestionSeries, RecommendButton } from './Questions';
 import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
@@ -17,10 +11,9 @@ import { when } from '../step/Facts';
 import { useApprove } from '../../lib/useApprove';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
-import { Body, Button, Label, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Body, Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
-import { Pending, Reading, ReadingLines, CutPress } from '@/components/look';
-import { troubleOf } from '@/lib/api/read';
+import { Pending, CutPress } from '@/components/look';
 
 /**
  * What a surface that holds a gate in a view of its own (the waiting card's modal) gives it to call once the api has taken an
@@ -41,8 +34,8 @@ type StepApproval = NonNullable<StepGate['approval']>;
  * refusal shows beside the button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does
  * with it, until the run is read again and the step says it: approved under the step, or the try asked in its note.
  *
- * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself. Empty where there is nothing to send
- * back, and then approving is the only word there is to say.
+ * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself. Empty where there is
+ * nothing to send back, and then approving is the only word there is to say.
  *
  * What is being approved — the step's summary and each field it declared — is its part's Said and Gave, drawn beside the gate in the
  * step's part (`components/step/part`), so the gate draws none of it.
@@ -117,17 +110,8 @@ export function Gate({
         <div className="min-w-0 space-y-4">
           {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
           <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} />
-          <ApproveForm
-            step={step}
-            approveLine={approveLine}
-            approval={approval}
-            busy={busy}
-            budgeting={budgeting}
-            {...answering}
-          />
-          {back.length > 0 && (
-            <SendBackForm step={step} field={field} sendBack={sendBack} busy={busy} {...answering} />
-          )}
+          <ApproveForm step={step} approveLine={approveLine} approval={approval} busy={busy} budgeting={budgeting} {...answering} />
+          {back.length > 0 && <SendBackForm step={step} field={field} sendBack={sendBack} busy={busy} {...answering} />}
         </div>
       </section>
     </Body>
@@ -232,7 +216,8 @@ function ApproveForm({
 }
 
 /**
- * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to the gated step. Where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
+ * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to the gated step.
+ * Where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
  */
 const SEND_BACK_HINT = 'What to change: its next try is told it, under “Your answer”, and waits at its gate again.';
 
@@ -440,8 +425,8 @@ export const takenOf = (taken: { approved: number } | { asked: { try: number; st
     : { named: taken.step, said: askedSaid(taken.asked) };
 
 /**
- * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off. The package's
- * own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
+ * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off.
+ * The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
  *
  * @param gate the step's gate
  */
@@ -474,8 +459,8 @@ export function Approved({
         <p>
           <span className="font-medium text-on-surface">Approved</span>{' '}
           <span className="text-on-surface-variant">
-            try {approval.try}, {when(approval.at)} —{' '}
-            every step after the gate is handed {approval.message === null ? 'the approval' : 'these words'}
+            try {approval.try}, {when(approval.at)} — every step after the gate is handed{' '}
+            {approval.message === null ? 'the approval' : 'these words'}
           </span>
         </p>
         <Actor actor={approval.actor} />

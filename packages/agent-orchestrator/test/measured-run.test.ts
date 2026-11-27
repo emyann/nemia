@@ -2,7 +2,9 @@
  * A measured run, end to end, told as one story on the stage (`story.ts`): a run of `plan` (gated) → `implement` (checked, `retries: 1`)
  * → `review` (looping back to implement, its findings tallied) → `ship` (gated, checked), walked by the store's tick
  * (`tickRun`) on the engine's stand-in, a daemon restarted once on the way. Its plan signs off blocked and is answered in its session,
- * then approved; implement's first try's check refuses and its second passes; review sends the work round once; ship passes its check and is approved, and its branch is merged by hand. What it is measured by, each read off the same walk: the steps' metrics, each recorded once whatever daemon
+ * then approved; implement's first try's check refuses and its second passes; review sends the work round once; ship passes its
+ * check and is approved, and its branch is merged by hand. What it is measured by, each read off the same walk: the steps'
+ * metrics, each recorded once whatever daemon
  * reads the settle (`recordStepMetrics`, `settledOnce`, `onceFacts`); the run's timeline handed to the traces as spans, row for row the
  * rows its page reads (`timelineFacts`, `timelineRows`); its clock's parts adding up to its wall (`clockOf`); `nemia stats --json`; the
  * spans of a pass nested under it, and the wait, denied and timeline spans roots of their own; and the series rolled to minutes and hours.
@@ -78,8 +80,7 @@ const MEASURED = {
     required: ['findings', 'again'],
     additionalProperties: false,
   }),
-  'ship.md':
-    '---\nafter: review\nplace: git\ngate: true\ncheck: npm test\n---\nSay what the run changed, and sign off with its message.\n',
+  'ship.md': '---\nafter: review\nplace: git\ngate: true\ncheck: npm test\n---\nSay what the run changed, and sign off with its message.\n',
 };
 
 /** A daemon's life: its memo of runs at rest, and the spans its passes leave, kept by a tracer of the test's own. */
@@ -442,11 +443,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     async () => {
       const stats = JSON.parse(JSON.stringify(await stage.main(['stats', '--json']))) as Stats;
       const { total } = stats.all;
-      assert.deepEqual(
-        [total.runs, total.merged, total.rounds, total.refused],
-        [1, 1, 2, 1],
-        'merged, two rounds, a check refused',
-      );
+      assert.deepEqual([total.runs, total.merged, total.rounds, total.refused], [1, 1, 2, 1], 'merged, two rounds, a check refused');
       assert.equal(total.gateWaitMs, 8 * MIN, "the mean of plan's 9 minutes and ship's 7");
       const row = (step: string) => stats.all.steps.find((x) => x.step === step)!;
       assert.equal(

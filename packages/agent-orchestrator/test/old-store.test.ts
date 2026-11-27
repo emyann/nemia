@@ -137,10 +137,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
       ['retries', false, 'continue'],
       'the former `then` and `nudge` read as today',
     );
-    assert.deepEqual(
-      [notes.steps.implement.check?.taskId, notes.steps.ship.taskId],
-      ['notes-implement-try2-check', 'notes-ship'],
-    );
+    assert.deepEqual([notes.steps.implement.check?.taskId, notes.steps.ship.taskId], ['notes-implement-try2-check', 'notes-ship']);
 
     const [write] = runRecord(ROOT, 'drafts').workflow!;
     assert.deepEqual(

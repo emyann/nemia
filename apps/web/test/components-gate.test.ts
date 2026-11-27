@@ -19,7 +19,6 @@ import {
   atGate,
   commandsOf,
   cut,
-  endingRun,
   needing,
   offersMarkup,
   planCloseout,
@@ -44,7 +43,6 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/gate/Decide.tsx');
 const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
-type RunDetail = import('../src/lib/runView.ts').RunDetail;
 type Decidable = import('../src/lib/api/decision.ts').Decidable;
 const { FieldWidgetView } = await import('../src/components/field/widgets/FieldWidgetView.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
@@ -53,7 +51,6 @@ const { RecommendButton } = await import('../src/components/gate/Questions.tsx')
 type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { container, ringed } = await import('../src/lib/meaning.ts');
-const { decisionStamp } = await import('../src/lib/decide.ts');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const Gates = await import('../src/components/gate/Gate.tsx');
 const { Gate } = await import('../src/components/gate/Gate.tsx');
@@ -672,19 +669,6 @@ test('the approval under a step: the try, when, and the words as they were writt
     ],
     ['awaiting approval', 'approved, try 1', 'holds once it has signed off'],
   );
-});
-
-/** The run's decision as the api gives it, cut to what the panel reads: where the result branch stands, and how much it changed. */
-const decidedAs = (standings: unknown[]) => ({
-  standings,
-  touched: [],
-  lesson: { said: '', state: 'nothing' },
-  sensitive: [],
-  used: {},
-  total: {},
-  cost: null,
-  overBudget: null,
-  commands: [],
 });
 
 test("the gate's own words: the approval's box says every step after the gate is handed them, and the word taken names the step it was about", () => {

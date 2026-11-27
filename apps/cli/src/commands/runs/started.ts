@@ -76,13 +76,12 @@ const waitLines = (succeeded: readonly string[], { after = [], context = [] }: R
 ];
 
 /** The steps that wait on a person: each gated. */
-const gateLines = (id: string, { gated = [] }: RunStartedFacts) => [
-  ...(gated.length
+const gateLines = (id: string, { gated = [] }: RunStartedFacts) =>
+  gated.length
     ? [
         `gated at: ${gated.join(', ')} — nothing after ${gated.length > 1 ? 'each' : 'it'} is filed until nemia approve ${id} <step>, once it has signed off`,
       ]
-    : []),
-];
+    : [];
 
 /** The models the run names for its steps, for it alone; its labels, by key; and each label it did not inherit, with how to set it. */
 const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStartedFacts) => [

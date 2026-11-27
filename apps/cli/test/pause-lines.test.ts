@@ -18,7 +18,7 @@ const paused = {
     { run: 'r-3', step: 'c', after: 'Read' },
     { run: 'r-4', step: 'd', cut: 'Bash' },
   ],
- 
+
   held: [],
 };
 

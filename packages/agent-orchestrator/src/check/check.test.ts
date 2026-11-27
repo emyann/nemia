@@ -36,7 +36,6 @@ import {
 import { checkTaskId, refusedCheck, stepTaskId, type Run } from '../record/record.ts';
 import type { EarlierTry } from '../retry/index.ts';
 import { checkLogsOf } from '../forget/forget.ts';
-import { exitVerdicts } from '../views/views.verb.ts';
 import { HARNESSES } from '../runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { run } from '../../test/assessed.ts';
@@ -581,4 +580,3 @@ describe('checkHandedSection: what a step after a check is handed', () => {
     );
   });
 });
-

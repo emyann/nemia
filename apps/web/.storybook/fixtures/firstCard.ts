@@ -90,7 +90,8 @@ const bodyOf = async (request: Request) => {
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 };
 
-/** A step of a listed workflow, every key unset but what it follows and what it waits on: a wait node, which lands what the step before it made. */
+/** A step of a listed workflow, every key unset but what it follows and what it waits on: a wait node, which lands what the step
+ * before it made. */
 const listedStep = (name: string, after: string[], waitsFor: string[]) => ({
   name,
   spec: { ...UNSET, after, waitsFor },

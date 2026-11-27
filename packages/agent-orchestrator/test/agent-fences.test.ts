@@ -174,14 +174,6 @@ function unallowed(step: Step, commands: string[], allowed: readonly string[] = 
 /** The step of the tests' team that names an agent, as its folder resolves it. */
 const stepOf = (agent: string) => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)! satisfies Step;
 
-/** A folder of steps written from their frontmatter and a one-line body, beside no agents. */
-const folderOf = (steps: Record<string, string>) => {
-  const dir = scratch('wf-fences-folder-');
-  for (const [name, front] of Object.entries(steps))
-    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
-  return dir;
-};
-
 test("REFUSED: a rule on an MCP tool's parameter in an allow list is not read as allowing anything: the matcher throws on it", () => {
   const reviewer = stepOf('reviewer');
   const call = [{ tool: 'mcp__playwright__browser_navigate', url: 'http://127.0.0.1:41234/' }];

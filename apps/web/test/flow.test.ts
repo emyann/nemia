@@ -36,13 +36,7 @@ const buildGraph: RunGraph = {
   edges: [after('design', 'implement'), after('implement', 'review'), after('review', 'land'), loop('review', 'implement')],
 };
 const buildAt = (states: Record<string, StepState>, notes: Record<string, string> = {}) =>
-  graphOf(
-    build,
-    buildGraph,
-    stepsOf(states, notes),
-    [{ step: 'design' }],
-    false,
-  );
+  graphOf(build, buildGraph, stepsOf(states, notes), [{ step: 'design' }], false);
 
 describe("graphOf and windowOf: a run's steps as its workflow's graph drawn small, folded around the live column", () => {
   test("a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering's order", () => {

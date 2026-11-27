@@ -249,7 +249,7 @@ function rendered(name: string, workflows: readonly string[]) {
   const quick = path.join(tree, 'workflows', FIRST_WORKFLOW);
   fs.mkdirSync(quick, { recursive: true });
   fs.writeFileSync(path.join(quick, 'implement.md'), '---\nplace: git\nharness: claude\n---\nBuild the change.\n');
-  fs.writeFileSync(path.join(quick, 'land.md'), '---\nplace: git\nharness: claude\nafter: implement\nworkspace: base\n---\nLand it.\n');
+  fs.writeFileSync(path.join(quick, 'land.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nLand it.\n');
 }
 
 /**

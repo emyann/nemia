@@ -53,8 +53,7 @@ const gateOf = (steps: readonly ListedStep[]) => steps.find(waits)?.spec.after?.
 const firstGatesOfSpec = spec<(steps: readonly ListedStep[] | undefined) => readonly string[]>({
   ensures: {
     gatedWhereItLands: {
-      description:
-        'A first run is gated at the step before the wait node that lands it, so the person approves what lands',
+      description: 'A first run is gated at the step before the wait node that lands it, so the person approves what lands',
       condition: ({ input: [steps], output }) => {
         const gate = steps === undefined ? undefined : gateOf(steps);
         return gate === undefined || (output.length === 1 && output.at(0) === gate);

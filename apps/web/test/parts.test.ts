@@ -50,10 +50,7 @@ const graphRun = (steps: ReadonlyArray<(typeof STEPS)[number]>, held = false) =>
     roots: [steps[0].name],
     edges: steps.slice(1).map((step, i) => ({ from: steps[i].name, to: step.name, kind: 'after' as const })),
   },
-  gates: [
-    { step: 'design', at: 'after' as const },
-    { step: 'land', at: 'before' as const },
-  ],
+  gates: [{ step: 'design' }],
   cancelledAt: null,
   holding: held ? { at: '2026-11-15T17:30:00.000Z', runs: [], word: 'held by you', advice: '', waitingOnYou: false } : null,
 });

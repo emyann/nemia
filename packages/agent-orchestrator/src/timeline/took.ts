@@ -173,9 +173,11 @@ const msBetween = (from: string | null, to: string) => (from ? Math.max(0, Date.
 
 /**
  * How long a person took to approve try `t` of `step` in `run`, off the run's timeline `tl`: from the try's end (`tryEndOf`: for a try
- * that answered an earlier try's session, the end of that answer's turn) to the approval of that step and that try. For an approval given before the try ended (a record written
+ * that answered an earlier try's session, the end of that answer's turn) to the approval of that step and that try. For an
+ * approval given before the try ended (a record written
  * when an ending could be approved before it was filed), from the latest end of the steps it waits on before the approval. Null with no
- * approval. The one rule of a gate's wait: `nemia stats`, the tick's metric (`gateWaits`) and the run's `gate` row (`timelineRows`) all read it.
+ * approval. The one rule of a gate's wait: `nemia stats`, the tick's metric (`gateWaits`) and the run's `gate` row
+ * (`timelineRows`) all read it.
  * @param run The run's approvals.
  * @param tl The run's timeline (`timeline`).
  * @param step The step approved: its name and the steps it waits on.

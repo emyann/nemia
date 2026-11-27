@@ -108,7 +108,8 @@ export default {
    * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
    * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Stop now… (`stop-now`'s page).
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
-   * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and two steps' checks are held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
+   * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and two steps'
+   * checks are held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
    * naming each; and on the run's page that step's chip is drawn waiting, `paused`, the api's read of the run held with
    * `route` as the package words it. Which tasks finish, and which checks are held, is the package's judgement, proven in its own tests
    * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,

@@ -1021,11 +1021,7 @@ describe('a former key on the board: listed and saved under the name it has now,
     const before = snapshot(dir);
     for (const spec of [{ ...step.spec, place: 'cloud' }]) {
       const refused = await put('placed', { steps: [{ ...step, spec }] });
-      assert.equal(
-        refused.status,
-        400,
-        `place is a closed word of StepKeys, refused at the door: ${await refused.clone().text()}`,
-      );
+      assert.equal(refused.status, 400, `place is a closed word of StepKeys, refused at the door: ${await refused.clone().text()}`);
       assert.deepEqual(snapshot(dir), before, 'nothing written');
     }
 

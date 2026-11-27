@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantAsk, plantFactory, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
+import { plantFactory, plantRecord, runKey, runsNow, plantMarker } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';

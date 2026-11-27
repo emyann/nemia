@@ -263,7 +263,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       assert.match(
         pausedWords(standing) ?? '',
         /^Pausing: 4 sessions finishing a tool call, cut now/,
-        "what still finishes: four sessions, the session of a run called off among them, and a check; the clock is past the timeout, so their calls are being cut",
+        'what still finishes: four sessions, the session of a run called off among them, and a check; the clock is past the timeout, so their calls are being cut',
       );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
     },

@@ -37,7 +37,8 @@ export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
 
 /**
  * The pause in words: its `state`; `text`, the button's short form (`Pausing · 2`, `Paused`, none while all factories run); `label`, the
- * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, session parked and check held, a sentence each.
+ * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing, session parked
+ * and check held, a sentence each.
  */
 export type PauseWords = {
   state: PauseState;

@@ -97,10 +97,7 @@ fs.writeFileSync(
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
 const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
 fs.writeFileSync(path.join(ENDING, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
-fs.writeFileSync(
-  path.join(ENDING, 'ship.md'),
-  '---\nafter: work\nplace: git\ngate: true\nharness: codex\n---\nShip it.\n',
-);
+fs.writeFileSync(path.join(ENDING, 'ship.md'), '---\nafter: work\nplace: git\ngate: true\nharness: codex\n---\nShip it.\n');
 
 /** `work`, gated once it has run: its session signs off, and the step waits at its gate on a person, as a design's does. */
 const GATED = fs.mkdtempSync(path.join(ROOT, 'wf-gated-'));

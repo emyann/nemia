@@ -78,12 +78,7 @@ const standingLines = (d: Decidable) =>
 
 /** The collisions read at an ending's decision: the whole in one line, then each branch that does not merge and the semantic refusal. */
 const collisionLines = (d: Decidable) =>
-  d.collisions === null
-    ? []
-    : [
-        d.collisions.said,
-        ...d.collisions.colliding.map((c) => `  ${c.said}`),
-      ];
+  d.collisions === null ? [] : [d.collisions.said, ...d.collisions.colliding.map((c) => `  ${c.said}`)];
 
 /** One question as asked: its number and title, its body, each option by its letter, the recommended marked, and how many it takes. */
 const questionBlock = (q: DecisionQuestion) => [

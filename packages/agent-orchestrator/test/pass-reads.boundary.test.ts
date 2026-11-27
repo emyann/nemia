@@ -15,7 +15,6 @@
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
 import { acceptKey, askNames, plantMarker, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
-import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -46,11 +45,10 @@ import {
   startRun,
   tickRun,
 } from '../src/runner.ts';
-import { stepsNow as stepsOf } from './steps-now.ts';
 import { passRead } from '../src/cap/cap.verb.ts';
 import { passRevisions } from '../src/revisions/pin.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
-import { passParents, reportedEngine } from '../src/views/views.verb.ts';
+import { reportedEngine } from '../src/views/views.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { readStanding, standingFile } from '../src/standing/standing.store.ts';

@@ -10,7 +10,7 @@
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
 import { listRuns, runRecord, runsNow } from '../testing.ts';
-import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
+import { type Env } from '../src/config/config.store.ts';
 import type { Run } from '../src/run.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';

@@ -50,10 +50,7 @@ describe('pauseWords: what the pause says, from none to Pausing to Paused', () =
       words.line,
     );
     assert.match(words.line, /each working session runs on to its end/, 'a pause with no timeout lets each session run on');
-    assert.deepEqual(words.finishing, [
-      "r-1's plan is finishing: its session is at work",
-      "r-2's ship is finishing: its check runs",
-    ]);
+    assert.deepEqual(words.finishing, ["r-1's plan is finishing: its session is at work", "r-2's ship is finishing: its check runs"]);
     assert.deepEqual(words.held, [
       "r-3's ship has signed off, and its check waits on the resume",
       "r-4's land has signed off, and its check waits on the resume",

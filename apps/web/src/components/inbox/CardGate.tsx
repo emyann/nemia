@@ -64,11 +64,7 @@ export function CardGate({
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
     >
-      <p
-        data-gate-line={gate.step}
-        title={`${line}\n${title}`}
-        className="truncate text-body-small text-yours"
-      >
+      <p data-gate-line={gate.step} title={`${line}\n${title}`} className="truncate text-body-small text-yours">
         {line}
       </p>
       <div className="flex items-center gap-1.5">

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { assess, branchWord, decision, endingSteps, firstLine, toDecideWords, type Decision, type RepositoryRun } from '../src/run.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { StepSpec } from '../src/workflow.ts';
-import { aRead, names, phases, run, step, STEPS } from './assessed.ts';
+import { aRead, phases, run, step, STEPS } from './assessed.ts';
 
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
@@ -30,13 +30,6 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
   );
 const nothingShipped = () => false;
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
-const said = (outcome: Closeout['outcome']) => ({
-  outcome,
-  summary: 'rewrote the parser\nand the three tests that pinned it',
-  artifacts: [],
-  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
-});
-
 describe("decision: landed is asked of git and never stored, and a finished run is a person's to decide", () => {
   test('a run still going has nothing to decide, and says what it is waiting on', () => {
     const d = decision(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'running' }) }), nothingShipped);

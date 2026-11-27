@@ -20,7 +20,7 @@ import {
   type Forgot,
   askOffLine,
 } from './forget.ts';
-import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run.ts';
+import type { RepositoryRun, Run, RoundAsk, TaskPhase } from '../run.ts';
 import type { Held } from '../place/place.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { EarlierTry, RetryAsk, RetryMode } from '../retry/retry-ask.ts';

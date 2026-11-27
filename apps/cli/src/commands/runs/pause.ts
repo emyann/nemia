@@ -52,9 +52,7 @@ export const pauseLines = (answer: PauseAnswer, cost: string) => {
     kept
       ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is cut`
       : `the store is paused at once ${sinceWords(pause)} — what runs is cut; ${RESUME_LINE} resumes it`,
-    interrupted.length
-      ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:`
-      : 'nothing was at work: nothing was stopped',
+    interrupted.length ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:` : 'nothing was at work: nothing was stopped',
     ...interrupted.map((i) => `   ${interruptWords(i)}`),
     ...skipped.map((i) => `   ${interruptWords(i)} — left at work: a try of it is asked for already`),
     ...(interrupted.length ? [cost] : []),

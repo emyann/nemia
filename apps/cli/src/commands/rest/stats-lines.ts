@@ -1,6 +1,7 @@
 /**
  * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the tiles,
- * a row per day, a row per change to what the runs froze, a row per step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a
+ * a row per day, a row per change to what the runs froze, a row per step, a row per workflow step's memory peaks against what
+ * it asks, a row per call a step was refused, a row per skill a step loaded, a
  * row per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
  * number with nothing measured under it reads `—`, never 0. Pure.
  */

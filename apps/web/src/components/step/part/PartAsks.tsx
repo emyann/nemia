@@ -1,6 +1,6 @@
 /**
  * What a step asks of a person, in its part: the run's page's own parts, never a copy, picked as her chat picks them (`broughtPart`): its
- * gate told and answered (`GateBrief`), beside the work an ending would act on (`ActsOn`); the Decide section's row for its answer
+ * gate told and answered (`GateBrief`); the Decide section's row for its answer
  * (`AnswerRow`); Continue for a session the harness blocked; the note of a try already asked (`AskedRow`); else, in words, what it needs,
  * the calls its harness denied, and what it waits for. On the graph's node, one line of it.
  */

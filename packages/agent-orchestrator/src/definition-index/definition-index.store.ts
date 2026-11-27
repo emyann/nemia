@@ -4,7 +4,7 @@
  * digest of what it holds — of an agent, a skill or a workflow of a factory's tree (its scope the factory's name), of the person's library
  * (`_library`) or of Nemia's builtin (`_builtin`, where a builtin template and a builtin skill are). The daemon's sweep (`indexSweep`)
  * reads each file and writes a record only where it differs from what the index holds (`recordDue`), a record whose file is gone
- * deleted, so a revision moves exactly when a definition's files do. The name is escaped by `encodeURIComponent`, as the ledger's is.
+ * deleted, so a revision moves exactly when a definition's files do. The name is escaped by `encodeURIComponent`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -329,9 +329,6 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
     )
     .pipe(Effect.catchTag('KeyRefused', () => Effect.succeed(0)));
 });
-
-/** What `definitionRevisionsNow` reads: the revisions of every definition at one moment. */
-export type DefinitionRevisions = Effect.Success<ReturnType<typeof definitionRevisionsNow>>;
 
 /**
  * The revision of each definition, worked out with no write (`definitionsNumbered`) and read once: `of` is the revision a reader is

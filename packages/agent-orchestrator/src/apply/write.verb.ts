@@ -3,7 +3,7 @@
  * door at the factory's tree, judged as `nemia workflows write factory` judges it (`factoryWriteOf`); an Agent and a Skill through their
  * doors at the tree; a Hire and the Factory's attached workflows through `wire`, judged by `wiringRefusal`; an McpServer, the rules and the
  * instruction through the Factory door, so a Factory's spec is written through the doors alone. Answers the revision it made:
- * `<resource>/<name>#<n>`, the ledger's number, for a kind the ledger counts, else `<resource>/<name>`.
+ * `<resource>/<name>#<n>`, the definition's revision, for a kind the index counts, else `<resource>/<name>`.
  */
 import fs from 'node:fs';
 import os from 'node:os';

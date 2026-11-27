@@ -676,6 +676,26 @@ const waiting = async (t: Team, repo: string) => {
   return await started(t.dir, repo, { after: [parent.id], isolate: true });
 };
 
+test('a kind that stops reading between passes stops that run alone: it keeps the revisions it had, and the pass judges it', async () => {
+  const repo = aRepo();
+  const t = team();
+  const run = await waiting(t, repo);
+  const b = board();
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const before = runRecord(ROOT, run.id);
+  const prompt = promptOf(run.id, 'build');
+
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
+  fs.symlinkSync(scratch('wf-revisions-outside-'), path.join(ROOT, 'workflows', 'skills', t.skill, 'linked'));
+  const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+
+  assert.match(pass.notes.join('\n'), /keeps the revisions it had, since resolving them did not read/, 'the pass says what did not read');
+  assert.equal(pass.status, 'running', 'and the pass judged the run all the same, rather than dying of what did not read');
+  assert.deepEqual(runRecord(ROOT, run.id).pinned, before.pinned, 'the run keeps the pins it had');
+  assert.deepEqual(Object.keys(runRecord(ROOT, run.id).steps), Object.keys(before.steps), 'and the step set it froze');
+  assert.equal(promptOf(run.id, 'build'), prompt, 'and the prompt its next filing reads, since the record is changed after the render');
+});
+
 test('a run that has filed nothing keeps the step set it froze where the folder holds a set `nemia start` refuses', async () => {
   const repo = aRepo();
   const t = team();

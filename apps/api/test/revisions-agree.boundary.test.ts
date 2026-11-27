@@ -10,7 +10,7 @@
  * listing's digest.
  */
 import { root } from './harness.ts';
-import { AGENTS, definitionRevisionsNow, engine, hireObject, SKILLS_READ } from 'agent-orchestrator';
+import { AGENTS, definitionRevisionsNow, engine, hireObject, SKILLS_READ, WORKFLOWS_WRITE } from 'agent-orchestrator';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -70,6 +70,16 @@ test('an agent, a skill and a workflow have one resourceVersion, through the orc
   const after = await readAll();
   assert.deepEqual(after.api, after.verb, 'after an edit by hand they still agree');
   assert.equal(after.listed, after.api.workflow);
+});
+
+test("a workflow written through the orchestrator's verb is served at the revision the verb answered, read and listed", async () => {
+  const draft = [{ name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' }];
+  const written = await verb(WORKFLOWS_WRITE.handler({ from: 'user', name: 'agreed', draft }));
+  assert.match(written.version, /^\d+$/, 'the verb answers a revision');
+  const served = (await (await app.request('/api/namespaces/default/workflows/agreed?origin=user')).json()) as Workflow;
+  assert.equal(served.metadata.resourceVersion, written.version, "the api's read of it");
+  const listed = (await (await app.request('/api/namespaces/default/workflows')).json()) as { items: Workflow[] };
+  assert.equal(listed.items.find((w) => w.metadata.name === 'agreed')?.metadata.resourceVersion, written.version, "and its list's item");
 });
 
 test('a Hire has one resourceVersion, in process and through the api', async () => {

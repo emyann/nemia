@@ -10,7 +10,7 @@ import type { DiskReading } from '../disk/disk.ts';
  * The phases of a pass. `records`: the run records, with the cancellation, pruning and hold beside each. `asks`: a person's asks,
  * approvals, acceptances and answers. `journals`: the runtime's journals, read through the engine (`view`, `feed`, `logs`, `output`), less
  * the observing a view does.
- * `revisions`: the workflow folders, agents, skills and factory rules a run's kinds are resolved from, and the ledger they are
+ * `revisions`: the workflow folders, agents, skills and factory rules a run's kinds are resolved from, and the definition index they are
  * numbered in — one read of each folder a pass, shared by every run on it (`passRevisions`).
  * `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time.
  * `runtime`: the runtime's own pass, less its observe. `place`: every question asked of the place, a call each, the processes the place

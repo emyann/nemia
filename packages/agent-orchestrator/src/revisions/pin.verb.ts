@@ -125,7 +125,7 @@ type FolderRun = Pick<Run, 'workflowDir' | 'repo' | 'factory'>;
 /**
  * `f` read once for each `key`, its outcome kept — a throw included, kept and thrown again — and each read of the world charged to the
  * `revisions` phase while a pass is metered (`within`): the memo of the pass's synchronous reads, the factory, the allow rules and the
- * ledger's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A
+ * index's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A
  * key is exactly what its `f` reads, so a memo never answers for a world it did not read; `key` is given the same arguments as `f`, and
  * may take fewer than it, leaving out those `f` does not read by (a stamp).
  */
@@ -427,8 +427,8 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  * the pass has a filing due (`followPass`) — neither of which adds or removes a step. Nothing is carried between passes: what has moved
  * is the digests against the run's own pins.
  *
- * Writes nothing where no digest moved, so a run resolved twice with no edit leaves the record alone and the ledger empty of a second
- * entry. A run a person called off is left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
+ * Writes nothing where no digest moved, so a run resolved twice with no edit leaves the record alone. A run a person called off is
+ * left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
  * rendered again wherever the pins moved (`renderAgain`), since a pin the board shows and a prompt the session reads must be the one
  * content.
  *
@@ -454,7 +454,7 @@ export const pinPass = Effect.fn('pinPass')(function* (run: Run, given?: PassRev
 
 /**
  * What the pass says where resolving the world threw — a skill folder a person renamed or deleted between passes, which `writeAgentFiles`
- * refuses, a digest of a file that has stopped reading, a ledger the store could not write — and the run keeps the revisions and the
+ * refuses, a digest of a file that has stopped reading, an index the store could not read — and the run keeps the revisions and the
  * workflow it had: a kind that stopped reading stops this run's resolve, never the pass, which judges every other run.
  *
  * The record is changed last, after the one write of the pass that can throw (`renderAgain`), so a run that keeps its revisions keeps its
@@ -499,8 +499,8 @@ const follows = (run: Run, read: PassRevisions) =>
  * is read off its own file every pass (the Run door's `refresh.stands`), never off the record, which never holds it. A filed run nobody
  * asked resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may
  * not pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
- * has something to file. So a pinned run's edit after a filing is numbered when something resolves that content — another run's filing,
- * or this run's `nemia refresh`, which resolves to answer.
+ * has something to file. So a pinned run's edit after a filing is read at the index's revision when something resolves that content —
+ * another run's filing, or this run's `nemia refresh`, which resolves to answer.
  */
 const refreshDue = Effect.fnUntraced(function* (run: Run, read: PassRevisions) {
   if (!(yield* (yield* RunDoor).refresh.stands(RunId.read(run.id)))) return NOTHING;
@@ -548,7 +548,7 @@ export const followPass = Effect.fn('followPass')(function* (run: Run, filing: b
  * `nemia refresh <run>`: write down that a person asked this run to take the new revisions, so every filing after it — a new step, a retry,
  * a round — is filed on them, and answers with the drift it was asked on.
  *
- * It resolves the kinds now to answer, which is what gives an edit its number in the ledger, and compares by digest, as the board's band
+ * It resolves the kinds now to answer, which numbers an edit at the index's revision, and compares by digest, as the board's band
  * does (`driftNow`).
  *
  * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose factory

@@ -602,7 +602,12 @@ describe('a pinned run whose files moved past its pins says `revisions behind` o
     const notes = behind(run).map((l) => l.note ?? '');
     assert.equal(notes.length, 2, notes.join(' | '));
     assert.notEqual(notes[0], notes[1], 'two edits nobody resolved read as one number, and the digest tells them apart');
-    assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev `)));
+    const numbers = notes.map((n) => /^workflow \S+: rev (\d+), now (\d+) \(/.exec(n)?.slice(1, 3));
+    assert.ok(
+      numbers.every((n) => n !== undefined),
+      notes.join(' | '),
+    );
+    assert.deepEqual(numbers[0], numbers[1], 'the one number');
   });
   s.test('a succeeded run, which files nothing again, never raises it', async () => {
     const done = await started('done', dir);

@@ -828,8 +828,8 @@ Three things it is honest about. It is **not a valid Agent Card**: A2A marks `su
 interface is a transport and a URL, and there is no URL — nothing here answers A2A, there is no `/.well-known/agent-card.json`,
 and a card is left where a reader would have to be told it is only a description. That is why the last line goes to
 stderr, where a pipe does not carry it. `capabilities` in A2A is protocol features — streaming, push notifications,
-extensions — not reach, so all three are `false` and mean it. And `version` is the content digest `agentVersion` computes,
-not a semantic version: it changes when the agent's file, its result schema or one of its skills does, which is what the board needs it for.
+extensions — not reach, so all three are `false` and mean it. And `version` is the agent's revision in the definition index, not a semantic version: it moves when the agent's file, its result schema
+or one of its skills does, which is what the board needs it for.
 
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.

@@ -121,7 +121,7 @@ const STORE_BOTTOM = [
  * factory's level, rules and servers, each on the run store, and its folder whole (`folder.store.ts`, on no store file), the Workflow door
  * on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors it reads a folder's agents and
  * skills through), the folder written and the Agent and Skill doors it finds a workflow's agents and skills through, and the Template door
- * on the pattern alone, a template being a folder outside the store, the Ledger door, the Card door and the Delegation door on the pattern,
+ * on the pattern alone, a template being a folder outside the store, the Card door and the Delegation door on the pattern,
  * the keyspace and its import of a kind's files (`import.store.ts`, on the pattern and the keyspace), the Delegation door on the run store
  * besides, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the run
  * store, the tally, the keyspace and its import — what a place is and how its processes are stopped, on no store file (`place.store.ts`),

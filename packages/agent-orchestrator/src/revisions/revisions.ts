@@ -42,9 +42,9 @@ const pinFor = (pins: readonly Pin[], of: KindName) => pins.find((t) => t.kind =
 
 /**
  * The kinds `pinned` differs from `now` on, in `pinned`'s order: one `Drift` per kind and name whose content `now` holds other bytes of, by
- * the digest — never by the number, which is only the ledger's reading of a content: a kind edited and reverted is the pin's number again,
- * and a kind reverted to an older content is that older number, so `now` may be lower than `pinned`. `[]` when nothing differs, a kind
- * `now` does not hold included, and for a record written before this slice, which pinned nothing.
+ * the digest — never by the number, which only says when the index counted it: a kind edited and reverted is a new, higher
+ * revision. `[]` when nothing differs,
+ * a kind `now` does not hold included, and for a record written before this slice, which pinned nothing.
  * @param pinned What the run resolved, or undefined on a record that pinned nothing.
  * @param now What the files hold now.
  */

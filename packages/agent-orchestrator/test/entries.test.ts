@@ -1044,6 +1044,7 @@ const PINNED: Record<string, string[]> = {
     'HARNESS_PROMPTS',
     'LIST_KEYS',
     'LOOP_REPLIES',
+    'NODE_BRIEFS',
     'NODE_CARDS',
     'REMOTE_NAME',
     'REMOTE_PREFIX',

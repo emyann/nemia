@@ -73,7 +73,7 @@ export const RUN: WaitingRun = {
   pruned: null,
   onDisk: { worktrees: true, files: true },
   read: null,
-  gates: [{ step: 'land', at: 'before' }],
+  gates: [{ step: 'land' }],
   warning: null,
   kinds: [],
   after: [],

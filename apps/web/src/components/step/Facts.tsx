@@ -129,7 +129,6 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
         ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
         ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
         ['after', spec.after.length ? code(spec.after.join(', ')) : null],
-        ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
         ...placeRows(spec),
         ...(spec.loop === null
           ? []
@@ -180,7 +179,6 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null) {
     ['harness', code(spec.harness ?? (filed?.remote ? `a2a:${filed.remote.name}` : null))],
     ['agent', filed?.remote?.address ? code(address) : address],
     ['after', spec.after.length ? code(spec.after.join(', ')) : null],
-    ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
     ...placeRows(spec),
     ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
   ] satisfies Array<[string, ReactNode]>;

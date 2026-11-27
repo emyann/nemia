@@ -9,7 +9,7 @@
 import type { Collision, Collisions, Decidable } from './api/decision.ts';
 import type { RunView } from './api/judged.ts';
 import type { RunDetail, StepView } from './runView';
-import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
+import { askedSaid, needsOf, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 import { verdictWords } from './words.ts';
 
@@ -19,18 +19,15 @@ type StepAsked = NonNullable<StepView['asked']>;
 type DetailStep = StepView;
 
 /**
- * A gate a person answers from the board: the step waiting at it; whether it ends the run in the repository's own checkout (`ends`), held
- * before it is filed so that the approval is what runs it; and the steps a send-back goes to (`back`) — the step itself for a gate that
- * holds after its step has run, the work an ending waits on for an ending, and none for an ending that waits on nothing.
+ * A gate a person answers from the board: the step waiting at it, which has signed off; and the steps a send-back goes to (`back`), the
+ * step itself.
  */
-export type GateAsk = { step: string; ends: boolean; back: readonly string[]; onto: string | null };
+export type GateAsk = { step: string; back: readonly string[]; onto: string | null };
 
 /**
- * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its
- * gate on you. Null on a run called off, on a run a person holds (the CLI's `hold`, whose approval the package refuses), and where no gate
- * waits. A to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one
- * whose `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back
- * goes, which the package would refuse for an ending, in its words.
+ * The gate the Factory's card answers, off the list alone: the gate the run's to-decide says, or the first step waiting at its gate
+ * on you. Null on a run called off, on a run a person holds (the CLI's `hold`, whose approval the package refuses), and where no gate
+ * waits. A list from an api without `back` reads the step alone as where a send-back goes.
  * @param run The run as the list shows it: its calling off, its hold, its steps, its gates on you and its to-decide.
  */
 export function gateOfSummary(
@@ -39,17 +36,15 @@ export function gateOfSummary(
   if (run.cancelledAt !== null || run.holding != null) return null;
   const decide = run.toDecide;
   if (decide?.kind === 'approve') {
-    const back = decide.back ?? [decide.step];
-    return { step: decide.step, ends: !back.includes(decide.step), back, onto: decide.onto ?? null };
+    return { step: decide.step, back: decide.back ?? [decide.step], onto: decide.onto ?? null };
   }
   const need = needsOf(run).find((one) => one.kind === 'approve');
-  return need ? { step: need.step, ends: false, back: [need.step], onto: null } : null;
+  return need ? { step: need.step, back: [need.step], onto: null } : null;
 }
 
 /**
  * The same gate off a run's detail, for one step: the inspector's and the node's. Null unless the step waits at its gate on you, on a run
- * nobody called off. `ends` off the workflow the run froze (`workspace: base`); `back` as the package names it, off the graph's `after`
- * edges for an ending that has no task yet.
+ * nobody called off. `back` is the step itself.
  * @param run The run's detail: its calling off, its gates on you, its base branch and its graph.
  * @param step The step asked about: its name, whether it holds at a gate, its spec and its task, if any.
  */
@@ -58,11 +53,7 @@ export function gateOfStep(
   step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
 ) {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
-  const ends = step.spec?.workspace === 'base';
-  const back = step.taskId
-    ? [step.name]
-    : run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from);
-  return { step: step.name, ends: ends && !step.taskId, back, onto: run.branch };
+  return { step: step.name, back: [step.name], onto: run.branch };
 }
 
 /**
@@ -72,72 +63,43 @@ export function gateOfStep(
 export const backName = (back: readonly string[]) => (back.length === 1 ? back[0] : 'the work');
 
 /**
- * What approving an ending does, said before a person approves it, on the card and at the run page's gate alike: it runs in the
- * repository's own checkout, on the base branch where it is known (`onto`), and cannot be taken back.
- * @param step The ending step's name.
- * @param onto The base branch it runs on, or null where it is not known.
- */
-export const endingWarning = (step: string, onto: string | null) =>
-  `This runs ${step} in the repository's own checkout${onto ? ` on ${onto}` : ''}, and it cannot be taken back.`;
-
-/**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
- * `approve to run ship on main, or send review back`; for a gate that holds after its step ran,
  * `approve what review handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
  * prose; the inspector says it all, whole.
  * @param gate The gate the card answers.
  */
 export function gateCardLine(gate: GateAsk) {
-  const approving = gate.ends ? `approve to run ${gate.step}${gate.onto ? ` on ${gate.onto}` : ''}` : `approve what ${gate.step} handed on`;
+  const approving = `approve what ${gate.step} handed on`;
   if (!gate.back.length) return `${approving}: it waits on no step to send back`;
-  return `${approving}, or send ${gate.ends ? `${backName(gate.back)} back` : 'it back'}`;
+  return `${approving}, or send it back`;
 }
 
 /**
- * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and where on
- * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is:
- * `Read what it handed on`, whatever the step is named. An ending has handed nothing on and has no closeout of its own: its section
- * (`hash`), where what it would act on is drawn beside its gate.
- * @param gate The gate: its step, and whether it is an ending.
+ * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and the
+ * step whose inspector opens on its Output tab, where its closeout is.
+ * @param gate The gate: its step.
  */
-export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>) =>
-  (gate.ends
-    ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) }
-    : { words: 'Read what it handed on', step: gate.step }) satisfies { words: string; step: string } | { words: string; hash: string } as
-    | { words: string; step: string }
-    | { words: string; hash: string };
+export const readLink = (gate: Pick<GateAsk, 'step'>) => ({ words: 'Read what it handed on', step: gate.step });
 
 /**
- * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve review's hand-off`. Both name the step as
- * the CLI's `ls` does (`approve review`), and the inspector says the rest.
- * @param gate The gate: its step, and whether it is an ending.
+ * A gate's node, under its name, where one line fits: `approve review's hand-off`. It names the step as the CLI's `ls` does (`approve
+ * review`), and the inspector says the rest.
+ * @param gate The gate: its step.
  */
-export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>) =>
-  gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`;
+export const gateNodeLine = (gate: Pick<GateAsk, 'step'>) => `approve ${gate.step}'s hand-off`;
 
 /**
  * The inspector's opening: which step waits, what approving does and what sending back does, each a sentence off the record.
  *
- * Approving an ending runs it — in the repository's own checkout, on the base branch — and it is handed the approval's words as its terms;
- * what it does there is the package's `toDecide.says`, the first line of the step's own note, quoted, never the board's guess. Approving
- * any other gate files the steps that wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the
+ * Approving a gate files the steps that wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the
  * person's words, and the gate holds again once that try signs off.
  * @param gate The gate the inspector opens on.
- * @param says The first line of the ending's own note (`toDecide.says`), or null where the package says none.
  * @param next The steps that wait on the gate, filed once it is approved.
  */
-export function gateBrief(gate: GateAsk, says: string | null, next: readonly string[]) {
-  const waits = gate.ends
-    ? `${gate.step} waits at its gate: it has not run, and it runs only on your approval.`
-    : `${gate.step} has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.`;
-  const approving = gate.ends
-    ? `Approving runs ${gate.step} in the repository's own checkout${gate.onto ? `, on ${gate.onto}` : ''}, handed your words, if any, as its terms.${says ? ` Its folder says what it does: “${says}”` : ''}`
-    : `Approving files ${next.length ? next.join(', ') : 'nothing: no step waits on it'}${next.length ? `, handed ${gate.step}'s closeout and your words, if any` : ''}.`;
-  const sendingBack = !gate.back.length
-    ? `There is nothing to send back: ${gate.step} waits on no step.`
-    : gate.ends
-      ? `Sending back asks ${gate.back.join(' or ')} for a new try, told your words; ${gate.step} waits at its gate again once it signs off.`
-      : `Sending back asks ${gate.step} for a new try, told your words; it waits at its gate again once it signs off.`;
+export function gateBrief(gate: GateAsk, next: readonly string[]) {
+  const waits = `${gate.step} has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.`;
+  const approving = `Approving files ${next.length ? next.join(', ') : 'nothing: no step waits on it'}${next.length ? `, handed ${gate.step}'s closeout and your words, if any` : ''}.`;
+  const sendingBack = `Sending back asks ${gate.step} for a new try, told your words; it waits at its gate again once it signs off.`;
   return { waits, approving, sendingBack };
 }
 
@@ -152,7 +114,7 @@ export const takenLine = (
   gate: GateAsk,
 ) =>
   'approved' in taken
-    ? `approved — the next pass files ${gate.ends ? gate.step : `what waits on ${gate.step}`}`
+    ? `approved — the next pass files what waits on ${gate.step}`
     : `sent back to ${taken.to} — ${askedSaid(taken.asked)}`;
 
 /** One fact under a gate, as the inspector lists it: a label, the words, and where to read more (a step's section on the run's page). */
@@ -242,13 +204,13 @@ function decisionFacts(decision: Decidable) {
 }
 
 /**
- * The facts an ending's collisions add under its gate: the runs in flight on the base in one line — good when it collides with none, bad
- * when it conflicts with one — then each branch of theirs one of ours does not merge onto cleanly, and the semantic conflict.
- * @param collisions The ending's collisions with the runs in flight on the base.
+ * The facts a result's collisions add under its gate: the runs in flight on the base in one line — good when it collides with none, bad
+ * when it conflicts with one — then each branch of theirs one of ours does not merge onto cleanly.
+ * @param collisions The result's collisions with the runs in flight on the base.
  */
 export function collisionFacts(collisions: Collisions) {
   const conflicts = (c: Collision) => 'clean' in c.merge;
-  const { colliding, semantic } = collisions;
+  const { colliding } = collisions;
   return [
     {
       label: 'others',
@@ -258,7 +220,6 @@ export function collisionFacts(collisions: Collisions) {
     ...colliding.map(
       (c) => ({ label: 'collides', said: `${c.ours} ${c.said}`, state: conflicts(c) ? 'bad' : undefined }) satisfies GateFact,
     ),
-    ...(semantic ? [{ label: 'semantic', said: semantic.said, state: 'bad', step: semantic.step } satisfies GateFact] : []),
   ] satisfies GateFact[];
 }
 

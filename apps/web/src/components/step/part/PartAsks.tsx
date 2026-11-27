@@ -12,7 +12,6 @@ import type { RunDetail, StepView } from '@/lib/runView';
 import type { PartSize, StepPartModel } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
 import { AnswerRow, Continue } from '../../gate/Decide';
-import { ActsOn, endsTheRun } from '../../gate/Gate';
 import { GateBrief } from '../../gate/GateBrief';
 import { AskedRow } from '../../gate/Questions';
 import { Markdown } from '../../markdown/Markdown';
@@ -50,13 +49,7 @@ function Words({ asks }: { asks: Asks }) {
 /** The form that answers the step, or its note, or its words, as `broughtPart` picks off the run as it is read now. */
 function Answered({ run, step, asks }: { run: RunDetail; step: StepView; asks: Asks }) {
   const part = broughtPart(broughtFacts(run, step.name));
-  if (part === 'gate')
-    return (
-      <>
-        {endsTheRun(step) && step.taskId === null && <ActsOn run={run} step={step} />}
-        <GateBrief run={run} step={step} />
-      </>
-    );
+  if (part === 'gate') return <GateBrief run={run} step={step} />;
   if (part === 'continue') return <Continue runId={run.id} step={step.name} line={step.commands.retry} />;
   const offer = offersOf(run).find((o): o is Answer => o.step === step.name && o.case !== 'continue');
   if (part === 'answer' && offer)

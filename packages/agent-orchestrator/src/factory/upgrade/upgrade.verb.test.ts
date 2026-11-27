@@ -442,7 +442,9 @@ test('choices made for another version are not merged, and the next resolve drop
   );
   assert.deepEqual(bytesUnder(treeDir(ROOT, 'stale')), tree, 'and nothing is merged with them');
   await main(['factory', 'resolve', 'stale', `${README}:1-1`, '--theirs'], noEngine());
-  assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'stale'), 'utf8')), {
+  const { seen, ...written } = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'stale'), 'utf8'));
+  assert.deepEqual(Object.keys(seen), [`${README}:1-1`], 'the choice records what it was made against, and the dropped ones none');
+  assert.deepEqual(written, {
     to: '0.3.0',
     template: 'team',
     base: digestOf(entriesIn(appliedDir(ROOT, 'stale'))),
@@ -614,7 +616,7 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
       delete spec.hires['dev/ship'];
     });
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
-      spec.steps[2] = { name: 'ship', after: 'review', waitsFor: ['shipped'] };
+      spec.steps[2] = { name: 'ship', after: ['review'], waitsFor: ['shipped'] };
     });
     const preview = (await previewOf('wait', '--to', '0.2.0')) as Previewed & {
       merge: { conflicts: { at: string; message?: string }[] };
@@ -635,8 +637,8 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
   });
   test('a refused proposal keeps the choices whose conflict did not change, and asks again only for the one that did', async () => {
     vi.spyOn(console, 'log');
-    const dir = await appliedWithHire('kept');
-    const tree = treeDir(ROOT, 'kept');
+    const dir = await appliedWithHire('tidy');
+    const tree = treeDir(ROOT, 'tidy');
     fs.writeFileSync(path.join(tree, SHIP), textIn(tree, SHIP).replace(/^---\n/, '---\ndisallowedTools: Bash(git push)\n'));
     rewrite(tree, REVIEW, 'rounds: 3', 'rounds: 4');
     edit(dir, 'nemia.yaml', (spec) => {
@@ -644,29 +646,29 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     });
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 2;
-      spec.steps[2] = { name: 'ship', after: 'review', waitsFor: ['shipped'] };
+      spec.steps[2] = { name: 'ship', after: ['review'], waitsFor: ['shipped'] };
     });
-    await main(['factory', 'upgrade', 'kept', '--to', '0.2.0'], noEngine());
+    await main(['factory', 'upgrade', 'tidy', '--to', '0.2.0'], noEngine());
     const at = [`${SHIP}#disallowedTools`, `${REVIEW}#rounds`];
-    const waiting = await reconciled(templated('kept'));
+    const waiting = await reconciled(templated('tidy'));
     assert.deepEqual(waiting.upgrade?.conflicts.map((c) => c.at).sort(), at.sort());
-    await main(['factory', 'resolve', 'kept', at[0] ?? '', '--theirs'], noEngine());
-    await main(['factory', 'resolve', 'kept', at[1] ?? '', '--theirs'], noEngine());
-    const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'kept'), 'utf8'));
+    await main(['factory', 'resolve', 'tidy', at[0] ?? '', '--theirs'], noEngine());
+    await main(['factory', 'resolve', 'tidy', at[1] ?? '', '--theirs'], noEngine());
+    const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'tidy'), 'utf8'));
     const proposal: string = kept.proposals?.['Workflow/dev'] ?? '';
     assert.ok(proposal, 'both choices proposed the workflow');
-    await runWith(noEngine(), declineProgram(PERSON, 'kept', proposal));
-    const declined = await reconciled(templated('kept'));
+    await runWith(noEngine(), declineProgram(PERSON, 'tidy', proposal));
+    const declined = await reconciled(templated('tidy'));
     assert.equal(
-      (declined.conditions[1].message.match(/nemia factory resolve kept/g) ?? []).length,
+      (declined.conditions[1].message.match(/nemia factory resolve tidy/g) ?? []).length,
       1,
       'one line proposes the owner again from the kept choices',
     );
-    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'kept'), 'utf8')).choices, kept.choices, 'every choice is kept');
+    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'tidy'), 'utf8')).choices, kept.choices, 'every choice is kept');
     rewrite(tree, SHIP, 'Bash(git push)', 'Bash(git push:*)');
-    const changed = await reconciled(templated('kept'));
+    const changed = await reconciled(templated('tidy'));
     const asked = changed.conditions[1].message;
-    assert.match(asked, new RegExp(`resolve kept '${SHIP}#disallowedTools'`));
+    assert.match(asked, new RegExp(`resolve tidy '${SHIP}#disallowedTools'`));
     assert.doesNotMatch(asked, /rounds/, 'the conflict that did not change is not asked again');
   });
 });

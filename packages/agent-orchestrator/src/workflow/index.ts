@@ -35,4 +35,6 @@ export {
   terminalSteps,
   upstreamOf,
   validate,
+  waitKeyRefusal,
+  waitRefused,
 } from './validate.ts';

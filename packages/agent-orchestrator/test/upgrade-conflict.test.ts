@@ -339,7 +339,9 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       [['Factory', 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n']],
       'the rules as the choice composes them with what merged cleanly',
     );
-    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8')), {
+    const { seen, ...written } = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8'));
+    assert.deepEqual(Object.keys(seen).sort(), Object.keys(written.choices).sort(), 'each choice records what it was made against');
+    assert.deepEqual(written, {
       to: '0.2.0',
       template: 'team',
       base: digestOf(entriesIn(appliedDir(ROOT, 'crew'))),
@@ -456,7 +458,9 @@ describe("a workflow's resolution declined: the status says to resolve again, an
       [[SCRIPT_LINE, { name: first, phase: 'declined' }]],
     );
     assert.ok(
-      status.conditions[1].message.includes(`nemia factory resolve refused '${SCRIPT_LINE}' --ours|--theirs|--file <path> again`),
+      status.conditions[1].message.includes(
+        `nemia factory resolve refused '${SCRIPT_LINE}' --file <path> to propose the Workflow dev again from your kept choices`,
+      ),
       status.conditions[1].message,
     );
   });

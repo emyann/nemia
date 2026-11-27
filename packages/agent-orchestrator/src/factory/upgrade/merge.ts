@@ -8,7 +8,7 @@
  * `nemia factory diff` prints it (`planLines`). Pure.
  */
 import { diff2Lines, diff3Lines, linesOf } from './lines.ts';
-import { waitKeyRefusal, waitRefused } from '../../workflow/validate.ts';
+import { waitKeyRefusal, waitRefused } from '../../workflow/index.ts';
 import type { BaseTemplateOf, MergeBaseOf, UnrelatedKey, UnrelatedSet } from '../../../contracts/switch.contract.ts';
 
 /** One file of a tree: its path in it, its bytes, and its mode where it keeps one. */

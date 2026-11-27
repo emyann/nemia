@@ -407,7 +407,7 @@ export const withClient = (element: ReturnType<typeof createElement>) =>
 /** What `wf ls` says of a run at its gate, as the api gives it (`RunToDecide`). */
 const SHIP_SAYS = 'Merge this run onto the base branch, or abort on any failure.';
 
-export const toShip = {
+const toShip = {
   kind: 'approve' as const,
   step: 'ship',
   back: ['ship'],

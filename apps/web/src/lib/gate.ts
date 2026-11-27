@@ -57,12 +57,6 @@ export function gateOfStep(
 }
 
 /**
- * Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from.
- * @param back The steps a send-back goes to.
- */
-export const backName = (back: readonly string[]) => (back.length === 1 ? back[0] : 'the work');
-
-/**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
  * `approve what review handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
  * prose; the inspector says it all, whole.

@@ -50,7 +50,7 @@ The runtime owns how a session runs; the layers above own what it means. The Kub
 task: if the Pod spec (`core/v1`) has one — a container's command, args, env, volumes, restart policy, resources, priority — it is the
 runtime's.
 
-**Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
+**Above the runtime by design**: run slots, worktrees, where a run's branch stands, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
 **A machine's needs, the readiness read, fixes and tickets are the orchestrator's** (`src/needs/`, `src/pairing/`): whether a need
@@ -159,11 +159,8 @@ of the process that asks, the release installed, and a change to the place reach
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `cause: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
 (`test/merge-round-walk.boundary.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
-the landing — its approval, or, where its review routes an ungated one, the tick that files it; one of a run whose result step closes no
-loop, to `nemia retry`. Unless the ending's last landing check refused
-the merge staged on the base as it is now (`Landed`'s `refusedOn`): the conflict is semantic, and the merge is asked, its target handed
-what the check said (`refusedLanding`, `src/merge/merge.ts`; `test/ship.test.ts`, *the conflict is semantic*, and the refusals for a
-base moved since and a check that did not finish). While a merge is asked, `nemia retry --round` and
+`nemia decide`, which says how the branch merges by hand. A merge is asked only where the trial merge collides (`src/merge/merge.ts`, its target handed the
+conflict). While a merge is asked, `nemia retry --round` and
 `nemia approve` of its loop out of rounds are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
 
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
@@ -205,7 +202,7 @@ sessions' records by the factory of the run that filed each task). A person may 
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands — a pause with no timeout,
-so nothing new is filed and the jobs and the checks run on, untouched, a landing's check among them, and are not waited for — the daemon's own sessions (`restartPolicy:
+so nothing new is filed and the jobs and the checks run on, untouched, a check among them, and are not waited for — the daemon's own sessions (`restartPolicy:
 'Always'`) held by the holder's drain and their calls in flight waited for up to the timeout (`--timeout <d>`, else the store's, `nemia
 pause-timeout`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
 has completed its first pass, which resumes each parked session as the same try on the release it runs — refused, naming its log,

@@ -1,6 +1,6 @@
 ---
 title: Workflows
-description: A workflow is a folder of Markdown files, one file per step. This page covers gates, checks, loops and rounds, landing, and what a step may spend.
+description: A workflow is a folder of Markdown files, one file per step. This page covers gates, checks, loops and rounds, the end of a run, and what a step may spend.
 ---
 
 A workflow is how a team works on a card: which steps there are, who does each one, in what order, what gets checked, and where a
@@ -141,19 +141,13 @@ waits, the step shows `awaiting approval`, holds no slot, and spends nothing.
 
 You can also add a gate when you start a run (`--gate <step>`), or on a card.
 
-## The landing
+## The end of a run
 
-The end of a run is a step too: its workflow's last one. In a workflow that lands on a branch, that step stages the merge. It runs in
-the repository's own checkout (`workspace: base`) and has a check. It also either has a gate, or waits on a step that can send the
-work back: a review, whose `loop:` closes on the work.
+A run ends with its branch, and Nemia merges nothing itself. `nemia decide <run>` says where the branch stands against the base and
+how to merge it. A workflow that wants a merge, a pull request or a release makes it a step of its own, and its template says how.
 
-1. A person approves the gate. Or, when the last step has no gate, the review before it passes, and the run starts the step itself.
-   A workflow whose last step has a check but neither of these is rejected when the folder loads: its check would commit to the base
-   branch without anyone's approval.
-2. The step's agent stages a merge of the run's branch into the base branch, without committing it, and signs off with the commit
-   message.
-3. The run executes the check on the merged code. On exit 0, it commits the merge. On any other exit, it aborts it (`landEnding` in
-   `packages/agent-orchestrator/src/ending/ending.verb.ts`, on `landingDue`).
+Every step works in a worktree of its own. `workspace: base`, which once ran a step in the repository's own checkout, is refused when
+the folder loads. Write a step that works in a worktree and merges in a command of its own.
 
 Nothing in the packages assumes what shipping means. Another workflow's last step might open a pull request, or be a study that a
 person accepts.

@@ -1,7 +1,7 @@
 # The orchestrator's model
 
 The orchestrator's model is its entities as Effect Schemas, each context's beside its glossary in a `<context>.model.ts` file: run-core's
-in `src/record/record.model.ts` — a run (the aggregate), its steps, their tries, a round asked of a loop, and a landing — with every
+in `src/record/record.model.ts` — a run (the aggregate), its steps, their tries and a round asked of a loop — with every
 identifier branded by one helper (`src/model/brand.model.ts`), checked on create by its writer's own rule and nominal on read, so no
 record already written becomes unreadable. Each aggregate's invariants are checks on its schema, each citing the line of the writer
 that upholds it. A relation to another layer is an identifier only: a try names the runtime's `TaskId`, which the diagram draws as a
@@ -99,7 +99,6 @@ erDiagram
     string branch
     boolean isolate
     object placeSkill "optional"
-    string stagedFile "optional"
   }
   FolderRun {
     RunId id FK
@@ -149,7 +148,6 @@ erDiagram
     unknown branch "optional"
     unknown isolate "optional"
     unknown placeSkill "optional"
-    unknown stagedFile "optional"
   }
   Step {
     TaskId taskId FK
@@ -181,12 +179,6 @@ erDiagram
     number budget "optional"
     string at
     object merge "optional"
-  }
-  Landing {
-    string commit "optional"
-    string aborted "optional"
-    string refusedOn "optional"
-    string untouched "optional"
   }
   Workflow {
     WorkflowDir dir PK
@@ -389,7 +381,6 @@ erDiagram
   TaskId ||--o{ Step : taskId
   Step ||--o{ Try : tries
   TaskId ||--o{ Step : handedOff
-  Step ||--o| Landing : landed
   TaskId ||--o{ Try : taskId
   WorkflowStep ||--o{ Round : step
   Workflow ||--o{ WorkflowStep : steps

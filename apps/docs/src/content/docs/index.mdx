@@ -4,9 +4,9 @@ description: Nemia runs teams of agents. You put in a card, and you get back a c
 ---
 
 Nemia runs teams of agents. You describe a piece of work on a card. A team of agents does it in steps, and you decide at the points
-that matter. The result is a landing: the work is merged into your base branch once a check passes on the merged code.
+that matter. The result is a branch of checked work, and `nemia decide` says how to merge it.
 
-## A card in, a landing out
+## A card in, a branch out
 
 Every piece of work goes through these stages:
 
@@ -20,8 +20,7 @@ Every piece of work goes through these stages:
    exit code decides whether the run continues, not the agent. When a review step asks for changes, the steps of its loop run again.
    Each pass is a round.
 4. **Gates.** When a step has a gate, nothing after it starts until a person approves.
-5. **A landing.** The last step of a run stages a merge of the run's branch into the base branch. The run checks the merged code. If
-   the check passes, the merge is committed. If it fails, the merge is aborted (`landingDue`).
+5. **A branch.** A run ends with a branch. `nemia decide` says where it stands and how to merge it.
 
 ```mermaid
 flowchart LR
@@ -30,7 +29,7 @@ flowchart LR
   step --> check{Its check}
   check -->|refused| step
   check -->|passed| gate[A gate, where a person decides]
-  gate --> landing[A landing on the base branch]
+  gate --> branch[A branch to merge]
 ```
 
 ## Who decides what

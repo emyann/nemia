@@ -145,8 +145,8 @@ export const DRESSED: { file: string; classes: string; why: string }[] = [
   },
   {
     file: 'src/components/agent/FactoryAgentPage.tsx',
-    classes: 'text-title-large m-0 font-semibold',
-    why: "an agent's role heads its page at 22/28 semibold, as its board (B5) draws it, where the title role is regular",
+    classes: 'text-title-large m-0 font-sans font-semibold',
+    why: "an agent's role heads its page in the body face at 22/28 semibold, as its board (B5) draws it, where the title role is the display face, regular",
   },
 ];
 

@@ -133,24 +133,26 @@ function GroupHead({ title }: { title: string }) {
 }
 
 /**
- * A tile of one height in the grid: its name, what it is for cut to the lines it has room for, the whole of it said on hover, and
- * where it comes from at its foot.
+ * A tile in the grid: its name, what it is for cut to the lines it has room for, the whole of it said on hover, and where it comes from
+ * at its foot; of one height where `even` (a skill's), as tall as its words where not (a server's, which says no more than its name).
  */
 function Tile({
   name,
   what,
   where,
   icon,
+  even = true,
   data,
 }: {
   name: string;
   what: string | null;
   where: string;
   icon?: boolean;
+  even?: boolean;
   data: Record<string, string>;
 }) {
   return (
-    <CutFrame size={10} fill className={cn('w-full', TILE_HEIGHT)}>
+    <CutFrame size={10} fill className={cn('w-full', even && TILE_HEIGHT)}>
       <div {...data} className="flex h-full min-h-0 flex-col gap-1.5 px-3 pt-2.5 pb-3">
         <span className="flex min-w-0 items-center gap-2">
           {icon && <NetworkIcon aria-hidden="true" className="size-[18px] shrink-0" />}
@@ -158,9 +160,11 @@ function Tile({
             {name}
           </Body>
         </span>
-        <Body size="small" component="p" data-tile-what className="m-0 line-clamp-3 min-h-0" title={what ?? undefined}>
-          {what}
-        </Body>
+        {(even || what !== null) && (
+          <Body size="small" component="p" data-tile-what className="m-0 line-clamp-3 min-h-0" title={what ?? undefined}>
+            {what}
+          </Body>
+        )}
         <Body size="small" component="p" data-tile-where className="m-0 mt-auto line-clamp-2 text-on-surface-variant">
           {where}
         </Body>
@@ -234,7 +238,7 @@ function Who({
       <Ring name={name} working={activity.kind !== 'none'} />
       <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
-          <Title size="large" component="p" data-agent-role className="m-0 font-semibold">
+          <Title size="large" component="p" data-agent-role className="m-0 font-sans font-semibold">
             {agent.role ?? 'No role yet'}
           </Title>
           <Hovered said={`${personOf(name)} belongs to factory ${factory}, so it can't be edited here.`}>
@@ -495,7 +499,7 @@ function ServersSection({ mcp, gives, read }: { mcp: string | null; gives: reado
       {read ? (
         <div className={TILES}>
           {servers.map((one) => (
-            <Tile key={one.name} name={one.name} what={null} where={one.where} icon data={{ 'data-server-tile': one.name }} />
+            <Tile key={one.name} name={one.name} what={null} where={one.where} icon even={false} data={{ 'data-server-tile': one.name }} />
           ))}
         </div>
       ) : (

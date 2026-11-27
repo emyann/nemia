@@ -6,7 +6,9 @@
  * step's own `agent:` before the hire (`fillOrigin`), and where each setting came from (`settingOrigin`). A step whose own file names an
  * agent the factory hires one into too is read with its own, and refused (`refused`). Two steps whose names join to one name are both
  * listed, each with `status.error` naming the other, and neither is read or written by it: `Conflict`, naming both and the fix. A
- * workflow whose folder does not read is listed by its step files, each Hire's error saying why.
+ * workflow whose folder does not read with the factory's hires is listed by its step files, each hired step's error saying why;
+ * the read without
+ * its hires serves only to tell each step's own `agent:`, and its refusal goes on no row.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +17,7 @@ import { API_VERSION, type Hire, type HireList, HireSettings } from 'objects';
 import { workflowDirAt } from '../../folder/folder.store.ts';
 import type { Fills } from '../../folder/folder.ts';
 import { fillsOf, type Factory } from '../factory.ts';
-import { hireNamed, hiresCollided, hireStatusOf, type HiredStep } from '../hire/hire.ts';
+import { hireNamed, hireRowError, hiresCollided, hireStatusOf, type HiredStep } from '../hire/hire.ts';
 
 /** The settings a Hire says the origin of, as `objects` names them. */
 const SETTING_KEYS: readonly string[] = Object.keys(HireSettings.fields);
@@ -98,16 +100,19 @@ const workflowHires = Effect.fn('workflowHires')(function* (f: HiringFactory, ho
     workflow,
     agents: Object.fromEntries(Object.entries(hires).filter(([step]) => steps.find((s) => s.name === step)?.agent === undefined)),
   };
-  const filled =
-    own.why === undefined
-      ? yield* readOrWhy(door.workflows.read(at, places, fills) as Effect.Effect<readonly StepRead[], { readonly message: string }>)
-      : own;
+  const filled = yield* readOrWhy(
+    door.workflows.read(at, places, fills) as Effect.Effect<readonly StepRead[], { readonly message: string }>,
+  );
   return steps.map((step) => {
     const hired = hires[step.name];
     const both = step.agent !== undefined && hired !== undefined ? bothFill(f, workflow, step.name, step.agent.name, hired) : undefined;
-    const why = own.why ?? (hired === undefined ? undefined : filled.why);
     const read = filled.steps.find((s) => s.name === step.name) ?? step;
-    return { workflow, step: step.name, hired, read: readOf(step, read, hired, f, both ?? why) };
+    return {
+      workflow,
+      step: step.name,
+      hired,
+      read: readOf(step, read, hired, f, hireRowError({ bothFill: both, hired: hired !== undefined, filled: filled.why })),
+    };
   });
 });
 

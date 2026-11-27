@@ -1,5 +1,6 @@
 /**
- * The spec an owner of an upgrade's conflicts proposes, as the person's choices compose its files from the merge (`ownerSpec`): a Workflow
+ * The spec an owner of an upgrade's conflicts proposes, as the person's choices compose its files from the merge
+ * (`ownerObjects`): a Workflow
  * its folder's text files (`workflowSpecOf`); an Agent its file and the result schema its `output:` names (`agentSpecOf`); a Skill its
  * SKILL.md and its folder's other text files (`skillSpecOf`); a Hire the wiring's value for its step; the Factory its rules and its
  * instruction. One reading each with what the tree holds now (`currentOf`), so the proposal reads as a change of only what was chosen.
@@ -15,6 +16,7 @@ import { agentSpecOf, skillSpecOf, workflowSpecOf } from '../../propose/index.ts
 import { compose, isJsonObject, type Choice, type TreeMerge } from './merge.ts';
 import { WIRING_FILE } from './resolution.ts';
 import type { ResolutionOwner } from '../../../contracts/resolution.contract.ts';
+import type { AgentHiresFired, Hires } from '../../../contracts/upgrade-apply.contract.ts';
 
 /** The text files of a composed tree, by their path in it. */
 type Texts = ReadonlyMap<string, string>;
@@ -123,16 +125,53 @@ function factoryOf(factory: string, owner: ResolutionOwner, texts: Texts, ours: 
   return { ...(rules !== undefined && { rules }), ...(instruction !== undefined && { instruction }) };
 }
 
+/** The hires a tree's wiring text holds, each with its step as `<workflow>/<step>`: none where it holds none or does not read. */
+function hiresIn(text: string | undefined) {
+  let wiring: unknown;
+  try {
+    wiring = JSON.parse(text ?? '{}');
+  } catch {
+    return [];
+  }
+  const hires = isJsonObject(wiring) ? wiring.hires : undefined;
+  return Object.entries(isJsonObject(hires) ? hires : {}).flatMap(([step, agent]) => (typeof agent === 'string' ? [{ step, agent }] : []));
+}
+
 /**
- * The spec `owner` of `factory` proposes as `merge` composes its files with `choices`, or its removal (`undefined`); `ours`, the tree's
- * text files now, says what a removal of the rules or the instruction takes away. Thrown `Invalid` as the file's head says.
+ * What the removal of `agent` does to the hires: the steps of the tree's wiring `tree` it is hired into, fired by the same proposal; or,
+ * where the wiring the upgrade composes, `composed`, still hires it, the steps it is hired into there.
+ * @param agent The agent the resolution removes.
+ * @param tree The tree's hires now.
+ * @param composed The hires the upgrade composes.
+ */
+export const agentHiresFired: AgentHiresFired = (agent, tree, composed) => {
+  const into = (hires: Hires) => hires.filter((hire) => hire.agent === agent).map((hire) => hire.step);
+  const still = into(composed);
+  return still.length > 0 ? { stillHired: still } : { fire: into(tree) };
+};
+
+/** One object an owner proposes: its kind, its name and its spec, undefined for a removal. */
+export type OwnerObject = { kind: ResolutionOwner['kind']; name: string; spec: unknown };
+
+/** The Hire `<workflow>/<step>` fired: its object, which hires no one into the step. */
+const fired = (step: string) => {
+  const cut = step.indexOf('/');
+  const [workflow, name] = [step.slice(0, cut), step.slice(cut + 1)];
+  return { kind: 'Hire', name: `${workflow}.${name}`, spec: { workflow, step: name } } satisfies OwnerObject;
+};
+
+/**
+ * The objects `owner` of `factory` proposes as `merge` composes its files with `choices`: the spec of the owner, or its removal; and, for
+ * an Agent the composition removes, first a Hire fired for each step the tree's wiring hires it into, so the factory never holds a hire of
+ * an agent it no longer has. `ours`, the tree's text files now, says what a removal of the rules or the instruction takes away, and what
+ * the tree hires. Thrown `Invalid` as the file's head says, and where the composed wiring still hires the agent it removes.
  * @param factory The factory's name.
  * @param owner The owner of the conflicts: its kind and name.
  * @param merge The merge of the trees: its clean entries and its conflicts.
  * @param choices The person's choice for each conflict, by where it is; a conflict with none is taken as the tree has it.
  * @param ours The tree's text files now, by their path in it.
  */
-export function ownerSpec(
+export function ownerObjects(
   factory: string,
   owner: ResolutionOwner,
   merge: TreeMerge,
@@ -140,17 +179,26 @@ export function ownerSpec(
   ours: Texts,
 ) {
   const texts = composedTexts(merge, choices);
+  const object = (spec: unknown) => ({ kind: owner.kind, name: owner.name, spec }) satisfies OwnerObject;
   switch (owner.kind) {
     case 'Workflow':
-      return workflowOf(factory, owner, texts) as unknown;
-    case 'Agent':
-      return agentOf(factory, owner, texts) as unknown;
+      return [object(workflowOf(factory, owner, texts))];
+    case 'Agent': {
+      const spec = agentOf(factory, owner, texts);
+      if (spec !== undefined) return [object(spec)];
+      const removed = agentHiresFired(owner.name, hiresIn(ours.get(WIRING_FILE)), hiresIn(texts.get(WIRING_FILE)));
+      if ('stillHired' in removed)
+        throw new Invalid({
+          message: `nemia factory resolve: your choices remove the agent ${owner.name}, which the upgraded wiring still hires into ${removed.stillHired.join(', ')}: keep the agent, --ours or --file <path> on its conflict, or fire its hires, nemia factory fire <workflow>.<step>. ${keptLine(factory, owner)}`,
+        });
+      return [...removed.fire.map(fired), object(undefined)];
+    }
     case 'Skill':
-      return skillOf(factory, owner, texts) as unknown;
+      return [object(skillOf(factory, owner, texts))];
     case 'Hire':
-      return hireOf(factory, owner, texts) as unknown;
+      return [object(hireOf(factory, owner, texts))];
     case 'Factory':
-      return factoryOf(factory, owner, texts, ours) as unknown;
+      return [object(factoryOf(factory, owner, texts, ours))];
   }
-  return undefined;
+  return [];
 }

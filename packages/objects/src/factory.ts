@@ -195,6 +195,11 @@ export const FactoryUpgrade = Schema.Struct({
       base: Side.annotate({ description: 'The text of the common base, cut; null where it has none.' }),
       ours: Side.annotate({ description: "The text of the factory's side, cut; null where it has none." }),
       theirs: Side.annotate({ description: "The text of the template's side, cut; null where it has none." }),
+      message: Schema.optionalKey(
+        Schema.String.annotate({
+          description: 'Why the merge asks a choice here where it would have taken a side; absent for a plain conflict.',
+        }),
+      ),
       proposal: Schema.optionalKey(
         ConflictProposal.annotate({ description: 'The proposal its resolution waits on; absent where none was made.' }),
       ),
@@ -614,6 +619,11 @@ const MergeConflict = Schema.Struct({
   base: Side.annotate({ description: 'The text of the common base; null where it has none.' }),
   ours: Side.annotate({ description: "The text of the factory's side; null where it has none." }),
   theirs: Side.annotate({ description: "The text of the template's side; null where it has none." }),
+  message: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'Why the merge asks a choice here where it would have taken a side; absent for a plain conflict.',
+    }),
+  ),
 });
 
 /**

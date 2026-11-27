@@ -130,8 +130,6 @@ describe('needOf: what a step needs from a person — its question, its blocked 
       toDecide: {
         kind: 'approve',
         step: 'ship',
-        says: 'Merge it.',
-        filed: false,
         back: ['implement'],
         onto: 'main',
         said: 'Merge it. — wf approve r ship',

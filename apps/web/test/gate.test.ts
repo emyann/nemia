@@ -6,7 +6,6 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   decideLine,
-  endingWarning,
   gateBrief,
   gateCardLine,
   gateFacts,
@@ -40,15 +39,13 @@ const step = (name: string, over: Partial<Step> = {}) =>
     ...over,
   }) as Step;
 
-const ENDING_DECIDE = {
+const GATE_DECIDE = {
   kind: 'approve',
-  step: 'ship',
-  says: 'Merge this run onto the base branch, or abort on any failure.',
-  filed: false,
-  back: ['review'],
+  step: 'plan',
+  back: ['plan'],
   onto: 'main',
-  said: 'Merge this run onto the base branch, or abort on any failure.',
-  command: 'wf approve r ship',
+  said: 'approve plan',
+  command: 'wf approve r plan',
 } as unknown as NonNullable<RunView['toDecide']>;
 
 const summary = (over: Partial<RunView> = {}) =>
@@ -81,43 +78,34 @@ const colliding = (more: Partial<Collisions>) =>
   ({
     touched: [],
     standings: [],
-    collisions: { onto: 'main', base: [], inFlight: [], colliding: [], semantic: null, said: 'no other run is in flight on main', ...more },
+    collisions: { onto: 'main', base: [], inFlight: [], colliding: [], said: 'no other run is in flight on main', ...more },
   }) as unknown as Decidable;
 
 /** The facts under a gate past the round every one opens with, off `decision`. */
 const pastRound = (decision: Decidable | null) => gateFacts(detail([]), decision).filter((f) => f.label !== 'round');
 
 describe("gateOfSummary, readLink: the card's gate, what it approves and sends back, and none on a run held or called off", () => {
-  test("the card's gate is the ending the to-decide names, held before it is filed: approving runs it on the base, and a send-back goes to what it waits on", () => {
-    const gate = gateOfSummary(summary({ toDecide: ENDING_DECIDE, waitingOnYou: ['ship'] }));
-    assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
-    assert.equal(gateCardLine(gate), 'approve to run ship on main, or send review back');
-    assert.equal(gateNodeLine(gate), 'approve ship to run it');
-    assert.equal(takenLine({ approved: true }, gate), 'approved — the next pass files ship');
-    assert.equal(
-      takenLine({ asked: { try: 2, stopFirst: false }, to: 'review' }, gate),
-      'sent back to review — try 2 asked — the next tick files it',
-    );
-  });
-  test('a to-decide gate whose send-back names the step itself is not an ending: it ran, and approving files what waits on it', () => {
-    const decide = { ...ENDING_DECIDE, step: 'plan', back: ['plan'] } as NonNullable<RunView['toDecide']>;
-    const gate = gateOfSummary(summary({ toDecide: decide }));
-    assert.equal(gate?.ends, false, 'the step is where a send-back goes: it has a task, so it ran');
+  test("the card's gate is the one the to-decide names: approving files what waits on it, and a send-back goes to the step itself", () => {
+    const gate = gateOfSummary(summary({ toDecide: GATE_DECIDE, waitingOnYou: ['plan'] }))!;
+    assert.deepEqual(gate, { step: 'plan', back: ['plan'], onto: 'main' });
     assert.equal(gateCardLine(gate), 'approve what plan handed on, or send it back');
     assert.equal(gateNodeLine(gate), "approve plan's hand-off");
     assert.equal(takenLine({ approved: true }, gate), 'approved — the next pass files what waits on plan');
+    assert.equal(
+      takenLine({ asked: { try: 2, stopFirst: false }, to: 'plan' }, gate),
+      'sent back to plan — try 2 asked — the next tick files it',
+    );
   });
   test("a step waiting at its gate on you is the card's gate when no to-decide names one; a run called off, or a gate not waiting on you, has none", () => {
     const steps = [step('plan', { approve: 'approve plan' }), step('implement')] as unknown as RunView['steps'];
     assert.deepEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), {
       step: 'plan',
-      ends: false,
       back: ['plan'],
       onto: null,
     });
     assert.equal(gateOfSummary(summary({ steps, waitingOnYou: [] })), null, 'approved already: not waiting on you');
     assert.equal(gateOfSummary(summary({ steps, waitingOnYou: ['plan'], cancelledAt: '2026-09-19T07:00:00.000Z' })), null);
-    assert.equal(gateOfSummary(summary({ toDecide: ENDING_DECIDE, cancelledAt: '2026-09-19T07:00:00.000Z' })), null);
+    assert.equal(gateOfSummary(summary({ toDecide: GATE_DECIDE, cancelledAt: '2026-09-19T07:00:00.000Z' })), null);
     const asks = [step('implement', { needs: 'Which database?' })] as unknown as RunView['steps'];
     assert.equal(
       gateOfSummary(summary({ steps: asks, waitingOnYou: ['implement'] })),
@@ -125,12 +113,11 @@ describe("gateOfSummary, readLink: the card's gate, what it approves and sends b
       'a question is not a gate: it is answered on the run page',
     );
   });
-  test('an ending that waits on nothing has nobody to send back, and says so rather than offering it', () => {
-    const decide = { ...ENDING_DECIDE, back: [] } as unknown as NonNullable<RunView['toDecide']>;
+  test('a gate that has nobody to send back says so rather than offering it', () => {
+    const decide = { ...GATE_DECIDE, back: [] } as unknown as NonNullable<RunView['toDecide']>;
     const gate = gateOfSummary(summary({ toDecide: decide }))!;
-    assert.equal(gate.ends, true);
-    assert.equal(gateCardLine(gate), 'approve to run ship on main: it waits on no step to send back');
-    assert.equal(gateBrief(gate, null, []).sendingBack, 'There is nothing to send back: ship waits on no step.');
+    assert.equal(gateCardLine(gate), 'approve what plan handed on: it waits on no step to send back');
+    assert.equal(gateBrief(gate, []).sendingBack, 'There is nothing to send back: plan waits on no step.');
   });
   test('REFUSED: a run a person holds has no gate on its card, whether a to-decide or a step waiting at its gate names it — the package refuses the approval', () => {
     const holding = {
@@ -141,57 +128,31 @@ describe("gateOfSummary, readLink: the card's gate, what it approves and sends b
       waitingOnYou: false,
     };
     const steps = [step('plan', { approve: 'approve plan' })] as unknown as RunView['steps'];
-    assert.notEqual(gateOfSummary(summary({ toDecide: ENDING_DECIDE })), null);
-    assert.equal(gateOfSummary({ ...summary({ toDecide: ENDING_DECIDE }), holding }), null);
+    assert.notEqual(gateOfSummary(summary({ toDecide: GATE_DECIDE })), null);
+    assert.equal(gateOfSummary({ ...summary({ toDecide: GATE_DECIDE }), holding }), null);
     assert.notEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), null);
     assert.equal(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding }), null);
     assert.notEqual(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding: null }), null, 'a run nobody holds');
   });
-  test("the card's link to what a gate approves: the step's inspector, in one set of words whatever its name, and an ending's section, which has handed nothing on", () => {
-    assert.deepEqual(readLink({ step: 'plan', ends: false }), { words: 'Read what it handed on', step: 'plan' });
-    assert.deepEqual(readLink({ step: 'review', ends: false }), { words: 'Read what it handed on', step: 'review' });
-    assert.deepEqual(readLink({ step: 'ship', ends: true }), { words: 'Read what it acts on', hash: 'step-ship' });
-    assert.deepEqual(
-      readLink({ step: 'plan', ends: true }),
-      { words: 'Read what it acts on', hash: 'step-plan' },
-      'an ending has handed nothing on yet, whatever its name',
-    );
+  test("the card's link to what a gate approves: the step's inspector, in one set of words whatever its name", () => {
+    assert.deepEqual(readLink({ step: 'plan' }), { words: 'Read what it handed on', step: 'plan' });
+    assert.deepEqual(readLink({ step: 'review' }), { words: 'Read what it handed on', step: 'review' });
   });
 });
 
 describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it, and what else a run waits on a person for", () => {
-  test("the inspector's gate is read off the step: an ending with no task runs on approval and goes back along its `after` edges, never its loop's", () => {
-    const ship = step('ship', { approve: 'approve ship', taskId: null, spec: { workspace: 'base' } as Step['spec'] });
-    const run = detail([ship]);
-    const gate = gateOfStep(run, ship);
-    assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
-    const brief = gateBrief(gate, 'Merge this run onto the base branch.', []);
-    assert.equal(brief.waits, 'ship waits at its gate: it has not run, and it runs only on your approval.');
-    assert.equal(
-      brief.approving,
-      "Approving runs ship in the repository's own checkout, on main, handed your words, if any, as its terms. Its folder says what it does: “Merge this run onto the base branch.”",
-    );
-    assert.equal(
-      brief.sendingBack,
-      'Sending back asks review for a new try, told your words; ship waits at its gate again once it signs off.',
-    );
-    assert.equal(gateOfStep({ ...run, waitingOnYou: [] }, ship), null, 'not waiting on you');
-    assert.equal(gateOfStep({ ...run, cancelledAt: '2026-09-19T07:00:00.000Z' }, ship), null, 'called off');
-    assert.equal(gateOfStep(run, { ...ship, approve: null }), null, 'no words: no gate offered');
-  });
-  test("a gate on a step that ran is §6's: approving files what waits on it, and a send-back asks the step itself", () => {
+  test("the inspector's gate is read off the step: approving files what waits on it, and a send-back asks the step itself", () => {
     const plan = step('plan', { approve: 'approve plan', spec: {} as Step['spec'] });
-    const gate = gateOfStep(detail([plan], { waitingOnYou: ['plan'] }), plan)!;
-    assert.deepEqual(gate, { step: 'plan', ends: false, back: ['plan'], onto: 'main' });
-    const brief = gateBrief(gate, null, ['implement']);
+    const run = detail([plan], { waitingOnYou: ['plan'] });
+    const gate = gateOfStep(run, plan)!;
+    assert.deepEqual(gate, { step: 'plan', back: ['plan'], onto: 'main' });
+    const brief = gateBrief(gate, ['implement']);
+    assert.equal(brief.waits, 'plan has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.');
     assert.equal(brief.approving, "Approving files implement, handed plan's closeout and your words, if any.");
     assert.equal(brief.sendingBack, 'Sending back asks plan for a new try, told your words; it waits at its gate again once it signs off.');
-    const ran = step('ship', { approve: 'approve ship', spec: { workspace: 'base' } as Step['spec'] });
-    assert.deepEqual(
-      gateOfStep(detail([ran]), ran),
-      { step: 'ship', ends: false, back: ['ship'], onto: 'main' },
-      'an ending that has a task already, sent back and filed, holds after it ran: a send-back asks it, not what it waits on',
-    );
+    assert.equal(gateOfStep({ ...run, waitingOnYou: [] }, plan), null, 'not waiting on you');
+    assert.equal(gateOfStep({ ...run, cancelledAt: '2026-09-19T07:00:00.000Z' }, plan), null, 'called off');
+    assert.equal(gateOfStep(run, { ...plan, approve: null }), null, 'no words: no gate offered');
   });
   test("the facts under a gate: the round of its loop's cap and the cost, the review's word, each check's verdict, and — once the decision is read — what it touched and whether it merges", () => {
     const steps = [
@@ -269,7 +230,7 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     const failed = [step('implement', { check: { verdict: { result: 'failed', exit: 1 } } as Step['check'] })];
     assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');
   });
-  test("the facts under an ending's gate: the runs in flight on its base, each it collides with and in which files, and the semantic conflict", () => {
+  test("the facts under a gate: the runs in flight on its base, each it collides with and in which files", () => {
     const conflict: Collision = {
       run: 'r-2',
       branch: 'wf/r-2/implement',
@@ -294,11 +255,6 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
       said: 'not known',
       state: undefined,
     });
-    const semantic = { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" };
-    assert.deepEqual(pastRound(colliding({ semantic })), [
-      { label: 'others', said: 'no other run is in flight on main', state: 'good' },
-      { label: 'semantic', said: "ship's landing check refused the merged tree", state: 'bad', step: 'ship' },
-    ]);
   });
   test('REFUSED: no fact of collisions under a gate whose decision read none, or is not read yet', () => {
     assert.deepEqual(pastRound({ touched: [], standings: [], collisions: null } as unknown as Decidable), []);
@@ -319,19 +275,5 @@ describe("gateOfStep, gateFacts, needWords: the inspector's gate, the facts unde
     assert.equal(needWords({ step: 'held', kind: 'harness', waitingFor: null, lastLine: null }), 'held is blocked by the harness');
     assert.equal(decideLine(['wf/r/implement']), 'decide its result: a branch ahead of the base that nothing merges');
     assert.equal(decideLine(['a', 'b']), 'decide its result: 2 branches ahead of the base that nothing merges');
-  });
-});
-
-describe('endingWarning: what approving an ending does, on the base branch where it is known, and that it cannot be taken back', () => {
-  test('an ending onto main says it runs in the checkout on main', () => {
-    const said = endingWarning('ship', 'main');
-    assert.match(said, /runs ship in the repository's own checkout on main,/);
-    assert.match(said, /cannot be taken back\.$/);
-  });
-  test('an ending whose base is not known names no branch, and still warns', () => {
-    const said = endingWarning('ship', null);
-    assert.match(said, /runs ship in the repository's own checkout,/);
-    assert.doesNotMatch(said, / on /);
-    assert.match(said, /cannot be taken back\.$/);
   });
 });

@@ -664,16 +664,6 @@ test('the approval under a step: the try, when, and the words as they were writt
     `a gate lets what follows through\n${html}`,
   );
   assert.ok(textsOf(none).join(' ').includes('every step after the gate is handed the approval'), none);
-  const ending = renderToStaticMarkup(
-    createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: words }, ends: true }),
-  );
-  assert.ok(
-    textsOf(ending).join(' ').includes('your approval filed it, and the step is handed these words as the terms it acts on'),
-    `an ending's approval files the step itself, and the words are the terms it acts on\n${ending}`,
-  );
-  const bare = renderToStaticMarkup(createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: null }, ends: true }));
-  assert.ok(textsOf(bare).join(' ').includes('your approval filed it, and the step is handed it as the terms it acts on'), bare);
-  assert.doesNotMatch(ending, /every step after the gate/);
   assert.deepEqual(
     [
       Gates.gateWord({ awaiting: true, approval: null }),
@@ -697,194 +687,28 @@ const decidedAs = (standings: unknown[]) => ({
   commands: [],
 });
 
-/** What an ending's gate would act on, drawn in a router (each work step a link to its part) with the run's decision already read. */
-const actsOn = (run: RunDetail, decision: unknown) =>
-  routedWith(createElement(Gates.ActsOn, { run, step: run.steps[1] }), [
-    [['runs', run.id, 'decision', decisionStamp(run)], decision],
-  ]) satisfies Promise<string>;
-
-test('the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off', async () => {
-  const [implement, ship] = endingRun().steps;
-  assert.equal(Gates.endsTheRun(ship), true, "it works in the repository's own checkout");
-  assert.equal(Gates.endsTheRun(implement), false, 'the work does not');
-  assert.equal(Gates.endsTheRun({ spec: null }), false, 'nor a step nothing defines any more');
-  assert.equal(Gates.endsTheRun({ spec: { ...ship.spec!, workspace: null } }), false, 'nor one in a worktree of the run');
-
-  const held = { awaiting: false, approval: null };
-  assert.equal(
-    Gates.gateWord(held, true),
-    'holds once the work has handed on, and your approval files it',
-    'its gate holds before the step is filed, so the word for a gate not yet held is about the work, never about this step signing off',
-  );
-
-  assert.equal(Gates.gateWord(held), 'holds once it has signed off', "§6's gate, which holds what its step handed on");
-  assert.deepEqual(
-    [
-      Gates.gateWord({ awaiting: true, approval: null }, true),
-      Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }, true),
-    ],
-    ['awaiting approval', 'approved, try 1'],
-    "at it, and approved, both gates read the same: the word is the run's state, not the step's kind",
-  );
-});
-
-test("what an ending step would act on, beside its gate: the branch's standing and counts, and a link to each work step's part with its summary", async () => {
-  const run = endingRun();
-  const standing = {
-    branch: 'wf/r-1/implement',
-    where: 'ahead',
-    commits: 3,
-    said: 'wf/r-1/implement is ahead of main by 3 commits',
-    stat: '4 files: +456 −2',
-  };
-  const html = await actsOn(run, decidedAs([standing]));
-  assert.match(
-    html,
-    /^<div data-slot="typography" class="text-body-medium font-body-medium contents"><section aria-label="What ship would act on"/,
-  );
-  assert.match(html, /data-standing="ahead"/);
-  const texts = textsOf(html);
-  assert.ok(texts.includes(standing.said), html);
-  assert.ok(texts.includes(standing.stat), 'how much it changed, as `wf decide` prints it');
-  assert.match(
-    html,
-    /<li data-acts-on="implement"[^>]*><a [^>]*href="\/runs\/r-1#step-implement"[^>]*>What implement gave<\/a>/,
-    `the work it waits on, off the graph, a link to its part on the run's page\n${html}`,
-  );
-  assert.doesNotMatch(
-    html,
-    /<h4[^>]*>What changed|Artifacts of implement|data-artifact/,
-    'what it gave is its part, drawn once, not here again',
-  );
-
-  const none = await actsOn(run, decidedAs([]));
-  assert.ok(
-    textsOf(none).includes('No result branch of its own: the work is on the base branch.'),
-    `a run with no result branch of its own: said, not left blank\n${none}`,
-  );
-});
-
-test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", async () => {
-  const run = endingRun();
-  const why = 'the place was not heard: timed out';
-  const standing = {
-    branch: 'wf/r-1/implement',
-    where: 'unread',
-    why,
-    said: `wf/r-1/implement: where it stands is not read (${why})`,
-    stat: null,
-  };
-  const html = await actsOn(run, decidedAs([standing]));
-  assert.match(html, /data-standing="unread"/);
-  assert.ok(textsOf(html).includes(standing.said), html);
-  assert.doesNotMatch(html, /data-standing="(on|ahead|gone)"|data-stat/, 'no standing of its own, and no counts');
-});
-
-test('the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses', () => {
-  const html = withClient(
-    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['implement'], acts: true }),
-  );
-  const texts = textsOf(html).join(' ');
-  assert.match(
-    texts,
-    /ship waits at its gate: nothing of it runs until you approve it — your approval is what files it — or you send implement back\./,
-  );
-  assert.ok(texts.includes('nemia approve r-1 ship'), html);
-  assert.match(texts, /the next tick files it(?! what)/);
-  const forms = [...html.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(forms, ['Approve ship', 'Send implement back'], 'the send-back names the step it goes to');
-  assert.match(html, /<textarea aria-label="What to change, sent back to implement"/);
-  const wide = withClient(
-    createElement(Gates.Gate, {
-      runId: 'r-1',
-      step: 'ship',
-      approveLine: 'nemia approve r-1 ship',
-      back: ['implement', 'docs'],
-      acts: true,
-    }),
-  );
-  assert.deepEqual(
-    [...wide.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
-    ['Approve ship', 'Send the work back'],
-    'several work steps: one send-back form',
-  );
-  const to = kitRadios(wide, /-to$/);
-  assert.deepEqual(
-    to,
-    [
-      ['implement', true],
-      ['docs', false],
-    ],
-    'the objection picks one, since one is enough to hold the gate again',
-  );
-  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
-  assert.match(
-    textsOf(held).join(' '),
-    /plan waits at its gate: nothing after it is filed until you approve what it handed on, or send it back\./,
-    'a gate that is no ending holds what its step handed on',
-  );
-  assert.doesNotMatch(held, /name="[^"]*-to"/, "and its send-back is the step's own");
-});
-
-test("the second press at an ending's gate reads the ending's warning, on its base branch, then the press that approves it", () => {
-  const onMain = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: 'main' }))).join(' ');
-  assert.match(
-    onMain,
-    /runs ship in the repository's own checkout on main, and it cannot be taken back\. Press Run ship now to approve it\.$/,
-  );
-  const unknown = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: null }))).join(' ');
-  assert.match(unknown, /own checkout, and it cannot be taken back\. Press Run ship now/, 'no branch is named where the run knows none');
-});
-
-test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
-  const html = withClient(
-    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),
-  );
-  assert.match(
-    html,
-    /placeholder="Your words \(optional\): the step is handed them as the terms it acts on, under “Approved”\."/,
-    "the words go to the step itself, as its brief's `## Approved` hands them: nothing follows an ending to be handed anything",
-  );
+test("the gate's own words: the approval's box says every step after the gate is handed them, and the word taken names the step it was about", () => {
   const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.match(held, /placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/);
-
-  assert.deepEqual(
-    Gates.takenOf({ approved: 1 }, 'ship', true),
-    { named: 'ship', said: 'approved try 1 — the next tick files it' },
-    "the panel shown the moment a word is taken: an approval is the gated step's, and files it where nothing follows it",
-  );
-  assert.deepEqual(Gates.takenOf({ approved: 2 }, 'plan', false), {
+  assert.deepEqual(Gates.takenOf({ approved: 2 }, 'plan'), {
     named: 'plan',
     said: 'approved try 2 — the next tick files what waits on it',
   });
-  assert.deepEqual(
-    Gates.takenOf({ asked: { try: 2, stopFirst: false }, step: 'review' }, 'ship', true),
-    { named: 'review', said: 'try 2 asked — the next tick files it' },
-    "a send-back is about the step its try was asked for: the work at an ending's gate, never the step at the gate",
-  );
-  assert.deepEqual(Gates.takenOf({ asked: { try: 3, stopFirst: false }, step: 'plan' }, 'plan', false), {
+  assert.deepEqual(Gates.takenOf({ asked: { try: 3, stopFirst: false }, step: 'plan' }, 'plan'), {
     named: 'plan',
     said: 'try 3 asked — the next tick files it',
   });
 });
 
-test('REFUSED: an ending that waits on nothing is offered no send-back, since a try of the unfiled step is refused — the approval is the only word there is', () => {
-  const alone = withClient(
-    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: [], acts: true }),
-  );
+test('REFUSED: a gate with nothing to send back is offered the approval alone', () => {
+  const alone = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', back: [] }));
   const forms = [...alone.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(forms, ['Approve ship'], "the approval alone, as `wf ls`'s gate note prints it for such a step");
+  assert.deepEqual(forms, ['Approve plan'], 'the approval alone');
   assert.doesNotMatch(alone, /Send back|What to change/);
-  assert.ok(
-    textsOf(alone).join(' ').includes('ship waits at its gate: nothing of it runs until you approve it — your approval is what files it.'),
-    alone,
-  );
-  const withWork = withClient(
-    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),
-  );
+  const withWork = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.deepEqual(
     [...withWork.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
-    ['Approve ship', 'Send review back'],
+    ['Approve plan', 'Send plan back'],
     'with work to send back to, both are offered',
   );
 });
@@ -921,7 +745,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
   assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
 });
 
-test('the Decide section of an ending whose landing its check refused shows its trial merges: the runs in flight, each it collides with, and the semantic conflict, linked to the step — and none where the decision read no trial', async () => {
+test('the Decide section shows its trial merges: the runs in flight and each it collides with — and none where the decision read no trial', async () => {
   const decision: Decidable = {
     standings: [],
     touched: [],
@@ -944,7 +768,6 @@ test('the Decide section of an ending whose landing its check refused shows its 
           said: "conflicts with r-2's wf/r-2/implement in 1 file: src/a.ts",
         },
       ],
-      semantic: { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" },
       said: 'collides with 1 of the 1 run in flight on main: r-2',
     },
     commands: [],
@@ -957,12 +780,8 @@ test('the Decide section of an ending whose landing its check refused shows its 
     merges,
     /<dd data-fact="collides" data-state="bad"[^>]*>wf\/r-1\/implement conflicts with r-2&#x27;s wf\/r-2\/implement in 1 file: src\/a\.ts<\/dd>/,
   );
-  assert.match(
-    merges,
-    /<dd data-fact="semantic" data-state="bad"[^>]*><a [^>]*data-fact-link="ship"[^>]*href="\/runs\/r-1#step-ship"[^>]*>ship&#x27;s landing check refused the merged tree<\/a><\/dd>/,
-  );
   const none = await routedWith(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, collisions: null } }));
-  assert.doesNotMatch(none, /Trial merges|data-fact="(others|collides|semantic)"/, 'no trial read: nothing said of one');
+  assert.doesNotMatch(none, /Trial merges|data-fact="(others|collides)"/, 'no trial read: nothing said of one');
 });
 
 test('what sessions read, by price: beside the cost, the peak marked at a cap or past 200k, a rebuilt cache said beneath — and no row where nothing measured it', () => {

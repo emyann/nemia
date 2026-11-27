@@ -524,8 +524,6 @@ const approve = (id: string, step: string) =>
   ({
     kind: 'approve',
     step,
-    says: 'Merge it onto the base branch.',
-    filed: false,
     back: [step],
     onto: 'main',
     said: `Merge it onto the base branch. — wf approve ${id} ${step}`,

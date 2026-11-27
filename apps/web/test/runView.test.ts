@@ -39,7 +39,6 @@ const frozen = (name: string, after: string[]) =>
     model: `${name}-model`,
     effort: null,
     context: null,
-    workspace: null,
     place: null,
     resume: null,
     fence: 'acceptEdits',

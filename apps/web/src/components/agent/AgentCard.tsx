@@ -1,4 +1,6 @@
 import type { AgentListing, AgentRoleKey } from '../../lib/api/agents.ts';
+import type { PagePlace } from '../../lib/api/workflows.ts';
+import { definitionLink } from '../../lib/factoryAddress';
 import { AgentFace, FromBadge, personOf, RouteLink, Skills, UsedBy } from './AgentParts';
 import { FactoryTags } from '../factory/FactoryTag';
 
@@ -10,9 +12,15 @@ const STATS: readonly AgentRoleKey[] = ['model', 'effort', 'harness'];
  * can do, its model, effort and harness where it sets them, the factories it fills a step in, each linked to its floor — nothing for none,
  * or where the listing does not say — and the nodes that name it. The whole card opens the agent's page, where every other key, the skills
  * it gives and what becomes of Claude Code's own prompt are; its name is the link there, stretched over the card, and the factories' and
- * the nodes' links sit above it.
+ * the nodes' links sit above it. A factory's own agent is read in the factory `place` names, which alone serves its page.
  */
-export function AgentCard({ agent }: { agent: Omit<AgentListing, 'body' | 'schema' | 'source'> & { factories?: readonly string[] } }) {
+export function AgentCard({
+  agent,
+  place = {},
+}: {
+  agent: Omit<AgentListing, 'body' | 'schema' | 'source'> & { factories?: readonly string[] };
+  place?: PagePlace;
+}) {
   return (
     <section
       aria-label={`Agent ${agent.name}`}
@@ -28,8 +36,7 @@ export function AgentCard({ agent }: { agent: Omit<AgentListing, 'body' | 'schem
         <header className="flex flex-col items-center gap-1 text-center">
           <h3 className="text-title-medium leading-tight">
             <RouteLink
-              to="/agents/$from/$agent"
-              params={{ from: agent.from, agent: agent.name }}
+              {...definitionLink('agent', agent.from, agent.name, place)}
               className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring/50"
             >
               {personOf(agent.name)}

@@ -4,11 +4,12 @@ import { AgentCard } from './AgentCard';
 import { personOf, SkillLink } from './AgentParts';
 import { ListFilter, NothingMatches } from '../filter/ListFilter';
 import { Button } from '@/components/ui/ds';
-import { agentsQuery, type LibraryAgent } from '@/lib/api/agents';
+import { agentsQuery, factoryAgentsQuery, type LibraryAgent } from '@/lib/api/agents';
 import { skillsQuery, type SkillPlace } from '@/lib/api/skills';
 import { storeQuery } from '@/lib/api/store';
 import { matches, useFilterText } from '@/lib/listFilter';
 import { PLACE_LABELS } from '@/lib/skills';
+import type { PagePlace } from '@/lib/api/workflows';
 
 /**
  * What the Agents page loads before it draws: your agents and your folders, and the skills, which it draws once they come.
@@ -16,6 +17,22 @@ import { PLACE_LABELS } from '@/lib/skills';
  */
 export const loadAgents = (client: QueryClient) =>
   Promise.all([client.ensureQueryData(agentsQuery), client.ensureQueryData(storeQuery), client.prefetchQuery(skillsQuery)]);
+
+/**
+ * What a factory's Agents page loads before it draws: the factory's own agents, then all the Agents page loads.
+ * @param client The board's query client.
+ * @param factory The factory's name.
+ */
+export const loadFactoryAgents = (client: QueryClient, factory: string) =>
+  Promise.all([client.ensureQueryData(factoryAgentsQuery(factory)), loadAgents(client)]);
+
+/**
+ * A factory's Agents page: the Agents page with the factory's own agents listed first, under the factory's name.
+ */
+export function FactoryAgentsPage({ factory, query, onQuery }: { factory: string; query: string; onQuery: (query: string) => void }) {
+  const { data: agents } = useSuspenseQuery(factoryAgentsQuery(factory));
+  return <AgentsPage query={query} onQuery={onQuery} own={{ factory, agents }} />;
+}
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -25,17 +42,26 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * attached — what that node's work is told first and runs with — and each lists the nodes that name it. Then the skills an agent can be
  * given, by place, each linked to its page. Your folders are the api's (`storeQuery`). Both lists are filtered by the address's `query`
  * (`?q=`) as a person types, each keystroke handed to `onQuery`: while it holds a text, a list it keeps nothing of is not drawn, and
- * where it keeps nothing of either, once the skills are read, the page says nothing matches.
+ * where it keeps nothing of any, once the skills are read, the page says nothing matches. On a factory's page, `own` holds the factory's
+ * own agents, listed first under its name and filtered the same way.
  */
-export function AgentsPage({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {
+export function AgentsPage({
+  query,
+  onQuery,
+  own,
+}: {
+  query: string;
+  onQuery: (query: string) => void;
+  own?: { factory: string; agents: readonly LibraryAgent[] };
+}) {
   const { data: agents } = useSuspenseQuery(agentsQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: skills } = useQuery(skillsQuery);
   const [text, setText] = useFilterText(query, onQuery);
   const filtering = text.trim() !== '';
-  const yours = agents
-    .filter((a) => a.from === 'user')
-    .filter((a) => matches(text, a.name, a.description) || matches(text, personOf(a.name)));
+  const kept = (a: LibraryAgent) => matches(text, a.name, a.description) || matches(text, personOf(a.name));
+  const yours = agents.filter((a) => a.from === 'user').filter(kept);
+  const factoryOwn = own?.agents.filter(kept) ?? [];
   const places = skills?.map((place) => ({
     ...place,
     skills: place.skills.filter((one) => matches(text, one.name, one.entry?.description)),
@@ -62,7 +88,22 @@ export function AgentsPage({ query, onQuery }: { query: string; onQuery: (query:
       </div>
 
       <ListFilter label="Filter agents and skills" text={text} onText={setText} />
-      {filtering && yours.length === 0 && keptPlaces?.length === 0 && <NothingMatches text={text} onClear={() => setText('')} />}
+      {filtering && factoryOwn.length === 0 && yours.length === 0 && keptPlaces?.length === 0 && (
+        <NothingMatches text={text} onClear={() => setText('')} />
+      )}
+      {own && (!filtering || factoryOwn.length > 0) && (
+        <Place
+          title={own.factory}
+          agents={factoryOwn}
+          place={{ factory: own.factory }}
+          empty={
+            <>
+              {own.factory} has no agent of its own. A factory's agents come from its template, or from the {code('agents/')} folder of its
+              tree.
+            </>
+          }
+        />
+      )}
       {(!filtering || yours.length > 0) && (
         <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code(`${store.agents}/`)}.</>} />
       )}
@@ -71,8 +112,18 @@ export function AgentsPage({ query, onQuery }: { query: string; onQuery: (query:
   );
 }
 
-/** One place's agents, a card each with the factories it fills a step in; `empty` where it has none. */
-function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]; empty: React.ReactNode }) {
+/** One place's agents, a card each with the factories it fills a step in, linked in `place`; `empty` where it has none. */
+function Place({
+  title,
+  agents,
+  empty,
+  place,
+}: {
+  title: string;
+  agents: readonly LibraryAgent[];
+  empty: React.ReactNode;
+  place?: PagePlace;
+}) {
   return (
     <section aria-label={title} className="space-y-3">
       <h2 className="text-title-small">{title}</h2>
@@ -80,7 +131,7 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
         <ul className="grid gap-4 @md/page:grid-cols-2 @5xl/page:grid-cols-3">
           {agents.map((agent) => (
             <li key={`${agent.from}:${agent.name}`}>
-              <AgentCard agent={agent} />
+              <AgentCard agent={agent} {...(place && { place })} />
             </li>
           ))}
         </ul>

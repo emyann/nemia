@@ -70,8 +70,8 @@ export const AgentFill = Schema.Struct({
 });
 
 /**
- * A skill the agent gives, as its line names it: the origin a start finds it in (null where none, `foundIn` then the folder the repository
- * has it in, or null too), its card entry or why it has none, and what it costs a turn.
+ * A skill the agent gives, as its line names it: the origin a start finds it in (null where none), the folder the repository has it in
+ * (`foundIn`, null where it has none), its card entry or why it has none, and what it costs a turn.
  */
 export const GivenSkill = Schema.Struct({
   name: Schema.String.annotate({ description: "The skill's name, as the agent's line names it." }),
@@ -79,7 +79,7 @@ export const GivenSkill = Schema.Struct({
     description: 'The origin a start finds the skill in; null where none.',
   }),
   foundIn: Text.annotate({
-    description: 'The folder the repository has the skill in, where a start finds none; null too where it has none.',
+    description: "The folder the repository has the skill in, from the repository's root; null where the repository has none.",
   }),
   entry: Schema.NullOr(CardSkill).annotate({ description: 'Its card entry; null where it has none.' }),
   error: Text.annotate({ description: 'Why it has no card entry; null where it has one.' }),

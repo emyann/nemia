@@ -22,7 +22,7 @@ import { Effect, Layer } from 'effect';
 import { AgentDoor, SkillDoor, type AgentDoorShape, type SkillDoorShape } from 'agent-orchestrator';
 import { addFactory, agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';
 import { app as served, appOf, liveOf } from '../app.ts';
-import { foundInOf, listSkills, BUILTIN_SKILLS, yourSkillsRead } from './skills.ts';
+import { foundInOf, listSkills, BUILTIN_SKILLS, sourceOf, yourSkillsRead } from './skills.ts';
 import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
 import { asAgentListing } from '../../test/definitions.ts';
@@ -396,7 +396,7 @@ test('a skill named with its folder is listed on its agent as written, found, wi
     assert.deepEqual(
       typer.given.map((g) => [g.name, g.from, g.foundIn, g.entry?.description ?? null]),
       [
-        ['review', 'repo', null, 'Reviews a change.'],
+        ['review', 'repo', '.claude/skills/review', 'Reviews a change.'],
         ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', 'Lays a page out.'],
         ['apps/site:no-such', null, null, null],
       ],
@@ -419,11 +419,19 @@ test('a skill named with its folder is listed on its agent as written, found, wi
   }
 });
 
-test('REFUSED: where a skill was found is said for none the board pages, nor the repository itself, nor a folder outside it', () => {
+test("the skill of Nemia's builtin place, the git place's, is Nemia's builtin, as its skills are, and no folder of the repository", () => {
+  const place = path.join(path.dirname(BUILTIN_SKILLS), 'place', 'git');
+  assert.equal(sourceOf(place, repo, root), 'builtin');
+  assert.equal(sourceOf(path.join(BUILTIN, 'grill-me'), repo, root), 'builtin');
+  assert.equal(foundInOf(place, repo, root), null);
+});
+
+test('REFUSED: where the repository has a skill is said for none of yours or Nemia\'s, nor the repository itself, nor a folder outside it', () => {
   assert.equal(foundInOf(path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out'), repo, root), 'apps/site/.claude/skills/lay-out');
-  assert.equal(foundInOf(path.join(LIBRARY, 'mine'), repo, root), null, 'yours has a page');
-  assert.equal(foundInOf(path.join(THEIRS, 'review'), repo, root), null, "the repository's has a page");
-  assert.equal(foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root), null, 'and the one beside its agents');
+  assert.equal(foundInOf(path.join(THEIRS, 'review'), repo, root), '.claude/skills/review', "the repository's own place says its folder");
+  assert.equal(foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root), 'workflows/skills/beside', 'and the one beside its agents');
+  assert.equal(foundInOf(path.join(LIBRARY, 'mine'), repo, root), null, 'yours is no folder of the repository');
+  assert.equal(foundInOf(path.join(BUILTIN, 'grill-me'), repo, root), null, "nor is Nemia's");
   assert.equal(foundInOf(repo, repo, root), null, 'the repository itself');
   assert.equal(
     foundInOf(`${repo}-twin/apps/site/.claude/skills/lay-out`, repo, root),

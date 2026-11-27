@@ -251,7 +251,7 @@ test("each skill of a step's layers, the agent's then its own: one named with it
   );
   assert.deepEqual(skillsFromOf(layers, found, repo, store), [
     { name: 'apps/site:lay-out', from: null, foundIn: 'apps/site/.claude/skills/lay-out' },
-    { name: 'review', from: 'repo', foundIn: null },
+    { name: 'review', from: 'repo', foundIn: '.claude/skills/review' },
     { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
     { name: 'gone', from: null, foundIn: null },
   ]);

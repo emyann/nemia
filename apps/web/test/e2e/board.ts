@@ -319,7 +319,7 @@ export const scrollFrame = (page: Page, to: number | 'end') =>
   page.evaluate(
     ([column, at]) => {
       const main = document.querySelector(column as string);
-      if (main) main.scrollTop = at === 'end' ? main.scrollHeight : (at as number);
+      if (main) main.scrollTop = at === 'end' ? main.scrollHeight : at;
     },
     [COLUMN, to] as const,
   );

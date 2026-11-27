@@ -291,8 +291,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * Words said to a running session: A2A's follow-up, a message on the session's Task. Taken while the session runs —
    * working, or waiting on a person (`INPUT_REQUIRED`) — as the harness's inbox takes them either way; a session that has
    * ended takes no more, as A2A refuses a message to a Task in a terminal state, unless its harness says it still holds its
-   * process (`held`): a long-lived session listed done between turns keeps its inbox. The harness is listed afresh for the
-   * session's id: the handler holds no listing of its own, and the message's context, when it sends one, must be that
+   * process (`held`): a long-lived session listed done between turns keeps its inbox. The harness is looked at afresh for the
+   * session's id (`sightingOf`): the handler holds no listing of its own, and the message's context, when it sends one, must be that
    * session's. Answered with the session as that listing saw it.
    *
    * A harness with no channel into a session (`say`) is refused before any observe, so it is asked nothing. A2A's way on
@@ -308,7 +308,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
         `the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked \`${RUNTIME_EXTENSION}\` — in this session's contextId.`,
       );
     }
-    const seen = (await this.run(this.ops.observe)).get(m.taskId);
+    const seen = await this.sightingOf(m.taskId);
     if (!seen)
       throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
     const elsewhere = contextRefusal(m.taskId, m.contextId, seen);
@@ -318,6 +318,21 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     }
     await this.run(this.ops.say({ name: m.taskId, sessionId: seen.sessionId }, followUpText(m)));
     return taskOfSighting(m.taskId, seen);
+  }
+
+  /**
+   * The session `name` as its harness lists it: looked for by that one name where the harness looks by name (`observeFor`), so the
+   * read does not grow with every session it has run, and in its whole listing (`observe`) otherwise. A name the look by name left
+   * unread fails, in the harness's words, as a listing that could not be read does.
+   */
+  private async sightingOf(name: string) {
+    if (!this.ops.observeFor) return (await this.run(this.ops.observe)).get(name);
+    const looked = await this.run(this.ops.observeFor([{ name }]));
+    if (looked.unread.has(name))
+      throw new HarnessFailed(
+        looked.unreadWhy?.get(name) ?? looked.why?.join(' ') ?? `the \`${this.harness}\` harness left \`${name}\` unread`,
+      );
+    return looked.seen.get(name);
   }
 
   // oxlint-disable-next-line require-yield -- the SDK's handler types this as a stream, and this agent refuses to stream
@@ -488,10 +503,10 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * Effect door's `Runner.transcript`, whose caller has the id already — the harness reads that session. By name, the
    * session's id is found afresh on every read. An attempt that has ended — or whose task settled with it open — has its session's id on
    * the record, and no registry is asked. Otherwise, and for a name no attempt is journalled under yet, since a session is
-   * listed before its spawn is written, it is found by name when the harness can `find` one in flight, and observed when
-   * it cannot or finds none. A registry that cannot be read this time is nothing observed, and a `find` that fails is
-   * nothing found: a caller polls again, as it would a session not registered yet. The read itself answers in the
-   * harness's words.
+   * listed before its spawn is written, it is found by name when the harness can `find` one in flight, and looked for by
+   * name (`sightingOf`) when it cannot or finds none. A registry that cannot be read this time is nothing observed, and a
+   * `find` that fails is nothing found: a caller polls again, as it would a session not registered yet. The read itself
+   * answers in the harness's words.
    */
   async sessionTranscript(params: TranscriptRequest, _context: ServerCallContext) {
     if (!this.ops.transcript) {
@@ -517,10 +532,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     const inFlight = attempt === undefined || attempt.ended === null;
     const found =
       !attempt?.nativeId && inFlight && this.ops.find ? await this.run(this.ops.find(params.name)).catch(() => undefined) : undefined;
-    const sessionId =
-      attempt?.nativeId ??
-      found?.sessionId ??
-      (await this.run(this.ops.observe).catch(() => new Map<string, Sighting>())).get(params.name)?.sessionId;
+    const sessionId = attempt?.nativeId ?? found?.sessionId ?? (await this.sightingOf(params.name).catch(() => undefined))?.sessionId;
     if (!sessionId) return null;
     return this.run(this.ops.transcript(sessionId, params.after));
   }

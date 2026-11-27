@@ -91,52 +91,55 @@ export function CutSearch({
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
   useSlashFocus(input);
   return (
-    <ComboBox
-      aria-label={label}
-      allowsCustomValue
-      allowsEmptyCollection
-      menuTrigger="focus"
-      inputValue={text}
-      onInputChange={onText}
-      selectedKey={null}
-      onSelectionChange={(key) => {
-        if (key !== null) onPick(String(key));
-      }}
-      items={suggestions}
-      className={cn('flex flex-col', className)}
-    >
-      <CutField data-search-bar="">
+    <div ref={bar} className={className}>
+      <CutField>
         <Body size="medium" component="span" className="flex flex-wrap items-center gap-2 py-1.5 pl-3.5 pr-4">
           <Search aria-hidden="true" size={16} className="shrink-0 text-on-surface-variant" />
           {chips.map((chip) => (
             <SearchChip key={chip.id} chip={chip} onRemove={onRemove} />
           ))}
-          <Input
-            ref={input}
-            placeholder={chips.length === 0 ? placeholder : undefined}
-            onKeyDown={(event) => keyed(event, { text, chips, onRemove, onSubmit })}
-            className="min-w-32 flex-1 bg-transparent py-1 text-on-surface outline-none placeholder:text-on-surface-variant"
-          />
+          <ComboBox
+            aria-label={label}
+            allowsCustomValue
+            allowsEmptyCollection
+            menuTrigger="focus"
+            inputValue={text}
+            onInputChange={onText}
+            selectedKey={null}
+            onSelectionChange={(key) => {
+              if (key !== null) onPick(String(key));
+            }}
+            items={suggestions}
+            className="flex min-w-32 flex-1"
+          >
+            <Input
+              ref={input}
+              placeholder={chips.length === 0 ? placeholder : undefined}
+              onKeyDown={(event) => keyed(event, { text, chips, onRemove, onSubmit })}
+              className="min-w-0 flex-1 bg-transparent py-1 text-on-surface outline-none placeholder:text-on-surface-variant"
+            />
+            <Popover className={CHOICES} placement="bottom start" triggerRef={bar}>
+              <ListBox className="max-h-72 overflow-auto outline-none">
+                {(suggestion: CutSuggestion) => (
+                  <ListBoxItem id={suggestion.id} textValue={suggestion.label} className={CHOICE}>
+                    <Body size="medium" component="span" className="flex-1">
+                      {suggestion.label}
+                    </Body>
+                    {suggestion.hint && (
+                      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
+                        {suggestion.hint}
+                      </Body>
+                    )}
+                  </ListBoxItem>
+                )}
+              </ListBox>
+            </Popover>
+          </ComboBox>
         </Body>
       </CutField>
-      <Popover className={CHOICES} placement="bottom start">
-        <ListBox className="max-h-72 overflow-auto outline-none">
-          {(suggestion: CutSuggestion) => (
-            <ListBoxItem id={suggestion.id} textValue={suggestion.label} className={CHOICE}>
-              <Body size="medium" component="span" className="flex-1">
-                {suggestion.label}
-              </Body>
-              {suggestion.hint && (
-                <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
-                  {suggestion.hint}
-                </Body>
-              )}
-            </ListBoxItem>
-          )}
-        </ListBox>
-      </Popover>
-    </ComboBox>
+    </div>
   );
 }

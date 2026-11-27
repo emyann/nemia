@@ -164,7 +164,7 @@ export const NoMatch: Story = {
 
 /** The first page of several: the pager says where it stands, and Older leads on. */
 export const FirstOfMany: Story = {
-  render: () => drawn({ cards: OPEN, counts: OPEN_COUNTS, remaining: 20 }),
+  render: () => drawn({ cards: OPEN, counts: OPEN_COUNTS, remaining: 30 }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-pager-at]')).toHaveTextContent('Page 1 / 3');
   },

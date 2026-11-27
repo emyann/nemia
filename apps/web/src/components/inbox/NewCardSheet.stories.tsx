@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxPageQuery } from '@/lib/api/inbox';
 import { FACTORY, factoryView, seeded } from '../../../.storybook/fixtures/proposals';
@@ -50,7 +50,7 @@ export const Open: Story = {
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'New card' }));
     const sheet = await within(document.body).findByRole('dialog', { name: 'New card' });
-    await expect(within(sheet).getByRole('textbox', { name: 'Title' })).toBeVisible();
+    await waitFor(() => expect(within(sheet).getByRole('textbox', { name: 'Title' })).toBeVisible());
     await expect(within(sheet).getByRole('textbox', { name: 'Details' })).toBeVisible();
     await expect(within(sheet).getByRole('combobox', { name: 'Run it after' })).toBeVisible();
     await expect(within(sheet).getByRole('combobox', { name: 'Labels' })).toBeVisible();

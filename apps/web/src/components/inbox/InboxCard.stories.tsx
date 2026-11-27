@@ -9,7 +9,15 @@ import { InboxCard, InboxCardRow, type CardSize } from './InboxCard';
 /** A card drawn in `size`, or as a row where `row` is given, over a store that holds the factory `nemia`. */
 const drawn = (entry: InboxEntry, size: CardSize = 'regular', row = false) => (
   <QueryClientProvider client={seeded([[factoriesQuery.queryKey, [factoryView(FACTORY)]]])}>
-    <div style={{ width: row ? 920 : 340 }}>{row ? <InboxCardRow entry={entry} /> : <InboxCard entry={entry} size={size} />}</div>
+    <div style={{ width: row ? 920 : 340 }}>
+      {row ? (
+        <ul>
+          <InboxCardRow entry={entry} />
+        </ul>
+      ) : (
+        <InboxCard entry={entry} size={size} />
+      )}
+    </div>
   </QueryClientProvider>
 );
 
@@ -68,7 +76,7 @@ export const Working: Story = {
   render: () => drawn(started('running', 'working')),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'alive');
-    await expect(within(canvasElement).getByRole('button', { name: 'Open run' })).toBeVisible();
+    await expect(within(canvasElement).getByRole('link', { name: 'Open run' })).toBeVisible();
   },
 };
 
@@ -99,7 +107,7 @@ export const Refused: Story = {
     }),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'failure');
-    await expect(within(canvasElement).getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(within(canvasElement).getByRole('link', { name: 'Edit' })).toBeVisible();
   },
 };
 

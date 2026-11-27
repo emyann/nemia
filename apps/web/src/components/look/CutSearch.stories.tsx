@@ -58,11 +58,11 @@ export const WithChips: Story = {
     );
   },
   play: async ({ args, canvasElement, userEvent }) => {
-    const bar = within(canvasElement).getByRole('combobox', { name: 'Search the cards' });
-    await userEvent.click(bar);
-    await userEvent.keyboard('{Backspace}');
-    await expect(args.onRemove).toHaveBeenCalledWith('area=board');
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Take off “reads”' }));
     await expect(args.onRemove).toHaveBeenCalledWith('q');
+    await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }));
+    await userEvent.keyboard('{Backspace}');
+    await expect(args.onRemove).toHaveBeenCalledWith('area=board');
+    await userEvent.keyboard('{Escape}');
   },
 };

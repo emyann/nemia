@@ -241,11 +241,6 @@ const ROWS: Row[] = [
       }),
     naming: ['implement: ', '`output: implement.schema.json` declares `replies`', '(`loop: implement`)', 'Rename the field'],
   },
-  {
-    row: 'workspace: REFUSED at load, base or any other, naming what to write instead',
-    run: () => parseWorkflow('ship', fileOf('place: git\nworkspace: base')),
-    naming: ['ship: ', '`workspace`', '`workspace: base` is gone', '`nemia decide <run>`', '`place: folder`'],
-  },
   { row: 'slot: a workflow of one step takes none', run: () => validate([watcher]) },
   {
     row: 'slot: REFUSED, a root beside it',

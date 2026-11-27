@@ -343,7 +343,7 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - Reset layout lays the cards on the grid again with every run closed and the saved arrangement forgotten; Collapse all closes every
  *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
  * - The header counts runs in flight, finished, to decide as the CLI's `ls` says them, and waiting on you. A run waiting on you, or to
- *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in
+ *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at a step's gate is in
  *   both.   Beside the counts it draws the cap (`CapLine`), and at its right the floor's options (`FloorOptions`).
  * - The floor fills the screen under the root's top bar, narrowing beside the frame's side sheet when it opens. The queue lane sits at
  *   its left, and gives its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs

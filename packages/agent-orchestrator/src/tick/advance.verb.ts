@@ -1,5 +1,5 @@
 /**
- * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift
+ * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, lift
  * a hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the continue
  * that answers a task held open; then keep the tips and write the run's record, which this file alone writes. It reads and adopts through
  * `readAndAdopt` (adopt/run-adopt.verb.ts), as `nemia cancel`, `nemia rm` and `nemia prune` do. Beside it, the steps owed a hand-off

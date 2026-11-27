@@ -817,12 +817,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
-      "rules": {
-
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/status/status.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],

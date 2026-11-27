@@ -63,7 +63,7 @@ export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>)
 export const ownNote = (step: Pick<StepSpec, 'body' | 'agent'>) => (step.agent ? step.agent.body : step.body);
 
 /**
- * What a run waits on a person to decide (`toDecide`): its ending step, which approving accepts — or its result branches, which a merge
+ * What a run waits on a person to decide (`toDecide`): a step at its gate, which approving accepts — or its result branches, which a merge
  * lands.
  */
 export type ToDecide = { kind: 'approve'; step: string } | { kind: 'result'; branches: string[] };

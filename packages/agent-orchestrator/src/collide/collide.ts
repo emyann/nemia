@@ -16,7 +16,7 @@ export type Theirs = { run: string; branch: string };
 export type Collision = Theirs & { ours: string; merge: MergeWord; said: string };
 
 /**
- * What an ending's decision says of collisions (`collisionsOf`):
+ * What a decision says of collisions (`collisionsOf`):
  *
  *   onto       the base branch
  *   base       whether each of this run's branches ahead merges onto the base as it is now, each in words

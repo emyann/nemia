@@ -99,8 +99,8 @@ export type Listing = {
    */
   cost?: string;
   /**
-   * What a person has to decide about the run's result (`toDecide`), as `assess` reads it on the same inputs: its ending step's gate, or
-   * its branch ahead of the base with no ending step to take it. Absent while there is nothing — which is every run still going.
+   * What a person has to decide about the run's result (`toDecide`), as `assess` reads it on the same inputs: a step at its gate, or
+   * its branch ahead of the base. Absent while there is nothing — which is every run still going.
    */
   toDecide?: ToDecide;
 };

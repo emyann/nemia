@@ -47,7 +47,7 @@ export type { HandedRunFolders } from '../../contracts/handed-folders.contract.t
  * @param steps Every step of the run's workflow, as the run froze them.
  * @param run The run's record: its gates, mounts, volumes, harness settings and labels.
  * @param t What the filing chooses and the caller read for it: the model and cap, the run's folders, the harness's own arguments, the
- * deny list of an ending and the factory's servers.
+ * deny list and the factory's servers.
  */
 export const filedConfig = <Own extends object>(
   step: StepSpec,

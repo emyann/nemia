@@ -62,7 +62,7 @@ export type RunStatus = Assessment['status'];
  * <step>`, or `nemia decide <run>` for the branches, which the board runs no more than `nemia ls` does.
  *
  * An approval carries what the Factory's card answers it with, off the record alone: `back`, the steps a send-back goes to (`sendBackTo`) —
- * the step itself once it has a task, and at an ending's gate, held before it is filed, the work it waits on — and `onto`, the base branch
+ * the step itself — and `onto`, the base branch
  * the run's result is on its way to. Neither asks git anything, so the list the Factory polls can carry them.
  */
 export type RunToDecide = (
@@ -493,7 +493,7 @@ const workFiled = (run: Run, steps: readonly StepSpec[]) =>
 
 /**
  * Where each of a run's result branches stands against the base branch, as `git` read it (`branchStandings`): what says a finished run
- * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
+ * with a branch ahead of the base is one nobody has decided (`toDecide`'s git kind).
  *
  * Asked of the branches `branchesAsked` names and of no other: those the tick's pass reads, of a run no longer running, nobody called off,
  * that cut worktrees of its own. Level-triggered, as the package is: read on the request that asks, off the tick's last reading, stored

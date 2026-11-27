@@ -208,7 +208,7 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
   return null;
 }
 
-/** Whether a try moved behind starts the step's count of tries afresh: a round, a merge, an ending sent back. */
+/** Whether a try moved behind starts the step's count of tries afresh: a round, a merge, a gate sent back. */
 const anew = (t: EarlierTry) => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
 
 /**

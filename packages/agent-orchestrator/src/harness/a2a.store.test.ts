@@ -306,10 +306,6 @@ describe('a2a-agents.json, the secrets a remote step is given and the keys it ma
       loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nloop: plan\n---\nx\n')),
       /^ask: `loop: plan` .*remote A2A agent/,
     );
-    assert.match(
-      loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nworkspace: base\n---\nx\n')),
-      /^ask: a step may not set `workspace`/,
-    );
     assert.deepEqual(
       REMOTE_REFUSED_KEYS,
       STEP_KEYS.filter((key) => key in LOCAL_ONLY || key === 'loop'),

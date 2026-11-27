@@ -166,7 +166,7 @@ export type Decided = {
    */
   standings: BranchStanding[];
   /**
-   * What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged (`assess`, on
+   * What is left for a person to decide about the result (`toDecide`): a step's gate, or a branch nobody has merged (`assess`, on
    * the same `standings`).
    */
   toDecide?: ToDecide;
@@ -305,7 +305,7 @@ export const needsRefusedOf = (steps: readonly StepSpec[], run: Run, read: Asses
  * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
  * due, what is left to decide and the decision itself, the runs it waits on and is held until, every try's view —
  * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
- * tick's last reading): the standings, the collisions at an ending and the cap's parents are read through it, and git is asked nothing.
+ * tick's last reading): the standings, the collisions and the cap's parents are read through it, and git is asked nothing.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The

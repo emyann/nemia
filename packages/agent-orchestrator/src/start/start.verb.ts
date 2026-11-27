@@ -130,7 +130,7 @@ export const startedSteps = Effect.fn('startedSteps')(function* (workflowDir: st
  * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires
  *   leave unfilled or fill twice (`stepsIn`);
  * - a step set no run may take (`stepSetRefusal`, pure, asked of a folder a waiting run takes again too): a step named for another step's
- *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team, one that fans out, and an ending;
+ *   check or try, and, with `isolate: false` (`--no-worktree`), a `place: folder` team and one that fans out;
  * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
  * - a remote agent not declared (`undeclaredRefusal`): the engine refuses it only when the step is filed, with the run on the record;
  * - a store (`WF_ROOT`) whose path a permission rule a step would be filed cannot carry (`storeRootRefusal`), in the store's words, asked
@@ -232,7 +232,7 @@ function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | unde
  * The first step whose config, as its first filing would file it (`filedConfig`) in a run started at `gates`, the runtime refuses on its
  * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
  * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
- * it to, and an ending's read the run's artifacts folder, neither there yet. The runtime judges which flags a step has, and of a path a
+ * it to, not there yet. The runtime judges which flags a step has, and of a path a
  * permission rule names, a mount's or an allow's, whether the rule can carry it, never whether it is there; a store whose own path no
  * rule can carry is refused before it, in the store's words (`storeRootRefusal`). A step whose sandbox its file writes as
  * `permissionMode:` (`written`, by the step's name) is quoted by that line.

@@ -64,7 +64,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * Read as `cancel` reads a run: a check, a try, a round or a step a pass filed and never wrote down is adopted in memory, so it is in
  * flight too — on a cancelled run as well, which a pass that read it before the cancel may be filing now. A record with no frozen workflow
  * reads its folder, which may be gone: the run is then judged without its steps (`forgetRefusal`). Where the result stands against the
- * base branch is read only for an ending that has not run: one whose result git already has holds nothing.
+ * base branch is read only for a result not yet on the base: one git already has holds nothing.
  *
  * Once nothing refuses, a task held open that waits for a word is closed, as no pass reads the run again to close it; one the engine
  * refuses to close, answered, settled or stopped since it was read, waits for nothing. A folder run's folders are under its own directory,

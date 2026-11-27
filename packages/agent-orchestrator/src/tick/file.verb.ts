@@ -537,8 +537,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
 
 /**
  * A round's target filed under its next try's id, at the priority of the word it was filed on (`askedOrMomentum`): its session continued,
- * told the round — and what the ending's check said of a merged
- * tree it refused (`said.landing`), and for a new session, what recent runs cost (`said.costs`) — with its cap for the round, as the tick
+ * told the round — and for a new session, what recent runs cost (`said.costs`) — with its cap for the round, as the tick
  * tells it (`told`, which its caller yields of `toldOf`).
  */
 function roundSpec(

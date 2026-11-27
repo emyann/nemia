@@ -72,7 +72,8 @@ export const mergedRun = (run: Run, steps: readonly StepSpec[], git: BranchReade
 
 /**
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
- * tasks had settled. Rejects with what a view rejected with, a journal that does not read among it.
+ * tasks had settled, and its branches are not waiting on a merge: a person's merge writes no record, so what reads `merged: false`
+ * is read again each call, and kept only once it is final. Rejects with what a view rejected with, a journal that does not read among it.
  */
 const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSpec[]) {
   const home = yield* StoreRoot;
@@ -96,7 +97,7 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSp
     merged,
     memoryOf: (taskId) => tryMemoryOf(everyTry.get(taskId)?.state.attempts ?? []),
   });
-  return { ...of, settled };
+  return { ...of, settled: settled && merged !== false };
 });
 
 /** One run's facts, as `statsOf` takes them: what it froze, and its tries and its run, none where a journal of it does not read. */

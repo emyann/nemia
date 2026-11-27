@@ -28,9 +28,8 @@ export const MODES: Record<RetryMode, string> = {
  * would fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads,
  * which answers a gate from the board.
  *
- * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
- * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it. Its `answers` are a person's to the
- * questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
+ * The request the api takes names the step at the gate, which a send-back asks again (`sendBackTo` in
+ * agent-orchestrator). Its `answers` are a person's to the questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
  *
  * Sent in the run's namespace: `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
  *

@@ -368,8 +368,8 @@ function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly str
  * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, approve or a send-back for each
  * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then merge it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
- * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
- * (`merges`) is offered no merge it nor drop it: its ending step is what merges, one approval away.
+ * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A run worked on its base branch itself
+ * (`merges`) is offered no merge it nor drop it: it has no branch of its own.
  *
  * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
  * @param steps The workflow's steps.

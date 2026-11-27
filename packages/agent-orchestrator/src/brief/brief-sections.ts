@@ -723,7 +723,7 @@ export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSp
  * open. Nothing for a step after no accepted loop, so a run where no loop ran out of rounds composes no such section.
  *
  * It is on the brief because this step is the only one that can carry it anywhere. A loop ended by a person is a decision about scope: the
- * change is good enough, and what the reviewer found is somebody's later work. An ending step that merges without knowing that writes a
+ * change is good enough, and what the reviewer found is somebody's later work. A step that merges without knowing that writes a
  * merge nobody can read the reason of, and the findings are lost with the run.
  * @param step The step told.
  * @param run The run.

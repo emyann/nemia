@@ -38,7 +38,7 @@ export function CardGate({
 }: {
   run: RunAt;
   gate: GateAsk;
-  /** The gate's words in full, on hover under the line: the folder's own for an ending, the CLI `ls`'s for a step's hand-off. */
+  /** The gate's words in full, on hover under the line: the CLI `ls`'s for a step's hand-off. */
   title: string;
   stamp: string;
   onTaken: (taken: Taken) => void;

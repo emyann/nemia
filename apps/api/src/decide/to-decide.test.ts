@@ -436,7 +436,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 
-test('at its gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none', async () => {
+test('at its gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each', async () => {
   const own = aRepo();
   const runOn = (id: string, file: string, text: string, done: boolean, workflow = GATED) => {
     const branch = `wf/${id}/implement`;

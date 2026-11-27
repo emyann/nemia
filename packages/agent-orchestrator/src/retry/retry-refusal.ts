@@ -48,8 +48,7 @@ type Asked = {
 };
 
 /**
- * The ask with the step's standing read (`retryable`): the step, its next try, the ask already waiting for it (`pending`), and the ending
-
+ * The ask with the step's standing read (`retryable`): the step, its next try, the ask already waiting for it (`pending`).
  */
 type Judged = Asked &
   ReturnType<typeof retryable> & {

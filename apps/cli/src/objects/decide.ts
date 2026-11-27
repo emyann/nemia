@@ -76,7 +76,7 @@ const usedLines = (d: Decidable) => [
 const standingLines = (d: Decidable) =>
   d.standings.map((s) => `${s.branch}  ${s.said}${s.stat !== null ? `  ${s.stat}` : ''}${s.merge !== null ? `  · ${s.merge.said}` : ''}`);
 
-/** The collisions read at an ending's decision: the whole in one line, then each branch that does not merge and the semantic refusal. */
+/** The collisions a decision reads: the whole in one line, then each branch that does not merge. */
 const collisionLines = (d: Decidable) =>
   d.collisions === null ? [] : [d.collisions.said, ...d.collisions.colliding.map((c) => `  ${c.said}`)];
 

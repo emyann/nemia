@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
 import { LIST_PAGE } from 'objects';
-import { fed, openFold, partOf, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
+import { fed, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
 import { cardOf, expectClearOfEachOther, gateAnswer, gateApprove, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING, FAKE } from '../seed.ts';
@@ -10,11 +10,11 @@ import { dropStoredAsks, OUT, storeAsk, storedAsks } from '../world.ts';
 
 export default {
   /**
-   * A gate answered on the Factory, from the floor as the grid lays it out: the ending's card says what approving does and where a
-   * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
-   * main its branch collides with among them; the step not filed says so rather than a table of dashes. In a page of its own whose one
-   * refusal is the point, an approval with words made elsewhere first is refused; then the gate is approved on the card, its Approve
-   * asking a second press at an ending, and sent back… with words from its split button's menu. The page takes each file back and lays
+   * A gate answered on the Factory, from the floor as the grid lays it out: the gated step's card says what approving does and where a
+   * send-back goes, and answers it; its inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
+   * main its branch collides with among them. In a page of its own whose one refusal is the point, an approval with words made
+   * elsewhere first is refused; then the gate is approved on the card with one press of Approve, and sent back… with words from its
+   * split button's menu. The page takes each file back and lays
    * the floor out again, each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
    */
   name: 'factory-gate',
@@ -27,12 +27,12 @@ export default {
     const lineOf = (p: Page) => cardOf(p, id).locator(`[data-gate-line="${ending}"]`);
     const approveOf = (p: Page) => gateApprove(cardOf(p, id));
     const approval = (p: Page) => p.getByRole('dialog', { name: `Approve ${ending}` });
-    const runNow = (p: Page) => approval(p).getByRole('button', { name: `Run ${ending} now`, exact: true });
+    const confirm = (p: Page) => approval(p).getByRole('button', { name: 'Approve', exact: true });
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     const card = cardOf(page, id);
     await expectVisible(
-      lineOf(page).filter({ hasText: `approve to run ${ending} on main, or send ${back} back` }),
+      lineOf(page).filter({ hasText: `approve what ${ending} handed on, or send it back` }),
       `the card says what approving ${ending} does`,
     );
     await expectCount(card.locator('[data-taken]'), 0, 'and nothing is answered yet');
@@ -54,7 +54,7 @@ export default {
       await approval(refused)
         .getByRole('textbox', { name: `Words to approve ${ending} with, if any` })
         .fill(ENDING.objection);
-      const [answered] = await Promise.all([refused.waitForResponse(approved, { timeout: WAIT_MS }), runNow(refused).click()]);
+      const [answered] = await Promise.all([refused.waitForResponse(approved, { timeout: WAIT_MS }), confirm(refused).click()]);
       const { error } = (await answered.json()) as { error?: string };
       if (answered.status() !== 409 || !error)
         throw new Refused(
@@ -91,22 +91,23 @@ export default {
     const node = card.locator(`[data-tile="${ending}"]`);
     await expectVisible(node, `the card opens into its steps, ${ending} among them`);
     await expectVisible(
-      card.locator(`[data-gate-line="${ending}"]`, { hasText: `approve to run ${ending}` }),
-      `the opened card's gate says approving runs ${ending}`,
+      card.locator(`[data-gate-line="${ending}"]`, { hasText: `approve what ${ending} handed on` }),
+      `the opened card's gate says approving takes what ${ending} handed on`,
     );
     await node.click();
     const inspector = stepBar(page, id, ending);
     const asked = inspector.locator(`section[aria-label="What ${ending} asks of you"]`);
     await expectVisible(asked, `the inspector of ${ending} opens on what it asks of you`);
     await expectVisible(
-      asked.locator('[data-brief="waits"]', { hasText: `${ending} waits at its gate: it has not run, and it runs only on your approval.` }),
+      asked.locator('[data-brief="waits"]', {
+        hasText: `${ending} has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.`,
+      }),
       'which step waits',
     );
     await expectVisible(
-      asked.locator('[data-brief="approving"]', { hasText: `Approving runs ${ending} in the repository's own checkout, on main` }),
+      asked.locator('[data-brief="approving"]', { hasText: 'Approving files nothing: no step waits on it' }),
       'what approving does',
     );
-    await expectVisible(asked.locator('[data-brief="approving"]', { hasText: `“${ENDING.says}”` }), "in the folder's own words");
     await expectVisible(
       asked.locator('[data-brief="sending-back"]', { hasText: `Sending back asks ${back} for a new try` }),
       `and that a send-back goes to ${back}`,
@@ -126,26 +127,14 @@ export default {
       }),
       `with ${FAKE.branch}, and in which file`,
     );
-    const detail = await openFold(partOf(inspector, ending), 'detail');
-    await expectVisible(
-      detail.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }),
-      `${ending} is not filed, and its inspector's detail says so`,
-    );
-    await expectCount(detail.locator('dt', { hasText: /^sessions$/ }), 0, 'rather than a table of dashes');
     await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await card.getByRole('button', { name: 'Hide steps' }).click();
 
-    await approveOf(page).click();
-    await expectVisible(
-      approval(page).getByText(`This runs ${ending} in the repository's own checkout on main, and it cannot be taken back.`),
-      'Approve at an ending is the first of two presses: its popover says what approving runs',
-    );
     await settled(page);
-    await photograph(page, path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), { fullPage: true });
-    const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), runNow(page).click()]);
+    const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), approveOf(page).click()]);
     if (response.status() !== 202)
       throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
     const file = `approve-${ending}-1`;
@@ -155,9 +144,8 @@ export default {
         `the approval is written as wf approve writes it, with no words, and nothing else — the run's ask ${file} holds ${JSON.stringify(written)}, beside ${Object.keys(storedAsks(id)).join(', ')}`,
       );
     }
-    await expectCount(approval(page), 0, 'the popover closes');
     await expectVisible(
-      card.locator('[data-taken]', { hasText: `approved — the next pass files ${ending}` }),
+      card.locator('[data-taken]', { hasText: `approved — the next pass files what waits on ${ending}` }),
       'the card says it is approved, and what comes next',
     );
     await expectCount(approveOf(page), 0, 'and offers the gate no more');

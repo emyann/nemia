@@ -5,21 +5,14 @@ import type { Interrupt, Paused } from '../../../src/lib/api/pause.ts';
 import { finishingSentence, interruptSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { ENDING, lines } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, restoreRunKeys, store, storedAsks, storedRecord, storedRunKeys, storeRecord } from '../world.ts';
+import { OUT, restoreRunKeys, store, storedAsks, storedRunKeys } from '../world.ts';
 
 /** The top bar's pause: its one button. */
 const pauseOf = (page: Page) => page.locator('footer[data-machine-bar] button[data-pause]');
 
 /** The pause's popover. */
 const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
-
-/** The run the page writes whose ending is at work: a landing, which a pause at once leaves to finish. */
-const LANDING = 'lands-under-a-pause-e2e';
-
-/** The landing's session at work. */
-const LANDING_TASK = `${LANDING}-ship`;
 
 /** Why the page pauses at once, given in the confirm. */
 const NOW_WHY = 'the quota runs low';
@@ -61,23 +54,6 @@ function restore(before: ReturnType<typeof snapshot>) {
   restoreRunKeys(before.keys);
 }
 
-/** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed. */
-function writeLanding() {
-  const record = storedRecord(ENDING.id) as {
-    steps: Record<string, object>;
-  };
-  const steps = { ...record.steps, ship: { taskId: LANDING_TASK } };
-  storeRecord(LANDING, JSON.stringify({ ...record, id: LANDING, steps }));
-  const at = new Date(Date.now() - 60_000).toISOString();
-  const events = [
-    { kind: 'filed', at, brief: 'Merge this run onto the base branch.', cwd: '/code/app', maxAttempts: 1 },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-  ];
-  fs.writeFileSync(path.join(store!, 'engine', 'tasks', `${LANDING_TASK}.jsonl`), lines(events));
-  fs.appendFileSync(path.join(store!, 'engine', 'feed.jsonl'), lines(events.map((event) => ({ taskId: LANDING_TASK, event }))));
-}
-
 /** What the api answers on `route`, read beside the board. */
 async function apiRead<T>(page: Page, route: string) {
   return (await (await page.request.get(new URL(route, page.url()).href)).json()) as T;
@@ -102,11 +78,11 @@ async function confirmOpened(page: Page) {
 export default {
   /**
    * All factories paused at once from the top bar, as `wf pause --now --yes` does (`POST /api/pause` with `now`). With a session at
-   * work and a landing at work (LANDING, which the page writes), Stop now…, offered beside Pause… while all factories run, names each
-   * run's step it stops — the api's read (`GET /api/pause/now`), which leaves the landing out — and says what that costs. Confirmed, the
+   * work, Stop now…, offered beside Pause… while all factories run, names each run's step it stops — the api's read
+   * (`GET /api/pause/now`) — and says what that costs. Confirmed, the
    * pause's file holds its why; a session it named is asked no stop and no try, its call cut by the sessions' drain so it goes on as the
-   * same try on the resume, while a check it named is asked to stop and has the try that runs it again beside its run; the landing is
-   * left at work, and the popover reads Pausing, each named check stopping and tried again on the resume. From Pausing, after
+   * same try on the resume, while a check it named is asked to stop and has the try that runs it again beside its run; the popover
+   * reads Pausing, each named check stopping and tried again on the resume. From Pausing, after
    * a plain Pause…, Stop now… is offered beside Resume, asks no why, and keeps the pause as it was put, its timeout cut to 0; on a phone's
    * screen its confirm fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the
    * package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it
@@ -122,7 +98,6 @@ export default {
     const before = snapshot();
     try {
       if (before.files.has('cordon')) throw new Refused('no pause before the page puts one — the store has its file');
-      writeLanding();
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectVisible(button.and(page.locator('[data-pause="running"]')), 'all factories running');
@@ -134,8 +109,6 @@ export default {
       const read = await confirmOpened(page);
       if (!read.interrupts.some((i) => i.kind === 'session'))
         throw new Refused(`the seeded store has a session at work — the api's read names none: ${JSON.stringify(read.interrupts)}`);
-      if (read.interrupts.some((i) => i.run === LANDING))
-        throw new Refused(`a landing is left to finish — the api's read names it: ${JSON.stringify(read.interrupts)}`);
       if (read.cost !== COST) throw new Refused(`the api says what an interrupted step costs, "${COST}" — it says "${read.cost}"`);
       await expectTexts(popover.locator('[data-pause-interrupt] li'), read.interrupts.map(interruptSentence), 'the confirm names each');
       await expectTexts(popover.locator('[data-pause-cost]'), [COST], 'and says what an interrupted step costs');
@@ -156,7 +129,6 @@ export default {
         if (kind === 'check' && !ask) throw new Refused(`${run}'s ${step}: the try that runs its check again is asked beside its run`);
       }
       const checks = read.interrupts.filter((i) => i.kind === 'check');
-      if (journalOf(LANDING_TASK).includes('"stop-requested"')) throw new Refused('the landing is left at work, never asked to stop');
       const paused = await apiRead<Paused>(page, '/api/pause');
       const stopping = paused.finishing.filter((f) => f.stopping && f.resumed);
       if (stopping.length !== checks.length)
@@ -178,7 +150,6 @@ export default {
       await page.keyboard.press('Escape');
 
       restore(before);
-      writeLanding();
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectVisible(button.and(page.locator('[data-pause="running"]')), 'put back, all factories run again');

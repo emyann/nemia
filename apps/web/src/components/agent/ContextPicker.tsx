@@ -37,7 +37,8 @@ export function ContextPicker({
         {label}
       </Body>
       <Body size="small">
-        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
+        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not succeeded, not
+        judged.
       </Body>
       {runs.error ? (
         <ReadTrouble what="the runs to read" error={runs.error} size="small" />
@@ -89,8 +90,9 @@ export function ContextPicker({
 }
 
 /**
- * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not landed,
- * not judged` badge for a run that has not landed; or why it could not be read.
+ * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not
+ * succeeded,
+ * not judged` badge for a run that has not succeeded; or why it could not be read.
  */
 export function ConcludedPreview({ run }: { run: string }) {
   const concluded = useQuery(concludedQuery(run));
@@ -100,9 +102,9 @@ export function ConcludedPreview({ run }: { run: string }) {
         <span>
           What <span className="font-mono">{run}</span> hands
         </span>
-        {concluded.data && !concluded.data.landed && (
-          <Tag variant="outlined" data-not-landed className="border-dashed">
-            not landed, not judged
+        {concluded.data && !concluded.data.succeeded && (
+          <Tag variant="outlined" data-not-succeeded className="border-dashed">
+            not succeeded, not judged
           </Tag>
         )}
       </Body>

@@ -16,7 +16,7 @@ import { STATS } from '../stats/commands.verb.ts';
 import { SERIES } from '../series/commands.verb.ts';
 import { PAGES } from '../steps/commands.verb.ts';
 import { CANCEL } from '../cancel/commands.verb.ts';
-import { HOLD } from '../wait/commands.verb.ts';
+import { HOLD, RELEASE } from '../wait/commands.verb.ts';
 import { ASSIGN } from '../assignee/commands.verb.ts';
 import { WAIT } from '../await/commands.verb.ts';
 import { PRUNE, RM } from '../forget/commands.verb.ts';
@@ -93,6 +93,7 @@ export const COMMANDS: readonly (Command | Served)[] = [
   ...SKILL_ENTRIES,
   tableEntry(CANCEL),
   tableEntry(HOLD),
+  tableEntry(RELEASE),
   tableEntry(ASSIGN),
   WAIT,
   RM,

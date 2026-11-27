@@ -17,7 +17,7 @@ import { Conflict, type Refusal } from '../refusal/refusal.ts';
 import type { Labels } from '../labels/labels.ts';
 import { dropFiles, filesAt } from '../record/files.store.ts';
 import { assigneeIn, cancelledIn, holdIn, isSaid, labelsIn, prunedIn, runsDir, type RunMarks } from '../record/record.store.ts';
-import type { Assignee, Hold, Pruned, RunStore, SaidBefore } from '../record/record.ts';
+import type { Assignee, Hold, Pruned, Released, RunStore, SaidBefore } from '../record/record.ts';
 import { fromThrow, type DoorOf } from '../door/door.store.ts';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import type { RunId } from '../record/record.model.ts';
@@ -198,6 +198,20 @@ const assigneeMethods = ({ inside, held }: Marking) =>
     stands: (id) => holds(held, id, runMarkKey(id, 'assignee')),
   }) satisfies Shape['assignees'];
 
+/** The release of the run's waiters: written once, never taken back. */
+const releasedMethods = ({ inside }: Marking) =>
+  ({
+    put: (id, actor) =>
+      inside((tx) =>
+        Effect.gen(function* () {
+          if ((yield* tx.get(runMarkKey(id, 'released'))) !== undefined) return null as Released | null;
+          const released: Released = { at: new Date().toISOString(), ...(actor ? { actor } : {}) };
+          yield* tx.write(runMarkKey(id, 'released'), create(JSON.stringify(released, null, 2)));
+          return released;
+        }),
+      ),
+  }) satisfies Shape['released'];
+
 /** What `nemia rm` wrote down of the tasks of a run it forgets. */
 const forgettingMethods = ({ inside, held }: Marking) =>
   ({
@@ -318,6 +332,7 @@ export function markerMethods(home: string, open: Opened, held: Held) {
     filesAt: (id: string) => fromThrow(() => filesAt(home, id)),
     dropFiles: (id: string) => fromThrow(() => dropFiles(home, id)),
     holds: holdMethods(marking),
+    released: releasedMethods(marking),
     assignees: assigneeMethods(marking),
     said,
     labels,
@@ -343,7 +358,7 @@ const strayMarks = (home: string) =>
     .filter((entry) => !MARKER_ENDINGS.some(({ end }) => entry.endsWith(end)))
     .map((entry) => ({
       entry: path.join(runsDir(home), entry),
-      why: 'a run keeps a file beside its record only as one of its markers (cancelled, pruned, hold, unheld, assignee, unassigned, labels, refresh, said)',
+      why: 'a run keeps a file beside its record only as one of its markers (cancelled, pruned, hold, unheld, assignee, unassigned, labels, refresh, released, said)',
     }));
 
 /**

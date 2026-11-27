@@ -32,7 +32,7 @@ describe('holdable, holdCandidates: which run is offered a hold, and which runs 
     assert.equal(holdable(run({ repo: null })), true, 'a repository run with no repository said: nothing to wait on, held all the same');
   });
   test('REFUSED: a run that cannot be held by what it says of itself is offered none — called off, pruned, held, succeeded', () => {
-    const holding = { at: 'now', runs: [], word: 'held until r-2 lands', advice: '', waitingOnYou: false };
+    const holding = { at: 'now', runs: [], word: 'held until r-2 succeeds', advice: '', waitingOnYou: false };
     const cases: Array<[string, Partial<Run>]> = [
       ['called off', { cancelledAt: 'now', status: 'cancelled' }],
       ['called off, its status not yet said', { cancelledAt: 'now' }],

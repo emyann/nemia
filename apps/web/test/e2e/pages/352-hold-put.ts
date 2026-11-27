@@ -6,7 +6,7 @@ import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredMarker, OUT, storedMarker, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, storedMarker } from '../world.ts';
 
 /** The why the page gives the hold. */
 const WHY = 'its parser conflicts with the flag';
@@ -25,7 +25,7 @@ export default {
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const word = `held until ${unreadName(until)} lands (why: ${WHY}; by ${os.userInfo().username})`;
+    const word = `held until ${until} succeeds (why: ${WHY}; by ${os.userInfo().username})`;
     const theme = await themeOf(page);
     const section = page.locator('section[aria-label="Held"]');
     await expectCount(section, 0, `before the hold, ${id}'s page says no hold`);

@@ -385,11 +385,11 @@ async function visit(page: Page) {
     const brief = startForm.getByRole('textbox', { name: 'Brief' });
     if ((await brief.inputValue()) !== planned.body)
       throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await brief.inputValue())}`);
-    await expectCount(
-      startForm.locator('ul[aria-label="Runs to wait on"] li'),
-      DIAMOND_RUNS.length,
-      `the start form offers the ${DIAMOND_RUNS.length} runs on its repository to wait on`,
-    );
+    for (const run of DIAMOND_RUNS)
+      await expectVisible(
+        startForm.locator(`ul[aria-label="Runs to wait on"] li[data-run="${run.id}"]`),
+        `the start form offers ${run.id} to wait on`,
+      );
     await expectVisible(startForm.getByRole('button', { name: 'Start' }), 'and a Start button');
     await settled(page);
     await photograph(page, path.join(OUT, `inbox-start-${await themeOf(page)}.png`), { fullPage: true });

@@ -10,6 +10,7 @@ import {
   CANCEL_WORDS,
   HOLD_WORDS,
   holdRefusal,
+  RELEASE_WORDS,
   REFRESH_WORDS,
   refreshRefusal,
   ROUTE_WORDS,
@@ -19,13 +20,12 @@ import {
 } from './commands-runs-act.ts';
 import { ASSIGN_WORDS, assignRefusal } from './commands-runs-assign.ts';
 import { CONDITION_WORDS } from './commands-runs-condition.ts';
-import { ANSWER_HELP, answerFlag, APPROVE_WORDS, approveRefusal, RETRY_WORDS, retryRefusal, SAY_WORDS } from './commands-runs-answer.ts';
+import { APPROVE_WORDS, approveRefusal, RETRY_WORDS, retryRefusal, SAY_WORDS } from './commands-runs-answer.ts';
 import { PRUNE_WORDS, RM_WORDS, rmRefusal } from './commands-runs-forget.ts';
 import { PAUSE_TIMEOUT_WORDS, PAUSE_WORDS, pauseRefusal, pauseTimeoutCheck, RESUME_WORDS, timeoutRefusal } from './commands-runs-pause.ts';
 import { START_WORDS } from './commands-runs-start.ts';
 
 export {
-  ANSWER_HELP,
   APPROVE_WORDS,
   ASSIGN_WORDS,
   BY_CAP,
@@ -36,6 +36,7 @@ export {
   PAUSE_WORDS,
   PRUNE_WORDS,
   REFRESH_WORDS,
+  RELEASE_WORDS,
   RESUME_WORDS,
   RETRY_WORDS,
   RM_WORDS,
@@ -44,7 +45,6 @@ export {
   START_WORDS,
   WAIT_WORDS,
   WHY_CAP,
-  answerFlag,
   approveRefusal,
   assignRefusal,
   holdRefusal,
@@ -68,6 +68,7 @@ export const RUN_WORDS = [
   SAY_WORDS,
   CANCEL_WORDS,
   HOLD_WORDS,
+  RELEASE_WORDS,
   ASSIGN_WORDS,
   WAIT_WORDS,
   RM_WORDS,

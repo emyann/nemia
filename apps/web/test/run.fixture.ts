@@ -335,7 +335,7 @@ export const detail = (extra: Partial<RunDetail> = {}) =>
     from: { inbox: 'decode-reads' },
     fromNote: 'from the inbox card decode-reads',
     waiting: {
-      runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [] }],
+      runs: [{ run: 'r-0', missing: false, cancelledAt: null, failed: false }],
       word: 'waiting on r-0',
       advice: 'wait',
       waitingOnYou: false,
@@ -345,8 +345,8 @@ export const detail = (extra: Partial<RunDetail> = {}) =>
     assignee: null,
     holding: {
       at: '2026-09-30T05:00:00.000Z',
-      runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
-      word: 'held until r-0 lands',
+      runs: [{ run: 'r-0', missing: false, cancelledAt: null, failed: false, released: false }],
+      word: 'held until r-0 succeeds',
       advice: 'wf hold r-1 --off',
       waitingOnYou: true,
     },

@@ -100,9 +100,9 @@ const statusCell = ({ status }: Run) => {
   return asking.length ? `${word} — ${asking.join('; ')}` : word;
 };
 
-/** A hold in `nemia ls`'s words, with what lifts it: its advice where a run it names never lands, nothing while the tick lifts it. */
+/** A hold in `nemia ls`'s words, with what lifts it: its advice where a run it names never succeeds, nothing while the tick lifts it. */
 const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>) => {
-  const lifting = holding.runs.length > 0 && holding.runs.every((r) => r.landed);
+  const lifting = holding.runs.length > 0 && holding.runs.every((r) => r.released);
   if (holding.waitingOnYou) return `${holding.word}: ${holding.advice}`;
   return lifting ? holding.word : `${holding.word} — nemia hold ${name} --off lifts it`;
 };

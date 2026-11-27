@@ -33,7 +33,7 @@ const ROOT = scratch('wf-slots-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const rooted = runsNow(ROOT);
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
-const noParents = () => passParents(standingReader(NOTHING_READ));
+const noParents = () => passParents();
 
 const at = (minute: number) => `2026-10-02T09:0${minute}:00.000Z`;
 const tasks = new Map<string, unknown[]>();

@@ -56,7 +56,7 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
     'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
   from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
   after:
-    'the cards it waits on, by name, comma-separated: no trigger queues it and the tick starts none of it until each has landed — its own run, or the run of the card its work was passed on to; none when unset',
+    'the cards it waits on, by name, comma-separated: no trigger queues it and the tick starts none of it until each has succeeded — its own run, or the run of the card its work was passed on to; none when unset',
   labels:
     "a person's labels on the card, a map of a key to its value: what `-l key=value` selects it by, copied to the run it starts; none when unset",
   files:
@@ -168,21 +168,21 @@ export const CardLabelLeftOut = Schema.Struct({
 export type CardLabelLeftOut = typeof CardLabelLeftOut.Type;
 
 /**
- * What a wait of a card is, closed: `waiting`, on a named card whose work has not landed yet, standing at a card (`at`); `missing`, on a
+ * What a wait of a card is, closed: `waiting`, on a named card whose work has not succeeded yet, standing at a card (`at`); `missing`, on a
  * name the store knows nothing of; `cycle`, on a card whose `after:` leads back to this one.
  */
 export const CARD_WAIT_KINDS = ['waiting', 'missing', 'cycle'] as const;
 export type CardWaitKind = (typeof CARD_WAIT_KINDS)[number];
 
 /**
- * One card a card waits on that has not landed: the card named, the kind of the wait, the card its work stands at and that card's state,
+ * One card a card waits on that has not succeeded: the card named, the kind of the wait, the card its work stands at and that card's state,
  * the route of a cycle, and whether only a person can release it (`stalled`).
  */
 export const CardWait = Schema.Struct({
   card: Schema.String.annotate({ description: "The card named in the card's `after:`, by name." }),
   kind: Schema.Literals(CARD_WAIT_KINDS).annotate({
     description:
-      'What the wait is: waiting, on a named card whose work has not landed; missing, on a name the store knows nothing of; cycle, on a card whose after: leads back to this one.',
+      'What the wait is: waiting, on a named card whose work has not succeeded; missing, on a name the store knows nothing of; cycle, on a card whose after: leads back to this one.',
   }),
   at: Schema.optionalKey(
     Schema.String.annotate({
@@ -202,9 +202,9 @@ export const CardWait = Schema.Struct({
   ),
   stalled: Schema.Boolean.annotate({
     description:
-      'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without landing or whose start was refused. Fix it with nemia inbox resend <card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
+      'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without succeeding or whose start was refused. Fix it with nemia inbox resend <card>, nemia release <the run of that card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
   }),
-}).annotate({ description: 'One card a card waits on that has not landed, and where its work stands.' });
+}).annotate({ description: 'One card a card waits on that has not succeeded, and where its work stands.' });
 export type CardWait = typeof CardWait.Type;
 
 /**
@@ -262,7 +262,7 @@ export const CardStatus = Schema.Struct({
   waitingOn: Schema.optionalKey(
     Schema.Array(CardWait).annotate({
       description:
-        'The cards of its after: that have not landed, each with where its work stands: no trigger queues it and the tick starts none of it while any is listed. Read on every pass, never written on the card; absent where it waits on none.',
+        'The cards of its after: that have not succeeded, each with where its work stands: no trigger queues it and the tick starts none of it while any is listed. Read on every pass, never written on the card; absent where it waits on none.',
     }),
   ),
   queueLength: Schema.optionalKey(
@@ -330,7 +330,7 @@ export const CardFile = Schema.Struct({
   ),
   after: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
-      description: 'The cards it waits on, by name: it is queued and started only once each has landed.',
+      description: 'The cards it waits on, by name: it is queued and started only once each has succeeded.',
     }),
   ),
   files: Schema.optionalKey(
@@ -363,7 +363,7 @@ export const CardStart = Schema.Struct({
   from: Schema.optionalKey(
     Schema.Literals(['repo', 'yours', 'user']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
   ),
-  after: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The runs its first steps wait on to land, by id.' })),
+  after: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The runs its first steps wait on to succeed, by id.' })),
   context: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description: 'The runs whose conclusions it is handed as context, by id; it does not wait on them.',

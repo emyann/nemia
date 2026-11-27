@@ -218,7 +218,7 @@ describe('what a step was told: its task cut back into the sections the run comp
   const implement = { name: 'implement', after: ['design'], input: ['design'], body: 'i' } as unknown as StepSpec;
   const steps = [design, implement];
   const said = { outcome: 'done' as const, summary: 's', artifacts: [], output: { findings: ['one'] } };
-  const parent = { run: 'parent-a1', asked: 'Lay the ground.', steps: [], how: 'waited' as const, landed: true };
+  const parent = { run: 'parent-a1', asked: 'Lay the ground.', steps: [], how: 'waited' as const, succeeded: true };
   const refusal = { command: 'npm test', verdict: 1 as const, stdout: '## not a heading of the brief', stderr: '' };
   test('each section is cut with its source, and a step or check part names the step that gave it', () => {
     assert.deepEqual(

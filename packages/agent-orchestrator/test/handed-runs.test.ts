@@ -115,9 +115,9 @@ describe('a run started --from an earlier run reads its artifacts and inputs on 
     id = started.id;
     assert.deepEqual(runRecord(ROOT, id).context, [earlier]);
     assert.deepEqual(
-      [started.facts.context, started.landed ?? []],
+      [started.facts.context, started.succeeded ?? []],
       [[earlier], []],
-      'the start says the run it reads as context, still in flight, not landed',
+      'the start says the run it reads as context, still in flight, not succeeded',
     );
     assert.deepEqual((await pass(id)).filed, ['implement']);
     stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });

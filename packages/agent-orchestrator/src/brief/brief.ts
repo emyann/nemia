@@ -217,7 +217,8 @@ function inputsSaid(
  *   try or round (`keepWorktreeInstalled`): said to a session continued too, since its tree changed under it.
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
- * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them land, or was handed runs as context
+ * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them succeed, or was handed runs as
+ * context
  *   (`--from`): what each concluded (`handedSection`), the runs waited on first, gathered by file.verb.ts. Given to no other step: a run
  *   with neither, and every step after a root, is composed without it.
  * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with

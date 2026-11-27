@@ -72,7 +72,8 @@ export type RunSlot = { inFlight: number; cap: number };
  * waits on another run's in one directory, or on the lift, waits on no person, and would otherwise free the very slot it is queued for. A
  * cancelled run counts while the engine is still stopping what it had in flight; one that waits on a person, or has finished, does not.
  *
- * `wants`: it has nothing filed, nobody called it off, the runs it waits on have landed (`runReady`), and a root is ready — a run slot is
+ * `wants`: it has nothing filed, nobody called it off, the runs it waits on have succeeded or been released (`runReady`), and a root is
+ * ready — a run slot is
  * what it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
  *
  * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap
@@ -81,7 +82,7 @@ export type RunSlot = { inFlight: number; cap: number };
  * @param run The run's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
  * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the checkout or the pause holds.
- * @param landed Whether the run of that id has landed, which a run waiting on runs (`--after`) asks.
+ * @param landed Whether the run of that id has succeeded or been released, which a run waiting on runs (`--after`) asks.
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(

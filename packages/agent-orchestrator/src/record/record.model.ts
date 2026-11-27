@@ -240,6 +240,9 @@ const Hold = Schema.Struct({
 /** Who lifted a person's hold by hand, composed on read (`Unheld`, record.ts). */
 const Unheld = Schema.Struct({ since: Schema.String, actor: Actor });
 
+/** A person's release of the run's waiters, composed on read (`Released`, record.ts). */
+const Released = Schema.Struct({ at: Schema.String, actor: Schema.optional(Actor) });
+
 /** Who has a run in hand, composed on read (`Assignee`, record.ts). */
 const Assignee = Schema.Struct({
   at: Schema.String,
@@ -527,6 +530,12 @@ const runFields = {
    * that hold carries it (`holdOnce`). Absent where no caller the api resolved has lifted one.
    */
   unheld: Schema.optional(Unheld),
+  /**
+   * That a person released the run's waiters by hand (`nemia release <run>`), and since when — composed on read from a file of its own,
+   * `/registry/runmarks/<id>/released`, and never written into the record. The wait of every run that follows this one (`--after`,
+   * `hold --until`, a card's `after:`) reads it as a success (`waitStanding`). Absent where none was written.
+   */
+  released: Schema.optional(Released),
   /**
    * Who has the run in hand (`nemia assign`), since when, for how long an ask may wait on them, and why — composed on read from a file of
    * its own, `runs/<id>.assignee`, and never written into the record. It refuses nothing: while it stands (`assigneeStanding`) what the

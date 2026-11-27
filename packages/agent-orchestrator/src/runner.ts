@@ -306,7 +306,7 @@ export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
 export { type BranchReader } from './branches/branches.store.ts';
-export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot } from './standing/standing.verb.ts';
+export { passStanding, standingLive, standingReader, standingSnapshot } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy, recordMemo, type RecordMemo } from './rest/index.ts';
 export { removeAgent, writeAgent, type AgentSchema } from './agents/agents.store.ts';
@@ -380,6 +380,7 @@ export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun, type Approved } from './gate/gate.verb.ts';
 export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, type Holding, unhold } from './wait/wait.verb.ts';
+export { release, type Releasing } from './wait/release.verb.ts';
 export {
   heldLines,
   pausedLines,
@@ -403,7 +404,7 @@ export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type Floo
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
 export { CONDITION } from './condition/condition.verb.ts';
-export { HOLD } from './wait/commands.verb.ts';
+export { HOLD, RELEASE } from './wait/commands.verb.ts';
 export { ASSIGN } from './assignee/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';

@@ -284,11 +284,6 @@ const asksOwnOr = (ids: readonly string[]) => {
   return ((run) => asked.has(run.id) || asksOwn(run)) satisfies (run: RepositoryRun) => boolean;
 };
 
-/** A reader over where the runs of `ids` the store has stand now, each asked of (`standingLive`): none asked where the store has none. */
-export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readonly string[]) {
-  return yield* standingLive(yield* recordsOf(ids, []));
-});
-
 /**
  * Every branch of `run`'s repository and its commit, asked of `place` now: for a pass that read none for it, or whose reading a hand-off
  * it committed has moved. Undefined for a folder run, and a reading the place gave none of.

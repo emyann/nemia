@@ -20,7 +20,7 @@ runs/. A card is a plan's card with two differences — its keys optional, and i
     gate: review               # the step whose closeout waits for nemia approve in the run it starts
     factory: acme              # the factory it is started in (nemia factory --help); required to start
     from: add-cache-a1b2       # runs its run is handed as context, comma-separated: read, never waited on
-    after: add-a-cache-k2q9    # cards it waits on, comma-separated: queued and started once each has landed
+    after: add-a-cache-k2q9    # cards it waits on, comma-separated: queued and started once each has succeeded
     labels: { team: core }     # a person's labels: what -l selects it by, copied to the run it starts
     ---
     Cache the engine's views between passes.
@@ -30,11 +30,11 @@ wiring names for the workflow, else on its only one (nemia factory attach <facto
 An old card's repo: is retired: it still reads and lists, and no start reads it.
 
 A card that names cards in its after: waits on them: no trigger queues it and the tick starts none of it until
-each has landed — its own run, or, for a card a run passed its work on to (a workflow node's card, nemia inbox
+each has succeeded — its own run, or, for a card a run passed its work on to (a workflow node's card, nemia inbox
 resend), that card's. nemia inbox says waiting on <card>, at the card its work stands at, and its state; a wait
-only a person can release (a card the store does not know, a cycle, a run ended unlanded or a start refused) says
-needs you, with the fix: nemia inbox resend <card>, nemia inbox edit <name> to change after:, or nemia start
-<name>, which starts it all the same and says which cards had not landed.
+only a person can release (a card the store does not know, a cycle, a run ended without succeeding or a start refused) says
+needs you, with the fix: nemia inbox resend <card>, nemia release <run> for the run it waits on, nemia inbox edit <name> to change after:, or nemia start
+<name>, which starts it all the same and says which cards had not succeeded.
 
   nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow when set,
                  and started as <runId>, <phase> for a card a run's record says it was started as, the phase
@@ -55,7 +55,7 @@ needs you, with the fix: nemia inbox resend <card>, nemia inbox edit <name> to c
                  up's line, and the card is not tried again until it is edited or queued again, or its factory's wiring
                  names it another repository; a start that failed otherwise is said once, and tried again on the next
                  pass.
-  nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, landed or still in
+  nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, succeeded or still in
                  flight: what each concluded is read when the run's steps are filed, and none is waited on.
                  --off takes the key off.
   nemia inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.

@@ -12,10 +12,9 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest } from '../../test/placed.ts';
 import { CardDoor, cardDoorOver, type CardDoorShape } from '../cards/cards.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
-import { landedThrough, startQueued, waitingOf } from './inbox.verb.ts';
+import { releasedThrough, startQueued, waitingOf } from './inbox.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { testEngine } from 'agent-runtime/testing';
-import type { BranchReader } from '../branches/branches.store.ts';
 import type { ParentRun } from '../wait/wait.ts';
 import type { MissedStart } from './index.ts';
 import { CardName } from './inbox.model.ts';
@@ -70,7 +69,7 @@ test('a stale try that cannot be removed is ignored, and logged first', async ()
 
 test('a queued card that waits on a card whose run has not landed is not started; on the pass after that run lands, it is the card taken', async () => {
   const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
-  const pass = (landed: boolean) =>
+  const pass = (released: boolean) =>
     Effect.runPromise(
       Effect.gen(function* () {
         const door = yield* CardDoor;
@@ -79,19 +78,16 @@ test('a queued card that waits on a card whose run has not landed is not started
           CardName.read('b-3z4w'),
           aCard('Second', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z', after: 'a-1x2y' }),
         );
-        return yield* startQueued('/repo', [first], () => Effect.succeed(landed));
+        return yield* startQueued('/repo', [first], () => Effect.succeed(released));
       }).pipe(Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env)))),
     );
   assert.equal(await pass(false), undefined, 'the card waits: nothing is taken');
   assert.equal((await pass(true))?.card, 'b-3z4w', 'its card landed: the queue takes it');
 });
 
-/** The branch reader of a pass whose runs were all read before: never reached, since `Parents.read` answers each. */
-const unreached = { git: {} as unknown as BranchReader };
-
-test("through the pass's landing read (`landedThrough` over `Parents.read`), a queued card waits while its card's run reads unlanded, and is taken once it reads landed", async () => {
+test("through the pass's landing read (`releasedThrough` over `Parents.read`), a queued card waits while its card's run has not released its waiters, and is taken once it has", async () => {
   const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
-  const pass = (landed: boolean) =>
+  const pass = (released: boolean) =>
     Effect.runPromise(
       Effect.gen(function* () {
         const door = yield* CardDoor;
@@ -100,12 +96,14 @@ test("through the pass's landing read (`landedThrough` over `Parents.read`), a q
           CardName.read('b-3z4w'),
           aCard('Second', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z', after: 'a-1x2y' }),
         );
-        const read = new Map<string, ParentRun>([['a-run-k2q9', { landed }]]);
-        return yield* startQueued('/repo', [first], landedThrough(engineOf(engine().layer), { git: unreached.git, read }));
+        const read = new Map<string, ParentRun>([
+          ['a-run-k2q9', { standing: released ? { kind: 'released', by: 'succeeded' } : { kind: 'waiting', on: 'running' } }],
+        ]);
+        return yield* startQueued('/repo', [first], releasedThrough(engineOf(engine().layer), { read }));
       }).pipe(Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env)))),
     );
-  assert.equal(await pass(false), undefined, 'its run read unlanded: nothing is taken');
-  assert.equal((await pass(true))?.card, 'b-3z4w', 'its run read landed: the queue takes it');
+  assert.equal(await pass(false), undefined, 'its run has not released its waiters: nothing is taken');
+  assert.equal((await pass(true))?.card, 'b-3z4w', 'its run released its waiters: the queue takes it');
 });
 
 test('`waitingOf` follows a card to the card a node of its run filed (`sent`) and to the card it was sent on as (`<run>-resent`), reading the landing of each run once', () => {
@@ -126,9 +124,9 @@ test('`waitingOf` follows a card to the card a node of its run filed (`sent`) an
   const landed = (id: string) => Effect.sync(() => (asked.push(id), id === 'a2-run-m5n6'));
   const waiting = Effect.runSync(waitingOf(files, [routed, onward, resent], landed));
   assert.ok(waiting, 'a card not started names cards in its after:, so they are read');
-  assert.deepEqual(waiting.look('a-1x2y'), { known: true, runs: [{ id: 'a-run-k2q9', landed: false }], onward: ['a2-3z4w'] });
-  assert.deepEqual(waiting.look('a2-3z4w'), { known: true, runs: [{ id: 'a2-run-m5n6', landed: true }], onward: [] });
-  assert.deepEqual(waiting.look('x-5v6u'), { known: true, runs: [{ id: 'x-run-p7q8', landed: false }], onward: ['x-run-p7q8-resent'] });
+  assert.deepEqual(waiting.look('a-1x2y'), { known: true, runs: [{ id: 'a-run-k2q9', released: false }], onward: ['a2-3z4w'] });
+  assert.deepEqual(waiting.look('a2-3z4w'), { known: true, runs: [{ id: 'a2-run-m5n6', released: true }], onward: [] });
+  assert.deepEqual(waiting.look('x-5v6u'), { known: true, runs: [{ id: 'x-run-p7q8', released: false }], onward: ['x-run-p7q8-resent'] });
   assert.deepEqual(waiting.look('x-run-p7q8-resent'), { known: true, runs: [], onward: [] }, 'in the inbox, with no run of its own yet');
   assert.equal(waiting.look('gone-1a2b').known, false, 'neither in the inbox nor started from');
   assert.deepEqual([...asked].sort(), ['a-run-k2q9', 'a2-run-m5n6', 'x-run-p7q8'], 'each run read once');

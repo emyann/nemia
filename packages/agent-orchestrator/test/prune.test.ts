@@ -182,11 +182,11 @@ const listedOf = async (e: Engine, id: string) => {
 
 /**
  * Whether a listing says the run waits on a person anywhere: a step it names (`waitingOnYou`), a run its roots wait on that is missing,
- * cancelled or gone (`waiting`), or a step's own word (`message`), as an over-budget step's is.
+ * cancelled or failed (`waiting`), or a step's own word (`message`), as an over-budget step's is.
  */
 const waitsOnYou = (l: Listing) =>
   l.waitingOnYou.length > 0 ||
-  l.waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length) ||
+  l.waiting.some((w) => w.missing || w.cancelledAt || w.failed) ||
   l.steps.some((s) => /waiting on you/.test(s.message));
 
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */

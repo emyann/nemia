@@ -503,7 +503,7 @@ test('a warm read by state costs the records of the runs still moving alone: as 
   assert.equal(page.tallies?.records, few, "a warm page of the finished runs reads no finished run's record");
 });
 
-test('a run held until a run that never lands waits on a person since the hold was placed', async (t) => {
+test('a run held until a run that never succeeds waits on a person since the hold was placed', async (t) => {
   seeded(t);
   const parent = await anInFlight();
   const id = await started({ work: null });

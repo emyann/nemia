@@ -42,6 +42,7 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
   builtinGitPlace,
+  release,
   startRun,
   tickRun,
 } from '../src/runner.ts';
@@ -322,7 +323,7 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
         read: {
           runs: [run],
           slots,
-          parents: passParents(standingReader(NOTHING_READ)),
+          parents: passParents(),
           standing: NOTHING_READ,
           revisions: aPassRevisions(),
         },
@@ -564,7 +565,7 @@ row(
 
 row(
   STANDING,
-  'REFUSED: a run waits on one whose standing is unread, though it has landed, says why, and is filed once standing answers',
+  'a run waits on one whose standing is unread as on any other: the wait reads none of it, and it is filed once its parent is released',
   async () => {
     const { b, repo } = await theStore();
     const parent = await atTheGate(b, repo);
@@ -575,15 +576,14 @@ row(
     assert.equal(
       runRecord(ROOT, child.id).steps.implement.taskId ?? undefined,
       undefined,
-      'nothing of it filed while its parent reads unread',
+      'nothing of it filed while its parent has not succeeded, its standing unread or not',
     );
-    assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
-      { run: parent.id, unread: 'the place was not heard: the standing broke' },
-    ]);
+    assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [{ run: parent.id }]);
     const places = readStanding(ROOT)?.places ?? [];
     assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
+    await runWith(b.e, release(parent.id));
     await runWith(b.e, tickRun({ memo: freshRestMemo() }));
-    assert.ok(runRecord(ROOT, child.id).steps.implement.taskId, 'filed once its parent reads landed');
+    assert.ok(runRecord(ROOT, child.id).steps.implement.taskId, 'filed once its parent is released');
     assert.equal(
       runRecord(ROOT, child.id).baseRef,
       git(repo, 'rev-parse', 'main').trim(),
@@ -634,12 +634,13 @@ row(
 
 row(
   STANDING,
-  'REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read landed',
+  'REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent released',
   async () => {
     const { b, repo } = await theStore();
     const parent = await atTheGate(b, repo);
     const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
     git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+    await runWith(b.e, release(parent.id));
     const headless = PlaceService.layer(
       placeOver(builtinGitPlace, {
         standing: (request) => {
@@ -651,7 +652,7 @@ row(
       }),
     );
     await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
-    assert.ok(runRecord(ROOT, child.id).steps.implement.taskId, 'filed: its parent reads landed');
+    assert.ok(runRecord(ROOT, child.id).steps.implement.taskId, 'filed: its parent was released');
     assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
     assert.equal(
       runRecord(ROOT, child.id).baseRef,

@@ -37,7 +37,6 @@ import type { Engine, EngineService } from '../src/runtime-client.ts';
 import type { Refusal } from '../src/refusal/refusal.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
-import type { BranchReader } from '../src/branches/branches.store.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { scratch } from 'test-kit/scratch';
@@ -69,7 +68,6 @@ import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { PHASES } from '../src/meter/meter.ts';
 import { main } from '../src/cli/main.ts';
 import * as views from '../src/views/views.verb.ts';
-import { standingLiveOf } from '../src/standing/standing.verb.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 
 const ROOT = scratch('wf-faces-');
@@ -241,8 +239,7 @@ const folderTeam = () => {
 };
 /** The views' programs, and the standing of `ids` read off the test place. */
 const viewPrograms = async () => {
-  const live = (ids: readonly string[]) => runPlaced(standingLiveOf(ids));
-  return { over, live, ...views };
+  return { over, ...views };
 };
 
 /** The tick's program, given `engine` as the service, run to a Promise as the face runs it. */
@@ -561,13 +558,12 @@ describe("each verb's program, given its services, answers what its plain face a
     const running = await aParent(repo, b);
     const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [landed.run.id, running.run.id] }));
     const ids = [landed.run.id, running.run.id, 'no-such-run'];
-    const git = await v.live(ids);
-    const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
+    const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id))));
     assert.deepEqual(
-      read.map((p) => p.landed),
-      [true, false, false],
+      read.map((p) => p.standing.kind),
+      ['released', 'waiting', 'yours'],
     );
-    const lookup = await v.over(b.e, v.parentsRead(runRecord(ROOT, child.id), git));
+    const lookup = await v.over(b.e, v.parentsRead(runRecord(ROOT, child.id)));
     assert.deepStrictEqual(ids.map(lookup), read);
   });
   test("REFUSED as a death in the runtime's words: a refusal the engine's view, logs or feed fails with is each views program's death, exit code 2; a refusal of the store is still its failure", async () => {
@@ -584,7 +580,6 @@ describe("each verb's program, given its services, answers what its plain face a
       (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
     );
     const failed = () => 'failed' as const satisfies TaskPhase;
-    const live = await v.live([parent.run.id]);
     const reads = (err: unknown) => {
       const refuse = () => Effect.fail(err);
       return [
@@ -592,8 +587,8 @@ describe("each verb's program, given its services, answers what its plain face a
         ['checkReports', 'logs', v.checkReportsRead(record, stepsOf(record), failed, () => true), { ...e, logs: refuse }],
         ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
         ['refusalWhole', 'logs', v.refusalWholeRead('npm test', check), { ...e, logs: refuse }],
-        ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...e, view: refuse }],
-        ['parentsOf', 'view', v.parentsRead(child, live), { ...e, view: refuse }],
+        ['parentOf', 'view', v.parentRead(parent.run.id), { ...e, view: refuse }],
+        ['parentsOf', 'view', v.parentsRead(child), { ...e, view: refuse }],
       ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;
     };
 
@@ -612,16 +607,6 @@ describe("each verb's program, given its services, answers what its plain face a
       assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
       assert.equal(await rejection(v.over(broken, program), what), boom, `${what}: the program rejects with the error itself`);
     }
-
-    const unreadable = new Missing({ message: 'git has no such repository' });
-    const git: BranchReader = {
-      ...live,
-      has: () => {
-        throw unreadable;
-      },
-    };
-    const caught = await v.over(b.e, v.parentRead(parent.run.id, git).pipe(Effect.catchTag('Missing', (r) => Effect.succeed(r))));
-    assert.equal(caught, unreadable, 'a refusal of git is the program’s failure, recovered by its tag');
   });
   test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers", async () => {
     const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));

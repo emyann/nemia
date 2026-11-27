@@ -76,20 +76,20 @@ const row = (id: string, on: string[] = [], until: Array<[string, boolean]> = []
     waiting:
       on.length === 0
         ? null
-        : { runs: on.map((run) => ({ run, missing, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false },
+        : { runs: on.map((run) => ({ run, missing, cancelledAt: null, failed: false })), word: '', advice: '', waitingOnYou: false },
     holding:
       until.length === 0
         ? null
         : {
             at: '2026-11-15T00:00:00.000Z',
-            runs: until.map(([run, landed]) => ({ run, missing: false, cancelledAt: null, gone: [], landed })),
+            runs: until.map(([run, landed]) => ({ run, missing: false, cancelledAt: null, failed: false, released: landed })),
             word: '',
             advice: '',
             waitingOnYou: false,
           },
   });
 
-describe('waitersOf: the runs of the page that wait on a run, on its checkout, or are held until it lands', () => {
+describe('waitersOf: the runs of the page that wait on a run, on its checkout, or are held until it succeeds', () => {
   test('a wait and an unlanded hold each count once', () => {
     const rows = [row('a'), row('b', ['a']), row('c', [], [['a', false]]), row('d', ['x'])];
     assert.equal(waitersOf(rows, 'a').length, 2);

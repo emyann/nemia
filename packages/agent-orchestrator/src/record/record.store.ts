@@ -20,6 +20,7 @@ import {
   type Hold,
   type Run,
   type Unheld,
+  type Released,
   type Assignee,
   type AssigneeEnd,
   type Unassigned,
@@ -293,6 +294,17 @@ function unheldIn(text: string) {
   return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined;
 }
 
+/**
+ * The release of a run's waiters as its record's text reads: its moment and who wrote it; a text that does not read as one still
+ * releases them, at no moment known.
+ * @param text What the released record holds.
+ */
+function releasedIn(text: string) {
+  const json = jsonOr(text);
+  const at = fieldOf(json, 'at');
+  return { at: isText(at) ? at : '', ...actorIn(fieldOf(json, 'actor')) } satisfies Released;
+}
+
 /** The longest time an assignee is read with, in milliseconds: 23 hours, as `--for` takes. */
 const MOST_FOR_MS = 23 * 3_600_000;
 
@@ -365,7 +377,9 @@ function saidIn(words: readonly string[]) {
 /**
  * A run's markers as its records hold them: each marker's text where the run has it, and the words said to its steps in the order kept.
  */
-export type RunMarks = { readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'assignee' | 'unassigned' | 'labels']?: string } & {
+export type RunMarks = {
+  readonly [K in 'cancelled' | 'pruned' | 'hold' | 'unheld' | 'released' | 'assignee' | 'unassigned' | 'labels']?: string;
+} & {
   readonly said?: readonly string[];
 };
 
@@ -378,7 +392,8 @@ const assignedIn = (marks: RunMarks) => {
   return {
     ...(marks.assignee === undefined ? {} : { assignee: assigneeIn(marks.assignee) }),
     ...(unassigned ? { unassigned } : {}),
-  } satisfies Pick<Run, 'assignee' | 'unassigned'>;
+    ...(marks.released === undefined ? {} : { released: releasedIn(marks.released) }),
+  } satisfies Pick<Run, 'assignee' | 'unassigned' | 'released'>;
 };
 
 /**
@@ -457,6 +472,7 @@ export const recordIn = (id: string, text: string, where: string) =>
       'pruned',
       'hold',
       'unheld',
+      'released',
       'assignee',
       'unassigned',
       'labels',

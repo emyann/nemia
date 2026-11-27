@@ -86,9 +86,9 @@ export const FORGETTING_PREFIX = '/registry/forgetting/';
 /**
  * The markers a run carries by a key of their own, each the text its file held: called off, pruned, held, who lifted a hold, assigned,
  * how an assignee ended, labelled,
- * asked to refresh.
+ * asked to refresh, and released from its waiters' waits (`nemia release`).
  */
-export const RUN_MARKERS = ['cancelled', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'refresh'] as const;
+export const RUN_MARKERS = ['cancelled', 'pruned', 'hold', 'unheld', 'assignee', 'unassigned', 'labels', 'refresh', 'released'] as const;
 
 /** One of a run's markers. */
 export type RunMarker = (typeof RUN_MARKERS)[number];

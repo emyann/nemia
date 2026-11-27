@@ -74,9 +74,10 @@ type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'> & {
 };
 
 /**
- * Which of `rows` wait on the run `id`, by id, on its checkout, or are held until it lands: a run that names it among the runs it waits on
+ * Which of `rows` wait on the run `id`, by id, on its checkout, or are held until it succeeds: a run that names it among the runs it
+ * waits on
  * and the store has, a run a step of which waits on the checkout its ending has (`baseHeldBy`), or one that names it among the runs its
- * hold waits for that have not landed; each run once, never `id` itself.
+ * hold waits for that have not succeeded; each run once, never `id` itself.
  * @param rows The runs of the page, each with what it waits on, its hold and its steps.
  * @param id The run waited on.
  */
@@ -87,6 +88,6 @@ export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string) =>
         row.id !== id &&
         ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
           row.steps.some((step) => step.baseHeldBy?.run === id) ||
-          (row.holding?.runs.some((run) => run.run === id && !run.landed) ?? false)),
+          (row.holding?.runs.some((run) => run.run === id && !run.released) ?? false)),
     )
     .map((row) => row.id);

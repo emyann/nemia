@@ -22,6 +22,7 @@ import {
   RunAssign,
   RunAssigned,
   RunHeld,
+  RunReleased,
   RunHold,
   RunPrune,
   RunPruned,
@@ -195,13 +196,21 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     error: runActionErrors,
   }).annotate(
     OpenApi.Description,
-    'Puts a hold on the run, until the runs the body names land or, naming none, until a person lifts it, recording who put it. Answers RunHeld.',
+    'Puts a hold on the run, until the runs the body names succeed or, naming none, until a person lifts it, recording who put it. Answers RunHeld.',
   ),
   HttpApiEndpoint.delete('unhold', '/api/namespaces/:namespace/runs/:name/hold', {
     params: runParams,
     success: RunHeld,
     error: runActionErrors,
   }).annotate(OpenApi.Description, "Lifts the run's hold now, recording who lifted it. Answers RunHeld, lifted."),
+  HttpApiEndpoint.post('release', '/api/namespaces/:namespace/runs/:name/release', {
+    params: runParams,
+    success: RunReleased,
+    error: runActionErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Lets go every run that waits on this one (--after, a hold --until, a card after:) as if it had succeeded, for a run that will not on its own, recording who did. Written once, never taken back. Answers RunReleased.',
+  ),
   HttpApiEndpoint.post('assign', '/api/namespaces/:namespace/runs/:name/assignee', {
     params: runParams,
     payload: RunAssign,
@@ -283,7 +292,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     error: [Missing, Invalid],
   }).annotate(
     OpenApi.Description,
-    'Reads what a run started now with this run as context would be handed: whether it has landed, and its ## From run section. Answers Concluded.',
+    'Reads what a run started now with this run as context would be handed: whether it has succeeded, and its ## From run section. Answers Concluded.',
   ),
   HttpApiEndpoint.get('record', '/api/runs/:name/record', { params: nameParams, success: RunRecord, error: [Missing, Invalid] }).annotate(
     OpenApi.Description,

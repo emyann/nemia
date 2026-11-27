@@ -27,7 +27,6 @@ import { pausedRead } from '../list/list.verb.ts';
 import type { Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
 import { EngineService } from '../runtime-client.ts';
-import { standingLive } from '../standing/standing.verb.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -38,10 +37,11 @@ import { settingsNamed } from '../harness-settings/harness-settings.ts';
 
 /**
  * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, a `repo:` the
- * start did not take, and the cards of its `after:` that had not landed (`waitedOn`); for a brief, the `--repo` that only found the
+ * start did not take, and the cards of its `after:` that had not succeeded (`waitedOn`); for a brief, the `--repo` that only found the
  * factory, where its wiring placed the run on another (`repoFoundFactory`, as typed); the store's pause as it stood once the run was
- * written (`pausedRead`), while one stands; `landed`, the
- * runs it is handed as context that had landed when it started; and `hints`, a line for each file of its folder that still writes a former
+ * written (`pausedRead`), while one stands; `succeeded`, the
+ * runs it is handed as context that had succeeded when it started; and `hints`, a line for each file of its folder that still writes a
+ * former
  * spelling, read through the Workflow door (`hints`), where any does.
  */
 export type Started = {
@@ -52,11 +52,11 @@ export type Started = {
   card?: string;
   queueLeft?: string;
   ignoredRepo?: string;
-  /** The cards of the card's `after:` that had not landed when a person started it all the same. */
+  /** The cards of the card's `after:` that had not succeeded when a person started it all the same. */
   waitedOn?: readonly string[];
   repoFoundFactory?: string;
   paused?: Paused;
-  landed?: readonly string[];
+  succeeded?: readonly string[];
   hints?: readonly string[];
   /** The factory's repositories and volumes left out of the run's mounts, each no directory now (`leftOutMounts`, `leftOutVolumes`). */
   notMounted?: readonly string[];
@@ -182,7 +182,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
     fix: given.fix ?? '--factory <name>',
-    landed: yield* requestLanded(yield* EngineService),
+    landed: requestLanded(yield* EngineService),
   });
   return {
     id: started.run.id,
@@ -243,17 +243,16 @@ export const START: Served<Started, StartInput> = {
   handler: Effect.fnUntraced(function* (given: StartInput) {
     const started = yield* startOf(given);
     const paused = yield* pausedRead();
-    const landed: string[] = [];
+    const succeeded: string[] = [];
     const context = started.run.context ?? [];
-    const git = context.length ? yield* standingLive([started.run]) : undefined;
-    for (const id of context) if (git && (yield* parentRead(id, git)).landed) landed.push(id);
+    for (const id of context) if ((yield* parentRead(id)).standing.kind === 'released') succeeded.push(id);
     const hints = yield* hintsOf(started.run);
     const notMounted = yield* leftOutMounts(started.run);
     const notVolumes = yield* leftOutVolumes(started.run);
     return {
       ...started,
       ...(paused.pause ? { paused } : {}),
-      ...(started.run.context?.length ? { landed } : {}),
+      ...(started.run.context?.length ? { succeeded } : {}),
       ...(hints.length ? { hints } : {}),
       ...(notMounted.length ? { notMounted } : {}),
       ...(notVolumes.length ? { notVolumes } : {}),
@@ -261,12 +260,13 @@ export const START: Served<Started, StartInput> = {
   }),
 };
 
-/** What `nemia concluded` answers: the run, whether it has landed, and the section a root handed it as context would be handed now. */
-type Concluded = { run: string; landed: boolean; section: string };
+/** What `nemia concluded` answers: the run, whether it has succeeded, and the section a root handed it as context would be handed now. */
+type Concluded = { run: string; succeeded: boolean; section: string };
 
 /**
  * `nemia concluded <run>`: what a run started now with `--from <run>` would be handed of it — the `## From run <id>` section its roots
- * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled landed or not landed, not judged, as `parentOf`
+ * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled succeeded or not succeeded, not judged, as
+ * `parentOf`
  * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
  * the store is read, and with `Missing` for a run the store does not have.
  */
@@ -282,11 +282,10 @@ export const CONCLUDED: Served<Concluded, typeof ConcludedInput.Type> = {
     if (notId) throw new Invalid({ message: notId });
     if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
-    const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
-    const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
+    const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read');
     if (parent === undefined)
       throw new Missing({ message: `nemia concluded ${id}: nothing was read of run ${id}. See what it holds with nemia ls ${id}.` });
-    return { run: id, landed: parent.landed, section: contextSection(parent) };
+    return { run: id, succeeded: parent.succeeded, section: contextSection(parent) };
   }),
 };
 

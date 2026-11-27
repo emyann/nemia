@@ -70,7 +70,7 @@ test("a try's answer says who answered it, in its part's Said for the try shown,
 test('a hold says who put it, where its file says', async () => {
   const wait = {
     runs: [{ run: 'a-1', missing: false }],
-    word: 'held until a-1 lands',
+    word: 'held until a-1 succeeds',
     advice: 'nemia hold r-1 --off',
     waitingOnYou: false,
   };

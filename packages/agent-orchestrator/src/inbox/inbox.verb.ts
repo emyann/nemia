@@ -58,7 +58,6 @@ import { StoreRoot } from '../config/root.store.ts';
 import { FileDoor, filesDir } from '../start/files.store.ts';
 import { keptParent, passParents, type Parents } from '../views/views.verb.ts';
 import { over, type Engine } from '../runtime-client.ts';
-import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -436,21 +435,21 @@ const triggeredStart = (card: Pick<InboxListing, 'workflow' | 'queued'>) => {
 };
 
 /**
- * Whether a run has landed, as its own `nemia decide` says it (`keptParent` over a pass's `Parents`, so each run is read once): what the
- * cards' waits read through. A read that fails is no landing: the card waits, and the next pass reads it again.
+ * Whether a run has released its waiters — it succeeded, or a person released them (`keptParent` over a pass's `Parents`, so each run is
+ * read once): what the cards' waits read through. A read that fails releases nothing: the card waits, and the next pass reads it again.
  */
 export type RunLanded = (run: string) => Effect.Effect<boolean>;
 
 /**
- * Whether each run has landed, read through `parents` with the engine `e`, each run once for as long as `parents` stands (`keptParent`):
- * a run whose read fails has not landed.
+ * Whether each run has released its waiters, read through `parents` with the engine `e`, each run once for as long as `parents` stands
+ * (`keptParent`): a run whose read fails has released none.
  * @param e The engine, which a run's tasks are read through.
- * @param parents The pass's runs read so far, and the branch reader they are read through.
+ * @param parents The pass's runs read so far.
  */
-export const landedThrough = (e: Engine, parents: Parents) =>
+export const releasedThrough = (e: Engine, parents: Parents) =>
   ((id: string) =>
-    keptParent(id, parents.git, parents.read).pipe(
-      Effect.map((p) => p.landed),
+    keptParent(id, parents.read).pipe(
+      Effect.map((p) => p.standing.kind === 'released'),
       over(e),
       Effect.orElseSucceed(() => false),
     )) satisfies RunLanded;
@@ -507,8 +506,8 @@ export const waitingOf = Effect.fnUntraced(function* (
     if (name === undefined || looks.has(name)) continue;
     const own = byCard.get(name) ?? [];
     const onward = [...new Set(own.flatMap(onwardOf))];
-    const ran: { id: string; landed: boolean }[] = [];
-    for (const run of own) ran.push({ id: run.id, landed: yield* landed(run.id) });
+    const ran: { id: string; released: boolean }[] = [];
+    for (const run of own) ran.push({ id: run.id, released: yield* landed(run.id) });
     looks.set(name, { known: inInbox.has(name) || own.length > 0, runs: ran, onward });
     queue.push(...onward);
   }
@@ -649,16 +648,13 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
   const factories = yield* readableFactories();
   const started = new Set(runs.flatMap((r) => (r.from?.inbox === undefined ? [] : [r.from.inbox])));
   const waiting = namedAfter(entries, (name) => started.has(name)).length
-    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), yield* requestLanded(e))
+    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), requestLanded(e))
     : undefined;
   return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()), waiting);
 });
 
 /**
- * Whether each run has landed for one request: read through where its branches stand as the last pass wrote it (`standingSnapshot`),
- * each run once (`landedThrough`).
+ * Whether each run has released its waiters for one request, each run once (`releasedThrough`).
  * @param e The engine.
  */
-export const requestLanded = Effect.fnUntraced(function* (e: Engine) {
-  return landedThrough(e, passParents(standingReader(yield* standingSnapshot())));
-});
+export const requestLanded = (e: Engine) => releasedThrough(e, passParents());

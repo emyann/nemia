@@ -159,18 +159,18 @@ test('a loop out of rounds says `rounds exhausted` in its status, and waits on y
 
 test('a held run says held, with what lifts it: `nemia hold <run> --off`, its advice where a run it names never lands, nothing while it lifts', () => {
   const holding = (runs: object[], waitingOnYou: boolean) => ({
-    word: 'held until r-other lands',
+    word: 'held until r-other succeeds',
     advice: 'resolve it',
     runs,
     waitingOnYou,
   });
-  const held = runOf('r-held', { status: { status: 'waiting', holding: holding([{ run: 'r-other', landed: false }], false) } });
+  const held = runOf('r-held', { status: { status: 'waiting', holding: holding([{ run: 'r-other', released: false }], false) } });
   assert.equal(cellOf(held, 'Status'), 'waiting, held');
-  assert.equal(cellOf(held, 'Waits'), 'held until r-other lands — nemia hold r-held --off lifts it');
-  const never = runOf('r-never', { status: { status: 'waiting', holding: holding([{ run: 'r-other', landed: false }], true) } });
-  assert.equal(cellOf(never, 'Waits'), 'held until r-other lands: resolve it');
-  const lifting = runOf('r-lifting', { status: { status: 'waiting', holding: holding([{ run: 'r-other', landed: true }], false) } });
-  assert.equal(cellOf(lifting, 'Waits'), 'held until r-other lands');
+  assert.equal(cellOf(held, 'Waits'), 'held until r-other succeeds — nemia hold r-held --off lifts it');
+  const never = runOf('r-never', { status: { status: 'waiting', holding: holding([{ run: 'r-other', released: false }], true) } });
+  assert.equal(cellOf(never, 'Waits'), 'held until r-other succeeds: resolve it');
+  const lifting = runOf('r-lifting', { status: { status: 'waiting', holding: holding([{ run: 'r-other', released: true }], false) } });
+  assert.equal(cellOf(lifting, 'Waits'), 'held until r-other succeeds');
 });
 
 test('a run waiting on a run that never lands waits on you with its advice; a session waiting on its harness says for what', () => {

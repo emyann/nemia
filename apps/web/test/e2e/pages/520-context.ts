@@ -60,7 +60,7 @@ const TASK = [
   `## From run ${FAKE.id}`,
   '',
   `This run was handed ${FAKE.id} as context (\`--from\`); it did not wait on it.`,
-  `Not landed, not judged: ${FAKE.id} was still in flight (or did not land) when this run's steps were filed.`,
+  `Not succeeded, not judged: ${FAKE.id} was still in flight (or did not land) when this run's steps were filed.`,
   '',
   'What it was asked, the first line:',
   '',
@@ -178,9 +178,9 @@ async function onTheStartForm(page: Page, what: string) {
   const running = form.locator(`section[data-concluded="${DIAMOND.running.id}"]`);
   const landed = form.locator(`section[data-concluded="${DIAMOND.landed.id}"]`);
   await expectVisible(running.locator('[data-markdown]'), `what ${DIAMOND.running.id} would hand, drawn`);
-  await expectVisible(running.locator('[data-not-landed]', { hasText: 'not landed, not judged' }), 'badged: it has not landed');
+  await expectVisible(running.locator('[data-not-succeeded]', { hasText: 'not succeeded, not judged' }), 'badged: it has not landed');
   await expectVisible(landed.locator('[data-markdown]'), `what ${DIAMOND.landed.id} would hand, drawn`);
-  await expectCount(landed.locator('[data-not-landed]'), 0, 'unbadged: it landed');
+  await expectCount(landed.locator('[data-not-succeeded]'), 0, 'unbadged: it landed');
   for (const [id, preview] of [
     [DIAMOND.running.id, running],
     [DIAMOND.landed.id, landed],
@@ -226,7 +226,7 @@ async function onTheRunPage(page: Page, what: string) {
   await expectVisible(blocks.nth(0).locator('h5', { hasText: `Waited on, landed · ${DIAMOND.top.title}` }), 'the wait, headed by how');
   await expectVisible(blocks.nth(1).locator('h5', { hasText: `Read as context · ${FAKE.title}` }), 'what it read, headed by how');
   await expectVisible(blocks.nth(1).locator(`a[href="/runs/${FAKE.id}"]`), 'linked to its run');
-  await expectVisible(blocks.nth(1).getByText('Not landed, not judged', { exact: false }), 'and labelled not landed');
+  await expectVisible(blocks.nth(1).getByText('Not succeeded, not judged', { exact: false }), 'and labelled not landed');
   await fold.locator('[data-layer="task"]').scrollIntoViewIfNeeded();
   await shoot(page, fold.locator('[data-layer="task"]'), `blocks-${what}`);
 }

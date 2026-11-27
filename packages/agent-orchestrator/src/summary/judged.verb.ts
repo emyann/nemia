@@ -117,14 +117,15 @@ export const spentOf = (spend: Spend) =>
 /**
  * What a run started `--after` still waits on, as `nemia ls` and `nemia decide` say it — never worded here.
  *
- * `runs` are the package's `waitsOf`: each run in `after` that has not landed, as its own `nemia decide` says it, and, for one that never
- * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
+ * `runs` are the package's `waitsOf`: each run in `after` that has not succeeded or been released, and, for one that never
+ * will without a person, why — the store has no such run (`missing`), it was cancelled, or it failed (`failed`). `word` is
  * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `waitingOnYou` is
- * whether a person has to act — some run of `runs` never lands on its own — which is when `nemia ls` prints `→ waiting on you:` before the
+ * whether a person has to act — some run of `runs` never succeeds on its own — which is when `nemia ls` prints `→ waiting on you:`
+ * before the
  * advice.
  */
 export type RunWaiting = {
-  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; failed: boolean }>;
   word: string;
   advice: string;
   waitingOnYou: boolean;
@@ -134,19 +135,21 @@ export type RunWaiting = {
  * What a person's hold on a run says (`nemia hold <run> --until <run>`, `Run.hold`), as `nemia ls` and `nemia decide` say it — never worded
  * here.
  *
- * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not landed,
- * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has landed and the next
- * tick has not yet lifted the hold, each of them `landed`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
+ * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not released it,
+ * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has released it and the
+ * next tick has not yet lifted the hold, each of them `released`. `word` is what `nemia ls` prints under the run (`holdWord`), with the
+ * person's
  * why and name when the hold has them, and `advice` the line
  * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold waits on a person: exactly when a run it names never
- * lands on its own, and false for a hold that names no run, which is the person's word already given (`holdNeedsYou`, the rule `nemia ls`
+ * succeeds on its own, and false for a hold that names no run, which is the person's word already given (`holdNeedsYou`, the rule `nemia
+ * ls`
  * prints the advice by). `runs` is empty for such a hold. A hold asks nothing of anyone while it stands:
  * every verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`)
  * and nothing is offered.
  */
 export type RunHolding = {
   at: string;
-  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; failed: boolean; released: boolean }>;
   word: string;
   advice: string;
   waitingOnYou: boolean;
@@ -204,10 +207,10 @@ export type StepNeeds = {
  * A run waited on that never lands without a person: what `nemia ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
  * resolve.
  *
- * The package decides it (`neverLands` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
- * it may never land without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
+ * The package decides it (`neverSucceeds` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
+ * it may never succeed without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `failed`.
  */
-const neverLands = (w: Wait) => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
+const neverSucceeds = (w: Wait) => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
 /**
  * What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run.
@@ -217,10 +220,10 @@ const neverLands = (w: Wait) => Object.entries(w).some(([key, why]) => key !== '
 function runWaitingOf(run: Run, waits: readonly Wait[]) {
   if (!waits.length) return null;
   return {
-    runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
+    runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, failed: Boolean(w.failed) })),
     word: waitWord(waits),
     advice: waitAdvice(run, waits),
-    waitingOnYou: waits.some(neverLands),
+    waitingOnYou: waits.some(neverSucceeds),
   };
 }
 
@@ -238,8 +241,8 @@ function holdingOf(run: Run, holds: readonly Wait[]) {
       run: w.run,
       missing: Boolean(w.missing),
       cancelledAt: w.cancelledAt ?? null,
-      gone: w.gone ?? [],
-      landed: Boolean(w.landed),
+      failed: Boolean(w.failed),
+      released: Boolean(w.released),
     })),
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),

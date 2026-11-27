@@ -70,7 +70,6 @@ import { shownStatus, type RunsListed } from '../src/list/list.ts';
 import { CardDoor, type CardDoorShape } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { passParents } from '../src/views/views.verb.ts';
-import { NOTHING_READ, standingReader } from '../src/standing/standing.verb.ts';
 import { story, staged } from './story.ts';
 
 const ROOT = scratch('wf-queue-');
@@ -128,7 +127,7 @@ const listedLines = async () => {
 /** Run `id`'s decision on this file's stage, as the api serves it (`decisionOn`). */
 const decisionNow = async (id: string) => (await decisionOn(stage, id)).decision;
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
-const noParents = () => passParents(standingReader(NOTHING_READ));
+const noParents = () => passParents();
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 

@@ -16,7 +16,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import type { Settings } from '../config/config.store.ts';
 import { parentsRead, passParents, type Parents } from '../views/views.verb.ts';
-import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
+import { type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { readRun } from '../tick/told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -53,8 +53,8 @@ const needOf = Effect.fnUntraced(function* (
   const { read } = yield* readRun(seen, run, { steps, views: new Map(listed) });
   const { phaseOf } = read;
   const a = assess(read);
-  const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(seen));
-  return slotNeed(run, phaseOf, a, (id) => parent(id).landed, steps);
+  const parent = yield* parentsRead(run, parents.read).pipe(over(seen));
+  return slotNeed(run, phaseOf, a, (id) => parent(id).standing.kind === 'released', steps);
 });
 
 /**
@@ -172,7 +172,7 @@ export const passRead = (
   standing: PassStanding,
   revisions: PassRevisions,
 ) => {
-  const parents = passParents(standingReader(standing));
+  const parents = passParents();
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
   const slots = Effect.suspend(() => {

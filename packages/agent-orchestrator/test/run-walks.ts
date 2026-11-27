@@ -773,6 +773,19 @@ const HOLDS: Record<string, Walk[]> = {
       says: false,
     },
   ],
+  'released.put': [
+    {
+      name: 'a release is put once: a second answers null, and the first stands on the run, read back with its actor',
+      walk: ({ door }) => {
+        made(door, 'w-release');
+        const first = act(door.released.put(idOf('w-release'), ON_LAPTOP)) as { at: string; actor?: Actor } | null;
+        const again = act(door.released.put(idOf('w-release')));
+        const read = (act(door.runs.read(idOf('w-release'))) as Run).released;
+        return [Boolean(first?.at), first?.actor, again, read?.at === first?.at, read?.actor];
+      },
+      says: [true, ON_LAPTOP, null, true, ON_LAPTOP],
+    },
+  ],
   'refresh.put': [
     {
       name: 'a refresh ask is put once: a second answers null, and it stands until lifted',

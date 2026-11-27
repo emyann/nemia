@@ -66,23 +66,23 @@ export function holdRefusal(args: Args) {
   return null;
 }
 
-/** `nemia hold`: a run held until other runs land, or until a person lifts it; with `--off`, its hold lifted now. */
+/** `nemia hold`: a run held until other runs succeed, or until a person lifts it; with `--off`, its hold lifted now. */
 export const HOLD_WORDS = {
   name: 'hold',
   served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'unhold' }],
   usage: '<runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
-    'file nothing more of a run until other runs land, as --after would',
+    'file nothing more of a run until other runs succeed, as --after would',
     'have: what is in flight finishes, nothing new is filed, and nothing',
-    'is asked of you — nemia ls and nemia decide say held until <run> lands, and',
+    'is asked of you — nemia ls and nemia decide say held until <run> succeeds, and',
     'what a step asks is asked once the hold lifts. The tick lifts it when',
-    'every run named has landed. With no --until, the run is held until a',
+    'every run named has succeeded (or been released: nemia release). With no --until, the run is held until a',
     'person lifts it (--off), and no tick lifts it: nemia ls and nemia',
     'decide say held until a person lifts it. Refused of a run cancelled,',
-    'pruned, finished or already held, and of a run named that is unknown,',
+    'pruned, succeeded or already held, and of a run named that is unknown,',
     'the run itself, or one that already waits on it, through --after or a',
     'hold.',
-    '--why: the reason, shown beside held until <run> lands wherever it is',
+    '--why: the reason, shown beside held until <run> succeeds wherever it is',
     'said; --by: who puts the hold (default: your OS user).',
     'nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
     'if it had never been put',
@@ -102,6 +102,29 @@ export const HOLD_WORDS = {
   writes: true,
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `hold` and `unhold` of `objects`' Api, calling this handler" },
+} as const satisfies CommandWords;
+
+/** `nemia release`: every run that waits on this one let go, as if it had succeeded. */
+export const RELEASE_WORDS = {
+  name: 'release',
+  served: [{ endpoint: 'runs.release' }],
+  usage: '<runId>',
+  help: [
+    'let go every run that waits on this one — --after, hold --until and a',
+    "card's after: alike — as if it had succeeded. For a run that will not",
+    'succeed on its own: one that failed or was cancelled and whose work you',
+    'merged by hand. Written once, never taken back. Refused of a run',
+    'that has already succeeded or been released.',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `nemia release takes one run's id: not ${arg}.`,
+  },
+  writes: true,
+  ticks: true,
+  class: 'act',
+  only: { side: 'cli', why: "the api serves it as the Run's `release` of `objects`' Api, calling this handler" },
 } as const satisfies CommandWords;
 
 /** `nemia route`: a person's route for a condition's try, which the next tick takes over the condition's own answer. */

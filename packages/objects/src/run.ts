@@ -193,7 +193,7 @@ export const RunSpec = Schema.Struct({
   try: Schema.NullOr(Schema.Struct({ agent: Schema.String.annotate({ description: 'The name of the agent tried.' }) })).annotate({
     description: "The agent a try from an agent's page tried; null for any other run.",
   }),
-  after: Strings.annotate({ description: 'The runs its first steps wait on to land (nemia start --after).' }),
+  after: Strings.annotate({ description: 'The runs its first steps wait on to succeed (nemia start --after).' }),
   context: Strings.annotate({ description: 'The runs whose conclusions it is handed as context.' }),
   from: Schema.NullOr(Schema.Struct({ inbox: Schema.String.annotate({ description: "The inbox card's id." }) })).annotate({
     description: 'The inbox card it was started from; null for none.',
@@ -428,42 +428,48 @@ export const RunStepStatus = Schema.Struct({
   .annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
-/** The runs a run waits on or is held until, each that has not landed and why it never will on its own (`RunWaiting`, `RunHolding`). */
+/** The runs a run waits on or is held until, each that has not released it and why it never will on its own (`RunWaiting`,
+ * `RunHolding`). */
 const waitedRun = {
   run: Schema.String.annotate({ description: "The waited-on run's id." }),
   missing: Schema.Boolean.annotate({ description: 'Whether the store has no such run.' }),
   cancelledAt: NullString.annotate({ description: 'When the run was called off; null where it was not.' }),
-  gone: Strings.annotate({ description: 'The result branches the run recorded that are gone; empty where none is.' }),
+  failed: Schema.Boolean.annotate({ description: 'Whether the run failed, which it does not succeed from on its own.' }),
 };
 
-/** The runs a run's roots wait on that have not landed (`RunWaiting`, judged.verb.ts), in the package's words. */
+/** The runs a run's roots wait on that have not succeeded (`RunWaiting`, judged.verb.ts), in the package's words. */
 export const RunWaiting = Schema.Struct({
   runs: List(Schema.Struct(waitedRun)).annotate({
     description:
-      'Each run waited on that has not landed, and why it never will on its own where it will not: missing, called off, or its branches gone.',
+      'Each run waited on that has not succeeded or been released, and why it never will on its own where it will not: missing, called off, or failed.',
   }),
   word: Schema.String.annotate({ description: 'What nemia ls prints under the run for its wait.' }),
   advice: Schema.String.annotate({ description: 'The line nemia decide prints under it: what to do about the wait.' }),
-  waitingOnYou: Schema.Boolean.annotate({ description: 'Whether a run it waits on never lands without a person.' }),
+  waitingOnYou: Schema.Boolean.annotate({ description: 'Whether a run it waits on never succeeds without a person.' }),
 }).annotate({
   identifier: 'RunWaiting',
-  description: "The runs a run's roots wait on that have not landed, with the words nemia ls and nemia decide print for the wait.",
+  description: "The runs a run's roots wait on that have not succeeded, with the words nemia ls and nemia decide print for the wait.",
 });
 export type RunWaiting = typeof RunWaiting.Type;
 
 /** A person's hold on a run (`RunHolding`, judged.verb.ts), in the package's words. */
 export const RunHolding = Schema.Struct({
   at: Schema.String.annotate({ description: 'When the hold was put (nemia hold).' }),
-  runs: List(Schema.Struct({ ...waitedRun, landed: Schema.Boolean.annotate({ description: 'Whether the run landed.' }) })).annotate({
+  runs: List(
+    Schema.Struct({
+      ...waitedRun,
+      released: Schema.Boolean.annotate({ description: 'Whether the run succeeded or a person released its waiters.' }),
+    }),
+  ).annotate({
     description:
-      'The runs the hold waits for, each with why it never lands on its own where it will not, and whether it landed; empty for a hold that names none.',
+      'The runs the hold waits for, each with why it never succeeds on its own where it will not, and whether it released the hold; empty for a hold that names none.',
   }),
   word: Schema.String.annotate({
     description: "What nemia ls prints under the run for its hold, with the person's why and name where the hold has them.",
   }),
   advice: Schema.String.annotate({ description: 'The line nemia decide prints under it.' }),
   waitingOnYou: Schema.Boolean.annotate({
-    description: 'Whether the hold waits on a person: exactly when a run it names never lands on its own.',
+    description: 'Whether the hold waits on a person: exactly when a run it names never succeeds on its own.',
   }),
   why: Schema.optionalKey(
     Schema.String.annotate({
@@ -626,7 +632,7 @@ export const RunStatus = Schema.Struct({
       'The tokens its sessions used, every try together: the total and its parts, how many tries were measured and how many were not, and both said in words; null until one was measured.',
   }),
   waiting: Schema.NullOr(RunWaiting).annotate({
-    description: "The runs this run's first steps wait on to land (nemia start --after); null where it waits on none.",
+    description: "The runs this run's first steps wait on to succeed (nemia start --after); null where it waits on none.",
   }),
   holding: Schema.NullOr(RunHolding).annotate({
     description:

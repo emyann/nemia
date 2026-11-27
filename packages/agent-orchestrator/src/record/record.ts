@@ -84,7 +84,7 @@ export const placeOf = (run: Pick<Run, 'place'>) => run.place?.kind ?? 'git';
 export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'git';
 
 /**
- * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
+ * A person's hold on a run, as its file says it: when it was put, the runs it waits on to succeed, in the order they were named, the
  * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line; and
  * the caller who put it (`actor`, objects' `Actor`): absent on a hold put in-process, and on a file older code wrote.
  */
@@ -96,6 +96,12 @@ export type Hold = { at: string; until: readonly string[]; why?: string; by?: st
  * lift's alone: a lift by a caller the api did not resolve leaves none.
  */
 export type Unheld = { since: string; actor: Actor };
+
+/**
+ * A person's release of a run's waiters (`nemia release <run>`), as its file says it: when it was written (`at`) and the caller who
+ * wrote it (`actor`), absent on one made in-process. Written once and never taken back: waiters that started cannot be un-started.
+ */
+export type Released = { at: string; actor?: Actor };
 
 /**
  * Who has a run in hand (`nemia assign`), as its file says it: when it was put (`at`), how long an ask may wait on them before the run is
@@ -778,6 +784,10 @@ export type RunStore = {
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
+  };
+  readonly released: {
+    /** Release the run's waiters, once: the release written, or null when one already stands, which is kept. */
+    readonly put: (id: string, actor?: Actor) => Released | null;
   };
   readonly assignees: {
     /**

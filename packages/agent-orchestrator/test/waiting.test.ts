@@ -1,13 +1,15 @@
 /**
  * Runs that wait on runs, told as a person's stories on the stage (`story.ts`): a diamond `nemia start <folder>` starts, whose children
- * file once their parents land, each root handed `## From run <parent>`; a parent that will not land — cancelled, failed with nothing
- * committed, its branch gone — and the parents that land all the same; and context without a wait (`--from`). Beside them, what `nemia
+ * file once their parents succeed, each root handed `## From run <parent>`; a parent that will not succeed — cancelled, or failed —
+ * until a person releases
+ * its waiters, and the parents that release them all the same, merged or not; and context without a wait (`--from`). Beside them, what
+ * `nemia
  * start --after` refuses of the store and git as they stand, what `nemia start <folder>` refuses before it starts anything, and a plan
  * stopped part-way by a start that dies, kept focused.
  *
  * What the waits mean is pure, in `src/wait/wait.test.ts` (readiness, the words, `afterRefusal`'s every reason); a card's format and
  * the plan's order in `src/plan/plan.test.ts`; the sections a root is handed in `src/brief/handed.test.ts`. A parent on another
- * repository whose branch git alone can say is gone is in `after-elsewhere.boundary.test.ts`, on real git.
+ * repository is in `after-elsewhere.boundary.test.ts`, on real git.
  *
  * Every story starts its own runs and counts only its own: they share this file's store at `ROOT`, given as `ENV`.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
@@ -20,7 +22,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { RepositoryRun, Run } from '../src/run.ts';
-import type { BranchReader } from '../src/branches/branches.store.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { decisionOn } from './screens.ts';
@@ -32,9 +33,9 @@ import {
   list,
   parentRead,
   PERSON,
+  release,
   retryRun,
   sayRun,
-  standingLiveOf,
   startPlan,
   planLines,
   startRun,
@@ -83,8 +84,12 @@ const board = () => stage.board() satisfies Board;
 const tick = (id: string) => stage.runWith(board().e, advanceRun(runRecord(ROOT, id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = () => stage.runWith(board().e, passStanding(listRuns(ROOT)));
-/** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
-const parentNow = (id: string) => stage.runWith(board().e, standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git))));
+/** A run as one waiting on it reads it now: its record and where a wait on it stands. */
+const parentNow = (id: string) => stage.runWith(board().e, parentRead(id));
+/** Whether a wait on the run `id` is released now. */
+const releasedNow = async (id: string) => (await parentNow(id)).standing.kind === 'released';
+/** `nemia release <id>`, on the stage's engine. */
+const releasing = (id: string) => stage.runWith(board().e, release(id));
 const decided = async (id: string) => (await stage.runWith(board().e, decideRun(id))).decision;
 const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, runRecord(ROOT, id)))).steps.map((s) => s.message);
 /** The brief the engine was filed with for the task `id`. */
@@ -300,7 +305,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
     for (const card of ['b', 'c', 'd']) assert.deepEqual((await tick(ids[card])).filed, [], `${card} waits`);
   });
   s.test(
-    'while a is not landed, b files nothing, pass after pass, and says `waiting on a` — and `nemia decide` offers nothing',
+    'while a has not succeeded, b files nothing, pass after pass, and says `waiting on a` — and `nemia decide` offers nothing',
     async () => {
       line('a');
       committed('a', 'a.txt');
@@ -312,10 +317,10 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
         assert.deepEqual(
           [r.filed, board().filings, r.waiting],
           [[], filings, [{ run: ids.a }]],
-          `pass ${pass + 1}: on its branch, not landed`,
+          `pass ${pass + 1}: on its branch, not succeeded`,
         );
       }
-      assert.equal((await parentNow(ids.a)).landed, false);
+      assert.equal(await releasedNow(ids.a), false);
       await aPass();
       assert.deepEqual(await statuses(ids.b), [`waiting on ${ids.a}`]);
       const d = await stage.runWith(board().e, decideRun(ids.b));
@@ -330,26 +335,23 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
       assert.deepEqual((await tick(ids.b)).filed, []);
     },
   );
-  s.test(
-    'a signs off: it has landed, once a pass has read where it stands, and b and c file their roots from the base as it stands now, with what a committed',
-    async () => {
-      const startedOn = record('b').baseRef;
-      const tip = world().head(repo);
-      board().settle(`${ids.a}-review`, 'succeeded', { ...SIGNED, summary: 'A-SUMMARY: the flag is parsed first', findings: FOUND });
-      await aPass();
-      assert.deepEqual(await decided(ids.a), { kind: 'landed', branches: [lines.a.branch] });
-      for (const card of ['b', 'c']) {
-        const r = await tick(ids[card]);
-        assert.deepEqual([r.filed, r.waiting], [['implement'], []], card);
-        const now = runRecord(ROOT, ids[card]);
-        assert.notEqual(startedOn, tip);
-        assert.equal(now.baseRef, tip, `${card}: the base as it stands now, and not as it stood at \`nemia start <folder>\``);
-        line(card);
-        assert.equal(fs.readFileSync(path.join(lines[card].wt, 'a.txt'), 'utf8'), 'a.txt\n', `${card}'s worktree has a's work`);
-        assert.equal(world().head(lines[card].wt), tip);
-      }
-    },
-  );
+  s.test('a signs off: it has succeeded, and b and c file their roots from the base as it stands now, with what a committed', async () => {
+    const startedOn = record('b').baseRef;
+    const tip = world().head(repo);
+    board().settle(`${ids.a}-review`, 'succeeded', { ...SIGNED, summary: 'A-SUMMARY: the flag is parsed first', findings: FOUND });
+    await aPass();
+    assert.deepEqual(await decided(ids.a), { kind: 'landed', branches: [lines.a.branch] });
+    for (const card of ['b', 'c']) {
+      const r = await tick(ids[card]);
+      assert.deepEqual([r.filed, r.waiting], [['implement'], []], card);
+      const now = runRecord(ROOT, ids[card]);
+      assert.notEqual(startedOn, tip);
+      assert.equal(now.baseRef, tip, `${card}: the base as it stands now, and not as it stood at \`nemia start <folder>\``);
+      line(card);
+      assert.equal(fs.readFileSync(path.join(lines[card].wt, 'a.txt'), 'utf8'), 'a.txt\n', `${card}'s worktree has a's work`);
+      assert.equal(world().head(lines[card].wt), tip);
+    }
+  });
   s.test(
     "each root is handed `## From run <a>`: the first line of a's brief, its terminal step's summary and declared fields, as data",
     async () => {
@@ -374,7 +376,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
     },
   );
   s.test(
-    'b finishes, is merged and its branch deleted while c still runs: b lands by the tip its own pass recorded, as its `nemia decide` says once a pass reads the hand merge, and d waits on c alone',
+    'b finishes, is merged and its branch deleted while c still runs: b has succeeded whatever git holds, and d waits on c alone',
     async () => {
       committed('b', 'b.txt');
       board().settle(`${ids.b}-implement`, 'succeeded', SIGNED);
@@ -384,7 +386,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
       assert.deepEqual(record('b').tips, { [lines.b.branch]: tip }, 'its own pass, once it finished, records its result branch');
       mergedByHand(repo, lines.b.branch, 'Merge b');
       droppedByHand(repo, lines.b.wt, lines.b.branch);
-      assert.deepEqual(await parentNow(ids.b), { record: record('b'), landed: true }, 'the merge stays, the branch goes');
+      assert.deepEqual(await parentNow(ids.b), { record: record('b'), standing: { kind: 'released', by: 'succeeded' } }, 'git is not read');
       await aPass();
       assert.deepEqual(await decided(ids.b), { kind: 'landed', branches: [lines.b.branch] }, 'and its own `nemia decide` says so');
       assert.equal((await tick(ids.b)).run.tips?.[lines.b.branch], tip, 'a branch git no longer has keeps the tip last seen');
@@ -430,7 +432,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
   });
 });
 
-describe('a parent that will not land — cancelled, failed with nothing committed, its frozen steps unread — and the parents that land all the same', () => {
+describe('a parent that will not succeed — cancelled, failed, its frozen steps unread — waits on a person, and the parents that release their waiters all the same', () => {
   let repo!: string;
   beforeAll(() => {
     const t = teardowns();
@@ -438,78 +440,100 @@ describe('a parent that will not land — cancelled, failed with nothing committ
     return t.end;
   });
   const s = story(test);
-  s.test('a run whose parent was cancelled files nothing, merged or not: its `nemia decide` says cancelled, never landed', async () => {
-    const p = await aParent(repo, { work: 'parent.txt' });
-    const child = await started({ brief: 'the child of a cancelled run', repo, workflowDir: twoSteps(), after: [p.run.id] });
-    const at = markCancelled(ROOT, p.run.id);
-    const filings = [...board().filings];
-    for (let pass = 0; pass < 2; pass++) {
-      const r = await tick(child.id);
-      assert.deepEqual([r.filed, board().filings, r.waiting], [[], filings, [{ run: p.run.id, cancelledAt: at }]]);
-    }
-    mergedByHand(repo, p.branch, 'Merge the cancelled parent');
-    assert.equal((await decided(p.run.id)).kind, 'cancelled');
-    assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings], 'and the gate says what it says');
-
-    const ls = await listedOf(child.id);
-    assert.deepEqual(wordsOf(ls.listing, 'implement'), [`waiting on ${p.run.id} (cancelled)`, undefined, null, undefined]);
-    assert.deepEqual(wordsOf(ls.listing, 'review'), ['pending', undefined, null, undefined]);
-    assert.deepEqual(ls.listing.waiting, [{ run: p.run.id, cancelledAt: at }], 'what waits on you: the parent cancelled');
-    namesFor(
-      '`nemia ls` says how to resolve it',
-      waitAdvice(ls.run, ls.listing.waiting),
-      `${p.run.id} was cancelled at ${at}`,
-      `nemia cancel ${child.id}`,
-      `--after ${p.run.id}`,
-    );
-    const { decision } = await decisionOn(stage, child.id);
-    assert.ok('waiting' in decision && !('holding' in decision), JSON.stringify(decision));
-    assert.deepEqual([decision.waiting.word, decision.waiting.waitingOnYou], [`waiting on ${p.run.id} (cancelled)`, true]);
-    namesFor(
-      'and so does the decision',
-      decision.waiting.advice,
-      `${p.run.id} was cancelled at ${at}`,
-      `nemia cancel ${child.id}`,
-      `--after ${p.run.id}`,
-    );
-
-    assert.equal((await stage.runWith(board().e, cancelRun(child.id))).plan.kind, 'cancel');
-    assert.deepEqual(await statuses(child.id), ['pending', 'pending'], 'a person resolves it: the child called off waits on nothing');
-    assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings]);
-  });
-  s.test('a one-step run whose step failed with nothing committed reads failed, not landed, and a run after it files nothing', async () => {
-    const p = await aParent(repo);
-    board().settle(`${p.run.id}-implement`, 'failed');
-    await tick(p.run.id);
-    assert.equal(ahead(repo, p.run.baseRef, p.branch), 0, 'its own pass had nothing to hand off: nothing past its base');
-    assert.ok(commitsOf(repo, p.run.branch).includes(world().tip(repo, p.branch)!), 'and so on the base branch, as its place reads it');
-    const d = await decided(p.run.id);
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.branches], ['failed', ['implement'], [p.branch]]);
-    assert.equal((await parentNow(p.run.id)).landed, false);
-    const child = await started({ brief: 'the child of a failure', repo, workflowDir: twoSteps(), after: [p.run.id] });
-    for (let pass = 0; pass < 3; pass++) {
-      const r = await tick(child.id);
-      assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id }]], `pass ${pass + 1}`);
-    }
-  });
   s.test(
-    'a parent whose step signs off with nothing to commit has landed, as its own `nemia decide` says once a pass has read where it stands, and its child files',
+    'a run whose parent was cancelled files nothing, merged or not: its `nemia decide` says cancelled, and the wait is yours',
     async () => {
-      const p = await aParent(repo);
-      const child = await started({ brief: 'the child of a change already made', repo, workflowDir: twoSteps(), after: [p.run.id] });
-      assert.deepEqual((await tick(child.id)).filed, [], 'running, with nothing committed: on the base since it was cut, not landed');
-      assert.equal((await decided(p.run.id)).kind, 'running');
-      board().settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
-      assert.equal(ahead(repo, p.run.baseRef, p.branch), 0);
-      await aPass();
-      assert.deepEqual(await decided(p.run.id), { kind: 'landed', branches: [p.branch] });
-      assert.equal((await parentNow(p.run.id)).landed, true, 'the gate says what its `nemia decide` says');
-      const r = await tick(child.id);
-      assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+      const p = await aParent(repo, { work: 'parent.txt' });
+      const child = await started({ brief: 'the child of a cancelled run', repo, workflowDir: twoSteps(), after: [p.run.id] });
+      const at = markCancelled(ROOT, p.run.id);
+      const filings = [...board().filings];
+      for (let pass = 0; pass < 2; pass++) {
+        const r = await tick(child.id);
+        assert.deepEqual([r.filed, board().filings, r.waiting], [[], filings, [{ run: p.run.id, cancelledAt: at }]]);
+      }
+      mergedByHand(repo, p.branch, 'Merge the cancelled parent');
+      assert.equal((await decided(p.run.id)).kind, 'cancelled');
+      assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings], 'and the gate says what it says');
+
+      const ls = await listedOf(child.id);
+      assert.deepEqual(wordsOf(ls.listing, 'implement'), [`waiting on ${p.run.id} (cancelled)`, undefined, null, undefined]);
+      assert.deepEqual(wordsOf(ls.listing, 'review'), ['pending', undefined, null, undefined]);
+      assert.deepEqual(ls.listing.waiting, [{ run: p.run.id, cancelledAt: at }], 'what waits on you: the parent cancelled');
+      namesFor(
+        '`nemia ls` says how to resolve it',
+        waitAdvice(ls.run, ls.listing.waiting),
+        `${p.run.id} was cancelled at ${at}`,
+        `nemia cancel ${child.id}`,
+        `nemia release ${p.run.id}`,
+        `--after ${p.run.id}`,
+      );
+      const { decision } = await decisionOn(stage, child.id);
+      assert.ok('waiting' in decision && !('holding' in decision), JSON.stringify(decision));
+      assert.deepEqual([decision.waiting.word, decision.waiting.waitingOnYou], [`waiting on ${p.run.id} (cancelled)`, true]);
+      namesFor(
+        'and so does the decision',
+        decision.waiting.advice,
+        `${p.run.id} was cancelled at ${at}`,
+        `nemia cancel ${child.id}`,
+        `--after ${p.run.id}`,
+      );
+
+      assert.equal((await stage.runWith(board().e, cancelRun(child.id))).plan.kind, 'cancel');
+      assert.deepEqual(await statuses(child.id), ['pending', 'pending'], 'a person resolves it: the child called off waits on nothing');
+      assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings]);
     },
   );
+  s.test('a cancelled parent whose waiters a person released files its child on the next pass', async () => {
+    const p = await aParent(repo, { work: 'released.txt' });
+    const child = await started({ brief: 'the child of a released run', repo, workflowDir: twoSteps(), after: [p.run.id] });
+    markCancelled(ROOT, p.run.id);
+    assert.deepEqual((await tick(child.id)).filed, []);
+    await releasing(p.run.id);
+    const r = await tick(child.id);
+    assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  });
   s.test(
-    'failed parents whose work a person merged have landed, once a pass reads the hand merge, whatever the step said, and their child files — handed why their closeouts cannot be',
+    'a one-step run whose step failed reads failed, and a run after it files nothing: the wait is yours, until it is retried or released',
+    async () => {
+      const p = await aParent(repo);
+      board().settle(`${p.run.id}-implement`, 'failed');
+      await tick(p.run.id);
+      assert.equal(ahead(repo, p.run.baseRef, p.branch), 0, 'its own pass had nothing to hand off: nothing past its base');
+      assert.ok(commitsOf(repo, p.run.branch).includes(world().tip(repo, p.branch)!), 'and so on the base branch, as its place reads it');
+      const d = await decided(p.run.id);
+      assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.branches], ['failed', ['implement'], [p.branch]]);
+      assert.deepEqual((await parentNow(p.run.id)).standing, { kind: 'yours', why: 'failed' });
+      const child = await started({ brief: 'the child of a failure', repo, workflowDir: twoSteps(), after: [p.run.id] });
+      for (let pass = 1; pass <= 3; pass++) {
+        const r = await tick(child.id);
+        assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id, failed: true }]], `pass ${pass}`);
+      }
+      await aPass();
+      const { decision } = await decisionOn(stage, child.id);
+      assert.ok('waiting' in decision, JSON.stringify(decision));
+      assert.equal(decision.waiting.waitingOnYou, true);
+      namesFor('the advice names the ways out', decision.waiting.advice, `nemia retry ${p.run.id}`, `nemia release ${p.run.id}`);
+      mergedByHand(repo, p.branch, 'Merge the failed parent by hand');
+      assert.deepEqual((await tick(child.id)).filed, [], 'a hand merge releases nothing: git is not read');
+      await releasing(p.run.id);
+      assert.deepEqual((await tick(child.id)).filed, ['implement'], 'once a person releases it');
+    },
+  );
+  s.test('a parent whose step signs off with nothing to commit has succeeded, and its child files, merged or not', async () => {
+    const p = await aParent(repo);
+    const child = await started({ brief: 'the child of a change already made', repo, workflowDir: twoSteps(), after: [p.run.id] });
+    assert.deepEqual((await tick(child.id)).filed, [], 'running, with nothing committed: not succeeded');
+    assert.equal((await decided(p.run.id)).kind, 'running');
+    board().settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
+    assert.equal(ahead(repo, p.run.baseRef, p.branch), 0);
+    await aPass();
+    assert.deepEqual(await decided(p.run.id), { kind: 'landed', branches: [p.branch] });
+    assert.equal(await releasedNow(p.run.id), true, 'the wait is released by its success');
+    const r = await tick(child.id);
+    assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  });
+  s.test(
+    'failed parents whose waiters a person released free their child, whatever the step said and merged or not — handed why their closeouts cannot be',
     async () => {
       const lost = await aParent(repo, { work: 'lost.txt', signed: false });
       board().settle(`${lost.run.id}-implement`, 'failed');
@@ -521,6 +545,8 @@ describe('a parent that will not land — cancelled, failed with nothing committ
         mergedByHand(repo, parent.branch);
         await aPass();
         assert.deepEqual(await decided(parent.run.id), { kind: 'landed', branches: [parent.branch] });
+        assert.equal(await releasedNow(parent.run.id), false, 'merged by hand, still failed: the wait is not released');
+        await releasing(parent.run.id);
       }
       const child = await started({
         brief: 'the child of merged work',
@@ -545,123 +571,113 @@ describe('a parent that will not land — cancelled, failed with nothing committ
       );
     },
   );
-  s.test(
-    'a parent whose frozen steps cannot be read has not landed: its read answers so with why, and asks git nothing of its branches',
-    async () => {
-      const dir = oneStep();
-      const p = await aParent(repo, { workflowDir: dir, signed: true });
-      const readable = await stage.runWith(board().e, parentRead(p.run.id, await stage.runPlaced(standingLiveOf([p.run.id]))));
-      assert.equal(readable.landed, true, 'signed off, with its steps readable, it has landed');
-      const record = runRecord(ROOT, p.run.id);
-      delete record.workflow;
-      plantRecord(ROOT, runKey(record.id), JSON.stringify(record, null, 2));
-      fs.rmSync(dir, { recursive: true });
-      let why: string | undefined;
-      assert.throws(
-        () => stepsOf(runRecord(ROOT, p.run.id), ROOT),
-        (err: unknown) => {
-          why = err instanceof UnloadedFolder ? err.why : undefined;
-          return err instanceof UnloadedFolder;
-        },
-        'its steps do not read',
-      );
-      const asked: string[] = [];
-      const read = await stage.runPlaced(standingLiveOf([p.run.id]));
-      const git: BranchReader = {
-        ...read,
-        landed: (run, branch) => {
-          asked.push(branch);
-          return read.landed(run, branch);
-        },
-      };
-      assert.deepStrictEqual(await stage.runWith(board().e, parentRead(p.run.id, git)), {
-        record: runRecord(ROOT, p.run.id),
-        landed: false,
-        unread: why,
-      });
-      assert.ok(why, 'the reason kept is the refusal’s own');
-      assert.deepEqual(asked, [], 'no branch of it asked');
-    },
-  );
-});
-
-describe('REFUSED by name at `nemia start --after`, as the store and git stand: a result branch gone, read from git — exit 2, nothing written; and what is let through', () => {
-  let repo!: string;
-  let dropped!: Awaited<ReturnType<typeof aParent>>;
-  let unseen!: Awaited<ReturnType<typeof aParent>>;
-  let child!: Awaited<ReturnType<typeof started>>;
-  beforeAll(async () => {
-    repo = aRepo();
-    dropped = await aParent(repo, { work: 'dropped.txt' });
-    await tick(dropped.run.id);
-    unseen = await aParent(repo, { work: 'unseen.txt' });
-    child = await started({
-      brief: 'the child of work that is gone',
-      repo,
-      workflowDir: twoSteps(),
-      after: [dropped.run.id, unseen.run.id],
-    });
-    mergedByHand(repo, unseen.branch);
-    for (const p of [dropped, unseen]) droppedByHand(repo, p.wt, p.branch);
-    assert.ok(runRecord(ROOT, dropped.run.id).tips?.[dropped.branch], 'the dropped parent had its tip recorded');
-  });
-  test('a run after them files nothing, and says `(<branch> gone)` of each', async () => {
-    const filings = [...board().filings];
-    const r = await tick(child.id);
-    assert.deepEqual(
-      [r.filed, board().filings, r.waiting],
-      [
-        [],
-        filings,
-        [
-          { run: dropped.run.id, gone: [dropped.branch] },
-          { run: unseen.run.id, gone: [unseen.branch] },
-        ],
-      ],
-      'no pass over the unseen parent since it signed off: no tip was recorded, and git keeps no trace of what its branch named',
+  s.test('a parent whose frozen steps cannot be read has not succeeded: its read answers so with why', async () => {
+    const dir = oneStep();
+    const p = await aParent(repo, { workflowDir: dir, signed: true });
+    const readable = await parentNow(p.run.id);
+    assert.equal(readable.standing.kind, 'released', 'signed off, with its steps readable, it has succeeded');
+    const record = runRecord(ROOT, p.run.id);
+    delete record.workflow;
+    plantRecord(ROOT, runKey(record.id), JSON.stringify(record, null, 2));
+    fs.rmSync(dir, { recursive: true });
+    let why: string | undefined;
+    assert.throws(
+      () => stepsOf(runRecord(ROOT, p.run.id), ROOT),
+      (err: unknown) => {
+        why = err instanceof UnloadedFolder ? err.why : undefined;
+        return err instanceof UnloadedFolder;
+      },
+      'its steps do not read',
     );
-    await aPass();
-    assert.deepEqual(await statuses(child.id), [
-      `waiting on ${dropped.run.id} (${dropped.branch} gone), ${unseen.run.id} (${unseen.branch} gone)`,
-      'pending',
-    ]);
-  });
-  const refusals: Array<[string, () => [string, string[]]]> = [
-    [
-      'a parent dropped unmerged after its tip was recorded',
-      () => [dropped.run.id, [dropped.branch, 'is gone', 'on main', `without --after ${dropped.run.id}`]],
-    ],
-    [
-      'a parent merged and deleted before any pass saw it finish',
-      () => [unseen.run.id, [unseen.branch, 'is gone', 'on main', `without --after ${unseen.run.id}`]],
-    ],
-    ['a run the store does not have', () => ['nobody-x9', ['no run nobody-x9', 'nemia ls']]],
-  ];
-  for (const [what, later] of refusals) {
-    test(`REFUSED: ${what}`, async () => {
-      const [id, facts] = later();
-      const before = runsWritten();
-      await assert.rejects(
-        stage.runPlaced(startRun({ brief: 'another child', repo, workflowDir: twoSteps(), after: [id] })),
-        refusedNaming('Invalid', `--after ${id}:`, ...facts),
-      );
-      assert.equal(runsWritten(), before, 'nothing written');
+    assert.deepStrictEqual(await parentNow(p.run.id), {
+      record: runRecord(ROOT, p.run.id),
+      standing: { kind: 'waiting', on: 'unread' },
+      unread: why,
     });
-  }
-  test('allowed: a parent merged and then its branch deleted, by the tip its finished run recorded', async () => {
-    const p = await aParent(repo, { work: 'kept.txt' });
-    await tick(p.run.id);
-    mergedByHand(repo, p.branch);
-    droppedByHand(repo, p.wt, p.branch);
-    assert.deepEqual((await started({ brief: 'the latest child', repo, workflowDir: twoSteps(), after: [p.run.id] })).after, [p.run.id]);
-  });
-  test('allowed: a parent that signed off with nothing to commit', async () => {
-    const p = await aParent(repo, { signed: true });
-    assert.deepEqual((await started({ brief: 'another child', repo, workflowDir: twoSteps(), after: [p.run.id] })).after, [p.run.id]);
+    assert.ok(why, 'the reason kept is the refusal’s own');
   });
 });
 
-describe('context without a wait: a run handed another with `--from` files at once, told what it reads is not landed, and `nemia concluded` prints it', () => {
+describe('`nemia start --after` reads no branch: a parent whose branch is dropped, unmerged or never cut is waited on all the same, and a missing run is refused', () => {
+  let repo!: string;
+  beforeAll(() => {
+    repo = aRepo();
+  });
+  test('REFUSED: a run the store does not have', async () => {
+    const before = runsWritten();
+    await assert.rejects(
+      stage.runPlaced(startRun({ brief: 'another child', repo, workflowDir: twoSteps(), after: ['nobody-x9'] })),
+      refusedNaming('Invalid', '--after nobody-x9:', 'no run nobody-x9', 'nemia ls'),
+    );
+    assert.equal(runsWritten(), before, 'nothing written');
+  });
+  test('REFUSED: `nemia release` of a run that is not there, of one that has succeeded, and a second release — nothing is written', async () => {
+    await assert.rejects(releasing('nobody-x9'), refusedNaming('Missing', 'no such run: nobody-x9', 'nemia release <runId>'));
+    const done = await aParent(repo, { work: 'done.txt' });
+    await tick(done.run.id);
+    await assert.rejects(releasing(done.run.id), refusedNaming('Conflict', `${done.run.id} has succeeded`));
+    assert.equal(runRecord(ROOT, done.run.id).released, undefined);
+    const failed = await aParent(repo, { signed: false });
+    board().settle(`${failed.run.id}-implement`, 'failed');
+    await tick(failed.run.id);
+    await releasing(failed.run.id);
+    await assert.rejects(releasing(failed.run.id), refusedNaming('Conflict', `${failed.run.id}'s waiters were released at`));
+  });
+  test('a parent that succeeded, its branch dropped unmerged, frees its child, which starts from the base as it is without the parent’s work', async () => {
+    const p = await aParent(repo, { work: 'dropped.txt' });
+    await tick(p.run.id);
+    droppedByHand(repo, p.wt, p.branch);
+    const child = await started({ brief: 'the child of dropped work', repo, workflowDir: twoSteps(), after: [p.run.id] });
+    const r = await tick(child.id);
+    assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+    assert.equal(
+      fs.existsSync(path.join(runRecord(ROOT, child.id).steps.implement.workspace!, 'dropped.txt')),
+      false,
+      'the work was never merged',
+    );
+  });
+  test('a parent that succeeded with its branch unmerged frees its child, which starts from the base branch as it is when its roots are filed', async () => {
+    const p = await aParent(repo, { work: 'unmerged.txt' });
+    const child = await started({ brief: 'the child of unmerged work', repo, workflowDir: twoSteps(), after: [p.run.id] });
+    const tip = world().head(repo);
+    const r = await tick(child.id);
+    assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+    const wt = runRecord(ROOT, child.id).steps.implement.workspace!;
+    assert.equal(world().head(wt), tip, 'cut at the base branch’s tip');
+    assert.equal(fs.existsSync(path.join(wt, 'unmerged.txt')), false, 'without the parent’s commits');
+  });
+  test('a parent started with no worktree, so with no result branch, succeeds and frees its child all the same', async () => {
+    const p = await started({ brief: 'the parent on the base itself', repo, workflowDir: oneStep(), isolate: false });
+    await tick(p.id);
+    assert.equal(
+      runRecord(ROOT, p.id).steps.implement.branch,
+      repositoryRunOf(runRecord(ROOT, p.id)).branch,
+      'it works on the base itself: no branch of its own',
+    );
+    const child = await started({ brief: 'the child of a parent with no branch', repo, workflowDir: twoSteps(), after: [p.id] });
+    assert.deepEqual((await tick(child.id)).filed, [], 'the parent has not succeeded');
+    board().settle(`${p.id}-implement`, 'succeeded', SIGNED);
+    await tick(p.id);
+    assert.equal(await releasedNow(p.id), true);
+    assert.deepEqual((await tick(child.id)).filed, ['implement'], 'it needs no branch to release its waiter');
+  });
+  test('a hold until a run that succeeds lifts, and a hold until a failed one waits on you until that run is released', async () => {
+    const ok = await aParent(repo, { signed: false });
+    const failed = await aParent(repo, { signed: false });
+    board().settle(`${failed.run.id}-implement`, 'failed');
+    await tick(failed.run.id);
+    const held = await started({ brief: 'held on two', repo, workflowDir: oneStep() });
+    await stage.main(['hold', held.id, '--until', ok.run.id, '--until', failed.run.id]);
+    assert.deepEqual((await tick(held.id)).filed, [], 'neither has succeeded');
+    board().settle(`${ok.run.id}-implement`, 'succeeded', SIGNED);
+    await tick(ok.run.id);
+    assert.deepEqual((await tick(held.id)).filed, [], 'one has succeeded, the other failed: still held');
+    await releasing(failed.run.id);
+    assert.deepEqual((await tick(held.id)).filed, ['implement'], 'both released: the hold lifts, and the run goes on');
+  });
+});
+
+describe('context without a wait: a run handed another with `--from` files at once, told what it reads has not succeeded, and `nemia concluded` prints it', () => {
   let repo!: string;
   beforeAll(() => {
     const t = teardowns();
@@ -671,7 +687,7 @@ describe('context without a wait: a run handed another with `--from` files at on
   const s = story(test);
   let source = { run: { id: '' } as RepositoryRun, wt: '', branch: '' };
   s.test(
-    'a run handed only a run still in flight files its roots on the first pass, the source handed as not landed, not judged',
+    'a run handed only a run still in flight files its roots on the first pass, the source handed as not succeeded, not judged',
     async () => {
       source = await aParent(repo, { work: 'source.txt', signed: false });
       const child = await started({ brief: 'Read what the source has', repo, workflowDir: twoSteps(), context: [source.run.id] });
@@ -680,7 +696,7 @@ describe('context without a wait: a run handed another with `--from` files at on
       assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
       const section = sectionOf(briefOf(`${child.id}-implement`), source.run.id);
       assert.match(section, /as context \(`--from`\); it did not wait on it/);
-      assert.match(section, new RegExp(`Not landed, not judged: ${source.run.id} was still in flight`));
+      assert.match(section, new RegExp(`Not succeeded, not judged: ${source.run.id} was still in flight`));
     },
   );
   s.test('`nemia concluded` prints the section the tick hands a run started with `--from` — the very one', async () => {
@@ -701,7 +717,7 @@ describe('context without a wait: a run handed another with `--from` files at on
     });
   });
   s.test('a run after one run and handed another waits for the first alone, handed it in `--after` words before the other', async () => {
-    const waited = await aParent(repo, { work: 'waited.txt' });
+    const waited = await aParent(repo, { work: 'waited.txt', signed: false });
     const child = await started({ brief: 'the child', repo, workflowDir: twoSteps(), after: [waited.run.id], context: [source.run.id] });
     const before = await tick(child.id);
     assert.deepEqual(
@@ -709,15 +725,15 @@ describe('context without a wait: a run handed another with `--from` files at on
       [[], [{ run: waited.run.id }]],
       'waiting on the run it waits on, never the one it reads',
     );
-    mergedByHand(repo, waited.branch);
+    board().settle(`${waited.run.id}-implement`, 'succeeded', SIGNED);
     const r = await tick(child.id);
     assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
     const brief = briefOf(`${child.id}-implement`);
     const waitedAt = brief.indexOf(`\n## From run ${waited.run.id}\n`);
     const readAt = brief.indexOf(`\n## From run ${source.run.id}\n`);
     assert.ok(waitedAt > 0 && readAt > waitedAt, brief);
-    assert.match(brief.slice(waitedAt, readAt), /waited on .* \(`--after`\) and started once it landed/);
-    assert.match(brief.slice(readAt), /as context \(`--from`\).*\n.*\nNot landed, not judged/);
+    assert.match(brief.slice(waitedAt, readAt), /waited on .* \(`--after`\) and started once it succeeded/);
+    assert.match(brief.slice(readAt), /as context \(`--from`\).*\n.*\nNot succeeded, not judged/);
   });
 });
 
@@ -729,7 +745,7 @@ describe('words said to a step of a run waiting on another are kept, and its fir
   beforeAll(async () => {
     const t = teardowns();
     repo = aRepo();
-    parent = await aParent(repo, { work: 'parent.txt' });
+    parent = await aParent(repo, { work: 'parent.txt', signed: false });
     child = await started({ brief: 'Page the reads', repo, workflowDir: twoSteps(), after: [parent.run.id] });
     implement = `${child.id}-implement`;
     return t.end;
@@ -767,9 +783,9 @@ describe('words said to a step of a run waiting on another are kept, and its fir
     assert.match(listed.steps[0].note ?? '', /said to 3× before it ran/);
   });
   s.test(
-    "once the parent lands the step is filed, and its first try's brief holds the words beside what was asked for, each with its time and who said it",
+    "once the parent succeeds the step is filed, and its first try's brief holds the words beside what was asked for, each with its time and who said it",
     async () => {
-      mergedByHand(repo, parent.branch);
+      board().settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
       const r = await tick(child.id);
       assert.deepEqual(r.filed, ['implement']);
       const brief = briefOf(implement);
@@ -898,7 +914,7 @@ test('a `start()` that refuses part-way stops the plan: the runs already started
   assert.equal(folderOfCard(stopped!.card), flow);
 });
 
-test('a parent whose script condition answered a route no pass has copied yet has not landed, its branch on its base: what waits on it still waits', async () => {
+test('a parent whose script condition answered a route no pass has copied yet has not succeeded: what waits on it still waits', async () => {
   const b = board();
   const dir = folderOf(
     {
@@ -921,5 +937,5 @@ test('a parent whose script condition answered a route no pass has copied yet ha
   world().commit(repo, 'merge');
   b.end(`${id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web"}' });
   assert.equal(runRecord(ROOT, id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
-  assert.equal((await parentNow(id)).landed, false);
+  assert.equal(await releasedNow(id), false);
 });

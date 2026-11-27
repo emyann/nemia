@@ -5,7 +5,7 @@ import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photog
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { DIAMOND, GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredMarker, OUT, plantStoredMarker, storedMarker, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, plantStoredMarker, storedMarker } from '../world.ts';
 
 export default {
   /**
@@ -16,16 +16,16 @@ export default {
    * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
    * offers no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every
    * page after reads the store as seeded — and the card, read again, offers its gate as it did. That hold is one older code wrote, with
-   * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`). HELD's repository is one no machine
-   * has: the hold names it unread, in its place's words (`unreadName`). Last, a held run nothing of which has started (`heldNotStarted`).
+   * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`). Last, a held run nothing of which has
+   * started (`heldNotStarted`).
    */
   name: 'hold',
   route: '/factories/default',
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const word = `held until ${unreadName(until)} lands`;
-    const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has landed; to go on before then: nemia hold ${id} --off`;
+    const word = `held until ${until} succeeds`;
+    const advice = `nothing of ${id} is filed, and nothing is asked of you, until ${until} has succeeded; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     const card = cardOf(page, id);
@@ -104,13 +104,13 @@ export default {
 /**
  * GATED held until HELD as `wf hold --why … --by operator` writes it: its card on the Factory, its row on Runs, its page and its gate's
  * note each say the hold's why and who put it beside `held until`, in the package's words, the card clamped to its two lines and whole
- * on hover; the note names HELD off the hold alone, where it stands unread. The hold is then taken back, and the run's page says no hold.
+ * on hover; the note names HELD off the hold alone. The hold is then taken back, and the run's page says no hold.
  */
 async function heldWithWords(page: Page) {
   const { id, gated } = GATED;
   const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
-  const word = `held until ${unreadName(HELD.id)} lands (why: ${why}; by operator)`;
-  const noted = `held until ${HELD.id} lands (why: ${why}; by operator); its approval is asked once the hold lifts`;
+  const word = `held until ${HELD.id} succeeds (why: ${why}; by operator)`;
+  const noted = `held until ${HELD.id} succeeds (why: ${why}; by operator); its approval is asked once the hold lifts`;
   const whole = new RegExp(`^${literal(word)}$`);
   try {
     if (storedMarker(id, 'hold') !== null)

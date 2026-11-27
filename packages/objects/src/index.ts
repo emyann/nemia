@@ -52,7 +52,7 @@ export {
   RunStarted,
   RunStartedFacts,
 } from './run-actions.ts';
-export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold } from './run-actions.ts';
+export { RunAssign, RunAssigned, RunConditionWrite, RunConditionWritten, RunHeld, RunHold, RunReleased } from './run-actions.ts';
 export {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -669,7 +669,6 @@ export {
 } from './commands-flags.ts';
 export { MACHINE_VERBS, type MachineVerb, STREAM_COMMANDS, type StreamCommand } from './commands-machine.ts';
 export {
-  ANSWER_HELP,
   APPROVE_WORDS,
   ASSIGN_WORDS,
   BY_CAP,
@@ -680,6 +679,7 @@ export {
   PAUSE_WORDS,
   PRUNE_WORDS,
   REFRESH_WORDS,
+  RELEASE_WORDS,
   RESUME_WORDS,
   RETRY_WORDS,
   RM_WORDS,
@@ -689,7 +689,6 @@ export {
   START_WORDS,
   WAIT_WORDS,
   WHY_CAP,
-  answerFlag,
   approveRefusal,
   holdRefusal,
   pauseRefusal,

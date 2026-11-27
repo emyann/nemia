@@ -143,20 +143,14 @@ export default {
       if (!(await start.isEnabled())) throw new Refused('Start is enabled once a brief is written — it stayed disabled');
 
       const offered = dev.locator('ul[aria-label="Runs to wait on"] li');
-      await expectCount(
-        offered,
-        DIAMOND_RUNS.length,
-        `the start form offers the ${DIAMOND_RUNS.length} runs on this repository to wait on`,
-      );
       for (const run of DIAMOND_RUNS)
         await expectVisible(
           offered.filter({ hasText: run.title }).locator(`input[type="checkbox"][value="${run.id}"]`),
           `${run.id} is offered, by its title`,
         );
-      await expectCount(
+      await expectVisible(
         dev.locator(`ul[aria-label="Runs to wait on"] [data-run="${FAKE.id}"]`),
-        0,
-        `${FAKE.id}, on another repository, is not offered`,
+        `${FAKE.id}, on another repository, is offered too: any run may be waited on`,
       );
       for (const [run, standing] of [
         [DIAMOND.orphan, 'waiting'],
@@ -188,7 +182,7 @@ export default {
           form.getByRole('button', { name: 'Start' }).click(),
         ]);
         const { error } = (await answered.json()) as { error?: string };
-        const sentence = `--after ${DIAMOND.cancelled.id}: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never lands, so this run would wait for ever. Start it without --after ${DIAMOND.cancelled.id}.`;
+        const sentence = `--after ${DIAMOND.cancelled.id}: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never succeeds, so this run would wait for ever. Start it without --after ${DIAMOND.cancelled.id}.`;
         if (answered.status() !== 422 || error !== sentence) {
           throw new Refused(
             `the api refuses to wait on a run called off, in afterRefusal's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,

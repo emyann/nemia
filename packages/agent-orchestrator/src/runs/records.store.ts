@@ -622,11 +622,12 @@ function askMethods(open: Opened, held: Held) {
  * @param held The keyspace a read reads, or undefined where there is none.
  */
 export function runRecords(home: string, open: Opened, held: Held) {
-  const { holds, assignees, said, labels, refresh, forgetting, ...markers } = markerMethods(home, open, held);
+  const { holds, released, assignees, said, labels, refresh, forgetting, ...markers } = markerMethods(home, open, held);
   return {
     runs: { ...runReads(home, held), ...runWrites(home, open, held), ...markers },
     asks: askMethods(open, held),
     holds,
+    released,
     assignees,
     said,
     labels,

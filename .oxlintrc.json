@@ -845,12 +845,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/wait/wait.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 29]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/timeline/timeline.ts"],
       "rules": {
         "complexity": ["error", { "max": 28 }],

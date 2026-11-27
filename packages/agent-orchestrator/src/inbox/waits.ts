@@ -1,8 +1,9 @@
 /**
- * What a card waits on (`after:`): whether each card it names has landed (`cardLanded`, proved by `contracts/card-landing.contract.ts`),
+ * What a card waits on (`after:`): whether each card it names has released its waiters (`cardLanded`, proved by
+ * `contracts/card-landing.contract.ts`),
  * following its work through the cards its runs passed it on to (`cardWaitsOf`); a cycle of `after:` lines (`afterCycle`); and whether a
  * wait will never be released without a person (`waitStalled`). Read from the level on every pass and written nowhere. Pure: the listing
- * hands it what the store and git said (inbox.ts, inbox.verb.ts).
+ * hands it what the store said (inbox.ts, inbox.verb.ts).
  */
 import type { CardState } from 'objects';
 import type { CardLanded, CardLanding, WaitedRun, WaitStalled } from '../../contracts/card-landing.contract.ts';
@@ -10,16 +11,17 @@ import type { CardLanded, CardLanding, WaitedRun, WaitStalled } from '../../cont
 export type { CardLanding } from '../../contracts/card-landing.contract.ts';
 
 /**
- * Where the work of one card another waits on stands: missing where the store knows nothing of it; landed where a run of its own, or a
- * card its runs passed its work on to, has landed; else waiting, at the first card it was passed on to that still waits, else missing by
+ * Where the work of one card another waits on stands: missing where the store knows nothing of it; released where a run of its own, or a
+ * card its runs passed its work on to, has released its waiters (it succeeded, or a person released them); else waiting, at the first
+ * card it was passed on to that still waits, else missing by
  * the first that is gone, else at itself.
- * @param card The card: its name, whether the store knows it, and the runs started from it, each with whether it landed.
+ * @param card The card: its name, whether the store knows it, and the runs started from it, each with whether it released its waiters.
  * @param onward Where each card its runs passed its work on to stands, already judged by this same decision.
  * @public
  */
 export const cardLanded: CardLanded = (card, onward) => {
   if (!card.known) return { kind: 'missing', card: card.name };
-  if (card.runs.some((r) => r.landed) || onward.some((o) => o.kind === 'landed')) return { kind: 'landed' };
+  if (card.runs.some((r) => r.released) || onward.some((o) => o.kind === 'released')) return { kind: 'released' };
   const at = onward.find((o) => o.kind === 'waiting');
   if (at !== undefined && at.kind === 'waiting') return { kind: 'waiting', card: at.card };
   const gone = onward.find((o) => o.kind === 'missing');
@@ -27,24 +29,28 @@ export const cardLanded: CardLanded = (card, onward) => {
   return { kind: 'waiting', card: card.name };
 };
 
-/** The states of the card a wait stands at from which nothing the tick does lands it: a run ended unlanded, or a start refused. */
-const ENDED_UNLANDED: readonly CardState[] = ['succeeded', 'failed', 'stopped', 'cancelled', 'refused'];
+/** The states of the card a wait stands at from which nothing the tick does releases it: a run ended without succeeding, or a start
+ * refused. */
+const ENDED_UNLANDED: readonly CardState[] = ['failed', 'stopped', 'cancelled', 'refused'];
 
 /**
- * Whether a wait will never be released without a person: a name the store knows nothing of, a cycle, or a card whose run ended unlanded
+ * Whether a wait will never be released without a person: a name the store knows nothing of, a cycle, or a card whose run ended without
+ * succeeding
  * or whose start was refused.
  * @param wait The wait's kind, and the state of the card it stands at as the inbox lists it (null where not read).
  */
 export const waitStalled: WaitStalled = (wait) => wait.kind !== 'waiting' || (wait.state !== null && ENDED_UNLANDED.includes(wait.state));
 
-/** A card as the walk reads it: whether the store knows it, its runs with whether each landed, and the cards its runs passed work on to. */
+/** A card as the walk reads it: whether the store knows it, its runs with whether each released its waiters, and the cards its runs
+ * passed work on to. */
 export type CardLook = { readonly known: boolean; readonly runs: readonly WaitedRun[]; readonly onward: readonly string[] };
 
-/** A card named in an `after:` that has not landed, and where its work stands (`cardLanded`'s waiting or missing). */
-type CardWaitOn = { readonly card: string; readonly landing: Exclude<CardLanding, { kind: 'landed' }> };
+/** A card named in an `after:` that has not released its waiters, and where its work stands (`cardLanded`'s waiting or missing). */
+type CardWaitOn = { readonly card: string; readonly landing: Exclude<CardLanding, { kind: 'released' }> };
 
 /**
- * The cards of `after` that have not landed, in the order written, each with where its work stands: `cardLanded` asked of each card, and
+ * The cards of `after` that have not released their waiters, in the order written, each with where its work stands: `cardLanded` asked
+ * of each card, and
  * of each card its runs passed its work on to before it, each card read once (`look`) and a hand-off back to a card already on the way
  * passed over, so the walk ends whatever the hand-offs say.
  * @param after The names a card's `after:` gives.
@@ -72,7 +78,7 @@ export function cardWaitsOf(after: readonly string[], look: (name: string) => Ca
   };
   return after.flatMap((card) => {
     const landing = judge(card, new Set());
-    return landing.kind === 'landed' ? [] : [{ card, landing } satisfies CardWaitOn];
+    return landing.kind === 'released' ? [] : [{ card, landing } satisfies CardWaitOn];
   });
 }
 

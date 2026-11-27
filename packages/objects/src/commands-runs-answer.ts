@@ -7,7 +7,7 @@
 import { type Args, type CommandWords, commandLine, type Flag } from './command.ts';
 
 /** What `nemia retry`'s and `nemia approve`'s help say of `--answer`. */
-export const ANSWER_HELP = [
+const ANSWER_HELP = [
   '--answer <n>=<letter>: answer question n, numbered as nemia decide',
   '<runId> prints them, with the option its letter names; once for each',
   'question: "<n>=a,c" chooses several where it takes several,',
@@ -20,7 +20,7 @@ export const ANSWER_HELP = [
  * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
  * @param verb The command the flag belongs to, as its refusal names it.
  */
-export const answerFlag = (verb: 'retry' | 'approve') =>
+const answerFlag = (verb: 'retry' | 'approve') =>
   ({
     flag: '--answer',
     kind: 'text',

@@ -1,5 +1,6 @@
 /**
- * `nemia hold`: hold a run until other runs land, or until a person lifts it (`hold`), and lift a hold by hand (`unhold`), each writing the
+ * `nemia hold`: hold a run until other runs succeed, or until a person lifts it (`hold`), and lift a hold by hand (`unhold`), each
+ * writing the
  * person's own file, refused before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`): each
  * verb is a program that fails with its refusal (`Invalid`, `Missing`, `Conflict`) and dies of anything else the store, git or the engine
  * throws.
@@ -8,10 +9,9 @@ import os from 'node:os';
 import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { honoursAsks, type Hold, type Run } from '../record/record.ts';
-import { holdRefusal } from './wait.ts';
+import { holdRefusal, waitStanding } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { standingLiveOf } from '../standing/standing.verb.ts';
 import { parentRead } from '../views/views.verb.ts';
 import { readRun } from '../tick/told.verb.ts';
 import { EngineService } from '../runtime-client.ts';
@@ -23,21 +23,18 @@ import { RunId } from '../record/record.model.ts';
 export type Holding = { run: Run; hold: Hold };
 
 /**
- * Hold a run until other runs land — `nemia hold <run> --until <run>…`: while any of them has not landed, as `nemia decide` says it of that
- * run (`parentRead`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in
- * flight runs on. The tick lifts the hold on the pass that reads every one of them landed (`advanceRun`). Naming no run — `nemia hold
- * <run>`, as Kubernetes' Job `spec.suspend` — the run is held the same way until a person lifts it (`unhold`), and no tick does; a folder
- * run may take this hold alone.
+ * Hold a run until other runs succeed — `nemia hold <run> --until <run>…`: while any of them has not released its waiters — it succeeded,
+ * as `nemia ls` says its status, or a person ran `nemia release` on it (`parentRead`, which `--after` reads too) — nothing of this run is
+ * filed and nothing of it is asked of a person (`assess`); what is in flight runs on. The tick lifts the hold on the pass that reads every
+ * one of them released (`advanceRun`). Naming no run — `nemia hold <run>`, as Kubernetes' Job `spec.suspend` — the run is held the same
+ * way until a person lifts it (`unhold`), and no tick does. No git is read.
  *
  * Fails before anything is written, with what to do instead: an id that is not a run's (`idRefusal`), and one named after `--until`, whose
  * fix keeps the run to hold (`Invalid`); a run not there (`Missing`); and what `holdRefusal` refuses (`Conflict`) — a run cancelled,
- * pruned, landed (as `--after` reads it, where the branches stand now: `standingLiveOf`) or succeeded with nothing left but a person's
- * merge, asked of the engine only for a run nothing else refuses, a run already held, a folder run named `--until`; and of each run named:
- * twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch gone,
- * already landed — and one that already waits on this run, through `--after` or a hold. Writes the record `/registry/runmarks/<id>/hold`,
- * once: a hold two
- * people put at once is the first one's, and the second is refused as already held. Dies of anything else the store, git or the engine
- * throws.
+ * pruned or succeeded, asked of the engine only for a run nothing else refuses, a run already held; and of each run named: twice, the run
+ * itself, one not there, cancelled, already succeeded or released — and one that already waits on this run, through `--after` or a hold.
+ * Writes the record `/registry/runmarks/<id>/hold`, once: a hold two people put at once is the first one's, and the second is refused as
+ * already held. Dies of anything else the store or the engine throws.
  *
  * @param said The person's words for why (`--why`), and who they are (`--by`): without a name, the user this process runs as, and none when
  * the system has no name for it; and the caller who puts it (`actor`), kept beside `by` where it is known.
@@ -56,31 +53,38 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
       }),
     );
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const git = yield* standingLiveOf([id, ...until]);
   const read = new Map(
     yield* Effect.all(
-      [...new Set(until)].filter((u) => u !== id).map((u) => Effect.map(parentRead(u, git), (parent) => [u, parent] as const)),
+      [...new Set(until)].filter((u) => u !== id).map((u) => Effect.map(parentRead(u), (parent) => [u, parent] as const)),
       { concurrency: 'unbounded' },
     ),
   );
-  let finished: 'landed' | 'succeeded' | undefined;
+  let succeeded = false;
   if (honoursAsks(run)) {
-    if ((yield* parentRead(id, git)).landed) finished = 'landed';
-    else {
-      const { read: runRead } = yield* readRun(yield* EngineService, run);
-      const { status } = assess(runRead);
-      if (status === 'succeeded') finished = 'succeeded';
-    }
+    const { read: runRead } = yield* readRun(yield* EngineService, run);
+    succeeded = assess(runRead).status === 'succeeded';
   }
   const others = yield* (yield* RunDoor).runs.list();
-  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { landed: false }, others, finished);
+  const refused = holdRefusal(
+    run,
+    until,
+    (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) },
+    others,
+    succeeded,
+  );
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const put = yield* (yield* RunDoor).holds.put(RunId.read(id), until, { ...said, by: said.by ?? osUser() });
   if (!put) {
     const again = yield* (yield* RunDoor).runs.read(RunId.read(id));
     return yield* Effect.fail(
       new Conflict({
-        message: holdRefusal(again, until, (u) => read.get(u) ?? { landed: false }, []) ?? `${id} is already held: nemia ls ${id}.`,
+        message:
+          holdRefusal(
+            again,
+            until,
+            (u) => read.get(u) ?? { standing: waitStanding({ known: false, status: null, released: false }) },
+            [],
+          ) ?? `${id} is already held: nemia ls ${id}.`,
       }),
     );
   }
@@ -115,7 +119,7 @@ export const unhold = Effect.fn('unhold')(function* (id: string, actor?: Actor) 
   if (!held)
     return yield* Effect.fail(
       new Conflict({
-        message: `${id} is not held, so there is no hold to lift. To hold it until you lift it: nemia hold ${id}; until other runs land: nemia hold ${id} --until <runId>.`,
+        message: `${id} is not held, so there is no hold to lift. To hold it until you lift it: nemia hold ${id}; until other runs succeed: nemia hold ${id} --until <runId>.`,
       }),
     );
   if (!(yield* (yield* RunDoor).holds.lift(RunId.read(id), held.at, actor)) && (yield* (yield* RunDoor).holds.stands(RunId.read(id))))

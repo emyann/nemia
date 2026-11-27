@@ -25,7 +25,6 @@ import {
 import { startRun, type WorkflowListing } from '../src/lib/api/workflows.ts';
 import { type Factory } from '../src/lib/api/factories.ts';
 import {
-  afterFor,
   capLine,
   CARD_KIND,
   cardFiling,
@@ -243,22 +242,10 @@ describe('newestCardsFirst, hasPage: the cards in order, a refusal on its own en
   });
 });
 
-describe("afterFor, workflowKey: the runs a card's start waits on, and a workflow as a pick is keyed", () => {
+describe('workflowKey: a workflow as a pick is keyed', () => {
   test('a workflow as a pick is keyed by its source and its name: yours and the repository may each have one of a name', () => {
     assert.equal(workflowKey(WORKFLOWS[0]), 'repo:dev');
     assert.equal(workflowKey(WORKFLOWS[2]), 'user:dev');
-  });
-  test('a start sends the runs it waits on, as they were picked', () => {
-    const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
-    assert.deepEqual(afterFor(onRepo, ['a-run-k2q9', 'another-c3d4']), ['a-run-k2q9', 'another-c3d4']);
-  });
-  test('REFUSED: a start of a team that works in folders sends none, whatever the picker was left holding', () => {
-    const inFolders = { ...listing('note', 'user', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
-    assert.deepEqual(
-      afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']),
-      [],
-      'the picker is hidden for a folder team, not emptied: runs picked under a git workflow are not sent, which `wf start` refuses as `--after` on such a run',
-    );
   });
 });
 

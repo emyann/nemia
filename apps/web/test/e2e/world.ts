@@ -376,21 +376,6 @@ export function standingPass() {
   }
 }
 
-/**
- * The run `id` as a wait or a hold names it where its place did not read where it stands: the run, with the words the e2e's pass wrote to
- * the store's `standing.json` for its repository (`standingPass`) — a repository the seed names and no machine has, never said to be on
- * the base or not. Throws where the pass read that repository, or did not ask it.
- */
-export function unreadName(id: string) {
-  const { repo } = storedRecord(id) as { repo: string };
-  const { places } = JSON.parse(fs.readFileSync(path.join(store!, 'standing.json'), 'utf8')) as {
-    places: { repo: string; unread?: string }[];
-  };
-  const unread = places.find((p) => p.repo === repo)?.unread;
-  if (unread === undefined) throw new Error(`the e2e's pass read where ${repo} stands, or did not ask it: ${id} is not unread`);
-  return `${id} (where it stands is unread: ${unread})`;
-}
-
 /** The ids of the runs whose records the seeded store holds: what a page reads before it starts one, to take back what it started. */
 export function storedRuns() {
   return JSON.parse(

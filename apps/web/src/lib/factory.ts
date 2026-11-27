@@ -21,13 +21,15 @@ import type { Frozen } from './frozen.ts';
  * its stop landed. A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show
  * finished", or on Runs.
  *
- * A run started `--after` runs that have not landed is in flight while each may still land: it moves, since the tick files its roots when
+ * A run started `--after` runs that have not succeeded is in flight while each may still succeed: it moves, since the tick files its
+ * roots when
  * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.waitingOnYou`) — no
- * such run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves
+ * such run, a failed or cancelled one — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves
  * until a person acts, and it waits on them.
  *
- * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
- * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
+ * So is a run a person holds until runs succeed (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
+ * steps say, and the tick lifts the hold when those runs succeed, though nothing of it is filed before then. Not once only a person
+ * lifts it
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  *
  * So is a run that asks something of a person (`asksOfAPerson`) that someone has in hand (`assignee`): it is theirs, not the person's.
@@ -73,7 +75,7 @@ export const toDecideOfYou = (run: { toDecide?: Frozen<RunToDecide> | null; assi
 
 /**
  * Whether anything of the run is asked of a person, whoever has it in hand: a step does (`waitingOnYou`) — at its gate anywhere in
- * the run, or signed off blocked — or a run it waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for,
+ * the run, or signed off blocked — or a run it waits on never succeeds without one — what the CLI's `ls` prints `→ waiting on you` for,
  * either way — or a hold on it only a person lifts (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there).
  * Not once it is cancelled: a cancelled run waits on nobody, whatever its steps last said.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
@@ -90,7 +92,8 @@ const asksOfAPerson = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'>
 export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) => asksOfAPerson(run) && !run.assignee;
 
 /**
- * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
+ * Whether a run waits on runs, and on nothing else: started `--after` runs not succeeded, each of which may still succeed, with nothing
+ * of it
  * filed yet (the api's `waiting`, null once a step is filed), and nobody to act (`waitsOnYou`). The floor draws such a run as a ghost, as
  * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
@@ -117,7 +120,7 @@ export const onYouOf = (
 
 /**
  * Where a run stands, in a word (`STANDING`), as the start form offers it to wait on: cancelled; waiting, on you (`waitsOnYou`) — a run
- * that waits on a run that never lands is one, though it has filed nothing and is not in flight; running; or finished.
+ * that waits on a run that never succeeds is one, though it has filed nothing and is not in flight; running; or finished.
  * @param run The run as the api lists it.
  */
 export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>) =>
@@ -200,7 +203,8 @@ const rowWords = (run: Clocked, now: number) => {
  * still runs started added as `now` moves. The title gives the start, the end or that it still goes, and the wall time between.
  *
  * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
- * then waits, doing nothing, until they land, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
+ * then waits, doing nothing, until they succeed, and that wait is not time at work. Until it starts it says it is waiting, for as long
+ * as it
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
  * A run the api could not judge has no time at work, and says when it started.
  * @param run The run's times: created, started, called off, and its time at work where the api gives it.
@@ -309,22 +313,22 @@ type Waits = Pick<RunView, 'id' | 'waiting'> & { holding?: RunView['holding'] };
 
 /**
  * The runs a card still waits on, each once: those its roots wait on before anything is filed (`waiting`, the CLI's `--after`), then each
- * a person holds it until that has not landed (`holding`). None once the run has started and nobody holds it: a wait it was started with
+ * a person holds it until that has not succeeded (`holding`). None once the run has started and nobody holds it: a wait it was started with
  * is over, and a run it reads as context is never one.
  */
 const liveWaits = (run: Waits) => [
-  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.landed).map((h) => h.run)]),
+  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.released).map((h) => h.run)]),
 ];
 
 /**
- * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it lands
+ * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it succeeds
  * (`hold:`). Always dashed, to come: a wait that is over draws nothing.
  */
 type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come'> };
 
 /**
  * The edges between the cards on the floor that are live waits: one from each run a card's roots still wait on (`waiting`), and one from
- * each run a person holds it until that has not landed (`holding`), where none already joins the two — each only when both cards are on
+ * each run a person holds it until that has not succeeded (`holding`), where none already joins the two — each only when both cards are on
  * the floor. A run that has started draws none from its waits, and a run it reads as context none at all (`contextEdges`).
  *
  * Reduced transitively: an edge u→w is dropped when another path u→…→w joins the two among the edges drawn, since the chain says it.

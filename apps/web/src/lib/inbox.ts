@@ -203,19 +203,6 @@ export function startPlace(entry: Pick<InboxEntry, 'workflow'>, picked: string, 
 }
 
 /**
- * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. The CLI's `start` refuses `--after` for such
- * a team — a folder run has no branch, so there is nothing for another run to wait for — and the form hides the picker for one.
- *
- * Hiding a control does not forget what was chosen in it: the picker is on the card's form under the workflow it picks, and a person who
- * picked runs under a git workflow and then picked a folder team would have sent them still, to be shown a refusal about a control no
- * longer on the page. What is not offered is not sent.
- * @param workflow The workflow the start picks: whether every step of its team works in a folder.
- * @param after The runs picked to wait on.
- */
-export const afterFor = (workflow: Pick<WorkflowListing, 'folderTeam'>, after: readonly string[]) =>
-  workflow.folderTeam ? [] : [...after];
-
-/**
  * A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`.
  * @param n The place, counted from 1.
  */

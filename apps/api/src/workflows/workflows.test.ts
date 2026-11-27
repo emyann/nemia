@@ -19,10 +19,9 @@ import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { Effect } from 'effect';
 import { definitionRevisionNow, StoreRoot } from 'agent-orchestrator';
-import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
-import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, settingsOf } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, parseWorkflow, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 import {
   addFactory,
@@ -653,12 +652,6 @@ describe('a person starts runs from the board: the record as `nemia start` write
       assert.deepEqual(runsNow(root).runs.read(id).after, ['p-running']);
       assert.deepEqual(filedTasks(), [], 'nothing filed');
 
-      const unread = await objectOf(app, id);
-      assert.ok(
-        unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
-        `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
-      );
-      await runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 

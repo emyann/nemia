@@ -134,11 +134,11 @@ export function Facts({
   );
 }
 
-/** The runs a run waits on: those of its waits and hold not landed, and the run whose ending holds the checkout it waits on. */
+/** The runs a run waits on: those of its waits and hold not succeeded, and the run whose ending holds the checkout it waits on. */
 const waitsOnOf = (run: PanelRun) => [
   ...new Set([
     ...(run.waiting?.runs.filter((waited) => !waited.missing).map((waited) => waited.run) ?? []),
-    ...(run.holding?.runs.filter((held) => !held.landed).map((held) => held.run) ?? []),
+    ...(run.holding?.runs.filter((held) => !held.released).map((held) => held.run) ?? []),
     ...run.steps.flatMap((step) => (step.baseHeldBy ? [step.baseHeldBy.run] : [])),
   ]),
 ];

@@ -46,7 +46,6 @@ import {
   startRun,
   startFromInbox,
   runWith as runEngine,
-  standingLiveOf,
 } from '../src/runner.ts';
 
 import { passStanding } from '../src/standing/standing.verb.ts';
@@ -83,8 +82,8 @@ const ENV: Env = {
 /** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
-/** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
-const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
+/** Whether the wait on the run `id` is released now. */
+const releasedNow = (id: string) => parentRead(id).pipe(Effect.map((p) => p.standing.kind === 'released'));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns(ROOT)));
 /** One pass of the tick over the run `id`. */
@@ -581,9 +580,9 @@ describe('a parent whose last step waits at its gate has not landed, though a pe
     stage.place().world.stage(repo, runRecord(ROOT, parent).steps.implement.branch!);
     stage.place().world.commit(repo, 'merge the parent');
   });
-  s.test('REFUSED: merged, and at its gate, it has not landed; a run `--after` it files nothing, pass after pass', async () => {
+  s.test('REFUSED: merged, and at its gate, it has not succeeded; a run `--after` it files nothing, pass after pass', async () => {
     child = (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent] }))).id;
-    assert.equal((await runWith(b.e, parentNow(parent))).landed, false);
+    assert.equal(await runWith(b.e, releasedNow(parent)), false);
     for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await tick(b.e, child)).filed, [], `pass ${pass}`);
   });
   s.test('`nemia ls` of the child says it is waiting on the parent', async () => {
@@ -591,7 +590,7 @@ describe('a parent whose last step waits at its gate has not landed, though a pe
     assert.deepEqual((await runWith(b.e, list(b.e, runRecord(ROOT, child)))).steps[0].message, `waiting on ${parent}`);
   });
   s.test(
-    "approved by a person's file, with words, composed on read: it has landed, and the child's next tick files its roots",
+    "approved by a person's file, with words, composed on read: it has succeeded, and the child's next tick files its roots",
     async () => {
       approveByHand(parent, 'implement', 1, { at: '2026-09-16T23:10:00.000Z', message: 'the second reading' });
       assert.deepEqual(
@@ -603,7 +602,7 @@ describe('a parent whose last step waits at its gate has not landed, though a pe
           message: 'the second reading',
         },
       );
-      assert.equal((await runWith(b.e, parentNow(parent))).landed, true);
+      assert.equal(await runWith(b.e, releasedNow(parent)), true);
       assert.deepEqual((await tick(b.e, child)).filed, ['plan']);
     },
   );
@@ -619,7 +618,7 @@ describe('a parent whose last step waits at its gate has not landed, though a pe
     assert.ok(recordText(ROOT, askKeyOf(parent, 'retry-implement-2')) === undefined, 'no ask written');
     const [first, second] = [await tick(b.e, parent), await tick(b.e, parent)];
     assert.deepEqual(first.filed.concat(second.tried), []);
-    assert.equal((await runWith(b.e, parentNow(parent))).landed, true, 'still landed');
+    assert.equal(await runWith(b.e, releasedNow(parent)), true, 'still succeeded');
   });
 });
 

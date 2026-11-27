@@ -229,7 +229,7 @@ export function Refused({ refusal }: { refusal: CardRefusal }) {
 
 /**
  * A card's place in the queue — its word, by whom where triggers queue it, and since when — and, on a card two triggers of its factory
- * would send to two workflows, the clash and what to change; on a card that waits on cards of its `after:` not landed, each, in the
+ * would send to two workflows, the clash and what to change; on a card that waits on cards of its `after:` not succeeded, each, in the
  * failure's colours where only a person can release one.
  */
 export function CardQueue({ entry }: { entry: InboxEntry }) {

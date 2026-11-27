@@ -5,7 +5,7 @@ import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photog
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredMarker, OUT, plantStoredMarker, storedMarker, unreadName } from '../world.ts';
+import { dropStoredMarker, OUT, plantStoredMarker, storedMarker } from '../world.ts';
 
 export default {
   /**
@@ -19,7 +19,7 @@ export default {
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
-    const word = `held until ${unreadName(until)} lands`;
+    const word = `held until ${until} succeeds`;
     const holdIt = () => {
       if (storedMarker(id, 'hold') !== null) throw new Refused(`no hold on ${id} before the page writes one — the hold record is there`);
       plantStoredMarker(id, 'hold', JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2));

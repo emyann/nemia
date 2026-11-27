@@ -49,10 +49,10 @@ export const RunLines = Schema.Struct({
 }).annotate({ identifier: 'RunLines' });
 export type RunLines = typeof RunLines.Type;
 
-/** What a run started now with it as context would be handed: the run, whether it has landed, and its `## From run` section. */
+/** What a run started now with it as context would be handed: the run, whether it has succeeded, and its `## From run` section. */
 export const Concluded = Schema.Struct({
   run: Schema.String.annotate({ description: "The run's id." }),
-  landed: Schema.Boolean.annotate({ description: 'Whether it has landed.' }),
+  succeeded: Schema.Boolean.annotate({ description: 'Whether it has succeeded.' }),
   section: Schema.String.annotate({ description: 'Its ## From run section, as a run started now with it as context would be handed it.' }),
 }).annotate({
   identifier: 'Concluded',

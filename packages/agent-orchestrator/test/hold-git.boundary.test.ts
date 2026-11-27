@@ -1,8 +1,8 @@
 /**
- * `nemia hold --until` refused where git alone can say why: a run on another base branch, checked out by hand, and one whose result
- * branch a person removed with `git worktree remove` and `git branch -D` — beyond the test place, which has no checkout of another
- * branch and no hand on a worktree past its handle — beside a pruned run, a folder run and one run --no-worktree, which this one fixture
- * sets up together. Over a store and repositories of its own, with git for real. The rest of `nemia hold` is told on the stage, in
+ * `nemia hold --until` where git alone could say something: a run on another base branch, checked out by hand, and one whose result
+ * branch a person removed with `git worktree remove` and `git branch -D`, a folder run and one run --no-worktree, which hold all the
+ * same since the wait reads no git, beside a pruned run, which a hold is refused on. One fixture sets them up together. Over a store and
+ * repositories of its own, with git for real. The rest of `nemia hold` is told on the stage, in
  * `hold.test.ts`, and its pure refusals in `src/wait/wait.test.ts`.
  */
 import { recordText, runRecord } from '../testing.ts';
@@ -141,11 +141,10 @@ const folderTeam = () => {
   return dir;
 };
 
-test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, and --until a folder run, a run started --no-worktree, one on another base branch, and one whose result branch is gone', async (t) => {
+test('a hold on a pruned run is refused, and a hold on or until a folder run, a run started --no-worktree, one on another base branch, or one whose result branch is gone is held: git is not read', async (t) => {
   const b = board();
   const repo = aRepo();
   const run = await aRunning(b, repo);
-  const id = run.id;
   const target = await aRunning(b, repo);
 
   const pruned = await aDone(b, repo);
@@ -153,57 +152,23 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   await refused(t, b.e, 'Conflict', [`${pruned.id} was pruned at`, 'nothing to hold'], 'hold', pruned.id, '--until', target.id);
 
   const folder = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() }));
-  await refused(t, b.e, 'Conflict', [`${folder.id}'s team works in folders`, 'place: folder'], 'hold', folder.id, '--until', target.id);
-  await refused(
-    t,
-    b.e,
-    'Conflict',
-    [`--until ${folder.id}:`, `${folder.id} is a folder run`, 'never lands on a branch'],
-    'hold',
-    id,
-    '--until',
-    folder.id,
+  assert.equal(
+    (await typed(t, b.e, 'hold', folder.id, '--until', target.id)).error,
+    undefined,
+    'a folder run is held until a run, as any other',
   );
-
   const inPlace = await runPlaced(startRun({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false }));
-  await refused(
-    t,
-    b.e,
-    'Conflict',
-    [`--until ${inPlace.id}:`, `${inPlace.id} worked on main itself`, '--no-worktree', 'no result branch'],
-    'hold',
-    id,
-    '--until',
-    inPlace.id,
-  );
-
   git(repo, 'checkout', '-q', '-b', 'release');
   const onRelease = await runPlaced(startRun({ brief: 'onto release', repo, workflowDir: oneStep() }));
   git(repo, 'checkout', '-q', 'main');
-  await refused(
-    t,
-    b.e,
-    'Conflict',
-    [`--until ${onRelease.id}:`, `${onRelease.id} lands on release`, `${id} on main`],
-    'hold',
-    id,
-    '--until',
-    onRelease.id,
-  );
-
-  const dropped = await aDone(b, repo);
+  const dropped = await aRunning(b, repo);
   git(repo, 'worktree', 'remove', '--force', runRecord(ROOT, dropped.id).steps.implement.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/${LINE_NAME}`);
-  await refused(
-    t,
-    b.e,
-    'Conflict',
-    [`--until ${dropped.id}:`, `wf/${dropped.id}/${LINE_NAME} is gone`, 'main'],
-    'hold',
-    id,
-    '--until',
-    dropped.id,
-  );
+  for (const until of [folder.id, inPlace.id, onRelease.id, dropped.id]) {
+    const waiter = await aRunning(b, repo);
+    assert.equal((await typed(t, b.e, 'hold', waiter.id, '--until', until)).error, undefined, `--until ${until} is held: git is not read`);
+    assert.ok(recordText(ROOT, runMarkKey(waiter.id, 'hold')) !== undefined, `a hold written on ${waiter.id}`);
+  }
 
-  for (const r of [pruned, folder, run]) assert.ok(recordText(ROOT, runMarkKey(r.id, 'hold')) === undefined, `no hold written on ${r.id}`);
+  for (const r of [pruned, run]) assert.ok(recordText(ROOT, runMarkKey(r.id, 'hold')) === undefined, `no hold written on ${r.id}`);
 });

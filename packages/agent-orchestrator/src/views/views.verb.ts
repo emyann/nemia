@@ -9,7 +9,7 @@
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
-import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, asked, denialText, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   attemptVerdict,
   CHECK_TAIL_LINES,
@@ -28,16 +28,14 @@ import {
 } from '../check/index.ts';
 import { checkLine, stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
-import { resultSteps } from '../branches/index.ts';
-import { isRepositoryRun, checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { taskSpend, type SpendOf } from '../status/status.ts';
 import { type Consumed } from '../usage/usage.ts';
-import { waitedOn, type ParentRun } from '../wait/wait.ts';
-import { decision } from '../decide/decide.ts';
+import { waitedOn, waitStanding, type ParentRun } from '../wait/wait.ts';
+import { assess } from '../tick/assess.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
-import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
@@ -684,41 +682,31 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run, s
 };
 
 /**
- * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
+ * A run another waits on (`--after`, `nemia hold --until`, a card's `after:`), read by the pass that asks and carried nowhere — what
+ * `runReady` and `waitsOf` are handed.
  *
- * Landed is the run's own `nemia decide`'s word, and nothing stricter or looser: `decision` says `landed` — the run is not running, it
- * was not cancelled, and every result branch is on its base branch (`BranchReader.landed`), with work past its base or with every step
- * succeeded. A child starts when its parent's `nemia decide` says landed, and a child waits exactly while it does not. A result branch is
- * cut at its run's base, which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent
- * still running has not landed for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed
- * off with nothing to commit has, as its `nemia decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
- *
- * Git first, which costs no harness observe: a result branch not on the base branch has not landed, whatever the run's steps say. The
- * engine's view of the parent's tasks is read only once every one is.
- *
- * A result branch git no longer has is read by the tip the parent's own tick recorded once it had finished (`tipsSeen`), so the diamond's
- * first parent merged and cleaned up while the second is still in review still counts. One whose tip git cannot find on the base — dropped
- * unmerged, or deleted before any tick saw its run finish — is `gone`, and not landed. A run that started before the branch was deleted
- * never asks (`gated`). Where `git` read the parent's branches once for the pass and could not (`unread`), it has not landed, and says
- * why.
- *
- * A parent whose unfrozen folder does not load has not landed, and says why (`unread`): that is its answer, neither a failure nor a defect.
- * Fails with a refusal a read of the store, git or the engine failed with; dies of anything else.
+ * Where a wait on it stands is the run's own status, as `nemia ls` says it (`assess`), and whether a person released its waiters
+ * (`Run.released`): `waitStanding` judges them. No git is read: a branch merged by hand releases nothing, and a succeeded run with no
+ * result branch, or whose branch nobody merged, releases its waiters. A run the store does not have, a cancelled one and one whose
+ * unfrozen folder does not load (`unread`, its status unread) are answered from the record alone, without the engine.
+ * Fails with a refusal a read of the store or the engine failed with; dies of anything else.
+ * @param id The waited-on run's id, as given.
  */
-export const parentRead = Effect.fn('parentOf')(function* (id: string, git: BranchReader) {
-  const known = yield* parentRecord(id, git);
+export const parentRead = Effect.fn('parentOf')(function* (id: string) {
+  const known = yield* parentRecord(id);
   const { record } = known;
-  if (!record || record.cancelledAt || known.gone) return { ...known, landed: false } satisfies ParentRun;
+  const released = Boolean(record?.released);
+  if (!record || record.cancelledAt) {
+    return {
+      ...known,
+      standing: waitStanding({ known: Boolean(record), status: record ? 'cancelled' : null, released }),
+    } satisfies ParentRun;
+  }
   const frozen = yield* stepsOrWhy(record);
-  if ('unloaded' in frozen) return { ...known, landed: false, unread: frozen.unloaded } satisfies ParentRun;
+  if ('unloaded' in frozen) {
+    return { ...known, standing: waitStanding({ known: true, status: null, released }), unread: frozen.unloaded } satisfies ParentRun;
+  }
   const { steps } = frozen;
-  const branches = resultSteps(steps)
-    .map((s) => record.steps[s.name]?.branch)
-    .filter((b): b is string => Boolean(b));
-  const unread = isRepositoryRun(record) ? (git.unread(record) ?? branches.map((b) => git.unread(record, b)).find(Boolean)) : undefined;
-  if (unread !== undefined) return { ...known, landed: false, unread } satisfies ParentRun;
-  const onBase = yield* tried(() => branches.length > 0 && branches.every(landedOf(record, git)));
-  if (!onBase) return { ...known, landed: false } satisfies ParentRun;
   const { views, phaseOf } = yield* taskPhasesRead(record);
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const read = {
@@ -736,43 +724,40 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
     standings: [],
     checkout: undefined,
   };
-  const said = decision(read, landedOf(record, git));
-  return { ...known, landed: said.kind === 'landed' } satisfies ParentRun;
+  return { ...known, standing: waitStanding({ known: true, status: assess(read).status, released }) } satisfies ParentRun;
 });
 
-/** A run another waits on as `read` holds it, else read (`parentRead`) over `git` and kept in `read` for whoever asks next. */
-export const keptParent = Effect.fn('keptParent')(function* (id: string, git: BranchReader, read: Map<string, ParentRun>) {
+/** A run another waits on as `read` holds it, else read (`parentRead`) and kept in `read` for whoever asks next. */
+export const keptParent = Effect.fn('keptParent')(function* (id: string, read: Map<string, ParentRun>) {
   const was = read.get(id);
   if (was) return was;
-  const now = yield* parentRead(id, git);
+  const now = yield* parentRead(id);
   read.set(id, now);
   return now;
 });
 
 /**
- * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, off what the tick's pass read of
- * where the branches stand (`standingReader`), or what a person's verb asked of it live (`standingLive`): what the pass's
- * `admit`, `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs (`needOf`) all read through. Made by the pass and dropped
- * with it, so a parent the pass lands is read landed on the next.
+ * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id: what the pass's `admit`,
+ * `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs (`needOf`) all read through. Made by the pass and dropped with it,
+ * so a parent the pass succeeds is read succeeded on the next.
  */
-export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
+export type Parents = { read: Map<string, ParentRun> };
 
-/**
- * The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`.
- * @param git What reads the runs' branches.
- */
-export const passParents = (git: BranchReader) => ({ git, read: new Map() }) satisfies Parents;
+/** The runs a pass reads as runs others wait on (`Parents`), none read yet. */
+export const passParents = () => ({ read: new Map() }) satisfies Parents;
 
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
  * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. A run `read` holds is answered from it,
  * and every run read is kept there. Fails with a refusal a read failed with; dies of anything else.
  * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
+ * @param run The run whose waits are read.
+ * @param read The runs already read, by id; every run read here is kept in it.
  */
-export const parentsRead = Effect.fnUntraced(function* (run: Run, git: BranchReader, read = new Map<string, ParentRun>()) {
+export const parentsRead = Effect.fnUntraced(function* (run: Run, read = new Map<string, ParentRun>()) {
   const mine = new Map<string, ParentRun>();
-  for (const id of new Set(waitedOn(run))) mine.set(id, yield* keptParent(id, git, read));
-  return (id: string) => mine.get(id) ?? { landed: false };
+  for (const id of new Set(waitedOn(run))) mine.set(id, yield* keptParent(id, read));
+  return (id: string) => mine.get(id) ?? { standing: waitStanding({ known: false, status: null, released: false }) };
 });
 
 /**

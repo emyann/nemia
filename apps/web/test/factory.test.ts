@@ -500,7 +500,7 @@ describe("placeRuns: an open run's graph moves the cards it covers, and never on
 /** What the api says a run waiting on `p` waits on: a run that may still land, or one that was cancelled and never will. */
 const waitingOn = (onYou: boolean) =>
   ({
-    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [] }],
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, failed: false }],
     word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
     advice: onYou
       ? `p was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: wf cancel r-1, or start the work again without --after p`
@@ -513,7 +513,7 @@ const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toIS
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`). */
 const waitsOn = (...runs: string[]) =>
   ({
-    runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
+    runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, failed: false })),
     word: `waiting on ${runs.join(', ')}`,
     advice: '',
     waitingOnYou: false,
@@ -888,8 +888,8 @@ describe("runClock and clockCounts: a card's and a row's clock, and what its hov
 const holdingOn = (onYou: boolean) =>
   ({
     at: '2026-09-13T00:30:00.000Z',
-    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], landed: false }],
-    word: 'held until p lands',
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, failed: false, released: false }],
+    word: 'held until p succeeds',
     advice: onYou
       ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
       : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
@@ -1010,7 +1010,7 @@ describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and 
     );
     assert.deepEqual(onYouOf({ ...before, waitingOnYou: [] }), []);
   });
-  test('a run held until runs that may still land is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
+  test('a run held until runs that may still succeed is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
     const gated = { status: 'running' as const, moving: false, waitingOnYou: [] as string[], waiting: null };
     const lifts = run(['awaiting approval', 'waiting'], { ...gated, holdUntil: ['p'], holding: holdingOn(false) });
     assert.deepEqual(
@@ -1340,7 +1340,7 @@ describe('parentsWanted and floorRowsOf: the finished runs the floor reads besid
         id: 'h',
         status: 'running',
         holdUntil: ['held-on'],
-        holding: { ...holdingOn(false), runs: [{ run: 'held-on', missing: false, cancelledAt: null, gone: [], landed: false }] },
+        holding: { ...holdingOn(false), runs: [{ run: 'held-on', missing: false, cancelledAt: null, failed: false, released: false }] },
         createdAt: at(3),
       }),
       run(['running (working)'], { id: 's', moving: true, after: ['started-after'], createdAt: at(4) }),
@@ -1423,7 +1423,7 @@ describe('runEdges and contextEdges: the edges drawn between cards', () => {
       [],
       'b has started: its parents landed, and it waits on none',
     );
-    const landed = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, gone: [], landed: true }] };
+    const landed = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, failed: false, released: true }] };
     assert.deepEqual(
       runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', holdUntil: ['a'], holding: landed })]),
       [],
@@ -1447,7 +1447,7 @@ describe('runEdges and contextEdges: the edges drawn between cards', () => {
     const held = (...runs: string[]) =>
       ({
         ...holdingOn(false),
-        runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], landed: false })),
+        runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, failed: false, released: false })),
       }) satisfies RunView['holding'];
     const edges = runEdges([
       run(['verified ✓'], { id: 'a' }),

@@ -372,13 +372,13 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                it (nemia workflows lists them); a card's own workflow: where it names
                                one. A path to a workflow folder, and a folder of cards, are refused:
                                file each card (nemia inbox add <card>) and start it by its name
-                               --after <runId>: file nothing of this run until nemia decide says that
-                               run has landed — finished, and its result branch on the base
-                               branch — and start from the base as it is then; once per run.
+                               --after <runId>: file nothing of this run until that run has succeeded
+                               (nemia ls says succeeded), or a person ran nemia release on it; the
+                               run starts from the base branch as it is then; once per run.
                                --from <runId>: hand this run what that run concluded, as context,
-                               and wait on nothing: landed or still in flight, it is read once,
-                               when this run's steps are filed, and said not landed, not judged
-                               until it has landed; once per run.
+                               and wait on nothing: succeeded or still in flight, it is read once,
+                               when this run's steps are filed, and said not succeeded, not judged
+                               until it has succeeded; once per run.
                                --gate <step>: that step's closeout waits for nemia approve before
                                anything after it is filed, as a step's own gate: true does; once
                                per step. An inbox card's gate: <step> is one more
@@ -418,7 +418,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                park an idea as a card in the inbox, named from its first line;
                                each --file is uploaded and carried by the card, as is each file
                                beside an idea file that its text names as an image or a link;
-                               each --after names a card it waits on, and it starts once they land
+                               each --after names a card it waits on, and it starts once they have succeeded
                                each tool's words: tools.md#inbox_add
                                on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]
@@ -537,22 +537,30 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                each tool's words: tools.md#skills_write, tools.md#skills_replace, tools.md#skills_copy
                                on the port: skills_write, skills_replace, skills_copy
   nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
-                               file nothing more of a run until other runs land, as --after would
+                               file nothing more of a run until other runs succeed, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
-                               is asked of you — nemia ls and nemia decide say held until <run> lands, and
+                               is asked of you — nemia ls and nemia decide say held until <run> succeeds, and
                                what a step asks is asked once the hold lifts. The tick lifts it when
-                               every run named has landed. With no --until, the run is held until a
+                               every run named has succeeded (or been released: nemia release). With no --until, the run is held until a
                                person lifts it (--off), and no tick lifts it: nemia ls and nemia
                                decide say held until a person lifts it. Refused of a run cancelled,
-                               pruned, finished or already held, and of a run named that is unknown,
+                               pruned, succeeded or already held, and of a run named that is unknown,
                                the run itself, or one that already waits on it, through --after or a
                                hold.
-                               --why: the reason, shown beside held until <run> lands wherever it is
+                               --why: the reason, shown beside held until <run> succeeds wherever it is
                                said; --by: who puts the hold (default: your OS user).
                                nemia hold <runId> --off: lift the hold now, and the next tick goes on as
                                if it had never been put
                                each tool's words: tools.md#hold, tools.md#unhold
                                on the port: hold, unhold
+  nemia release <runId>
+                               let go every run that waits on this one — --after, hold --until and a
+                               card's after: alike — as if it had succeeded. For a run that will not
+                               succeed on its own: one that failed or was cancelled and whose work you
+                               merged by hand. Written once, never taken back. Refused of a run
+                               that has already succeeded or been released.
+                               each tool's words: tools.md#release
+                               on the port: release
   nemia assign <runId> [--to <name>] [--why "<words>"] [--for <d>]
                                say who has a run in hand: what it asks of a person — an approval, a
                                question, a retry, a budget, a hold only a person ends — is theirs to

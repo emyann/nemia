@@ -232,7 +232,7 @@ test('a folder team starts from a directory that is no repository, and its recor
   assert.deepEqual(gitAsked(), []);
 });
 
-test('a folder team refuses --repo, --no-worktree and --after, before anything is written', async () => {
+test('a folder team refuses --repo, --no-worktree and --after a run that is not there, before anything is written', async () => {
   const before = [...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort();
   const named = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM })));
   assert.equal(named.exitCode, 2);
@@ -246,8 +246,7 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   const waiting = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] })));
   assert.equal(waiting.exitCode, 2);
   assert.ok(waiting.message.startsWith('--after some-run-a1b2: '), waiting.message);
-  assert.ok(waiting.message.includes('(place: folder)'), waiting.message);
-  assert.ok(waiting.message.includes('Start it without --after'), 'and names the flag to drop');
+  assert.ok(waiting.message.includes('no run some-run-a1b2'), waiting.message);
 
   assert.deepEqual([...runFolderNames(ROOT), ...keysUnder(ROOT, '/registry/runs/')].sort(), before, 'nothing was written');
   assert.deepEqual(gitAsked(), []);
@@ -277,6 +276,30 @@ test("a folder team whose agent is given one of Nemia's builtin skills starts: i
   fs.writeFileSync(path.join(team, 'ask.md'), '---\nworkspace: folder\nagent: asker\n---\nask about the note\n');
   const run = await runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team }));
   assert.ok(runRecord(ROOT, run.id), 'started: a skill no place had would refuse the start');
+  assert.deepEqual(gitAsked(), []);
+});
+
+test('a folder run started --after another folder run waits for it, and files its roots once that run has succeeded, with no git asked', async () => {
+  const solo = path.join(ROOT, 'workflows', 'solo');
+  fs.mkdirSync(solo, { recursive: true });
+  fs.writeFileSync(path.join(solo, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite the note\n');
+  const parent = await runPlaced(startRun({ brief: 'the first note', repo: NOT_A_REPO, workflowDir: solo }));
+  const child = await runPlaced(startRun({ brief: 'the second note', repo: NOT_A_REPO, workflowDir: solo, after: [parent.id] }));
+  assert.deepEqual(runRecord(ROOT, child.id).after, [parent.id]);
+  const { e, settle } = board();
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, parent.id)))).filed, ['write']);
+  assert.deepEqual(
+    (await runWith(e, advanceRun(runRecord(ROOT, child.id)))).filed,
+    [],
+    'nothing of the child is filed while its parent works',
+  );
+  settle(`${parent.id}-write`, 'succeeded', WROTE_NONE);
+  await runWith(e, advanceRun(runRecord(ROOT, parent.id)));
+  assert.deepEqual(
+    (await runWith(e, advanceRun(runRecord(ROOT, child.id)))).filed,
+    ['write'],
+    'its parent has succeeded: its roots are filed',
+  );
   assert.deepEqual(gitAsked(), []);
 });
 

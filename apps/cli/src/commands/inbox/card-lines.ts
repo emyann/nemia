@@ -76,13 +76,13 @@ export const fileOf = (card: Card) => card.status.file ?? `${card.metadata.name}
 export const repoFactory = (card: Card) => `${card.spec.repo ? `  repo: ${card.spec.repo} (retired)` : ''}${factoryLine(card)}`;
 
 /**
- * `  after: <a, b> — queued and started once each has landed`, where the card waits on cards: what `nemia inbox add` and `nemia inbox
+ * `  after: <a, b> — queued and started once each has succeeded`, where the card waits on cards: what `nemia inbox add` and `nemia inbox
  * edit` say of a card's wait, with `suffix` after it; none for a card that waits on none.
  * @param after The cards the card waits on (its `spec.after`), by name.
  * @param suffix What the line says after the wait, such as ` (was <cards>)`.
  */
 export const afterLines = (after: readonly string[] | undefined, suffix = '') =>
-  after?.length ? [`  after: ${after.join(', ')} — queued and started once each has landed${suffix}`] : [];
+  after?.length ? [`  after: ${after.join(', ')} — queued and started once each has succeeded${suffix}`] : [];
 
 /**
  * `  factory: <f>`, where the card is in one: what a line of a card filed says after its workflow.

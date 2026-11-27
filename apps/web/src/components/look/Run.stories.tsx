@@ -263,7 +263,9 @@ const HELD_ROWS = [
   }),
   heldAs('n0ne', {}),
   heldAs('z2pn', {
-    runs: [{ run: TARGET_RUNS['1sw7'].metadata.name, missing: false, cancelledAt: '2026-11-15T17:00:00.000Z', gone: [], landed: false }],
+    runs: [
+      { run: TARGET_RUNS['1sw7'].metadata.name, missing: false, cancelledAt: '2026-11-15T17:00:00.000Z', failed: false, released: false },
+    ],
     waitingOnYou: true,
     why: 'rebase after the release is cut',
     by: 'operator',

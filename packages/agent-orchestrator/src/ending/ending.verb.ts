@@ -174,8 +174,8 @@ const mainClaim = Effect.fnUntraced(function* (
   const claim = { id: run.id, repo, step: ending.name, holds: false, at };
   if (a.retry.some((r) => r.step === ending.name)) return claim;
   if (!a.ready.includes(ending.name)) return undefined;
-  const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
-  return runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot) ? claim : undefined;
+  const parent = yield* parentsRead(run, parents.read).pipe(over(e));
+  return runReady(run, (id) => parent(id).standing.kind === 'released') && runAdmitted(run, yield* slot) ? claim : undefined;
 });
 
 /**

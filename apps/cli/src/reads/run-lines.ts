@@ -2,7 +2,7 @@
  * The lines `nemia ls <run>` prints of one run, off the `Run` the api answers (`GET /api/runs/:name`), in the words its status already
  * carries: its head line — its name, its brief's first line, whether it was called off, what it cost and the labels asked — then a step a
  * line, its word, its cost, its branch and its note, and under them what it asks of a person: what to decide, the steps that wait on
- * you, a run waited on that never lands, a hold and what lifts it, and where its work ended up. Pure.
+ * you, a run waited on that never succeeds, a hold and what lifts it, and where its work ended up. Pure.
  */
 import { headline, type Run, type RunStepStatus, type TableAsked } from 'objects';
 
@@ -51,7 +51,7 @@ const labelsOf = (labels: Readonly<Record<string, string>>, asked: TableAsked) =
 const asksLines = ({ metadata: { name }, status }: Run) => {
   const { toDecide, waiting, holding, result = [] } = status;
   const words = status.waitingOnYouWords.filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
-  const lifting = holding !== null && holding.runs.length > 0 && holding.runs.every((r) => r.landed);
+  const lifting = holding !== null && holding.runs.length > 0 && holding.runs.every((r) => r.released);
   const held =
     holding === null
       ? []

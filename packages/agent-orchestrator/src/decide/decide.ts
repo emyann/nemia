@@ -43,7 +43,9 @@ import { checksPhase } from '../check/index.ts';
  * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
  * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
  * as landed, a run whose last step failed with nothing committed would say `landed`: `nemia decide` would
- * hide the failure, and a run waiting on it (`--after`) would start. So `landed` says which yes it is (`Landed`).
+ * hide the failure. So `landed` says which yes it is (`Landed`). A run waiting on this one reads none of it: it waits for the run to
+ * succeed
+ * (`waitStanding`), not for its branch to land.
  */
 export type Decision =
   | { kind: 'running'; waiting: string[] }
@@ -138,7 +140,7 @@ function once(landed: (branch: string) => Landed) {
  * asked, not some — a fan-out that ends in two branches has not landed because one did — each once, and none after the first that is
  * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not landed while one does, save
  * an ending at its gate that has not run whose result git already has (`resultOnBase`): the merge its gate holds was made by hand, so
- * the run is landed and a run `--after` it starts (`parentOf`), since its approval is refused and that child would wait for ever.
+ * the run is landed, since its approval is refused with nothing left to merge.
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,

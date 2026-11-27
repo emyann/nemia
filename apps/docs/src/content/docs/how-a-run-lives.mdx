@@ -90,18 +90,17 @@ send the card back to the inbox, unqueued, with the label edits its `relabel:` l
 ### A card that waits on others
 
 A card can list the cards it **waits on** in its `after:`, by name and comma-separated, or when it is created, with one
-`--after <card>` per card. Until all of them have landed, no trigger queues the card and the tick doesn't start it, even if it was
-queued by hand. A listed card has landed when a run started from it has landed (by that run's own decision), or when the card its run
-passed the work on to has landed. That is the card a routing workflow's card node created for it, or the card it was sent on as. When
-the last one lands, the next pass queues the card like any other, and its run starts from the base branch as it is then. So you can
+`--after <card>` per card. Until all of them have succeeded, no trigger queues the card and the tick doesn't start it, even if it was
+queued by hand. A listed card has succeeded when a run started from it has (as `nemia ls` says its status), when a person ran `nemia release`
+on that run, or when the card its run passed the work on to has succeeded. That is the card a routing workflow's card node created for it, or the card it was sent on as. When
+the last one has succeeded, the next pass queues the card like any other, and its run starts from the base branch as it is then. So you can
 put a whole chain in the sprint at once, each card waiting on the one before, and the factory runs them in order.
 
 The inbox, the Card's `status.waitingOn`, and the board list a waiting card with each card it waits on, where that work stands now,
 and that card's state. This is read on every pass, and nothing is written on the card. A wait that only a person can release is
-**stalled**. That happens when a name is unknown to the store, when `after:` lines form a cycle, or when a card's run ended without
-landing or its start was refused. The inbox line says so and gives the fix, and the feed says so once when the stall begins and once
-when it clears. To fix it, send the card on, change this card's `after:`, or start this card by hand. You can still start a waiting card
-by hand: the wait doesn't block it, and the start lists the cards that have not landed yet.
+**stalled**. That happens when a name is unknown to the store, when `after:` lines form a cycle, or when a card's run failed or was cancelled and was not released, or its start was refused. The inbox line says so and gives the fix, and the feed says so once when the stall begins and once
+when it clears. To fix it, send the card on, change this card's `after:`, release the run with `nemia release`, or start this card by hand. You can still start a waiting card
+by hand: the wait doesn't block it, and the start lists the cards that have not succeeded yet.
 
 ## Who writes what
 

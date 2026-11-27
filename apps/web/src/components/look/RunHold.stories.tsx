@@ -6,8 +6,8 @@ import { HoldLine } from './RunHold';
 /** A hold with no reason and nobody named: the runs it waits on, and the words the api says of it. */
 const BARE = {
   at: '2026-11-15T17:30:00.000Z',
-  runs: [{ run: 'cli-the-api-only-consumer-1sw7', missing: false, cancelledAt: null, gone: [], landed: false }],
-  word: 'held until cli-the-api-only-consumer-1sw7 lands',
+  runs: [{ run: 'cli-the-api-only-consumer-1sw7', missing: false, cancelledAt: null, failed: false, released: false }],
+  word: 'held until cli-the-api-only-consumer-1sw7 succeeds',
   advice: '',
   waitingOnYou: false,
 };

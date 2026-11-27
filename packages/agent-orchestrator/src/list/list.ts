@@ -87,7 +87,8 @@ export type Listing = {
   waitingOnYou: string[];
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `nemia ls` says
-   * `held until <run> lands` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
+   * `held until <run> succeeds` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off;
+   * empty
    * on a hold that names no run, which a person alone lifts (`held until a person lifts it`).
    */
   holding?: Wait[];
@@ -168,7 +169,7 @@ export interface ListingInput {
   readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   readonly answers?: readonly RetryAsk[];
-  /** The runs this run waits on that have not landed (`waitsOf`): what its roots say where `waiting` would be. */
+  /** The runs this run waits on that have not succeeded (`waitsOf`): what its roots say where `waiting` would be. */
   readonly waits?: readonly Wait[];
   /**
    * How many times a person said something to each step's current try while it ran (`nemia say`), off the engine's `said` on its
@@ -215,8 +216,8 @@ export interface ListingInput {
    */
   readonly parkedOf?: (taskId: string) => { after?: string; cut?: string } | undefined;
   /**
-   * The runs a held run waits on to land, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
-   * the runs the hold names, each taken as one that may still land.
+   * The runs a held run waits on to succeed, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
+   * the runs the hold names, each taken as one that may still succeed.
    */
   readonly holds?: readonly Wait[];
   /**

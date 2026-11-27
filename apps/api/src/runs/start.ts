@@ -113,7 +113,7 @@ const startedOf = (started: Awaited<ReturnType<typeof runStarted>>) => ({
   ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
   ...(started.waitedOn !== undefined ? { waitedOn: [...started.waitedOn] } : {}),
   ...(started.paused !== undefined ? { paused: started.paused } : {}),
-  ...(started.landed !== undefined ? { landed: [...started.landed] } : {}),
+  ...(started.succeeded !== undefined ? { succeeded: [...started.succeeded] } : {}),
   ...(started.hints !== undefined ? { hints: [...started.hints] } : {}),
   ...(started.notMounted !== undefined ? { notMounted: [...started.notMounted] } : {}),
   ...(started.notVolumes !== undefined ? { notVolumes: [...started.notVolumes] } : {}),

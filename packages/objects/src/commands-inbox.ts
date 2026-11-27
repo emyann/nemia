@@ -72,7 +72,7 @@ export const INBOX_ADD_WORDS = {
     'park an idea as a card in the inbox, named from its first line;',
     'each --file is uploaded and carried by the card, as is each file',
     'beside an idea file that its text names as an image or a link;',
-    'each --after names a card it waits on, and it starts once they land',
+    'each --after names a card it waits on, and it starts once they have succeeded',
   ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),

@@ -27,7 +27,6 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { UnloadedFolder, unloadedFolder } from './steps.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
-import { NOTHING_READ, standingReader } from '../standing/standing.verb.ts';
 import { parentRecord, stepsOf, stepsOrNone, stepsOrWhy, unloadedOf } from './steps.verb.ts';
 
 /** `run`'s record with no frozen workflow, its folder `dir`: what a record written before `nemia start` froze one holds. */
@@ -129,17 +128,16 @@ test('stepsOrWhy: an unfrozen folder that does not load is answered with its rea
   assert.equal(failureOf(stepsOrWhy(unfrozen(path.join(root, 'workflows', 'dev')))) instanceof Invalid, true, 'no root is no reason');
 });
 
-test('parentRecord: a run waited on whose unfrozen folder does not load says why (unread), never a run with no branches', () => {
+test('parentRecord: a run waited on whose unfrozen folder does not load says why (unread), never a run that reads as missing', () => {
   const root = scratch('wf-steps-parent-');
   const run = unfrozen(path.join(root, 'workflows', 'gone'));
   const program = Effect.gen(function* () {
     yield* (yield* RunDoor).runs.create(run);
-    return yield* parentRecord(run.id, standingReader(NOTHING_READ));
+    return yield* parentRecord(run.id);
   });
   const known = Effect.runSync(Effect.provide(Effect.provideService(program, StoreRoot, root), runDoorMemory()));
   assert.equal(known.record?.id, run.id, 'the record is read');
   const refusal = failureOf(Effect.provideService(stepsOf(run), StoreRoot, root));
   assert.ok(refusal instanceof UnloadedFolder);
   assert.equal(known.unread, refusal.why, "the reason is the refusal's own, as stepsOrWhy keeps it");
-  assert.equal(known.gone, undefined, 'no branch is called gone');
 });

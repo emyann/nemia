@@ -116,10 +116,10 @@ export function validate(steps: readonly StepSpec[]) {
   const cycle = cycleRefusal(steps);
   if (cycle !== undefined) throw new WorkflowError(cycle);
 
+  validateWaits(steps);
   validateLoops(steps);
   validateRoutes(steps);
   validateCommands(steps);
-  validateWaits(steps);
   validateBaseChecks(steps);
 }
 

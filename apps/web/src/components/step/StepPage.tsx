@@ -10,7 +10,7 @@ import { RunGone } from '@/components/run/RunGone';
 import { agentsQuery } from '@/lib/api/agents';
 import { readGone } from '@/lib/api/gone';
 import { type Said } from '@/lib/api/asks';
-import { useRunView, type RunDetail, type StepView } from '@/lib/runView';
+import { runsNoSession, useRunView, type RunDetail, type StepView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { waitsAtGate, stepState } from '@/lib/status';
@@ -150,7 +150,12 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
  * empty shell carries (`SessionQuiet`); while it is still being read, the shape of its turns (`SessionReading`).
  */
 export function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
-  if (!step.taskId) return <SessionQuiet words="Not filed yet, so there is no session to show." />;
+  if (!step.taskId)
+    return (
+      <SessionQuiet
+        words={runsNoSession(step) ? 'It runs no session, so there is none to show.' : 'Not filed yet, so there is no session to show.'}
+      />
+    );
   if (!sessionToRead(step)) return <SessionQuiet words="No session of it has started yet, so there is no conversation to show." />;
   if (following.loading) return <SessionReading words="Reading the conversation…" />;
   if (turns.length || following.partial)

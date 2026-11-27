@@ -13,7 +13,7 @@ import { durationWords } from '@/lib/duration';
 import { isLive } from '@/lib/canvas';
 import { outcomeOf } from '@/lib/outcome';
 import { ranOnWords } from '@/lib/ranOn';
-import type { RunDetail, StepView } from '@/lib/runView';
+import { runsNoSession, type RunDetail, type StepView } from '@/lib/runView';
 import { stepState } from '@/lib/status';
 import type { StepPartModel } from '@/lib/stepPart';
 import { Approved, endsTheRun, gateWord } from '../../gate/Gate';
@@ -35,7 +35,10 @@ type Detail = Exclude<StepPartModel['detail'], 'none'>;
 function ShownTry({ step }: { step: StepView }) {
   const shown = step.tries.find((t) => t.try === step.shown);
   if (!shown) return null;
-  const outcome = outcomeOf(shown, step.taskId === null ? 'Not filed yet.' : 'No closeout yet.');
+  const outcome = outcomeOf(
+    shown,
+    step.taskId === null ? (runsNoSession(step) ? 'Runs no session.' : 'Not filed yet.') : 'No closeout yet.',
+  );
   return (
     <Body size="small" component="div" className="contents">
       <section aria-label="The try shown" data-shown-try={shown.try} className="space-y-1">
@@ -118,6 +121,12 @@ function FolderFiles({ step }: { step: StepView }) {
   );
 }
 
+/** What a step with no task says of itself: it runs no session, or it is not filed yet, and waits at its gate where it has one. */
+const unfiledWords = (step: StepView, live: boolean) => {
+  if (runsNoSession(step)) return 'runs no session: its conditions are its checks';
+  return step.approve && live ? 'not filed yet: it waits at its gate' : 'not filed yet';
+};
+
 /**
  * The step's facts: its sessions, when the latest began and ended and how long it took, what it ran on, what its current try used and
  * cost, what its sessions read, what every try cost together, where it worked, its task and its gate.
@@ -128,7 +137,7 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
     return (
       <>
         <Body size="small" colorRole="on-surface-variant" data-unfiled>
-          {step.approve && run.cancelledAt === null ? 'not filed yet: it waits at its gate' : 'not filed yet'}
+          {unfiledWords(step, run.cancelledAt === null)}
         </Body>
         {step.gate && <Facts rows={[['gate', gateWord(step.gate, endsTheRun(step))]]} />}
       </>

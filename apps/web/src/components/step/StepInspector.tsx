@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { agentsQuery } from '../../lib/api/agents';
-import type { RunDetail, StepView } from '../../lib/runView';
+import { runsNoSession, type RunDetail, type StepView } from '../../lib/runView';
 import { waitsAtGate, stepState } from '../../lib/status';
 import { foldTranscript, sessionToRead } from '../../lib/transcript';
 import { useStepTranscript, type Following } from '../../lib/useStepTranscript';
@@ -111,7 +111,12 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 
-  if (!step.taskId) return <p className="text-on-surface-variant">Not filed yet, so there is no conversation.</p>;
+  if (!step.taskId)
+    return (
+      <p className="text-on-surface-variant">
+        {runsNoSession(step) ? 'It runs no session, so there is no conversation.' : 'Not filed yet, so there is no conversation.'}
+      </p>
+    );
   if (!sessionToRead(step))
     return <p className="text-on-surface-variant">No session of it has started, so there is no conversation yet.</p>;
 

@@ -628,6 +628,7 @@ describe('a wait node (`waitsFor:`): what loads, and what it refuses at load, na
           assert.ok(e instanceof WorkflowError, String(e));
           assert.equal(e.exitCode, 2, e.message);
           assert.ok(e.message.startsWith('ready: '), e.message);
+          assert.ok(e.message.includes('waitsFor'), e.message);
           return true;
         },
       );

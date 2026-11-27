@@ -2372,7 +2372,7 @@ first parent's workspace, and stands on its checks alone: `pending`, `checking`,
 written False. A False refuses it as any failed check does and the run waits on a person: `retries:` is refused at load, and
 `nemia retry --recheck` is a new try, whose conditions are written afresh, since a condition belongs to the try it was written for.
 It takes `after:`, `when:`, `gate:` and `place:`; load refuses any other key, an instruction, an empty or repeated list, `check:`
-beside it, and a place inside a loop's span. A factory hires no agent into it.
+beside it, and the node inside a loop's span. A factory hires no agent into it.
 
 ## Files a person gives the run: `wf start --input`
 

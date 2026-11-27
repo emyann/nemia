@@ -56,8 +56,12 @@ export const whatItRefuses = assume(closeoutRefusals, { pure: true });
 export const whereItsChecksStand = assume(checksPhase, { pure: true });
 
 const standingSpec = spec<Stands>({
-  /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
-  requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  /**
+   * The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). A wait node has its conditions laid as checks,
+   * since the loader refuses an empty list.
+   */
+  requires: ({ input: [step, run] }) =>
+    Object.hasOwn(run.steps, step.name) && (step.waitsFor === undefined || (step.checks?.length ?? 0) > 0),
   /**
    * Whether a step is held is left to the code where it turns on what `phaseOf`, `closeoutOf`, `askedCloseout`, `spendOf` and
    * `verdictOf` say: a blocked step whose session has settled, a check that refused, a looping step's round, an ending not
@@ -209,7 +213,8 @@ const ownStatusSpec = spec<
     spendOf: SpendOf,
   ) => StepStatus
 >({
-  requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  requires: ({ input: [step, run] }) =>
+    Object.hasOwn(run.steps, step.name) && (step.waitsFor === undefined || (step.checks?.length ?? 0) > 0),
   /**
    * Every status but pending turns on what `phaseOf`, `closeoutOf`, `askedCloseout` and `spendOf` say of its task, which the
    * verifier reads as answering anew on each call, so a law that asks one cannot say what the code was told; held by
@@ -248,9 +253,9 @@ const ownStatusSpec = spec<
       condition: ({ input: [step], output }) => output !== 'unverified' || !judgedByAnExit(step),
     },
     aCheckIsReadOnlyOfAStepWithOne: {
-      description: 'Verified, checking, or failed at its check only of a step that has a check, of a command node, or of a wait node',
+      description: 'Verified, checking, or failed at its check only of a step that has a check or of a command node',
       condition: ({ input: [step], output }) =>
-        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step) || waits(step),
+        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step),
     },
     deniedOnlyUnderDenialsFail: {
       description: 'Denied only of a step whose denials fail it',

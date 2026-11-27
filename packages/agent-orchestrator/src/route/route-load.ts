@@ -8,7 +8,7 @@ import { judgeRefusal, type JudgeFence } from './judge.ts';
  * Why a workflow's routing cannot run, or `undefined` where it closes (the design's §1, *What load refuses*): every `when:` waits on
  * exactly one condition and names its routes, and none it ends on (`whenRefusal`); every route is taken by a node or ended on, a table is
  * closed over its producer's enum and the condition's routes, and a condition cuts no workspace, has no check, files no try of its own and
- * spends no budget but a judge's (`conditionRefusal`); a workflow node files a card and nothing else (`workflowNodeRefusal`). The loops'
+ * spends no budget but a judge's (`conditionRefusal`); a workflow node starts a run and nothing else (`workflowNodeRefusal`). The loops'
  * own rule, that no span crosses a condition, is `validate`'s, beside the loops'. A judge's fence writes nothing (`judgeRefusal`, by
  * the fence's own judgement, which `validate` hands in), unless it is left to a hire.
  * @param steps The workflow's steps.

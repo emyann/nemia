@@ -93,7 +93,9 @@ export const gateNodeLine = (gate: Pick<GateAsk, 'step'>) => `approve ${gate.ste
 export function gateBrief(gate: GateAsk, next: readonly string[]) {
   const waits = `${gate.step} has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.`;
   const approving = `Approving files ${next.length ? next.join(', ') : 'nothing: no step waits on it'}${next.length ? `, handed ${gate.step}'s closeout and your words, if any` : ''}.`;
-  const sendingBack = `Sending back asks ${gate.step} for a new try, told your words; it waits at its gate again once it signs off.`;
+  const sendingBack = !gate.back.length
+    ? `There is nothing to send back: ${gate.step} waits on no step.`
+    : `Sending back asks ${gate.step} for a new try, told your words; it waits at its gate again once it signs off.`;
   return { waits, approving, sendingBack };
 }
 

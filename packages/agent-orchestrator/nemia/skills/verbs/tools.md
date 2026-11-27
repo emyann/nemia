@@ -1965,7 +1965,7 @@ Calls `GET /api/namespaces/:namespace/agents/:name`.
 
 Its arguments:
 
-- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- namespace (--namespace at a shell): The namespace the object is in: the name of its factory, default for one that names none.
 - name (<name> at a shell): The object's name, unique in its namespace for its kind.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
@@ -2008,7 +2008,7 @@ Calls `GET /api/namespaces/:namespace/skills/:name`.
 
 Its arguments:
 
-- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- namespace (--namespace at a shell): The namespace the object is in: the name of its factory, default for one that names none.
 - name (<name> at a shell): The object's name, unique in its namespace for its kind.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 

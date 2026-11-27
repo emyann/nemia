@@ -237,7 +237,12 @@ function unfiledLine(
   node: Frozen<GraphNode> | null | undefined,
   spec: { agent?: string | null; harness: string | null; model: string | null } | null,
 ) {
-  if (node?.kind === 'workflow' || node?.kind === 'command' || (node?.kind === 'condition' && !spec?.agent && taskId === null))
+  if (
+    node?.kind === 'workflow' ||
+    node?.kind === 'command' ||
+    node?.kind === 'wait' ||
+    (node?.kind === 'condition' && !spec?.agent && taskId === null)
+  )
     return 'runs no session';
   return taskId === null ? 'not filed yet' : 'no session yet';
 }
@@ -249,6 +254,7 @@ function nodeLine(
   if (node?.kind === 'workflow') return `files a card for ${node.workflow ?? 'a workflow'}`;
   if (node?.kind === 'condition' && !spec?.agent) return 'answers its route, no session';
   if (node?.kind === 'command') return spec?.agent ? `runs a command as ${spec.agent}, no session` : 'runs a command, no session';
+  if (node?.kind === 'wait') return 'waits on its conditions, no session';
   return spec ? runsOn(spec) : 'no spec';
 }
 

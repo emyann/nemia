@@ -35,6 +35,18 @@ type Stands = (
  */
 const judgedByAnExit = (step: StepSpec) => !!step.check || (step.checks?.length ?? 0) > 0 || step.run !== undefined;
 
+/**
+ * Whether a step is a wait node (`waitsFor:`): it runs no session and no command, and stands on its condition checks alone, which the
+ * loader lays as its `checks:` (one per name, waiting on nothing), as Kubernetes' readinessGates name the conditions a Pod waits on.
+ */
+const waits = (step: StepSpec) => step.waitsFor !== undefined;
+
+/**
+ * Whether anything of a step is filed for the try it is on: its task, or, for a wait node, which files no task, its checks laid on its
+ * record.
+ */
+const filed = (step: StepSpec, run: Run) => !!run.steps[step.name]?.taskId || (waits(step) && !!run.steps[step.name]?.check);
+
 export const overItsCap = assume(overBudget, { pure: true });
 export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
@@ -44,8 +56,12 @@ export const whatItRefuses = assume(closeoutRefusals, { pure: true });
 export const whereItsChecksStand = assume(checksPhase, { pure: true });
 
 const standingSpec = spec<Stands>({
-  /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
-  requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  /**
+   * The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). A wait node has its conditions laid as checks,
+   * since the loader refuses an empty list.
+   */
+  requires: ({ input: [step, run] }) =>
+    Object.hasOwn(run.steps, step.name) && (step.waitsFor === undefined || (step.checks?.length ?? 0) > 0),
   /**
    * Whether a step is held is left to the code where it turns on what `phaseOf`, `closeoutOf`, `askedCloseout`, `spendOf` and
    * `verdictOf` say: a blocked step whose session has settled, a check that refused, a looping step's round, an ending not
@@ -97,6 +113,10 @@ const standingSpec = spec<Stands>({
     overBudgetOnlyOnceFiled: {
       description: 'Over budget only where another session of it would be the way on: a step filed',
       condition: ({ input: [step, run], output }) => output.status !== 'over budget' || !!run.steps[step.name]?.taskId,
+    },
+    aWaitIsNeverOverBudget: {
+      description: 'A wait node spends nothing, since it runs no session: no budget holds it',
+      condition: ({ input: [step], output }) => !waits(step) || output.status !== 'over budget',
     },
     overBudgetOnlyOverACap: {
       description: 'Over budget only over its cap, or as a loop held by a step of it over its own',
@@ -193,7 +213,8 @@ const ownStatusSpec = spec<
     spendOf: SpendOf,
   ) => StepStatus
 >({
-  requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
+  requires: ({ input: [step, run] }) =>
+    Object.hasOwn(run.steps, step.name) && (step.waitsFor === undefined || (step.checks?.length ?? 0) > 0),
   /**
    * Every status but pending turns on what `phaseOf`, `closeoutOf`, `askedCloseout` and `spendOf` say of its task, which the
    * verifier reads as answering anew on each call, so a law that asks one cannot say what the code was told; held by
@@ -213,15 +234,26 @@ const ownStatusSpec = spec<
       condition: ({ output }) => output !== 'sent' && output !== 'skipped',
     },
     pendingExactlyUnfiled: {
-      description: 'A step is pending exactly while it has no task filed',
-      condition: ({ input: [step, run], output }) => (output === 'pending') === !run.steps[step.name]?.taskId,
+      description:
+        'A step is pending exactly while nothing of it is filed: no task, and for a wait node, which files none, no checks laid on its record',
+      condition: ({ input: [step, run], output }) => (output === 'pending') === !filed(step, run),
+    },
+    aWaitStandsOnlyOnItsConditions: {
+      description:
+        'A wait node runs no session and no command, so it is never running, unsigned, blocked, failed, stopped, denied, cut off at a budget nor out of rounds: it is pending, checking, verified, or refused at its check',
+      condition: ({ input: [step], output }) =>
+        !waits(step) || output === 'pending' || output === 'checking' || output === 'verified' || output === 'failed (check)',
+    },
+    aWaitIsJudgedByItsChecks: {
+      description: 'A wait node is never unverified: its conditions are checks, and only their verdict passes it',
+      condition: ({ input: [step], output }) => !waits(step) || output !== 'unverified',
     },
     unverifiedOnlyWithNoCheck: {
       description: 'Unverified only of a step with no check nor command: a step with one is verified, checking, or its check failed',
       condition: ({ input: [step], output }) => output !== 'unverified' || !judgedByAnExit(step),
     },
     aCheckIsReadOnlyOfAStepWithOne: {
-      description: 'Verified, checking, or failed at its check only of a step that has a check, or of a command node',
+      description: 'Verified, checking, or failed at its check only of a step that has a check or of a command node',
       condition: ({ input: [step], output }) =>
         (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step),
     },

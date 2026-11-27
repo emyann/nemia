@@ -41,7 +41,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine)
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, yield* asked('view', reader.view(taskId)));
     if (check) views.set(check.taskId, yield* asked('view', reader.view(check.taskId)));
-    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* asked('view', reader.view(t.taskId)));
+    for (const t of tries ?? []) if (t.taskId && !views.has(t.taskId)) views.set(t.taskId, yield* asked('view', reader.view(t.taskId)));
   }
   return views satisfies Views;
 });

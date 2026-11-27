@@ -8,7 +8,7 @@ import { parseCloseout } from '../closeout/index.ts';
 import type { TryCause } from '../retry/index.ts';
 
 /** A try of a step as a turn is read off it: its session's task, and what replaced it; `cause` absent on the step's current try. */
-export type TurnTry = { taskId: string; cause?: TryCause };
+export type TurnTry = { taskId: string | null; cause?: TryCause };
 
 /**
  * An attempt as a turn is read off it: its spawn, its end, the turn of a task held open the runtime stamped it with, and the closeout it

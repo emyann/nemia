@@ -4,7 +4,7 @@
  * each with the keys its own file writes and its own note, and its other files. Its `status` is what Nemia works out of it: where it was
  * found (`origin`), its description, its needs and its README's instruction, its typed graph (every node with its kind, decision 12),
  * each step resolved — its keys with its agent's, what its agent is told, the agent the factory hires into it,
- * its told layers and MCP servers — the schemas beside it, why a run of it cannot start in the factory, and the ledger's revision.
+ * its told layers and MCP servers — the schemas beside it, and why a run of it cannot start in the factory.
  *
  * Beside it, the bodies a write is sent (`WorkflowWrite`, `WorkflowCreate`). Plain Schemas of JSON, as every object of this package is.
  */
@@ -67,6 +67,7 @@ export const STEP_KEYS = [
   'workflow',
   'card',
   'relabel',
+  'waitsFor',
 ] as const;
 
 /** One of `STEP_KEYS`. */
@@ -147,6 +148,7 @@ export const STEP_KEY_FORM = {
   workflow: 'text',
   card: 'choice',
   relabel: 'list',
+  waitsFor: 'list',
 } as const satisfies { readonly [K in StepKey]: StepKeyForm };
 
 /** Each key a step has as the loader reads it, every one optional: a key added to `STEP_KEYS` without one does not typecheck. */
@@ -273,7 +275,7 @@ const stepKeyFields = {
   checks: Schema.optionalKey(
     Text.annotate({
       description:
-        "The step's named checks, each a name, a shell line (run), the checks it waits on (after) and, on an ending, usesCheckout: false where it reads nothing of the repository's own working tree, which is then handed to the next ending once every other check passed; written as a YAML list; exit 0 of every one makes the step verified.",
+        "The step's named checks, each a name, a shell line (run) or a condition it waits on (condition), and the checks it waits on (after); written as a YAML list; exit 0 of every one makes the step verified.",
     }),
   ),
   run: Schema.optionalKey(
@@ -338,6 +340,11 @@ const stepKeyFields = {
   relabel: Schema.optionalKey(
     Schema.NullOr(Strings).annotate({
       description: 'The label edits a backlog node files the card back with: key=value sets a key, key- removes it.',
+    }),
+  ),
+  waitsFor: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({
+      description: 'The conditions a wait node waits on: it runs no session and passes once each is written True for its try.',
     }),
   ),
 } satisfies { readonly [K in StepKey]: Schema.Top };

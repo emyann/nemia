@@ -975,6 +975,7 @@ const unset: WorkflowStepSpec = {
   workflow: null,
   card: null,
   relabel: null,
+  waitsFor: null,
 };
 
 test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no session", async () => {
@@ -2594,13 +2595,22 @@ test('what the run did not accept of a closeout is drawn under its words, each u
   assert.match(html, /<p [^>]*data-refused="true"/);
 });
 
-test('the step bar is one scroll and no tabs: the part whole, then its conversation under it', async () => {
+test("the step bar draws the step's card and no conversation, until its conversation is shown in the card's place", async () => {
   const { StepInspector } = await import('../src/components/step/StepInspector.tsx');
-  const html = await routedWith(createElement(StepInspector, { run: gatedRun(planCloseout), step: gatedRun(planCloseout).steps[0] }));
-  assert.doesNotMatch(html, /role="tab"/, 'no tabs');
-  assert.ok(html.indexOf('data-step-part="L"') >= 0, 'the part, whole');
-  assert.ok(html.indexOf('data-step-part="L"') < html.indexOf('aria-label="Its conversation"'), 'its conversation under it');
-  assert.match(html, /data-field="approach"/, 'what it gave is there without a press');
+  const run = gatedRun(planCloseout);
+  const card = await routedWith(
+    createElement(StepInspector, { run, step: run.steps[0], talk: false, said: false, onBack: () => undefined, onSaid: () => undefined }),
+  );
+  assert.doesNotMatch(card, /role="tab"/, 'no tabs');
+  assert.equal(card.match(/data-step-part="L"/g)?.length, 1, 'the part, whole');
+  assert.doesNotMatch(card, /^<div[^>]*data-cut-frame/, "drawn on the bar's frame, with no frame of its own");
+  assert.doesNotMatch(card, /aria-label="Its conversation"/, 'no conversation');
+  assert.match(card, /data-field="approach"/, 'what it gave is there without a press');
+  const talk = await routedWith(
+    createElement(StepInspector, { run, step: run.steps[0], talk: true, said: false, onBack: () => undefined, onSaid: () => undefined }),
+  );
+  assert.match(talk, /aria-label="Its conversation"/, 'its conversation, once shown');
+  assert.doesNotMatch(talk, /data-step-part=/, "in the card's place");
 });
 
 test("a gate in its step's part draws no closeout of its own: what it approves is the part's Said and Gave, each drawn once", async () => {

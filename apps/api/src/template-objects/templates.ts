@@ -6,7 +6,7 @@
  * A template's documents are its render with its parameters' defaults (`templateTree`, written once per digest), read as a factory's tree
  * is read: the request placed in a factory of the template's wiring whose tree is the render (`renderedIn`), then the definitions' own
  * readers of a tree (`treeWorkflowsHeld`, `treeAgentsHeld`, `treeSkillsHeld`), each held at origin `builtin`, in no namespace, with no
- * revision of the ledger's, which counts a definition by its bare name. A workflow is loaded in that factory, handed to the loader whole
+ * revision, which the index counts by a definition's bare name. A workflow is loaded in that factory, handed to the loader whole
  * since the store holds none of a template's, so each of its hires fills its step as in a factory applied from it. Each program runs over
  * the request's own services (`inRequest`), so the builtin folder and the folder of renders are the app's.
  */
@@ -91,7 +91,7 @@ export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
       listOrTable(
         answeredWrite(async (s) => {
           const at = await renderedIn(s, name);
-          return listed('Agent', await agentObjectsOf(at, servedOf(await treeAgentsHeld(at, 'builtin'), undefined)), queryOf(query));
+          return listed('Agent', agentObjectsOf(at.home, servedOf(await treeAgentsHeld(at, 'builtin'), undefined)), queryOf(query));
         }),
         agentTable,
       ),
@@ -100,7 +100,7 @@ export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
       answeredWrite(async (s) => {
         const at = await renderedIn(s, name);
         const one = servedNamed(await treeAgentsHeld(at, 'builtin'), doc, undefined, listPath(name, 'agents'));
-        return theOne(await agentObjectsOf(at, [one]), doc);
+        return theOne(agentObjectsOf(at.home, [one]), doc);
       }),
     )
     .handle('skills', ({ params: { name }, query }) =>

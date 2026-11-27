@@ -19,7 +19,7 @@ import {
 } from '../step/step.ts';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten } from '../check/index.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten, waitChecksOf } from '../check/index.ts';
 import { fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -139,11 +139,11 @@ export function parseWorkflow(
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
     : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), MAP_KEYS);
   meta = baseSpelled(placeSpelled(name, meta));
-  placeRequired(name, meta.place);
+  placedOrWaits(name, meta);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     refuseFenceBlock(name, fenced, meta.harness);
-    if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
+    bodiedOrWaits(name, own, meta);
     const step = stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
     if (meta.skills !== undefined)
       refuse(
@@ -341,6 +341,33 @@ function notAnAgent(step: string, name: string, there: readonly string[], hired:
   );
 }
 
+/** A step's `place:` as its file says it, which a wait node need not: it works in no place of its own (`placeRequired`). */
+function placedOrWaits(name: string, meta: Partial<Record<StepKey, string>>) {
+  if (meta.waitsFor === undefined) placeRequired(name, meta.place);
+}
+
+/** A step with no agent has something to say, which a wait node has not: it runs no session. */
+function bodiedOrWaits(name: string, own: string, meta: Partial<Record<StepKey, string>>) {
+  if (!own && meta.waitsFor === undefined) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
+}
+
+/**
+ * `waitsFor:`, the conditions a wait node waits on, as a list of names; refused beside `check:` or `checks:`, which it lays itself.
+ * @param name The step's name, which a refusal starts with.
+ * @param meta The step's keys as written.
+ */
+function waitsOf(name: string, meta: Partial<Record<StepKey, string>>) {
+  if (meta.waitsFor === undefined) return undefined;
+  if (meta.check !== undefined || meta.checks !== undefined)
+    refuse(
+      `${name}: \`waitsFor:\` lays the step's checks itself, one condition each, so it takes no \`${meta.check !== undefined ? 'check' : 'checks'}:\`. Delete that line, or delete \`waitsFor:\` to make it a step.`,
+    );
+  return meta.waitsFor
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
 /**
  * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
  * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it. `resume: x` adds `x` to
@@ -366,6 +393,7 @@ export function stepFrom(
     .map((s) => s.trim())
     .filter(Boolean);
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
+  const waits = waitsOf(name, meta);
   const harness = harnessOf(name, meta.harness);
   if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
   const output = merged ?? outputOf(name, meta.output, read);
@@ -402,7 +430,7 @@ export function stepFrom(
     memoryRequest: memoryRequestOf(name, meta.memoryRequest, meta.memory),
     budget: budgetOf(name, meta.budget),
     check: checkOf(name, meta.check),
-    checks: checksOf(name, meta.check, meta.checks),
+    checks: waitChecksOf(name, waits) ?? checksOf(name, meta.check, meta.checks),
     run: commandRunOf(name, meta.run),
     checkMemory: checkMemoryOf(name, meta.checkMemory, meta.check ?? meta.checks),
     retries: countOf(name, 'retries', meta.retries),
@@ -417,6 +445,7 @@ export function stepFrom(
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
     ...routingOf(name, meta),
+    ...(waits !== undefined && { waitsFor: waits }),
   } satisfies StepSpec;
 }
 
@@ -491,6 +520,7 @@ export function renderStep(step: StepDraft) {
       return (route === undefined ? [] : [['route', routeWritten(route)]]) satisfies FrontmatterPair[];
     }
     if (key === 'checks') {
+      if (step.waitsFor != null) return [] satisfies FrontmatterPair[];
       const checks = checksDrafted(step.name, step.checks);
       return (checks === undefined ? [] : [['checks', checksWritten(checks)]]) satisfies FrontmatterPair[];
     }

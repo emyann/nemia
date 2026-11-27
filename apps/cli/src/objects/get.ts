@@ -1,5 +1,6 @@
 /**
- * `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]`, as `kubectl get` reads it: the
+ * `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [--field-selector <term>] [-o json|yaml|name]`, as
+ * `kubectl get` reads it: the
  * word resolved among the resources discovery lists (`resourceFor`), then the kind called through its table (`KIND_CALLS`). A list is in
  * the namespace `-n` names, `default` where none is typed, or across all with `-A`, where the api lists the kind across all; a kind no
  * namespace holds is listed whole. One object by its name is read in the namespace `-n` names, else across all by its store-wide name
@@ -29,16 +30,18 @@ type GetAsked = {
   namespace: string | undefined;
   all: boolean;
   selector: string[];
+  fieldSelector: string | undefined;
   output: Output;
 };
 
-const GET_HELP = `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]
+const GET_HELP = `nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [--field-selector <term>] [-o json|yaml|name]
 
 Read the objects of a resource the api serves, or one by its name. The resources are those \`nemia explain\` names.
 
   -n, --namespace <namespace>  the namespace (a factory) to read in; default where none is typed
   -A, --all-namespaces         list across every namespace, where the api lists the kind across all
   -l, --selector <selector>    a label selector (team=core), given again for another, of which one must take an object
+      --field-selector <term>  runs only: the runs in one state or outcome (status.state!=finished)
   -o, --output <format>        json, yaml (each read back by nemia apply -f) or name; a table where none is typed
 `;
 
@@ -70,6 +73,7 @@ function optionsOf(args: readonly string[], out: GetAsked) {
       const value = valueOf(args, at++, arg);
       if (arg === '-n' || arg === '--namespace') out.namespace = value;
       else if (arg === '-l' || arg === '--selector') out.selector.push(value);
+      else if (arg === '--field-selector') out.fieldSelector = value;
       else if (arg === '-o' || arg === '--output') out.output = outputOf(value);
       else throw new Refused(`nemia get: ${arg} is no option of get; see \`nemia get --help\``);
     }
@@ -79,7 +83,15 @@ function optionsOf(args: readonly string[], out: GetAsked) {
 
 /** What `args` ask of `get`. */
 function parsed(args: readonly string[]) {
-  const out: GetAsked = { word: '', name: undefined, namespace: undefined, all: false, selector: [], output: 'table' };
+  const out: GetAsked = {
+    word: '',
+    name: undefined,
+    namespace: undefined,
+    all: false,
+    selector: [],
+    fieldSelector: undefined,
+    output: 'table',
+  };
   const [first, second, ...more] = optionsOf(args, out);
   if (first === undefined) throw new Refused('nemia get: name a resource, `nemia get <resource>`; the resources are in `nemia explain`');
   const [word = '', slashed, ...deeper] = first.split('/');
@@ -165,13 +177,20 @@ const noneFound = (resource: APIResource, typed: GetAsked) => {
   return `No ${resource.name} found${where}${matching}.`;
 };
 
+/** Refuses a `--field-selector` on a resource that is not runs, naming the one that takes it. */
+const refuseFieldSelector = (resource: APIResource, typed: GetAsked) => {
+  if (typed.fieldSelector !== undefined && resource.kind !== 'Run')
+    throw new Refused(`nemia get: --field-selector is read of runs only: \`nemia get runs --field-selector status.state!=finished\``);
+};
+
 /** The objects of `resource`, in a namespace or across all, printed as `typed` asks. */
 async function getList(resource: APIResource, typed: GetAsked) {
+  refuseFieldSelector(resource, typed);
   const calls = KIND_CALLS[resource.kind];
   const call =
     !resource.namespaced || typed.all
-      ? calls.list.all?.(typed.selector)
-      : calls.list.in?.(typed.namespace ?? DEFAULT_NAMESPACE, typed.selector);
+      ? calls.list.all?.(typed.selector, typed.fieldSelector)
+      : calls.list.in?.(typed.namespace ?? DEFAULT_NAMESPACE, typed.selector, typed.fieldSelector);
   if (call === undefined)
     throw new Refused(
       `nemia get: the api lists ${resource.name} in one namespace at a time: \`nemia get ${resource.name} -n <namespace>\``,

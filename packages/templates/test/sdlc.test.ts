@@ -79,14 +79,15 @@ const chained = (at: string, checks: readonly { name?: unknown; run?: unknown; a
 
 /**
  * The check of the step `workflow/step` of `tree`: its `check:`; or its `checks:` as one line, each joined to the one before it by `&&`,
- * the order the pass runs sdlc's chained checks in; or a command node's `run:`, which runs with the same frozen folders.
+ * the order the pass runs sdlc's chained checks in, the conditions a program writes left out; or a command node's `run:`, which runs with
+ * the same frozen folders.
  */
 const checkOf = (tree: string, workflow: string, step: string) => {
   const { front } = stepIn(tree, workflow, step);
   const checks = typeof front.checks === 'string' ? (JSON.parse(front.checks) as unknown) : front.checks;
   if (Array.isArray(checks))
     return chained(`${workflow}/${step}`, checks)
-      .map((c) => String(c.run ?? ''))
+      .flatMap((c) => (c.run === undefined ? [] : [String(c.run)]))
       .join(' && ');
   return String(front.check ?? front.run ?? '');
 };
@@ -145,14 +146,12 @@ test('applied with every parameter set, each is written where the template says,
   const tree = treeOf('set');
   const build = checkOf(tree, 'build', 'implement');
   assert.ok(build.includes('{ echo round; }'), build);
-  assert.match(build, ciCheck('gate'));
-  assert.match(checkOf(tree, 'quick', 'implement'), ciCheck('gate'));
+  for (const workflow of ['build', 'quick']) assert.match(checkOf(tree, workflow, 'land'), ciCheck('gate'), `${workflow}/land's receipt`);
   for (const workflow of ['build', 'quick'])
     assert.ok(
       checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix"; fi && '),
       `${workflow}/implement labels by the rules set`,
     );
-  for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('gate'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(true)), `${workflow}/${step} branches on GitHub:\n${check}`);
@@ -173,14 +172,70 @@ test('applied with every parameter set, each is written where the template says,
   );
 });
 
+/**
+ * The enabled `checks:` of the step `workflow/step` of `tree`, as its frontmatter holds them: each a name and a `run` line or a
+ * `condition`.
+ */
+const checksIn = (tree: string, workflow: string, step: string) => {
+  const { front } = stepIn(tree, workflow, step);
+  const checks = typeof front.checks === 'string' ? (JSON.parse(front.checks) as unknown) : front.checks;
+  const all = (Array.isArray(checks) ? checks : []) as { name: string; run?: string; condition?: string; enabled?: unknown }[];
+  return all.filter((c) => c.enabled !== false && c.enabled !== 'false');
+};
+
+/** The factory program `name` of `tree`, as the rendered wiring holds it: its `run:` line and the conditions it writes. */
+const programIn = (tree: string, name: string) => {
+  const wiring = JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')) as {
+    programs?: Record<string, { run: string; writes: string[] }>;
+  };
+  const program = wiring.programs?.[name];
+  assert.ok(program, `${name} is in the tree's wiring`);
+  return program;
+};
+
+test('on GitHub the round and the landing wait on the conditions the ci-watch program writes, with no check that waits on CI; in the checkout they wait on none', () => {
+  const set = treeOf('set');
+  const program = programIn(set, 'ci-watch');
+  assert.deepEqual(program.writes, ['ci', 'base-ci']);
+  assert.ok(program.run.includes('ci-watch.ts" --check "gate" --wait-on-ci "true"'), program.run);
+  for (const workflow of ['build', 'quick']) {
+    const implement = checksIn(set, workflow, 'implement');
+    assert.deepEqual(
+      implement.slice(-2).map((c) => [c.name, c.condition]),
+      [
+        ['local', undefined],
+        ['ci', 'ci'],
+      ],
+      `${workflow}/implement ends on the local check, then the ci condition`,
+    );
+    const land = checksIn(set, workflow, 'land');
+    assert.deepEqual(
+      land.map((c) => [c.name, c.condition]),
+      [
+        ['ci', 'ci'],
+        ['receipt', undefined],
+        ['base-ci', 'base-ci'],
+      ],
+    );
+    for (const c of [...implement, ...land].filter((c) => c.run !== undefined))
+      assert.doesNotMatch(c.run ?? '', /pull-request\.ts" wait|landing\.ts" base-ci/, `${workflow}: ${c.name} waits on no CI`);
+  }
+  const plain = treeOf('plain');
+  for (const workflow of ['build', 'quick'])
+    assert.deepEqual(
+      [...checksIn(plain, workflow, 'implement'), ...checksIn(plain, workflow, 'land')].filter((c) => c.condition !== undefined),
+      [],
+      `${workflow}: no condition is waited on where github is false`,
+    );
+});
+
 test('applied with no --set, each parameter takes its default', () => {
   const tree = treeOf('plain');
+  assert.match(programIn(tree, 'ci-watch').run, ciCheck('ci'), 'the ci-watch program reads the default CI context');
   const build = checkOf(tree, 'build', 'implement');
   assert.ok(build.includes('{ npm run --if-present lint && npm run --if-present typecheck; }'), build);
-  assert.match(build, ciCheck('ci'));
   for (const workflow of ['build', 'quick'])
     assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels ""; fi && '), `${workflow}/implement labels nothing by default`);
-  for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('ci'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(false)), `${workflow}/${step} is in the checkout by default:\n${check}`);

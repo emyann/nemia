@@ -3,7 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, type StepSpec, WorkflowError } from '../step/step.ts';
+import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, STEP_KEYS, type StepSpec, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -116,10 +116,10 @@ export function validate(steps: readonly StepSpec[]) {
   const cycle = cycleRefusal(steps);
   if (cycle !== undefined) throw new WorkflowError(cycle);
 
+  validateWaits(steps);
   validateLoops(steps);
   validateRoutes(steps);
   validateCommands(steps);
-  validateBaseChecks(steps);
 }
 
 /**
@@ -138,6 +138,12 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
   ['card', 'a card node files a card and runs nothing'],
   ['loop', 'it asks for no round'],
 ];
+
+/**
+ * The keys a wait node (`waitsFor:`) takes: when it waits, what it waits on, where it stands and whether a person approves it. `checks` is
+ * its conditions, laid by the loader.
+ */
+const WAIT_TAKES: readonly string[] = ['name', 'body', 'after', 'when', 'gate', 'place', 'waitsFor', 'checks'];
 
 /**
  * Refused: a command node (`run:`) with a key it cannot take (`COMMAND_REFUSED`), an instruction of its own, or no `agent:`. A command acts
@@ -165,16 +171,27 @@ function validateCommands(steps: readonly StepSpec[]) {
 }
 
 /**
- * Refused: a check that says it uses no checkout (`usesCheckout: false`) on a step that is no ending. Only an ending works in the
- * repository's own checkout, which a check gives back to the next ending by saying so; a step in a worktree the run owns holds nothing.
+ * Refused: a wait node (`waitsFor:`) with a key but the four it takes (`after`, `when`, `gate`, `place`), or an instruction of its own, or
+ * inside a loop's span. It runs no session and no command, and the conditions are its checks, so a key of a session, a command, a retry or
+ * a budget would mean nothing to it. A loop round files its span again, and a wait node's conditions belong to the try they were written
+ * for, so a round of it is not built yet.
  */
-function validateBaseChecks(steps: readonly StepSpec[]) {
+function validateWaits(steps: readonly StepSpec[]) {
+  const inLoop = new Set(steps.filter((s) => s.loop).flatMap((s) => loopSpan(steps, s)));
   for (const s of steps) {
-    if (endsOnBase(s)) continue;
-    const free = stepChecks(s).find((c) => c.usesCheckout === false);
-    if (free)
+    if (s.waitsFor === undefined) continue;
+    const refused = STEP_KEYS.find((key) => !WAIT_TAKES.includes(key) && s[key] !== undefined);
+    if (refused)
       throw new WorkflowError(
-        `${s.name}: the check \`${free.name}\` says \`usesCheckout: false\`, which gives the repository's own checkout back to the next ending, and this step is no ending (\`workspace: base\`): it works in a worktree of its own and holds no checkout. Delete the line.`,
+        `${s.name}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${refused}:\`. Delete the \`${refused}:\` line, or the \`waitsFor:\` line to make it a step.`,
+      );
+    if (s.body.trim())
+      throw new WorkflowError(
+        `${s.name}: a wait node (\`waitsFor:\`) runs no session, so nothing reads an instruction: empty ${s.name}.md below its frontmatter, or delete \`waitsFor:\` to make it a step.`,
+      );
+    if (inLoop.has(s.name))
+      throw new WorkflowError(
+        `${s.name}: a wait node (\`waitsFor:\`) cannot sit in a loop's span, since a round files its steps again and its conditions belong to one try. Move it after the loop.`,
       );
   }
 }
@@ -210,14 +227,14 @@ function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
 
 /**
  * The ways a step cannot run in the repository's own checkout (`workspace: base`): it is not the workflow's last step, or its `check:`
- * is nobody's to file (`unfilableCheck`).
+ * is nobody's to file (`unfilableCheck`). A wait node is left to `validateWaits`, which refuses its `workspace:`.
  *
  * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
  * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
  */
 function validateBaseWorkspace(steps: readonly StepSpec[]) {
-  for (const s of steps.filter((x) => endsOnBase(x))) {
+  for (const s of steps.filter((x) => x.waitsFor === undefined && endsOnBase(x))) {
     const named = `${s.name}: \`workspace: base\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
     if (waiting.length) {
@@ -245,8 +262,9 @@ function validateBaseWorkspace(steps: readonly StepSpec[]) {
  * rather than one of the two guessed.
  */
 function validateFolder(steps: readonly StepSpec[]) {
-  const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
-  const not = steps.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
+  const placed = steps.filter((s) => s.waitsFor === undefined);
+  const folder = placed.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
+  const not = placed.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
   if (!folder.length || !not.length) return;
   throw new WorkflowError(
     `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`place: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'work' : 'works'} on a repository, as \`place: git\` — every step of a team says \`place: folder\`, or none does.` +

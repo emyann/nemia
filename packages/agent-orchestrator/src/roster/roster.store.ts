@@ -23,6 +23,7 @@ import {
   emptyReading,
   unreadReading,
   type AgentCopiedFrom,
+  type AgentRevisions,
   type AgentPlace,
   type AgentReading,
   type AgentsRead,
@@ -31,9 +32,10 @@ import {
 
 /**
  * Where agents are read: the repository `repo`, none where there is none (an install with no factory named), and the store `home` that
- * holds yours.
+ * holds yours. A reading's `version` is the agent's revision in `namespace`, none for the library's, as `revisions` number it: the
+ * definition index's table, read once by the caller (a store reads no index).
  */
-export type Readings = { repo: string | undefined; home: string };
+export type Readings = { repo: string | undefined; home: string; namespace?: string | undefined; revisions: AgentRevisions };
 
 /** An agent read through the Agent door, or the door's refusal of it in its own words: a file that does not read, a name that is none. */
 type Read = Agent | Refusal;
@@ -155,10 +157,15 @@ function copiedOf(home: string, name: string) {
  * folder. A file that does not read is answered with its lines as written (`unreadReading`), so what is wrong can be put right in a form.
  * An agent the door holds with no file to read (its memory) is answered from what the door read, its `source` empty.
  */
-export const agentRead = Effect.fn('agentRead')(function* (from: AgentPlace, dir: string, name: string, { repo, home }: Readings) {
+export const agentRead = Effect.fn('agentRead')(function* (
+  from: AgentPlace,
+  dir: string,
+  name: string,
+  { repo, home, namespace, revisions }: Readings,
+) {
   const found = yield* agentSkillsFound(dir, repo, home);
-  const version = yield* versionOf(name, dir, found);
-  if (version === null) return null;
+  if ((yield* versionOf(name, dir, found)) === null) return null;
+  const version = String(revisions.of('Agent', namespace, name));
   const file = path.join(dir, `${name}.md`);
   const usedBy = agentUsers(path.dirname(dir), name).map((user) => {
     const [workflow, step] = user.split('/') as [string, string];
@@ -210,12 +217,12 @@ export const agentRead = Effect.fn('agentRead')(function* (from: AgentPlace, dir
 });
 
 /** Every agent of both places, the repository's then yours, each by name and read now through the Agent door; and the places' folders. */
-export const agentsRead = Effect.fn('agentsRead')(function* ({ repo, home }: Readings) {
+export const agentsRead = Effect.fn('agentsRead')(function* ({ repo, home, namespace, revisions }: Readings) {
   const places = agentPlaces(repo, home);
   const agents: AgentReading[] = [];
   for (const { from, dir } of places)
     for (const name of yield* namesIn(dir)) {
-      const read = yield* agentRead(from, dir, name, { repo, home });
+      const read = yield* agentRead(from, dir, name, { repo, home, namespace, revisions });
       if (read !== null) agents.push(read);
     }
   return { agents, places } satisfies AgentsRead;
@@ -225,10 +232,13 @@ export const agentsRead = Effect.fn('agentsRead')(function* ({ repo, home }: Rea
  * The agent `name`'s card, from `from` when it is given and otherwise the first place that has it: refused as `findAgent` refuses, and as
  * the package refuses a card it cannot make (`cardSkills`).
  */
-export const agentCardRead = Effect.fn('agentCardRead')(function* (name: string, { repo, home, from }: Readings & { from?: AgentPlace }) {
+export const agentCardRead = Effect.fn('agentCardRead')(function* (
+  name: string,
+  { repo, home, from, namespace, revisions }: Readings & { from?: AgentPlace },
+) {
   const found = yield* findAgent(name, repo, home, from);
   const skills = yield* agentSkillsFound(found.dir, repo, home);
-  const version = (yield* versionOf(name, found.dir, skills)) ?? '';
+  const version = String(revisions.of('Agent', namespace, name));
   const card = yield* fromThrow(() => cardSkills(found.agent, skills));
   return { from: found.from, card: agentCard(found.agent, version, card) } satisfies CardRead;
 });

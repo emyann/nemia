@@ -163,7 +163,7 @@ export const closeoutsAfterMerge = Effect.fnUntraced(function* (
   signedOff: (step: string) => Closeout | undefined,
 ) {
   const before = step.loop && merged(run.steps[step.name]) ? run.steps[step.name]?.tries?.at(-1) : undefined;
-  const said = before ? (yield* asked('view', e.view(before.taskId))).state.attempts.at(-1)?.closeout : undefined;
+  const said = before?.taskId ? (yield* asked('view', e.view(before.taskId))).state.attempts.at(-1)?.closeout : undefined;
   const own = said === undefined ? undefined : parseCloseout(said);
   return (name: string) => (own && name === step.name && !('error' in own) ? own : signedOff(name)) satisfies Closeout | undefined;
 });

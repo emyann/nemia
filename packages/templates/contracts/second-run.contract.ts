@@ -1,6 +1,7 @@
 /**
  * Whether a red CI context is worth a second run before the step that waits on it hears of it (`packages/templates/sdlc/carried/ci-log.ts`,
- * `toldOf` and `rerunDue`, which `pull-request.ts`'s wait asks before it re-runs a red once). A red job is told apart by what GitHub and
+ * `toldOf` and `rerunDue`, which `ci-watch.ts` asks of a red head before it re-runs it once: `Red`, `contracts/ci-write.contract.ts`). A
+ * red job is told apart by what GitHub and
  * its own log say of it: a failure whose log names a line that failed it — a test, a type error, a lint rule, a runner's failed subject,
  * as `failures` reads a log — is the change's, and a second run of the same commit would fail it again; any other red (timed out,
  * started up wrong, a failure whose log names no such line: an install, a network step, a runner lost) is the machine's, and a failure

@@ -140,7 +140,7 @@ function tasksOf(record: Run['steps'][string]) {
     ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
     ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
     ...(record.tries ?? []).flatMap((t) => [
-      { taskId: t.taskId, metric: 'try' as const },
+      ...(t.taskId ? [{ taskId: t.taskId, metric: 'try' as const }] : []),
       ...(t.check ? [{ taskId: t.check.taskId, metric: 'check' as const }] : []),
     ]),
   ];
@@ -309,8 +309,8 @@ function triesOf(record: Run['steps'][string]) {
   const tries = [...(record.tries ?? []), ...(record.taskId ? [{ taskId: record.taskId, check: record.check }] : [])];
   const seen = new Set<string>();
   return tries.flatMap((t, i) => {
-    const session = seen.has(t.taskId) ? [] : [{ taskId: t.taskId, try: i + 1, check: false }];
-    seen.add(t.taskId);
+    const session = !t.taskId || seen.has(t.taskId) ? [] : [{ taskId: t.taskId, try: i + 1, check: false }];
+    if (t.taskId) seen.add(t.taskId);
     return [...session, ...(t.check ? [{ taskId: t.check.taskId, try: i + 1, check: true }] : [])];
   });
 }

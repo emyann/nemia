@@ -3,7 +3,7 @@
  * door at the factory's tree, judged as `nemia workflows write factory` judges it (`factoryWriteOf`); an Agent and a Skill through their
  * doors at the tree; a Hire and the Factory's attached workflows through `wire`, judged by `wiringRefusal`; an McpServer, the rules and the
  * instruction through the Factory door, so a Factory's spec is written through the doors alone. Answers the revision it made:
- * `<resource>/<name>#<n>`, the ledger's number, for a kind the ledger counts, else `<resource>/<name>`.
+ * `<resource>/<name>#<n>`, the definition's revision, for a kind the index counts, else `<resource>/<name>`.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -30,8 +30,7 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt, workflowSpecReadme } from '../folder/folder.store.ts';
 import { stepDraftOf } from '../propose/index.ts';
-import { definitionRevision } from '../revisions/revisions.store.ts';
-import type { RevisionKind } from '../revisions/revisions.ts';
+import { definitionRevisionNow, definitionsSwept } from '../definition-index/definition-index.store.ts';
 import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
@@ -64,14 +63,21 @@ const agentDraftOf = (name: string, spec: AgentSpec) => ({
 const digestNow = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.map(contentNow(place, factory, object.kind, object.metadata.name), (now) => now.version ?? undefined);
 
-/** The revision a write of `kind`'s `name` at `version` made, the ledger's number. */
-const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
-  Effect.map(
-    definitionRevision(kind, object.metadata.name, version),
-    (n) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}#${n}`,
+/**
+ * The revision a write of the factory's definition made: the index swept, then the revision the definition stands at.
+ * @param kind What the definition is.
+ * @param factory The factory it is written in, the namespace it is served in.
+ * @param object The object the proposal writes.
+ */
+const counted = (kind: 'Agent' | 'Skill' | 'Workflow', factory: string, object: ProposedObject) =>
+  Effect.flatMap(definitionsSwept(), () =>
+    Effect.map(
+      definitionRevisionNow(kind, factory, object.metadata.name),
+      (n) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}#${n}`,
+    ),
   );
 
-/** The revision of a kind the ledger does not count. */
+/** The revision of a kind the index does not count. */
 const uncounted = (object: ProposedObject) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;
 
 /** The agents' folder of a factory's tree, `workflows/agents/`, as its files' paths in the tree begin. */
@@ -131,7 +137,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
     }
     const spec = object.spec as WorkflowSpec;
     const readme = workflowSpecReadme(dir, spec);
-    const saved = yield* agentsFoundIn(
+    yield* agentsFoundIn(
       against,
       door.write(
         dir,
@@ -145,7 +151,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
         fills,
       ),
     );
-    return yield* counted('workflow', object, saved.version);
+    return yield* counted('Workflow', factory, object);
   });
 
 /** An Agent of the factory's tree written or removed, the result schema its spec's `output` carries written beside it. */
@@ -159,12 +165,12 @@ const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObj
       return uncounted(object);
     }
     const spec = object.spec as AgentSpec;
-    const written = yield* door.write(name, agentDraftOf(name, spec), yield* digestNow(place, factory, object), {
+    yield* door.write(name, agentDraftOf(name, spec), yield* digestNow(place, factory, object), {
       dir,
       anywhere: true,
       ...(spec.output !== undefined && { schema: spec.output }),
     });
-    return yield* counted('agent', object, written.version);
+    return yield* counted('Agent', factory, object);
   });
 
 /**
@@ -175,14 +181,14 @@ const skillWritten = (place: ProposalPlace, factory: string, object: ProposedObj
   Effect.gen(function* () {
     const at = yield* treeDir(place.home, factory, 'skills');
     const { files, ...spec } = object.spec as SkillSpec;
-    const written = yield* (yield* SkillDoor).skills.write(
+    yield* (yield* SkillDoor).skills.write(
       SkillName.read(object.metadata.name),
       { name: object.metadata.name, ...spec, ...(files !== undefined && { files }) },
       yield* digestNow(place, factory, object),
       at,
       { anywhere: true },
     );
-    return yield* counted('skill', object, written.version);
+    return yield* counted('Skill', factory, object);
   });
 
 /** A Hire written: the agent hired into its step, or the step's hire taken back where it names none or is removed. */

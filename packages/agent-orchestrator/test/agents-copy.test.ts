@@ -45,7 +45,8 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 
 /** `nemia agents`' reading of `repo` and the store `home`, through the Agent and Skill doors at that store's root. */
-const agentsRead = (at: { repo: string; home: string }) => Effect.runSync(agentsReadAt(at).pipe(Effect.provideService(StoreRoot, at.home)));
+const agentsRead = (at: { repo: string; home: string }) =>
+  Effect.runSync(agentsReadAt({ ...at, revisions: { of: () => 1 } }).pipe(Effect.provideService(StoreRoot, at.home)));
 
 /**
  * The fixture repository: `.claude/agents/` with `scout` and `counted`, `workflows/agents/` with `planner`, and a planted `docs/agents/`.

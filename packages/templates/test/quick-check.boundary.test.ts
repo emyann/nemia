@@ -21,7 +21,7 @@ import { loadWorkflows } from 'agent-orchestrator';
 import { checkArgv } from 'agent-orchestrator/run';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
-import { type Rule, bareOrigin, ghIn, passing, rollup } from './origin.ts';
+import { type Rule, bareOrigin, ghIn, passing } from './origin.ts';
 
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
@@ -38,11 +38,12 @@ type Rendered = { tree: string; store: string };
 
 /** The steps of the rendered tree's `workflow`, read as a start of it in the factory reads them: with the factory's hires. */
 /**
- * A step's checks as one shell line, each joined to the one before it by `&&`: the order the pass runs sdlc's chained checks in, each
+ * A step's checks as one shell line, each joined to the one before it by `&&`: the order the pass runs sdlc's chained checks in, the
+ * conditions a program writes left out, each
  * filed only once the one above it passed, so the line refuses where the first refusing check would; the step's `check:` where it has one.
  */
 const chainOf = (step: { check?: string; checks?: readonly { run?: string | undefined }[] } | undefined) =>
-  step?.checks ? step.checks.map((c) => c.run).join(' && ') : step?.check;
+  step?.checks ? step.checks.flatMap((c) => (c.run === undefined ? [] : [c.run])).join(' && ') : step?.check;
 
 function stepsOf(at: Rendered, workflow: string) {
   const { hires } = JSON.parse(fs.readFileSync(path.join(at.tree, 'factory.json'), 'utf8')) as { hires: Record<string, string> };
@@ -244,7 +245,6 @@ function shipped(
       ...gh.env(),
       WF_ARTIFACTS: files,
       WF_CLOSEOUT: closeoutFile(closeout),
-      WF_CI_POLL_SECONDS: '0',
       ...more,
     }),
     encoding: 'utf8',
@@ -298,7 +298,6 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
     /no live probe of run r-1/,
     /nemia parts: run r-1 has no branch but/,
     /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/,
-    /nemia ci: `ci` passed on/,
   ];
   const printed = (ran: Ran) => PRINTS.map((line) => ran.out.search(line));
 
@@ -321,7 +320,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
   assert.match(probing.err, /cannot tell which probes are live/);
   assert.deepEqual(
     printed(probing).map((at) => at >= 0),
-    [true, false, false, false, false],
+    [true, false, false, false],
     'the probes are read second, after the size',
   );
 
@@ -334,7 +333,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
   assert.match(unsettled.err, /nemia parts: `wf\/r-1\/p1`/);
   assert.deepEqual(
     printed(unsettled).map((at) => at >= 0),
-    [true, true, false, false, false],
+    [true, true, false, false],
     'the parts are read third, after the probes, and a part left out refuses before anything is pushed',
   );
   git(repo, 'branch', '-D', 'wf/r-1/p1');
@@ -344,23 +343,11 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
   assert.match(unopened.err, /no open pull request has wf\/r-1\/run as its head/);
   assert.deepEqual(
     printed(unopened).map((at) => at >= 0),
-    [true, true, true, false, false],
+    [true, true, true, false],
     'the branch is pushed fourth, after the parts are read',
   );
 
-  const red = run(signed, {}, [
-    ...passing(repo).filter((rule) => rule.when !== 'pr view'),
-    { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
-  ]);
-  assert.notEqual(red.code, 0, red.out);
-  assert.match(red.err, /`ci` for #7 is failure/);
-  assert.ok(red.err.includes('nemia retry r-1 implement --recheck'), red.err);
-  assert.deepEqual(
-    printed(red).map((at) => at >= 0),
-    [true, true, true, true, false],
-    'CI is waited on last',
-  );
-  for (const refused of [probing, unsettled, unopened, red]) assert.deepEqual(refused.said, []);
+  for (const refused of [probing, unsettled, unopened]) assert.deepEqual(refused.said, []);
 });
 
 test("REFUSED at shipped defaults, in the checkout: implement's check runs the size, the probes, the parts and the local check, in that order, pushes nothing and calls no gh", () => {
@@ -421,7 +408,6 @@ test("the factory's own check, set, runs after the parts and before the push or 
       env: envOf(repo, base, bin, {
         ...gh.env(),
         WF_CLOSEOUT: closeoutFile({ plan: 'p' }),
-        WF_CI_POLL_SECONDS: '0',
         WF_WORKFLOW_FILES: path.join(OWN_RENDERED[way].tree, 'workflows', 'quick'),
         WF_CARRIED_FILES: path.join(OWN_RENDERED[way].tree, 'workflows', 'carried'),
       }),
@@ -438,7 +424,7 @@ test("the factory's own check, set, runs after the parts and before the push or 
     /own check ran for r-1/,
   ];
   const PRINTS = {
-    github: [...ahead, /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/, /nemia ci: `ci` passed on/],
+    github: [...ahead, /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/],
     local: [...ahead, /local check ran/],
   };
   for (const way of ['github', 'local'] as const) {
@@ -560,9 +546,6 @@ test("REFUSED: no base to measure from, and a verb the script has not, each a pe
 const OWN_SAID =
   "the\\s+factory's\\s+own\\s+check,\\s+its\\s+`implementCheck`\\s+parameter(?:\\s+\\(`\\$\\{\\{ parameters\\.implementCheck \\}\\}`;\\s+`true`\\s+checks\\s+nothing\\))?";
 
-/** The wait's flag, which a carried README, never rendered, says as `wait --check <name>`. */
-const WAIT_FLAG = '(?:\\s+--check\\s+<name>)?';
-
 test("REFUSED: a note or a README that says a bound on the size, or other clauses than the check's", () => {
   const said = (file: string) => fs.readFileSync(path.join(QUICK, file), 'utf8');
   const bound = /at\s+most\s+(?:\*\*)?\d+\s+(?:lines|files)/;
@@ -573,18 +556,11 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   const clauses = [
     ...check.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size|tests|pages|push|declares-ci|wait)?/g),
   ].map(([, script, verb]) => (verb ? `${script} ${verb}` : script));
-  assert.deepEqual(clauses, [
-    'change.ts size',
-    'probe.ts',
-    'parts.ts',
-    'pull-request.ts push',
-    'pull-request.ts declares-ci',
-    'pull-request.ts wait',
-  ]);
+  assert.deepEqual(clauses, ['change.ts size', 'probe.ts', 'parts.ts', 'pull-request.ts push', 'pull-request.ts declares-ci']);
   assert.equal(local, '; else { node "$WF_CARRIED_FILES/local-check.ts" --runner npm; }; fi');
   const localCheck = local.slice('; else { '.length, -'; }; fi'.length);
-  assert.equal(github.split(`else { ${localCheck}; }`).length, 2, 'the GitHub way runs the local check once, where no CI is declared');
-  assert.doesNotMatch(check.replace(`else { ${localCheck}; }`, ''), /\bnpm\b|\bnpx\b/);
+  assert.ok(localCheck.includes('local-check.ts'), 'the GitHub way runs the same local check, where no CI is declared');
+  assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
   const ahead = [...before.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
@@ -597,9 +573,7 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   const runsHere = new RegExp(
     `runs\\s+${ahead.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``).join(',\\s+')},\\s+${OWN_SAID},?\\s+and\\s+the\\s+local\\s+check,\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
   );
-  const ticked = clauses.map(
-    (clause, i) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}${i === clauses.length - 1 ? WAIT_FLAG : ''}\``,
-  );
+  const ticked = clauses.map((clause) => `\`${clause.replace('.', '\\.').replace(' ', '\\s+')}\``);
   const runs = new RegExp(
     `runs\\s+${ticked.slice(0, ahead.length).join(',\\s+')},\\s+${OWN_SAID},\\s+${ticked.slice(ahead.length, -1).join(',\\s+')}\\s+and\\s+${ticked.at(-1)},\\s+in\\s+that\\s+order,\\s+and\\s+nothing\\s+else`,
   );

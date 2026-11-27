@@ -37,7 +37,7 @@ import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, SaidBefore } from './record.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { Pins } from '../revisions/revisions.store.ts';
+import { Pins } from '../revisions/revisions.model.ts';
 import { countRead, countRecord, within, withinEffect } from '../meter/tally.store.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
 
@@ -53,7 +53,7 @@ const Strings = Schema.mutable(Schema.Array(Schema.String));
  * `then` by an older tick is read under `cause` (`upgradeTries`) before this reads it, so a try with neither is refused at its `cause`.
  */
 const EarlierTrySchema = Kept({
-  taskId: Schema.String,
+  taskId: Schema.NullOr(Schema.String),
   check: Schema.optional(Kept({ taskId: Schema.String })),
   cause: Schema.Literals(TRY_CAUSES),
   model: Schema.optional(Schema.String),

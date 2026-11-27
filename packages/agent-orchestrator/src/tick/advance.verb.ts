@@ -178,7 +178,7 @@ export const advancePass = Effect.fn('advancePass')(
     yield* Effect.annotateCurrentSpan({ run: run.id });
     const revisions = pass?.revisions ?? (yield* passRevisions());
     const home = yield* StoreRoot;
-    const took = yield* pinPass(run, new Date().toISOString(), revisions);
+    const took = yield* pinPass(run, revisions);
     const {
       read: reads,
       askNotes,
@@ -258,7 +258,7 @@ const followedDue = Effect.fnUntraced(function* (
   revisions: PassRead['revisions'],
 ) {
   const due = admission.ready.length + assessed.retry.length + assessed.round.length > 0;
-  const followed = yield* followPass(run, new Date().toISOString(), due, revisions);
+  const followed = yield* followPass(run, due, revisions);
   if (!followed.wrote) return { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
   return { followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] };
 });

@@ -208,7 +208,7 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
     const last = run.steps[name]?.tries?.at(-1);
-    if (!answer || last === undefined || answer.message === undefined) continue;
+    if (!answer || last?.taskId == null || answer.message === undefined) continue;
     const before = last.taskId;
     const closeout = (views.get(before) ?? (yield* engineAsked('view', e.view(before)))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
@@ -229,7 +229,7 @@ function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>) {
     const tasks = [...(record.tries ?? []).map((t) => t.taskId), ...(record.taskId ? [record.taskId] : [])];
     const told: SaidTo[] = [];
     for (const [i, taskId] of tasks.entries()) {
-      if (tasks.indexOf(taskId) !== i) continue;
+      if (taskId === null || tasks.indexOf(taskId) !== i) continue;
       for (const s of saidIn(everyTry.get(taskId))) told.push({ ...s, try: i + 1 });
     }
     if (told.length) said[name] = told;

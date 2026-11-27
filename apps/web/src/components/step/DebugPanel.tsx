@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api/steps';
-import type { RunDetail, StepView } from '@/lib/runView';
+import { runsNoSession, type RunDetail, type StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
@@ -113,7 +113,15 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
           </Body>
         </Reading>
       ) : (
-        <PathDrawn read={read.data} reading={read.isPlaceholderData} at={at} lit={lit} taken={taken} onScrub={onScrub} />
+        <PathDrawn
+          read={read.data}
+          sessionless={runsNoSession(step)}
+          reading={read.isPlaceholderData}
+          at={at}
+          lit={lit}
+          taken={taken}
+          onScrub={onScrub}
+        />
       )}
     </div>
   );
@@ -125,6 +133,7 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
  */
 function PathDrawn({
   read,
+  sessionless,
   reading,
   at,
   lit,
@@ -132,13 +141,19 @@ function PathDrawn({
   onScrub,
 }: {
   read: StepPath;
+  sessionless: boolean;
   reading: boolean;
   at: number;
   lit: string | undefined;
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
-  if (read.taskId === null) return <Body size="medium">Not filed yet, so there is no path to show.</Body>;
+  if (read.taskId === null)
+    return (
+      <Body size="medium">
+        {sessionless ? 'It runs no session, so there is no path to show.' : 'Not filed yet, so there is no path to show.'}
+      </Body>
+    );
   return (
     <div
       data-path={read.taskId}

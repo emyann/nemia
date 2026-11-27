@@ -250,6 +250,7 @@ describe('parseAgent: an agent file read as its role keys, its own lines and its
 /** Every step key an agent may not set: the wiring, which belongs on the step. */
 const WIRING = [
   'after',
+  'waitsFor',
   'resume',
   'input',
   'place',

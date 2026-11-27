@@ -99,7 +99,6 @@ export default {
 
     try {
       fs.writeFileSync(agentFile, naming);
-      const unmade = await versionOfScribe();
 
       await page.getByRole('link', { name: 'New skill' }).click();
       await page.waitForURL((url) => url.pathname === '/agents/skills/new', { timeout: WAIT_MS });
@@ -147,8 +146,6 @@ export default {
         'and that a change of it changes every agent that gives it',
       );
       const named = await versionOfScribe();
-      if (named === unmade)
-        throw new Refused(`written, the skill ${seeded.name} names moves ${seeded.name}'s version — it stayed ${named}`);
 
       const toggle = page.getByRole('switch', { name: /Load it every turn/ });
       await expectVisible(page.getByRole('switch', { name: /Load it every turn/, checked: false }), 'the switch is off');

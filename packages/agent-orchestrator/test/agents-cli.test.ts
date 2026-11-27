@@ -120,7 +120,7 @@ describe("nemia agents' handlers: both places read with what each agent can do, 
       Effect.gen(function* () {
         const door = yield* AgentDoor;
         yield* door.agents.write(AgentName.read('courier'), aDraft('courier'), undefined, { dir: MEMORY_AGENTS });
-        return yield* agentsRead({ repo, home: MEMORY_ROOT });
+        return yield* agentsRead({ repo, home: MEMORY_ROOT, revisions: { of: () => 1 } });
       }).pipe(Effect.provide(Layer.merge(agentDoorMemory(), skillDoorMemory()))),
     );
     assert.deepEqual(
@@ -157,7 +157,7 @@ describe("nemia agents' handlers: both places read with what each agent can do, 
       ['read-a-thing'],
     );
     assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
-    assert.match(card.version, /^[0-9a-f]{16}$/);
+    assert.match(card.version, /^\d+$/, 'the card is at a revision, the number an object of it is served at');
   });
   s.test('nemia agents and nemia agents card take --repo joined as they take it apart', async () => {
     assert.deepEqual(await asked('agents', `--repo=${repo}`), await asked('agents', '--repo', repo));

@@ -172,13 +172,22 @@ export function foundInOf(dir: string, repo: string | undefined, home: string) {
 export const readsOf = (s: Served, dirs: readonly string[]) => s.inRequest(SKILLS_LIST.handler({ skills: dirs }));
 
 /**
- * The version of the skill in the folder `dir`, null where none reads, and the other text files of its folder, by path, as the package
+ * The revision of the skill in the folder `dir`, null where none reads, and the other text files of its folder, by path, as the package
  * reads them through its Skill door (`SKILLS_READ`).
  * @param s The request's services, its caller and the place it is answered in.
  * @param dir The skill's folder.
+ * @param revision The skill's revision, which a listing numbers once for all its skills; read for this skill alone where none is given.
+ * @param namespace The namespace the revision is read in; none for the library's.
  */
-export const skillShownAt = async (s: Served, dir: string) => {
-  const { version, files } = await s.inRequest(SKILLS_READ.handler({ name: path.basename(dir), dir }));
+export const skillShownAt = async (s: Served, dir: string, revision?: number, namespace?: string) => {
+  const { version, files } = await s.inRequest(
+    SKILLS_READ.handler({
+      name: path.basename(dir),
+      dir,
+      ...(namespace !== undefined && { namespace }),
+      ...(revision !== undefined && { version: String(revision) }),
+    }),
+  );
   return { version, files };
 };
 

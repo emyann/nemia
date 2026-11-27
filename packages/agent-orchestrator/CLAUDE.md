@@ -128,9 +128,9 @@ of its kind, never from an older file that looks alike:
 - **A new step status is a state of the step machine, and its moves are edges a walk takes** (`src/step-machine/step-machine.ts`): a word
   with no state fails the typecheck, and a move `stepStatus` makes that no edge draws, or an edge no walk takes, fails
   `src/step-machine/step-machine.test.ts`; add the walk and the edge, then regenerate the README's `diagram:step` block.
-- **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
-  compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
-  reads as no drift and a reverted one as behind.
+- **A pin's number is the definition's revision in the definition index, and says nothing of what the files hold**: compare against a
+  fresh resolve (`driftNow`, which numbers without a write), by digest, never by number, or an edit reverted reads as behind (a revert is
+  a new, higher revision). A pass that pins sweeps the index first (`definitionsSwept`), so no pin takes a provisional number.
 - **A run's labels are a person's record, `/registry/runmarks/<id>/labels`, composed on read and never written into the record** (`src/record/files.store.ts`): `runs.create` drops them, so a start writes them with `runs.labels.put` after it, and a test plants them the same way.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
@@ -190,13 +190,12 @@ of its kind, never from an older file that looks alike:
   A `--template <name>` and a factory's recorded name are resolved by `templatePlace` at `BuiltinTemplates`, before the door: a test
   gives a scratch folder of its own (`withBuiltins`, `test/templated.ts`), never `packages/templates`.
 - **A subscription and its delivery are read and written through the Subscription door (`SubscriptionDoor`,
-  `src/subscription/subscription.store.ts`), the revision ledger through the Ledger door (`LedgerDoor`, `src/revisions/revisions.store.ts`)
-  and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
-  one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
-  `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
+  `src/subscription/subscription.store.ts`), and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
+  one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()` or `feedDoorMemory()` (each a
+  `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `readFeed`, …)
   reads the keyspace or the feed at the root it hands them whatever door was given, the feed's counted in `test/feed-door.baseline.ts`;
   none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
-- **Delegations, subscriptions and deliveries, the ledger, tokens, and cards and their tries are records of the keyspace**, each kind's
+- **Delegations, subscriptions and deliveries, tokens, and cards and their tries are records of the keyspace**, each kind's
   door one engine over it (`<kind>Records`) and its stand-in the same code over a keyspace in memory. A kind's files of before are
   imported by its `ImportKind` (`src/keyspace/import.store.ts`) the first time a process opens the keyspace, and moved under
   `<root>/imported/`: a test that plants a file of before reads it back only after the import (`kindsTakenUp`, the testing entry), and

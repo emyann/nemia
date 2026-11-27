@@ -663,7 +663,7 @@ resolves it on every pass, so each new filing (a step, a retry, a round) takes t
 removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
 filing after it. Between those a pinned run never takes `agents/` again, from a worktree or
 anywhere — it reads the files only to say how far it is behind them (`driftNow`: the run page's band, and the feed's `revisions
-behind`), compared by digest with its pins and numbered without a write to the ledger: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
+behind`), compared by digest with its pins and numbered at the definitions' revisions without a write: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory
@@ -829,8 +829,8 @@ Three things it is honest about. It is **not a valid Agent Card**: A2A marks `su
 interface is a transport and a URL, and there is no URL — nothing here answers A2A, there is no `/.well-known/agent-card.json`,
 and a card is left where a reader would have to be told it is only a description. That is why the last line goes to
 stderr, where a pipe does not carry it. `capabilities` in A2A is protocol features — streaming, push notifications,
-extensions — not reach, so all three are `false` and mean it. And `version` is the content digest `agentVersion` computes,
-not a semantic version: it changes when the agent's file, its result schema or one of its skills does, which is what the board needs it for.
+extensions — not reach, so all three are `false` and mean it. And `version` is the agent's revision in the definition index, not a semantic version: it moves when the agent's file, its result schema
+or one of its skills does, which is what the board needs it for.
 
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.
@@ -2042,6 +2042,7 @@ stateDiagram-v2
   pending --> unsigned: its table answered no route
   pending --> skipped: its route not taken
   pending --> sent: its card filed
+  pending --> checking: filed with nothing to run: its checks laid
   skipped --> pending: a new route, before a follower is filed
   running --> unverified: signed, with no check
   running --> checking: signed, with a check
@@ -2073,7 +2074,7 @@ stateDiagram-v2
   unsigned --> running: tried again
   denied --> running: tried again
   failed_check --> running: tried again
-  failed_check --> checking: checked again
+  failed_check --> checking: checked again, or a wait node tried again
   failed_check --> pending: an ending sent back with its work
   failed --> running: tried again
   stopped --> running: tried again
@@ -2265,25 +2266,22 @@ checks:
     enabled: false
 ```
 
-- **Each entry is `{ name, run, after?, enabled?, usesCheckout? }`.** `run:` is a shell line, as a GitHub Actions step's; a `name` is lower-case
+- **Each entry is `{ name, run | condition, after?, enabled? }`.** `run:` is a shell line, as a GitHub Actions step's, and `condition: <name>` in its place waits on a condition a program or a person writes; a `name` is lower-case
   words joined by `-`. A check with no `after:` waits on the one above it, so a plain list is a chain; `after: []` waits on nothing, and
   two such run side by side; `after: [a, b]` waits on both. `enabled: false` takes a check out and hands its waits on to the checks
-  that waited on it. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
+  that waited on it; a template writes it as `enabled: "${{ parameters.<name> }}"` for a boolean parameter, which a factory's apply renders as `true` or `false`. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
   off, and `check:` beside `checks:`.
-- **An ending may say a check uses no checkout: `usesCheckout: false`.** An ending (`workspace: base`) works in the repository's own
-  checkout, and holds it until every check that uses it has passed; a check with `usesCheckout: false` reads and writes nothing there,
-  as a wait on a CI service at the commit that landed does, so it runs after the checkout is given back to the next run's ending, with
-  nothing installed before it, and still judges the step (`checksHoldCheckout`, proved by `contracts/checkout-checks.contract.ts`).
-  Load refuses it on a step that is no ending. A shell line cannot be fenced to it: a check that says so and reads the checkout races
-  the next landing.
+- **A condition check holds no checkout.** An ending (`workspace: base`) works in the repository's own checkout, and holds it until every
+  check that runs a command there has passed; a `condition:` check runs nothing there, as a wait on a CI service at the commit that
+  landed does, so the checkout is given back to the next run's ending once the commands have passed, and the condition still judges the
+  step once its writer writes it (`checksHoldCheckout`, proved by `contracts/checkout-checks.contract.ts`).
 
   ```yaml
   checks:
     - name: receipt
       run: node land.ts receipt
     - name: base-ci
-      run: node land.ts base-ci
-      usesCheckout: false
+      condition: base-ci
   ```
 
 - **`check: <line>` is one check named `check`**, filed under the task id it always had, so a run started before `checks:` reads as it
@@ -2349,12 +2347,29 @@ spec:
 ## A command node: `run:`
 
 A node with `run:` and no session runs its shell line as a workload of its own on the `command` harness, in its first parent's
-workspace, told its parent's closeout (`WF_CLOSEOUT`) and the file it may answer in (`WF_ANSWER`). Every node signs off with a closeout:
-a session's own, a condition's answer, a command's exit. Exit 0 signs it off `done`, its output the JSON object it left in `WF_ANSWER`
+workspace, told its parent's closeout (`WF_CLOSEOUT`) and the file it may answer in (`WF_ANSWER`). Every node that runs signs off with a
+closeout: a session's own, a condition's answer, a command's exit. Exit 0 signs it off `done`, its output the JSON object it left in `WF_ANSWER`
 (decoded by `output:`); any other exit fails it, and an answer that is not one JSON object leaves it unsigned. It takes `retries:`
 (each try runs the line afresh), a failure policy by exit code, `nemia retry` and `gate:` as a step does, and nothing a session or a
 check needs (`check:`, `checks:`, `workspace:`, `resume:`, a route, an instruction). It acts as the agent it names, under a token
 bound to its try, and load refuses one that names none.
+
+## A wait node: `waitsFor:`
+
+A node with `waitsFor: [ready, approved]` runs no session and no command: it passes once every condition it names is written True for
+the try it is on, by a program of the factory or by a person (`nemia condition`). It follows Kubernetes' `readinessGates`, a list of
+condition names in the spec that an outside controller writes, and the pod is ready only when all are True; where Kubernetes reads a
+condition nobody wrote as False, this reads it as undecided, so the node waits and says who writes it. A GitHub Actions environment's
+protection rules gate a job in the same way. The loader lays each name as a condition check that waits on none, so everything that
+reads a step's checks reads these: its row says `checking`, names each undecided condition and the program that writes it (or that none
+does), and the same words reach `nemia ls`, the board and the MCP port.
+
+The node files no task. When its parents have passed, the pass lays its record with its checks and no task (`taskId` is null), in its
+first parent's workspace, and stands on its checks alone: `pending`, `checking`, `verified`, or `failed (check)` where a condition is
+written False. A False refuses it as any failed check does and the run waits on a person: `retries:` is refused at load, and
+`nemia retry --recheck` is a new try, whose conditions are written afresh, since a condition belongs to the try it was written for.
+It takes `after:`, `when:`, `gate:` and `place:`; load refuses any other key, an instruction, an empty or repeated list, `check:`
+beside it, and the node inside a loop's span. A factory hires no agent into it.
 
 ## Files a person gives the run: `wf start --input`
 
@@ -2738,9 +2753,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   ending as a person's try does, and `wf ls` says so beside the try. A landing
   holds the checkout until it has landed or aborted, not only while its session runs: while its check runs on the
   merge, and while the merge is staged and not yet committed or aborted, so another run's ending is filed on the
-  first pass after that one — except for its checks with `usesCheckout: false`, which run after it is given back:
-  once every other check has passed and nothing of the run's is staged, another run's ending is filed while they
-  still run, and the first still records its own landing, or fails its step, on their word. Such a run is running, not waiting on anybody:
+  first pass after that one — except for its `condition:` checks, which wait after it is given back:
+  once every check that runs a command has passed and nothing of the run's is staged, another run's ending is filed while they
+  are still unwritten, and the first still records its own landing, or fails its step, on their word. Such a run is running, not waiting on anybody:
   the word that files its ending is given, so `wf decide` reads it as still running, nothing is `→ waiting on
   you`, and it keeps counting against the cap on runs in flight. A claim on that checkout is a promise that the
   pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
@@ -4257,7 +4272,7 @@ screen of the board.
   or `launchctl print`'s `pid`: the daemon lets the lease go before its process exits, and systemd answers a start of a unit still
   active as done and does nothing), and resumes the store once the new daemon has completed its first pass — never on a daemon that
   only ticks. It waits
-  on no check, a landing's wait on CI included: each runs on its worker through the restart, and the new daemon reads its result. The
+  on no check, a landing's check included: each runs on its worker through the restart, and the new daemon reads its result. The
   pause it puts and the drain it holds the sessions by each name the process that put them, so a restart killed while it waits leaves
   neither standing past the daemon's next pass (`liftLapsedPause`, `putDrain`). A new daemon that stops before that pass, or a lease that does
   not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused; where the unit then runs
@@ -4317,7 +4332,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `revisions` (the workflow folders,
-  agents, skills and factory rules a run's kinds are resolved from, and the ledger they are numbered in — one read of each folder a pass,
+  agents, skills and factory rules a run's kinds are resolved from, and the revisions they are numbered at — one read of each folder a pass,
   shared by every run on it), `observe` (asking each harness what runs), `runtime` (the
   runtime's own pass, less its observe), `place` (every question asked of the place, a call each: the git processes it starts and
   its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`

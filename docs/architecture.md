@@ -9,7 +9,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`, attached, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. Each run's judgement, held in memory by the daemon that judged it (the informer, *Who owns what*). The in-process `nemia` command (`bin/nemia.ts`, and `bin/wf.ts`, the alias), which the client spawns for the verbs about this machine alone. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), the words a run is described in, and the shell a check runs under (`checkArgv`, `CHECK_DEADLINE_SECONDS`), re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. `agent-orchestrator/bin` → `bin/nemia.ts` and `agent-orchestrator/bin/wf` → `bin/wf.ts`, the CLI's entries, resolved and spawned by `apps/cli/src/local.ts` alone and imported by no file. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — each pinned at the definition index's revision in the run's namespace, with the digest of what it held, on the run and on each filed step. Each run's judgement, held in memory by the daemon that judged it (the informer, *Who owns what*). The in-process `nemia` command (`bin/nemia.ts`, and `bin/wf.ts`, the alias), which the client spawns for the verbs about this machine alone. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), the words a run is described in, and the shell a check runs under (`checkArgv`, `CHECK_DEADLINE_SECONDS`), re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. `agent-orchestrator/bin` → `bin/nemia.ts` and `agent-orchestrator/bin/wf` → `bin/wf.ts`, the CLI's entries, resolved and spawned by `apps/cli/src/local.ts` alone and imported by no file. |
 | `packages/objects` | The objects' shapes: what every kind Nemia serves is, as a `nemia/v1` object (`apiVersion`, `kind`, `metadata`, and its spec and status), the metadata every object carries and the envelope of a list of it (`src/meta.ts`), and the HttpApi definition that serves them. The commands' words and the parser that reads a command line by them (`src/command.ts`, `src/commands.ts`), which the client, the api and the orchestrator read alike. It imports `effect` alone (`packages/objects/CLAUDE.md`). | `objects` → `src/index.ts`, the Schemas and constants, re-exported by name. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages but `objects`, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -205,7 +205,7 @@ sessions' records by the factory of the run that filed each task). A person may 
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands — a pause with no timeout,
-so nothing new is filed and the jobs and the checks run on, untouched, a landing's wait on CI among them, and are not waited for — the daemon's own sessions (`restartPolicy:
+so nothing new is filed and the jobs and the checks run on, untouched, a landing's check among them, and are not waited for — the daemon's own sessions (`restartPolicy:
 'Always'`) held by the holder's drain and their calls in flight waited for up to the timeout (`--timeout <d>`, else the store's, `nemia
 pause-timeout`), SIGTERM, the holder's let-go parking each session for the next, the unit started, and the store resumed once the new daemon
 has completed its first pass, which resumes each parked session as the same try on the release it runs — refused, naming its log,
@@ -621,14 +621,6 @@ that is not there `Missing` — and a delivery written is decoded through the mo
 apart (`left`), and the deliverer says each once: the store writes no stderr. A delivery's cursor may fall below where its subscription
 began, since a cut feed sets it to 0. What once called its module spellings is paid, and its store test refuses any use.
 
-**The Ledger door.** The revision ledger — the numbers each content of a workflow, an agent, a skill or a factory's rules was given —
-is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/revisions/revisions.store.ts`), by `RevisionOf`, a kind
-and a name, rooted as the Factory door is: records of the keyspace (`ledgerRecords`, `/registry/revisions/<kind>/<name>`, an append
-read and written in one transaction; the files of before, `revisions/<kind>/<name>.json`, imported once by `LEDGER_FILES`) and a memory stand-in (`ledgerDoorMemory`, `src/revisions/memory.store.ts`, in `STAND_INS`), held to one
-table of walks (`test/ledger-walks.ts`). An append is checked by the model's `Revision` (`src/revisions/revisions.model.ts`) before it is
-numbered by `revisionNow`; a stored entry is read nominally and kept whole, and a record that does not read as a list of revisions reads as an
-empty ledger, an append to it refused `Invalid`, nothing numbered.
-
 **The Feed door.** The feed is read and appended to through `FeedDoor` (`packages/agent-orchestrator/src/feed/feed.store.ts`), one
 group of lines, append-only, rooted as the Factory door is: the files (`feedFiles(home)`, `<root>/feed.jsonl`, its end the file's size
 and inode, a line appended after a torn one on a line of its own) and a memory stand-in that keeps the lines as their bytes, so a cursor
@@ -672,7 +664,7 @@ moved (`recordDue`, `contracts/observed.contract.ts`). Compaction keeps the last
 of `kine_sweeps` (migration `0003_sweeps`), and a compaction reaches the head of the latest sweep at least 5 minutes old (`compactTo`).
 
 The other kinds of record followed it into the keyspace: delegations (`/registry/delegations/`), subscriptions and their deliveries,
-the revision ledger, session and standing tokens (`/registry/tokens/`, `/registry/persontokens/`, a standing token's name checked and
+session and standing tokens (`/registry/tokens/`, `/registry/persontokens/`, a standing token's name checked and
 taken in the transaction that writes it) and the inbox's cards and the tick's tries. Each kind's door is one real engine over the
 keyspace (`<kind>Records`), its memory stand-in the same code over a keyspace in memory (`STAND_INS`). A kind's files of before are
 imported by one decision (`src/keyspace/import.store.ts`, an `ImportKind` per kind: its folders, and for each file its key, where it is
@@ -765,8 +757,8 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   and config/config.store.ts, which import no store file; config/root.store.ts, the store's
   root as the service a program is given, imports config.store.ts and nothing else. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
-  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom stores, folder.store.ts and
-  revisions/revisions.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
+  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom stores and folder.store.ts;
+  workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
   imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.

@@ -569,7 +569,7 @@ export function dataBlock(value: unknown) {
 export const stepTasks = ({ taskId, check, tries }: StepRecord) => [
   ...(taskId ? [taskId] : []),
   ...(check ? checkTasksOf(check).map(([, id]) => id) : []),
-  ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? checkTasksOf(t.check).map(([, id]) => id) : [])]),
+  ...(tries ?? []).flatMap((t) => [...(t.taskId ? [t.taskId] : []), ...(t.check ? checkTasksOf(t.check).map(([, id]) => id) : [])]),
 ];
 
 /**

@@ -198,7 +198,7 @@ describe('one broken run does not stop the others: each left out and said once, 
     async () => {
       spoil(runRecord(ROOT, runs.journal).steps.work.taskId!);
       spoil(runRecord(ROOT, runs.checked).steps.work.check!.taskId);
-      spoil(runRecord(ROOT, runs.tried).steps.work.tries![0].taskId);
+      spoil(runRecord(ROOT, runs.tried).steps.work.tries![0].taskId!);
       unfrozen(runs.gone, path.join(ROOT, 'no-such-folder'));
       plantRecord(ROOT, runKey('torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
@@ -257,7 +257,7 @@ describe('one broken run does not stop the others: each left out and said once, 
     const lines = await lsOf();
     for (const [id, task] of [
       [runs.checked, runRecord(ROOT, runs.checked).steps.work.check!.taskId],
-      [runs.tried, runRecord(ROOT, runs.tried).steps.work.tries![0].taskId],
+      [runs.tried, runRecord(ROOT, runs.tried).steps.work.tries![0].taskId!],
     ]) {
       const listed = listingOf(lines, id);
       const said = unreadableOf(listed);

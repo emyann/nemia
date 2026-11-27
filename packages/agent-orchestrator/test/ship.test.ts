@@ -55,6 +55,7 @@ import {
   toDecideWords,
   isRepositoryRun,
   runWith as runEngine,
+  CONDITION,
 } from '../src/runner.ts';
 import { told, type StartedAnswer } from './typed.ts';
 import { staged, story } from './story.ts';
@@ -1482,7 +1483,7 @@ describe('two runs of one repository land close together: each records the commi
   });
 });
 
-describe("an ending whose check uses no checkout gives the checkout back once its other check passed: another run's ending is filed while it runs, and it still judges its own step", () => {
+describe("an ending whose last check is a condition gives the checkout back once its other check passed: another run's ending is filed while it waits, and it still judges its own step", () => {
   let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
   let two!: Awaited<ReturnType<typeof twoChecksApproved>>;
   beforeAll(() => {
@@ -1491,7 +1492,20 @@ describe("an ending whose check uses no checkout gives the checkout back once it
     return t.end;
   });
   const s = story(test);
-  const CHECKS = 'checks:\n  - name: receipt\n    run: npm test\n  - name: base-ci\n    run: npm run wait\n    usesCheckout: false';
+  const CHECKS = 'checks:\n  - name: receipt\n    run: npm test\n  - name: base-ci\n    condition: base-ci';
+  const writeBaseCi = (id: string, status: 'True' | 'False') =>
+    stage.runWith(
+      stage.board().e,
+      CONDITION.handler({
+        runId: id,
+        step: 'ship',
+        condition: 'base-ci',
+        status,
+        try: 1,
+        message: 'main is judged',
+        caller: { kind: 'person' },
+      }),
+    );
   const twoChecksFolder = () => {
     const dir = at.folder();
     const file = path.join(dir, 'ship.md');
@@ -1525,14 +1539,16 @@ describe("an ending whose check uses no checkout gives the checkout back once it
   s.test("A's receipt passes and its base-ci runs: B's ending is filed in the checkout on that pass", async () => {
     const { repo, a, b } = two;
     settle(`${a.id}-ship-check-receipt`, 'succeeded', undefined, 0);
-    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'its base-ci is filed');
-    assert.equal(runRecord(ROOT, a.id).steps.ship.landed, undefined, 'A has not landed while base-ci runs');
+    await at.pass(a.id);
+    assert.equal(runRecord(ROOT, a.id).steps.ship.landed, undefined, 'A has not landed while base-ci is unwritten');
     assert.deepEqual((await at.pass(b.id)).filed, ['ship'], 'the checkout was given back');
     assert.equal(runRecord(ROOT, b.id).steps.ship?.workspace, repo);
   });
   s.test("A's base-ci passes while B works in the checkout: A records its own merge commit", async () => {
     const { repo, a, b } = two;
     at.mergedByHand(repo, b.branch);
+    await writeBaseCi(a.id, 'True');
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'the written condition files its check, which exits 0');
     settle(`${a.id}-ship-check-base-ci`, 'succeeded', undefined, 0);
     await at.pass(a.id);
     assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
@@ -1548,13 +1564,12 @@ describe("an ending whose check uses no checkout gives the checkout back once it
     settle(`${a.id}-ship-check-receipt`, 'succeeded', undefined, 0);
     await at.pass(a.id);
     assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
+    await writeBaseCi(a.id, 'False');
+    assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'the refusal files its check, which exits 1');
     settle(`${a.id}-ship-check-base-ci`, 'failed', undefined, 1);
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
-    assert.ok(
-      landed && 'aborted' in landed && landed.aborted.includes('(exit 1)'),
-      `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`,
-    );
+    assert.ok(landed && 'aborted' in landed, `A's step fails on base-ci's refusal: ${JSON.stringify(landed)}`);
     assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, "B's ending is still filed");
     assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined);
   });

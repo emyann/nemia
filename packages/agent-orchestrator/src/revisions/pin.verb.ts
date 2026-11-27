@@ -2,9 +2,10 @@
  * Resolving a run's kinds now, and the person's ask to take the new ones.
  *
  * `pinsOf` reads the four kinds a run resolves — its workflow folder, each step's agent, each skill those agents are given, and its
- * factory's rules — digests each as the package already digests it, gives each its number in the ledger (`LedgerDoor`) and answers with
- * the run's pins. `resolvedNow` does that for a run that has filed nothing, reading the folder again so an edit made while the run waited
- * reaches its first step; `refreshedNow` does it for a run that has filed, keeping the step set it already names — on a person's ask, or
+ * factory's rules — digests each as the package already digests it, numbers each at the definition's revision in the run's namespace
+ * (the definition index's, swept first where the pass pins) and answers with the run's pins. `resolvedNow` does that for a run that has
+ * filed nothing, reading the folder again so an edit made while the run waited reaches its first step;
+ * `refreshedNow` does it for a run that has filed, keeping the step set it already names — on a person's ask, or
  * where the run's factory follows revisions (`revisions: follow`) and a filing is due (`followPass`). `refreshRun` is
  * `nemia refresh <run>`: it writes a person's ask that the next pass re-pins on. `driftNow` is what the run's next filing would take,
  * against its pins, read and numbered without a write: the board's band, and, for a pinned run, the feed's `revisions behind`
@@ -42,8 +43,8 @@ import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import { endedForGood, type Run, type Spent } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
-import { LedgerDoor } from './revisions.store.ts';
-import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
+import { definitionRevisionsNow, definitionsSwept } from '../definition-index/definition-index.store.ts';
+import { kindsDrift, stepsDrift, type Drift, type KindName, type Pin } from './revisions.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -124,7 +125,7 @@ type FolderRun = Pick<Run, 'workflowDir' | 'repo' | 'factory'>;
 /**
  * `f` read once for each `key`, its outcome kept — a throw included, kept and thrown again — and each read of the world charged to the
  * `revisions` phase while a pass is metered (`within`): the memo of the pass's synchronous reads, the factory, the allow rules and the
- * ledger's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A
+ * index's numbers, whose stores are not yet behind a door this reader yields. The reads through a door are `Cache`s (`passRevisions`). A
  * key is exactly what its `f` reads, so a memo never answers for a world it did not read; `key` is given the same arguments as `f`, and
  * may take fewer than it, leaving out those `f` does not read by (a stamp).
  */
@@ -149,8 +150,8 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
 /**
  * What one pass reads once for every run whose kinds it resolves: the factory a run is in, its workflow folder loaded, the skills found
  * beside that folder (the Skill door's `found`), the allow rules that folder's repository grants a session, the digest of one kind and
- * name (through the Agent, Skill and Workflow doors), and a kind's entry in the ledger — appended where the content is new (`revision`),
- * or only read (`looked`), which writes nothing. Ten runs waiting on one folder read and digest that folder once a pass between them, not
+ * name (through the Agent, Skill and Workflow doors), and the definitions' revisions — read after one sweep of the index (`revision`), or
+ * only read (`looked`), which writes nothing. Ten runs waiting on one folder read and digest that folder once a pass between them, not
  * ten times, and the reads are charged to the `revisions` phase.
  *
  * It shares a read of the world, never a judgement: what stays per run is judged per run — `stepSetRefusal` on the run's own `isolate`,
@@ -171,8 +172,11 @@ export type PassRevisions = {
   readonly looked: Numbering;
 };
 
-/** How a digest is given its number in the ledger: appended where it is new (the Ledger door's `append`), or read only (`revisionNow`). */
-type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Effect.Effect<Revision, Refusal>;
+/**
+ * How a kind is given its number: the revision of its definition in the run's namespace, read after a sweep of the index (`revision`) or
+ * as it stands (`looked`).
+ */
+type Numbering = (of: KindName, run: FolderRun) => Effect.Effect<number, Refusal>;
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;
@@ -233,29 +237,26 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     },
   });
   const digest = (of: KindName, run: FolderRun) => Cache.get(digestCache, JSON.stringify([of.kind, of.name, ...where(run)]));
-  const ledger = yield* LedgerDoor;
-  const numbered = (read: (kind: RevisionKind, name: string, hash: string, at: string) => Effect.Effect<Revision, Refusal>) => {
-    const at = new Map<string, string>();
-    return Effect.map(
-      Cache.make({
-        capacity: PASS_KEYS,
-        lookup: (key: string) => {
-          const [kind, name, hash] = JSON.parse(key) as [RevisionKind, string, string];
-          return withinEffect('revisions', read(kind, name, hash, at.get(key) ?? ''));
-        },
-      }),
-      (cache) =>
-        ((kind, name, hash, when) => {
-          const key = JSON.stringify([kind, name, hash]);
-          if (!at.has(key)) at.set(key, when);
-          return Cache.get(cache, key);
-        }) satisfies Numbering,
-    );
-  };
-  const revision = yield* numbered((kind, name, hash, when) => ledger.entries.append({ kind, name }, hash, when));
-  const looked = yield* numbered((kind, name, hash, when) =>
-    Effect.map(ledger.entries.of({ kind, name }), (entries) => revisionNow(entries, hash, when)),
-  );
+  const tables = yield* Cache.make({
+    capacity: 2,
+    lookup: (swept: boolean) =>
+      withinEffect(
+        'revisions',
+        Effect.gen(function* () {
+          if (swept) yield* definitionsSwept();
+          return yield* definitionRevisionsNow(true);
+        }),
+      ),
+  });
+  const numbered = (swept: boolean) =>
+    ((of, run) =>
+      Effect.map(Cache.get(tables, swept), (table) =>
+        of.kind === 'rules'
+          ? table.words(of.name)
+          : table.of(of.kind === 'workflow' ? 'Workflow' : of.kind === 'agent' ? 'Agent' : 'Skill', runNamespace(run.factory), of.name),
+      )) satisfies Numbering;
+  const revision = numbered(true);
+  const looked = numbered(false);
   return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions;
 });
 
@@ -263,14 +264,13 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
 const readOr = (read: PassRevisions | undefined) => (read ? Effect.succeed(read) : passRevisions());
 
 /**
- * The pins of `steps` as the world holds them now, each given its number in the ledger by `number`: appended where the digest has moved
- * (`read.revision`, the default), or only read (`read.looked`). A kind that is not there is left out: a pin says what was resolved, and
+ * The pins of `steps` as the world holds them now, each given its revision by `number`: after a sweep of the index
+ * (`read.revision`, the default), or as it stands (`read.looked`). A kind that is not there is left out: a pin says what was resolved, and
  * nothing was.
  */
 export const pinsOf = Effect.fn('pinsOf')(function* (
   run: FolderRun,
   steps: readonly StepSpec[],
-  at: string,
   given?: PassRevisions,
   numbering?: Numbering,
 ) {
@@ -280,7 +280,7 @@ export const pinsOf = Effect.fn('pinsOf')(function* (
   for (const of of kindsIn(run, steps)) {
     const hash = yield* read.digest(of, run);
     if (hash === null) continue;
-    const { n } = yield* number(of.kind, of.name, hash, at);
+    const n = yield* number(of, run);
     pins.push({ kind: of.kind, name: of.name, n, hash });
   }
   return pins;
@@ -311,7 +311,6 @@ const folderNow = (run: FolderRun & Pick<Run, 'models'>, read: PassRevisions) =>
  */
 export const resolvedNow = Effect.fn('resolvedNow')(function* (
   run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate' | 'models'>,
-  at: string,
   given?: PassRevisions,
 ) {
   const read = yield* readOr(given);
@@ -319,9 +318,7 @@ export const resolvedNow = Effect.fn('resolvedNow')(function* (
   if (!steps) return undefined;
   const allows = read.allows(run);
   const refused = stepSetRefusal(steps, run.isolate ?? true) ?? unallowedRefusal(steps, allows.rules, allows.untrusted);
-  return refused
-    ? ({ kept: firstLine(refused) } satisfies Kept)
-    : ({ steps, pins: yield* pinsOf(run, steps, at, read) } satisfies Resolved);
+  return refused ? ({ kept: firstLine(refused) } satisfies Kept) : ({ steps, pins: yield* pinsOf(run, steps, read) } satisfies Resolved);
 });
 
 /**
@@ -329,10 +326,10 @@ export const resolvedNow = Effect.fn('resolvedNow')(function* (
  * names, in the order the run has them, and a step the folder no longer has kept as the run froze it — the verb takes new content, never a
  * new step set. Undefined where the folder does not load, so the run keeps what it froze and its pins.
  */
-const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: string, given?: PassRevisions) {
+const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, given?: PassRevisions) {
   const read = yield* readOr(given);
   const steps = yield* refreshedSteps(run, read);
-  return steps && ({ steps, pins: yield* pinsOf(run, steps, at, read) } satisfies Resolved);
+  return steps && ({ steps, pins: yield* pinsOf(run, steps, read) } satisfies Resolved);
 });
 
 /** The steps a filed run's next filing would take (`refreshedNow`'s): undefined where the folder does not load. */
@@ -345,9 +342,9 @@ const refreshedSteps = (run: Run, read: PassRevisions) =>
 
 /**
  * What the run's next filing would take that its pins and its filed steps' pins are not (`kindsDrift`, `stepsDrift`): the kinds resolved
- * as `refreshedNow` resolves them, compared by digest, and numbered off the ledger without a write (`read.looked`) — a content nobody has
- * resolved reads as the next number, and the ledger stays as it was. So an edit later reverted is no drift, and a revert to an older
- * content is, its `now` that older number.
+ * as `refreshedNow` resolves them, compared by digest, and numbered at the definitions' revisions without a write
+ * (`read.looked`) — a content nobody has swept reads as the next number, and the index stays as it was. So an edit later reverted is no
+ * drift, and a revert to an older content is, its `now` a new, higher revision.
  *
  * `[]` for a run that has filed nothing, which takes the folder afresh at its first filing anyway; for a record that pinned nothing; and
  * where the folder does not load or a kind does not read, since there is then nothing a filing would take.
@@ -365,7 +362,7 @@ const pinsNow = (run: Run, read: PassRevisions) =>
     ? Effect.succeed([])
     : Effect.gen(function* () {
         const steps = yield* refreshedSteps(run, read);
-        return steps ? yield* pinsOf(run, steps, new Date().toISOString(), read, read.looked) : [];
+        return steps ? yield* pinsOf(run, steps, read, read.looked) : [];
       }).pipe(Effect.catchCause(() => Effect.succeed<Pin[]>([])));
 
 /** One kind a pinned run is behind on (`behindNow`): its drift, and the digest of what the files hold now, which tells two edits apart. */
@@ -430,8 +427,8 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  * the pass has a filing due (`followPass`) — neither of which adds or removes a step. Nothing is carried between passes: what has moved
  * is the digests against the run's own pins.
  *
- * Writes nothing where no digest moved, so a run resolved twice with no edit leaves the record alone and the ledger empty of a second
- * entry. A run a person called off is left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
+ * Writes nothing where no digest moved, so a run resolved twice with no edit leaves the record alone. A run a person called off is
+ * left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
  * rendered again wherever the pins moved (`renderAgain`), since a pin the board shows and a prompt the session reads must be the one
  * content.
  *
@@ -443,12 +440,12 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  * @param read What this pass reads once for every run it resolves (`PassRevisions`), so ten runs on one workflow folder read and digest
  *   it once between them. A one-off verb that hands none — `advanceRun`, `nemia refresh`, `nemia start` — reads the world for itself.
  */
-export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, given?: PassRevisions) {
+export const pinPass = Effect.fn('pinPass')(function* (run: Run, given?: PassRevisions) {
   if (endedForGood(run)) return NOTHING;
   const filed = hasStarted(run);
   const read = yield* readOr(given);
   const door = yield* RunDoor;
-  return yield* (filed ? refreshDue(run, at, read) : firstResolve(run, at, read)).pipe(
+  return yield* (filed ? refreshDue(run, read) : firstResolve(run, read)).pipe(
     Effect.catchCause((cause) =>
       Effect.map(filed ? door.refresh.stands(RunId.read(run.id)) : Effect.succeed(false), (stands) => unread(Cause.squash(cause), stands)),
     ),
@@ -457,7 +454,7 @@ export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, giv
 
 /**
  * What the pass says where resolving the world threw — a skill folder a person renamed or deleted between passes, which `writeAgentFiles`
- * refuses, a digest of a file that has stopped reading, a ledger the store could not write — and the run keeps the revisions and the
+ * refuses, a digest of a file that has stopped reading, an index the store could not read — and the run keeps the revisions and the
  * workflow it had: a kind that stopped reading stops this run's resolve, never the pass, which judges every other run.
  *
  * The record is changed last, after the one write of the pass that can throw (`renderAgain`), so a run that keeps its revisions keeps its
@@ -471,8 +468,8 @@ const unread = (err: unknown, lift: boolean) => ({
 });
 
 /** The run's workflow and pins taken afresh, for a run that has filed nothing: `run` is changed where anything moved, and last. */
-const firstResolve = Effect.fnUntraced(function* (run: Run, at: string, read: PassRevisions) {
-  const resolved = yield* resolvedNow(run, at, read);
+const firstResolve = Effect.fnUntraced(function* (run: Run, read: PassRevisions) {
+  const resolved = yield* resolvedNow(run, read);
   if (!resolved) return NOTHING;
   if ('kept' in resolved)
     return { wrote: false, notes: [`the run keeps the step set it froze: ${resolved.kept}`], lift: false } satisfies PinnedPass;
@@ -502,12 +499,12 @@ const follows = (run: Run, read: PassRevisions) =>
  * is read off its own file every pass (the Run door's `refresh.stands`), never off the record, which never holds it. A filed run nobody
  * asked resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may
  * not pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
- * has something to file. So a pinned run's edit after a filing is numbered when something resolves that content — another run's filing,
- * or this run's `nemia refresh`, which resolves to answer.
+ * has something to file. So a pinned run's edit after a filing is read at the index's revision when something resolves that content —
+ * another run's filing, or this run's `nemia refresh`, which resolves to answer.
  */
-const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: PassRevisions) {
+const refreshDue = Effect.fnUntraced(function* (run: Run, read: PassRevisions) {
   if (!(yield* (yield* RunDoor).refresh.stands(RunId.read(run.id)))) return NOTHING;
-  const resolved = yield* refreshedNow(run, at, read);
+  const resolved = yield* refreshedNow(run, read);
   if (!resolved)
     return {
       wrote: false,
@@ -533,12 +530,12 @@ const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: Pass
  * run what it had, unsaid, since it would be said on every pass. A held run has no filing due, so it is left alone by `filing` alone,
  * its pins kept for the lift; one called off or pruned is left alone whatever it is handed (`endedForGood`).
  */
-export const followPass = Effect.fn('followPass')(function* (run: Run, at: string, filing: boolean, given?: PassRevisions) {
+export const followPass = Effect.fn('followPass')(function* (run: Run, filing: boolean, given?: PassRevisions) {
   if (!filing || endedForGood(run) || !hasStarted(run)) return NOTHING;
   const read = yield* readOr(given);
   if (!(yield* follows(run, read))) return NOTHING;
   return yield* Effect.gen(function* () {
-    const resolved = yield* refreshedNow(run, at, read);
+    const resolved = yield* refreshedNow(run, read);
     if (!resolved || isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins)) return NOTHING;
     yield* renderAgain(run, resolved.steps, read);
     run.workflow = resolved.steps;
@@ -551,7 +548,7 @@ export const followPass = Effect.fn('followPass')(function* (run: Run, at: strin
  * `nemia refresh <run>`: write down that a person asked this run to take the new revisions, so every filing after it — a new step, a retry,
  * a round — is filed on them, and answers with the drift it was asked on.
  *
- * It resolves the kinds now to answer, which is what gives an edit its number in the ledger, and compares by digest, as the board's band
+ * It resolves the kinds now to answer, which numbers an edit at the index's revision, and compares by digest, as the board's band
  * does (`driftNow`).
  *
  * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose factory
@@ -574,7 +571,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
         message: `run ${id} is in the factory ${run.factory}, which follows revisions: its every filing takes what the files hold, so there is nothing to refresh. To keep a run's revisions until a refresh, nemia factory revisions ${run.factory} pinned. Nothing was written.`,
       }),
     );
-  const resolved = yield* refreshedNow(run, new Date().toISOString(), read);
+  const resolved = yield* refreshedNow(run, read);
   if (!resolved)
     return yield* Effect.fail(
       new Conflict({

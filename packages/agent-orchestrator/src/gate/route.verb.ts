@@ -12,6 +12,7 @@ import { tryOf, type Run } from '../record/record.ts';
 import { RunId } from '../record/record.model.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
+import { waitFiled } from '../wait-node/index.ts';
 
 /**
  * The follower of a condition already filed or sent its card, which settles its route; undefined while none is.
@@ -20,7 +21,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
  * @param steps The workflow's steps.
  */
 const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]) =>
-  steps.find((s) => s.after.includes(condition) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent))?.name;
+  steps.find((s) => s.after.includes(condition) && (waitFiled(s, run.steps[s.name]) || Boolean(run.steps[s.name]?.sent)))?.name;
 
 /**
  * Why `route` cannot be given to `step` of `run`, in words that name the fix — or undefined, when it may: a step that is no condition, a

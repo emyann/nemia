@@ -53,15 +53,16 @@ function Slot({
 
 /**
  * The part of the step `step` of the run's view `view`, at `size`. `agents` gives its agent a role where they are read; `now` the
- * instant its times are said at, else the clock, read again every 30 seconds. `here` is the step's own page, where the head links to no
- * page; `id` the part's anchor, as the ledger names it (`step-<name>`). `frame`, for a caller that gives the frame (the approve modal,
- * whose one frame holds its title too), draws the part's body in place of its own cut frame, told the hue the frame would wear.
+ * instant its times are said at, else the clock, read again every 30 seconds. `here` is where the head links to no page: the step's own
+ * page, and the step's bar, whose menu opens it; `id` the part's anchor, as the ledger names it (`step-<name>`). `frame`, for a caller
+ * that gives the frame (the approve modal, whose one frame holds its title too; the step's bar, which is one), draws the part's body in
+ * place of its own cut frame, told the hue the frame would wear.
  * @param props.view The run's view the step is read from.
  * @param props.step The step's name.
  * @param props.size The size it is drawn at.
  * @param props.agents The agents its head names a role from.
  * @param props.now The instant its times are said at.
- * @param props.here Whether it is drawn on the step's own page.
+ * @param props.here Whether its head links to no page: on the step's own page, or in its bar.
  * @param props.id The part's anchor.
  * @param props.frame The caller's frame around the body, given the body and its hue; the part's own cut frame by default.
  */

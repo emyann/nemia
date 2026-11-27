@@ -790,9 +790,9 @@ export const wiredRepoFor = Effect.fnUntraced(function* (name: string, workflow:
  * workflow, by its folder's name (`costLines`), is frozen beside them as `costLine`: a gate whose caps pass it says so, and holds auto
  * back (`gateBudgets`, `withinBudget`).
  *
- * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is appended to
- * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an
- * edit made while it waits `--after` reaches its first filing.
+ * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is numbered at the
+ * definition index's revision and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every
+ * pass, so an edit made while it waits `--after` reaches its first filing.
  *
  * `labels` are the run's person labels, copied once, at creation (`inheritedLabels`): every key the `after` and `context` runs agree on,
  * the card's own over them, and the typed edits over those. A key two of those runs disagree on that neither the card nor an edit sets is
@@ -867,7 +867,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   yield* forgotten(tried(() => copyInputs(home, run, inputs, cards)));
   Object.assign(run, yield* forgotten(tried(() => renderAgents(home, run, steps, found, factory))));
   Object.assign(run, workedSwitches(factory, run));
-  const pinned = yield* pinsOf(run, steps, run.createdAt);
+  const pinned = yield* pinsOf(run, steps);
   if (pinned.length) run.pinned = pinned;
   yield* homeTrusted(home, run, steps);
   yield* (yield* RunDoor).runs.create(run);

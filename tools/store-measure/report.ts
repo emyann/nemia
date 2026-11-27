@@ -38,6 +38,9 @@
  * - `inbox`, `inboxAfterPass`: `GET /api/cards`, every card (a `CardList`), over an app built afresh for each cold call and kept for the
  *   warm ones, and the same asked after a pass has filled the app's informer, as `runListAfterPass` is. A baseline taken before the
  *   CardList read `GET /api/inbox?all=true`, every card too, so a `--compare` sets the two reads of every card side by side.
+ * - `cardPage`, `cardCounts`: the board's Inbox reads (`GET /api/cards`): a page of 25 cards, newest first, those in play and not chained
+ *   (`?limit=25&orderBy=metadata.creationTimestamp desc&fieldSelector=status.inPlay=true,status.chained=false`), and a page of one card, for its
+ *   counts (`?limit=1`), over apps as `inbox` is. The intent holds the first near a run page's cost, 0.15 s warm.
  * - `chatHistory`, `chatBeatBefore`, `chatFoldStep`: her chat, at the place the copy's level file names (`nemiaChatPlace`), each over an
  *   engine (`passEngine`) and reads (`ChatReads`: the informer and the filings an app keeps) built afresh for each cold call and kept for
  *   the warm ones. `chatHistory` is `chatHistory(place, {})`, what a reader lists on joining and what the board's dock read every 5 s
@@ -406,6 +409,12 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv
 /** The inbox, every card: a page of the most a list answers, so a default page smaller than the store's cards cuts none. */
 const INBOX_URL = '/api/cards?limit=500';
 
+/** The board's page of cards: 25, newest first, in play and not in a chain. */
+const CARD_PAGE_URL = `/api/cards?limit=25&orderBy=${encodeURIComponent('metadata.creationTimestamp desc')}&fieldSelector=${encodeURIComponent('status.inPlay=true,status.chained=false')}`;
+
+/** A page of one card, which a caller that wants only the counts asks. */
+const CARD_COUNTS_URL = '/api/cards?limit=1';
+
 /** How long `chatFold` waits for the moment it hands to be sent: a fold that sends nothing (no session of hers to fold into) is null. */
 const FOLD_BOUND_MS = 10_000;
 
@@ -570,6 +579,8 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     openRunAfterPass: await objectOf(openRun, passed),
     inbox: await overApps(fresh, (app) => get(app, INBOX_URL), repeat),
     inboxAfterPass: await overApps(passed, (app) => get(app, INBOX_URL), repeat),
+    cardPage: await overApps(fresh, (app) => get(app, CARD_PAGE_URL), repeat),
+    cardCounts: await overApps(fresh, (app) => get(app, CARD_COUNTS_URL), repeat),
     chatHistory: null,
     chatBeatBefore: null,
     chatFoldStep: null,

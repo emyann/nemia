@@ -228,6 +228,8 @@ test('on an empty store the report counts no run and holds every measure, the ma
     'runListAfterPass',
     'inbox',
     'inboxAfterPass',
+    'cardPage',
+    'cardCounts',
     'chatHistory',
     'chatBeatBefore',
     'factoryList',

@@ -137,7 +137,7 @@ export const OfACard: StoryObj<typeof CopyId> = {
 };
 
 /** A card name longer than its room, with `wrap`: the id breaks across lines and the control stays inside the box beside it. */
-export const Wraps: StoryObj = {
+export const Wraps: StoryObj<{ id: string }> = {
   args: { id: 'tools-touched-runs-at-most-h-a599' },
   render: (args) => (
     <div data-box style={{ width: '12rem' }}>

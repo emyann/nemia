@@ -340,7 +340,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
     const tip = world().head(repo);
     board().settle(`${ids.a}-review`, 'succeeded', { ...SIGNED, summary: 'A-SUMMARY: the flag is parsed first', findings: FOUND });
     await aPass();
-    assert.deepEqual(await decided(ids.a), { kind: 'landed', branches: [lines.a.branch] });
+    assert.deepEqual(await decided(ids.a), { kind: 'merged', branches: [lines.a.branch] });
     for (const card of ['b', 'c']) {
       const r = await tick(ids[card]);
       assert.deepEqual([r.filed, r.waiting], [['implement'], []], card);
@@ -388,7 +388,7 @@ describe('a diamond plan: a, then b and c after it, then d after both — each f
       droppedByHand(repo, lines.b.wt, lines.b.branch);
       assert.deepEqual(await parentNow(ids.b), { record: record('b'), standing: { kind: 'released', by: 'succeeded' } }, 'git is not read');
       await aPass();
-      assert.deepEqual(await decided(ids.b), { kind: 'landed', branches: [lines.b.branch] }, 'and its own `nemia decide` says so');
+      assert.deepEqual(await decided(ids.b), { kind: 'merged', branches: [lines.b.branch] }, 'and its own `nemia decide` says so');
       assert.equal((await tick(ids.b)).run.tips?.[lines.b.branch], tip, 'a branch git no longer has keeps the tip last seen');
       const filings = [...board().filings];
       for (let pass = 0; pass < 2; pass++) {
@@ -527,7 +527,7 @@ describe('a parent that will not succeed — cancelled, failed, its frozen steps
     board().settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
     assert.equal(ahead(repo, p.run.baseRef, p.branch), 0);
     await aPass();
-    assert.deepEqual(await decided(p.run.id), { kind: 'landed', branches: [p.branch] });
+    assert.deepEqual(await decided(p.run.id), { kind: 'merged', branches: [p.branch] });
     assert.equal(await releasedNow(p.run.id), true, 'the wait is released by its success');
     const r = await tick(child.id);
     assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
@@ -544,7 +544,7 @@ describe('a parent that will not succeed — cancelled, failed, its frozen steps
       for (const parent of [lost, garbled]) {
         mergedByHand(repo, parent.branch);
         await aPass();
-        assert.deepEqual(await decided(parent.run.id), { kind: 'landed', branches: [parent.branch] });
+        assert.deepEqual(await decided(parent.run.id), { kind: 'merged', branches: [parent.branch] });
         assert.equal(await releasedNow(parent.run.id), false, 'merged by hand, still failed: the wait is not released');
         await releasing(parent.run.id);
       }

@@ -958,16 +958,16 @@ describe("decision: landed is asked of git and never stored, and a finished run 
 
     assert.deepEqual(
       decision(aRead(STEPS, finished(), { phaseOf: DONE }), unchanged),
-      { kind: 'landed', branches: ['wf/r-1/review'] },
+      { kind: 'merged', branches: ['wf/r-1/review'] },
       'every step succeeded, with nothing to commit: landed',
     );
     assert.deepEqual(decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: says('done'), asked: () => true }), unchanged), {
-      kind: 'landed',
+      kind: 'merged',
       branches: ['wf/r-1/review'],
     });
     assert.deepEqual(
       decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), () => true),
-      { kind: 'landed', branches: ['wf/r-1/review'] },
+      { kind: 'merged', branches: ['wf/r-1/review'] },
       'work past the base, merged by a person: landed though a step failed',
     );
 
@@ -992,7 +992,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
     assert.equal(decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }) }), half).kind, 'merged');
     assert.equal(
       decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }) }), () => true).kind,
-      'landed',
+      'merged',
     );
 
     const asked: string[] = [];
@@ -1021,12 +1021,12 @@ describe("an ending's gate and git's word: what is to decide, read off where the
     const byHand = decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), merged);
     assert.deepEqual(
       [byHand.kind, byHand.kind === 'merged' ? byHand.branches : []],
-      ['landed', ['wf/r-1/implement']],
+      ['merged', ['wf/r-1/implement']],
       'merged by hand before the ending ran: the gate held the merge and nothing else, and git has it: landed, so a run --after it starts',
     );
     assert.equal(
       decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), () => 'unchanged' as const).kind,
-      'landed',
+      'merged',
       "the work committed nothing past the run's base: on the base as the no-ending kind reads it, landed once every step finished",
     );
 
@@ -1053,7 +1053,7 @@ describe("an ending's gate and git's word: what is to decide, read off where the
     );
     assert.deepEqual(
       [landed.kind, landed.kind === 'merged' ? landed.branches : []],
-      ['landed', ['wf/r-1/implement']],
+      ['merged', ['wf/r-1/implement']],
       'approved, filed and done, it lands as any run does: on the branch the ending step merged, never on main',
     );
   });
@@ -1092,7 +1092,7 @@ describe("an ending's gate and git's word: what is to decide, read off where the
     assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
     assert.equal(
       l.steps[2].note,
-      'wf/r-1/implement is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel r-1',
+      'wf/r-1/implement is on main — nothing is left for ship to merge: every branch is merged as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel r-1',
     );
     assert.equal(
       approvalRefusal(
@@ -1109,7 +1109,7 @@ describe("an ending's gate and git's word: what is to decide, read off where the
         ON,
       ),
       'wf/r-1/implement is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. ' +
-        'The run has landed as git reads it — nemia decide r-1 says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: nemia cancel r-1.',
+        'Every branch of the run is merged — nemia decide r-1 says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: nemia cancel r-1.',
     );
     assert.equal(
       forgetRefusal(

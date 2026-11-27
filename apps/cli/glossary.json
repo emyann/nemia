@@ -8,7 +8,7 @@
   "terms": [
     {
       "term": "Merged",
-      "meaning": "a run whose base step committed its merge into the base branch, as `nemia stats` counts it (the `merged` column and `cost/merged`, `time/merged`, in `apps/cli/src/commands/rest/stats-lines.ts`): a branch that is merged, not a run that succeeded.",
+      "meaning": "a run whose base step committed its merge into the base branch, as `nemia stats` counts it (the `merged` column and the cost and time per merged run, in `apps/cli/src/commands/rest/stats-lines.ts`): a branch that is merged, not a run that succeeded.",
       "retired": [
         {
           "spelling": "landed",

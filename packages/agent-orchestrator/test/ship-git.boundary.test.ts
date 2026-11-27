@@ -315,7 +315,7 @@ test("an approved ending with no check of its own is filed, in the repository's 
   assert.equal(await isLanded(repositoryRun(record), branch), true);
   await aPass();
   const { decision, toDecide, standings } = await runWith(e, decideRun(id));
-  assert.deepEqual([decision.kind, toDecide, standings], ['landed', undefined, [{ branch, where: 'on' }]]);
+  assert.deepEqual([decision.kind, toDecide, standings], ['merged', undefined, [{ branch, where: 'on' }]]);
   assert.equal(
     git(repo, 'rev-parse', 'HEAD'),
     merged,

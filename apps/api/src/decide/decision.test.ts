@@ -185,7 +185,7 @@ describe("a run's decision on the api, and the run object beside it: one reading
       assert.deepEqual(body.lesson, { said: 'CLAUDE.md +2 −0', state: 'written' });
       assert.deepEqual(
         body.commands.map((c: DecideCommand) => c.label),
-        ['land it', 'drop it'],
+        ['merge it', 'drop it'],
       );
       const detail = await detailOf('r-d1');
       assert.deepEqual(

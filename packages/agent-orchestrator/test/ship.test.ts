@@ -1109,7 +1109,7 @@ describe('a result a person merged by hand before its ending ran: the run has la
         [ship.message, ship.note],
         [
           'awaiting approval',
-          `${branch} is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
+          `${branch} is on main — nothing is left for ship to merge: every branch is merged as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
         ],
       );
     },

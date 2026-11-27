@@ -2943,7 +2943,7 @@ test('the task is drawn in its parts: its text, and each run it was handed a blo
   assert.ok(task.indexOf('Do the work.') < task.indexOf('data-from-run="cache-a1"'), 'in the order the task has them');
   const block = (run: string) => new RegExp(`<section data-from-run="${run}"[\\s\\S]*?</section>`).exec(task)?.[0] ?? '';
   assert.match(block('cache-a1'), /data-how="waited"/);
-  assert.match(block('cache-a1'), /href="\/runs\/cache-a1"[^>]*>Waited on, landed · Build the cache\. ↗<\/a>/);
+  assert.match(block('cache-a1'), /href="\/runs\/cache-a1"[^>]*>Waited on, succeeded · Build the cache\. ↗<\/a>/);
   assert.match(block('cache-a1'), /<strong>the cache<\/strong>/, 'its body drawn as markdown');
   assert.match(block('probe-b2'), /href="\/runs\/probe-b2"[^>]*>Read as context · Measure the cache\. ↗<\/a>/);
   assert.doesNotMatch(task, /data-from-run="old-c3"|href="\/runs\/old-c3"/);

@@ -223,7 +223,7 @@ async function onTheRunPage(page: Page, what: string) {
   await expectCount(blocks, 3, 'a block for each run it was handed');
   const hows = await blocks.evaluateAll((all) => all.map((el) => el.getAttribute('data-how')));
   if (hows.join() !== 'waited,read,read') throw new Refused(`the blocks are headed waited, read, read — they are ${hows.join(', ')}`);
-  await expectVisible(blocks.nth(0).locator('h5', { hasText: `Waited on, landed · ${DIAMOND.top.title}` }), 'the wait, headed by how');
+  await expectVisible(blocks.nth(0).locator('h5', { hasText: `Waited on, succeeded · ${DIAMOND.top.title}` }), 'the wait, headed by how');
   await expectVisible(blocks.nth(1).locator('h5', { hasText: `Read as context · ${FAKE.title}` }), 'what it read, headed by how');
   await expectVisible(blocks.nth(1).locator(`a[href="/runs/${FAKE.id}"]`), 'linked to its run');
   await expectVisible(blocks.nth(1).getByText('Not succeeded, not judged', { exact: false }), 'and labelled not landed');

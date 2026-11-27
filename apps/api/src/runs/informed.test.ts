@@ -210,7 +210,7 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     assert.deepEqual(await saidBoth(), { decision: true, object: true }, 'no pass has read the hand merge: neither has moved');
     await aPass();
     const said = await decision();
-    assert.ok('nothing' in said && said.nothing.startsWith('succeeded'), JSON.stringify(said));
+    assert.ok('nothing' in said && said.nothing.includes(' merged into '), JSON.stringify(said));
     assert.equal((await object(id)).status.toDecide, null, 'once a pass reads the hand merge, the object has nothing to decide either');
   } finally {
     dropRecord(root, runKey(id));

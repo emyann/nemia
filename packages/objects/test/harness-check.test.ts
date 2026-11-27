@@ -37,7 +37,7 @@ test('a check turn, an install piece with its two checks and the milestones deco
       { name: 'harness', state: 'done', message: 'a harness is signed in' },
       { name: 'factory', state: 'next', message: 'file a factory' },
       { name: 'volume', state: 'later', message: 'mount a volume' },
-      { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+      { name: 'succeeded', state: 'later', message: 'see a first run succeed' },
     ],
   };
   assert.deepEqual(Schema.decodeUnknownSync(Milestones)(read), read);

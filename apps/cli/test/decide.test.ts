@@ -56,7 +56,7 @@ const DECISIONS: Record<string, unknown> = {
     commands: [
       { label: 'approve', command: 'nemia approve r-1 plan', said: 'lets what follows be filed', step: 'plan' },
       { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
-      { label: 'land it', command: 'git -C /repo merge --no-ff wf/r-1/plan', said: null, step: null },
+      { label: 'merge it', command: 'git -C /repo merge --no-ff wf/r-1/plan', said: null, step: null },
     ],
     awaiting: { branches: ['wf/r-1/plan'], direct: false },
     collisions: null,
@@ -126,7 +126,7 @@ test('off a terminal, the screen of the decision is printed off the api read, it
   assert.match(out, /in full {2}wf\/r-1\/plan: package\.json/);
   assert.match(out, /wf\/r-1\/plan {2}ahead of main by 2 commits {2}3 files: \+14 −1/);
   assert.match(out, /^ {2}1\. approve: nemia approve r-1 plan/m);
-  assert.match(out, /^ {2}3\. land it: git -C \/repo merge --no-ff wf\/r-1\/plan/m);
+  assert.match(out, /^ {2}3\. merge it: git -C \/repo merge --no-ff wf\/r-1\/plan/m);
   assert.deepEqual(ran, []);
 });
 

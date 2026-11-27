@@ -230,7 +230,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}) => {
       checks: checksOn(decided.timeline.steps),
     },
     decision: {
-      landed: 'nothing' in read && Boolean(read.nothing?.startsWith('landed')),
+      landed: 'nothing' in read && Boolean(read.nothing?.includes(' merged into ')),
       waitingOn: sorted('waiting' in read ? read.waiting.runs.map((w) => w.run) : []),
       ...('standings' in read ? { checkout: read.baseHeldBy?.run ?? null } : {}),
     },

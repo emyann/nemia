@@ -28,8 +28,8 @@ const ctx = new ServerCallContext();
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
  * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget`, `kept`, `compact` — unless
- * `bare`, which leaves
- * it the four every driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
+ * `bare`, which leaves it the four every driver has; `noFind` takes `find` alone away, and `noObserveFor` `observeFor`
+ * alone. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
   o: {
@@ -41,6 +41,7 @@ const harness = (
     transcriptFails?: unknown;
     bare?: boolean;
     noFind?: boolean;
+    noObserveFor?: boolean;
   } = {},
 ) => {
   const sessions = new Map<string, Sighting>();
@@ -86,6 +87,20 @@ const harness = (
               return Effect.succeed(s ? { sessionId: s.sessionId } : undefined);
             }),
         }),
+    ...(o.bare || o.noObserveFor
+      ? {}
+      : {
+          /**
+           * Told what is expected, it lists those alone: what a driver that reads less when told looks like. A name it was
+           * told to leave unread (`unread`) it leaves unread, as a driver whose registry could not be read leaves one.
+           */
+          observeFor: (expected: readonly ExpectedSession[]) =>
+            Effect.suspend(() => {
+              asked.push(['observeFor', expected]);
+              const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
+              return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
+            }),
+        }),
     ...(o.bare
       ? {}
       : {
@@ -103,20 +118,10 @@ const harness = (
               asked.push(['say', [session, text]]);
               return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
             }),
-          /**
-           * Told what is expected, it lists those alone: what a driver that reads less when told looks like. A name it was
-           * told to leave unread (`unread`) it leaves unread, as a driver whose registry could not be read leaves one.
-           */
           output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
             Effect.suspend(() => {
               asked.push(['output', [name, stream, lastBytes]]);
               return Effect.succeed(sessions.has(name) ? `${stream} of ${name}` : undefined);
-            }),
-          observeFor: (expected: readonly ExpectedSession[]) =>
-            Effect.suspend(() => {
-              asked.push(['observeFor', expected]);
-              const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
-              return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
             }),
           forget: (session: { name: string; nativeId?: string }, options: { dry: boolean }) =>
             Effect.suspend(() => {
@@ -154,7 +159,7 @@ const harness = (
         }),
   };
   const handler = new HarnessHandler('fake', ops, async (id) => journal.get(id) ?? []);
-  const acted = () => asked.filter(([verb]) => verb !== 'observe');
+  const acted = () => asked.filter(([verb]) => verb !== 'observe' && verb !== 'observeFor');
   return { handler, sessions, unread, asked, acted, journal };
 };
 
@@ -765,7 +770,7 @@ describe("the card and the runtime's extension: each method offered as the drive
       [['ae/t-1/1', TaskState.TASK_STATE_WORKING]],
     );
     assert.deepEqual(unread, []);
-    assert.deepEqual(h.acted(), [['observeFor', expected]]);
+    assert.deepEqual(h.asked, [['observeFor', expected]]);
   });
   test('observeSessions answers the names the driver could not read, beside the Tasks it listed', async () => {
     const h = harness();
@@ -1197,7 +1202,7 @@ describe('a running session told words and stopped: the harness asked once, with
       refusedWith(HarnessFailed, 'fake stop s-1: no such session (exit 1)'),
     );
   });
-  test('words to a running session reach the harness with the id it lists, and the Task answers as it was seen', async () => {
+  test('words to a running session reach the harness with the id it lists, looked for by its one name, and the Task answers as it was seen', async () => {
     const h = harness();
     h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
     h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'input-required', waitingFor: 'permission prompt' });
@@ -1207,10 +1212,24 @@ describe('a running session told words and stopped: the harness asked once, with
     const waiting = await h.handler.sendMessage(said('ae/t-2/1', 'go on', { contextId: '' }), ctx);
     assert.ok('status' in waiting);
     assert.equal(waiting.status.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'a session waiting on a person still takes words');
-    assert.deepEqual(h.acted(), [
+    assert.deepEqual(h.asked, [
+      ['observeFor', [{ name: 'ae/t-1/1' }]],
       ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'look at the tests again']],
+      ['observeFor', [{ name: 'ae/t-2/1' }]],
       ['say', [{ name: 'ae/t-2/1', sessionId: 's-2' }, 'go on']],
     ]);
+
+    const whole = harness({ noObserveFor: true });
+    whole.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    await whole.handler.sendMessage(said('ae/t-1/1', 'again'), ctx);
+    assert.deepEqual(
+      whole.asked,
+      [
+        ['observe', undefined],
+        ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'again']],
+      ],
+      'a harness that cannot look by name is listed whole',
+    );
   });
   test('words to a session listed done whose process its harness still holds reach it, as an open session; one let go is refused', async () => {
     const h = harness();
@@ -1223,7 +1242,18 @@ describe('a running session told words and stopped: the harness asked once, with
       h.handler.sendMessage(said('ae/t-2/1', 'next', { contextId: '' }), ctx),
       refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (completed): it takes no more words.'),
     );
-    assert.deepEqual(h.acted(), [['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'next']]]);
+    assert.deepEqual(h.asked, [
+      ['observeFor', [{ name: 'ae/t-1/1' }]],
+      ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'next']],
+      ['observeFor', [{ name: 'ae/t-2/1' }]],
+    ]);
+  });
+  test('words to a session its harness looked for by name and could not read throw HarnessFailed, never a session not listed, and say is not asked', async () => {
+    const h = harness();
+    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    h.unread.add('ae/t-1/1');
+    await assert.rejects(h.handler.sendMessage(said('ae/t-1/1', 'hi'), ctx), (e) => e instanceof HarnessFailed);
+    assert.deepEqual(h.asked, [['observeFor', [{ name: 'ae/t-1/1' }]]]);
   });
   test('words the harness could not deliver throw its words, unchanged', async () => {
     const h = harness({ sayFails: 'fake message s-1: inbox closed (exit 3)' });
@@ -1262,7 +1292,7 @@ describe('sessionTranscript: read by the id the record names, found or observed 
     );
     assert.deepEqual(h.asked.slice(1), [['transcript', ['s-left', undefined]]]);
   });
-  test('a transcript of an attempt in flight: found by name when the harness can find, with no listing; observed when it cannot', async () => {
+  test('a transcript of an attempt in flight: found by name when the harness can find, with no listing; looked for by its one name when it cannot', async () => {
     const flight: Event[] = [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }];
     const finds = harness();
     finds.journal.set('t-1', flight);
@@ -1278,9 +1308,22 @@ describe('sessionTranscript: read by the id the record names, found or observed 
     lists.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'input-required' });
     assert.equal((await lists.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
     assert.deepEqual(lists.asked, [
-      ['observe', undefined],
+      ['observeFor', [{ name: 'ae/t-1/1' }]],
       ['transcript', ['s-1', undefined]],
     ]);
+
+    const whole = harness({ noFind: true, noObserveFor: true });
+    whole.journal.set('t-1', flight);
+    whole.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    assert.equal((await whole.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+    assert.deepEqual(
+      whole.asked,
+      [
+        ['observe', undefined],
+        ['transcript', ['s-1', undefined]],
+      ],
+      'a harness that cannot look by name is listed whole',
+    );
   });
   test('a transcript whose session its harness cannot name this time is none, and the harness is not asked to read one', async () => {
     const flight: Event[] = [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }];
@@ -1293,12 +1336,13 @@ describe('sessionTranscript: read by the id the record names, found or observed 
     );
     assert.deepEqual(early.asked, [
       ['find', 'ae/t-1/1'],
-      ['observe', undefined],
+      ['observeFor', [{ name: 'ae/t-1/1' }]],
     ]);
 
-    const broken = harness({ findFails: new TypeError('the registry file is torn'), observeFails: 'fake ls: exit 3' });
+    const broken = harness({ findFails: new TypeError('the registry file is torn') });
     broken.journal.set('t-1', flight);
     broken.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    broken.unread.add('ae/t-1/1');
     assert.equal(
       await broken.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
       null,
@@ -1306,7 +1350,7 @@ describe('sessionTranscript: read by the id the record names, found or observed 
     );
     assert.deepEqual(broken.asked, [
       ['find', 'ae/t-1/1'],
-      ['observe', undefined],
+      ['observeFor', [{ name: 'ae/t-1/1' }]],
     ]);
 
     const listed = harness({ findFails: new RunnerError({ verb: 'find', message: 'fake: no registration file' }) });
@@ -1331,7 +1375,7 @@ describe('sessionTranscript: read by the id the record names, found or observed 
     assert.deepEqual(
       h.asked,
       [
-        ['observe', undefined],
+        ['observeFor', [{ name: 'ae/t-1/1' }]],
         ['transcript', ['s-1', undefined]],
       ],
       'an `ended` with no id, as an older runtime wrote one: no find, which reads only what is in flight — the listing',

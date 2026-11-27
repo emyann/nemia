@@ -83,7 +83,10 @@ export type LandRead = {
   readonly mergeable: Mergeable;
   /** The CI context the factory names (`ciCheck`) passed at the head, or neither the head nor its base declares a CI workflow. */
   readonly green: boolean;
-  /** The head holds the base branch's tip where the factory names a refresh; true where it names none. */
+  /**
+   * The head lands as ci judged it where the factory names a refresh: it holds the base branch's tip, or merging that tip in changes
+   * nothing the refresh derives; true where the factory names none.
+   */
   readonly current: boolean;
   /**
    * A commit of one of the run's result branches has no equivalent patch (`git cherry`) on the open head, or on the merge commit where
@@ -153,7 +156,7 @@ const landWriteSpec = spec<(read: LandRead) => LandAct>({
     },
     mergesOnlyTheRunsOwnGreenWholeCurrentHead: {
       description:
-        "The pull request is merged exactly where it is open, the run's own, mergeable, green at its head, holding the base where the factory refreshes, and leaving no result branch out",
+        "The pull request is merged exactly where it is open, the run's own, mergeable, green at its head, current where the factory refreshes, and leaving no result branch out",
       condition: ({ input: [r], output }) =>
         (output === 'merge') === (live(r) && r.pull === 'open' && r.ours && r.mergeable === 'yes' && r.green && r.current && !r.leftOut),
     },

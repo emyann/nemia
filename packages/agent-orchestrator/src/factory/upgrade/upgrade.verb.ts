@@ -5,7 +5,8 @@
  * factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve` writes the person's choice for
  * one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict an object of the tree owns (`resolvedBy`: a Workflow, an
  * Agent, a Skill, a Hire or the Factory), once each conflict of that owner has one, proposes the owner as the choices compose it
- * (`ownerSpec`), a Proposal of it at its version now, by the caller its session's token names (`sessionCaller`), and records it beside the
+ * (`ownerObjects`), a Proposal of it at its version now, by the caller its session's token names (`sessionCaller`), and records
+ * it beside the
  * choices by the owner's key (`ownerKey`); the controller merges once each other conflict — a carried file's, the wiring's other keys', a
  * file's that is not text — has a choice and each such proposal applied. A run in flight keeps the folders frozen on its record.
  */
@@ -16,7 +17,7 @@ import { FACTORY_DIFF_WORDS, FACTORY_RESOLVE_WORDS, FACTORY_UPGRADE_WORDS } from
 import type { Args } from '../../command/command.ts';
 import type { Served } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
-import { ownerSpec } from './owner-spec.ts';
+import { ownerObjects } from './owner-spec.ts';
 import { ResolutionProposer } from './proposer.verb.ts';
 import { textIn } from '../../folder/folder.ts';
 import { StoreRoot } from '../../config/root.store.ts';
@@ -44,6 +45,8 @@ import {
   entriesIn,
   readResolutions,
   choicesFor,
+  choicesHeld,
+  conflictDigest,
   proposalsFor,
   resolutionsFile,
   treeDir,
@@ -478,9 +481,9 @@ type Resolved = {
 };
 
 /**
- * The owner `key` of `factory` (`ownerOfKey`) as `merge` composes its files with `choices` (`ownerSpec`), handed to the proposer the
+ * The owner `key` of `factory` (`ownerOfKey`) as `merge` composes its files with `choices` (`ownerObjects`), handed to the proposer the
  * program was given (`ResolutionProposer`): proposed at the version it is at now, by the caller the session's token names, or its removal.
- * Refused as `ownerSpec` refuses (`Invalid`), and as the proposer refuses. The proposal's name.
+ * Refused as `ownerObjects` refuses (`Invalid`), and as the proposer refuses. The proposal's name.
  */
 const proposedResolution = Effect.fn('proposedResolution')(function* (
   factory: Templated,
@@ -492,9 +495,9 @@ const proposedResolution = Effect.fn('proposedResolution')(function* (
 ) {
   const owner = ownerOfKey(key);
   const tree = new Map(ours.flatMap((e) => (textIn(e.bytes) === null ? [] : [[e.path, textIn(e.bytes) ?? ''] as const])));
-  const spec = yield* tried(() => ownerSpec(factory.name, owner, merge, choices, tree));
+  const objects = yield* tried(() => ownerObjects(factory.name, owner, merge, choices, tree));
   const why = `the resolution of ${factory.name}'s upgrade to ${to}: ${ownerSaid(key)} as the choices for its conflicts compose it`;
-  return yield* (yield* ResolutionProposer)(factory.name, owner.kind, owner.name, spec, why);
+  return yield* (yield* ResolutionProposer)(factory.name, objects, why);
 });
 
 /**
@@ -536,7 +539,11 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
       }),
     );
   const kept = readResolutions(home, factory.name);
-  const choices = { ...choicesFor(kept, merging), [at]: choice };
+  const held = choicesHeld(choicesFor(kept, merging), kept?.seen, merge.conflicts);
+  const choices = { ...held, [at]: choice };
+  const seen: Record<string, string> = Object.fromEntries(
+    merge.conflicts.filter((c) => Object.hasOwn(choices, c.at)).map((c) => [c.at, conflictDigest(c)]),
+  );
   const proposals: Record<string, string> = Object.fromEntries(Object.entries(proposalsFor(kept, merging)).filter(([o]) => o !== owner));
   const written = () => {
     const { proposals: _was, ...others } = kept ?? {};
@@ -546,6 +553,7 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
       template: merging.template,
       base: merging.base,
       choices,
+      seen,
       ...(Object.keys(proposals).length ? { proposals } : {}),
     });
   };

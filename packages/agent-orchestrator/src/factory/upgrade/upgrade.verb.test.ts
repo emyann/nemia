@@ -618,6 +618,7 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[2] = { name: 'ship', after: ['review'], waitsFor: ['shipped'] };
     });
+    fs.writeFileSync(path.join(dir, 'workflows/dev/ship.md'), '');
     const preview = (await previewOf('wait', '--to', '0.2.0')) as Previewed & {
       merge: { conflicts: { at: string; message?: string }[] };
     };
@@ -650,6 +651,7 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
       spec.steps[1].rounds = 2;
       spec.steps[2] = { name: 'ship', after: ['review'], waitsFor: ['shipped'] };
     });
+    fs.writeFileSync(path.join(dir, 'workflows/dev/ship.md'), '');
     await main(['factory', 'upgrade', 'tidy', '--to', '0.2.0'], noEngine());
     const at = [`${SHIP}#disallowedTools`, `${REVIEW}#rounds`];
     const waiting = await reconciled(templated('tidy'));

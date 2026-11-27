@@ -22,6 +22,9 @@ const labelChips = (selector: string | undefined) =>
  */
 const SEGMENT = { icon: 'hidden', label: 'flex items-center gap-2 whitespace-nowrap' } as const;
 
+/** A segment at the width of its word, so the segmented choices keep their content's width and the search bar takes the rest of the row. */
+const FIT = 'flex-none basis-auto';
+
 /**
  * The search bar of the Inbox: the chips of what was picked — the words searched and each label — and the words being typed, with the
  * labels in use suggested, each with how many cards hold it. Enter keeps the words as the page's search; picking a suggestion adds its
@@ -93,30 +96,32 @@ export function InboxToolbar({
       <SearchBar view={view} labels={labels} onSearch={onSearch} />
       <SegmentedButton
         aria-label="Sort"
+        className="w-auto shrink-0"
         disallowEmptySelection
         selectedKeys={[view.sort ?? 'newest']}
         onSelectionChange={(keys) => onSearch({ sort: keys.has('oldest') ? 'oldest' : undefined, older: undefined })}
       >
-        <Segment id="newest" classNames={SEGMENT}>
+        <Segment id="newest" classNames={SEGMENT} className={FIT}>
           <ArrowUpDown aria-hidden="true" size={16} />
           Newest
         </Segment>
-        <Segment id="oldest" classNames={SEGMENT}>
+        <Segment id="oldest" classNames={SEGMENT} className={FIT}>
           <ArrowUpDown aria-hidden="true" size={16} />
           Oldest
         </Segment>
       </SegmentedButton>
       <SegmentedButton
         aria-label="Layout"
+        className="w-auto shrink-0"
         disallowEmptySelection
         selectedKeys={[layout]}
         onSelectionChange={(keys) => onLayout(keys.has('list') ? 'list' : 'grid')}
       >
-        <Segment id="grid" classNames={SEGMENT}>
+        <Segment id="grid" classNames={SEGMENT} className={FIT}>
           <LayoutGrid aria-hidden="true" size={16} />
           Grid
         </Segment>
-        <Segment id="list" classNames={SEGMENT}>
+        <Segment id="list" classNames={SEGMENT} className={FIT}>
           <List aria-hidden="true" size={16} />
           List
         </Segment>

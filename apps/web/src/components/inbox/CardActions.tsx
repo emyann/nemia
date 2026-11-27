@@ -5,7 +5,7 @@ import { Ellipsis, X } from 'lucide-react';
 import { Body, Button, IconButton, Menu, SideSheet, Checkbox } from '@/components/ui/ds';
 import { CutComboBox } from '@/components/look';
 import { factoriesQuery } from '@/lib/api/factories';
-import { dropCard, inboxPageQuery, queueCard, setCardAfter, setCardFrom, type InboxEntry } from '@/lib/api/inbox';
+import { cardBodyQuery, dropCard, inboxPageQuery, queueCard, setCardAfter, setCardFrom, startCard, type InboxEntry } from '@/lib/api/inbox';
 import { type Started } from '@/lib/api/workflows';
 import { queueable, startedCard, unassigned, type CardRefusal } from '@/lib/inbox';
 import { sayWritten } from '@/lib/written';
@@ -41,8 +41,10 @@ const useRead = () => {
 };
 
 /**
- * The one Start of a card, and what stands beside it. A card not started and not queued: Start, which queues it where it names a factory
- * and a workflow (it runs once the cards before it are done, and when there is room), and opens its start where it names either not. A
+ * The one Start of a card, and what stands beside it. A card not started and not queued: Start, which queues it where it waits on cards
+ * not yet done (it runs once they are, and when there is room), starts it at once where it names a factory and a workflow and waits on
+ * nothing, with its body as the brief, staying on the page with a notice that offers Open, and opens its start where it names either not,
+ * or has no body. A
  * card queued shows no Start; its menu takes the start back. A card whose start was refused, or that waits on a card only a person can
  * release, shows Edit, which opens what to change. A card started shows Open run.
  */
@@ -66,6 +68,21 @@ function CardPrimary({
     onMutate: () => onRefused(null),
     onSuccess: () => sayWritten('started', entry.name, () => void navigate({ to: '/inbox/$name', params: { name: entry.name } })),
     onError: (error) => onRefused({ action: 'queue', message: error.message }),
+    onSettled: read,
+  });
+  const queryClient = useQueryClient();
+  const begin = useMutation({
+    mutationFn: async () => {
+      const brief = await queryClient.fetchQuery(cardBodyQuery(entry.name));
+      if (brief.trim() === '' || entry.workflow === null) return null;
+      return startCard(entry, { workflow: entry.workflow, brief }, entry.factory);
+    },
+    onMutate: () => onRefused(null),
+    onSuccess: (started) => {
+      if (started === null) return onSheet('start');
+      sayWritten('started', entry.name, () => void navigate({ to: '/runs/$runId', params: { runId: started.id } }));
+    },
+    onError: (error) => onRefused({ action: 'start', message: error.message }),
     onSettled: read,
   });
   const run = entry.startedAs.at(-1);
@@ -96,8 +113,12 @@ function CardPrimary({
     <Button
       variant="outlined"
       size={size}
-      isDisabled={queue.isPending}
-      onPress={() => (queueable(entry) && entry.waits !== undefined ? queue.mutate() : onSheet('start'))}
+      isDisabled={queue.isPending || begin.isPending}
+      onPress={() => {
+        if (!queueable(entry)) return onSheet('start');
+        if (entry.waits !== undefined) return queue.mutate();
+        begin.mutate();
+      }}
     >
       Start
     </Button>

@@ -262,7 +262,6 @@ function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: Readonl
         <line
           key={gate.step}
           data-gate={gate.step}
-          data-gate-at={gate.at}
           x1={gate.x}
           x2={gate.x}
           y1={gate.y - 5.5}

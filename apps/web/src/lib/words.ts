@@ -245,8 +245,6 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
  */
 export const NOW_WORDS = {
   waitsOn: 'waits on',
-  checkout: 'waits on the checkout',
-  theCheckout: '· the checkout',
   slot: 'a run slot',
   until: '· until',
   succeeds: 'succeeds',

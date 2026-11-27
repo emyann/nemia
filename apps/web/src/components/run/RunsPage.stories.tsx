@@ -65,11 +65,11 @@ const tonesOf = (page: HTMLElement, name: string) =>
   );
 
 /**
- * That lgll's row counts the two runs that wait on it in its fan, and that each of `ends` says it waits on lgll's checkout, lgll a link.
+ * That lgll's row counts the two runs that wait on it in its fan, and that each of `ends` says it waits on lgll, lgll a link.
  * @param page The page.
- * @param ends The rows that wait on the checkout lgll holds, by their id's last four characters.
+ * @param ends The rows that wait on lgll, by their id's last four characters.
  */
-const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_RUNS>) => {
+const lgllWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_RUNS>) => {
   const row = (end: keyof typeof TARGET_RUNS) =>
     page.querySelector<HTMLElement>(`[data-section="in-flight"] [data-run="${TARGET_RUNS[end].metadata.name}"]`)!;
   await expect(within(row('lgll')).getByRole('img', { name: NOW_WORDS.waitedBy(2) })).toHaveTextContent('2');
@@ -78,7 +78,7 @@ const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_
       'href',
       `/runs/${TARGET_RUNS.lgll.metadata.name}`,
     );
-    await expect(row(end).querySelector('[data-now-words]')).toHaveTextContent(`${NOW_WORDS.waitsOn} lgll ${NOW_WORDS.theCheckout}`);
+    await expect(row(end).querySelector('[data-now-words]')).toHaveTextContent(`${NOW_WORDS.waitsOn} lgll`);
   }
 };
 
@@ -113,8 +113,7 @@ const headsOf = (page: HTMLElement, label: string) =>
   [...page.querySelectorAll(`[aria-label="${label}"] [role="columnheader"]`)].map((head) => head.textContent?.trim().toUpperCase());
 
 /**
- * Nothing waits on you: the waiting part one line, its chip quiet; three runs in flight, lgll being checked and two waiting on the
- * checkout it holds, each naming lgll, which counts them in its fan; and a page of the finished runs, each table by its columns; and
+ * Nothing waits on you: the waiting part one line, its chip quiet; three runs in flight, lgll being checked and two waiting on it, each naming lgll, which counts them in its fan; and a page of the finished runs, each table by its columns; and
  * the rows' marks each say their words in the kit's tooltip.
  */
 export const NothingWaits: Story = {
@@ -133,7 +132,7 @@ export const NothingWaits: Story = {
     const lgll = page.querySelector<HTMLElement>(`[data-run="${TARGET_RUNS.lgll.metadata.name}"]`)!;
     await expect(within(lgll).getByRole('link', { name: 'area=api' })).toHaveTextContent('api');
     await expect(within(lgll).getByText('quick')).toBeVisible();
-    await checkoutWaits(page, ['649a', '5zt1']);
+    await lgllWaits(page, ['649a', '5zt1']);
     await tipsSay(page, userEvent);
   },
 };
@@ -154,13 +153,12 @@ export const OneWaitsOnYou: Story = {
     await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);
     await expect(open).toHaveTextContent('Open the run');
     await expect(open?.closest('a') ?? open).toHaveAttribute('href', `/runs/${TARGET_RUNS.vqvd.metadata.name}`);
-    await checkoutWaits(page, ['649a', '5zt1']);
+    await lgllWaits(page, ['649a', '5zt1']);
   },
 };
 
 /**
- * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting on the checkout that
- * run holds, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you:
+ * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you:
  * one that asks questions, one whose check failed.
  */
 export const EveryState: Story = {
@@ -185,7 +183,7 @@ export const EveryState: Story = {
     await expect(row('1sw7').getByRole('img', { name: 'round 2 of 3' })).toBeVisible();
     await expect(row('1sw7').getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
     await expect(row('649a').getByRole('link', { name: /^lgll: / })).toBeVisible();
-    await checkoutWaits(page, ['5zt1']);
+    await lgllWaits(page, ['5zt1']);
     for (const card of page.querySelectorAll('[data-section="waiting"] article[data-run]'))
       await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);
   },

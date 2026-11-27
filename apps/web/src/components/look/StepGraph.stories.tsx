@@ -64,25 +64,14 @@ export const AtWork: Story = {
 /** A run whose check is at work on implement: alive, as its session would be. */
 export const Checking: Story = { args: { run: graphRun(CHECKED) } };
 
-/** A run at its gate: land yellow and a size larger, its gate's tick yellow, before land, which is approved before it runs. */
-export const AtItsGate: Story = {
-  args: { run: graphRun(GATE) },
-  play: async ({ canvasElement }) => {
-    const tick = canvasElement.querySelector('[data-gate="land"]')!;
-    await expect(tick).toHaveAttribute('data-gate-at', 'before');
-    await expect(Number(tick.getAttribute('x1'))).toBeLessThan(centreOf(canvasElement, 'land'));
-  },
-};
-
 /**
  * A build run at its design gate: design yellow and a size larger, its gate's tick yellow after it, between design and implement, since
- * its closeout is what waits; land's tick still before land.
+ * its closeout is what waits.
  */
 export const AtItsDesignGate: Story = {
   args: { run: graphRun(DESIGN_GATE) },
   play: async ({ canvasElement }) => {
     const tick = canvasElement.querySelector('[data-gate="design"]')!;
-    await expect(tick).toHaveAttribute('data-gate-at', 'after');
     const x = Number(tick.getAttribute('x1'));
     await expect(x).toBeGreaterThan(centreOf(canvasElement, 'design'));
     await expect(x).toBeLessThan(centreOf(canvasElement, 'implement'));

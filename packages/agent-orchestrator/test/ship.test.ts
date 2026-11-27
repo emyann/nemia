@@ -1122,7 +1122,7 @@ describe('a result a person merged by hand before its ending ran: the run has la
       assert.deepEqual([decision.kind, decision.kind === 'merged' ? decision.branches : []], ['merged', [branch]]);
       const decided = (await decisionOn(stage, id)).decision;
       const said = 'nothing' in decided ? decided.nothing : '';
-      assert.match(said, new RegExp(`^\\w+ — ${branch} merged into main\\n  ship never ran`));
+      assert.match(said, new RegExp(`^awaiting approval — ${branch} merged into main\\n  ship never ran`));
       assert.ok(said.endsWith(`nemia cancel ${id}`));
     },
   );

@@ -251,7 +251,7 @@
     },
     {
       "term": "Node kind",
-      "meaning": "what a node of a workflow's graph is: a `step`, a `condition` that routes, a `workflow` node that files a card for another workflow, a `command` run with no session, or a `wait` node that runs nothing and passes when its conditions are True (`NODE_KINDS`, `packages/objects/src/words.ts`).",
+      "meaning": "what a node of a workflow's graph is: a `step`, a `condition` that routes, a `workflow` node that starts a run of another workflow, a `command` run with no session, or a `wait` node that runs nothing and passes when its conditions are True (`NODE_KINDS`, `packages/objects/src/words.ts`).",
       "type": "NodeKind"
     },
     {

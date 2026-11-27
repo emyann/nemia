@@ -1,2 +1,2 @@
-The route to `build`: files a card for the intent with `workflow: build` and `from:` this run, which the factory starts as any card.
+The route to `build`: starts a run of `workflow: build` for the intent, handed this run as context.
 No agent runs here.

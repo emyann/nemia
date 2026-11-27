@@ -23,7 +23,7 @@ import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
 import { markedKeyspace, markedKeyspaceHeld, runRecords } from './records.store.ts';
 
-export { cardStartedTwice, runTaken } from './records.store.ts';
+export { cardStartedTwice, childStartedTwice, runTaken } from './records.store.ts';
 
 /** The memory stand-in's layer of the Run door: the run store's groups, as plain synchronous methods. */
 export type RunsLayer = RunStore;

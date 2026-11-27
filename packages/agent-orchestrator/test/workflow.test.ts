@@ -292,6 +292,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
       | 'when'
       | 'ends'
       | 'workflow'
+      | 'brief'
       | 'card'
       | 'relabel'
       | 'waitsFor'
@@ -353,8 +354,12 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
   const condition = fm('triage', 'routes: [web, docs]\nroute: judge\nends: [docs]');
   assert.deepEqual([condition.routes, condition.route, condition.ends], [['web', 'docs'], { kind: 'judge' }, ['docs']]);
-  const routed = fm('to-build', 'after: triage\nwhen: web\nworkflow: build');
-  assert.deepEqual([routed.when, routed.workflow], [['web'], 'build'], 'a node on a route: src/route/route.test.ts reads them too');
+  const routed = fm('to-build', 'after: triage\nwhen: web\nworkflow: build\nbrief: card');
+  assert.deepEqual(
+    [routed.when, routed.workflow, routed.brief],
+    [['web'], 'build', 'card'],
+    'a node on a route: src/route/route.test.ts reads them too',
+  );
   const filedBack = fm('backlog', 'after: triage\nwhen: docs\ncard: backlog\nrelabel: [ready-]');
   assert.deepEqual([filedBack.card, filedBack.relabel], ['backlog', ['ready-']], 'a card node: src/send/send.verb.test.ts reads them too');
   const waiting = fm('ready', 'after: verify\nwaitsFor: [ready]');
@@ -379,6 +384,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     ends: condition.ends,
     when: routed.when,
     workflow: routed.workflow,
+    brief: routed.brief,
     card: filedBack.card,
     relabel: filedBack.relabel,
     waitsFor: waiting.waitsFor,

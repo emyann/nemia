@@ -480,7 +480,17 @@ export {
   type FileHeld,
   type FilePointed,
 } from './start/files.store.ts';
-export { INBOX, INBOX_ADD, INBOX_ATTACH, INBOX_DETACH, INBOX_EDIT, INBOX_QUEUE, INBOX_RESEND, INBOX_RM } from './inbox/commands.verb.ts';
+export {
+  INBOX,
+  INBOX_ADD,
+  INBOX_ATTACH,
+  INBOX_DETACH,
+  INBOX_EDIT,
+  INBOX_QUEUE,
+  INBOX_RESEND,
+  INBOX_RM,
+  RESEND,
+} from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
 export { FACTORY_COST_LINE_RM, FACTORY_COST_LINE_SET } from './factory/cost-line/cost-line.verb.ts';

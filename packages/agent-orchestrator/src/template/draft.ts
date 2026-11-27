@@ -101,6 +101,7 @@ const PLACED = new Set<string>([
   'checkFailurePolicy',
   'checks',
   'workflow',
+  'brief',
   'card',
   ...ROUTE_LISTS,
   ...WORDS,
@@ -172,6 +173,7 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>) {
   if (typeof keys.checks === 'string') wired.checks = checksWritten(checksOf('checks', undefined, keys.checks) ?? []);
   if (typeof keys.workflow === 'string') wired.workflow = keys.workflow;
   if (typeof keys.card === 'string') wired.card = keys.card;
+  if (typeof keys.brief === 'string') wired.brief = keys.brief;
   return wired;
 }
 

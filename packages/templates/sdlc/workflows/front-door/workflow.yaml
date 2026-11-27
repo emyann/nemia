@@ -32,7 +32,7 @@ spec:
       when:
         - intake
       workflow: intake
-      card: given
+      brief: card
     - name: to-build
       after:
         - door
@@ -40,7 +40,7 @@ spec:
       when:
         - build
       workflow: build
-      card: given
+      brief: card
     - name: to-quick
       after:
         - door
@@ -48,7 +48,7 @@ spec:
       when:
         - quick
       workflow: quick
-      card: given
+      brief: card
     - name: answer
       after:
         - door

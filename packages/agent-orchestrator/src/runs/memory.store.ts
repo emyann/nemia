@@ -32,11 +32,11 @@ import type {
 } from '../record/record.ts';
 import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
 import { conditionAsk, unconditioned, withConditions } from '../condition/condition.ts';
-import { askDoneKey, askKeyOf, askName, claimKey, forgettingKey, runKey, runMarksPrefix, saidKey } from './run-keys.ts';
+import { childClaimKey, askDoneKey, askKeyOf, askName, claimKey, forgettingKey, runKey, runMarksPrefix, saidKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
-import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
+import { RunDoor, cardStartedTwice, childStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
@@ -162,9 +162,11 @@ function readOf(st: State, id: string) {
  */
 function forgetOf(st: State, id: string) {
   const card = st.records.get(id)?.from?.inbox;
+  const by = st.records.get(id)?.startedBy;
   const removed: string[] = [];
   if (st.records.delete(id)) {
     removed.push(runKey(id));
+    if (by !== undefined) removed.push(childClaimKey(by.run, by.node));
     if (card !== undefined) removed.push(claimKey(card));
   }
   for (const [name, held] of asksOf(st, id)) removed.push(held.done ? askDoneKey(id, name) : askKeyOf(id, name));
@@ -206,6 +208,10 @@ function runsOf(st: State) {
       const card = run.from?.inbox;
       const other = card === undefined ? undefined : [...st.records.values()].find((r) => r.from?.inbox === card);
       if (card !== undefined && other) throw cardStartedTwice(card, other.id);
+      const by = run.startedBy;
+      const sibling =
+        by === undefined ? undefined : [...st.records.values()].find((r) => r.startedBy?.run === by.run && r.startedBy.node === by.node);
+      if (by !== undefined && sibling) throw childStartedTwice(by.run, by.node, sibling.id);
       st.records.set(run.id, recordOf(run));
       touch(st, run.id);
     },

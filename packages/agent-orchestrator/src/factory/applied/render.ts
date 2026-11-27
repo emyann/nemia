@@ -260,6 +260,7 @@ const STEP_WORDS = [
   'ends',
   'when',
   'workflow',
+  'brief',
   'card',
   'relabel',
   'waitsFor',

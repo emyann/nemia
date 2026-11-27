@@ -11,6 +11,7 @@ import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Run, RunList } from './run.ts';
+import { RunResend, RunResent } from './card.ts';
 import { RunDecision } from './decide.ts';
 import {
   RunApprove,
@@ -232,6 +233,15 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }).annotate(
     OpenApi.Description,
     'Calls the run off: asks every task it has in flight to stop, and files nothing more of it. Answers RunCancelled, the plan it followed, a run already over included.',
+  ),
+  HttpApiEndpoint.post('resend', '/api/namespaces/:namespace/runs/:name/resend', {
+    params: runParams,
+    payload: RunResend,
+    success: RunResent.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: runActionErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Sends a run with no card behind it on: files its brief and labels as a card of its own, <run>-resent, handed the run, queued on the workflow the body names or, naming none, left for its factory's card triggers; then cancels the run when it waits on a person. Answers RunResent with a 201; a run started from a card, sent on already, or still at work is refused.",
   ),
   HttpApiEndpoint.post('retry', '/api/namespaces/:namespace/runs/:name/steps/:step/retry', {
     params: runStepParams,

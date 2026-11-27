@@ -223,7 +223,10 @@ export const CardStatus = Schema.Struct({
   state: Schema.Literals(CARD_STATES).annotate({
     description: "Where the card is in its life: its own word until it starts, and its run's phase from then on.",
   }),
-  runs: Schema.Array(Schema.String).annotate({ description: 'The ids of the runs the card was started as.' }),
+  runs: Schema.Array(Schema.String).annotate({
+    description:
+      "The ids of the runs the card's work went through, in the order they were started: the run started from the card, then each run a workflow node of those started.",
+  }),
   lastStart: Schema.optionalKey(CardLastStart.annotate({ description: "The tick's last start of the card that did not happen." })),
   title: Schema.optionalKey(Schema.String.annotate({ description: "The first line of the card's body; absent where it has none." })),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why the entry does not read as a card; absent on a card.' })),
@@ -514,3 +517,36 @@ export const CardResent = Schema.Struct({
   ),
 }).annotate({ identifier: 'CardResent' });
 export type CardResent = typeof CardResent.Type;
+
+/**
+ * A run with no card behind it sent on (resend): the workflow its new card is queued on, by its name; absent, the new card names none and
+ * is left unqueued, for its factory's card triggers to take. In the body, as a filing takes one.
+ */
+export const RunResend = Schema.Struct({
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.",
+    }),
+  ),
+});
+export type RunResend = typeof RunResend.Type;
+
+/**
+ * What a run sent on answers (resend): the card filed from the run's brief and labels, the run it was sent on from, and the run
+ * cancelled, or why it was not, when that run waited on a person.
+ */
+export const RunResent = Schema.Struct({
+  card: Card.annotate({ description: 'The card filed, `<run>-resent`, in the namespace of the run it was sent on from.' }),
+  from: Schema.Struct({
+    run: Schema.String.annotate({ description: 'The run it was sent on from, by id: what the card filed is named after.' }),
+  }).annotate({ description: 'The run it was sent on from.' }),
+  cancelled: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The run it was sent on from, by id, cancelled since it waited on a person.' }),
+  ),
+  cancelLeft: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'Why the run it was sent on from, which waited on a person, was not cancelled, and the command that cancels it.',
+    }),
+  ),
+}).annotate({ identifier: 'RunResent' });
+export type RunResent = typeof RunResent.Type;

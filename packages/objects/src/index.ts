@@ -678,6 +678,7 @@ export {
   PRUNE_WORDS,
   REFRESH_WORDS,
   RELEASE_WORDS,
+  RESEND_WORDS,
   RESUME_WORDS,
   RETRY_WORDS,
   RM_WORDS,
@@ -715,7 +716,7 @@ export {
   noEdits,
   runsNamed,
 } from './commands-inbox.ts';
-export { CardLabelLeftOut, CardQueue, CardResend, CardResent } from './card.ts';
+export { CardLabelLeftOut, CardQueue, CardResend, CardResent, RunResend, RunResent } from './card.ts';
 export {
   FACTORY_ADD_WORDS,
   FACTORY_ATTACH_WORDS,

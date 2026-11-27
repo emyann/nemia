@@ -3,7 +3,7 @@
  * cards in the sprint and ready to work by sdlc's own labels (`sdlc/stage=sprint,sdlc/state=ready-to-work`), whatever else a card
  * carries — what that selector selects is `src/watch/selector.test.ts`'s, in the orchestrator; `front-door` loads with Iris hired into
  * its door and its answer — the door a judge whose fence writes nothing, since a judge that writes is refused at load — routing to
- * intake, build and quick by card nodes that file the card as given, to an answer, and to a backlog node that files it back to the
+ * intake, build and quick by card nodes that start a run briefed by the card, to an answer, and to a backlog node that files it back to the
  * backlog by `sdlc/stage=backlog`; every hire of the template names an agent of the team.
  */
 import { test } from 'vitest';
@@ -75,6 +75,6 @@ test('front-door loads with Iris as its judge, routing by card nodes, an answer,
   assert.deepEqual([of('door')?.route, of('door')?.gate ?? false], [{ kind: 'judge' }, false]);
   assert.deepEqual(of('door')?.routes, ['intake', 'build', 'quick', 'answer', 'backlog']);
   for (const workflow of ['intake', 'build', 'quick'])
-    assert.deepEqual([of(`to-${workflow}`)?.workflow, of(`to-${workflow}`)?.card], [workflow, 'given']);
+    assert.deepEqual([of(`to-${workflow}`)?.workflow, of(`to-${workflow}`)?.brief], [workflow, 'card']);
   assert.deepEqual([of('backlog')?.card, of('backlog')?.workflow, of('backlog')?.relabel], ['backlog', undefined, ['sdlc/stage=backlog']]);
 });

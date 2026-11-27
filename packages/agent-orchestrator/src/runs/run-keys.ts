@@ -26,6 +26,13 @@ export const RUNSTATUS_PREFIX = '/registry/runstatus/';
 export const runKey = (id: string) => `${RUNS_PREFIX}${id}`;
 
 /**
+ * The key of the claim a run's workflow node holds on the run it started: one child per node.
+ * @param parent The id of the run the node is in.
+ * @param node The workflow node's name.
+ */
+export const childClaimKey = (parent: string, node: string) => `${RUNMARKS_PREFIX}${parent}/started/${node}`;
+
+/**
  * The key of a run's observed status record.
  * @param id The run's id.
  */

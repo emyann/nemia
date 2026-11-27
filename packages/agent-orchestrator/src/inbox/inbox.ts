@@ -68,6 +68,7 @@ import {
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
 import { FILE_ID_PREFIX } from 'objects';
 import { cardTriggered, matchingTriggers, triggerCardOf, type SelectingTrigger } from './triggered.ts';
+import { cardWork, workRuns, type Worked } from './card-work.ts';
 import { afterCycle, cardWaitsOf, waitStalled, type CardLook } from './waits.ts';
 
 export type InboxCard = {
@@ -509,7 +510,7 @@ export { CARD_STATES };
 export type CardState = (typeof CARD_STATES)[number];
 
 /** A run as the inbox reads it: its id, the card it was started from, and its phase as the runs list judges it, read now. */
-export type CardRun = Pick<Run, 'id' | 'from'> & { phase: RunPhase };
+export type CardRun = Pick<Run, 'id' | 'from'> & Partial<Pick<Run, 'startedBy' | 'createdAt'>> & { phase: RunPhase };
 
 /**
  * A listed entry's state, from what the listing read of it: the phase of its run when a record names it, whatever the card carries — the
@@ -610,7 +611,7 @@ function triggeredOf(
  */
 export function cardsListed(
   files: readonly PlanFile[],
-  runs: readonly Pick<Run, 'id' | 'from'>[],
+  runs: readonly Worked[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
   triggering?: Triggering,
@@ -631,6 +632,7 @@ export function cardsListed(
     const read = reads.get(name);
     return (read !== undefined && 'card' in read ? read.card.after : undefined) ?? [];
   };
+  const work = workRuns(runs);
   const listed = shown.map<CardListing>(({ file, text }) => {
     if (!file.endsWith('.md'))
       return unread(
@@ -640,7 +642,7 @@ export function cardsListed(
         `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
       );
     const name = file.slice(0, -'.md'.length);
-    const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
+    const startedAs = [...cardWork(name, work)];
     const read = reads.get(name) ?? cardOrWhy(file, text);
     if ('card' in read) {
       const { card } = read;
@@ -722,11 +724,12 @@ function waitsOf(
  * as `phaseOf` read them), or off the runs started from it where the inbox no longer has it, none where a phase was not read — and
  * whether only a person can release it (`waitStalled`). Writes the waits in place, as the queue's places are written.
  */
-function statesOfWaits(listed: readonly CardListing[], runs: readonly Pick<Run, 'id' | 'from'>[], phaseOf: Waiting['phaseOf']) {
+function statesOfWaits(listed: readonly CardListing[], runs: readonly Worked[], phaseOf: Waiting['phaseOf']) {
+  const work = workRuns(runs);
   const byName = new Map(listed.map((l) => [l.name, l]));
   const stateOf = (name: string) => {
     const l = byName.get(name);
-    const ids = l?.startedAs ?? runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
+    const ids = l?.startedAs ?? [...cardWork(name, work)];
     const phases = ids.flatMap((id) => phaseOf(id) ?? []);
     if (ids.length > 0 && phases.length < ids.length) return null;
     if (l === undefined && ids.length === 0) return null;

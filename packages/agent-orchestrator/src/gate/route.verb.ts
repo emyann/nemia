@@ -14,6 +14,9 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { waitFiled } from '../wait-node/index.ts';
 
+/** The run or the card a node sent, by its name. */
+const sentName = (sent: { run: string } | { card: string } | undefined) => (sent === undefined ? '' : 'run' in sent ? sent.run : sent.card);
+
 /**
  * The follower of a condition already filed or sent its card, which settles its route; undefined while none is.
  * @param condition The condition's step name.
@@ -49,7 +52,7 @@ function routeRefused(run: Run, steps: readonly StepSpec[], step: string, route:
   const settled = settledBy(step, run, steps);
   if (settled)
     return new Conflict({
-      message: `${step}'s route is taken: ${settled}, after it, is already ${run.steps[settled]?.sent ? `sent (${run.steps[settled]?.sent?.card})` : 'filed'}. To route it again, cancel the run — nemia cancel ${run.id} — and start it again.`,
+      message: `${step}'s route is taken: ${settled}, after it, is already ${run.steps[settled]?.sent ? `sent (${sentName(run.steps[settled]?.sent)})` : 'filed'}. To route it again, cancel the run — nemia cancel ${run.id} — and start it again.`,
     });
   return undefined;
 }

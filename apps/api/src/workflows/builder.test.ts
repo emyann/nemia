@@ -232,6 +232,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}) =>
     when: null,
     ends: null,
     workflow: null,
+    brief: null,
     card: null,
     relabel: null,
     waitsFor: null,

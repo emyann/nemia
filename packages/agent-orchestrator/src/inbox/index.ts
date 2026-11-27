@@ -22,6 +22,7 @@ export {
 } from './inbox.ts';
 export type { CardPhase } from 'objects';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox.ts';
+export { byCreated, cardWork, workRuns } from './card-work.ts';
 export { cardFileReplaced, fileLetGo } from './card-files.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';
 export { cardFieldTerm, fieldSelects, type FieldTerm } from './card-field.ts';

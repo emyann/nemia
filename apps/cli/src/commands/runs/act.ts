@@ -12,16 +12,19 @@ import {
   type FeedWait,
   HOLD_WORDS,
   RELEASE_WORDS,
+  RESEND_WORDS,
   REFRESH_WORDS,
   ROUTE_WORDS,
   type RunCancelled,
   type RunHeld,
   type RunReleased,
+  type RunResent,
   type RunRefreshed,
   type RunRouted,
   WAIT_WORDS,
 } from 'objects';
 import { asked } from '../../objects.ts';
+import { factoryLine, workflowNamed } from '../inbox/card-lines.ts';
 import { listArg, namespaceOfRun, said, selectorQuery, switchArg, textArg } from '../requests.ts';
 
 /**
@@ -47,6 +50,38 @@ export async function cancel(args: Args) {
   const name = runOf(args);
   const namespace = await namespaceOfRun(CANCEL_WORDS.name, name);
   said(cancelLines(await asked(CANCEL_WORDS.name, (c) => c.runs.cancel({ params: { namespace, name } }))));
+  return 0;
+}
+
+/**
+ * What `nemia resend` prints of the run sent on: the card filed and where it goes, the run it is handed, and the run cancelled or why not.
+ * @param sent What the api answers of the run sent on.
+ */
+export const resentLines = (sent: RunResent) => {
+  const { card, from } = sent;
+  const name = card.metadata.name;
+  const goes =
+    card.spec.workflow === undefined
+      ? `naming no workflow, for its factory's card triggers: where none selects it, queue it with nemia inbox queue ${name} --workflow <name>`
+      : `queued at ${card.spec.queued ?? ''} on ${card.spec.workflow}: the tick starts it once its turn comes and a run slot is free`;
+  const run = sent.cancelled
+    ? [`${from.run}  cancelled: it waited on you, and the card sent on takes its place`]
+    : sent.cancelLeft
+      ? [`${from.run}  not cancelled: ${sent.cancelLeft}`]
+      : [];
+  return [`${name}  filed from run ${from.run}${factoryLine(card)}`, `${name}  ${goes}`, ...run];
+};
+
+/**
+ * `nemia resend <runId> [--workflow <name>]`: a run no card started sent on as a card of its own, `<run>-resent`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function resend(args: Args) {
+  const name = runOf(args);
+  const workflow = workflowNamed(textArg(args, 'workflow'), RESEND_WORDS.name, `nemia resend ${name}`);
+  const namespace = await namespaceOfRun(RESEND_WORDS.name, name);
+  const payload = workflow === undefined ? {} : { workflow };
+  said(resentLines(await asked(RESEND_WORDS.name, (c) => c.runs.resend({ params: { namespace, name }, payload }))));
   return 0;
 }
 

@@ -171,6 +171,20 @@ test('a condition of each eval, a node after it and a workflow node read as they
   }
 });
 
+test('a node frozen with the retired `card: given` reads as a node briefed by the card, and `card: routed` as one with the default brief', () => {
+  const node = { name: 'to-build', after: ['triage'], body: '', when: ['web'], workflow: 'build' };
+  const briefed = decode(frozen({ ...node, brief: 'card' }));
+  assert.ok(Result.isSuccess(briefed) && briefed.success.brief === 'card', 'a node with `brief: card` reads as it was frozen');
+  assert.ok(Result.isFailure(decode({ ...node, brief: 'body' })), 'a brief that is neither of its words is refused');
+  const given = decode({ ...node, card: 'given' });
+  assert.ok(Result.isSuccess(given), 'a record frozen with `card: given` still decodes');
+  assert.deepEqual(asNamed(given.success), { ...node, brief: 'card' }, 'and is read as `brief: card`, with no card word');
+  const routed = decode({ ...node, card: 'routed' });
+  assert.ok(Result.isSuccess(routed), 'a record frozen with `card: routed` still decodes');
+  assert.deepEqual(asNamed(routed.success), node, 'and is read as a node with the default brief');
+  assert.ok(Result.isFailure(decode({ ...node, card: 'other' })), 'a card word that was never one is refused');
+});
+
 test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now, on a step and in its agent, and read under the new', () => {
   for (const [former, now] of Object.entries(FORMER_KEYS)) {
     const step = {

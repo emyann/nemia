@@ -71,6 +71,9 @@ const misnamed = (id: string) => {
 /** A run under `id` started out of the inbox's card `card`. */
 const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: card } }) satisfies Run;
 
+/** A run under `id` that the node `node` of the run `parent` started. */
+const startedAt = (id: string, parent: string, node: string) => ({ ...aRun(id), startedBy: { run: parent, node } }) satisfies Run;
+
 /** A run that waits on itself. */
 const selfWaiting = (id: string) => ({ ...aRun(id), after: [id] }) satisfies Run;
 
@@ -162,6 +165,27 @@ const CREATE: Walk[] = [
       return [act(door.runs.create(fromCard('w-card-anew', 'w-card-again'))), briefOf(door, 'w-card-anew')];
     },
     says: [undefined, 'add a flag'],
+  },
+  {
+    name: 'REFUSED: a second run from one node of a run is a Conflict, the first kept, nothing left under the second id',
+    walk: ({ door }) => {
+      act(door.runs.create(startedAt('w-child-first', 'w-parent', 'next')));
+      const again = act(door.runs.create(startedAt('w-child-second', 'w-parent', 'next')));
+      return [again, briefOf(door, 'w-child-first'), act(door.runs.taken(idOf('w-child-second')))];
+    },
+    says: [{ refused: 'Conflict' }, 'add a flag', false],
+  },
+  {
+    name: 'a node whose run was forgotten starts again, and another node of the same run is its own',
+    walk: ({ door }) => {
+      act(door.runs.create(startedAt('w-child-gone', 'w-parent-b', 'next')));
+      act(door.runs.forget(idOf('w-child-gone')));
+      return [
+        act(door.runs.create(startedAt('w-child-anew', 'w-parent-b', 'next'))),
+        act(door.runs.create(startedAt('w-child-other', 'w-parent-b', 'other'))),
+      ];
+    },
+    says: [undefined, undefined],
   },
 ];
 

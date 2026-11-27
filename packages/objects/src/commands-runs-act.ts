@@ -28,6 +28,46 @@ export const CANCEL_WORDS = {
   class: 'ask',
 } as const satisfies CommandWords;
 
+/** What `--workflow` of `nemia resend` takes, said where it is missing and where it stands apart from its value. */
+const RESEND_WORKFLOW_TAKES =
+  'nemia resend --workflow takes the workflow the run is sent on to, by its name: nemia resend <runId> --workflow <name>';
+
+/**
+ * `nemia resend`: a run with no card behind it sent on, filed as a card of its own (`<run>-resent`) from its brief and labels, handed the
+ * run, to the workflow named or naming none for its factory's card triggers, and the run cancelled when it waits on a person.
+ */
+export const RESEND_WORDS = {
+  name: 'resend',
+  served: [{ endpoint: 'runs.resend' }],
+  usage: '<runId> [--workflow <w>]',
+  help: [
+    'send a run that no card started on: file its brief as <run>-resent, handed',
+    "the run, queued on --workflow or, with none, for its factory's card triggers;",
+    'the run is cancelled when it waits on you. A run a card started: nemia inbox resend',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [
+      {
+        flag: '--workflow',
+        kind: 'text',
+        key: 'workflow',
+        takes: RESEND_WORKFLOW_TAKES,
+        twice: 'nemia resend takes --workflow once: a run is sent on to one workflow.',
+      },
+    ],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia resend does not take ${arg}. It takes the run's id, then --workflow <name>, or none for its factory's card triggers.`
+        : `nemia resend sends one run on, and ${arg} is a second: nemia resend <runId>, once per run.`,
+    apart: () => RESEND_WORKFLOW_TAKES,
+    missing: 'nemia resend takes the id of the run to send on, as nemia ls lists it: nemia resend <runId> [--workflow <name>].',
+  },
+  writes: true,
+  ticks: true,
+  class: 'act',
+} as const satisfies CommandWords;
+
 /** The values under `key`, in the order given, or none. */
 const listOf = (args: Args, key: string) => {
   const value = args[key];

@@ -47,6 +47,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
+import { cardWork, workRuns, type Worked } from './card-work.ts';
 import { filedNames, inboxCards, readableFactories, triggeringOf } from './inbox.store.ts';
 import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
@@ -138,7 +139,6 @@ const cardPlace = Effect.fn('cardPlace')(function* (
   card: InboxCard,
   filed: Factory | undefined,
 ) {
-  const home = yield* StoreRoot;
   const refusedWorkflow =
     opts.workflow === undefined ? undefined : cardWorkflowRefusal('--workflows', opts.workflow, 'Nothing was started.');
   if (refusedWorkflow !== undefined) return yield* Effect.fail(new Invalid({ message: refusedWorkflow }));
@@ -149,13 +149,32 @@ const cardPlace = Effect.fn('cardPlace')(function* (
       filed === undefined ? { by: dir, workflows: workflowsIn(dir) } : { by: `the factory ${filed.name}`, workflows: filed.workflows };
     return yield* Effect.fail(new WorkflowError(noWorkflowRefusal(card, card.name, offered, card.workflow)));
   }
+  return yield* workflowPlace({ filed, name, callerRepo: opts.callerRepo, card: opts.workflow === undefined ? card : undefined });
+});
+
+/**
+ * The repository and the folder a workflow named `name` starts in: the repository the factory's wiring names for it (`wiredRepo`), in the
+ * default factory `callerRepo`, and the workflow's folder, looked up as a factory looks a name up. Refused by name, `Invalid`: a workflow
+ * the factory does not offer (`unattachedRefusal`) or wires no repository for; and a folder that does not load, as a `WorkflowError`, in
+ * the words of `card`'s own `workflow:` line where it is one.
+ * @param place Where it is looked up: the factory (`filed`, undefined for the default), the workflow's `name`, the `callerRepo` of the
+ * default factory, and the `card` whose `workflow:` line names it, where one does.
+ */
+export const workflowPlace = Effect.fn('workflowPlace')(function* (place: {
+  filed: Factory | undefined;
+  name: string;
+  callerRepo: string;
+  card?: InboxCard | undefined;
+}) {
+  const home = yield* StoreRoot;
+  const { filed, name } = place;
   const unattached = filed === undefined ? undefined : unattachedRefusal(filed, name);
   if (unattached !== undefined) return yield* Effect.fail(new Invalid({ message: unattached }));
-  const wired = filed === undefined ? { repo: opts.callerRepo } : wiredRepo(filed, name);
+  const wired = filed === undefined ? { repo: place.callerRepo } : wiredRepo(filed, name);
   if (!('repo' in wired)) return yield* Effect.fail(new Invalid({ message: wired.message }));
   const { repo } = wired;
   const workflowDir = yield* Effect.try({
-    try: () => cardWorkflow(home, name, opts.workflow === undefined ? card : undefined, repo, filed?.tree),
+    try: () => cardWorkflow(home, name, place.card, repo, filed?.tree),
     catch: (err) => err as WorkflowError,
   });
   return { repo, workflowDir };
@@ -204,7 +223,7 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * @param home The store's root.
  * @param card The card, its factory and its files.
  */
-const cardFilesAt = Effect.fnUntraced(function* (home: string, card: InboxCard) {
+export const cardFilesAt = Effect.fnUntraced(function* (home: string, card: Pick<InboxCard, 'factory' | 'files'>) {
   const at = card.factory ?? DEFAULT_NAMESPACE;
   const door = yield* FileDoor;
   return yield* Effect.forEach(card.files ?? [], (f) =>
@@ -474,6 +493,15 @@ const namedAfter = (files: readonly PlanFile[], started: (name: string) => boole
   return [...new Set(named)];
 };
 
+/** What the waits read of a run: its id, its card, the run that started it, when it was made and its steps. */
+type WaitedRuns = Pick<Run, 'id' | 'from' | 'steps'> & Worked;
+
+/**
+ * Whether a run handed its work on: a step of it started a run or filed a card (`StepRecord.sent`). Its own success then releases no
+ * waiter; the run it started, or the card it filed, is judged instead.
+ */
+const handedOn = (run: Pick<Run, 'steps'>) => Object.values(run.steps).some((s) => s.sent !== undefined);
+
 /**
  * What the listing reads of the cards a card waits on (`Waiting`), or undefined where no card not yet started names one in its `after:`,
  * which then costs nothing. From each card named, through the cards each run of it passed its work on to — the card each workflow node of
@@ -486,20 +514,24 @@ const namedAfter = (files: readonly PlanFile[], started: (name: string) => boole
  */
 export const waitingOf = Effect.fnUntraced(function* (
   files: readonly PlanFile[],
-  runs: readonly Pick<Run, 'id' | 'from' | 'steps'>[],
+  runs: readonly WaitedRuns[],
   released: RunReleased,
   phaseOf: (run: string) => RunPhase | undefined = () => undefined,
 ) {
-  const byCard = new Map<string, Pick<Run, 'id' | 'from' | 'steps'>[]>();
-  for (const run of runs) {
-    const card = run.from?.inbox;
-    if (card !== undefined) byCard.set(card, [...(byCard.get(card) ?? []), run]);
+  const byCard = new Map<string, WaitedRuns[]>();
+  const work = workRuns(runs);
+  const byId = new Map(runs.map((run) => [run.id, run]));
+  for (const card of new Set(runs.flatMap((run) => (run.from === undefined ? [] : [run.from.inbox])))) {
+    byCard.set(
+      card,
+      cardWork(card, work).flatMap((id) => byId.get(id) ?? []),
+    );
   }
   const roots = namedAfter(files, (name) => byCard.has(name));
   if (!roots.length) return undefined;
   const inInbox = new Set(files.filter((f) => f.file.endsWith('.md')).map((f) => f.file.slice(0, -'.md'.length)));
   const onwardOf = (run: Pick<Run, 'id' | 'steps'>) => [
-    ...Object.values(run.steps).flatMap((s) => (s.sent === undefined ? [] : [s.sent.card])),
+    ...Object.values(run.steps).flatMap((s) => (s.sent === undefined || !('card' in s.sent) ? [] : [s.sent.card])),
     ...(inInbox.has(resentCardName(run.id)) ? [resentCardName(run.id)] : []),
   ];
   const looks = new Map<string, CardLook>();
@@ -510,7 +542,7 @@ export const waitingOf = Effect.fnUntraced(function* (
     const own = byCard.get(name) ?? [];
     const onward = [...new Set(own.flatMap(onwardOf))];
     const ran: { id: string; released: boolean }[] = [];
-    for (const run of own) ran.push({ id: run.id, released: yield* released(run.id) });
+    for (const run of own) ran.push({ id: run.id, released: !handedOn(run) && (yield* released(run.id)) });
     looks.set(name, { known: inInbox.has(name) || own.length > 0, runs: ran, onward });
     queue.push(...onward);
   }
@@ -554,7 +586,7 @@ type StalledWait = { factory: string; card: string; waits: string[] };
  * @param phaseOf A run's phase as the pass judged it, by id; undefined where it was not.
  */
 export const inboxNow = Effect.fn('inboxNow')(function* (
-  runs: readonly Pick<Run, 'id' | 'from' | 'steps'>[],
+  runs: readonly WaitedRuns[],
   released: RunReleased = NONE_RELEASED,
   phaseOf?: (run: string) => RunPhase | undefined,
 ) {

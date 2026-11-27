@@ -8,7 +8,7 @@ import { judgeRefusal, type JudgeFence } from './judge.ts';
  * Why a workflow's routing cannot run, or `undefined` where it closes (the design's §1, *What load refuses*): every `when:` waits on
  * exactly one condition and names its routes, and none it ends on (`whenRefusal`); every route is taken by a node or ended on, a table is
  * closed over its producer's enum and the condition's routes, and a condition cuts no workspace, has no check, files no try of its own and
- * spends no budget but a judge's (`conditionRefusal`); a workflow node files a card and nothing else (`workflowNodeRefusal`). The loops'
+ * spends no budget but a judge's (`conditionRefusal`); a workflow node starts a run and nothing else (`workflowNodeRefusal`). The loops'
  * own rule, that no span crosses a condition, is `validate`'s, beside the loops'. A judge's fence writes nothing (`judgeRefusal`, by
  * the fence's own judgement, which `validate` hands in), unless it is left to a hire.
  * @param steps The workflow's steps.
@@ -62,12 +62,12 @@ function conditionRefusal(c: StepSpec, steps: readonly StepSpec[], byName: Reado
   return conditionKeyRefusal(c) ?? (c.route?.kind === 'table' ? tableRefusal(c, c.route, byName) : undefined);
 }
 
-/** Why a workflow node does more than file its card: an agent, a workspace, a check or a gate. */
+/** Why a workflow node does more than start its run or file its card: an agent, a workspace, a check or a gate. */
 function workflowNodeRefusal(w: StepSpec) {
   if (w.workflow === undefined && w.card === undefined) return undefined;
   const extra = w.agent != null ? 'an agent' : w.check ? 'a check' : w.gate ? 'a gate' : undefined;
   if (extra === undefined) return undefined;
-  const files = w.workflow === undefined ? "files the run's card back to the inbox" : `files a card for ${w.workflow}`;
+  const files = w.workflow === undefined ? "files the run's card back to the inbox" : `starts a run of ${w.workflow}`;
   const line = w.workflow === undefined ? `card: ${w.card ?? 'backlog'}` : `workflow: ${w.workflow}`;
   return `${w.name}: \`${line}\` ${files} and does nothing else, and this node has ${extra}. Delete the line that gives it ${extra}; put the work on a step of its own before it.`;
 }

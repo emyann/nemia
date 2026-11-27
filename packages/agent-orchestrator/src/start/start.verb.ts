@@ -83,9 +83,10 @@ import { listedModels } from '../harness/models.store.ts';
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
  * against the agent hired, as if its file named it. Refused: first, a workflow the factory has not attached (`unattachedRefusal`), before
- * its folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
- * steps are filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default —
- * every workflow is offered, and a step that names no agent is a plain session, as it always was.
+ * its folder is read, since a factory offers only its workflows; then every workflow node whose workflow the factory does not offer; then
+ * every step left with no agent (`unfilledRefusal`), since a factory's steps are filled by its hires; and a hire into a step whose file
+ * names its own agent (`parseWorkflow`). With no factory — the default — every workflow is offered, and a step that names no agent is a
+ * plain session, as it always was.
  *
  * The factory's rules are read here, once, with its hires (`factoryFills`), and handed to every step: the run freezes them with its
  * steps. Refused (`Invalid`), naming the file, before a run is written: a rules file that cannot be told — a link, anything that is no
@@ -107,6 +108,11 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
       }),
     );
   const steps = yield* workflows.read(dir, places, fills);
+  for (const node of steps) {
+    const unoffered = node.workflow === undefined ? undefined : unattachedRefusal(factory, node.workflow);
+    if (unoffered)
+      return yield* Effect.fail(new Invalid({ message: `The node ${node.name} starts a run of another workflow. ${unoffered}` }));
+  }
   const unfilled = unfilledRefusal(steps, factory.name, workflow);
   if (unfilled) return yield* Effect.fail(new Invalid({ message: unfilled }));
   return steps;
@@ -349,6 +355,8 @@ export type StartOptions = {
   /** The inbox cards to hand the run (`nemia start --card`), by name: each copied into its `inputs/cards/` (`cardsDir`). */
   cards?: readonly string[];
   from?: { inbox: string };
+  /** The run and the workflow node that start this run directly (`sendCards`), frozen on the record as `startedBy`, held once per node. */
+  startedBy?: { run: string; node: string };
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
   /**
@@ -384,6 +392,7 @@ type Told = Pick<
   | 'inputs'
   | 'cards'
   | 'from'
+  | 'startedBy'
   | 'scheduled'
   | 'gates'
   | 'models'
@@ -540,6 +549,7 @@ function toldOf(
     ...(inputs.length ? { inputs: inputs.map(inputName) } : {}),
     ...(opts.cards?.length ? { cards: [...opts.cards] } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
+    ...(opts.startedBy ? { startedBy: { run: opts.startedBy.run, node: opts.startedBy.node } } : {}),
     ...(opts.scheduled
       ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
       : {}),

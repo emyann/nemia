@@ -2192,22 +2192,35 @@ on a node that waits on no condition or on two, and a route nobody takes and no 
 a `loop:` and nothing else, and a loop's span holds no condition but the looping step and no `when:` node but its target.
 
 A **workflow node** is a route to another workflow: `workflow: dev` beside its `when:` and `after:`, and no agent, workspace, check or
-gate. Once it is due it files a card for the named workflow (a bare name, resolved through the factory when the route is taken) and
-reads **`sent`**, which satisfies `after`: the caller goes on, or ends. **A routed run does not wait for its caller to land**: it is a
-card queued like any other, started from the base branch and handed its caller as `from:` (*Context without a wait*), never
-`--after`; a later card may add a wait. Each run keeps its own workspace, gate and budget. The card opens with the `title`
-its condition's producer signed off on (a table's `from:` step, else the condition itself), where that step's `output:` declares one
-and it says one, else with the run's own title, and carries the run's labels as its `labels:` (`sentCardTitle`, `sendCards`).
+gate. Once it is due it **starts a run** of the named workflow directly (a bare name, resolved through the factory as a card's start
+resolves it, `workflowPlace`) and files no card, and reads **`sent`**, which satisfies `after`: the caller goes on, or ends. **A started
+run does not wait for its caller to land**: it is handed its caller as context (*Context without a wait*), never `--after`, and waits for
+a run slot like any run with nothing filed (admission puts it before any queued card). Each run keeps its own workspace, gate and
+budget, and the parent's timing and cost never include its child's. The child's record names its parent (`startedBy`, `{ run, node }`),
+frozen at start; the node's `sent` is `{ run, at }`, and the child's brief is the title its condition's producer signed off on (a table's
+`from:` step, else the condition itself), where that step's `output:` declares one and it says one, else the run's own title, then why
+it was started (`childBrief`); with **`brief: card`** (`NODE_BRIEFS`) it is the run's own card as it was given — its body, labels and
+files, the files within the run's factory only — read through the Card door from the card the run was started from, else the run's
+brief, then why it was started and the reason the producer signed off with, so a routing workflow hands a raw card on as it came.
+A node starts one run: the node's claim (`/registry/runmarks/<run>/started/<node>`) is written in the transaction that makes the child's
+record, so a pass that started a child and died before writing `sent` finds it again and adopts it, and a second start is refused
+(`childStartedTwice`). A start the factory refuses (a workflow it does not offer or wire) is written on the node as `refused` and tried
+again on each pass, so the run waits, with the refusal as the node's sentence, until the factory is fixed.
 
-**What card a node files is its `card:`** (`NODE_CARDS`, `sentCardText`): `routed`, the default, the card just said; `given`, the
-run's own card as it was given — its body and its labels, read through the Card door from the card the run was started from, else the
-run's brief — with the route taken and the reason the condition's producer signed off with (`Its reason:`), so a routing workflow
-hands a raw card on as it came; and `backlog`, which names no `workflow:` and files the run's card back to the inbox naming none and
-unqueued, its labels after the edits its `relabel:` lists, kubectl's — `key=value` sets a key and `key-` removes it, each taken over the
-value the card had, so `relabel: [stage=backlog, ready-]` moves the card to the backlog and keeps its other labels (an empty list, as a
-template parameter left empty renders it, edits none). A
-card node runs no agent, a check, a gate or a workspace, as a workflow node does not; load refuses `card: backlog` with a `workflow:`,
-`given` or `routed` without one, `relabel:` off a backlog node, and an edit `nemia label` would refuse (`parseLabelEdits`). A judge's brief says a backlog node files the card back.
+**A card follows its work from run to run** (`cardWork`, proved by `contracts/card-work.contract.ts`): the runs started from the card,
+then each run a node of one of them started, in the order they were made. The card's served `runs`, its `state` and its `phase` cover
+them all, and a card that waits on it (`after:`) is released only when the last run of its work succeeds or a person releases it: a run
+that handed its work on (a step with `sent`) releases nobody by itself. `nemia inbox resend <card>` sends on the latest run of the work,
+and `nemia resend <run>` sends on a run that has no card behind it.
+
+`card: backlog` files a card: it names no `workflow:` and files the run's card back to the inbox naming none and unqueued, its labels
+after the edits its `relabel:` lists, kubectl's — `key=value` sets a key and `key-` removes it, each taken over the value the card had,
+so `relabel: [stage=backlog, ready-]` moves the card to the backlog and keeps its other labels (an empty list, as a template parameter
+left empty renders it, edits none). Its `sent` is `{ card, at }`, and so is every record written before a node started runs. A card
+node runs no agent, a check, a gate or a workspace, as a workflow node does not; load refuses `card: backlog` with a `workflow:`,
+`brief:` on a node with no `workflow:`, `relabel:` off a backlog node, and an edit `nemia label` would refuse (`parseLabelEdits`); the
+retired `card: given` (now `brief: card`) and `card: routed` (delete it) are refused naming the fix, and a run frozen with either still
+reads. A judge's brief says a backlog node files the card back.
 
 On a route not taken, a node that was never filed reads **`skipped`**, and so does a node whose parents are all skipped; it is worked
 out on every pass from the conditions' answers and carries nothing between passes. `skipped` neither satisfies `after` nor stops a

@@ -65,6 +65,7 @@ erDiagram
     string homeFiles "optional"
     object worked "optional"
     object from "optional"
+    object startedBy "optional"
     object scheduled "optional"
     list gates FK "optional"
     object models "optional"
@@ -114,6 +115,7 @@ erDiagram
     string homeFiles "optional"
     object worked "optional"
     object from "optional"
+    object startedBy "optional"
     object scheduled "optional"
     list gates FK "optional"
     object models "optional"
@@ -153,7 +155,8 @@ erDiagram
     TaskId taskId FK
     object conditions "optional"
     object route "optional"
-    object sent "optional"
+    unknown sent "optional"
+    object refused "optional"
     list pinned "optional"
     string workspace "optional"
     string branch "optional"
@@ -424,7 +427,7 @@ erDiagram
 A workflow is a machine of its own: its steps are the states, and `after`, a condition's routes, a loop and the ways a run ends are
 its moves. The graph every client draws (`graphOf`, `src/summary/graph.ts`) carries a `route` edge from a condition to each node that
 runs on one of its routes (`when:`), in place of the `after` edge between them, and, on a workflow with a condition or a workflow node,
-each node with its kind: `step`, `condition` (with the routes in its `ends:`) or `workflow` (with the workflow it files a card for).
+each node with its kind: `step`, `condition` (with the routes in its `ends:`) or `workflow` (with the workflow it starts a run of).
 Gates are a property of a node, not an edge. Below is the tests' `triage` workflow (`test/fixtures/team/triage`), printed by
 `routedDiagram`; `src/summary/graph.test.ts` holds the data it is drawn from equal to that folder. On `web`, `build-backend` is skipped
 and `notes` runs after `build-web` alone; on `docs`, every node after `triage` is skipped and the run ends there, and succeeds.

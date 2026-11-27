@@ -447,7 +447,7 @@ export function fillsOf(hires: Hires, workflow: string) {
   );
 }
 
-/** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
+/** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which starts a run. */
 const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow' | 'card' | 'waitsFor'>) =>
   s.waitsFor === undefined && s.workflow === undefined && s.card === undefined && (s.routes === undefined || s.route?.kind === 'judge');
 

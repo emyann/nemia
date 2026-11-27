@@ -12,7 +12,11 @@ import { unattachedRefusal } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService } from '../runtime-client.ts';
 import { WorkflowError } from '../step/step.ts';
-import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
+import { cardRuns, runPhaseOf, type SummaryHow } from '../summary/summary.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import type { RunPhase } from '../phase/phase.ts';
+import { cardWork, workRuns } from './card-work.ts';
 import { CARD_IN_PLAY, cardState, cardWorkflowRefusal, inboxNameRefusal, noCardLine, parseInboxCard, type InboxCard } from './inbox.ts';
 import { CardName } from './inbox.model.ts';
 import { inboxCards } from './inbox.store.ts';
@@ -66,7 +70,26 @@ export const resendCard = Effect.fn('resendCard')(function* (asked: ResendAsked,
     );
   }
   const card = yield* Effect.try({ try: () => parseInboxCard(`${name}.md`, text), catch: (err) => err as WorkflowError });
-  const runs = (yield* cardRuns(yield* EngineService, how)).filter((r) => r.from?.inbox === card.name);
+  const all = yield* cardRuns(yield* EngineService, how);
+  const runs = cardWork(card.name, workRuns(all)).flatMap((id) => all.find((r) => r.id === id) ?? []);
+  return yield* sentOn({ name, card, runs, workflow, actor });
+});
+
+/** What `sentOn` sends on: the name asked (a card's or a run's), its card as read, its runs as read now in the order they were started. */
+type SendOn = {
+  readonly name: string;
+  readonly card: InboxCard;
+  readonly runs: readonly { readonly id: string; readonly phase: RunPhase }[];
+  readonly workflow: string | undefined;
+  readonly actor: Actor | undefined;
+};
+
+/**
+ * File `card` again as `<run>-resent` from the run its state reads (`resentFrom`), refused as `resendRefusal` says, then cancel that run
+ * where it waits on a person.
+ */
+const sentOn = Effect.fnUntraced(function* ({ name, card, runs, workflow, actor }: SendOn) {
+  const door = yield* CardDoor;
   const run = resentFrom(runs);
   const state = cardState({ phases: runs.map((r) => r.phase) });
   const taken = run !== undefined && (yield* door.cards.read(CardName.read(resentCardName(run.id)))) !== null;
@@ -95,4 +118,43 @@ export const resendCard = Effect.fn('resendCard')(function* (asked: ResendAsked,
   const err = Cause.squash(cancelled.cause);
   const left = `${err instanceof Error ? err.message : String(err)} — the card was filed all the same: call the run off with nemia cancel ${run.id}.`;
   return { ...out, cancelLeft: left } satisfies Resent;
+});
+
+/** What `nemia resend` is asked: the run by id, the workflow it is sent to by name (none for its factory's card triggers), and who asks. */
+export type ResendRunAsked = { readonly run: string; readonly workflow?: string; readonly actor?: Actor };
+
+/**
+ * `nemia resend <run>`: a run with no card behind it sent on, filed as a card of its own (`<run>-resent`) from the run's brief and labels,
+ * in its factory, handed the run as context, to the workflow a person names or naming none for its factory's card triggers; then the run
+ * cancelled when it waits on a person. As `resendCard` does for a card, the same refusals and the same cancel.
+ *
+ * Refused by name, exit 2, before anything is written: a run not in the store (`Missing`), a run started from a card (`Invalid`, naming
+ * `nemia inbox resend <card>`), a workflow that is no workflow's name or its factory does not offer, and a run still at work or sent on
+ * already (`Conflict`).
+ * @param asked The run by id, the workflow it is sent to, and who asks.
+ * @param how The store's root, the informer and whether its answers are verified, which the run's phase is judged through.
+ */
+export const resendRun = Effect.fn('resendRun')(function* (asked: ResendRunAsked, how: SummaryHow) {
+  const { run: id, workflow, actor } = asked;
+  const wrongWorkflow = workflow === undefined ? undefined : cardWorkflowRefusal('--workflow', workflow, 'Nothing was filed.');
+  if (wrongWorkflow !== undefined) return yield* Effect.fail(new Invalid({ message: wrongWorkflow }));
+  const run = yield* (yield* RunDoor).runs.find(RunId.read(id), () => {});
+  if (run === undefined)
+    return yield* Effect.fail(new Missing({ message: `There is no run ${id}: read the runs with nemia ls. Nothing was filed.` }));
+  if (run.from !== undefined)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${id} was started from the card ${run.from.inbox}: send the card on, nemia inbox resend ${run.from.inbox}. Nothing was filed.`,
+      }),
+    );
+  const phase = yield* runPhaseOf(yield* EngineService, how, id);
+  const labels = run.labels;
+  const card: InboxCard = {
+    name: id,
+    file: `${id}.md`,
+    body: run.brief.trim(),
+    ...(run.factory !== undefined ? { factory: run.factory } : {}),
+    ...(labels !== undefined && Object.keys(labels).length ? { labels } : {}),
+  };
+  return yield* sentOn({ name: id, card, runs: phase === undefined ? [] : [{ id, phase }], workflow, actor });
 });

@@ -433,6 +433,12 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                the run it came from is cancelled when it waits on you
                                each tool's words: tools.md#inbox_resend
                                on the port: inbox_resend
+  nemia resend <runId> [--workflow <w>]
+                               send a run that no card started on: file its brief as <run>-resent, handed
+                               the run, queued on --workflow or, with none, for its factory's card triggers;
+                               the run is cancelled when it waits on you. A run a card started: nemia inbox resend
+                               each tool's words: tools.md#resend
+                               on the port: resend
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off

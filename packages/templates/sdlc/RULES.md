@@ -13,9 +13,10 @@
 - **A card routed wrong is said, not worked around.** A card the front door routed (its run's brief says the door's reason) whose ask
   is not what your workflow is for — an idea still loose in build or quick, a decision left open in quick, a question that asks no
   change — signs off `blocked`, saying which workflow it needs and why, so the person sends the card on with one command: `nemia inbox
-  resend <card> --workflow <workflow>` files it again under a name of its own, handed the blocked run, on the workflow it needs, or,
-  with no `--workflow`, keeping its labels, `sdlc/stage=sprint` and `sdlc/state=ready-to-work`, for the door to route it again; and it
-  cancels the blocked run. Nothing re-routes a card on its own.
+  resend <card> --workflow <workflow>` sends on the latest run of the card's work, filing the card again under a name of its own, handed the
+  blocked run, on the workflow it needs, or, with no `--workflow`, keeping its labels, `sdlc/stage=sprint` and `sdlc/state=ready-to-work`,
+  for the door to route it again; and it cancels the blocked run. A run with no card behind it is sent on the same way: `nemia resend <run>
+  [--workflow <workflow>]`. Nothing re-routes a card on its own.
 
 ## Routing
 

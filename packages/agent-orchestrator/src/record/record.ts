@@ -211,7 +211,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *   skipped          a node on a route its condition did not take, or every parent of which is skipped: never filed (`nodeFate`)
- *   sent             a workflow node (`workflow:`) that filed its card (`StepRecord.sent`)
+ *   sent             a workflow node (`workflow:`) that started its run, or a backlog node that filed its card (`StepRecord.sent`)
  *
  * Only `verified`, `unverified` and `sent` let a follower be filed. The engine's `succeeded` means the session
  * ended, never that the work is done.
@@ -399,8 +399,13 @@ export type StepRecord = {
   conditions?: Readonly<Record<string, ConditionWritten>>;
   /** The route a condition answered on the try it is on, written once per try by the tick. Absent on any other step. */
   route?: RouteRecord;
-  /** The card a workflow node filed (`<run>-<node>`), and when: once, never taken back. Absent on any other step. */
-  sent?: { card: string; at: string };
+  /**
+   * The run a workflow node started (`run`) or the card a backlog node filed (`card`), and when: once, never taken back. Absent on any
+   * other step, and on a node not yet sent.
+   */
+  sent?: { run: string; at: string } | { card: string; at: string };
+  /** Why a workflow node's run could not be started now, and when it was told: tried again on each pass. Absent where none was refused. */
+  refused?: { message: string; at: string };
   workspace?: string;
   branch?: string;
   check?: { taskId: string; tip?: string; tasks?: Readonly<Record<string, string>> };

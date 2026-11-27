@@ -5,7 +5,7 @@
  */
 import type { RunCommand } from 'objects';
 import type { Runner } from '../runner.ts';
-import { cancel, condition, hold, refresh, release, route, wait } from './act.ts';
+import { cancel, condition, hold, refresh, release, resend, route, wait } from './act.ts';
 import { assign } from './assign.ts';
 import { approve, retry, say } from './answer.ts';
 import { prune, rm } from './forget.ts';
@@ -25,6 +25,7 @@ export const RUN_RUNNERS: Readonly<Record<RunCommand, Runner>> = {
   hold,
   release,
   assign,
+  resend,
   wait,
   rm,
   prune,

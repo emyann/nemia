@@ -1,2 +1,2 @@
-The route to `quick`: files a card for the intent with `workflow: quick` and `from:` this run, which the factory starts as any card.
+The route to `quick`: starts a run of `workflow: quick` for the intent, handed this run as context.
 No agent runs here.

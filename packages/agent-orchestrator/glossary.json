@@ -1119,8 +1119,51 @@
       "type": "MilestoneStates"
     },
     {
+      "term": "Workflow node",
+      "meaning": "a node of a workflow that starts the run of another workflow and runs no agent, by its `workflow:`: the run it starts is handed the node's run as context, claimed by the node (`startedBy`), and briefed by its `brief:`, `title` (the default, the title its condition's producer gave) or `card` (the run's own card as it was given, its body, labels and files) (`NodeBrief`, `packages/agent-orchestrator/src/step/step.ts`).",
+      "type": "NodeBrief",
+      "retired": [
+        {
+          "spelling": "card: given",
+          "card": "run-core: a workflow node starts its run directly",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former/former.ts",
+              "why": "a run frozen with the retired word still reads, as `brief: card`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/route/route-keys.ts",
+              "why": "the loader refuses the retired word, naming the line that replaces it"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/route/route.test.ts",
+              "why": "holds the refusal of the retired word"
+            }
+          ]
+        },
+        {
+          "spelling": "card: routed",
+          "card": "run-core: a workflow node starts its run directly",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former/former.ts",
+              "why": "a run frozen with the retired word still reads, as the default brief"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/route/route-keys.ts",
+              "why": "the loader refuses the retired word, naming what to do"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/route/route.test.ts",
+              "why": "holds the refusal of the retired word"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "term": "Card node",
-      "meaning": "a node of a workflow that files a card and runs no agent, by its `card:`: `routed` (the default, a workflow node's card, titled and labelled by its run), `given` (the run's own card as it was given, its body and labels, with why it was routed and the reason its condition's producer gave), or `backlog` (the run's card back to the inbox naming no workflow, unqueued, its labels after the label edits its `relabel:` lists, kubectl's: `key=value` sets a key, `key-` removes it) (`NodeCard`, `packages/agent-orchestrator/src/step/step.ts`).",
+      "meaning": "a node of a workflow that files the run's card back to the inbox and runs no agent, by its `card: backlog`: the card names no workflow and is unqueued, its labels after the label edits its `relabel:` lists, kubectl's: `key=value` sets a key, `key-` removes it (`NodeCard`, `packages/agent-orchestrator/src/step/step.ts`).",
       "type": "NodeCard",
       "retired": [
         {

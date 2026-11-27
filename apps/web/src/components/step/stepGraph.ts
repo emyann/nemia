@@ -11,7 +11,8 @@ import { stepPartOf } from '../../lib/stepPart';
 /**
  * What a step's node shows, on its run's page and on the Factory alike: read off the run as the api gives it, whose
  * `waitingOnYou` decides the human gate beside the step's own word; for a condition or a workflow node, its graph node, and what its
- * sentence says of its route or its card (`routedOf`); and what its part says it gave, of the try it shows, whose first item the node draws
+ * sentence says of its route (`routedOf`) and what it sent (`sent`); and what its part says it gave, of the try it shows, whose first
+ * item the node draws
  * (`stepPartOf`, the one model of every size of a step).
  *
  * @param run the run, as the api gives it
@@ -27,6 +28,7 @@ export const stepData = (run: RunDetail, index: number) =>
     node: nodeKinds(run.graph).get(run.steps[index].name) ?? null,
     routes: routesOf(run.graph, run.steps[index].name),
     routed: routedOf(run.steps[index].message),
+    sent: run.steps[index].sent ?? null,
     taken: takenRoutes(run.steps).get(run.steps[index].name) ?? null,
     gave: stepPartOf(run, run.steps[index].name, new Date()).gave,
   }) satisfies StepNodeData;

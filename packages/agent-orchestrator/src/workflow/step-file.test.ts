@@ -899,6 +899,7 @@ const EVERY: Record<
     | 'when'
     | 'ends'
     | 'workflow'
+    | 'brief'
     | 'card'
     | 'relabel'
     | 'waitsFor'

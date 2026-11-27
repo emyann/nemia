@@ -92,8 +92,11 @@ const page = (namespace: string | undefined, query: ListQuery) =>
 /**
  * The card `name` of `namespace` (any namespace, for none), read now with its file as written (`status.source`), after its name is one a
  * card can have: what every verb on one card reads first.
+ * @param s The served door.
+ * @param namespace The namespace to read in, undefined for any.
+ * @param name The card's name.
  */
-const cardIn = async (s: Served, namespace: string | undefined, name: string) => {
+export const cardIn = async (s: Served, namespace: string | undefined, name: string) => {
   const wrong = inboxNameRefusal(name);
   if (wrong) throw new Refused({ message: wrong });
   return s.inRequest(cardObject(s.e, howOf(s), name, namespace));

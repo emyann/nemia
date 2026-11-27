@@ -139,7 +139,9 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
   await runWith(e(), RUNS.handler({}, { runs: memo }));
   assert.ok(memo.runs.has(loose), 'the list, within a pass, kept the run from no card');
 
-  assert.deepEqual(await runWith(e(), cardRuns(e(), how)), [{ id: fromCard, from: { inbox: 'cache-the-views-k2q9' }, phase: 'running' }]);
+  assert.deepEqual(await runWith(e(), cardRuns(e(), how)), [
+    { id: fromCard, from: { inbox: 'cache-the-views-k2q9' }, createdAt: runRecord(ROOT, fromCard).createdAt, phase: 'running' },
+  ]);
   assert.ok(memo.runs.has(loose), "an inbox read leaves the list's run from no card where it was");
 
   for (const step of ['build', 'notes'])

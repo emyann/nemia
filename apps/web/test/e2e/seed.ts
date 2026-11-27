@@ -798,8 +798,8 @@ export const ROUTED = {
   skipped: 'build-backend',
   workflowNode: 'handoff',
   workflow: 'dev',
-  /** The card `handoff` filed, `<run>-<node>`, as the send names it. */
-  card: 'route-the-change-e2e31-handoff',
+  /** The run `handoff` started, which the page writes beside the run. */
+  child: 'dev-the-change-e2e32',
   /** The workflow folder of yours the page writes beside the run, its steps the run's, and takes back. */
   folder: 'triage-e2e',
 } as const;
@@ -878,7 +878,7 @@ export function seedRouted(root: string, now = Date.now()) {
           [ROUTED.condition]: { taskId: null, route: { route: ROUTED.taken, try: 1, by: 'table' } },
           'build-web': { taskId: `${id}-build-web`, workspace: path.join(work, 'build-web') },
           [ROUTED.skipped]: { taskId: null },
-          [ROUTED.workflowNode]: { taskId: null, sent: { card: ROUTED.card, at: ago(24) } },
+          [ROUTED.workflowNode]: { taskId: null, sent: { run: ROUTED.child, at: ago(24) } },
           notes: { taskId: `${id}-notes`, workspace: path.join(work, 'notes') },
         },
       },

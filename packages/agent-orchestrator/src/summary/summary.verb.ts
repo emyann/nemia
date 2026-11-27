@@ -479,21 +479,65 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
 const NO_VIEWS: Views = new Map();
 
 /**
- * Each run a card was started from (`from.inbox`), with its phase as the list judges it, read through the informer `how.memo` as
+ * The runs of `all` that belong to some card's work: those started from a card (`from.inbox`), and each run a workflow node of one of
+ * them started that carries no card of its own (`startedBy`), and so on.
+ * @param all Every run the store lists.
+ */
+const cardWorkRuns = <R extends { readonly id: string; readonly from?: unknown; readonly startedBy?: { readonly run: string } }>(
+  all: readonly R[],
+) => {
+  const inWork = new Set(all.filter((run) => run.from !== undefined).map((run) => run.id));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const run of all)
+      if (!inWork.has(run.id) && run.from === undefined && run.startedBy !== undefined && inWork.has(run.startedBy.run)) {
+        inWork.add(run.id);
+        grew = true;
+      }
+  }
+  return all.filter((run) => inWork.has(run.id));
+};
+
+/**
+ * Each run of a card's work (`cardWork`): those started from it (`from.inbox`) and those its workflow nodes started, with its phase as
+ * the list judges it, read through the informer `how.memo` as
  * `runsSummarized` reads it: the card's state once it has started (`cardState`). One listing gives both which runs name a card and their
  * phases, so a card whose run is listed always has its phase. A run that could not be judged reads `running`, as the list counts it
  * (`unjudgedFields`). Every listed run is kept in the informer, so a read of the inbox leaves the list's runs where they were.
  */
 export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo, verify }: SummaryHow) {
   const { git, read, all } = yield* listedThrough(e, memo, verify);
-  const fromCards = all.filter((run) => run.from?.inbox !== undefined);
+  const fromCards = cardWorkRuns(all);
   const judged = yield* informedJudgements(e, home, fromCards, read, git, () => all);
   return fromCards.flatMap((run) => {
     const one = judged.runs.get(run.id);
     if (one === undefined) return [] satisfies CardRun[];
     const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
-    return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }] satisfies CardRun[];
+    return [
+      {
+        id: run.id,
+        ...(run.from === undefined ? {} : { from: run.from }),
+        ...(run.startedBy === undefined ? {} : { startedBy: run.startedBy }),
+        createdAt: run.createdAt,
+        phase,
+      },
+    ] satisfies CardRun[];
   });
+});
+
+/**
+ * One run's phase as the list judges it, through the informer `how.memo` as `cardRuns` reads a card's runs: undefined where the run is not
+ * listed. A run that could not be judged reads `running` (`unjudgedFields`).
+ * @param e The engine.
+ * @param how The store's root, the informer and whether its answers are verified.
+ * @param id The run's id.
+ */
+export const runPhaseOf = Effect.fn('runPhaseOf')(function* (e: Engine, { home, memo, verify }: SummaryHow, id: string) {
+  const { git, read, all } = yield* listedThrough(e, memo, verify);
+  const one = all.filter((run) => run.id === id);
+  const judged = yield* informedJudgements(e, home, one, read, git, () => all);
+  const found = judged.runs.get(id);
+  return found === undefined ? undefined : 'judgement' in found ? found.judgement.judged.phase : unjudgedFields().phase;
 });
 
 /**

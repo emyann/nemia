@@ -60,6 +60,8 @@ export type RunView = Pick<
     readonly createdAt: string;
     /** The inbox card the run was started from: absent for a run started from none. */
     readonly from?: { readonly inbox: string };
+    /** The run and the workflow node that started it directly: absent for a run started any other way. */
+    readonly startedBy?: { readonly run: string; readonly node: string };
     readonly graph: {
       readonly roots: readonly string[];
       readonly edges: readonly RunViewEdge[];
@@ -103,6 +105,7 @@ export const runViewOf = (object: Run) => {
     after: spec.after,
     context: spec.context,
     ...(spec.from ? { from: spec.from } : {}),
+    ...(spec.startedBy ? { startedBy: spec.startedBy } : {}),
     graph: {
       roots: graph.roots,
       edges: graph.edges.filter((e): e is RunViewEdge => e.kind !== 'input'),

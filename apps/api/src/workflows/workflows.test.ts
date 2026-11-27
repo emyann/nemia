@@ -127,6 +127,7 @@ const spec = (fields: Partial<WorkflowStepSpec>) => ({
   tools: null,
   disallowedTools: [],
   allowedTools: [],
+  brief: null,
   denials: null,
   remote: null,
   deadlineSeconds: null,

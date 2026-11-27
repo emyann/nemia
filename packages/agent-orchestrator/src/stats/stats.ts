@@ -19,6 +19,8 @@ import type { TryMemory } from '../out-of-memory/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { hasChecks, type StepSpec } from '../step/step.ts';
 import { askedAgain } from '../status/status.ts';
+import { answeredRoute } from '../route/routed/index.ts';
+import { conditionOf, nodeFate } from '../route/index.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
@@ -333,12 +335,34 @@ function runCostOf(t: Timeline) {
 }
 
 /**
+ * Whether a node never filed is skipped (`nodeFate`): off the route its condition took (`when:`), or every node it follows skipped, so
+ * there is nothing of it to be done.
+ */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it is recursive through `doneStep`, whose type inference cannot give
+function skippedNode(r: RunRead, step: StepSpec): boolean {
+  const own = r.run.steps[step.name];
+  if (own?.taskId || own?.sent !== undefined) return false;
+  const wordOf = (name: string) => {
+    const parent = r.steps.find((s) => s.name === name);
+    if (parent === undefined) return 'pending' as const;
+    if (skippedNode(r, parent)) return 'skipped' as const;
+    return doneStep(r, parent) ? ('verified' as const) : ('pending' as const);
+  };
+  const condition = conditionOf(step, r.steps);
+  const said = condition ? answeredRoute(condition, r.run, r.closeoutOf, wordOf, r.steps) : undefined;
+  return nodeFate(step.when, said?.kind === 'route' ? said.route : undefined, step.after.map(wordOf)) === 'skipped';
+}
+
+/**
  * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
  * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
-function doneStep(r: RunRead, step: StepSpec) {
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it is recursive through `skippedNode`, whose type cannot be inferred
+function doneStep(r: RunRead, step: StepSpec): boolean {
   const record = r.run.steps[step.name];
-  if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
+  if (record?.sent !== undefined) return true;
+  if (!record?.taskId) return skippedNode(r, step);
+  if (!r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
   if (askedAgain(step, r.run, r.closeoutOf)) return false;
   return record.check ? checkTasksOf(record.check).every(([, id]) => r.verdictOf(id) === 'passed') : !hasChecks(step);
 }

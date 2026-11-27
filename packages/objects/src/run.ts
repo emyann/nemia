@@ -677,7 +677,7 @@ export const RunStatus = Schema.Struct({
   waitingOnYouWords: Strings.annotate({ description: 'What each of those steps waits on a person for, in words, one line a step.' }),
   gates: List(RunGate).annotate({
     description:
-      'The steps of the run that are gates, in the order they run, each with where its approval is: after the step, its closeout waiting on it, or before it, for an ending approved first.',
+      'The steps of the run that are gates, in the order they run: each waits for a person\'s approval after it has signed off.',
   }),
   warning: NullString.annotate({ description: "A warning about the run's workflow folder, in words; null where there is none." }),
   kinds: List(RunDrift).annotate({

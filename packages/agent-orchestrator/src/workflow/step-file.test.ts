@@ -24,7 +24,6 @@ import {
   type StepKey,
   type StepSpec,
 } from '../workflow.ts';
-import { endsOnBase } from '../step/step.ts';
 import { readsMounts } from '../filed/filed.ts';
 import { FILED_AS } from '../keys/filed-as.ts';
 
@@ -107,7 +106,6 @@ describe('each key a step has: read as written, and refused blank, twice or with
       allowedTools: undefined,
       budget: undefined,
       gate: undefined,
-      workspace: undefined,
       slot: undefined,
       remote: undefined,
       denials: undefined,
@@ -324,19 +322,9 @@ describe('each key a step has: read as written, and refused blank, twice or with
     refuses('gate: blank', 'plan', 'gate:', '`gate` has no value'),
     refuses('gate: twice', 'plan', 'gate: true\ngate: true', '`gate` is set twice'),
 
-    reads('workspace: base', 'ship', 'after: review\nworkspace: base', { workspace: 'base' }),
-    refuses(
-      'workspace: worktree',
-      'ship',
-      'workspace: worktree',
-      '`workspace: worktree` is what a step without the line already is',
-      '`workspace: base`',
+    ...['base', 'main', 'worktree'].map((word) =>
+      refuses(`workspace: ${word}`, 'ship', `after: review\nworkspace: ${word}`, '`workspace`', '`waitsFor:`', '`nemia decide <run>`', 'Delete the line'),
     ),
-    ...['Base', 'Main', 'repo', '/tmp/x', 'true'].map((word) =>
-      refuses(`workspace: ${word}`, 'ship', `workspace: ${word}`, `\`workspace: ${word}\` is not \`base\``),
-    ),
-    refuses('workspace: blank', 'ship', 'workspace:', '`workspace` has no value'),
-    refuses('workspace: twice', 'ship', 'workspace: base\nworkspace: base', '`workspace` is set twice'),
 
     reads('place: folder', 'write', 'place: folder', { place: 'folder' }),
     reads('place: git', 'write', 'place: git', { place: 'git' }),
@@ -878,27 +866,6 @@ describe('the former names a file may still say: read under the names they have 
         'keep `place:`',
       ),
     ),
-    {
-      row: 'workspace: main, read as base and never written',
-      run: () => {
-        const former = fm('ship', 'after: review\nworkspace: main');
-        assert.equal(former.workspace, 'base');
-        assert.equal(endsOnBase(former), true);
-        assert.match(renderStep(former), /^workspace: base$/m);
-        assert.doesNotMatch(renderStep(former), /workspace: main/);
-        const frozen = { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'main' } as unknown as StepSpec;
-        assert.deepEqual(
-          asNamed(frozen),
-          { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'base' },
-          'a frozen `main` reads as `base`',
-        );
-      },
-    },
-    {
-      row: 'REFUSED: renderStep handed workspace: main',
-      run: () => renderStep({ ...fm('ship', 'after: review\nworkspace: main'), workspace: 'main' as never }),
-      naming: ['ship: ', '`workspace: main`', 'former spelling', 'Send `workspace: base`', 'reload it'],
-    },
     {
       row: "systemPrompt: an agent's, read as harnessPrompt",
       run: () => {

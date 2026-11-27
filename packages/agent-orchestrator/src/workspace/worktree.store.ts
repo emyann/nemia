@@ -88,7 +88,7 @@ export function lockfileParts(mainRoot: string, worktree: string) {
 }
 
 /**
- * Where the `package-lock.json` in a repository's checkout — during an ending, the merge staged there — asks for a package its own
+ * Where the `package-lock.json` in a repository's checkout asks for a package its own
  * `node_modules` does not have on disk: the first package path they disagree on, or null. `lockfileParting`, so a package nested in a
  * workspace's `node_modules` is compared as it is installed.
  *
@@ -648,7 +648,6 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   };
   if (!run.isolate) return cut({ workspace: run.repo, branch: run.branch, notes: [] });
   const followed = yield* followedBy(place, run.repo);
-  if (plan.kind === 'base') return cut({ workspace: run.repo, branch: run.branch, notes: followed });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
     const again = yield* Effect.promise(() => keepWorktreeInstalled(home, run.id, run.repo, parent.workspace));
@@ -659,7 +658,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
       notes: [...followed, ...(again ? reinstalledNotes(run.repo, again) : [])],
     });
   }
-  const to = inputsGiven(run, plan);
+  const to = inputsGiven(run);
   const asked = yield* madeBy(place, {
     repo: run.repo,
     at: path.join(home, 'worktrees', run.id, cutName(frozen, routed)),

@@ -73,7 +73,6 @@ export type GateReach = GateSite & {
 
 /** Why a condition never holds at a gate, in a person's words. */
 export const NEVER_WORDS: Record<NeverWhy, string> = {
-  'approved-before-it-runs': 'it is approved before it runs, so nothing of its own has happened yet',
   'no-check': 'it has no check to pass',
 };
 

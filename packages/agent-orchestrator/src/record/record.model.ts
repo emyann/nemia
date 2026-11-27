@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { Actor } from 'objects';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
-import { stepTaskId, type LandingRecord, type RouteBy, type StepRecord } from './record.ts';
+import { stepTaskId, type RouteBy, type StepRecord } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { FrozenWorkflowStep, StepName, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
@@ -81,27 +81,6 @@ export type Try = typeof Try.Type;
 const none = Schema.optional(Schema.Undefined);
 
 /**
- * What the run did with the merge an ending staged (`LandingRecord`, record.ts): the commit it made, the abort and why, or nothing
- * touched — exactly one, as the check holds it. Typed as the `LandingRecord` union every writer of `landed` is typed by, which the check
- * makes it: a member of the union refusing the others' keys would leave a reader's `'commit' in landed` narrowing nothing.
- */
-export const Landing = Schema.Struct({
-  commit: Schema.optional(Schema.String),
-  aborted: Schema.optional(Schema.String),
-  refusedOn: Schema.optional(Schema.String),
-  untouched: Schema.optional(Schema.String),
-})
-  .check(
-    Schema.makeFilter(
-      (l) =>
-        [l.commit, l.aborted, l.untouched].filter((v) => v !== undefined).length === 1 ||
-        'a landing is one of `commit`, `aborted` or `untouched`: write the one the pass did (`LandingRecord`, record.ts)',
-    ),
-  )
-  .annotate({ identifier: 'Landing' }) as unknown as Schema.Codec<LandingRecord>;
-export type Landing = typeof Landing.Type;
-
-/**
  * One step on a run's record (`StepRecord`): its current try's task — `null` while nothing of it is filed — and check, where it
  * works, the tries behind it, and what the run did with it. Its name is its key in the run's `steps`.
  */
@@ -138,7 +117,6 @@ export const Step = Schema.Struct({
   check: Schema.optional(CheckTask),
   tries: Schema.optional(Schema.Array(Try)),
   handedOff: Schema.optional(TaskId.OnRead),
-  landed: Schema.optional(Landing),
   filesRead: Schema.optional(Schema.Struct({ taskId: TaskId.OnRead, lacked: Schema.Record(Schema.String, Schema.String) })),
   closeoutHash: Schema.optional(Schema.String),
   declared: Schema.optional(Schema.Array(Schema.String)),
@@ -215,7 +193,6 @@ const Approval = Schema.Struct({
   at: Schema.String,
   message: Schema.optional(Schema.String),
   budgets: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
-  work: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
   actor: Schema.optional(Actor),
 });
 
@@ -599,11 +576,6 @@ export const RepositoryRun = Schema.Struct({
    * run asks the place its program is given.
    */
   placeSkill: Schema.optional(Schema.Struct({ skill: Schema.String, version: Schema.String })),
-  /**
-   * The file whose presence says a merge is staged in the repository's checkout, as the place's `open` named it at `nemia start`, read
-   * with a `stat` (`stagedHere`). Absent for a run started before the place named one, whose checkout is read through `status`.
-   */
-  stagedFile: Schema.optional(Schema.String),
 }).annotate({ identifier: 'RepositoryRun' });
 
 /**
@@ -619,7 +591,6 @@ export const FolderRun = Schema.Struct({
   branch: none,
   isolate: none,
   placeSkill: none,
-  stagedFile: none,
 }).annotate({ identifier: 'FolderRun' });
 
 /**
@@ -638,6 +609,6 @@ export const stepFieldsHeld: Same<keyof StepRecord, keyof Step> = true;
 
 /** Run-core's part of the orchestrator's diagram (`model/diagram.model.ts`): its entities, and the ids it owns. */
 export const recordModel = {
-  entities: [RepositoryRun, FolderRun, Step, Try, Round, Landing],
+  entities: [RepositoryRun, FolderRun, Step, Try, Round],
   ids: { RunId: 'Run', TryNumber: 'Try' },
 } satisfies ErModel;

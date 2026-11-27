@@ -13,7 +13,7 @@ import { Missing } from '../refusal/refusal.ts';
 import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
-import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
+import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import type {
   AskKey,
   AskOf,
@@ -133,7 +133,7 @@ const approvalsHeld = (st: State, id: string) =>
 function readOf(st: State, id: string) {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-  const approvals = approvalsHeld(st, id).filter((a) => workStands(record, a));
+  const approvals = approvalsHeld(st, id);
   const acceptances = waiting(st, id, 'loop');
   const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {

@@ -11,7 +11,7 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun, namesInOrder, type Run } from '../record/record.ts';
-import { approvedFirst, branchWord } from '../status/status.ts';
+import { branchWord } from '../status/status.ts';
 import { stepsReading, type StepsReading } from '../object/read.verb.ts';
 import { branchesToRead, countsLine, NO_RADIUS, lessonOf, resultSteps } from '../branches/index.ts';
 import { branchStandings, type BranchReader } from '../branches/branches.store.ts';
@@ -108,8 +108,7 @@ const answered = (read: DecisionRead | DecisionUnjudged) => read;
  * succeeded or been released is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight
  * (`decided`). Else the run is
  * decided (`decidedOf`). A run the cap on runs in flight holds is `running` with its slot (its `WF_MAX_RUNS` before any pass is `env`'s),
- * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`, with an approved ending that
- * never ran named. Else what there is to decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
+ * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`. Else what there is to decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
  * a run still running has a step waiting on you, and every branch a step worked on when no terminal step has one (`branchesToRead`), never
  * the base branch of a run that cut worktrees, each read from the run's place on this read (`changesOf`). What the place could not say is
  * an `error` on its entry, never a failed read. A folder run has no repository to ask, and a run that worked on its base branch itself no
@@ -139,7 +138,7 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
     return { decision: { running: true }, decided, ...none } satisfies DecisionRead;
   const d = decided.decision;
   if (d.kind === 'merged')
-    return { decision: { nothing: mergedWords(run, judged.status, d.branches, decided.steps) }, decided, ...none } satisfies DecisionRead;
+    return { decision: { nothing: mergedWords(run, judged.status, d.branches) }, decided, ...none } satisfies DecisionRead;
   const steps = decided.steps;
   const collisions = decided.collisions ?? null;
   const read = yield* branchesOf(run, git, steps, decided, d.kind === 'awaiting' ? d.branches : undefined, collisions, how);
@@ -159,7 +158,6 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
     cost: decided.runCostSaid,
     overBudget: decided.overBudgetLine ?? null,
     commands: decided.commands,
-    ...(decided.checkout ? { baseHeldBy: decided.checkout } : {}),
     awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
     collisions,
     ...(questions.length ? { questions } : {}),
@@ -193,15 +191,8 @@ export const runDecision = Effect.fn('runDecision')(function* (id: string, how: 
   return answer;
 });
 
-/** What a run whose branches are already on its base says: its status, the branches merged, and an ending approved first that never ran,
- * nothing left for it. */
-function mergedWords(run: Run, status: string, branches: readonly string[], steps: Decided['steps']) {
-  const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
-  const never = unrun
-    ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
-    : '';
-  return `${status} — ${branches.join(', ')} merged into ${run.branch}${never}`;
-}
+/** What a run whose branches are already on its base says: its status and the branches merged. */
+const mergedWords = (run: Run, status: string, branches: readonly string[]) => `${status} — ${branches.join(', ')} merged into ${run.branch}`;
 
 /** What `branch` changed among `changes`, which `changesOf` gives for each branch it was asked: thrown, naming it, where none. */
 function changeOf(changes: readonly BranchChanges[], branch: string) {
@@ -213,7 +204,7 @@ function changeOf(changes: readonly BranchChanges[], branch: string) {
 /**
  * What each branch to read changed (`branchesToRead`, in the order the run's steps run, `namesInOrder`), what each branch the run awaits
  * changed, and where each result branch stands against the base (`Standing`), all off one read of the place (`changesOf`). Whether each
- * branch ahead merges onto the base is the decision's own trial at an ending (`collisions`), and a trial merge (`mergesRead`) at any other.
+ * branch ahead merges onto the base is the decision's own trial at a decision (`collisions`), and a trial merge (`mergesRead`) at any other.
  */
 const branchesOf = Effect.fnUntraced(function* (
   run: Run,

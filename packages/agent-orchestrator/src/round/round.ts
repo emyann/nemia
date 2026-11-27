@@ -26,17 +26,13 @@ import {
   acceptanceOf,
   askedAgain,
   capOf,
-  endingStopped,
   loopOver,
   ownStatus,
   roundOf,
   roundWord,
-  sendBackTo,
-  sentBack,
   spentWord,
   standing,
   tryCommand,
-  waitsAtGate,
   type Round,
   type RoundAsk,
   type Spend,
@@ -49,7 +45,7 @@ import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision } from '../decide/decide.ts';
 import { mergeDue, mergeDueNote, mergeNote, mergeSpent, mergeWaits } from '../merge/merge.ts';
-import type { LandingSaid, Verdict } from '../check/index.ts';
+import type { Verdict } from '../check/index.ts';
 
 /**
  * The rounds due now. Pure, and blind to cancellation on purpose, as `retriesDue` is: `assess` answers for a cancelled run, and `advance`
@@ -96,7 +92,7 @@ export function roundsDue(
     }
     const sent =
       askedRound(steps, step, run, { status, own, round }, closeoutOf, asks, spendOf) ??
-      mergeDue(steps, run, step, status, asks, (f) => endingStopped(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
+      mergeDue(steps, run, step, status, asks);
     if (sent) due.push(sent);
   }
   return due;
@@ -138,7 +134,7 @@ function askedRound(
  * The run's steps once a round is filed. Pure.
  *
  * Every step of the loop moves its try behind it, `cause: 'round'` — `cause: 'merge'` on a merge, which spends no round — and keeps its
- * workspace and branch, and each ending a merge sends the work back from moves its own behind (`sentBack`). The target's place is taken
+ * workspace and branch. The target's place is taken
  * by the task just filed, which continues its session. Every other step's is left unfiled, for `assess` to file once what it waits on is
  * verified — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it,
  * and a pass that reads the record after this files no second round. A cap a person raised with the round is kept on each step it was
@@ -160,17 +156,12 @@ export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskI
   const next = { ...run.steps };
   const cause: TryCause = r.by === 'merge' ? 'merge' : 'round';
   for (const name of looping ? loopSpan(steps, looping) : []) {
-    const { check, tries = [], handedOff: _, landed: __, filesRead: ___, ...rest } = run.steps[name] ?? { taskId: null };
+    const { check, tries = [], handedOff: _, filesRead: __, ...rest } = run.steps[name] ?? { taskId: null };
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), cause, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
-  const back = (r.back ?? []).flatMap((b) => {
-    const was = next[b];
-    return was ? [[b, sentBack(was)]] : [];
-  });
-  const refiled = { ...next, ...Object.fromEntries(back) };
-  return { ...refiled, [r.target]: { ...(refiled[r.target] ?? { taskId: null }), ...filed } } satisfies Run['steps'] as Run['steps'];
+  return { ...next, [r.target]: { ...(next[r.target] ?? { taskId: null }), ...filed } } satisfies Run['steps'] as Run['steps'];
 }
 
 /**
@@ -185,17 +176,16 @@ export const roundFiledNote = (r: Round, looping: StepSpec) =>
 
 /**
  * What a round filed tells its target of itself (`RoundBriefing`): its loop, its number, the loop's `rounds:`, on whose word, and what it
- * merges — with what the ending's check said of the merged tree, where a merge is asked on its refusal (`landing`).
+ * merges.
  * @param r The round filed.
  * @param looping The round's looping step, whose `rounds:` the briefing names.
- * @param landing What the ending's check said of the merged tree, where the round is a merge asked on its refusal; undefined otherwise.
  */
-export const roundBriefed = (r: Round, looping: StepSpec, landing?: LandingSaid) => ({
+export const roundBriefed = (r: Round, looping: StepSpec) => ({
   loop: r.step,
   round: r.round,
   rounds: capOf(looping),
   by: r.by,
-  ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha, ...(landing ? { landing } : {}) } } : {}),
+  ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha } } : {}),
 });
 
 /**
@@ -254,9 +244,7 @@ function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over
  * loop is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that
  * ran on it and take none of that back. A step of the loop that stopped in the round, on its own status whatever its budget, is a try's to
  * take on; one over budget only because a round would file it again has not stopped. A step of the loop at its gate is moved by a
- * person's word, not a round. A loop that is over, with an ending held at its gate before it is filed (`waitsAtGate`) waiting on it, is
- * offered that approval and the send-back of the work (`sendBackTo`); with an ending that stopped on the base branch (`endingStopped`),
- * the send-back of the looping step, whose `again: true` is the round, or the ending's try to land again.
+ * person's word, not a round.
  *
  * @param steps The workflow the run is judged by: its loops and their steps.
  * @param run The run the round is asked of.
@@ -367,28 +355,6 @@ export function roundAsk(
       ? `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (nemia approve)`
       : `${looping.name} signed off without asking for another round (\`again: false\`)`;
     const overNow = `${ended}, so its loop is over${accepted ? ' on their word' : ''}`;
-    const ending = steps.find(
-      (s) => s.after.includes(looping.name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, () => undefined),
-    );
-    if (ending) {
-      const back = sendBackTo(ending, run)
-        .map((n) => `nemia retry ${run.id} ${n} --message "<objection>"`)
-        .join(' or ');
-      return no(
-        `${overNow}${filed ? '' : ' — and nothing waiting on it has been filed'}: the run is at ${ending.name}'s gate, ` +
-          `where nothing of ${ending.name} has run and your approval is what files it. Approve it: nemia approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`,
-      );
-    }
-    const stopped = steps.find(
-      (s) => s.after.includes(looping.name) && endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf),
-    );
-    if (stopped) {
-      return no(
-        `${ended}, and ${stopped.name} stopped on the base branch (${ownStatus(stopped, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for: ` +
-          `a round would file the work again with nothing said of why. Send it back, with what to change — ${looping.name} is filed again with your objection and what ${stopped.name} said, and its \`again: true\` is the round: ` +
-          `nemia retry ${run.id} ${looping.name} --message "<objection>". Or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${stopped.name}.`,
-      );
-    }
     return no(`${overNow} and there is nothing to go round again. What waits on it has been filed: nemia ls ${run.id}.`);
   }
   return no(

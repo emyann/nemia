@@ -81,22 +81,20 @@ export type RunSlot = { inFlight: number; cap: number };
  *
  * @param run The run's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
- * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the checkout or the pause holds.
+ * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the pause holds.
  * @param released Whether the run of that id has succeeded or been released, which a run waiting on runs (`--after`) asks.
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnPause'>,
   released: (runId: string) => boolean,
   steps: readonly Pick<StepSpec, 'slot'>[] = [],
 ) {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due =
-    a.ready.length + a.check.length + a.retry.length + a.round.length + a.waitingOnCheckout.length + (a.waitingOnPause?.steps.length ?? 0) >
-    0;
+  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + (a.waitingOnPause?.steps.length ?? 0) > 0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
     wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, released),

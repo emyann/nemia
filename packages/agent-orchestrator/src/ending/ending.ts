@@ -1,355 +1,27 @@
 /**
- * A run's ending step: when its merge lands on its check (`landingDue`), how long it holds the one checkout (`landingOpen`,
- * `checksHoldCheckout`: until every check that runs a command there has passed, a condition not yet written after it holds nothing),
- * what landed (`landedWords`), the checkout's line (`checkoutLine`), and what is left for a person to decide (`toDecide`, `gateRefusal`).
- * Pure: the tick merges and commits.
+ * A run's end, for a person: what is left for them to decide (`toDecide`, `toDecideWords`), the steps whose gate ends the run
+ * (`endingSteps`) and the refusal of a gate no step has (`gateRefusal`). A run ends with its branch: where it stands, and how to merge it,
+ * is `nemia decide`'s. Pure.
  */
-import type { Verdict } from '../check/index.ts';
-import type { MergeState } from '../place/place.ts';
 import type { StepSpec } from '../step/step.ts';
-import { sandboxed, terminalSteps } from '../workflow/index.ts';
-import type { RetryAsk } from '../retry/index.ts';
-import {
-  andList,
-  firstLine,
-  refusedCheck,
-  SETTLED,
-  TRIED_FROM,
-  tryOf,
-  type LandingRecord,
-  type Run,
-  type StepStatus,
-  type TaskPhase,
-} from '../record/record.ts';
-import {
-  approvalOf,
-  approvedFirst,
-  branchWord,
-  endsOnBase,
-  hasGate,
-  landsOnCheck,
-  resultOnBase,
-  type BranchStanding,
-} from '../status/status.ts';
-import type { CheckoutHold } from '../cap/cap.ts';
-import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { terminalSteps } from '../workflow/index.ts';
+import type { Run, StepStatus } from '../record/record.ts';
+import { hasGate, type BranchStanding } from '../status/status.ts';
 import type { Assessment } from '../tick/assess.ts';
-import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
-import { checksPhase, currentCheckTask, standingOf } from '../check/index.ts';
-import { stepChecks } from '../step/step.ts';
-import type { ChecksHoldCheckout } from '../../contracts/checkout-checks.contract.ts';
-
-/**
- * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session
- * (`denyWhileLanding`), the commands that commit a staged merge, asked only of an ending that lands on its check. The run commits it, on
- * the check's word; a shipper that committed first would put the merge on the base branch unchecked, and the pass after could only record
- * it as committed before its check ran. A deny is a prefix, not a sandbox, so the brief says it too, and a commit made anyway is recorded
- * as such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list. Pure.
- * @param step The step filed: its name, its gate, its workspace, its check and its own deny list.
- * @param run The run's gates.
- * @param landingDenied Gives what the step's place denies a landing session, asked only of an ending that lands on its check.
- */
-export const filedDenies = (
-  step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
-  run: Pick<Run, 'gates'>,
-  landingDenied: () => readonly string[],
-) => (landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...landingDenied()])] : step.disallowedTools);
-
-/**
- * The allow list a step is filed with, each try and each round: its own, and for a step in the repository's own checkout
- * (`workspace: base`) on a harness fenced by a permission mode and its rules, a read of its own run's artifacts folder, `runArtifacts`
- * (absolute), in the rule's `//` form. Such a step reads what the steps before it left there, and a checkout's local settings, where a
- * person's "don't ask again" writes, reach no step's session; the rule grants a read of that one run's folder and no write. Any other
- * step is filed with its own list. Pure.
- * @param step The step filed: its workspace, its harness and its own allow list.
- * @param runArtifacts The absolute path of the run's artifacts folder.
- */
-export const filedAllows = (step: Pick<StepSpec, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string) =>
-  readsRunArtifacts(step) ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])] : step.allowedTools;
-
-/**
- * Whether a step is filed a rule reading its run's artifacts folder (`filedAllows`): one in the repository's own checkout
- * (`workspace: base`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
- * @param step The step: its workspace and its harness.
- */
-export const readsRunArtifacts = (step: Pick<StepSpec, 'workspace' | 'harness'>) =>
-  endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
-
-/**
- * What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, only write down how it
- * stands, or wait, with why, where its place gave no reading of the checkout.
- */
-export type Landing =
-  | { act: 'wait'; why: string }
-  | { act: 'commit'; message: string }
-  | { act: 'abort'; why: string; refusedOn?: string }
-  | { act: 'record'; landed: LandingRecord };
-
-/**
- * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
- * when it does nothing. Pure: the tick acts, and writes what it did on the step's record (`landed`), once for each try. The checkout is
- * read through `merge` (`checkoutStatus`: the place's `status`, a process in a person's own checkout), and only once a landing can be due:
- * never while the step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — the
- * file the place named at `open` is there, read with no process — says a merge is in progress to take back. So an ending that ended
- * blocked with nothing staged is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know
- * reads `running`, and waits), with one `stat` of the checkout and no process, and the merges a person stages there after it — to resolve
- * by hand what stopped it, or a trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the
- * machine's — reads the checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once
- * nothing of it runs.
- *
- * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files the check
- * of a step that signed off done, whatever is staged — its merge, its result on HEAD already, or nothing, as when it pushed a head that
- * its check is to merge: the check is the judge — unless the run is held, which aborts it; nor on a merge that is not this run's
- * (`other`), which is never touched — the run did not start it; nor, but to `wait` with why, on a checkout the place gave no reading of
- * (`unread`), which is no verdict. Once neither runs:
- * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
- *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
- *   person's approval, or by its workflow once the step before it — one that can send the work back — passed, and its check is the run's
- *   own, from the folder frozen on the record.
- * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no
- *   merge waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
- *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
- *   step gave no message to commit it with. A check that refused it names the base the merge was staged on (`refusedBase`).
- * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; the check passed and the
- *   result is on the checkout's HEAD already (it landed there as the commit that brought it onto the base, the place's `landedBy`: never
- *   HEAD itself, which another landing may have moved on top of it while the check ran); or the check ended and the merge it judged is
- *   no longer staged, or none was: a check that passed records it aborted, and one that refused is the step's failed check.
- * @param step The ending's spec.
- * @param run The run's record.
- * @param own How the step ended on its own work.
- * @param phaseOf The phase of a task, by its id, as the engine reports it.
- * @param message The commit message the step's closeout gave, or undefined where it gave none.
- * @param verdict The exit code of the step's check, or undefined where it has none.
- * @param staged Whether the file the place named at `open` is there: a merge in progress to take back.
- * @param merge Reads how the checkout's merge stands through the place, or why it gave no reading (`unread`).
- */
-export function landingDue(
-  step: StepSpec,
-  run: Run,
-  own: StepStatus,
-  phaseOf: (taskId: string) => TaskPhase,
-  message: string | undefined,
-  verdict: Verdict | undefined,
-  staged: boolean,
-  merge: () => MergeState | { readonly unread: string },
-) {
-  const settled = landingSettled(step, run, phaseOf);
-  if (!settled) return undefined;
-  const { check } = settled;
-  const ended = SETTLED.has(settled.session) && (TRIED_FROM.has(own) || own === 'budget exhausted');
-  const nothing = ended
-    ? { act: 'record' as const, landed: { untouched: `${step.name} ended ${own}, and nothing of it was staged` } }
-    : undefined;
-  if (own !== 'checking' && !staged) return nothing satisfies Landing | undefined;
-  const read = merge();
-  if ('unread' in read) return { act: 'wait', why: read.unread } satisfies Landing | undefined;
-  const { merging, conflicted, missing, tip } = read;
-  if (merging === 'other') return undefined;
-  const ours = merging === 'ours';
-  const onHead = !ours && merging === 'none' && missing.length === 0;
-  const end = (why: string, refused: { refusedOn?: string } = {}) =>
-    (ours ? { act: 'abort', why, ...refused } : { act: 'record', landed: { aborted: why } }) satisfies Landing;
-  if (own !== 'checking')
-    return (ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing) satisfies Landing | undefined;
-  if (run.cancelledAt) return end('the run was called off before its merge was committed') satisfies Landing | undefined;
-  if (ours && conflicted) return end('the merge it staged has conflicts') satisfies Landing | undefined;
-  if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`) satisfies Landing | undefined;
-  if (!check) return (run.hold ? end('the run was held before its check was filed') : undefined) satisfies Landing | undefined;
-  if (check === 'succeeded') {
-    if (ours)
-      return (message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`)) satisfies
-        | Landing
-        | undefined;
-    if (onHead && read.landedBy) return { act: 'record', landed: { commit: read.landedBy } } satisfies Landing | undefined;
-    return {
-      act: 'record',
-      landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' },
-    } satisfies Landing | undefined;
-  }
-  const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';
-  return end(
-    onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why,
-    refusedBase(tip, check, verdict),
-  ) satisfies Landing | undefined;
-}
-
-/**
- * The phases of the session and the check (none before it is filed) of `step`, an ending of `run` that lands on its check, once both
- * have stopped running; undefined while either runs, and for a step that lands nothing or has landed. Pure.
- */
-const landingSettled = (step: StepSpec, run: Run, phaseOf: (taskId: string) => TaskPhase) => {
-  const record = run.steps[step.name];
-  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
-  const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  const session = phaseOf(record.taskId);
-  const check = record.check ? checksPhase(record.check, phaseOf) : undefined;
-  return busy(session) || busy(check) ? undefined : { session, check };
-};
-
-/**
- * The base a landing's check refused the merge on (`refusedOn`): the checkout's HEAD, where the merge was staged, once the check exited
- * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia refresh --base` file a merge
- * of work that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
- */
-const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict | undefined) =>
-  tip && refusedCheck(check, verdict) ? { refusedOn: tip } : {};
-
-/**
- * Whether an ending's checks still hold the repository's own checkout, proved by contracts/checkout-checks.contract.ts: a check that runs
- * a command there and is running holds it; an ending that signed off done holds it while a check that runs there has not passed (still to
- * be filed, running, or refused before its landing is recorded); once every such check has passed the checks hold nothing, whatever
- * the conditions it waits on stand at (a condition runs nothing there). Pure.
- * @param checks The ending's checks, each whether it runs a command in the checkout and where it stands on the current try.
- * @param signedDone Whether the ending signed off done, its checks due or running (`own` is `checking`).
- * @public
- */
-export const checksHoldCheckout: ChecksHoldCheckout = (checks, signedDone) =>
-  checks.some((c) => c.runsThere && (c.standing === 'running' || (signedDone && c.standing !== 'passed')));
-
-/**
- * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its
- * session in flight, its checks holding it (`checksHoldCheckout`: a check that runs there running, or, for a step that signed off done, one
- * not passed), or its merge staged. A condition holds nothing: once every check that runs a command has passed,
- * another run's ending may be filed there while it is still unwritten, and the step is still judged on it. What keeps another run's
- * ending out of
- * the checkout (`mainClaim`) and `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
- * @param step The ending's spec.
- * @param run The run's record.
- * @param own How the step ended on its own work.
- * @param phaseOf The phase of a task, by its id, as the engine reports it.
- * @param merging Reads whose merge the checkout has staged, if any.
- */
-export const landingOpen = (
-  step: StepSpec,
-  run: Run,
-  own: StepStatus,
-  phaseOf: (taskId: string) => TaskPhase,
-  merging: () => MergeState['merging'],
-) => {
-  const record = run.steps[step.name];
-  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
-  const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  const standing = (name: string) => (record.check ? standingOf(phaseOf(currentCheckTask(run, step.name, name)), true) : 'waiting');
-  const checks = stepChecks(step).map((c) => ({ runsThere: c.condition === undefined, standing: standing(c.name) }));
-  return busy(phaseOf(record.taskId)) || checksHoldCheckout(checks, own === 'checking') || merging() === 'ours';
-};
-
-/**
- * What the run did with an ending's merge — `the run merged into main as 1a2b3c4`, or why it made no commit — as the tick's
- * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge
- * the run aborted (`retryLines`).
- * @param run The run's base branch.
- * @param landed What the run did with the merge, as the step's record holds it.
- */
-export const landedWords = (run: Pick<Run, 'branch'>, landed: LandingRecord) =>
-  'commit' in landed
-    ? `the run merged into ${run.branch} as ${landed.commit.slice(0, 7)}`
-    : 'aborted' in landed
-      ? `nothing merged into ${run.branch}: ${landed.aborted}`
-      : `${landed.untouched}: the run left the checkout as it found it`;
-
-/** The longest `landedWords` a `nemia ls` line prints: the reason for an abort can be the place's refusal, whole (`landThrough`). */
-export const LANDED_CAP = 160;
-
-/**
- * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
- * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
- * other, and its try works in that same checkout. Undefined where there is no such word. An ending with no gate is filed with nobody's
- * word, and a filed ending whose try landed no commit is tried again by the run itself, so the claim reads `endingClaimedAt`, which gives
- * each the run's creation; this stays the person's word alone, as the rest blocker
- * `checkoutAsked` reads it. Pure.
- * @param run The run's record.
- * @param step The ending's spec.
- * @param asks The asks for a try written for the run.
- */
-export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[]) =>
-  run.steps[step.name]?.taskId
-    ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
-    : approvalOf(run, step.name)?.at;
-
-/**
- * When a run's ending claims the repository's own checkout (`MainClaim.at`), or none: the person's word that would file it, where there is
- * one; else, for an ending with no gate not yet filed, the run's creation, since its workflow files it with nobody's word once the step
- * before it passes; else, for a filed ending whose try landed no commit, the run's creation too, since the run files its next try itself
- * (a sign-off ask, a check's `retries:`) on the word the workflow gave at the start; else nothing. Proved by
- * `contracts/checkout-claim.contract.ts`. Pure.
- * @param w What the claim is read off: the person's word, whether the ending is gated, filed and landed, and the run's creation.
- * @public
- */
-export const claimedAt: ClaimedAt = (w) => w.asked ?? (w.filed ? (w.landed ? undefined : w.createdAt) : w.gated ? undefined : w.createdAt);
-
-/** Whether a try of an ending landed a commit on the base branch, read off its record's `landed`. Pure. */
-const landedCommit = (landed: LandingRecord | undefined) => landed !== undefined && 'commit' in landed;
-
-/**
- * `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`): `landed` is whether its try landed a
- * commit, which a filed ending that aborted, ended untouched or never landed has not. Pure.
- * @param run The run's record.
- * @param step The ending's spec.
- * @param asks The asks for a try written for the run.
- */
-export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAsk[]) =>
-  claimedAt({
-    asked: endingAsked(run, step, asks),
-    gated: hasGate(step, run),
-    filed: Boolean(run.steps[step.name]?.taskId),
-    landed: landedCommit(run.steps[step.name]?.landed),
-    createdAt: run.createdAt,
-  });
-
-/**
- * A run whose ending step waits for the repository's own checkout, as `nemia ls` says it on that step's line: `waiting on the checkout
- * (r-1's ship has it)`. Pure.
- *
- * `waiting on …`, and not `waiting for …`, because the board reads the words: `stepState` (`apps/web/src/lib/status.ts`) takes `waiting`,
- * `waiting on …` and `pending` as a step not filed, `slotWord`'s `waiting for a run slot` as a step the cap holds, and anything else as one
- * still working, so a step with no session of its own would be drawn as one whose session is running.
- * @param hold The run and step that hold the checkout.
- */
-export const checkoutWord = (hold: CheckoutHold) => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
-
-/**
- * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees
- * this one. Pure.
- * @param step The waiting step's name.
- * @param hold The run and step that hold the checkout.
- */
-export const checkoutLine = (step: string, hold: CheckoutHold) =>
-  `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
-
-/**
- * An ending at its gate whose work git already has on the base branch, beside its line on `nemia ls` where the approval would be: where
- * each branch stands, that nothing is left for the step to merge and every branch is merged as git reads it (`decision`), and the one
- * command
- * there still is. Pure.
- * @param run The run's id and base branch.
- * @param step The ending's name.
- * @param standings Where each result branch stands against the base branch.
- */
-export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]) =>
-  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: every branch is merged as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
  * at a gate.
  *
- *   approve  the run is at its result and the gate on a last step has nobody's approval: `says` is what that step would do, the first
- *            line of its own note (`ownNote`), for an ending that has not run — null where it has no note, and null for a gated step that
- *            has signed off (`filed`), whose closeout is what to read, since approving that one accepts what it did rather than letting it
- *            act
- *   git      nothing waits at such a gate, every step of the run finished, no step of the workflow merges (`workspace: base`), and a result
- *            branch is ahead of the base branch and not gone: the branch is the product, and merging or dropping it is a person's, by hand
- *
- * A folder whose ending merges answers for its own branch, so once that step has run there is nothing here to say; every other folder hands
- * a person a branch, whether its last step was gated or not, and a gate approved is not a branch merged.
+ *   approve  the run is at its result and the gate on a last step has nobody's approval
+ *   git      nothing waits at such a gate, every step of the run finished, and a result branch is ahead of the base branch and not gone:
+ *            the branch is the product, and merging or dropping it is a person's, by hand (`nemia decide` says how)
  *
  * Level-triggered: nothing is stored, the branches are read off git each pass, and a run whose branch a person merged stops being one to
  * decide without anybody telling the run. Nothing while the run is running, nor for a cancelled one.
  *
- * Never `approve` on a pruned run, whose approval is refused (`prunedRefusal`): what its branches hold is what is left to decide. Nothing
- * for an ending that has not run whose result git already has (`resultOnBase`): there is nothing for an approval to file, and `nemia
- * approve` is refused in those words. `git` only on a run every step of which finished: one that waits on a person for a step that
- * broke says so.
+ * Never `approve` on a pruned run, whose approval is refused (`prunedRefusal`): what its branches hold is what is left to decide. `git`
+ * only on a run every step of which finished: one that waits on a person for a step that broke says so.
  * @param steps The workflow's steps.
  * @param run The run's record.
  * @param status The run's status, as its assessment says it.
@@ -365,36 +37,18 @@ export function toDecide(
 ) {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
-  if (waiting && !run.pruned) {
-    if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
-    const filed = Boolean(run.steps[waiting.name]?.taskId);
-    return { kind: 'approve', step: waiting.name, says: filed ? null : firstLine(ownNote(waiting)) || null, filed } satisfies
-      | ToDecide
-      | undefined;
-  }
-  if (status !== 'succeeded' || merges(steps)) return undefined;
+  if (waiting && !run.pruned) return { kind: 'approve', step: waiting.name } satisfies ToDecide | undefined;
+  if (status !== 'succeeded') return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
   return (ahead.length ? { kind: 'result', branches: ahead } : undefined) satisfies ToDecide | undefined;
 }
 
 /**
- * Whether the workflow has a step that acts on the base branch itself (`endsOnBase`): the folder says what happens when the work is
- * done, so nobody is handed its branch and told to type `git merge`. Pure.
- * @param steps The workflow's steps.
- */
-export const merges = (steps: readonly StepSpec[]) => steps.some(endsOnBase);
-
-/**
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
  *
- * An ending is where a person's word ends the run. In a folder written for it, that step says in prose what happens when the work is done
- * — merge it, open a pull request, publish the study — and where it acts on the base branch it says `workspace: base` and is held before it
- * is filed. A gate a run was started with (`--gate <the last step>`) makes an ending of a step that was written as work: approving it is
- * then acceptance, and what becomes of the branch is still a person's (`merges`). Usually one; several only where a workflow ends wide.
- *
- * An ending with no gate is none of these: it is filed by its workflow, once the step before it that can send the work back passes
- * (a landing the review before it routes), and there is nothing for a person to decide about it. It still lands on its check
- * (`landsOnCheck`), which is what the landing reads.
+ * An ending is where a person's word ends the run: approving it is acceptance, and what becomes of the branch is still a person's
+ * (`nemia decide`). Usually one; several only where a workflow ends wide. A last step with no gate is none of these: nothing waits on a
+ * person there.
  * @param steps The workflow's steps.
  * @param run The run's gates.
  */
@@ -409,11 +63,10 @@ export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>)
 export const ownNote = (step: Pick<StepSpec, 'body' | 'agent'>) => (step.agent ? step.agent.body : step.body);
 
 /**
- * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which a
- * merge lands. `filed` is whether the step has run; `says` is the first line of its own note (`ownNote`), what it would do, and null for a
- * step that has already done it or has no note.
+ * What a run waits on a person to decide (`toDecide`): its ending step, which approving accepts — or its result branches, which a merge
+ * lands.
  */
-export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'result'; branches: string[] };
+export type ToDecide = { kind: 'approve'; step: string } | { kind: 'result'; branches: string[] };
 
 /**
  * What `nemia ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure.
@@ -422,7 +75,7 @@ export type ToDecide = { kind: 'approve'; step: string; says: string | null; fil
  */
 export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide) =>
   t.kind === 'approve'
-    ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — nemia approve ${run.id} ${t.step}`
+    ? `${t.step} has signed off at its gate — nemia approve ${run.id} ${t.step}`
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — nemia decide ${run.id}`;
 
 /**
@@ -448,13 +101,3 @@ export function gateRefusal(
   }
   return null;
 }
-
-/**
- * Whether `name` is an ending at its gate that has not run: approved first (`approvedFirst`) and never filed. What `decision` and the
- * listing read where the result git already has (`resultOnBase`) was merged by hand, so the ending's gate holds nothing.
- * @param steps The workflow's steps.
- * @param run The run's record.
- * @param name The step's name.
- */
-export const unrunEnding = (steps: readonly StepSpec[], run: Run, name: string) =>
-  !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));

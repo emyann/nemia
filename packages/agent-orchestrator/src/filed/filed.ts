@@ -3,7 +3,6 @@ import path from 'node:path';
 import { isObject } from 'effect/Predicate';
 import { modeOf, sessionContext, type StepSpec } from '../workflow.ts';
 import { isFolderTeam, sandboxed, writesNothing, writesOutsideByRule } from '../workflow/index.ts';
-import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
@@ -24,8 +23,7 @@ export type { HandedRunFolders } from '../../contracts/handed-folders.contract.t
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
  * run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues (`sessionContext`), its
- * deny list with what the run's place denies an ending (`filedDenies`, `t.landingDenied`, asked of an ending alone), its allow list with
- * an ending's read of the run's artifacts folder (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start),
+ * deny and allow lists as the step has them, the folders the run mounts (`mounts`, frozen at start),
  * writable where the step's `writable:` names one (`stepMounts`), then its factory's volumes (`run.volumes`), a writable one writable only
  * where the step's fence writes (`volumeMounts`), then the folders its brief names beside them (`filedFolders`): its own
  * files directory, read-only, for a step that writes outside its directory only by rule (`ownMounts`), the
@@ -67,7 +65,6 @@ export const filedConfig = <Own extends object>(
     /** The folders of each run this one is handed, as the pass found them on disk (`filedFoldersAt`): absent for a run handed none. */
     runs?: readonly HandedRunFolders[];
     own: Own;
-    landingDenied: () => readonly string[];
     /**
      * The servers the run's factory records (`factoryServers`), read by the caller's store and handed in: a name the step's agent gives
      * resolves against these before the checkout's `.mcp.json`. One writer hands it — `filedAt`, which every caller spreads — because a
@@ -100,8 +97,8 @@ export const filedConfig = <Own extends object>(
     contextTokens: sessionContext(step, steps),
     permissionMode: modeOf(step),
     tools: step.tools,
-    disallowedTools: withRules(filedDenies(step, run, t.landingDenied), placed.rule, placed.denies),
-    allowedTools: withRules(filedAllows(step, t.runArtifacts), placed.rule, []),
+    disallowedTools: withRules(step.disallowedTools, placed.rule, placed.denies),
+    allowedTools: withRules(step.allowedTools, placed.rule, []),
     budgetUsd: t.budgetUsd,
     ...mountsOf(placed.mounts.map(mountOf)),
     ...serversOf(step, t.servers),

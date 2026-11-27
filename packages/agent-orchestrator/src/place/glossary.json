@@ -87,22 +87,6 @@
       ]
     },
     {
-      "term": "In progress",
-      "meaning": "a merge begun in the repo and not yet committed or taken back; `inProgressFile` is the file whose presence says one is.",
-      "retired": [
-        {
-          "spelling": "staged",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter",
-          "kept": [
-            {
-              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
-              "why": "the record's `stagedFile`, the port's own inner name, off the contract"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "term": "Removable / on branch",
       "meaning": "what the place says of a workspace a run left: whether it may remove it (`yes`, `gone` when its folder is no longer there, `held` when someone holds it, their words in `heldBy`), and whether its work is on a branch.",
       "retired": [

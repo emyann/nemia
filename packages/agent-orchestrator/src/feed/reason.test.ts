@@ -329,7 +329,6 @@ describe('waitsOf: the lines that wait on a person are those of the Awaiting rea
       'Blocked',
       'RoundsExhausted',
       'WaitingForSlot',
-      'WaitingForCheckout',
       'WaitingForPause',
       'Held',
       'CheckDenied',

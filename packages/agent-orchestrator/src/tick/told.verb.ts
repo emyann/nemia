@@ -53,8 +53,7 @@ import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
-import type { LandingWords } from '../check/index.ts';
-import { landingWords, placeSay } from '../place/landing.store.ts';
+import { placeSay } from '../place/place.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
@@ -158,11 +157,10 @@ export const ownOf = (step: Pick<StepSpec, 'harness' | 'remote'>, rendered: Clau
 };
 
 /**
- * What a step's place says to it (`placeTold`): how it lands, undefined for a step that does not land on its check (`words`), and its
- * commands (`say`), undefined for a folder run's step.
+ * What a step's place says to it (`placeTold`): its commands (`say`), undefined for a folder run's step, and, for a judge, what each
+ * workflow it routes to is for (`targets`).
  */
 export type PlaceTold = {
-  readonly words: LandingWords | undefined;
   readonly say: PlaceSay | undefined;
   readonly targets?: Readonly<Record<string, string>>;
 };
@@ -198,18 +196,16 @@ export function workflowTargets(run: Run, steps: readonly StepSpec[], step: Step
 }
 
 /**
- * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
- * where given, and, for a judge, what each workflow it routes to is for (`workflowTargets`).
+ * What `step` of `run`, among its `steps`, is told by `place` (`placeSay`), and, for a judge, what each workflow it routes to is for
+ * (`workflowTargets`).
  * @param run The run.
  * @param steps The steps the run is judged by.
  * @param step The step told.
  * @param place The run's place, whose declaration says the words.
- * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
  */
-export function placeTold(run: Run, steps: readonly StepSpec[], step: StepSpec, place: Place, heads?: Readonly<Record<string, string>>) {
+export function placeTold(run: Run, steps: readonly StepSpec[], step: StepSpec, place: Place) {
   const targets = workflowTargets(run, steps, step);
   return {
-    words: landingWords(run, steps, step, place, heads),
     say: placeSay(run, place),
     ...(Object.keys(targets).length ? { targets } : {}),
   };
@@ -434,22 +430,9 @@ export const stepNamed = (f: TriedReads, name: string) =>
     `the step ${name}`,
   );
 
-/** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
-const endingSaid = (f: TriedReads, ending: StepSpec) => {
-  const { run, reads } = f;
-  const said = reads.signedOff(ending.name);
-  return {
-    step: ending.name,
-    status: ownStatus(ending, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf),
-    ...(said?.summary ? { summary: said.summary } : {}),
-    ...(said?.needs ? { needs: said.needs } : {}),
-    onto: isRepositoryRun(run) ? run.branch : 'the base branch',
-  };
-};
-
 /**
  * What a local try's brief is told of its try (`RetryBriefing`): how it came and on whose word, the session it continues and what was said
- * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
+ * to it, how the try before it ended, what its check refused and what was denied it.
  * @param home The store's root folder.
  * @param f What the pass read: the run, its steps and the engine's views of its tasks.
  * @param r The try filed.
@@ -478,7 +461,6 @@ export const tryTold = (
   ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
   ...(t.status === 'unsigned' ? lacksTold(home, f.run, r.step, record) : {}),
   ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
-  ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });
 
 /**
@@ -521,8 +503,7 @@ export type RunReadHow = {
  * The one read of a run (`RunRead`) every reader of it judges it by — the tick's pass, every verb, `nemia ls`, the api's listing and the
  * run object: its frozen steps, the engine's views of its tasks and the readers made of them (`readersOf`), and a person's asks, through
  * the Run door; and, of a run that has filed nothing, its needs — those of the harnesses its frozen steps run on among them — as this
- * process's memory of them reads them (`runNeeds`, `NeedsMemory`), none where it keeps none. Where the result branches stand and who holds
- * the checkout are a caller's to add, each read where it reads them (`standings`, `checkout`): left as none here. With it, the notes the
+ * process's memory of them reads them (`runNeeds`, `NeedsMemory`), none where it keeps none. Where the result branches stand is a caller's to add, read where it reads it (`standings`): left as none here. With it, the notes the
  * asks' read said (`askNotes`).
  */
 export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: RunReadHow = {}) {
@@ -542,7 +523,6 @@ export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: Ru
     roundAsks,
     answers,
     standings: [],
-    checkout: undefined,
     ...(needs.length ? { needs } : {}),
   };
   return { read, askNotes };

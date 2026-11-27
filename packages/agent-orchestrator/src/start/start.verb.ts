@@ -152,7 +152,6 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   workflowDir: string,
   isolate: boolean,
   places: Places,
-  denied: readonly string[],
   factory?: Factory,
   gates: readonly string[] = [],
   refused: ConfigRefused = configRefused,
@@ -170,7 +169,7 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   const steps = withModels(read, models);
   const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
   const asked = { refused, given, allows, harnessSettings };
-  return yield* tried(() => startable(home, steps, workflowDir, isolate, places, denied, found, gates, asked));
+  return yield* tried(() => startable(home, steps, workflowDir, isolate, places, found, gates, asked));
 });
 
 /** `stepsToStart`'s judgement of the steps read, past the folder's load: each refusal it names thrown as `Invalid`. */
@@ -180,7 +179,6 @@ function startable(
   workflowDir: string,
   isolate: boolean,
   places: Places,
-  denied: readonly string[],
   found: SkillsFound | undefined,
   gates: readonly string[],
   {
@@ -204,7 +202,7 @@ function startable(
     ...(given ? { inputs: inputsDir(home, { id: 'run' }) } : {}),
   });
   if (unruled) throw new Invalid({ message: unruled });
-  const refusedConfig = refused(home, steps, places, gates, denied, formerModesWritten(workflowDir), harnessSettings);
+  const refusedConfig = refused(home, steps, places, gates, formerModesWritten(workflowDir), harnessSettings);
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -242,7 +240,6 @@ function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | unde
  * @param steps The workflow's steps.
  * @param places The repository and the store's root the run's agents and skills are found in.
  * @param gates The gates the run is started at, beside the workflow's own.
- * @param denied What the run's place denies a landing session.
  * @param written The mode line each step's file writes, by the step's name; none where not given.
  * @param harnessSettings The factory's judged harness settings, or undefined where it sets none.
  */
@@ -251,18 +248,16 @@ export const configRefused = (
   steps: readonly StepSpec[],
   places: Places,
   gates: readonly string[],
-  denied: readonly string[],
   written: Readonly<Record<string, string>> = {},
   harnessSettings?: HarnessSettings,
-) => refusedStep(home, steps, places, gates, written, [], denied, [], harnessSettings)?.why;
+) => refusedStep(home, steps, places, gates, written, [], [], harnessSettings)?.why;
 
 /** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
 const startArtifacts = (home: string) => path.dirname(artifactsDir(home, { id: 'run' }, 'step'));
 
 /**
  * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and the volumes `volumes`
- * (`volumesAt`), given the factory's harness settings `harnessSettings` (`settingsAt`), and whose place denies a landing session
- * `denied`.
+ * (`volumesAt`), given the factory's harness settings `harnessSettings` (`settingsAt`).
  */
 function refusedStep(
   home: string,
@@ -271,7 +266,6 @@ function refusedStep(
   gates: readonly string[],
   written: Readonly<Record<string, string>>,
   mounts: readonly Mount[],
-  denied: readonly string[],
   volumes: readonly Mount[] = [],
   harnessSettings?: HarnessSettings,
 ) {
@@ -287,7 +281,7 @@ function refusedStep(
         ...(volumes.length ? { volumes: [...volumes] } : {}),
         ...(harnessSettings ? { harnessSettings } : {}),
       },
-      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(home), own, landingDenied: () => denied },
+      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(home), own },
     );
     const former = written[step.name];
     const lines = (field: string) =>
@@ -304,7 +298,6 @@ export type ConfigRefused = (
   steps: readonly StepSpec[],
   places: Places,
   gates: readonly string[],
-  denied: readonly string[],
   written?: Readonly<Record<string, string>>,
   harnessSettings?: HarnessSettings,
 ) => string | undefined;
@@ -466,14 +459,13 @@ function mountRefusal(
   factory: Factory | undefined,
   own: string | undefined,
   mounts: readonly Mount[],
-  denied: readonly string[],
   { volumes, harnessSettings }: { volumes: readonly Mount[]; harnessSettings: HarnessSettings | undefined },
 ) {
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || (!mounts.length && !volumes.length)) return unwritable;
   const ask = (asked: readonly StepSpec[], given: readonly Mount[] = []) =>
-    refusedStep(home, asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied, given, harnessSettings);
+    refusedStep(home, asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, given, harnessSettings);
   const reading = ask(steps.map(({ writable: _, ...step }) => step));
   if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
   const writing = ask(steps);
@@ -599,7 +591,7 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
  */
 const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const place = yield* PlaceService;
-  const { baseRef, branch, inProgressFile: staged } = yield* tried(() => openPlace(place, repo, isolate));
+  const { baseRef, branch } = yield* tried(() => openPlace(place, repo, isolate));
   const parents = yield* parentsOf(told.after ?? []);
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], (id) => parents.get(id) ?? {}));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
@@ -611,7 +603,6 @@ const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: To
     isolate,
     ...told,
     branch,
-    ...(staged === undefined ? {} : { stagedFile: staged }),
     steps,
     createdAt: new Date().toISOString(),
   };
@@ -816,14 +807,11 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const factory = yield* factoryOrNone(opts.factory);
   const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;
-  const { declared } = yield* PlaceService;
-  const denied = declared.denyWhileLanding;
   const found = yield* (yield* SkillDoor).skills.found({ dir: opts.workflowDir, places });
   const steps = yield* stepsToStart(
     opts.workflowDir,
     isolate,
     places,
-    denied,
     factory,
     opts.gates,
     refused,
@@ -854,7 +842,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const volumes = volumesAt(factory);
-  const unmounted = mountRefusal(home, opts, steps, places, factory, folder ? undefined : opts.repo, mounts, denied, {
+  const unmounted = mountRefusal(home, opts, steps, places, factory, folder ? undefined : opts.repo, mounts, {
     volumes,
     harnessSettings,
   });

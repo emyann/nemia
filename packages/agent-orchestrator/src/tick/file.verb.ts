@@ -15,10 +15,8 @@ import {
   CHECK_NICENESS,
   checkArgv,
   checkEnvOf,
-  LANDING_CHECK_DEADLINE_SECONDS,
   type CheckHanded,
   type CheckRefusal,
-  type LandingSaid,
   checksDue,
   currentCheckTask,
   stepChecksDue,
@@ -33,11 +31,8 @@ import {
   budgetOf,
   budgetUsdFor,
   holdsOpenOn,
-  landsOnCheck,
   ASKED_PRIORITY,
-  LANDING_MOMENTUM,
   MOMENTUM,
-  sentBack,
   stepMomentum,
   stepSpend,
   triedFrom,
@@ -57,7 +52,6 @@ import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout, writeCheckOutputs } from '../check/check.store.ts';
 import {
-  checkoutParts,
   cutNotes,
   keepWorktreeInstalled,
   reinstalledNotes,
@@ -65,7 +59,7 @@ import {
   type Cut,
   type Reinstalled,
 } from '../workspace/worktree.store.ts';
-import { checksHandedRead, landingSaidRead, refusalWholeRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedRead, refusalWholeRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
@@ -291,7 +285,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const record = recordNamed(run, r.step);
   const said = tryWord(r, step);
   if (r.mode === 'recheck') return yield* fileRecheck(f, r, out, said);
-  const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
+  const landing = placeTold(run, f.reads.steps, step, yield* PlaceService);
   const held = heldAnswered(f, r, step, record);
   const answers = held !== undefined;
   if (!answers && homeUntrusted(f, step)) return;
@@ -310,7 +304,6 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   out.tried.push(r.step);
   notes.push(said);
   run.steps[r.step] = tryFiled(f, step, record, r, taskId);
-  for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
 });
 
 /**
@@ -387,7 +380,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
         checked,
         foldersTold(home, run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        { words: told.words, say: told.say, targets: told.targets, workspace: record.workspace ?? run.workspace },
+        { say: told.say, targets: told.targets, workspace: record.workspace ?? run.workspace },
         undefined,
         reads.answers,
       );
@@ -485,7 +478,6 @@ const trySpec = (
       ...filedAt(f.run, f.home, record.workspace ?? f.run.workspace, t.told.servers),
       ...t.token,
       own: t.told.own,
-      landingDenied: () => t.told.words?.denied ?? [],
       ...picturesConfig(t.pictured),
     }),
     resumeFrom: t.resumeFrom,
@@ -517,7 +509,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = placeTold(run, f.reads.steps, target, yield* PlaceService, f.heads?.());
+  const landing = placeTold(run, f.reads.steps, target, yield* PlaceService);
   const record = recordNamed(run, r.target);
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   if (homeUntrusted(f, target)) return;
@@ -530,10 +522,8 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   notes.push(roundFiledNote(r, looping));
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
     const said = {
-      words: landing.words,
       say: landing.say,
       targets: landing.targets,
-      landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
       deps: isRemoteHarness(target.harness) ? undefined : (yield* depsBefore(f, r.target, record.workspace ?? run.workspace))?.deps,
     };
@@ -543,20 +533,6 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
   if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
-});
-
-/**
- * What the ending's check said of the merged tree it refused, for a merge asked on that refusal (`MergeOf.landing`), read off the check's
- * task with the command the run froze (`landingSaidRead`), its streams whole written into the target's files folder (`writeCheckOutputs`)
- * — or undefined for any other round.
- */
-const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
-  const landing = r.merge?.landing;
-  const command = landing && f.reads.steps.find((s) => s.name === landing.step)?.check;
-  if (!landing || !command) return undefined;
-  const { said, whole } = yield* landingSaidRead(landing.step, command, landing.check).pipe(over(asRead(f)));
-  if (!whole || 'unreadable' in said) return said;
-  return { ...said, kept: writeCheckOutputs(artifactsDir(yield* StoreRoot, f.run, r.target), landing.check, whole) } satisfies LandingSaid;
 });
 
 /**
@@ -573,7 +549,7 @@ function roundSpec(
   target: StepSpec,
   taskId: string,
   told: StepTold,
-  said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts; deps?: Provisioned },
+  said: PlaceTold & { costs?: WorkflowCosts; deps?: Provisioned },
   token: { readonly sessionToken?: string },
 ) {
   const { run, reads } = f;
@@ -595,7 +571,7 @@ function roundSpec(
         said.deps,
         undefined,
         {
-          ...roundBriefed(r, looping, said.landing),
+          ...roundBriefed(r, looping),
           resumed: Boolean(resumeFrom),
           ...(resumeFrom ? { said: saidIn(record.taskId === null ? undefined : reads.views.get(record.taskId)) } : {}),
         },
@@ -604,7 +580,7 @@ function roundSpec(
         undefined,
         foldersTold(home, run, reads, told.step),
         said.costs,
-        { words: said.words, say: said.say, workspace: record.workspace ?? run.workspace },
+        { say: said.say, workspace: record.workspace ?? run.workspace },
         undefined,
         reads.answers,
       ) + heldSaid(pictured),
@@ -622,7 +598,6 @@ function roundSpec(
           stepSpend(run, r.target, reads.spendOf),
         ),
         own: told.own,
-        landingDenied: () => said.words?.denied ?? [],
         ...picturesConfig(pictured),
       }),
       resumeFrom,
@@ -646,9 +621,8 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 });
 
 /**
- * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
- * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so;
- * any other's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
+ * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline,
+ * and put it on the record: the step's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
  * with no verdict (`checkArgv`'s `unprovisioned`).
  * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run, and records the commit the step's
  * branch was at as the pass read it (`CheckTask.tip`), which a recheck of a blocked step compares against (`blockedRecheck`).
@@ -716,8 +690,7 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
   fs.mkdirSync(path.dirname(checkCloseout(home, taskId)), { recursive: true });
   const files = artifactsDir(home, run, name);
   fs.mkdirSync(files, { recursive: true });
-  const lands = isRepositoryRun(run) && landsOnCheck(step, run);
-  const firstThing = yield* checkFirst(f, name, lands, workspace);
+  const firstThing = yield* checkFirst(f, name, workspace);
   const closeout = f.reads.signedOff(name);
   const env = {
     ...checkEnvOf(run, step, {
@@ -735,10 +708,10 @@ const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check
     e.file({
       id: taskId,
       harness: 'check',
-      priority: lands ? LANDING_MOMENTUM : MOMENTUM,
+      priority: MOMENTUM,
       brief: command,
       cwd: workspace,
-      deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
+      deadlineSeconds: CHECK_DEADLINE_SECONDS,
       ...checkRequestOf(step),
       config: { command: checkArgv(command, firstThing), env, niceness: CHECK_NICENESS },
     }),
@@ -780,19 +753,10 @@ const fileConditionCheck = Effect.fnUntraced(function* (f: Filing, name: string,
 });
 
 /**
- * What a check's script runs before its command, said in the pass's notes: an ending's (`lands`) installs first what the staged merge's
- * lockfile asks for (`checkoutParts`); any other's worktree is brought to its lockfile (`depsBefore`), and where that failed the check
- * runs no command (`unprovisioned`).
+ * What a check's script runs before its command, said in the pass's notes: the step's worktree is brought to its lockfile (`depsBefore`),
+ * and where that failed the check runs no command (`unprovisioned`).
  */
-const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, lands: boolean, workspace: string) {
-  if (lands) {
-    const install = checkoutParts(workspace);
-    if (!install) return undefined;
-    f.notes.push(
-      `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
-    );
-    return 'install' as const;
-  }
+const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, workspace: string) {
   if ((yield* depsBefore(f, name, workspace))?.deps.tree !== 'failed') return undefined;
   f.notes.push(`${name}: its worktree's node_modules could not be installed: its check runs no command, and ends with no verdict`);
   return 'unprovisioned' as const;
@@ -837,7 +801,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
     if (!(yield* f.mayFile)) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes) || homeUntrusted(f, step)) continue;
-    const landing = placeTold(run, f.reads.steps, step, placed, f.heads?.());
+    const landing = placeTold(run, f.reads.steps, step, placed);
     const made = yield* withinEffect('act', workspaceFor(home, run, f.reads.steps, step, placed));
     f.notes.push(...cutNotes(name, made));
     if (!('cut' in made)) continue;
@@ -851,7 +815,6 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       checked,
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
-      words: landing.words,
       say: landing.say,
       targets: landing.targets,
     };
@@ -956,7 +919,7 @@ function readySpec(
           said.checked,
           foldersTold(home, run, reads, told.step),
           said.costs,
-          { words: said.words, say: said.say, targets: said.targets, workspace: place.workspace },
+          { say: said.say, targets: said.targets, workspace: place.workspace },
           place.merge,
           reads.answers,
         ) + heldSaid(pictured),
@@ -972,7 +935,6 @@ function readySpec(
         ...token,
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
-        landingDenied: () => said.words?.denied ?? [],
         ...picturesConfig(pictured),
       }),
       resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.name]) : undefined,

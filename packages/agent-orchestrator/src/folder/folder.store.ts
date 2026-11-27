@@ -40,7 +40,6 @@ import {
   frontmatterKey,
   harnessPromptLine,
   placeLine,
-  baseLine,
 } from '../former/former.ts';
 import {
   agentsDir,
@@ -103,7 +102,7 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills, list
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`, and a step file that still says `workspace: folder` (`placeLine`),
- * which the parser reads as `place: folder`, or `workspace: main` (`baseLine`), which it reads as `workspace: base`. A frontmatter still in
+ * which the parser reads as `place: folder`. A frontmatter still in
  * the former line form is not named here: the load refuses it, at its line (`readFrontmatter`).
  * @param dir The workflow's folder.
  */
@@ -122,7 +121,6 @@ export function formerKeyLines(dir: string) {
         ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, harness),
         ...(frontmatterKey(text, 'workspace') === 'folder' ? [placeLine(at)] : []),
-        ...(frontmatterKey(text, 'workspace') === 'main' ? [baseLine(at)] : []),
       ];
     }),
     ...agents.flatMap((agent) => {
@@ -440,7 +438,6 @@ const frozenStepFields = {
   resume: Schema.optionalKey(Schema.String),
   input: Schema.optionalKey(Strings),
   place: Schema.optionalKey(Schema.Literals(PLACES)),
-  workspace: Schema.optionalKey(Schema.Literals(['main', 'base', 'folder'])),
   writable: Schema.optionalKey(Strings),
   reads: Schema.optionalKey(Strings),
   slot: Schema.optionalKey(Schema.Literal('none')),
@@ -531,10 +528,10 @@ const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: fr
 
 /**
  * A field of each key a step no longer has, still read off a run frozen with it, as it was typed: `background`, which ran a step's sessions
- * as background sessions before every session ran on the Agent SDK. Kept decoded and read by nothing: the step is filed as a job, and
+ * as background sessions before every session ran on the Agent SDK, and `workspace`, which ran the ending step in the repository's own checkout before every step worked in a worktree of its own (`workspace: folder`, read as `place: folder`, is still `asNamed`'s). Kept decoded and read by nothing: the step is filed as a job, and
  * the ends of its sessions said no denials, which the stats read as not measured.
  */
-const retiredStepFields = { background: Schema.optionalKey(Schema.Boolean) };
+const retiredStepFields = { background: Schema.optionalKey(Schema.Boolean), workspace: Schema.optionalKey(Schema.String) };
 
 /**
  * A step as the run froze it at `nemia start`: the parser's output (`StepSpec`), each key of `STEP_KEYS`, each under its former name

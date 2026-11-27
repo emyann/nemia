@@ -12,8 +12,8 @@
  */
 import { Effect, type Layer } from 'effect';
 import { worldOf } from './handle.ts';
-import { inventory, open, report, root, standing, status, trial, type Reply } from './reads.ts';
-import { cloned, exported, follow, handoff, initialized, land, make, remove, seal } from './writes.ts';
+import { inventory, open, report, root, standing, trial, type Reply } from './reads.ts';
+import { cloned, exported, follow, handoff, initialized, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
 import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
@@ -28,8 +28,6 @@ const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]
   report,
   standing,
   trial,
-  status,
-  land,
   inventory,
   remove,
   export: exported,
@@ -40,22 +38,19 @@ const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]
 
 /** What the test place declares of itself: nothing denied, and each sentence in words that name the handle, never a command. */
 export const declared: PlaceDeclared = {
-  denyWhileLanding: [],
   say: {
     look: ['read the files of your workspace against the commit {baseRef} of the test place'],
     readResult: 'ask the test place of {repo} what {branch} changed since {baseRef} (report)',
-    ship: 'stage {branch} in {repo} with world.stage, then land it',
+    ship: 'merge {branch} in {repo}: the test place answers no merge',
     drop: 'ask the test place of {repo} to remove {branches}',
     conflicts: 'The files in conflict hold both texts between marks.',
     unlock: 'the test place locks no workspace: {path} of {repo} is free',
-    stage: 'world.stage({repo}, {branches})',
     attach: 'the test place keeps every workspace on a branch: {path} is on one',
     commit: 'world.commit({path}, message)',
     inspect: 'ask the test place the inventory that lists {path}',
     orphans: 'ask the test place the inventory of their repository, and remove each',
     results: ['ask the test place how {branch} stands against {base} (standing)', 'ask it what {branch} changed since {base} (report)'],
     merge: 'world.stage(workspace, {sha}), then world.commit',
-    mergeUncommitted: 'world.stage(workspace, {sha})',
     showMerge: 'world.read(repo, head)',
     lastMerge: 'world.read(repo, head)',
   },

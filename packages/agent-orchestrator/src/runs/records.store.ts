@@ -185,7 +185,7 @@ function allAsksIn(asks: readonly AskEntry[]) {
 function askHeld(person: PersonRequest) {
   if (person.of !== 'base') return person.ask;
   const { step, round, at, merge } = person.ask;
-  return { loop: step, round, onto: merge.onto, sha: merge.sha, at, ...(merge.landing ? { landing: merge.landing } : {}) };
+  return { loop: step, round, onto: merge.onto, sha: merge.sha, at };
 }
 
 /** Each kind of ask's reader: what it holds read as that ask, or why it is not one. */

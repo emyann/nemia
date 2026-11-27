@@ -22,30 +22,24 @@ import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import { loopSpan } from '../workflow/index.ts';
 import {
   approvalOf,
-  approvedFirst,
   capOf,
-  endsOnBase,
   hasGate,
   loopOf,
   roundOf,
   roundWord,
   tryCommand,
-  type MergeLanding,
   type MergeOf,
   type Round,
   type RoundAsk,
 } from '../status/status.ts';
-import { landingSaidSection, type LandingSaid } from '../check/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 
 /**
- * What a merge reads of a run's steps: where each stands (`standing`), whether an ending stopped on the base branch without doing what it
- * was approved for (`endingStopped`), and whether a loop goes round again on its own word (`roundsDue`).
+ * What a merge reads of a run's steps: where each stands (`standing`), and whether a loop goes round again on its own word (`roundsDue`).
  */
 export type MergeReads = {
   standingOf: (step: StepSpec) => { status: StepStatus; own: StepStatus };
-  stopped: (step: StepSpec) => boolean;
   goesRound: (looping: StepSpec) => boolean;
 };
 
@@ -101,44 +95,20 @@ export function mergeWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[
 const loopDone = (status: StepStatus) => satisfiesAfter(status) || status === 'exhausted';
 
 /**
- * The steps waiting on the looping step that a merge sends the work back from: every one filed, when each stopped on the base branch
- * (`endingStopped`) — or undefined when one filed has not, since a merge would file the work again under a step that runs on it.
- */
-function backOf(steps: readonly StepSpec[], run: Run, looping: StepSpec, stopped: (step: StepSpec) => boolean) {
-  const filed = steps.filter((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
-  return filed.every(stopped) ? filed.map((s) => s.name) : undefined;
-}
-
-/**
  * The merge due now of `looping`'s loop, if any: a person's ask naming its target's next try, once the loop's round is over and nothing
- * waiting on it is filed but an ending stopped on the base branch, which goes back to its gate (`back`). The round is the one the loop is
- * on, which the merge does not spend.
+ * waiting on it is filed, since a merge would file the work again under a step that runs on it. The round is the one the loop is on,
+ * which the merge does not spend.
  * @param steps The workflow's steps.
  * @param run The run's record.
  * @param looping The looping step whose loop is asked of.
  * @param status The looping step's standing, which says whether its round is over.
  * @param asks The asks written on the run.
- * @param stopped Whether a step stopped, as the run's one read says it.
  */
-export function mergeDue(
-  steps: readonly StepSpec[],
-  run: Run,
-  looping: StepSpec,
-  status: StepStatus,
-  asks: readonly RoundAsk[],
-  stopped: (step: StepSpec) => boolean,
-) {
+export function mergeDue(steps: readonly StepSpec[], run: Run, looping: StepSpec, status: StepStatus, asks: readonly RoundAsk[]) {
   const merge = mergePending(run, looping, asks)?.merge;
-  const back = merge && loopDone(status) ? backOf(steps, run, looping, stopped) : undefined;
-  if (!merge || !back) return undefined;
-  return {
-    step: looping.name,
-    target: merge.target,
-    round: roundOf(run, looping.name),
-    by: 'merge',
-    merge,
-    ...(back.length ? { back } : {}),
-  } satisfies Round | undefined;
+  const filed = steps.some((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
+  if (!merge || !loopDone(status) || filed) return undefined;
+  return { step: looping.name, target: merge.target, round: roundOf(run, looping.name), by: 'merge', merge } satisfies Round | undefined;
 }
 
 /**
@@ -149,20 +119,14 @@ export function mergeDue(
  */
 export function mergeOffer(run: Run, ask: MergeAsk) {
   const command = `nemia refresh ${run.id} ${ask.step} --base`;
-  const { target, onto, landing } = ask.merge;
-  const conflict = landing
-    ? `${target}'s work merges cleanly onto ${onto}, but ${semantic(ask.merge, landing)}. Merge ${onto} into it and fix what broke`
-    : `${target}'s work conflicts with ${onto}. Merge ${onto} into it`;
+  const { target, onto } = ask.merge;
+  const conflict = `${target}'s work conflicts with ${onto}. Merge ${onto} into it`;
   return {
     step: ask.step,
     command,
     said: `${ask.step}: ${conflict} — ${target} continued, then a new ${ask.step}, on round ${ask.round}, which the merge does not spend:  ${command}`,
   };
 }
-
-/** A conflict that is no text's, as a merge's words say it: the ending whose check refused the merged tree, and the commit. */
-const semantic = (merge: MergeOf, landing: MergeLanding) =>
-  `${landing.step}'s check refused the merged tree at ${merge.sha.slice(0, 7)}: the conflict is semantic`;
 
 /**
  * A merge filed, as the tick's feed says it: the base, the commit its target merges, and the round it leaves as it is.
@@ -184,7 +148,7 @@ export const mergeDueNote = (r: Round) =>
  * @param looping The looping step, whose cap the round is said against.
  */
 export const mergeAskedLine = (a: MergeAsk, looping: StepSpec) =>
-  `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work${a.merge.landing ? `, where ${semantic(a.merge, a.merge.landing)}` : ''} — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
+  `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
 
 /**
  * What `nemia refresh --base` asks — the loop's target merges the base branch at `sha`, on the round the loop is on — or why it will not,
@@ -193,13 +157,10 @@ export const mergeAskedLine = (a: MergeAsk, looping: StepSpec) =>
  * `name` is the looping step or its target, and may be left out when the workflow has one loop. Refused, in this order: a cancelled, pruned
  * or held run; a folder run, which has no base; a step that is not here, or in no loop; several loops and none named; a run with no loop,
  * pointed to `nemia retry` of the step its ending waits on; a merge or a round already asked; a loop that goes round itself, whose round is
- * still running, or whose step stopped; a step waiting on the loop that runs, landed or is approved; and a trial merge (`trial`) of the
- * target's branch that is clean — nothing to merge, so the landing is approved — that git could not make, or whose base commit git could
+ * still running, or whose step stopped; a step waiting on the loop that is filed; and a trial merge (`trial`) of the
+ * target's branch that is clean — nothing to merge — that git could not make, or whose base commit git could
  * not read. `tried` makes the trial; the ask merges the base at the commit the trial read, and is dated `at`.
  *
- * A clean trial merge is asked all the same where the ending's last landing check refused the merge staged on that commit
- * (`refusedLanding`): the conflict is semantic, and the ask carries that landing (`MergeOf.landing`). One refused on another commit of the
- * base, or a check that did not finish, lets nothing through: the landing is tried again on the base as it is.
  * @param steps The workflow's steps.
  * @param run The run's record.
  * @param name The looping step or its target; undefined where the workflow has one loop.
@@ -241,10 +202,8 @@ export function mergeAsk(
       `whether ${branch} merges onto ${run.branch} is not known: ${trial.error}. Try again once git can say: nemia refresh ${run.id} ${looping.name} --base.`,
     );
   if (!base) return no(`git cannot read ${run.branch} in ${run.repo}. Check the repository, then: nemia refresh ${run.id} --base.`);
-  const landing = trial.clean ? refusedLanding(steps, run, looping, base) : undefined;
-  if (trial.clean && !landing)
-    return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — ${cleanNext(steps, run, looping, reads)}.`);
-  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base, ...(landing ? { landing } : {}) };
+  if (trial.clean) return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — see where the run stands: nemia decide ${run.id}.`);
+  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base };
   return { ask: { step: looping.name, round: roundOf(run, looping.name), at, merge } };
 }
 
@@ -267,8 +226,8 @@ function loopNamed(steps: readonly StepSpec[], run: Run, name: string | undefine
   };
 }
 
-/** The step whose work a run's ending lands: the one its ending waits on, or the workflow's last. */
-const resultStep = (steps: readonly StepSpec[]) => steps.find(endsOnBase)?.after[0] ?? steps.at(-1)?.name ?? '<step>';
+/** The step whose work a run ends with: the workflow's last. */
+const resultStep = (steps: readonly StepSpec[]) => steps.at(-1)?.name ?? '<step>';
 
 /** Why a merge cannot be asked over an ask already there: a merge, or a round, of this loop. */
 function askedRefusal(run: Run, looping: StepSpec, asks: readonly RoundAsk[]) {
@@ -296,84 +255,26 @@ function loopRefusal(steps: readonly StepSpec[], run: Run, looping: StepSpec, re
   return `round ${now} of ${looping.name}'s loop is ${status}, so its work is not ready to merge. Wait for it: nemia ls ${run.id}.`;
 }
 
-/**
- * Why a step waiting on the loop holds a merge off: it runs, landed, is approved and files next, or is an ungated ending the next tick
- * files (`routed`) — or undefined.
- *
- * `routed` is the ungated ending's case, and it is why `cleanNext` needs none: a merge filed there would file the work again with
- * `cause: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
- * merge, so it answers whether the base conflicts or not (`test/ship.test.ts`, *a merge asked of quick's shape*).
- */
+/** Why a step waiting on the loop holds a merge off: it is filed, so a merge would file the work again under a step that ran on it. */
 function followerRefusal(steps: readonly StepSpec[], run: Run, looping: StepSpec, reads: MergeReads) {
-  const approved = steps.find(
-    (s) => s.after.includes(looping.name) && approvedFirst(s, run) && !run.steps[s.name]?.taskId && approvalOf(run, s.name),
-  );
-  if (approved)
-    return `${approved.name} is approved and files on the next tick, where it merges ${run.branch} itself. If its merge stops, merge then: nemia refresh ${run.id} ${looping.name} --base.`;
-  const routed = steps.find((s) => s.after.includes(looping.name) && endsOnBase(s) && !hasGate(s, run) && !run.steps[s.name]?.taskId);
-  if (routed)
-    return `${routed.name} has no gate: the run files it on the next tick, once ${looping.name} passes, and it merges ${run.branch} itself. If its merge stops, merge then: nemia refresh ${run.id} ${looping.name} --base.`;
-  const filed = steps.filter((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
-  const going = filed.find((s) => !reads.stopped(s));
+  const going = steps.find((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
   if (!going) return undefined;
   return `${going.name} waits on ${looping.name} and is ${reads.standingOf(going).status}, so a merge would file the work again under a step that ran on it. See where the run stands: nemia decide ${run.id}.`;
 }
 
-/** The ending that waits on a loop: the step after it that acts on the base branch, gated or routed by that loop — or undefined. */
-const endingAfter = (steps: readonly StepSpec[], looping: StepSpec) => steps.find((s) => s.after.includes(looping.name) && endsOnBase(s));
-
-/**
- * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
- * on that commit of the base (`LandingRecord`'s `refusedOn`), and names its check's task — or undefined.
- */
-function refusedLanding(steps: readonly StepSpec[], run: Run, looping: StepSpec, sha: string) {
-  const ending = endingAfter(steps, looping);
-  const check = ending ? landingRefusedOn(run.steps[ending.name], sha) : undefined;
-  return ending && check ? { step: ending.name, check } : undefined;
-}
-
-/**
- * The task of the check that refused the merge an ending staged on `sha`, a commit of the base, as the ending's `record` says it
- * (`LandingRecord`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
- * @param record The ending's record, undefined where it has none.
- * @param sha The commit of the base the merge was staged on.
- */
-export function landingRefusedOn(record: StepRecord | undefined, sha: string) {
-  const landed = record?.landed;
-  if (!landed || !('aborted' in landed) || landed.refusedOn !== sha || !record?.check) return undefined;
-  return record.check.taskId;
-}
-
-/**
- * What to do with a loop whose work merges cleanly: approve the ending at its gate, land a stopped one again, or nothing.
- *
- * It names an approval without asking whether the ending is gated, because an ungated one never reaches here: `followerRefusal` runs
- * first, and its `routed` holds the merge off for exactly the state this would answer — an ungated ending not yet filed. Filed, it is
- * either stopped, which the line above answers, or running, which `followerRefusal` answers. `test/ship.test.ts`, *a merge asked of
- * quick's shape*, reads `routed`'s words back on a clean base and a moved one alike.
- */
-function cleanNext(steps: readonly StepSpec[], run: Run, looping: StepSpec, reads: MergeReads) {
-  const ending = endingAfter(steps, looping);
-  if (!ending) return `see where the run stands: nemia decide ${run.id}`;
-  if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `land it again: nemia retry ${run.id} ${ending.name}`;
-  return `approve the landing: nemia approve ${run.id} ${ending.name}`;
-}
-
 /**
  * `## Merge <base>`, on a loop's target filed by a merge: the commit of the base to merge, that both meanings are kept in each conflict,
- * that the check runs and nothing else changes, and that no round is spent and no finding is owed an answer. Where the work merged cleanly
- * and the ending's check refused the merged tree (`landing`), the conflict is semantic: the merge is made without a commit, what broke is
- * fixed inside it, and what that check said follows, as data (`landingSaidSection`).
+ * that the check runs and nothing else changes, and that no round is spent and no finding is owed an answer.
  *
  * @param step The loop's target, filed by the merge.
- * @param merge The base branch, the commit of it the person's trial merge read, and what the refusing check said, where one did.
+ * @param merge The base branch, the commit of it the person's trial merge read, and 
  * @param loop The looping step, which reads the merge once the target signs off.
  * @param steps The workflow's steps, which say the steps between the target and the looping step.
  * @param say The run's place's words for a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
 export function mergeSection(
   step: StepSpec,
-  merge: { onto: string; sha: string; landing?: LandingSaid },
+  merge: { onto: string; sha: string },
   loop: string,
   steps: readonly StepSpec[],
   say?: PlaceSay,
@@ -384,12 +285,11 @@ export function mergeSection(
     '',
     `## Merge ${merge.onto}`,
     '',
-    ...(merge.landing ? semanticMerge(merge, merge.landing, say) : textualMerge(merge, say)),
+    ...textualMerge(merge, say),
     `- Run the check${step.check ? ` (\`${step.check}\`)` : ''}, and fix what the merge broke — nothing else. Commit the merge.`,
     '- This is no review round: there are no findings to answer, and your `replies` are an empty list.',
     '',
     `When you have signed off, ${between.length ? `${between.join(', then ')}, then ` : ''}${loop} runs again and reads the merge. The round stays as it is.`,
-    ...(merge.landing ? [landingSaidSection(merge.landing)] : []),
   ].join('\n');
 }
 
@@ -406,20 +306,6 @@ const textualMerge = (merge: { onto: string; sha: string }, say?: PlaceSay) => [
   ...mergeCommand(`at the commit their trial merge read${say ? '' : `, \`${merge.sha}\``}`, merge.sha, say?.merge),
   `- In each conflict, keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off`,
   '  blocked and name the choice in `needs`.',
-];
-
-/** How a merge that conflicts in meaning is made: without a commit, what broke fixed inside it, so the merge commit shows the fix. */
-const semanticMerge = (merge: { onto: string; sha: string }, said: LandingSaid, say?: PlaceSay) => [
-  `A person asked for this (\`nemia refresh --base\`): the work merges cleanly onto \`${merge.onto}\` as text, but ${said.step}'s check refused the`,
-  `merged tree at \`${merge.sha}\`${'verdict' in said ? ` (exit ${said.verdict})` : ''}, so the conflict is semantic: this change and what \`${merge.onto}\``,
-  ...mergeCommand(
-    'changed each hold alone, and break together. Merge it in at that commit, without committing',
-    merge.sha,
-    say?.mergeUncommitted,
-  ),
-  `- Fix what broke inside the merge, before you commit it, so ${say ? `\`${say.showMerge}\`` : 'the merge commit'} shows the fix to whoever reads the merge.`,
-  `  Keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off blocked and name the`,
-  '  choice in `needs`.',
 ];
 
 /**

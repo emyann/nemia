@@ -16,7 +16,7 @@ import { taskTryOf, turnTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
-import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
+import type { RunSlot } from '../cap/cap.ts';
 import type { RunRead } from '../tick/told.verb.ts';
 import { driftWords } from '../revisions/revisions.ts';
 import type { Behind } from '../revisions/pin.verb.ts';
@@ -32,7 +32,6 @@ type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: strin
  * @param r What the pass read of the run (`readRun`): its steps, the engine's views and the person's answers.
  * @param assessed What `assess` judged of the run.
  * @param admission What the pass's admission said: who the run waits on, the slot that holds it, and the runs a hold waits for.
- * @param checkout The run whose base step holds the repository's checkout this run waits for, or undefined where none does.
  * @param lifted When the hold the pass lifted itself this pass was put, or undefined where it lifted none.
  * @param behind What the pass read of a pinned run's next filing against its pins; none where not given.
  */
@@ -41,7 +40,6 @@ export function wordFeed(
   r: RunRead,
   assessed: Assessment,
   admission: Admitted,
-  checkout: CheckoutHold | undefined,
   lifted?: string,
   behind: readonly Behind[] = [],
 ) {
@@ -49,7 +47,7 @@ export function wordFeed(
   return feedWords(
     listing({
       steps,
-      read: { ...r, run, checkout },
+      read: { ...r, run },
       assessed,
       phaseOf: (taskId) => feedPhase(engineWord(views)(taskId)),
       closeoutOf: (name) => closeoutOf(views, run, name),

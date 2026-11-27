@@ -24,12 +24,6 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
  * the directory at hand-off, before the check (`collectArtifacts` in artifacts.store.ts), so such a step hands it over too.
  *
- * `inMain` for a step that works in the repository's own checkout (`workspace: base`): there the second way is
- * false and does harm. The run hands nothing off in a person's checkout (`handOffDue`), so nothing is collected
- * and nothing is committed — a file left there stays in their checkout for ever, and the next run's ending step
- * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
- * since `workspace: base` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
- *
  * `inFolder` for a step of a folder run (`place: folder`): there the *first* way is the one that does harm. Such a step runs as a
  * job, which asks nobody, fenced to its own folder, and that directory sits beside the folder, outside the fence: told to put a file
  * there, the session is denied. The second way needs nothing outside the fence and hands the file over all the same. So it too is told
@@ -37,12 +31,11 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  *
  * Both of the ways that hand files to the steps after say that a file through a folder a harness reads as its own configuration
  * (`CONFIG_FOLDERS`) is refused, and why: a later step reads the files directory as a mounted folder, and its harness would take such a
- * file as its own. The checkout's way hands nothing to a later step, and says nothing of it.
+ * file as its own.
  * @param dir The step's files directory.
- * @param inMain Whether the step works in the repository's own checkout; false where absent.
  * @param inFolder Whether the step is of a folder run; false where absent.
  */
-export const artifactsContract = (dir: string, inMain = false, inFolder = false) =>
+export const artifactsContract = (dir: string, inFolder = false) =>
   (inFolder
     ? [
         '',
@@ -60,22 +53,6 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
         '',
         ...configurationRefused('copied out'),
       ]
-    : inMain
-      ? [
-          '',
-          '## Files for the person who decides',
-          '',
-          `A report, a log or a screenshot reaches them one way: put it in \`${dir}\`, and name it in \`artifacts\` by`,
-          'absolute path. The run made that directory for this step, outside every workspace, and a file there is the',
-          'only one it keeps.',
-          '',
-          "This workspace is the repository's own checkout, where the run hands nothing off: a file you leave here is",
-          "not collected and not committed — it stays in a person's checkout, and `nemia decide` reads a path named from",
-          'the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is',
-          'not collected, nor a file that is not there.',
-          '',
-          LACKS_REFUSE,
-        ]
       : [
           '',
           '## Files for the steps after you',

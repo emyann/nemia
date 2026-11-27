@@ -21,22 +21,19 @@ import { HANDED_CLOSEOUT } from '../artifacts/artifacts.ts';
 import {
   acceptanceOf,
   approvalOf,
-  approvedFirst,
   capOf,
   hasGate,
   owesReplies,
   roundOf,
   sendBackTo,
-  unfiledBack,
   standing,
-  unheld,
   type Round,
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { modeWord, retriesDue, type CheckKillOf, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
-import { refusalSection, refusalsSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
+import { refusalSection, refusalsSection, type CheckRefusal, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
@@ -64,11 +61,9 @@ export const TASK_HEADINGS = {
   'From run <id>': 'run',
   'From <step>': 'step',
   'Replies from <step>': 'step',
-  "What <step>'s check said on the merged tree": 'check',
   "What <step>'s check <check> said": 'check',
   "What <step>'s check said": 'check',
   'What the check said': 'check',
-  'What <step> said': 'step',
   'Try <n>': 'run',
   'Round <n> of <cap>': 'run',
   'Round <n>, past rounds: <cap>': 'run',
@@ -79,7 +74,6 @@ export const TASK_HEADINGS = {
   'Files for the steps after you': 'run',
   'Files for the person who decides': 'run',
   'Before you sign off': 'run',
-  'The run checks and lands your merge': 'run',
   'When you are finished': 'run',
   'Gates after you': 'run',
   'What runs of this workflow cost': 'run',
@@ -184,41 +178,7 @@ export type RetryBriefing = {
    * again to a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
    */
   said?: readonly Said[];
-  /**
-   * The ending this try sends the work back from (`Retry.back`): it was filed on its approval and stopped on the base branch — how, what it
-   * said, and the branch it acts on. The try's brief says so, and hands on what the ending said as data (`endingSection`).
-   */
-  ending?: EndingStopped;
 };
-
-/** What an ending that stopped on the base branch said, handed to the step its work is sent back to (`RetryBriefing.ending`). */
-export type EndingStopped = { step: string; status: StepStatus; summary?: string; needs?: string | null; onto: string };
-
-/**
- * `## What <ending> said`, on a try that sends the work back from an ending that stopped on the base branch: its summary and its needs, as
- * data, then what this step is asked to do with them — say whether the work must change to hold on the base branch as it is now, and hand
- * the change to the work's next round with `again: true`, where merging the base branch into the run's branch is the work's to do.
- */
-function endingSection(step: StepSpec, e: EndingStopped) {
-  const said = [
-    ...(e.summary ? ['', 'Its summary:', '', ...fenced(e.summary, 'text')] : []),
-    ...(e.needs ? ['', 'What it needs:', '', ...fenced(e.needs, 'text')] : []),
-  ];
-  return [
-    '',
-    headingOf('What <step> said', e.step),
-    ...(said.length ? said : ['', `${e.step} left no closeout to read.`]),
-    '',
-    `The work has to hold on ${e.onto} as it is now, which may have moved since the run's branch was cut: read ${e.onto} against the branch, not only the branch.`,
-    ...(step.loop
-      ? [
-          `If the work must change, sign off with \`again: true\` and say what — what ${e.step} needs among it: the work's next round is on the run's branch, where merging ${e.onto} into it is the work's to do.`,
-          `If it holds as it is, sign off with \`again: false\` and say why.`,
-        ]
-      : []),
-    `Either way, once the work settles ${e.step} waits at its gate for a new approval: the one given before is spent.`,
-  ];
-}
 
 /**
  * What the run's sign-off ask tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
@@ -344,8 +304,7 @@ const refusedSections = (r: RetryBriefing) => [
  * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off ask to a
  * session it continues is `SIGNOFF` alone, in place of why and who — or, where the closeout it gave named files the run did
  * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a
- * new session is told as any try is. A try sent back from an ending that stopped on the base branch is told why in the
- * ending's terms, then what it said (`endingSection`).
+ * new session is told as any try is.
  * @param step The step tried again.
  * @param r The try, and what became of the one before it.
  * @param inFolder Whether the step is of a folder run, told of its folder rather than a branch; false where absent.
@@ -368,10 +327,7 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false,
       : NEW_SESSION;
   const answer = r.message !== undefined ? ['', headingOf('Your answer'), '', ...fenced(r.message, 'text')] : [];
   const told = r.resumed ? saidSection(r.said) : [];
-  const said = r.ending
-    ? `You signed off, and the work went on to ${r.ending.step}, which a person approved: it acts on ${r.ending.onto} in the repository's own checkout, and it stopped there — \`${r.ending.status}\` — without doing what it was approved for. ` +
-      `A person sent the work back to you rather than land it again: what they object to is below, then what ${r.ending.step} said.`
-    : whyEnded(r);
+  const said = whyEnded(r);
   const denied =
     r.status === 'denied' && r.denied?.length
       ? ['', headingOf('What your session was denied'), '', ...fenced(r.denied.join('\n'), 'text')]
@@ -390,7 +346,6 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false,
     ...told,
     ...answer,
     ...denied,
-    ...(r.ending ? endingSection(step, r.ending) : []),
     ...refusedSections(r),
   ].join('\n');
 }
@@ -461,10 +416,9 @@ export type RoundBriefing = {
    */
   said?: readonly Said[];
   /**
-   * On a merge (`by: 'merge'`): the base branch and the commit of it the target merges (`mergeSection`), and what the ending's check said
-   * of the merged tree where it refused it (`LandingSaid`).
+   * On a merge (`by: 'merge'`): the base branch and the commit of it the target merges (`mergeSection`).
    */
-  merge?: { onto: string; sha: string; landing?: LandingSaid };
+  merge?: { onto: string; sha: string };
 };
 
 /**
@@ -678,8 +632,7 @@ export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps
 /**
  * `## Approved`: what a person approved at each gate this step comes after, directly or through another (`hasGate`, `upstreamOf`), in the
  * order the steps run — the step, the try, when, and the words given with it (`nemia approve --message`), fenced as data. Nothing for a
- * step after no approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is
- * given its own approval too: the words a person gave with it are the terms it acts on.
+ * step after no approved gate, so a run with no gate composes no such section.
  *
  * It travels as a parent run's closeout does, one level down: a person read what the gated step handed on and said it may go on, and their
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
@@ -691,7 +644,7 @@ export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps
 export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSpec[]) {
   const before = upstreamOf(steps, step.name);
   const approved = steps
-    .filter((s) => hasGate(s, run) && (before.has(s.name) || (s.name === step.name && approvedFirst(s, run))))
+    .filter((s) => hasGate(s, run) && before.has(s.name))
     .flatMap((s) => {
       const a = approvalOf(run, s.name);
       return a ? [a] : [];
@@ -820,8 +773,7 @@ function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined) {
  * closeout asks (`answersOr`) and the budgets it proposes (`approveCommand`). Nothing for a gated step not yet signed off, nor for one with
  * no gate. Pure.
  *
- * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
- * `nemia approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until
+ * On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until
  * the hold lifts (`heldRefusal`).
  *
  * @param steps The run's steps.
@@ -832,9 +784,6 @@ function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined) {
  *   never asked, for every task, where absent.
  * @param verdictOf A step's check verdict, by its name; undefined where it has none, and for every step where absent.
  * @param spendOf What a step has spent; undefined for every step where absent.
- * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`).
- * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet: the same.
- * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is due again.
  */
 export function gateLines(
   steps: readonly StepSpec[],
@@ -844,22 +793,13 @@ export function gateLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   spendOf: SpendOf = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  roundAsks: readonly RoundAsk[] = [],
-  checkKillOf: CheckKillOf = () => undefined,
 ) {
   const lines: Record<string, string> = {};
-  const waitingAgain = unheld(
-    steps,
-    run,
-    retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf, checkKillOf),
-    roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf),
-  );
   for (const step of steps) {
-    if (!hasGate(step, run) || waitingAgain.has(step.name)) continue;
+    if (!hasGate(step, run)) continue;
     const given = approvalOf(run, step.name);
     if (given) {
-      lines[step.name] = approvedLine(step, run, given);
+      lines[step.name] = approvedLine(given);
     } else if (standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval') {
       if (run.pruned) {
         lines[step.name] = neverApproved(run.pruned);
@@ -880,16 +820,11 @@ export function gateLines(
 }
 
 /**
- * What `nemia decide` prints under a step a person approved: when, the words they gave, and — for an ending approved and not filed — the
- * send-back of the work it would act on, which spends the approval (`unfiledBack`). Pure.
+ * What `nemia decide` prints under a step a person approved: when, and the words they gave. Pure.
+ * @param given The step's approval.
  */
-function approvedLine(step: StepSpec, run: Run, given: Approval) {
-  const back = unfiledBack(step, run)
-    .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
-    .join(' or ');
-  const said = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
-  return back ? `${said}  — not filed yet; or send the work back:  ${back}` : said;
-}
+const approvedLine = (given: Approval) =>
+  `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
 
 /**
  * What `nemia decide` prints under a looping step whose loop a person ended as it stands (`nemia approve`): when, and the words they gave,

@@ -8,7 +8,7 @@
 import { Effect } from 'effect';
 import { asked, type Engine } from '../runtime-client.ts';
 import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
+import { merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -41,7 +41,6 @@ function mergeReads(
 ) {
   return {
     standingOf: (step: StepSpec) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf, verdictOf),
-    stopped: (step: StepSpec) => endingStopped(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
     goesRound: (looping: StepSpec) =>
       roundsDue(steps, run, phaseOf, closeoutOf, asked, [], spendOf, verdictOf).some((r) => r.step === looping.name),
   };
@@ -101,7 +100,7 @@ export function mergeOffers(
  * nothing else. The next tick honours it once, and moves the run's base to the commit merged.
  *
  * Refused before anything is written, with what to do instead (`mergeAsk`): among them a run whose result step closes no loop, pointed to
- * `nemia retry`, work whose trial merge onto the base is clean, pointed to the landing's approval, and a base whose commit the trial
+ * `nemia retry`, work whose trial merge onto the base is clean, and a base whose commit the trial
  * did not read. The trial is the place's (`trialMerges`), which touches no checkout. An ask written by someone else between the look and
  * the write is refused as the look would have refused it, and a file at the ask's name that does not read as one is named (`strayAsk`).
  * Fails with a refusal, the verb's or one a read threw (`Missing` for no such run); dies of anything else (`tried`).

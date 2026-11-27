@@ -28,7 +28,6 @@ import {
   taskPhasesRead,
 } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
-import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -114,10 +113,9 @@ export const retryRun = Effect.fn('retry')(function* (
     const names = steps.map((s) => s.name).join(', ');
     return yield* Effect.fail(new Invalid({ message: `run ${id} has no step ${stepName}: retry one of its steps (${names})` }));
   }
-  const denied = landingDenies(run, place);
   const home = yield* StoreRoot;
   const { own, servers } = yield* toldOf(run, step);
-  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own, servers));
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, home, own, servers));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask = askOf(run, stepName, how, actor);
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'retry', of: 'try', ask });
@@ -156,7 +154,6 @@ function tryRefused(
   step: StepSpec,
   how: RetryHow,
   spendOf: SpendOf,
-  denied: readonly string[],
   home: string,
   own: StepTold['own'],
   servers: StepTold['servers'],
@@ -169,7 +166,6 @@ function tryRefused(
     budgetUsd,
     ...filedAt(run, home, run.steps[step.name]?.workspace ?? run.workspace, servers),
     own,
-    landingDenied: () => denied,
   });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));

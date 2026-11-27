@@ -7,7 +7,6 @@ import { isRepositoryRun, refusedCheck, tryOf, type Run, type StepStatus, type T
 import type { Verdict } from '../check/index.ts';
 import {
   budgetOf,
-  waitsOnCheckout,
   roundSpans,
   runSpend,
   sessionTasks,
@@ -22,7 +21,6 @@ import { readWords, type Consumed } from '../usage/usage.ts';
 import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';
-import { merges, unrunEnding } from '../ending/ending.ts';
 import type { DecideLabel, RunStatusWord } from 'objects';
 import { checksPhase } from '../check/index.ts';
 
@@ -130,17 +128,13 @@ function once(merged: (branch: string) => Merged) {
 
 /**
  * What is left for a person to do about this run (`Decision`). Pure. Read on `assess`'s inputs: a step a round due files again is held
- * on no budget (`roundSpans`); an ending un-held at its gate (`unheld`) needs no reading here, since the try or round due makes the run
- * `running`, and `gateLines` words that window.
+ * on no budget (`roundSpans`).
  *
- * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
- * repository's own checkout (`waitsOnCheckout`), a step the next tick tries again and a loop going round again.
+ * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, a step the next tick tries again and a loop going round again.
  *
  * A run that worked directly on its base branch is never asked whether it merged: git's answer is always yes. Every result branch is
  * asked, not some — a fan-out that ends in two branches has not merged because one did — each once, and none after the first that is
- * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not merged while one does, save
- * an ending at its gate that has not run whose result git already has (`resultOnBase`): the merge its gate holds was made by hand, so
- * the run is merged, since its approval is refused with nothing left to merge.
+ * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not merged while one does.
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
@@ -154,7 +148,7 @@ function once(merged: (branch: string) => Merged) {
  * @param assessed The run's assessment off `read`; `assess` on it by default.
  */
 export function decision(read: AssessRead, merged: (branch: string) => Merged, assessed: Assessment = assess(read)) {
-  const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf, checkout } = read;
+  const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf } = read;
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt } satisfies Decision;
 
   const { status, ready, retry, round } = assessed;
@@ -167,10 +161,9 @@ export function decision(read: AssessRead, merged: (branch: string) => Merged, a
         (s) => statusOf.get(s.name) === 'checking' || (statusOf.get(s.name) === 'running' && liveTask(run.steps[s.name]?.taskId, phaseOf)),
       )
       .map((s) => s.name);
-    const waitsForCheckout = checkout ? steps.filter((s) => waitsOnCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
     return {
       kind: 'running',
-      waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
+      waiting: [...new Set([...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
     } satisfies Decision;
   }
 
@@ -182,13 +175,7 @@ export function decision(read: AssessRead, merged: (branch: string) => Merged, a
 
   const stands = once(merged);
   const atGate = waitingAtGates(steps, run, statusOf, runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf));
-  const byHand =
-    atGate.length > 0 &&
-    atGate.every((name) => unrunEnding(steps, run, name)) &&
-    branches.length > 0 &&
-    !direct &&
-    branches.every((b) => stands(b) !== false);
-  const awaitingApproval = byHand ? [] : atGate;
+  const awaitingApproval = atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(stands);
   if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'merged', branches } satisfies Decision;
 
@@ -407,7 +394,7 @@ export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, off
       { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said, step: null },
     ] satisfies DecideCommand[];
   }
-  const first = merges(steps) ? undefined : d.branches[0];
+  const first = d.branches[0];
   if (!first) return once satisfies DecideCommand[];
   return [
     ...once,

@@ -119,8 +119,7 @@ const upgradeTry = (t: unknown) => {
  * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`, none for a wait node's, which
  * files no task. Or `round`: the step's loop went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the
  * loop was filed again on the round it is on, for its target to merge the base (`nemia refresh --base`), which no round counts
- * (`roundIn`). Or `back`: an ending that stopped on the base branch, sent back with its work (`sentBack`), whose next try is filed on a
- * new approval.
+ * (`roundIn`). Or `back`: a try a run sent back with its work, which only a record written before the landing left the core holds.
  */
 export type EarlierTry = {
   taskId: string | null;
@@ -190,11 +189,6 @@ export type Retry = {
   by: 'retries' | 'signoff' | 'ask' | 'pause';
   stopFirst?: true;
   runsOn?: true;
-  /**
-   * The endings that stopped on the base branch this try sends the work back from (`endingStopped`): filed, it moves each one's try behind
-   * (`sentBack`).
-   */
-  back?: string[];
 };
 
 /**
@@ -283,7 +277,7 @@ const askedWord = (r: Retry) =>
  * @param taskId The new task's id; absent for a recheck, which keeps the same task.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string) {
-  const { check, tries = [], handedOff: _, landed: __, filesRead, ...rest } = record;
+  const { check, tries = [], handedOff: _, filesRead, ...rest } = record;
   if (record.taskId === null && !record.check)
     throw new Error(`try ${retry.try} of ${retry.step} is filed over a record with no task: file a try of a step that has one`);
   const same = retry.mode === 'recheck';

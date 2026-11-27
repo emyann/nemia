@@ -2,7 +2,7 @@
  * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
  * touched (`judging`), and removing through the place it is given (`freeing`); many runs at once, judged side by side
  * (`judgingMany`) and removed a few runs a turn with one removal a repository (`freeingMany`, `freedByRepo`); and what `nemia rm`
- * shares with it — a path as git names a worktree (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching
+ * shares with it — a path as git names a worktree (`resolved`). A controller, reaching
  * the runtime through the client (`runtime-client.ts`); it never stops anything.
  */
 import { RunId } from '../../record/record.model.ts';
@@ -14,7 +14,6 @@ import { EngineService, type Engine } from '../../runtime-client.ts';
 import type { StepSpec } from '../../step/step.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
-import { approvedFirst, landsOnCheck } from '../../status/status.ts';
 import { decision } from '../../decide/decide.ts';
 import { askOffLine, forgetRefusal, heldWorktree, idRefusal, inventoryUnread, leftWhy, runWorktrees, type AskName } from '../forget.ts';
 import { stepsOrWhy } from '../../steps/steps.verb.ts';
@@ -22,38 +21,12 @@ import { RunDoor } from '../../runs/runs.store.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../place/place.ts';
-import { mergedOf, standingsOf } from '../../branches/branches.store.ts';
-import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../../place/landing.store.ts';
-import { headsOver, standingLive } from '../../standing/standing.verb.ts';
+import { mergedOf } from '../../branches/branches.store.ts';
+import { standingLive } from '../../standing/standing.verb.ts';
 import { handOffOwed } from '../../tick/advance.verb.ts';
 import { readAndAdopt } from '../../adopt/run-adopt.verb.ts';
 import { Conflict, Invalid } from '../../refusal/refusal.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-
-/**
- * Whose merge is in the repository's checkout, for a run whose ending lands on its check (`forgetRefusal`): none where the file its place
- * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not merged; else as its
- * place's `status` reads it (`checkoutStatus`), through `memo`. Refuses (`Conflict`) a checkout the place did not read, in its words:
- * nothing is removed on a guess.
- * @param run The run whose checkout is asked of.
- * @param steps Its workflow's steps, or undefined where its workflow does not read.
- * @param memo The place's answers already read, so one checkout is asked once.
- */
-export function merging(run: Run, steps: readonly StepSpec[] | undefined, memo: StatusMemo) {
-  if (!readsCheckout(run, steps)) return 'none';
-  const read = checkoutStatus(run, steps ?? [], memo);
-  if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
-  return read.merging;
-}
-
-/** Whether `merging` asks the place how `run`'s checkout stands: never for a run it answers `none` of without a question. */
-function readsCheckout(run: Run, steps: readonly StepSpec[] | undefined): run is RepositoryRun {
-  if (!isRepositoryRun(run)) return false;
-  const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
-  const marked = stagedHere(run);
-  if (!landings.length || marked === false) return false;
-  return marked !== undefined || landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed);
-}
 
 /**
  * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its
@@ -258,8 +231,7 @@ export function dropEmpty(within: string) {
 
 /**
  * Whether the run is over, what holds it as `nemia rm` would be held (`forgetRefusal`, worded for prune) and the hand-offs owed, once
- * what a pass filed and never wrote down is adopted onto it; none of it, for a run whose workflow does not read. Where `merging` reads
- * the run's checkout, the place is asked first and off the loop (`askCheckoutStatus`), and `merging` answers from that.
+ * what a pass filed and never wrote down is adopted onto it; none of it, for a run whose workflow does not read.
  */
 const judgedOf = Effect.fn('prune.judged')(function* (
   e: Engine,
@@ -270,13 +242,9 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };
   if (!steps) return judged;
   const git = yield* standingLive([run]);
-  const placed = yield* PlaceService;
   const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
   const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, spendOf } = read;
   const offOf = (a: AskName) => askOffLine(run.id, a);
-  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
-  const checkout = statusMemo(headsOver(git), placed);
-  if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
   return {
     decided: decision(read, mergedOf(run, git)).kind,
     held: forgetRefusal(
@@ -291,9 +259,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       rounds,
       spendOf,
       offOf,
-      standings,
       'prune',
-      merging(run, steps, checkout),
       pruneAgain(run.id, flags),
       checkKillOf,
     ),

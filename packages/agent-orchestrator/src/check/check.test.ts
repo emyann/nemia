@@ -82,7 +82,7 @@ describe("checkEnvOf: every check is told the run's copy of its workflow folder,
     closeout: undefined,
     workflowFiles: '/wf/runs/r-1/workflow/ab',
   };
-  const { repo: _repo, baseRef: _base, branch: _branch, isolate: _isolate, placeSkill: _skill, stagedFile: _staged, ...common } = run({});
+  const { repo: _repo, baseRef: _base, branch: _branch, isolate: _isolate, placeSkill: _skill, ...common } = run({});
   const folderRun: Run = { ...common, place: { kind: 'folder' }, workspace: '/wf/runs/r-1/work' };
   const rows: Array<[string, Run, { name: string; workspace?: 'base' }]> = [
     ["a repository run's step", run({}), { name: 'implement' }],

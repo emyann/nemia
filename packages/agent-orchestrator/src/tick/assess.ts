@@ -4,10 +4,8 @@
  */
 import { retriesDue, type CheckKillOf, type Retry, type RetryAsk, type TipOf } from '../retry/index.ts';
 import {
-  waitsOnCheckout,
   roundSpans,
   standing,
-  unheld,
   type BranchStanding,
   type Round,
   type RoundAsk,
@@ -28,7 +26,6 @@ import {
 import type { Closeout } from '../closeout/index.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import type { Verdict } from '../check/index.ts';
-import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
 import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
 import { answeredRoute, routedWords } from '../route/routed/index.ts';
@@ -55,12 +52,6 @@ export type Assessment = {
   /** Steps that cannot run, because something they wait on stops what follows it (`stopsFollowers`). */
   unreachable: string[];
   /**
-   * Steps waiting on the repository's own checkout on this pass (`waitsOnCheckout`): an ending a person's word, or its workflow, would
-   * file, or a try of one, while another run's `workspace: base` step is in that one directory. Nothing of them is filed, and the run is
-   * running for them — so the cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
-   */
-  waitingOnCheckout: string[];
-  /**
    * The run in one word. `failed` is a run in which a step broke: its task failed or was stopped, or its check refused it or did not
    * finish. A run stopped on a person alone is not `failed`: `awaiting approval` when every step that stops what follows it waits at its
    * gate, and `waiting` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
@@ -85,7 +76,7 @@ export type Assessment = {
   /**
    * What waits on the store's pause (`Run.pause`) on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
-   * cap on runs in flight for them, as for `waitingOnCheckout`. Absent while the store is not paused, and on a run nothing of which waits
+   * cap on runs in flight for them. Absent while the store is not paused, and on a run nothing of which waits
    * on the pause.
    */
   waitingOnPause?: { steps: string[]; checks: string[] };
@@ -95,18 +86,16 @@ export type Assessment = {
    */
   stepWords: ReadonlyMap<string, { status: StepStatus; own: StepStatus }>;
   /**
-   * The tries and rounds due on this pass before the checkout or the store's pause hold them back: what a person's ask, a check's
+   * The tries and rounds due on this pass before the store's pause holds them back: what a person's ask, a check's
    * `retries:` or a loop's `again` makes due. `retry` and `round` are what of them the pass files now. None on a run cancelled or held,
    * and none of a person's ask on a pruned one (`honoursAsks`).
    */
   due: { retry: Retry[]; round: Round[] };
-  /** The steps the work due on this pass sends back (`unheld`): an ending at its gate that waits for that work again. */
-  unheld: string[];
 };
 
 /**
  * What `assess` reads of a run, as one value: the run, its frozen steps, the readers made once of the engine's views (`readersOf` in
- * told.verb.ts), a person's asks, where the result branches stand and who holds the checkout. `RunRead` (told.verb.ts) is this and what a
+ * told.verb.ts), a person's asks, and where the result branches stand. `RunRead` (told.verb.ts) is this and what a
  * filing reads besides; a pure caller is handed one.
  */
 export type AssessRead = {
@@ -132,8 +121,6 @@ export type AssessRead = {
   readonly roundAsks: readonly RoundAsk[];
   /** Where each result branch stands against the base branch: what says a run with no gated ending is one nobody has decided. */
   readonly standings: readonly BranchStanding[];
-  /** The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold`), if one is. */
-  readonly checkout: CheckoutHold | undefined;
   /**
    * The needs of the run's workflow and of its place as the latest sweep read them, each with its words (`runNeeds`): what holds a run that
    * has filed nothing. Left out, none, as where the process keeps no reading.
@@ -158,12 +145,8 @@ export type AssessRead = {
  *   files nothing, asks nothing, is `running` with `waitingOnNeeds`, and takes no slot; a run that has filed a task is never held so.
  * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
  *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
- * - An ending step that `waitsOnCheckout` is not filed, neither a first session nor a person's try of it, since two sessions trial merging
- *   in one checkout collide: it goes to `waitingOnCheckout`, is filed once the other run's step settles, and a try of it stays `running`,
- *   so the run still counts against the cap on runs in flight.
- * - An ending held at its gate on work this pass files again (`unheld`) is `waiting`: its gate holds on what that work says.
  * - A check already filed is never filed twice; a step that waits on one that stops its followers is `unreachable`, never left to hang.
- * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round, nor one waiting on the checkout — and what
+ * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round — and what
  *   would be goes to `waitingOnPause`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask
  *   waits on its file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
  *
@@ -182,7 +165,6 @@ export function assess(read: AssessRead) {
     sessionBlocked,
     spendOf,
     standings,
-    checkout,
   } = read;
   const [asks, roundAsks] = honoursAsks(run) ? [read.asks, read.roundAsks] : [[], []];
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
@@ -193,24 +175,18 @@ export function assess(read: AssessRead) {
     check: [],
     retry: [],
     round: [],
-    waitingOnCheckout: [],
     stepWords,
     due: { retry: [], round: [] },
-    unheld: [],
   };
   if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' } satisfies Assessment;
 
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
   const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf, read.tipOf);
-  const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
-  const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf);
   unspent(status, stood, roundSpans(steps, round));
   for (const r of round) status.set(r.step, 'running');
-  const sentBack = [...unheld(steps, run, retry, round)];
-  for (const name of sentBack) status.set(name, 'pending');
-  const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, checkout, waitingOnCheckout, phaseOf);
+  const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, phaseOf);
 
   const all = [...status.values()];
   const overall: Assessment['status'] = succeeded(all)
@@ -227,22 +203,20 @@ export function assess(read: AssessRead) {
     ready,
     send,
     check,
-    retry,
+    retry: due,
     round,
     unreachable,
-    waitingOnCheckout,
     status: overall,
     ...(decide ? { toDecide: decide } : {}),
     stepWords,
     due: { retry: due, round },
-    unheld: sentBack,
   };
   return underPause(run, assessed) satisfies Assessment;
 }
 
 /**
  * What of the run's steps is due on this pass, off each step's word: a check nobody has filed, a node whose fate is ready (`nodeFate`, its
- * condition's route and its parents' words) filed as a session, or sent its card where it is a workflow node, or held for the checkout —
+ * condition's route and its parents' words) filed as a session, or sent its card where it is a workflow node —
  * never a table condition, which the pass answers unfiled — and one that waits on a step that stops it, unreachable. Pure.
  */
 function dueSteps(
@@ -250,8 +224,6 @@ function dueSteps(
   run: Run,
   status: ReadonlyMap<string, StepStatus>,
   closeoutOf: (step: string) => Closeout | undefined,
-  checkout: CheckoutHold | undefined,
-  waitingOnCheckout: string[],
   phaseOf: (taskId: string) => TaskPhase,
 ) {
   const due: Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> = { ready: [], send: [], check: [], unreachable: [] };
@@ -267,7 +239,6 @@ function dueSteps(
     if (fate === 'unreachable') due.unreachable.push(step.name);
     else if (fate !== 'ready' || step.route?.kind === 'table') continue;
     else if (nodeKind(step) === 'workflow') due.send.push(step.name);
-    else if (waitsOnCheckout(steps, step.name, checkout)) waitingOnCheckout.push(step.name);
     else due.ready.push(step.name);
   }
   return due;
@@ -281,11 +252,11 @@ const succeeded = (all: readonly StepStatus[]) =>
 function underPause(run: Run, a: Assessment) {
   if (!run.pause) return a;
   const steps = [
-    ...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout]),
+    ...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step)]),
   ];
   const checks = [...new Set([...a.check, ...a.retry.filter((r) => r.mode === 'recheck').map((r) => r.step)])];
   const waitingOnPause = steps.length ? { waitingOnPause: { steps, checks } } : {};
-  return { ...a, ready: [], send: [], check: [], retry: [], round: [], waitingOnCheckout: [], ...waitingOnPause };
+  return { ...a, ready: [], send: [], check: [], retry: [], round: [], ...waitingOnPause };
 }
 
 /** Read each step of a round due (`roundSpans`) that is `over budget` as its own ending under it, in `status`: never one not stood. */

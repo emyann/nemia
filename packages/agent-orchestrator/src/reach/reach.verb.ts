@@ -18,7 +18,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { approvedFirst, hasGate } from '../status/status.ts';
+import { hasGate } from '../status/status.ts';
 import { levelOfFactory } from '../level/levels.verb.ts';
 import type { Level } from '../level/level.ts';
 import { seenOf } from '../admission/seen.verb.ts';
@@ -51,14 +51,13 @@ export type PolicyReach = {
   unloaded: Unloaded[];
 };
 
-/** A step as reach reads it off its workflow: its name, its gate, its workspace and its check. */
-type Gated = { name: string; gate?: true; workspace?: 'base'; check?: string };
+/** A step as reach reads it off its workflow: its name, its gate and its check. */
+type Gated = { name: string; gate?: true; check?: string };
 
-/** The gate of `step` in `workflow`, approved first where it ends on the base branch, gated by its workflow or by `gates`. */
-const siteOf = (workflow: string, step: Gated, gates: readonly string[] = []) => ({
+/** The gate of `step` in `workflow`. */
+const siteOf = (workflow: string, step: Gated) => ({
   workflow,
   step: step.name,
-  approvedFirst: approvedFirst(step, { gates: [...gates] }),
   hasCheck: step.check !== undefined,
 });
 
@@ -123,7 +122,7 @@ const runSites = Effect.fnUntraced(function* (runId: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const steps = yield* stepsOf(run);
   const workflow = path.basename(run.workflowDir ?? '') || runId;
-  const sites = steps.filter((s) => hasGate(s, run)).map((s) => siteOf(workflow, s, run.gates));
+  const sites = steps.filter((s) => hasGate(s, run)).map((s) => siteOf(workflow, s));
   const facts = new Map<string, Facts>();
   for (const site of sites) facts.set(site.step, factsOf(yield* seenOf(runId, site.step)));
   return { factory: run.factory, sites, facts };

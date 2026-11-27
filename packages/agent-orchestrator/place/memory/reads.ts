@@ -1,11 +1,11 @@
 /**
- * The verbs of the test place that read and change nothing: `root`, `open`, `standing`, `report`, `trial`, `status` and `inventory`,
+ * The verbs of the test place that read and change nothing: `root`, `open`, `standing`, `report`, `trial` and `inventory`,
  * each over what the place holds (`Held`) and answering as its twin of the git place does for a repository it holds, refusing in its
  * own words.
  */
 import fs from 'node:fs';
 import { checkoutAt, dirty, headOf, repositoryAt, treeOf, type Found } from './acts.ts';
-import { inside, isDirectory, readTree, real, stagedFile } from './disk.ts';
+import { inside, isDirectory, readTree, real } from './disk.ts';
 import { ahead, baseOf, changesOf, commitAt, kindIn, merged, within, type Held, type Repository } from './world.ts';
 import type { BranchStood, Held as Left, PlaceAnswers, PlaceRequests, PlaceVerb, TrialMerge } from '../../src/place/place.ts';
 
@@ -40,7 +40,7 @@ export function root(held: Held, { dir }: PlaceRequests['root']) {
   return { root: null };
 }
 
-/** `open`: the repository at `root`, the commit and the branch it is on, and the file a staged merge is marked by. */
+/** `open`: the repository at `root`, the commit and the branch it is on. */
 export function open(held: Held, { root }: PlaceRequests['open']) {
   if (!isDirectory(root)) return refused(`${root} is not a directory: name a repository with --repo`);
   const at = checkoutAt(held, root);
@@ -49,7 +49,6 @@ export function open(held: Held, { root }: PlaceRequests['open']) {
     repo: root,
     baseRef: headOf(at.repo, at.checkout),
     branch: at.checkout.branch,
-    inProgressFile: stagedFile(at.checkout.dir),
   };
 }
 
@@ -120,27 +119,6 @@ export function trial(held: Held, { repo: dir, trials }: PlaceRequests['trial'])
   const repo = repositoryAt(held, dir);
   const at = Object.fromEntries(trials.map(({ onto }) => [onto, (repo && commitAt(repo, onto)?.id) ?? null]));
   return { at, trials: trials.map((pair) => tried(repo, pair)) } satisfies Reply<'trial'>;
-}
-
-/** `status`: whose merge is staged in a checkout, whether it conflicts, and the tips a commit now would leave out. */
-export function status(held: Held, { repo: dir, tips }: PlaceRequests['status']) {
-  const at = checkoutAt(held, dir);
-  if (!at) return refused(`no merge can be staged in ${dir}: ${noRepository(dir)}`) satisfies Reply<'status'>;
-  const { repo, checkout } = at;
-  const heads = checkout.staged?.heads ?? [];
-  const asked = new Set(Object.values(tips));
-  const head = headOf(repo, checkout);
-  const missing = Object.entries(tips)
-    .filter(([, id]) => !heads.includes(id) && !(repo.commits.has(id) && within(repo, id, head)))
-    .map(([branch]) => branch);
-  const landed = !missing.length && !heads.some((h) => asked.has(h)) ? firstToHold(repo, head, [...asked]) : undefined;
-  return {
-    merging: !heads.length ? 'none' : heads.every((h) => asked.has(h)) ? 'ours' : 'other',
-    conflicted: Boolean(checkout.staged?.conflicts.length),
-    missing,
-    tip: head,
-    ...(landed ? { landedBy: landed } : {}),
-  } satisfies Reply<'status'>;
 }
 
 /**

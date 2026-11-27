@@ -372,8 +372,8 @@ export const POLICY_REACHES = ['all', 'some', 'none'] as const;
 /** One of `POLICY_REACHES`. */
 export type PolicyReachWord = (typeof POLICY_REACHES)[number];
 
-/** Why a condition can never hold at a gate: the step is approved before it runs, or it has no check to pass. */
-export const NEVER_HOLDS = ['approved-before-it-runs', 'no-check'] as const;
+/** Why a condition can never hold at a gate: the step has no check to pass. */
+export const NEVER_HOLDS = ['no-check'] as const;
 
 /** One of `NEVER_HOLDS`. */
 export type NeverHolds = (typeof NEVER_HOLDS)[number];

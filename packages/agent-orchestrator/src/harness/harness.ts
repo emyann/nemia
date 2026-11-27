@@ -145,8 +145,6 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
     const why = REMOTE_REFUSED[key];
     if (why !== undefined && meta[key] !== undefined) said(key, why);
   }
-  if (meta.workspace?.trim() === 'base' || meta.workspace?.trim() === 'main')
-    said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
 }
 
 /**

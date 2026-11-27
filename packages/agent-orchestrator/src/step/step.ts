@@ -45,21 +45,6 @@ export type StepSpec = {
    */
   resume?: string;
   /**
-   * `workspace: base`: the step runs in the repository's own checkout, on the base branch, rather than a worktree of its own.
-   * `workspace: main` is its former spelling, still read as `base` (`baseSpelled`), and never written (`baseWritten`).
-   *
-   * A structural key, and with `place:` the only one about a directory: everything else about where a step works is the shape of
-   * the workflow (`workspacePlan`). A run's work happens on branches in worktrees, which is what keeps two steps out of each other's
-   * way — and merging one of those branches onto the base branch is the one thing a worktree cannot do, since the base branch is
-   * checked out in the repository. So the step that ends a run works where a person would.
-   *
-   * Refused on a step with a `check:` — the run would execute it in a person's checkout, which is no verdict on the step's work — on one
-   * with a `resume:`, whose session ran in another directory and was told none of what an ending needs, and on a step anything waits on,
-   * or one that ends a workflow beside another: a run has one ending (`validate`).
-   *
-   */
-  workspace?: 'base';
-  /**
    * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is not
    * the git kind (`place` on the run record). `place: git`: on branches of a repository. A step file says one (`placeRequired`); only a
    * step frozen on a run record before the key has none, and reads as `git` (`stepPlace`). A team is of one kind: every step says
@@ -456,7 +441,6 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'resume',
   'input',
   'place',
-  'workspace',
   'writable',
   'reads',
   'slot',
@@ -556,8 +540,6 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
   place:
     '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository. Every step says one; none is the default',
-  workspace:
-    "`base`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   writable:
     "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
   reads:
@@ -635,16 +617,6 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
 export const stepPlace = (step: Pick<StepSpec, 'place'>) => step.place ?? 'git';
 
 /**
- * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: base`). Pure, and read of the
- * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
- *
- * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
- * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
- * @param step The step, its `workspace:` among it.
- */
-export const endsOnBase = (step: Pick<StepSpec, 'workspace'>) => step.workspace === 'base';
-
-/**
  * A step's checks, in its order: its `checks:`, or its `check: <line>` as one check named `check` (`SHORTHAND_CHECK`); none where it has
  * neither.
  * @param step The step, whose `checks:` or `check:` is read.
@@ -669,6 +641,11 @@ export const outputFields = (step: StepSpec) => Object.keys(step.output?.schema.
  * work, and "not a key a step has" would be a worse answer than the truth.
  */
 export const REFUSED: Record<string, string> = {
+  workspace:
+    'every step of a run works in a worktree of its own, and a run ends with a branch, so no step runs in the repository\'s own checkout:' +
+    ' `workspace: base` is gone, and `workspace: worktree` is what a step without the line already is. Delete the line: `nemia decide <run>`' +
+    ' says where the run\'s branch stands and how to merge it. A workflow that lands its runs ends with a wait node (`waitsFor:`) on a condition' +
+    ' its factory writes. A step that works in a folder the run makes says `place: folder`',
   guide:
     "the harness reads CLAUDE.md or AGENTS.md from the step's workspace on its own. Standing rules belong" +
     ' in that file, and what only this step needs to know belongs in the body',

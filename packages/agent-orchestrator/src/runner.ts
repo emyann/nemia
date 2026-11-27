@@ -111,15 +111,10 @@ export {
   approvalOf,
   approvalRefusal,
   approvalWordsRefusal,
-  approvedFirst,
-  endsOnBase,
   artifactLines,
   branchWord,
-  checkoutLine,
-  checkoutWord,
   endingSteps,
   firstLine,
-  merges,
   ownNote,
   resultSteps,
   sendBackTo,
@@ -325,7 +320,6 @@ export type {
   PlaceVerb,
   Removed,
   Standing,
-  MergeState,
   TrialMerge,
   Unread,
 } from './place/place.ts';
@@ -369,7 +363,6 @@ export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export { advanceRun, type Advanced } from './tick/advance.verb.ts';
 export { refusalLines, tickRun, type Pass } from './tick/tick.verb.ts';
-export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, slotsOf } from './cap/cap.verb.ts';
 export type { StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
@@ -392,7 +385,6 @@ export {
   type Pause,
   type Paused,
   type PauseHeld,
-  type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
 export { retryRun, type Asked } from './retry/retry.verb.ts';

@@ -109,8 +109,6 @@ const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[
   report: [each(text, 'repo', 'baseRef', 'onto'), each(texts, 'branches', 'diffOf', 'present', 'atBase')],
   standing: [each(text, 'repo', 'base'), branches],
   trial: [each(text, 'repo'), pairs],
-  status: [each(text, 'repo'), each(strings, 'tips')],
-  land: [each(text, 'repo'), act],
   inventory: [each(text, 'repo', 'under', 'run', 'base')],
   remove: [each(text, 'repo'), each(texts, 'workspaces', 'branches')],
   export: [each(text, 'repo', 'tag', 'into')],

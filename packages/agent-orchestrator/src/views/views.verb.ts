@@ -5,7 +5,7 @@
  * `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and
  * files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the engine is an Effect program
  * that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `refusalWholeRead`,
- * `checksHandedRead`, `landingSaidRead`, `parentRead`, `parentsRead` — and fails with a refusal and dies of anything else.
+ * `checksHandedRead`, `parentRead`, `parentsRead` — and fails with a refusal and dies of anything else.
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
@@ -13,7 +13,6 @@ import { EngineService, asked, denialText, type Engine, type TaskView } from '..
 import {
   attemptVerdict,
   CHECK_TAIL_LINES,
-  failingLines,
   keptOutput,
   lastLines,
   REFUSAL_FILE_BYTES,
@@ -21,7 +20,6 @@ import {
   reportedLines,
   type CheckHanded,
   type CheckRefusal,
-  type LandingSaid,
   checksPhase,
   checkFailureAction,
   decidingCheckTask,
@@ -538,27 +536,6 @@ const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, comman
   const { lines, cut } = reportedLines(stdout);
   const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), reported: lines, cut, partial: !kept };
   return { step, command, ...said } satisfies CheckHanded;
-});
-
-/**
- * What the check of a run's ending said when it refused the merged tree, for the loop's target filed to merge that base (`LandingSaid`):
- * the verdict, the tails of its streams, and the lines naming a failing test (`failingLines`) from its whole stdout and the end of its
- * stderr (`checkStreams`) — `partial` where no whole stdout was kept — and, beside it, each stream whole up to `REFUSAL_FILE_BYTES`, its
- * end past it (`keptOutput`), for the target's files. A read that rejects is `unreadable`, with no streams, and the target is filed all the
- * same. Dies of nothing a read throws.
- *
- * @param step The ending step, whose frozen `check:` is `command`.
- * @param check The task of that check.
- */
-export const landingSaidRead = Effect.fn('landingSaid')(function* (step: string, command: string, check: string) {
-  const e = yield* EngineService;
-  const read = yield* Effect.exit(checkStreams(e, check, undefined, REFUSAL_FILE_BYTES + 4));
-  if (Exit.isFailure(read)) return { said: { step, check, command, unreadable: unreadWords(check, read.cause) } satisfies LandingSaid };
-  const { verdict, stdout, stderr, kept } = read.value;
-  const { lines, cut } = failingLines(`${stdout}\n${stderr}`);
-  const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), failing: lines, cut, partial: !kept };
-  const whole = { stdout: keptOutput(stdout, REFUSAL_FILE_BYTES), stderr: keptOutput(stderr, REFUSAL_FILE_BYTES) };
-  return { said: { step, check, command, ...said } satisfies LandingSaid, whole };
 });
 
 /** Why what a check's task printed cannot be given: the engine's words for the read that failed. */

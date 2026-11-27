@@ -23,7 +23,7 @@ import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { RunRead } from '../tick/told.verb.ts';
 import type { Decision, Merged } from '../decide/decide.ts';
-import { inFlight, type CheckoutHold } from '../cap/cap.ts';
+import { inFlight } from '../cap/cap.ts';
 import { type Assignee, isRepositoryRun, type Run } from '../record/record.ts';
 import { assigneeStanding, assigneeWord, type AssigneeStanding } from '../assignee/assignee.ts';
 import { asksOfAPerson, RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
@@ -403,9 +403,9 @@ type Judged = {
   roundDue: ReadonlySet<string>;
   /**
    * What the reading says beside each step's word: what its harness waits for (`waits`), what its try was denied (`denied`), and how many
-   * questions its closeout asks of a person it waits on (`asks`), and the run whose ending holds the checkout it waits on (`baseHeldBy`).
+   * questions its closeout asks of a person it waits on (`asks`).
    */
-  beside: ReadonlyMap<string, { waits?: string; denied?: string; asks?: number; baseHeldBy?: CheckoutHold }>;
+  beside: ReadonlyMap<string, { waits?: string; denied?: string; asks?: number }>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `nemia ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   waitingOnYouWords: string[];
@@ -636,7 +636,7 @@ export const judge = Effect.fn('judge')(function* (
     codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
-    beside: new Map(read.steps.map(({ name, waits, denied, asks, baseHeldBy }) => [name, { waits, denied, asks, baseHeldBy }])),
+    beside: new Map(read.steps.map(({ name, waits, denied, asks }) => [name, { waits, denied, asks }])),
     waitingOnYou,
     waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),

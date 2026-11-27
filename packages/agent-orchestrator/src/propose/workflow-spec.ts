@@ -89,12 +89,11 @@ const servedKeys = (keys: Readonly<Record<string, unknown>>) =>
   );
 
 /**
- * `keys` with a `workspace:` in a former word said in today's, as the loader reads it (`placeSpelled`, `baseSpelled`): `folder` as `place:
- * folder`, where `place:` is not written beside it, and `main` as `base`. A spec carries no word nothing writes, so a step read and
+ * `keys` with a `workspace:` in a former word said in today's, as the loader reads it (`placeSpelled`): `folder` as `place:
+ * folder`, where `place:` is not written beside it. A spec carries no word nothing writes, so a step read and
  * proposed back is written as the same step, its file kept.
  */
 const spelledNow = (keys: Record<string, unknown>) => {
-  if (keys.workspace === 'main') return { ...keys, workspace: 'base' };
   if (keys.workspace !== 'folder' || keys.place !== undefined) return keys;
   const { workspace: _workspace, ...rest } = keys;
   return { ...rest, place: 'folder' };

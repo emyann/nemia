@@ -6,7 +6,6 @@ import type { StepSpec } from '../step/step.ts';
 import {
   lackedOf,
   refusedCheck,
-  satisfiesAfter,
   tryOf,
   type CloseoutAsked,
   type Run,
@@ -19,17 +18,11 @@ import {
   approvalOf,
   budgetRefusal,
   capOf,
-  endingStopped,
   gateWords,
-  landsOnCheck,
   loopOf,
-  ownStatus,
   raiseOf,
   raiseWords,
-  sendBackTo,
-  takeBackWords,
   spentWord,
-  waitsAtGate,
   type Raise,
   type SpendOf,
 } from '../status/status.ts';
@@ -65,15 +58,13 @@ type Asked = {
 
 /**
  * The ask with the step's standing read (`retryable`): the step, its next try, the ask already waiting for it (`pending`), and the ending
- * stopped on the base branch (`stoppedAt`), with the command that lands it again (`again`).
+
  */
 type Judged = Asked &
   ReturnType<typeof retryable> & {
     step: StepSpec;
     next: number;
     pending?: RetryAsk;
-    stoppedAt?: StepSpec;
-    again: string;
     floor?: Raise;
   };
 
@@ -85,18 +76,10 @@ type Judged = Asked &
  * a cancelled run, which files
  * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `nemia pause --now` wrote that is void
  * (`pauseAskVoid`) too, said as set aside by the next pass, which alone moves it; a step whose last try is not over, or that let what
- * waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted;
+ * waits on it run (`retryable`); `--recheck` where no check failed;
  * and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a person.
  *
- * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
- * other: landing again would act on the work being changed, and a send-back would take back the try a person asked to land again on.
- * A send-back from it goes through the folder's loop, to the looping step it waits on, and a folder with none is told it has no such way.
- * An ending at its gate with nothing of it filed has no try to replace: it is offered its approval, and the send-back of the work it would
- * act on (`sendBackTo`).
- *
- * A send-back is an objection, refused with no words: a try with nothing to change would sign off as it did, and wait there again. At an
- * ending's gate held before it is filed (`waitsAtGate`), the refusal names that gate and the ending's approval, never the step's own,
- * which would be refused itself.
+ * A send-back is an objection, refused with no words: a try with nothing to change would sign off as it did, and wait there again.
  *
  * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
  * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
@@ -208,25 +191,14 @@ function judged(asked: Asked, step: StepSpec) {
   const { steps, run, name, phaseOf, closeoutOf, askedCloseout, asks, spendOf } = asked;
   const next = tryOf(run, name) + 1;
   const floor = raiseOf(step, run, spendOf);
-  const stoppedAt = steps.find((s) => endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
-  const again = stoppedAt ? `nemia retry ${run.id} ${stoppedAt.name}` : '';
   return {
     ...asked,
     ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf, asked.tipOf),
     step,
     next,
     pending: asks.find((a) => a.step === name && a.try === next),
-    stoppedAt,
-    again,
     ...(floor ? { floor } : {}),
   };
-}
-
-/** How an ending that stopped on the base branch is said: its name, its own status, and that it did not do what it was approved for. */
-function stoppedWords(c: Judged, ending: StepSpec) {
-  const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf } = c;
-
-  return `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;
 }
 
 /** The ask `nemia pause --now` wrote for this try: void, which the next pass sets aside; or still due, tried on the resume. */
@@ -247,26 +219,13 @@ function pauseAskRefusal(c: Judged) {
 function pendingRefusal(c: Judged) {
   const paused = pauseAskRefusal(c);
   if (paused !== undefined) return paused;
-  const { run, name, command, asks, next, pending, sendsBack, back, stoppedAt } = c;
+  const { run, name, command, next, pending, sendsBack } = c;
   if (pending && !carries(pending, c.raise, c.floor)) return uncarriedRefusal(c, pending);
   if (pending && !heard(pending, sendsBack)) {
-    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Take that ask back — nemia retry ${run.id} ${name} --off — and ask again: ${command} --message "<objection>".`;
+    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${gateWords(run, name)}, so no tick honours it: a send-back says what to change. Take that ask back — nemia retry ${run.id} ${name} --off — and ask again: ${command} --message "<objection>".`;
   }
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
-  }
-  const landing = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
-  if (landing) {
-    return (
-      `try ${landing.try} of ${landing.step} is asked for (${modeWord(landing)}, at ${landing.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
-      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, take that ask back — nemia retry ${run.id} ${landing.step} --off — and send the work back: ${command} --message "<objection>".`
-    );
-  }
-  if (stoppedAt?.name === name) {
-    const sending = stoppedAt.after.map((a) => asks.find((x) => x.step === a && x.try === tryOf(run, a) + 1)).find(Boolean);
-    if (sending) {
-      return `the work is being sent back from ${name} (nemia retry ${run.id} ${sending.step}, at ${sending.at}): ${name} returns to its gate once it settles, and a try of ${name} now would act on work that is being changed. Wait for it: nemia ls ${run.id}.`;
-    }
   }
   return undefined;
 }
@@ -285,50 +244,9 @@ function uncarriedRefusal(c: Judged, pending: RetryAsk) {
   return `${asked} with --budget ${pending.budget}, not above ${aboveWord(floor)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
 }
 
-/** Why a step with no way to be tried has none: an ending stopped on the base branch, an ending at its gate, or its status. */
+/** Why a step with no way to be tried has none: its status. */
 function nothingToTry(c: Judged) {
-  return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? unspentRefusal(c) ?? statusRefusal(c);
-}
-
-/** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or landed again. */
-function stoppedEndingRefusal(c: Judged) {
-  const { steps, run, name, status, stoppedAt, again } = c;
-  if (!stoppedAt || !satisfiesAfter(status)) return undefined;
-  const through = stoppedAt.after.filter((a) => steps.find((s) => s.name === a)?.loop);
-  if (through.length) {
-    return (
-      `${stoppedWords(c, stoppedAt)}, and the work goes back through the folder's loop, not to ${name}: send it back to ${through.join(' or ')}, which is filed again with your objection and what ${stoppedAt.name} said, and may ask for a round of the work — ` +
-      `${through.map((t) => `nemia retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or land again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
-    );
-  }
-  return (
-    `${stoppedWords(c, stoppedAt)}, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose \`again: true\` gives the work a round, and ${stoppedAt.after.join(', ') || 'nothing'} ${stoppedAt.after.length > 1 ? 'do' : 'does'} not loop. ` +
-    `Land again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (nemia cancel ${run.id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
-  );
-}
-
-/** An ending at its gate with nothing of it filed: no try to replace, so its approval, or a send-back of the work it would act on. */
-function endingGateRefusal(c: Judged) {
-  const { step, run, name, status } = c;
-  if (status !== 'awaiting approval' || run.steps[name]?.taskId) return undefined;
-  const back = sendBackTo(step, run)
-    .map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`)
-    .join(' or ');
-  return (
-    `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. ` +
-    `Approve it: nemia approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
-  );
-}
-
-/**
- * A send-back of work an ending approved and not filed waits on, where that approval names no work (`takeBackWords`): nothing would spend
- * it, so it is taken back first.
- */
-function unspentRefusal(c: Judged) {
-  const { steps, run, name, status } = c;
-  if (!satisfiesAfter(status)) return undefined;
-  const ending = steps.find((s) => s.after.includes(name) && sendBackTo(s, run).includes(name) && takeBackWords(s, run));
-  return ending ? takeBackWords(ending, run) : undefined;
+  return statusRefusal(c);
 }
 
 /** What a step's status says of a try, when it has none: not filed, running, checking, done, or a loop's round to go. */
@@ -348,7 +266,7 @@ function statusRefusal(c: Judged) {
 }
 
 /**
- * `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted; and on a step ended at its
+ * `--recheck` where no check failed; and on a step ended at its
  * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
  */
 /**
@@ -368,14 +286,8 @@ function checkNameRefusal({ how, run, name, command, phaseOf }: Judged) {
 }
 
 function modeRefusal(c: Judged) {
-  const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
+  const { run, name, how, command, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
-  if (landsOnCheck(step, run) && status === 'failed (check)') {
-    const why = refusedCheck(run.steps[name]?.check ? checksPhase(run.steps[name].check, phaseOf) : 'unknown', verdictOf(name))
-      ? 'refused it'
-      : 'did not finish';
-    return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
-  }
   if (status === 'budget exhausted') return budgetStopRefusal(c);
   if (status === 'blocked') return blockedRecheckRefusal(c);
   const is =
@@ -418,37 +330,19 @@ function blockedRecheckRefusal(c: Judged) {
   }
 }
 
-/** `--recheck` of a step ended at its budget that has no check to run, or whose staged merge the run took back: its session, raised. */
-function budgetStopRefusal({ step, command, raise }: Judged) {
-  const why = step.check
-    ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
-    : `its session was ended at its budget, and it declares no check: there is nothing to run`;
+/** `--recheck` of a step ended at its budget that has no check to run: its session, raised. */
+function budgetStopRefusal({ command, raise }: Judged) {
+  const why = `its session was ended at its budget, and it declares no check: there is nothing to run`;
   return `--recheck runs a step's check, and ${why}. Ask for another session, with its cap raised: ${command} --budget <amount>${
     raise ? ` (above ${aboveWord(raise)})` : ''
   }.`;
 }
 
-/** A send-back with no words: from an ending stopped on the base branch, from an ending's gate, or from the step's own. */
+/** A send-back with no words, from the step's own gate. */
 function wordlessRefusal(c: Judged) {
-  const { steps, run, name, how, command, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, sendsBack, back } = c;
+  const { run, name, how, command, sendsBack } = c;
   if (!sendsBack || how.message !== undefined) return undefined;
   const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
-  const sentFrom = back && steps.find((s) => s.name === back[0]);
-  if (sentFrom) {
-    return (
-      `${name}'s work went on to ${sentFrom.name}, and ${stoppedWords(c, sentFrom)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
-      `${say} — or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${sentFrom.name}.`
-    );
-  }
-  const ending = steps.find(
-    (s) => s.after.includes(name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf),
-  );
-  if (ending) {
-    return (
-      `${ending.name} is at its gate, not ${name}: ${ending.name} ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to ${name}, the work it would act on. ` +
-      `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: nemia approve ${run.id} ${ending.name}.`
-    );
-  }
   const given = approvalOf(run, name);
   return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: nemia approve ${run.id} ${name}`}.`;
 }

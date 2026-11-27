@@ -62,8 +62,8 @@ holds what every change needs.
   with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. A commit
   formats and lints its staged files (husky and lint-staged, `.husky/pre-commit`), and `npm run lint:fast` checks the whole tree.
-- `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
-  boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of the files
+- `npm run rules` — the repository-wide rule tests, in about two and a half minutes (`tools/guards/rules.ts`: the guards but their
+  boundary tests, and the structure and rule tests each package keeps, each a whole folder read). A change breaks one without touching it, and the tests of the files
   a change touched never run them: CI runs them, and a person runs them before a push.
 - `npx knip` — the files, exports and dependencies no workspace uses, by knip (pinned at the root, `knip.jsonc`): what it reports
   is removed, with what served only it; what reaches a file where knip cannot see (a path run by `node`, a bundle's door) is an entry

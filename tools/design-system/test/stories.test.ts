@@ -1,12 +1,14 @@
 /**
  * What a story declares, read as Storybook reads it (`src/stories/declared.ts`), and the fate the producer gives it before anything is
- * drawn (`storyFate`): a meta's tags apply to every story, `!<tag>` takes one off, and handlers named with no tag are refused.
+ * drawn (`storyFate`): a meta's tags apply to every story, `!<tag>` takes one off, and handlers named with no tag are refused. And every
+ * story file of the board reads as a card the build can name (`boardStories`), so a title the build cannot read is refused by
+ * `npm run rules`, not first by `ci`'s design-system job.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { storyFate } from '../src/decide.ts';
 import { declaredOf, mergedTags } from '../src/stories/declared.ts';
-import { storyNames } from '../src/stories/stories.ts';
+import { boardStories, storyNames } from '../src/stories/stories.ts';
 
 test("a meta's tags reach every story, a story's add to them, and !<tag> takes one back off", () => {
   assert.deepEqual(mergedTags([['network', 'a'], ['b']]), ['network', 'a', 'b']);
@@ -33,4 +35,8 @@ test('a story file exports its stories in the order it writes them', () => {
     'B',
     'A',
   ]);
+});
+
+test('every story file of the board reads as a card: its title opens with a group, and no two share a base name', () => {
+  assert.ok(boardStories().length > 0);
 });

@@ -64,6 +64,7 @@ export const STEP_KEYS = [
   'when',
   'ends',
   'workflow',
+  'brief',
   'card',
   'relabel',
   'waitsFor',
@@ -144,6 +145,7 @@ export const STEP_KEY_FORM = {
   when: 'list',
   ends: 'list',
   workflow: 'text',
+  brief: 'choice',
   card: 'choice',
   relabel: 'list',
   waitsFor: 'list',
@@ -322,11 +324,16 @@ const stepKeyFields = {
   ends: Schema.optionalKey(
     Schema.NullOr(Strings).annotate({ description: 'The routes of this condition on which the run ends, nothing after it running.' }),
   ),
-  workflow: Schema.optionalKey(Text.annotate({ description: 'The workflow this node routes to: it files a card for it from this run.' })),
+  workflow: Schema.optionalKey(Text.annotate({ description: 'The workflow this node routes to: it starts a run of it, handed this run as context.' })),
+  brief: Schema.optionalKey(
+    Text.annotate({
+      description: "What a workflow node briefs the run it starts with: title, its producer's title (the default); card, the run's own card as given.",
+    }),
+  ),
   card: Schema.optionalKey(
     Text.annotate({
       description:
-        "What card this node files: routed, a card of its own (the default); given, the run's own card as given; backlog, the run's card back to the inbox, unqueued.",
+        "What card this node files: backlog, the run's card back to the inbox, unqueued.",
     }),
   ),
   relabel: Schema.optionalKey(

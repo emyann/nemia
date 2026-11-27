@@ -520,8 +520,9 @@ export const harnessPromptLine = (file: string, word: string) =>
  * may still hold its harness prompt as `systemPrompt` (`FORMER_OWN_KEYS`), in a former word, and whose place may still be `workspace:
  * 'folder'` (`placeSpelled`).
  */
-export type FrozenStep = Omit<StepSpec, 'agent'> & {
+export type FrozenStep = Omit<StepSpec, 'agent' | 'card'> & {
   workspace?: string;
+  card?: StepSpec['card'] | 'given' | 'routed';
   agent?: Omit<StepAgent, 'keys'> & { keys: string[]; systemPrompt?: string };
 };
 
@@ -532,6 +533,7 @@ export type FrozenStep = Omit<StepSpec, 'agent'> & {
  */
 function isNamed(step: FrozenStep): step is StepSpec {
   if (step.agent && Object.hasOwn(step.agent, 'systemPrompt')) return false;
+  if (step.card === 'given' || step.card === 'routed') return false;
   if (Object.hasOwn(step, 'workspace') || isFormerWorkspace((step.agent?.given as Record<string, unknown> | undefined)?.workspace))
     return false;
   return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
@@ -565,6 +567,17 @@ function renamedFields(fields: object) {
 }
 
 /**
+ * A step frozen with `card: given` or `card: routed`, retired, read as a node that starts its run with `brief: card`, or with the default
+ * brief: the card word is left off, the node's `brief:` says what `given` said.
+ */
+function cardAsNamed(step: FrozenStep) {
+  const { card, ...rest } = step;
+  if (card === 'given') return { ...rest, brief: 'card' as const };
+  if (card === 'routed') return rest;
+  return step;
+}
+
+/**
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no `allowedTools` and
  * the step would run unfenced, with nothing said; and its agent's harness prompt as `systemPrompt`, in a former word (`FORMER_OWN_KEYS`):
@@ -577,7 +590,7 @@ function renamedFields(fields: object) {
  */
 export function asNamed(step: FrozenStep) {
   if (isNamed(step)) return step satisfies StepSpec;
-  const fields = renamedFields(step) as StepSpec;
+  const fields = cardAsNamed(renamedFields(step) as FrozenStep) as StepSpec;
   if (!step.agent) return fields satisfies StepSpec;
   const { keys, given } = step.agent;
   const agent = {

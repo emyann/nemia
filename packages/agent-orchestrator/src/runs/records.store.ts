@@ -88,6 +88,7 @@ import {
   runMarkKey,
   runMarksPrefix,
   RUNMARKS_PREFIX,
+  childClaimKey,
   RUNS_PREFIX,
 } from './run-keys.ts';
 
@@ -110,6 +111,21 @@ export const cardStartedTwice = (card: string, run: string) =>
   new Conflict({
     message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
   }) satisfies Conflict;
+
+/**
+ * A workflow node's run started twice, as a refusal: one run per node of a run, held by the node's claim.
+ * @param parent The id of the run the node is in.
+ * @param node The workflow node's name.
+ * @param run The id of the run the node started already.
+ */
+export const childStartedTwice = (parent: string, node: string, run: string) =>
+  new Conflict({
+    message: `the node ${node} of run ${parent} started run ${run} already: read it with nemia show ${run}, or forget it with nemia rm ${run}`,
+  }) satisfies Conflict;
+
+const startedByIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ startedBy: Schema.Struct({ run: Schema.String, node: Schema.String }) })),
+);
 
 const claimIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ run: Schema.String })));
 const fromCardIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ from: Schema.Struct({ inbox: Schema.String }) })));
@@ -397,13 +413,19 @@ function createdRun(open: Opened) {
       const card = run.from?.inbox;
       const writes = [[runKey(run.id), create(recordValue(run))] as const];
       const claim = card === undefined ? [] : [[claimKey(card), create(JSON.stringify({ run: run.id }))] as const];
-      yield* ks.txn([...writes, ...claim]).pipe(
+      const by = run.startedBy;
+      const childClaim = by === undefined ? [] : [[childClaimKey(by.run, by.node), create(JSON.stringify({ run: run.id }))] as const];
+      yield* ks.txn([...writes, ...claim, ...childClaim]).pipe(
         Effect.catchTag('KeyRefused', (err) =>
           Effect.gen(function* () {
             if (err.key === runKey(run.id) && err.refusal === 'exists') return yield* Effect.fail(runTaken(run.id));
+            if (by !== undefined && err.key === childClaimKey(by.run, by.node) && err.refusal === 'exists') {
+              const held = yield* ks.get(err.key);
+              return yield* Effect.fail(childStartedTwice(by.run, by.node, (held && claimedBy(held.value)) ?? 'another run'));
+            }
             if (card === undefined || err.key !== claimKey(card) || err.refusal !== 'exists') return yield* Effect.fail(raced(err));
-            const by = yield* ks.get(claimKey(card));
-            return yield* Effect.fail(cardStartedTwice(card, (by && claimedBy(by.value)) ?? 'another run'));
+            const holder = yield* ks.get(claimKey(card));
+            return yield* Effect.fail(cardStartedTwice(card, (holder && claimedBy(holder.value)) ?? 'another run'));
           }),
         ),
       );
@@ -420,8 +442,11 @@ const forgottenKeys = (ks: Keyspace, id: string) =>
         const record = yield* tx.get(runKey(id));
         const card = record === undefined ? undefined : cardIn(record.value);
         const claim = card === undefined ? undefined : yield* tx.get(claimKey(card));
+        const by = record === undefined ? undefined : Option.getOrUndefined(startedByIn(record.value))?.startedBy;
+        const childClaim = by === undefined ? undefined : yield* tx.get(childClaimKey(by.run, by.node));
         const keys = [
           ...(record === undefined ? [] : [runKey(id)]),
+          ...(by !== undefined && childClaim !== undefined && claimedBy(childClaim.value) === id ? [childClaimKey(by.run, by.node)] : []),
           ...(card !== undefined && claim !== undefined && claimedBy(claim.value) === id ? [claimKey(card)] : []),
           ...(yield* tx.list(asksPrefix(id))).map((ask) => ask.key),
           ...(yield* tx.list(runMarksPrefix(id))).map((mark) => mark.key),

@@ -110,7 +110,13 @@ export const Step = Schema.Struct({
   taskId: Schema.NullOr(TaskId.OnRead),
   conditions: Schema.optional(Schema.Record(Schema.String, ConditionWritten)),
   route: Schema.optional(RouteRecord),
-  sent: Schema.optional(Schema.Struct({ card: Schema.String, at: Schema.String })),
+  sent: Schema.optional(
+    Schema.Union([
+      Schema.Struct({ run: Schema.String, at: Schema.String }),
+      Schema.Struct({ card: Schema.String, at: Schema.String }),
+    ]),
+  ),
+  refused: Schema.optional(Schema.Struct({ message: Schema.String, at: Schema.String })),
   pinned: Schema.optional(Schema.Array(Pin)),
   workspace: Schema.optional(Schema.String),
   branch: Schema.optional(Schema.String),
@@ -347,6 +353,11 @@ const runFields = {
    * Absent on a run started any other way. `trigger`: the card trigger of its factory that queued the card, where one did.
    */
   from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead, trigger: Schema.optional(Schema.String) })),
+  /**
+   * The run and the workflow node that started this run directly (`sendCards`): the node's run, frozen at start, held once per node by
+   * the node's claim. Absent on a run started any other way.
+   */
+  startedBy: Schema.optional(Schema.Struct({ run: RunId.OnRead, node: Schema.String })),
   /**
    * The schedule that started the run, when the tick did (`startDue` in schedule.verb.ts): the factory, the workflow, and the fire it was
    * started for (`due`). The schedule's last run is read off it. Absent on a run started any other way.

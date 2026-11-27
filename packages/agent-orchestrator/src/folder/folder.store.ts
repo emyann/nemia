@@ -20,6 +20,7 @@ import {
   CARRIED_FOLDER,
   FRONTMATTER,
   isReadme,
+  NODE_BRIEFS,
   NODE_CARDS,
   SKILLS_FOLDER,
   STEP_KEYS,
@@ -519,7 +520,8 @@ const frozenStepFields = {
   when: Schema.optionalKey(Strings),
   ends: Schema.optionalKey(Strings),
   workflow: Schema.optionalKey(Schema.String),
-  card: Schema.optionalKey(Schema.Literals(NODE_CARDS)),
+  brief: Schema.optionalKey(Schema.Literals(NODE_BRIEFS)),
+  card: Schema.optionalKey(Schema.Literals([...NODE_CARDS, 'given', 'routed'])),
   relabel: Schema.optionalKey(Strings),
   waitsFor: Schema.optionalKey(Strings),
 } satisfies FrozenStepFields;

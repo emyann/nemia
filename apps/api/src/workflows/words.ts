@@ -3,7 +3,7 @@
  * `workflows/`, and a schema's, a `.json` file directly in that folder, each refusal a sentence naming the fix (400). And the words a
  * key of a fixed list may be set to (`WORDS`); how each key is set is objects' (`STEP_KEY_FORM`).
  */
-import { AGENTS_FOLDER, DENIALS, NODE_CARDS, SLOTS, type StepKey } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, DENIALS, NODE_BRIEFS, NODE_CARDS, SLOTS, type StepKey } from 'agent-orchestrator/workflow';
 import { PLACE_KINDS, type StepKeyForm } from 'objects';
 
 /**
@@ -62,5 +62,6 @@ export const WORDS: Readonly<Partial<Record<StepKey, readonly string[]>>> = {
   place: PLACE_KINDS,
   slot: SLOTS,
   denials: DENIALS,
+  brief: NODE_BRIEFS,
   card: NODE_CARDS,
 };

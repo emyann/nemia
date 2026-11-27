@@ -4,7 +4,7 @@
  * }`, `{ script }` — or `judge`, each refused in the file's words where it cannot be read (`routingOf`), and written back as the parser
  * reads it (`routeWritten`).
  */
-import { NODE_CARDS, refuse, type NodeCard, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
+import { NODE_BRIEFS, NODE_CARDS, refuse, type NodeBrief, type NodeCard, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';
 import { parseLabelEdits } from '../label-spelling/label-spelling.ts';
 
@@ -20,6 +20,7 @@ export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) 
   const { routes, route, ends } = conditionKeysOf(step, meta);
   const workflow = workflowOf(step, meta.workflow, routes !== undefined);
   const card = cardOf(step, meta.card, workflow);
+  const brief = briefOf(step, meta.brief, workflow);
   const relabel = relabelOf(step, meta.relabel, card);
   return {
     ...(routes !== undefined && { routes }),
@@ -27,6 +28,7 @@ export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) 
     ...(meta.when !== undefined && { when: wordsOf(step, 'when', meta.when) }),
     ...(ends !== undefined && { ends }),
     ...(workflow !== undefined && { workflow }),
+    ...(brief !== undefined && { brief }),
     ...(card !== undefined && { card }),
     ...(relabel !== undefined && { relabel }),
   };
@@ -35,8 +37,12 @@ export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) 
 /** Whether `word` is one of `NODE_CARDS`. */
 const isNodeCard = (word: string): word is NodeCard => (NODE_CARDS as readonly string[]).includes(word);
 
+/** Whether `word` is one of `NODE_BRIEFS`. */
+const isNodeBrief = (word: string): word is NodeBrief => (NODE_BRIEFS as readonly string[]).includes(word);
+
 /**
- * `card:`, what card a node files: `backlog` on a node with no `workflow:`, `routed` or `given` on one with it.
+ * `card:`, what card a node files: `backlog`, on a node with no `workflow:`. A `workflow:` node starts a run and files no card, so the
+ * retired `card: given` and `card: routed` are refused with what to write now.
  * @param step The step's name, which a refusal names.
  * @param written The text of its `card:` line, or undefined where it has none.
  * @param workflow The node's `workflow:`, read.
@@ -44,15 +50,30 @@ const isNodeCard = (word: string): word is NodeCard => (NODE_CARDS as readonly s
 function cardOf(step: string, written: string | undefined, workflow: string | undefined) {
   const card = written?.trim();
   if (card === undefined) return undefined;
-  if (!isNodeCard(card))
-    refuse(`${step}: \`card: ${card}\` is no card a node files. Write one of ${NODE_CARDS.join(', ')}: \`card: given\`.`);
-  if (card === 'backlog' && workflow !== undefined)
+  if (card === 'given')
+    refuse(`${step}: \`card: given\` is retired: a \`workflow:\` node starts its run and files no card. Write \`brief: card\` to brief the run with the run's own card.`);
+  if (card === 'routed')
+    refuse(`${step}: \`card: routed\` is retired: a \`workflow:\` node starts its run and files no card. Delete the line.`);
+  if (!isNodeCard(card)) refuse(`${step}: \`card: ${card}\` is no card a node files. Write one of ${NODE_CARDS.join(', ')}: \`card: backlog\`.`);
+  if (workflow !== undefined)
     refuse(
       `${step}: \`card: backlog\` files the run's card back to the inbox, naming no workflow, and this node names \`workflow: ${workflow}\`. Delete one of the two lines.`,
     );
-  if (card !== 'backlog' && workflow === undefined)
-    refuse(`${step}: \`card: ${card}\` files a card for a workflow, and this node names none. Add \`workflow: <name>\`.`);
   return card;
+}
+
+/**
+ * `brief:`, what a `workflow:` node briefs the run it starts with: `title` or `card`, on a node with a `workflow:` alone.
+ * @param step The step's name, which a refusal names.
+ * @param written The text of its `brief:` line, or undefined where it has none.
+ * @param workflow The node's `workflow:`, read.
+ */
+function briefOf(step: string, written: string | undefined, workflow: string | undefined) {
+  const brief = written?.trim();
+  if (brief === undefined) return undefined;
+  if (workflow === undefined) refuse(`${step}: \`brief: ${brief}\` briefs the run a node starts, and this node names no workflow. Add \`workflow: <name>\`, or delete the line.`);
+  if (!isNodeBrief(brief)) refuse(`${step}: \`brief: ${brief}\` is no brief a node gives. Write one of ${NODE_BRIEFS.join(', ')}: \`brief: card\`.`);
+  return brief;
 }
 
 /**

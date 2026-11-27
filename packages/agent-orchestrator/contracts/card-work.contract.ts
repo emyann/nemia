@@ -7,13 +7,13 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * A run as the walk reads it: its id, the card it was started from (null for none), the run whose workflow node started it (null for a
- * run started any other way), and when it was made, ISO.
+ * run started any other way), and when it was made, in milliseconds.
  */
 export type WorkRun = {
   readonly id: string;
   readonly card: string | null;
   readonly startedBy: string | null;
-  readonly created: string;
+  readonly created: number;
 };
 
 /**
@@ -31,11 +31,9 @@ const belongs = (run: WorkRun, runs: readonly WorkRun[], card: string) => {
   return false;
 };
 
-/** Whether `a` was made before `b`, or at the same instant with an id first in order. */
-const before = (a: WorkRun, b: WorkRun) => a.created < b.created || (a.created === b.created && a.id < b.id);
-
 const cardWorkSpec = spec<(card: string, runs: readonly WorkRun[]) => readonly string[]>({
-  requires: ({ input: [, runs] }) => runs.every((r, i) => runs.findIndex((o) => o.id === r.id) === i),
+  requires: ({ input: [, runs] }) =>
+    runs.every((r, i) => !runs.slice(0, i).some((o) => o.id === r.id) && (i === 0 || (runs[i - 1]?.created ?? 0) <= r.created)),
   ensures: {
     eachIsARun: {
       description: 'Every run of the work is a run the store lists',
@@ -60,16 +58,16 @@ const cardWorkSpec = spec<(card: string, runs: readonly WorkRun[]) => readonly s
     },
     eachOnce: {
       description: 'Each run is listed once',
-      condition: ({ output }) => output.every((id, i) => output.indexOf(id) === i),
+      condition: ({ output }) => output.every((id, i) => !output.slice(0, i).includes(id)),
     },
     inStartOrder: {
-      description: 'The runs are listed in the order they were made, an id first in order breaking a tie',
+      description: 'The runs are listed in the order they were made, those made at the same instant in the order the store lists them',
       condition: ({ input: [, runs], output }) =>
         output.every((id, i) => {
           const next = output[i + 1];
           const a = runs.find((r) => r.id === id);
           const b = next === undefined ? undefined : runs.find((r) => r.id === next);
-          return a === undefined || b === undefined || before(a, b);
+          return a === undefined || b === undefined || a.created <= b.created;
         }),
     },
   },

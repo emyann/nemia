@@ -284,12 +284,16 @@ export type StepSpec = {
   when?: string[];
   /** `ends: [docs]`: the routes of this condition on which the run ends, nothing after it running. */
   ends?: string[];
-  /** `workflow: build`: this node is a route to a workflow, and files a card for it `from:` this run, then reads `sent`. */
+  /** `workflow: build`: this node is a route to a workflow, and starts a run of it handed this run as context, then reads `sent`. */
   workflow?: string;
   /**
-   * `card: given`: what card a node files (`NODE_CARDS`): `routed`, a card of its own naming this run (the default, a `workflow:` node's
-   * as before); `given`, the run's own card as it was given, body and labels, for the node's `workflow:`; `backlog`, the run's card filed
-   * back to the inbox, unqueued and naming no workflow, with no `workflow:` of its own.
+   * `brief: card`: what a `workflow:` node briefs the run it starts with (`NODE_BRIEFS`): `title`, the title its condition's producer
+   * gave (the default); `card`, the run's own card as it was given, its body, labels and files.
+   */
+  brief?: NodeBrief;
+  /**
+   * `card: backlog`: a node that files the run's card back to the inbox (`NODE_CARDS`), unqueued and naming no workflow, with no
+   * `workflow:` of its own.
    */
   card?: NodeCard;
   /**
@@ -381,10 +385,15 @@ export const LOOP_REPLIES = 'replies';
  */
 export const JUDGE_ROUTE = 'route';
 
-/** What card a node files (`card:`): one of its own, the run's own as given, or the run's own back to the inbox. */
-export const NODE_CARDS = ['routed', 'given', 'backlog'] as const;
+/** What card a node files (`card:`): the run's own, back to the inbox. */
+export const NODE_CARDS = ['backlog'] as const;
 /** One of `NODE_CARDS`. */
 export type NodeCard = (typeof NODE_CARDS)[number];
+
+/** What a `workflow:` node briefs the run it starts with (`brief:`): the producer's title, or the run's own card. */
+export const NODE_BRIEFS = ['title', 'card'] as const;
+/** One of `NODE_BRIEFS`. */
+export type NodeBrief = (typeof NODE_BRIEFS)[number];
 
 /**
  * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
@@ -477,6 +486,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'when',
   'ends',
   'workflow',
+  'brief',
   'card',
   'relabel',
   'waitsFor',
@@ -593,8 +603,9 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "how this condition answers: a table over a producer's fact field (`{ from: <step>.<field>, table: { <value>: <route> } }`), a script (`{ script: <path> }`), or `judge`, a read-only agent",
   when: 'the routes of the condition this node waits on that it runs on: on any other it reads `skipped`',
   ends: 'the routes of this condition on which the run ends, nothing after it running',
-  workflow: 'the workflow this node routes to: it files a card for it, `from:` this run, and reads `sent`',
-  card: "what card this node files: `routed`, one of its own (the default); `given`, the run's own card as given, for its `workflow:`; `backlog`, the run's card back to the inbox, unqueued",
+  workflow: 'the workflow this node routes to: it starts a run of it, handed this run as context, and reads `sent`',
+  brief: "what a `workflow:` node briefs the run it starts with: `title`, its producer's title (the default); `card`, the run's own card as given",
+  card: "what card this node files: `backlog`, the run's card back to the inbox, unqueued",
   relabel:
     'the label edits a `card: backlog` node files the card back with: `key=value` sets a key, `key-` removes it, so no trigger queues it again',
   waitsFor:

@@ -81,7 +81,9 @@ type RowReads = {
 /** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
 function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads) {
   const record = run.steps[step.name];
-  if (word === 'sent' && record?.sent) return { message: `sent → ${record.sent.card}`, ...codedStep(REASON_OF.sent) };
+  if (word === 'sent' && record?.sent)
+    return { message: `sent → ${'run' in record.sent ? record.sent.run : record.sent.card}`, ...codedStep(REASON_OF.sent) };
+  if (record?.refused && step.workflow !== undefined) return { besides: record.refused.message };
   if (word === 'skipped') {
     const condition = conditionBefore(step, steps);
     const route = condition ? reads.routeOf(condition) : undefined;

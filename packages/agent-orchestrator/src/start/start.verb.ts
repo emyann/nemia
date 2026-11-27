@@ -349,6 +349,8 @@ export type StartOptions = {
   /** The inbox cards to hand the run (`nemia start --card`), by name: each copied into its `inputs/cards/` (`cardsDir`). */
   cards?: readonly string[];
   from?: { inbox: string };
+  /** The run and the workflow node that start this run directly (`sendCards`), frozen on the record as `startedBy`, held once per node. */
+  startedBy?: { run: string; node: string };
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
   /**
@@ -384,6 +386,7 @@ type Told = Pick<
   | 'inputs'
   | 'cards'
   | 'from'
+  | 'startedBy'
   | 'scheduled'
   | 'gates'
   | 'models'
@@ -540,6 +543,7 @@ function toldOf(
     ...(inputs.length ? { inputs: inputs.map(inputName) } : {}),
     ...(opts.cards?.length ? { cards: [...opts.cards] } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
+    ...(opts.startedBy ? { startedBy: { run: opts.startedBy.run, node: opts.startedBy.node } } : {}),
     ...(opts.scheduled
       ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
       : {}),

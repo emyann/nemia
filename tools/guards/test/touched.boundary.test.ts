@@ -4,7 +4,7 @@
  * is `test/<its name>.test.ts`, a test is its own, the config reaches every test), and the run goes to a stub `vitest` on the PATH
  * that records its folder and its arguments. No real suite runs.
  */
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -149,12 +149,54 @@ test('a named test file of a touched workspace runs alone', async () => {
   assertNoBareRun(made);
 });
 
-test('a change that reaches every test file of its workspace is not run, and dry runs nothing', async () => {
+test('a change that reaches every test file of its workspace is refused there, and dry decides the same and runs nothing', async () => {
   const { repo, touched, calls } = planted();
   write(repo, 'packages/a/vitest.config.ts', 'export default { test: {} };\n');
-  assert.equal(await touched(), 0);
+  assert.equal(await touched(), 2);
   assert.deepEqual(calls(), [], 'the whole suite of a is never run');
   write(repo, 'packages/b/src/one.ts', 'export const one = 2;\n');
-  assert.equal(await touched('--dry'), 0);
+  assert.equal(await touched('--dry'), 2);
   assert.deepEqual(calls(), [], 'dry lists and runs nothing');
+});
+
+test('a change reaching more than half of a workspace runs nothing there, says the line, and still runs the others', async () => {
+  const { repo, touched, calls } = planted();
+  write(repo, 'packages/a/src/one.ts', 'export const one = 2;\n');
+  write(repo, 'packages/a/src/two.ts', 'export const two = 2;\n');
+  write(repo, 'packages/b/src/one.ts', 'export const one = 2;\n');
+  const said: string[] = [];
+  const spy = vi.spyOn(console, 'error');
+  try {
+    assert.equal(await touched(), 2);
+  } finally {
+    said.push(...spy.mock.calls.map((args) => args.join(' ')));
+    spy.mockRestore();
+  }
+  const made = calls();
+  assert.deepEqual(
+    made.map(({ cwd }) => path.basename(cwd)),
+    ['b'],
+    'no vitest ran in a; b, at half, ran',
+  );
+  assert.ok(
+    said.some((line) => line.includes('packages/a') && line.includes('npm run touched -- <test file>')),
+    'the refusal of a names the line to run a chosen subset',
+  );
+  assertNoBareRun(made);
+});
+
+test('a change reaching half or less of a workspace runs related as before', async () => {
+  const { repo, touched, calls } = planted();
+  write(repo, 'packages/b/src/two.ts', 'export const two = 2;\n');
+  assert.equal(await touched(), 0);
+  const made = calls();
+  assert.equal(made.length, 1);
+  assert.deepEqual(made[0].argv.slice(0, 2), ['related', '--run']);
+});
+
+test('naming more than half of a workspace test files is refused, and nothing runs there', async () => {
+  const { repo, touched, calls } = planted();
+  write(repo, 'packages/a/src/one.ts', 'export const one = 2;\n');
+  assert.equal(await touched(path.join(repo, 'packages/a/test/one.test.ts'), path.join(repo, 'packages/a/test/two.test.ts')), 2);
+  assert.deepEqual(calls(), [], 'no vitest ran in a');
 });

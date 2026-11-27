@@ -14,10 +14,16 @@ The change is every file that differs between the merge base of the base and the
 does not track yet. For each workspace holding a changed file and a `vitest.config.ts`, one at a time, Vitest's Node API lists the
 test files that import one of its changed files (a changed test file is its own); the tool prints them, then runs
 `vitest related --run <the workspace's changed files>` under `nice`, in the workspace's folder and under its own config. In
-`apps/web` only the `node` project runs. A change that reaches every test file of a workspace (its config, a seat) is said and not run:
-CI runs it. A file outside every workspace (a doc, `tools/coverage/`) is named and reached by no import: the tests that read a file by
-its path are found by grepping, and CI runs them. A named test file runs alone, and is refused (exit 2) unless it is a test of a
-workspace the change touched.
+`apps/web` only the `node` project runs. A file outside every workspace (a doc, `tools/coverage/`) is named and reached by no import:
+the tests that read a file by its path are found by grepping, and CI runs them. A named test file runs alone, and is refused (exit 2)
+unless it is a test of a workspace the change touched.
 
-It exits 0 when what ran passed or nothing was due, 1 when a test file failed, naming each, and 2 when it was not asked what it runs.
+**It runs at most half of a workspace's test files** (`HALF` in `touched.ts`). When a change reaches more than half of them (its
+config, a seat, a module most of them import), none of that workspace runs. It says the count, the half it stopped at, and the line to
+run a chosen subset, `npm run touched -- <test file>…`; it goes on to the other workspaces, and its exit is 2. Named files are held to
+the same bound: naming more than half of a workspace's test files is refused the same way. `--dry` shows the same decision and runs
+nothing. CI runs the whole suite.
+
+It exits 0 when what ran passed or nothing was due, 1 when a test file failed, naming each, and 2 when it was not asked what it runs or
+refused a workspace past the bound.
 Its code and `tools/guards/test/touched.boundary.test.ts`, which plans over a scratch repository with a stub `vitest`, hold it.

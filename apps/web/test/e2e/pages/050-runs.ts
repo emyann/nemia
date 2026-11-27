@@ -495,6 +495,9 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage) {
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
   await page.mouse.move(0, 0);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expectCount(page.locator('[data-slot="tooltip"]'), 0, 'no tooltip left open by an earlier step, over a control it probes');
   await expectCount(page.locator('[data-slot="tooltip"] [data-step-glance]'), 0, 'no glance left open by a pointer resting on a bar');
   for (const [control, up, down, where] of controls) {
     await control.evaluate((button) => button.scrollIntoView({ block: 'center' }));

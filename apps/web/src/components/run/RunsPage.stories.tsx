@@ -161,7 +161,7 @@ export const OneWaitsOnYou: Story = {
 /**
  * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting on the checkout that
  * run holds, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you:
- * one that asks questions, one whose check failed.
+ * one that asks questions, which holds Answer, one whose check failed, which holds Open the run alone.
  */
 export const EveryState: Story = {
   tags: ['network'],
@@ -186,8 +186,12 @@ export const EveryState: Story = {
     await expect(row('1sw7').getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
     await expect(row('649a').getByRole('link', { name: /^lgll: / })).toBeVisible();
     await checkoutWaits(page, ['5zt1']);
-    for (const card of page.querySelectorAll('[data-section="waiting"] article[data-run]'))
-      await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);
+    const buttons = (end: keyof typeof TARGET_RUNS) =>
+      [...page.querySelectorAll(`[data-section="waiting"] [data-run="${TARGET_RUNS[end].metadata.name}"] [data-cut-button]`)].map(
+        (button) => button.getAttribute('aria-label') ?? button.textContent,
+      );
+    await expect(buttons('72wy'), 'the run whose design signed off blocked holds Answer').toEqual(['Answer design', 'Open the run']);
+    await expect(buttons('vqvd'), 'the run whose check refused holds Open the run alone').toEqual(['Open the run']);
   },
 };
 

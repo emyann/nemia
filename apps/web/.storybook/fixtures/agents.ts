@@ -1,9 +1,10 @@
 /**
  * The Agents pages' reads and Nemia's, for their stories (`Store/AgentForm`, `Pages/Agent`, `Pages/Agents`, `Pages/Skill`,
- * `Store/NemiaSettings` and the parts they draw): an agent of yours and the repository's (`scribe`, `critic`), the skills an agent can be
- * given by place (`skillPlaces`), a skill's page (`skillDetail`), your store's folders (`yourStore`), Nemia's level (`nemiaLevel`) and her
- * rules for Auto (`policyList`), each typed by the board's own reads of `objects`, so a key the api renames fails the typecheck here first.
- * Each story seeds its own query client with them (`seeded`, `proposals.ts`), its queries never asked of the network.
+ * `Store/NemiaSettings` and the parts they draw): an agent of yours and the repository's (`scribe`, `critic`), a factory's own two
+ * (`millAgents`), the skills an agent can be given by place (`skillPlaces`), a skill's page (`skillDetail`), your store's folders
+ * (`yourStore`), Nemia's level (`nemiaLevel`) and her rules for Auto (`policyList`), each typed by the board's own reads of `objects`,
+ * so a key the api renames fails the typecheck here first. Each story seeds its own query client with them (`seeded`, `proposals.ts`),
+ * its queries never asked of the network.
  */
 import type { AgentListing } from '../../src/lib/api/agents';
 
@@ -84,6 +85,36 @@ export const critic: WholeAgent = {
   version: 'critic-1',
   untried: { why: 'Only an agent of yours can be tried. Copy it to yours to try it.', copy: 'nemia agent copy critic' },
 };
+
+/**
+ * The factory `mill`'s own agents, read from its tree: a builder that fills its build workflow's implement step, and a reviewer that fills
+ * none yet.
+ */
+export const millAgents: WholeAgent[] = [
+  {
+    ...scribe,
+    name: 'builder',
+    from: 'factory',
+    dir: '/factories/mill/workflows/agents',
+    file: '/factories/mill/workflows/agents/builder.md',
+    role: 'Lead engineer',
+    description: 'Use this when a card needs its change built.',
+    version: 'builder-1',
+    fills: [{ from: 'factory', workflow: 'build', step: 'implement', hired: false }],
+    factories: ['mill'],
+  },
+  {
+    ...scribe,
+    name: 'warden',
+    from: 'factory',
+    dir: '/factories/mill/workflows/agents',
+    file: '/factories/mill/workflows/agents/warden.md',
+    role: 'Reviewer',
+    description: 'Use this when a change needs reading before it lands.',
+    version: 'warden-1',
+    factories: ['mill'],
+  },
+];
 
 /** The skills an agent of yours can be given: your library's two, and Nemia's own one, copied before it is given. */
 export const skillPlaces: SkillPlace[] = [

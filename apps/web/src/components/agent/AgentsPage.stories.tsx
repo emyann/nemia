@@ -2,11 +2,11 @@ import { Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, waitFor, within } from 'storybook/test';
-import { agentsQuery } from '@/lib/api/agents';
+import { agentsQuery, factoryAgentsQuery } from '@/lib/api/agents';
 import { skillsQuery } from '@/lib/api/skills';
 import { storeQuery } from '@/lib/api/store';
-import { AgentsPage } from './AgentsPage';
-import { scribe, skillPlaces, yourStore } from '../../../.storybook/fixtures/agents';
+import { AgentsPage, FactoryAgentsPage } from './AgentsPage';
+import { millAgents, scribe, skillPlaces, yourStore } from '../../../.storybook/fixtures/agents';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /** The Agents page, its reads seeded: your agents, your store's folders and the skills by place; its filter as the address keeps it. */
@@ -82,5 +82,66 @@ export const Cleared: Story = {
     await expect(args.onQuery).toHaveBeenLastCalledWith('');
     await expect(page.getByRole('region', { name: 'Yours' })).toBeVisible();
     await expect(page.getByRole('searchbox', { name: 'Filter agents and skills' })).toHaveValue('');
+  },
+};
+
+/**
+ * A factory's Agents page, its reads seeded: the factory mill's own two agents and none of yours. `own` is what the factory serves, so a
+ * story of a factory with none seeds an empty list.
+ * @param own The factory's own agents.
+ */
+const millPage = (own: typeof millAgents) =>
+  function MillPage(args: { query: string; onQuery: (query: string) => void }) {
+    return (
+      <QueryClientProvider
+        client={seeded([
+          [factoryAgentsQuery('mill').queryKey, own],
+          [agentsQuery.queryKey, []],
+          [storeQuery.queryKey, yourStore],
+          [skillsQuery.queryKey, skillPlaces],
+        ])}
+      >
+        <Suspense>
+          <FactoryAgentsPage factory="mill" {...args} />
+        </Suspense>
+      </QueryClientProvider>
+    );
+  };
+
+/** A factory's own agents, listed first under its name, each linked to its page in the factory; yours below, none yet. */
+export const FactoryAgents: Story = {
+  render: millPage(millAgents),
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    const mill = await page.findByRole('region', { name: 'mill' });
+    await expect(within(mill).getByRole('link', { name: 'Builder' })).toHaveAttribute('href', '/factories/mill/agents/builder');
+    await expect(within(mill).getByRole('link', { name: 'Warden' })).toHaveAttribute('href', '/factories/mill/agents/warden');
+    await expect(canvasElement.querySelector('[data-agent="builder"] [data-node="build/implement"]')).not.toBeNull();
+    await expect(page.getByRole('region', { name: 'Yours' })).toBeVisible();
+    const regions = [...canvasElement.querySelectorAll('section[aria-label]')].map((region) => region.getAttribute('aria-label'));
+    await expect(regions.indexOf('mill')).toBeLessThan(regions.indexOf('Yours'));
+  },
+};
+
+/** A factory's agents filtered: the filter keeps the one it matches, and Yours, which keeps nothing, is not drawn. */
+export const FactoryAgentsFiltered: Story = {
+  render: millPage(millAgents),
+  args: { query: 'build' },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    const mill = await page.findByRole('region', { name: 'mill' });
+    await expect(within(mill).getByRole('link', { name: 'Builder' })).toBeVisible();
+    await expect(within(mill).queryByRole('link', { name: 'Warden' })).toBeNull();
+    await expect(page.queryByRole('region', { name: 'Yours' })).toBeNull();
+  },
+};
+
+/** A factory with no agent of its own says so under its name, naming where a factory's agents come from. */
+export const FactoryWithNoAgents: Story = {
+  render: millPage([]),
+  play: async ({ canvasElement }) => {
+    const mill = await within(canvasElement).findByRole('region', { name: 'mill' });
+    await expect(within(mill).queryByRole('listitem')).toBeNull();
+    await expect(mill.querySelector('code')).toHaveTextContent('agents/');
   },
 };

@@ -113,7 +113,7 @@ export function barOffers(keys: readonly SearchKey[], text: string, picked: read
 }
 
 /** One chip of the bar: what takes it off is its id (`q`, `key=value`). */
-export type BarChip = { id: string; label: string };
+type BarChip = { id: string; label: string };
 
 /**
  * The chips of a view: its words, each label as `key: value`, and its state.
@@ -157,7 +157,7 @@ export function elsewhereLine(found: { total: number; factories: readonly string
 }
 
 /** How many cards the bar's suggestions read. */
-export const SUGGESTED = 5;
+const SUGGESTED = 5;
 
 /**
  * What the api's card list is asked for the cards the words typed in the bar would add: the page's own ask, with the words joined to

@@ -172,22 +172,22 @@ export const NoMatch: Story = {
 /** A search a factory's label keeps to finds nothing there: it names the scope, says where a card does match, and offers both ways out. */
 export const NothingFound: Story = {
   render: () => {
-    const at: InboxView = { search: 'microvm', l: 'factory=pipao' };
+    const at: InboxView = { search: 'microvm', l: 'factory=globex' };
     return drawn({
       at,
       cards: [],
       extra: [
         [
           searchQuery(everyFactory(suggestedAsk(at, '')), undefined).queryKey,
-          { entries: [unstartedCard('microvm-sandbox', 'nemia')], total: 1 },
+          { entries: [unstartedCard('microvm-sandbox', 'acme')], total: 1 },
         ],
       ],
     });
   },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No open card of pipao matches “microvm”.');
-    await expect(page.getByText('One open card of nemia does.')).toBeVisible();
+    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent('No open card of globex matches “microvm”.');
+    await expect(page.getByText('One open card of acme does.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Search closed cards' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Every factory' })).toBeVisible();
   },

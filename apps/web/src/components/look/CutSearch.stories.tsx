@@ -123,7 +123,7 @@ export const Groups: Story = {
       {
         id: 'out',
         title: 'Nothing else',
-        note: 'One card of nemia does.',
+        note: 'One card of acme does.',
         items: [{ id: 'every', label: 'Every factory', look: 'button' }],
       },
     ],

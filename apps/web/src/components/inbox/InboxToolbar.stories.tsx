@@ -18,8 +18,8 @@ const LABELS: InboxPage['labels'] = [
   { key: 'initiative', value: 'design-pass', cards: 3 },
   { key: 'work', value: 'feature', cards: 2 },
   { key: 'work', value: 'fix', cards: 5 },
-  { key: 'factory', value: 'nemia', cards: 20 },
-  { key: 'factory', value: 'pipao', cards: 4 },
+  { key: 'factory', value: 'acme', cards: 20 },
+  { key: 'factory', value: 'globex', cards: 4 },
   { key: 'workflow', value: 'build', cards: 18 },
   { key: 'workflow', value: 'quick', cards: 6 },
 ];
@@ -80,7 +80,7 @@ export const Searched: Story = {
 /** Focused with nothing typed: a row for each key the cards hold, then factory, workflow and state, and the filters used last. */
 export const FilterBy: Story = {
   beforeEach: () => {
-    localStorage.setItem('nemia.inbox.recent', 'l=area%3Dboard%2Cfactory%3Dpipao');
+    localStorage.setItem('nemia.inbox.recent', 'l=area%3Dboard%2Cfactory%3Dglobex');
     return () => localStorage.removeItem('nemia.inbox.recent');
   },
   play: async ({ canvasElement, userEvent }) => {
@@ -90,9 +90,9 @@ export const FilterBy: Story = {
     const rows = panel().getAllByRole('option');
     const keys = rows.slice(0, 6).map((row) => row.textContent?.split(':')[0]);
     await expect(keys).toEqual(['area', 'initiative', 'work', 'factory', 'workflow', 'state']);
-    await expect(rows[3]).toHaveTextContent('nemia, pipao');
+    await expect(rows[3]).toHaveTextContent('acme, globex');
     await expect(panel().getByText('Recent')).toBeVisible();
-    await expect(rows[6]).toHaveTextContent('area: board · factory: pipao');
+    await expect(rows[6]).toHaveTextContent('area: board · factory: globex');
     await userEvent.keyboard('{ArrowDown}{Enter}');
     await expect(bar).toHaveValue('area:');
   },

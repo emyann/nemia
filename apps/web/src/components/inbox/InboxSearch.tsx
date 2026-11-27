@@ -145,10 +145,6 @@ function panelOf({
  * its colon (`area:`) offers that key's values; words offer the filters they match and a few cards, with a line that keeps them as the
  * search. Picking a state sets the state chips' own address key (`?phase=`); picking a card opens it. Enter keeps the words; the clear key
  * takes every filter off. Recent is this browser's.
- * @param view What the page reads of its address.
- * @param labels The labels in use among the cards in view, each with how many cards hold it.
- * @param counts How many cards in view each phase holds.
- * @param onSearch Changes the page's address.
  */
 export function InboxSearch({
   view,

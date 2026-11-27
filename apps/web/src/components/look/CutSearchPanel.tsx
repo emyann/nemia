@@ -25,8 +25,6 @@ export type CutSearchSection = { id: string; title?: string; note?: string; item
 
 /**
  * `label` with the first place `words` occurs, whatever its case, in bold.
- * @param label The words of a line.
- * @param words The typed letters to show in bold.
  */
 function Marked({ label, words }: { label: string; words: string | undefined }) {
   const at = words === undefined || words === '' ? -1 : label.toLowerCase().indexOf(words.toLowerCase());
@@ -76,7 +74,6 @@ function Foot() {
 /**
  * The panel of the search bar: its groups, each with its title and lines, and the keys it answers to at its foot. It is the
  * ComboBox's list, so ↑ ↓ move between the lines and Enter picks one.
- * @param sections The groups to draw, in order.
  */
 export function CutSearchPanel({ sections }: { sections: readonly CutSearchSection[] }) {
   return (

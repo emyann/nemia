@@ -21,6 +21,7 @@ const FILES = [
   'components/look/CutField.tsx',
   'components/look/CutComboBox.tsx',
   'components/look/CutSearch.tsx',
+  'components/look/CutSearchPanel.tsx',
   'components/look/CutSelect.tsx',
   'components/look/CutTextArea.tsx',
   'components/look/CutTextField.tsx',

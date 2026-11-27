@@ -12,9 +12,9 @@ export type PageSpan = 'wide' | 'reading' | 'bleed';
  * columns by the page's column (the frame's named container), never by the window. What it holds takes the `span` it is given (`reading`
  * stops at `--frame-measure`), so no page picks a centred width of its own.
  *
- * @param span - how much of the grid the page takes.
- * @param className - what the span's own box adds (its layout inside).
- * @param children - the page.
+ * @param props.span - how much of the grid the page takes.
+ * @param props.className - what the span's own box adds (its layout inside).
+ * @param props.children - the page.
  */
 export function FrameGrid({ span, className, children }: { span: Exclude<PageSpan, 'bleed'>; className?: string; children: ReactNode }) {
   return (

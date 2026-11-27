@@ -41,11 +41,11 @@ const WRAPPED_ID = 'min-w-0 font-mono whitespace-normal text-on-surface-variant 
  * their controls, and what follows, at one edge. `wrap` lets the whole id break across lines inside the room it is given, the control
  * staying inside beside it, for a card whose name may be longer than the card is wide.
  *
- * @param id - the run's id or the card's name, which is what is copied.
- * @param short - show the id's last four characters alone.
- * @param room - how many characters wide the id is drawn at least.
- * @param of - what the id names, for the control's label.
- * @param wrap - let the whole id wrap inside its line.
+ * @param props.id - the run's id or the card's name, which is what is copied.
+ * @param props.short - show the id's last four characters alone.
+ * @param props.room - how many characters wide the id is drawn at least.
+ * @param props.of - what the id names, for the control's label.
+ * @param props.wrap - let the whole id wrap inside its line.
  */
 export function CopyId({
   id,

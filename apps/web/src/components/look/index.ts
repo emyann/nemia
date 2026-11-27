@@ -11,6 +11,7 @@ export { CutCue } from './CutCue';
 export { CutField } from './CutField';
 export { CutComboBox, type CutSuggestion } from './CutComboBox';
 export { CutSearch, type CutChip } from './CutSearch';
+export type { CutSearchItem, CutSearchSection } from './CutSearchPanel';
 export { CutSelect, type CutChoice } from './CutSelect';
 export { CutTextArea } from './CutTextArea';
 export { CutTextField } from './CutTextField';

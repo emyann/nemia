@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { Body } from '@/components/ui/ds';
-import { Pager, SectionHead } from '@/components/look';
-import { chainsQuery, inboxPageQuery } from '@/lib/api/inbox';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { Body, Button } from '@/components/ui/ds';
+import { Pager, SectionHead, TextLink } from '@/components/look';
+import { chainsQuery, inboxPageQuery, searchQuery } from '@/lib/api/inbox';
 import { trailOf } from '@/lib/finished';
 import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, TRAIL_MARK, type InboxView } from '@/lib/inbox';
+import { elsewhereLine, everyFactory, scopeOf, suggestedAsk, withoutFactory } from '@/lib/searchBar';
 import { readStored, store } from '@/lib/stored';
 import { CardChain } from './CardChain';
 import { CARD_LEAST, InboxCard, InboxList } from './InboxCard';
@@ -17,19 +18,54 @@ const LAYOUT_KEY = 'nemia.inbox.layout';
 /** The layout kept in this browser: Grid the first time. */
 const keptLayout = () => readStored<Layout>(LAYOUT_KEY, (raw) => (raw === 'list' ? 'list' : raw === 'grid' ? 'grid' : undefined), 'grid');
 
-/** What the page says where no card is shown: that none is there, or that none matches what was asked, with the way back. */
-function NoneShown({ filtered, factory }: { filtered: boolean; factory: string | undefined }) {
-  if (filtered) {
-    return (
-      <Body size="medium" data-filtered-out>
-        No card matches.{' '}
-        <Link to="." search={(prev) => ({ cards: prev.cards })} className="underline underline-offset-2">
-          Clear the search
-        </Link>
-        .
-      </Body>
-    );
-  }
+/**
+ * What the page says where the filters keep no card: which cards were searched, where some card does match, and the ways out: the other
+ * side, and every factory where a factory kept the search.
+ */
+function NothingFound({ at, onSearch }: { at: InboxView; onSearch: (patch: Partial<InboxView>) => void }) {
+  const navigate = useNavigate();
+  const scope = scopeOf(at);
+  const side = at.cards === 'closed' ? 'closed' : 'open';
+  const elsewhere = useQuery({ ...searchQuery(everyFactory(suggestedAsk(at, '')), undefined), enabled: scope !== undefined }).data;
+  const line =
+    elsewhere === undefined
+      ? null
+      : elsewhereLine({ total: elsewhere.total, factories: elsewhere.entries.flatMap((e) => e.factory ?? []) }, side);
+  const what = at.search === undefined ? 'matches these filters' : `matches “${at.search}”`;
+  return (
+    <div data-filtered-out className="flex flex-col items-start gap-2 border border-dashed border-outline-variant p-7">
+      <Body size="large" component="span">{`No ${side} card${scope === undefined ? '' : ` of ${scope}`} ${what}.`}</Body>
+      {line !== null && (
+        <Body size="small" component="span" colorRole="on-surface-variant">
+          {line}
+        </Body>
+      )}
+      <div className="mt-1 flex gap-3">
+        <Button
+          variant="outlined"
+          size="small"
+          onPress={() => onSearch({ cards: side === 'open' ? 'closed' : undefined, phase: undefined, older: undefined })}
+        >
+          {side === 'open' ? 'Search closed cards' : 'Search open cards'}
+        </Button>
+        {scope !== undefined && (
+          <Button
+            variant="outlined"
+            size="small"
+            onPress={() =>
+              void navigate({ to: '/inbox', search: { search: at.search, l: withoutFactory(at.l), cards: at.cards, phase: at.phase } })
+            }
+          >
+            Every factory
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** What the page says where no card is shown: that none is filed, or that none is in the factory, with the way on. */
+function NoneShown({ factory }: { factory: string | undefined }) {
   if (factory !== undefined) {
     return (
       <Body size="medium" data-filtered-out>
@@ -45,6 +81,20 @@ function NoneShown({ filtered, factory }: { filtered: boolean; factory: string |
     <Body size="medium" data-empty>
       The inbox is empty. File an idea with New card, or from the command line.
     </Body>
+  );
+}
+
+/** The line under the bar while a filter is set: how many cards the filters keep, and the key that takes every filter off. */
+function FilterLine({ total }: { total: number }) {
+  return (
+    <div data-filter-count className="flex items-center gap-3">
+      <Body size="small" component="span" colorRole="on-surface-variant">
+        {total} {total === 1 ? 'card' : 'cards'}
+      </Body>
+      <TextLink to="." search={(prev) => ({ ...prev, search: undefined, l: undefined, phase: undefined, older: undefined })} replace>
+        Clear filters
+      </TextLink>
+    </div>
   );
 }
 
@@ -68,6 +118,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
       <InboxToolbar
         view={at}
         labels={page.labels}
+        counts={page.counts}
         layout={layout}
         onLayout={(next) => {
           setLayout(next);
@@ -75,6 +126,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
         }}
         onSearch={onSearch}
       />
+      {filtered && <FilterLine total={page.entries.length + trail.length * INBOX_PAGE + page.remaining} />}
       <InboxSides view={at} counts={page.counts} onSearch={onSearch} />
       {grouped.length > 0 && (
         <section aria-label="Chains" className="flex flex-col gap-(--frame-gutter)">
@@ -92,7 +144,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
             tone="rest"
           />
         )}
-        {none && <NoneShown filtered={filtered} factory={at.factory} />}
+        {none && (filtered ? <NothingFound at={at} onSearch={onSearch} /> : <NoneShown factory={at.factory} />)}
         {layout === 'grid' ? (
           <ul
             className="grid gap-(--frame-gutter)"

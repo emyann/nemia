@@ -1,11 +1,11 @@
-import { useContext, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { Search, X } from 'lucide-react';
-import { ComboBox, ComboBoxStateContext, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
+import { ComboBox, ComboBoxStateContext, Input, Popover } from 'react-aria-components';
 import { Body, IconButton } from '@/components/ui/ds';
 import { CutField } from './CutField';
 import { CutTag } from './CutTag';
-import { CHOICE, CHOICES } from './CutSelect';
-import type { CutSuggestion } from './CutComboBox';
+import { CHOICES } from './CutSelect';
+import { CutSearchPanel, type CutSearchSection } from './CutSearchPanel';
 
 /** A chip of the bar: what was picked, as its words say it, and the key that takes it away. */
 export type CutChip = { id: string; label: string };
@@ -28,7 +28,7 @@ function useSlashFocus(input: RefObject<HTMLInputElement | null>) {
 }
 
 /** One chip of the bar: its words on the look's cut tag, and the key that takes it off. */
-function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) => void }) {
+function SearchChip({ chip, onRemove, open }: { chip: CutChip; onRemove: (id: string) => void; open: boolean }) {
   return (
     <span data-chip={chip.id} className="inline-flex">
       <CutTag edge>
@@ -36,32 +36,57 @@ function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) 
           <Body size="small" component="span">
             {chip.label}
           </Body>
-          <IconButton size="xsmall" variant="standard" icon={X} aria-label={`Take off ${chip.label}`} onPress={() => onRemove(chip.id)} />
+          <IconButton
+            size="xsmall"
+            variant="standard"
+            icon={X}
+            aria-label={`Take off ${chip.label}`}
+            excludeFromTabOrder={open}
+            onPress={() => onRemove(chip.id)}
+          />
         </span>
       </CutTag>
     </span>
   );
 }
 
+/** The key that takes every filter off; out of the tab order while the panel is open, which hides it from a screen reader. */
+function ClearKey({ open, onClear }: { open: boolean; onClear: () => void }) {
+  return (
+    <IconButton size="xsmall" variant="standard" icon={X} aria-label="Clear everything" excludeFromTabOrder={open} onPress={onClear} />
+  );
+}
+
 /**
  * The bar's input: its keys (`keyed`), and the suggestions closed once the words are kept, since a person who pressed Enter has finished
- * choosing and an open list hides the rest of the bar from a screen reader.
+ * choosing and an open list hides the rest of the bar from a screen reader. A pick that keeps the panel open (`reopen`) opens it again as
+ * the ComboBox closes it.
  */
 function BarInput({
   input,
   placeholder,
   bar,
+  reopen,
+  onReopened,
+  onChoose,
 }: {
   input: RefObject<HTMLInputElement | null>;
   placeholder: string | undefined;
   bar: Parameters<typeof keyed>[1];
+  reopen: boolean;
+  onReopened: () => void;
+  onChoose: (id: string) => void;
 }) {
   const state = useContext(ComboBoxStateContext);
   const kept = useRef(false);
   const open = state?.isOpen ?? false;
   useEffect(() => {
     if (open && kept.current) state?.close();
-  }, [open, state]);
+    if (!open && reopen) {
+      onReopened();
+      state?.open(null, 'manual');
+    }
+  }, [open, state, reopen, onReopened]);
   return (
     <Input
       ref={input}
@@ -70,8 +95,14 @@ function BarInput({
         kept.current = false;
       }}
       onKeyDown={(event) => {
-        keyed(event, bar);
-        if (!event.defaultPrevented) return;
+        const focused = state?.selectionManager.focusedKey;
+        if (event.key === 'Enter' && state?.isOpen && focused !== null && focused !== undefined) {
+          event.preventDefault();
+          onChoose(String(focused));
+          state.close();
+          return;
+        }
+        if (!keyed(event, bar)) return;
         kept.current = true;
         state?.close();
       }}
@@ -81,7 +112,8 @@ function BarInput({
 }
 
 /**
- * What a key does in the bar: Backspace on empty words takes the last chip off; Enter on words no suggestion is highlighted for keeps them.
+ * What a key does in the bar: Backspace on empty words takes the last chip off; Enter on words no suggestion is highlighted for keeps
+ * them, which is what it answers true for.
  * @param event The key pressed in the bar's input.
  * @param bar What the bar holds: its words, its chips, and what it does to take one off or keep the words.
  */
@@ -90,18 +122,45 @@ function keyed(
   bar: { text: string; chips: readonly CutChip[]; onRemove: (id: string) => void; onSubmit: (text: string) => void },
 ) {
   const last = bar.chips.at(-1);
-  if (event.key === 'Backspace' && bar.text === '' && last !== undefined) bar.onRemove(last.id);
+  if (event.key === 'Backspace' && bar.text === '' && last !== undefined) {
+    bar.onRemove(last.id);
+    return false;
+  }
   if (event.key === 'Enter' && event.currentTarget.getAttribute('aria-activedescendant') === null && bar.text.trim() !== '') {
     event.preventDefault();
     bar.onSubmit(bar.text.trim());
+    return true;
   }
+  return false;
+}
+
+/**
+ * What a pick does: it is `onPick`, and a line that keeps the panel open (`keeps`) has it open again (`reopen`, cleared by `reopened`);
+ * `picking` is true for the moment the ComboBox resets the input after a pick, which the caller does not take as typing.
+ * @param sections The groups the panel holds.
+ * @param onPick What picking a line does, given its id.
+ */
+function usePicks(sections: readonly CutSearchSection[], onPick: (id: string) => void) {
+  const picking = useRef(false);
+  const [reopen, setReopen] = useState(false);
+  const reopened = useCallback(() => setReopen(false), []);
+  const choose = (id: string) => {
+    picking.current = true;
+    queueMicrotask(() => {
+      picking.current = false;
+    });
+    setReopen(sections.some((section) => section.items.some((item) => item.id === id && item.keeps)));
+    onPick(id);
+  };
+  return { picking, reopen, reopened, choose };
 }
 
 /**
  * The search bar: the look's cut field with a magnifier, the chips of what was picked, and the words being typed, with suggestions in a
- * list beside it. `/`, pressed where nothing is typed, focuses it; Backspace on empty words takes the last chip off. Enter on words no
- * suggestion is highlighted for is `onSubmit`, which keeps them; picking a suggestion is `onPick`. The caller says what the suggestions
- * are for `text` and what a chip stands for.
+ * panel of groups under it, open as soon as it has the focus. `/`, pressed where nothing is typed, focuses it; Backspace on empty words
+ * takes the last chip off; the clear button, drawn once there is a chip or text, is `onClear`. ↑ ↓ move in the panel and Enter picks a
+ * line (`onPick`); Enter on words no line is highlighted for is `onSubmit`, which keeps them. The caller says what the panel holds for
+ * `text` and what a chip stands for.
  */
 export function CutSearch({
   label,
@@ -109,9 +168,10 @@ export function CutSearch({
   onRemove,
   text,
   onText,
-  suggestions,
+  sections,
   onPick,
   onSubmit,
+  onClear,
   placeholder,
   className,
 }: {
@@ -120,14 +180,17 @@ export function CutSearch({
   onRemove: (id: string) => void;
   text: string;
   onText: (text: string) => void;
-  suggestions: readonly CutSuggestion[];
+  sections: readonly CutSearchSection[];
   onPick: (id: string) => void;
   onSubmit: (text: string) => void;
+  onClear?: () => void;
   placeholder?: string;
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const { picking, reopen, reopened, choose } = usePicks(sections, onPick);
   useSlashFocus(input);
   return (
     <div ref={bar} className={className}>
@@ -135,40 +198,38 @@ export function CutSearch({
         <Body size="medium" component="span" className="flex flex-wrap items-center gap-2 py-1.5 pl-3.5 pr-4">
           <Search aria-hidden="true" size={16} className="shrink-0 text-on-surface-variant" />
           {chips.map((chip) => (
-            <SearchChip key={chip.id} chip={chip} onRemove={onRemove} />
+            <SearchChip key={chip.id} chip={chip} onRemove={onRemove} open={open} />
           ))}
           <ComboBox
             aria-label={label}
             allowsCustomValue
             allowsEmptyCollection
-            menuTrigger="input"
+            menuTrigger="focus"
+            onOpenChange={setOpen}
             inputValue={text}
-            onInputChange={onText}
+            onInputChange={(value) => {
+              if (!picking.current || value !== '') onText(value);
+            }}
             selectedKey={null}
             onSelectionChange={(key) => {
-              if (key !== null) onPick(String(key));
+              if (key !== null) choose(String(key));
             }}
-            items={suggestions}
+            items={sections}
             className="flex min-w-32 flex-1"
           >
-            <BarInput input={input} placeholder={chips.length === 0 ? placeholder : undefined} bar={{ text, chips, onRemove, onSubmit }} />
+            <BarInput
+              input={input}
+              placeholder={chips.length === 0 ? placeholder : undefined}
+              bar={{ text, chips, onRemove, onSubmit }}
+              reopen={reopen}
+              onReopened={reopened}
+              onChoose={choose}
+            />
             <Popover className={CHOICES} placement="bottom start" triggerRef={bar}>
-              <ListBox className="max-h-72 overflow-auto outline-none">
-                {(suggestion: CutSuggestion) => (
-                  <ListBoxItem id={suggestion.id} textValue={suggestion.label} className={CHOICE}>
-                    <Body size="medium" component="span" className="flex-1">
-                      {suggestion.label}
-                    </Body>
-                    {suggestion.hint && (
-                      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
-                        {suggestion.hint}
-                      </Body>
-                    )}
-                  </ListBoxItem>
-                )}
-              </ListBox>
+              <CutSearchPanel sections={sections} />
             </Popover>
           </ComboBox>
+          {onClear && (chips.length > 0 || text !== '') && <ClearKey open={open} onClear={onClear} />}
         </Body>
       </CutField>
     </div>

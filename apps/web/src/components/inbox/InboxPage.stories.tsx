@@ -102,11 +102,11 @@ export const OpenGrid: Story = {
   },
 };
 
-/** The same cards as rows: the card first, then its tag, its place and when it was filed. */
+/** The same cards as the list: a table whose rows say the card, its tag, its place, when it was filed and its actions. */
 export const OpenList: Story = {
   render: () => drawn({ cards: OPEN, counts: OPEN_COUNTS, layout: 'list' }),
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('listitem', { name: 'Card ship-it' })).toBeVisible();
+    await expect(canvasElement.querySelector('tr[data-card="ship-it"]')).toBeVisible();
   },
 };
 

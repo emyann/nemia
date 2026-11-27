@@ -464,7 +464,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       const decided = (await decisionOn(stage, a.run.id)).decision;
       assert.match(
         'nothing' in decided ? decided.nothing : '',
-        new RegExp(`^awaiting approval — ${a.branch} merged into main$`),
+        new RegExp(`^succeeded — ${a.branch} merged into main$`),
         'merged by hand, as a person merges a run with no ending step: it reads its status and the merge, and there is nothing left to decide',
       );
 

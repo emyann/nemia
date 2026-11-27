@@ -82,7 +82,7 @@ async function laidOut(page: Page) {
   await expectVisible(page.locator('article[data-card]'), 'the first time, the cards are drawn in a grid of frames');
   await page.getByRole('radio', { name: /^List/ }).click();
   await expectCount(page.locator('article[data-card]'), 0, 'List draws no frame');
-  await expectVisible(page.locator('li[data-card]'), 'but a row for each card');
+  await expectVisible(page.locator('tr[data-card]'), 'but a row of the table for each card');
   await open(page);
   await expectCount(page.locator('article[data-card]'), 0, 'the pick is kept: a load of the page is a list still');
   await page.getByRole('radio', { name: /^Grid/ }).click();

@@ -155,7 +155,7 @@ const INBOX_FRESH_MS = 10_000;
 
 /**
  * A factory's cards still in play, as the api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each
- * not yet started, and each whose run is pending, running or waiting — a card whose run ended is left out (`inboxAllQuery` lists it) —
+ * not yet started, and each whose run is pending, running or waiting — a card whose run ended is left out (`inboxPageQuery` lists it) —
  * each with its place in the queue of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
  * person files, drops or starts a card, here or at the command line. Read again on each visit once `INBOX_FRESH_MS` has passed since the
  * last read, and on a run's event on the workflow feed, which a queued card started is, and a run ending too. One key for every reader

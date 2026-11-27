@@ -113,12 +113,14 @@ describe('litOf, railHref and placeHref: what the rail lights, and where the rai
   });
 });
 
-test("pageNameOf: a page's head names its factory's place, else the store's page itself, else nothing", () => {
+test("pageNameOf: a page's head names its factory's place, a factory agent's page the agent, else the store's page itself, else nothing", () => {
   const rows: [string, string | undefined][] = [
     ['/factories/kit/runs/r-1', 'Runs'],
     ['/factories/kit', 'Floor'],
     ['/factories/kit/proposals', 'Proposals'],
     ['/factories/kit/proposals/p', 'Proposals'],
+    ['/factories/kit/agents', 'Agents'],
+    ['/factories/kit/agents/note-writer', 'Note writer'],
     ['/', 'Factories'],
     ['/runs', 'Runs'],
     ['/labels/k/v', 'Runs'],

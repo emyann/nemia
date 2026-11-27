@@ -26,7 +26,7 @@ export function AgentInstructions({ name, file, body }: { name: string; file: st
       <SectionHead count={words} word="Words of instructions" tone="rest" />
       <CutFrame size={16}>
         <div className="space-y-3 p-4">
-          <Body size="medium" component="div" data-instructions-panel className="max-h-[calc(10*1lh)] overflow-hidden">
+          <Body size="medium" component="div" data-instructions-panel style={{ maxHeight: `${LINES}lh` }} className="overflow-hidden">
             <Markdown top>{body}</Markdown>
           </Body>
           <Button variant="outlined" size="small" onPress={() => setOpen(true)}>

@@ -52,16 +52,17 @@ const models: HarnessModels = {
   ],
 };
 
-const row = (agent: string, run: string, minutes: number): AtWorkRow => ({
-  agent,
-  run,
-  title: run,
-  workflow: 'build',
-  step: 'review',
-  try: 1,
-  round: 1,
-  minutes,
-});
+const row = (agent: string, run: string, minutes: number) =>
+  ({
+    agent,
+    run,
+    title: run,
+    workflow: 'build',
+    step: 'review',
+    try: 1,
+    round: 1,
+    minutes,
+  }) satisfies AtWorkRow;
 
 describe("an agent page's plate and permissions", () => {
   test("the model is the list's name with its exact id as the note, and the effort fills its pips through the effort", () => {
@@ -180,7 +181,7 @@ describe("an agent page's small counts", () => {
     const at = '2026-11-27T10:00:00.000Z';
     const [open] = atWorkSince(at);
     const run = summary([['review', 'running']], { id: 'r1' });
-    const step = { ...run.steps[0]!, spec: givenAgent('agora'), timeline: [{ ...open!, session: { ...open!.session, endedAt: at } }] };
+    const step = { ...run.steps[0], spec: givenAgent('agora'), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] };
     assert.equal(lastEndedOf([{ ...run, steps: [step] }], 'agora'), Date.parse(at));
     assert.equal(lastEndedOf([{ ...run, steps: [step] }], 'other'), null);
   });

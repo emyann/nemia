@@ -3,7 +3,7 @@ import { useQueries, useQuery, useSuspenseQuery, type QueryClient } from '@tanst
 import { Body, Label, Skeleton, Tag, Title } from '@/components/ui/ds';
 import { CopyId, CutFrame, CutTag, Reading, SectionHead, Sticker } from '@/components/look';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
-import { agentQuery } from '@/lib/api/agents';
+import { agentQuery, readAgent } from '@/lib/api/agents';
 import { keyFormQuery } from '@/lib/api/builder';
 import { modelsQuery } from '@/lib/api/models';
 import { judged } from '@/lib/api/judged';
@@ -20,6 +20,7 @@ import {
   plateOf,
   serverGroupsOf,
   skillGroupsOf,
+  type Mark,
   type PlateRow,
   type StepGives,
   type TileGroup,
@@ -27,6 +28,8 @@ import {
 import { agoWords } from '@/lib/runWords';
 import { skillList } from '@/lib/agents';
 import { cn } from '@/lib/utils';
+import { useNow } from '@/lib/useNow';
+import type { Activity } from '@/lib/atWork';
 import { ActivityLine, useAgentActivity, WorkingSection } from './AgentActivity';
 import { AgentInstructions } from './AgentInstructions';
 import { AgentFace, NodeLink, nodesOf } from './AgentParts';
@@ -127,29 +130,22 @@ function Groups<T extends { name: string }>({ groups, tile }: { groups: readonly
   );
 }
 
+type Listing = Awaited<ReturnType<typeof readAgent>>;
+
 /**
- * A factory's agent, as its board draws it (B5): who it is, with its face in a ring that shows whether it is at work, its role, its
- * description and what it is working on; then two columns that stack on a narrow page. The left holds its spec, its permissions, the
- * steps it is hired into, its instructions and its history; the right, what it is working on where there are several sessions, its skills
- * and its MCP servers, each by where it comes from. Nothing here is written: the factory owns the agent.
- * @param props.name The agent's name.
- * @param props.factory The factory the agent is read in.
+ * What the page reads beyond the agent: the page of each step it fills, the factory's skills, the stats' change marks, and, for the line
+ * that says when its last session ended, the factory's runs.
+ * @param agent The agent, as the page read it.
+ * @param factory The factory it is read in.
+ * @param idle Whether it is at work nowhere, which is when the finished runs are read.
  */
-export function FactoryAgentPage({ name, factory }: { name: string; factory: string }) {
-  const { data: agent } = useSuspenseQuery(agentQuery('factory', name, { factory }));
-  const { data: keyForm } = useQuery(keyFormQuery);
-  const { data: models } = useQuery(modelsQuery);
-  const activity = useAgentActivity(name, factory);
-  const nodes = nodesOf(agent);
-  const pages = useQueries({ queries: nodes.map((node) => stepQuery(node.from, node.workflow, node.step, { factory })) });
+function useAgentReads(agent: Listing, factory: string, idle: boolean) {
+  const pages = useQueries({ queries: nodesOf(agent).map((node) => stepQuery(node.from, node.workflow, node.step, { factory })) });
   const skills = useQuery(factorySkillsQuery(factory));
-  const marks = useQuery(agentMarksQuery(name, factory));
+  const marks = useQuery(agentMarksQuery(agent.name, factory));
   const open = useQuery(openRunsQuery(factory));
-  const finished = useQuery({ ...finishedRunsQuery(factory, []), enabled: activity.kind === 'none' });
-  const ended = lastEndedOf(
-    [...(open.data ? [...open.data.waiting, ...open.data.inFlight].filter(judged) : []), ...(finished.data?.runs ?? [])],
-    name,
-  );
+  const finished = useQuery({ ...finishedRunsQuery(factory, []), enabled: idle });
+  const runs = [...(open.data ? [...open.data.waiting, ...open.data.inFlight].filter(judged) : []), ...(finished.data?.runs ?? [])];
   const gives = pages.flatMap((page) =>
     page.data
       ? [
@@ -162,148 +158,209 @@ export function FactoryAgentPage({ name, factory }: { name: string; factory: str
         ]
       : [],
   );
-  const skillGroups = skills.data ? skillGroupsOf(agent.given, gives, skills.data) : [];
-  const stepsRead = pages.every((page) => !page.isPending);
-  const stepsFailed = pages.find((page) => page.error)?.error;
-  const edited = editedDayOf(marks.data ?? []);
-  const history = historyOf(marks.data ?? []);
-  const permissions = permissionsOf(agent.keys);
-  const working = activity.kind !== 'none';
-  const where =
-    nodes.length === 1 ? `In factory ${factory}.` : nodes.length === 2 ? `Both in factory ${factory}.` : `All in factory ${factory}.`;
-  const endedAgo = ended === null ? null : agoWords(new Date(ended), new Date());
+  return {
+    gives,
+    skills,
+    stepsRead: pages.every((page) => !page.isPending),
+    stepsFailed: pages.find((page) => page.error)?.error,
+    marks: marks.data ?? [],
+    ended: lastEndedOf(runs, agent.name),
+  };
+}
 
+/** Who the agent is: its ring, its role with the tag that says it is read only, its description, what it is doing and where its file is. */
+function Who({
+  agent,
+  factory,
+  activity,
+  endedAgo,
+  edited,
+}: {
+  agent: Listing;
+  factory: string;
+  activity: Activity;
+  endedAgo: string | null;
+  edited: string | null;
+}) {
+  const { name } = agent;
+  return (
+    <header className="flex flex-wrap items-center gap-6">
+      <Ring name={name} working={activity.kind !== 'none'} />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Title size="medium" component="p" data-agent-role className="m-0">
+            {agent.role ?? 'No role yet'}
+          </Title>
+          <Hovered said={`${personOf(name)} belongs to factory ${factory}, so it can't be edited here.`}>
+            <span data-read-only data-way="factory">
+              <CutTag edge>
+                <Tag variant="outlined" color="neutral">
+                  Read only
+                </Tag>
+              </CutTag>
+            </span>
+          </Hovered>
+        </div>
+        {agent.description && (
+          <Body size="large" component="p" className="m-0">
+            {agent.description}
+          </Body>
+        )}
+        <ActivityLine activity={activity} endedAgo={endedAgo} />
+        <Body size="medium" component="div" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-on-surface-variant">
+          <span className="inline-flex items-center gap-1.5">
+            File <CopyId id={`agents/${name}.md`} of="file" />
+          </span>
+          {agent.keys.output && <span>Reports in {agent.keys.output}</span>}
+          {edited && <span>Edited {edited}</span>}
+        </Body>
+      </div>
+    </header>
+  );
+}
+
+/** Its spec on the plate, and under it the three counts of what it may use, each said on hover. */
+function Spec({ agent }: { agent: Listing }) {
+  const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: models } = useQuery(modelsQuery);
+  return (
+    <section aria-label="Spec" className="space-y-4">
+      <CutFrame size={16} ground="bg-inverse-surface" className="text-inverse-on-surface">
+        <dl data-plate className="m-0 divide-y divide-inverse-on-surface/15 px-4 py-1">
+          {plateOf(agent.keys, keyForm, models).map((row) => (
+            <Row key={row.label} row={row} />
+          ))}
+        </dl>
+      </CutFrame>
+      <div data-permissions className="space-y-2">
+        <Label size="large" component="h3" className="uppercase text-on-surface-variant">
+          Permissions
+        </Label>
+        <div className="flex flex-wrap gap-3">
+          {permissionsOf(agent.keys).map((one) => (
+            <Hovered key={one.label} said={one.said}>
+              <Sticker hue="ink" label={one.label}>
+                {one.count}
+              </Sticker>
+            </Hovered>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The steps it is hired into, each a link to its page, and the factory they are in. */
+function Steps({ agent, factory }: { agent: Listing; factory: string }) {
+  const nodes = nodesOf(agent);
+  const where = nodes.length === 1 ? 'In' : nodes.length === 2 ? 'Both in' : 'All in';
+  return (
+    <section aria-label="Steps" className="space-y-3">
+      <SectionHead count={nodes.length} word="Steps" tone="rest" />
+      <Body size="medium" data-used-by className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {nodes.length === 0 ? (
+          <span className="text-on-surface-variant">No step names it yet.</span>
+        ) : (
+          <>
+            {nodes.map((node) => (
+              <NodeLink key={`${node.workflow}/${node.step}`} user={node} />
+            ))}
+            <span className="text-on-surface-variant">
+              {where} factory {factory}.
+            </span>
+          </>
+        )}
+      </Body>
+    </section>
+  );
+}
+
+/** What changed in the agent, its steps and its skills, a sentence a day, the newest first; nothing is drawn while there is none. */
+function History({ marks }: { marks: readonly Mark[] }) {
+  const history = historyOf(marks);
+  if (history.length === 0) return null;
+  return (
+    <section aria-label="History" className="space-y-3">
+      <SectionHead count={history.length} word="History" tone="rest" />
+      <ul data-history className="m-0 list-none space-y-1.5 p-0">
+        {history.map((one) => (
+          <Body key={one.key} size="medium" component="li">
+            <span className="font-mono text-on-surface-variant">{one.day}</span> · {one.sentence}
+          </Body>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The skills it is given, by where each comes from, in a tile with what it is for. */
+function Skills({ agent, reads }: { agent: Listing; reads: ReturnType<typeof useAgentReads> }) {
+  const { gives, skills, stepsRead, stepsFailed } = reads;
+  const groups = skills.data ? skillGroupsOf(agent.given, gives, skills.data) : [];
+  return (
+    <section aria-label="Skills" className="space-y-3">
+      <SectionHead count={groups.reduce((n, group) => n + group.tiles.length, 0)} word="Skills" tone="rest" />
+      {!stepsRead || skills.isPending ? (
+        <Waiting label="Reading its skills…" />
+      ) : stepsFailed || skills.error ? (
+        <ReadTrouble what="its skills" error={stepsFailed ?? skills.error} size="small" />
+      ) : (
+        <Groups
+          groups={groups}
+          tile={(one) => (
+            <>
+              <Body size="medium" component="p" className="m-0 font-mono font-medium break-all" data-skill-tile={one.name}>
+                {one.name}
+              </Body>
+              {one.description && (
+                <Body size="medium" component="p" className="m-0 text-on-surface-variant">
+                  {one.description}
+                </Body>
+              )}
+              <Body size="medium" component="p" className="m-0 text-on-surface-variant" title={one.foundIn ?? undefined}>
+                {one.where}
+              </Body>
+            </>
+          )}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * A factory's agent, as its board draws it (B5): who it is, with its face in a ring that shows whether it is at work, its role, its
+ * description and what it is working on; then two columns that stack on a narrow page. The left holds its spec, its permissions, the
+ * steps it is hired into, its instructions and its history; the right, what it is working on where there are several sessions, its skills
+ * and its MCP servers, each by where it comes from. Nothing here is written: the factory owns the agent.
+ * @param props.name The agent's name.
+ * @param props.factory The factory the agent is read in.
+ */
+export function FactoryAgentPage({ name, factory }: { name: string; factory: string }) {
+  const { data: agent } = useSuspenseQuery(agentQuery('factory', name, { factory }));
+  const now = useNow(30_000);
+  const activity = useAgentActivity(name, factory);
+  const reads = useAgentReads(agent, factory, activity.kind === 'none');
+  const endedAgo = reads.ended === null ? null : agoWords(new Date(reads.ended), new Date(now));
   return (
     <article className="space-y-8">
-      <header className="flex flex-wrap items-center gap-6">
-        <Ring name={name} working={working} />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Title size="medium" component="p" data-agent-role className="m-0">
-              {agent.role ?? 'No role yet'}
-            </Title>
-            <Hovered said={`${personOf(name)} belongs to factory ${factory}, so it can't be edited here.`}>
-              <span data-read-only data-way="factory">
-                <CutTag edge>
-                  <Tag variant="outlined" color="neutral">
-                    Read only
-                  </Tag>
-                </CutTag>
-              </span>
-            </Hovered>
-          </div>
-          {agent.description && (
-            <Body size="large" component="p" className="m-0">
-              {agent.description}
-            </Body>
-          )}
-          <ActivityLine activity={activity} endedAgo={endedAgo} />
-          <Body size="medium" component="div" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-on-surface-variant">
-            <span className="inline-flex items-center gap-1.5">
-              File <CopyId id={`agents/${name}.md`} of="file" />
-            </span>
-            {agent.keys.output && <span>Reports in {agent.keys.output}</span>}
-            {edited && <span>Edited {edited}</span>}
-          </Body>
-        </div>
-      </header>
-
+      <Who agent={agent} factory={factory} activity={activity} endedAgo={endedAgo} edited={editedDayOf(reads.marks)} />
       {agent.error !== null && (
         <Body size="medium" data-agent-error className="font-mono whitespace-pre-wrap text-failure">
           {agent.error}
         </Body>
       )}
-
       <div className="grid gap-8 @5xl/page:grid-cols-[340px_minmax(0,1fr)]">
         <div data-column="left" className="min-w-0 space-y-8">
-          <section aria-label="Spec" className="space-y-4">
-            <CutFrame size={16} ground="bg-inverse-surface" className="text-inverse-on-surface">
-              <dl data-plate className="m-0 divide-y divide-inverse-on-surface/15 px-4 py-1">
-                {plateOf(agent.keys, keyForm, models).map((row) => (
-                  <Row key={row.label} row={row} />
-                ))}
-              </dl>
-            </CutFrame>
-            <div data-permissions className="space-y-2">
-              <Label size="large" component="h3" className="uppercase text-on-surface-variant">
-                Permissions
-              </Label>
-              <div className="flex flex-wrap gap-3">
-                {permissions.map((one) => (
-                  <Hovered key={one.label} said={one.said}>
-                    <Sticker hue="ink" label={one.label}>
-                      {one.count}
-                    </Sticker>
-                  </Hovered>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section aria-label="Steps" className="space-y-3">
-            <SectionHead count={nodes.length} word="Steps" tone="rest" />
-            <Body size="medium" data-used-by className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              {nodes.length === 0 ? (
-                <span className="text-on-surface-variant">No step names it yet.</span>
-              ) : (
-                <>
-                  {nodes.map((node) => (
-                    <NodeLink key={`${node.workflow}/${node.step}`} user={node} />
-                  ))}
-                  <span className="text-on-surface-variant">{where}</span>
-                </>
-              )}
-            </Body>
-          </section>
-
+          <Spec agent={agent} />
+          <Steps agent={agent} factory={factory} />
           <AgentInstructions name={name} file={`agents/${name}.md`} body={agent.body} />
-
-          {history.length > 0 && (
-            <section aria-label="History" className="space-y-3">
-              <SectionHead count={history.length} word="History" tone="rest" />
-              <ul data-history className="m-0 list-none space-y-1.5 p-0">
-                {history.map((one) => (
-                  <Body key={one.key} size="medium" component="li">
-                    <span className="font-mono text-on-surface-variant">{one.day}</span> · {one.sentence}
-                  </Body>
-                ))}
-              </ul>
-            </section>
-          )}
+          <History marks={reads.marks} />
         </div>
-
         <div data-column="right" className="min-w-0 space-y-8">
           <WorkingSection activity={activity} />
-
-          <section aria-label="Skills" className="space-y-3">
-            <SectionHead count={skillGroups.reduce((n, group) => n + group.tiles.length, 0)} word="Skills" tone="rest" />
-            {!stepsRead || skills.isPending ? (
-              <Waiting label="Reading its skills…" />
-            ) : stepsFailed || skills.error ? (
-              <ReadTrouble what="its skills" error={stepsFailed ?? skills.error} size="small" />
-            ) : (
-              <Groups
-                groups={skillGroups}
-                tile={(one) => (
-                  <>
-                    <Body size="medium" component="p" className="m-0 font-mono font-medium break-all" data-skill-tile={one.name}>
-                      {one.name}
-                    </Body>
-                    {one.description && (
-                      <Body size="medium" component="p" className="m-0 text-on-surface-variant">
-                        {one.description}
-                      </Body>
-                    )}
-                    <Body size="medium" component="p" className="m-0 text-on-surface-variant" title={one.foundIn ?? undefined}>
-                      {one.where}
-                    </Body>
-                  </>
-                )}
-              />
-            )}
-          </section>
-
-          <ServersSection mcp={agent.mcp} gives={gives} read={stepsRead} />
+          <Skills agent={agent} reads={reads} />
+          <ServersSection mcp={agent.mcp} gives={reads.gives} read={reads.stepsRead} />
         </div>
       </div>
     </article>

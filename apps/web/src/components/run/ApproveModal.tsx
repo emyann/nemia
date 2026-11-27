@@ -85,12 +85,7 @@ export function WaitAction({ run, action }: { run: { id: string }; action: Actio
           {face}
         </CutPress>
       </span>
-      <ModalDialog
-        isOpen={open}
-        onClose={close}
-        title={said}
-        className={CUT_MODAL}
-      >
+      <ModalDialog isOpen={open} onClose={close} title={said} className={CUT_MODAL}>
         {open && (
           <Answered.Provider value={close}>
             <Opened run={run.id} step={action.step} said={said} onClose={close} />

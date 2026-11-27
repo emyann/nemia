@@ -27,6 +27,23 @@ export type PlateRow = {
 const UNSET = 'Not set';
 
 /**
+ * The effort levels the model takes, as the harness lists them for it, else those the effort key's words allow the harness.
+ * @param keys The agent's role keys.
+ * @param keyForm The step form's keys; undefined while they load.
+ * @param listed The model as its harness lists it, if it does.
+ * @param harness The harness the agent runs on.
+ */
+const levelsOf = (
+  keys: AgentListing['keys'],
+  keyForm: KeyForm | undefined,
+  listed: { efforts: readonly string[] | null } | undefined,
+  harness: string,
+) => {
+  const field = keyForm?.keys.find((k) => k.key === 'effort');
+  return listed?.efforts ?? field?.byHarness?.[harness] ?? field?.choices ?? [];
+};
+
+/**
  * The spec plate's rows: Harness, Model, Effort, Mode and Context. The model is its display name where the harness lists it, with the
  * exact id as its note; the effort is its word with a pip for each level the model takes, those up to its own filled.
  * @param keys The agent's role keys, as its file writes them.
@@ -37,9 +54,8 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
   const meaning = (key: AgentRoleKey) => keyForm?.keys.find((k) => k.key === key)?.meaning ?? null;
   const harness = keys.harness ?? keyForm?.defaultHarness ?? UNSET;
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
-  const field = keyForm?.keys.find((k) => k.key === 'effort');
-  const levels = listed?.efforts ?? field?.byHarness?.[harness] ?? field?.choices ?? [];
-  const at = keys.effort === undefined ? -1 : levels.indexOf(keys.effort);
+  const levels = levelsOf(keys, keyForm, listed, harness);
+  const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
   return [
     { label: 'Harness', value: harness, note: meaning('harness'), pips: null },
     { label: 'Model', value: listed?.name ?? keys.model ?? UNSET, note: listed ? listed.id : meaning('model'), pips: null },
@@ -47,7 +63,7 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
       label: 'Effort',
       value: keys.effort ?? UNSET,
       note: meaning('effort'),
-      pips: levels.length > 0 ? { total: levels.length, filled: at + 1 } : null,
+      pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
     { label: 'Mode', value: keys.permissionMode ?? UNSET, note: meaning('permissionMode'), pips: null },
     { label: 'Context', value: keys.context ?? UNSET, note: meaning('context'), pips: null },
@@ -116,7 +132,7 @@ export type StepGives = {
 };
 
 /** One skill as its tile says it: its name, what it is for, and where it comes from. */
-export type SkillTile = { name: string; description: string | null; where: string; foundIn: string | null };
+type SkillTile = { name: string; description: string | null; where: string; foundIn: string | null };
 
 /** One group of tiles under its caption. */
 export type TileGroup<T> = { title: string; tiles: T[] };
@@ -150,7 +166,7 @@ export function skillGroupsOf(given: readonly AgentListing['given'][number][], s
       })),
     },
   ];
-  for (const name of [...new Set(steps.map((step) => step.step))]) {
+  for (const name of new Set(steps.map((step) => step.step))) {
     const added = [...new Set(steps.filter((step) => step.step === name).flatMap((step) => step.added))].filter(
       (skill) => !inFile.has(skill),
     );
@@ -174,7 +190,7 @@ export function skillGroupsOf(given: readonly AgentListing['given'][number][], s
 }
 
 /** One MCP server as its tile says it. */
-export type ServerTile = { name: string };
+type ServerTile = { name: string };
 
 /**
  * The MCP servers it loads by where they come from: those its file names, then those each step adds, one group for each step name.
@@ -184,7 +200,7 @@ export type ServerTile = { name: string };
 export function serverGroupsOf(mcp: string | null, steps: readonly StepGives[]) {
   const inFile = skillList(mcp ?? '');
   const groups: TileGroup<ServerTile>[] = [{ title: 'In its file', tiles: inFile.map((name) => ({ name })) }];
-  for (const name of [...new Set(steps.map((step) => step.step))]) {
+  for (const name of new Set(steps.map((step) => step.step))) {
     const added = [...new Set(steps.filter((step) => step.step === name).flatMap((step) => step.mcp))].filter(
       (server) => !inFile.includes(server),
     );

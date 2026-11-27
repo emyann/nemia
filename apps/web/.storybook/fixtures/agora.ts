@@ -157,7 +157,7 @@ export const models: HarnessModels = {
  * The review step of `workflow`, read in the factory: the agent hired into it, the skills its layers add and where each is found.
  * @param workflow The workflow the step is of.
  */
-export const reviewStep = (workflow: 'build' | 'quick'): WorkflowStepPage => ({
+export const reviewStep = (workflow: 'build' | 'quick') => ({
   workflow,
   from: 'repo',
   dir: `/factories/nemia/workflows/${workflow}`,
@@ -191,7 +191,7 @@ export const reviewStep = (workflow: 'build' | 'quick'): WorkflowStepPage => ({
     { name: 'tsverify', from: 'builtin', foundIn: null },
   ],
   recentRuns: [],
-});
+}) satisfies WorkflowStepPage;
 
 /** The change marks of the stats: the file, a step and a skill edited, one of them marked twice on a day. */
 export const marks = [
@@ -219,7 +219,7 @@ const atWork = (id: string, title: string, minutes: number, workflow: 'build' | 
     ...run,
     steps: [
       {
-        ...review!,
+        ...review,
         spec: givenAgent(AGORA),
         timeline: atWorkSince(ago(minutes)),
         current: { try: 1, round, phase: 'running', reason: 'Running', outcome: null, verdict: null },
@@ -261,7 +261,7 @@ export const finished: FinishedPage = {
       const [open] = atWorkSince(at);
       return {
         ...run,
-        steps: [{ ...review!, spec: givenAgent(AGORA), timeline: [{ ...open!, session: { ...open!.session!, endedAt: at } }] }],
+        steps: [{ ...review, spec: givenAgent(AGORA), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] }],
         wallMs: 0,
         finishedAt: at,
         outcome: 'succeeded' as const,

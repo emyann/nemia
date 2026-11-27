@@ -4,7 +4,7 @@
  * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
  * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
  */
-import { proposalsHeld } from '../../../test/proposal-walks.ts';
+import { proposalHeld, proposalsHeld } from '../../../test/proposal-walks.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -629,8 +629,10 @@ describe('an upgrade that removes an agent and turns a step it fills into a wait
     const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'wait'), 'utf8')).proposals?.['Workflow/dev'] ?? '';
     assert.ok(proposal, 'the workflow is proposed');
     await runWith(noEngine(), approveProgram(PERSON, 'wait', proposal, { home: ROOT }));
+    const decided = await proposalHeld(ROOT, 'wait', proposal);
+    assert.equal(decided.status.phase, 'applied', decided.status.message);
     const merged = await reconciled(templated('wait'));
-    assert.equal(merged.version, '0.2.0');
+    assert.equal(merged.version, '0.2.0', JSON.stringify([merged.conditions, merged.upgrade]));
     assert.equal(merged.conditions[0].reason, 'Upgraded');
     assert.doesNotMatch(textIn(tree, SHIP), /disallowedTools/);
     assert.deepEqual(JSON.parse(textIn(tree, 'factory.json')).hires['dev/ship'], undefined);

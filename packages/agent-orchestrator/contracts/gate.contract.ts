@@ -5,8 +5,8 @@
  * the step stands (`standing`, status.ts), which reads some forty functions of the run's record and closeouts: the gate
  * takes what its spec proves of it (`standing.contract.ts`), and nothing of its body. The approval turns on the word the run
  * reads for the step (`runWords`), its standing with the routing laid over it, so a node the run says waits at its gate is
- * never refused as not filed: declared, with what the gate leans on of it (`theRunsWords`). The send-back (`retryable`) and the
- * steps an ending waits on (`notHandedOn`) only shape what a refusal says: declared pure, and nothing more.
+ * never refused as not filed: declared, with what the gate leans on of it (`theRunsWords`). The send-back (`retryable`) only shapes
+ * what a refusal says: declared pure, and nothing more.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Verdict } from '../src/check/check.ts';
@@ -15,13 +15,12 @@ import type { CloseoutAsked, Run, TaskPhase } from '../src/record/record.ts';
 import type { RetryAsk } from '../src/retry/index.ts';
 import type { StepSpec } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
-import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
+import { type SpendOf, standing } from '../src/status/status.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
 import { holdsOpen } from '../src/gate/holds-open/holds-open.ts';
 import { approved, gated, tryNow } from './laws.ts';
 
 export const sendBack = assume(retryable, { pure: true });
-export const unfinished = assume(notHandedOn, { pure: true });
 
 /**
  * Every step's word on this pass, as the run's status and `nemia ls` read it (`runWords`, routed-words.ts): where it stands, with its
@@ -55,8 +54,8 @@ const theRunsWord = (
 
 /**
  * Whether the step `name` waits at its gate on this pass: the run reads it `awaiting approval` (`theRunsWord`) — and, filed, it stands
- * there too (`standing`), since its session is then what waits for the word. A step never filed waits where the run alone reads it so: an
- * ending approved before it is filed, a gated table condition whose table answered. The routing never reads a filed step `awaiting
+ * there too (`standing`), since its session is then what waits for the word. A step never filed waits where the run alone reads it so: a
+ * gated table condition whose table answered. The routing never reads a filed step `awaiting
  * approval` where its standing does not (`filedWord` only ever says `unverified` or `unsigned`), so the second half changes nothing of
  * a real run: it says that a filed step's gate is its session's.
  */
@@ -78,16 +77,6 @@ const atItsGate = (
   );
 };
 
-/**
- * Whether a step is an ending not yet filed whose approval would take what is not there to take: a step it comes after is sent
- * back, or every result branch is already on the base.
- */
-const anEndingNotToTake = (step: StepSpec, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]) =>
-  step.workspace === 'base' &&
-  gated(step, run) &&
-  !run.steps[step.name]?.taskId &&
-  (asks.some((x) => step.after.includes(x.step)) || (standings.length > 0 && standings.every((b) => b.where === 'on')));
-
 const approvalRefusalSpec = spec<
   (
     steps: readonly StepSpec[],
@@ -100,7 +89,6 @@ const approvalRefusalSpec = spec<
     verdictOf?: (step: string) => Verdict | undefined,
     asks?: readonly RetryAsk[],
     spendOf?: SpendOf,
-    standings?: readonly BranchStanding[],
   ) => string | null
 >({
   /**
@@ -155,57 +143,25 @@ const approvalRefusalSpec = spec<
     },
     takenAtItsGate: {
       description:
-        'An approval of a step the run reads awaiting approval — a gated step that signed off, an ending before it is filed, a gated table condition never filed whose table answered — on a run neither cancelled nor pruned, is taken: but where its words are blank, the run is held, the try after it is asked for, or it is an ending not yet filed whose work is sent back or already on the base',
-      condition: ({ input: [steps, run, name, message, p, c, a, v, asks, s, standings], output }) => {
+        'An approval of a step the run reads awaiting approval — a gated step that signed off, a gated table condition never filed whose table answered — on a run neither cancelled nor pruned, is taken: but where its words are blank, the run is held, or the try after it is asked for',
+      condition: ({ input: [steps, run, name, message, p, c, a, v, asks, s], output }) => {
         const step = steps.find((x) => x.name === name);
         if (step === undefined || run.cancelledAt || run.pruned) return true;
         if (message !== undefined && message.trim() === '') return true;
         if (run.hold) return true;
-        const asked = asks ?? [];
-        if (asked.some((x) => x.step === name && x.try === tryNow(run, name) + 1)) return true;
-        if (anEndingNotToTake(step, run, asked, standings ?? [])) return true;
+        if ((asks ?? []).some((x) => x.step === name && x.try === tryNow(run, name) + 1)) return true;
         return !atItsGate(steps, run, name, p, c, a, v, s) || output === null;
       },
     },
     heldOpenForIt: {
       description:
-        "What nemia approve accepts of a step it filed, that step's task is held open for: the approval reaches the session that waits. A step never filed — a table condition, an ending approved first — has no session to reach",
+        "What nemia approve accepts of a step it filed, that step's task is held open for: the approval reaches the session that waits. A step never filed — a table condition — has no session to reach",
       condition: ({ input: [steps, run, name, , p, c, a, v, , s], output }) => {
         const step = steps.find((x) => x.name === name);
         return (
           output !== null ||
           !run.steps[name]?.taskId ||
           (step !== undefined && holdsOpen(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v))
-        );
-      },
-    },
-    anEndingAlreadyLanded: {
-      description: "An ending not yet filed is refused once every result branch is on the base: git has already taken the run's result",
-      condition: ({ input: [steps, run, name, , , , , , , , standings], output }) => {
-        const step = steps.find((x) => x.name === name);
-        const on = standings ?? [];
-        return (
-          output !== null ||
-          step === undefined ||
-          step.workspace !== 'base' ||
-          !gated(step, run) ||
-          !!run.steps[name]?.taskId ||
-          on.length === 0 ||
-          !on.every((b) => b.where === 'on')
-        );
-      },
-    },
-    anEndingWhileItsWorkIsSentBack: {
-      description: 'An ending not yet filed is refused while a step it comes after is sent back',
-      condition: ({ input: [steps, run, name, , , , , , asks], output }) => {
-        const step = steps.find((x) => x.name === name);
-        return (
-          output !== null ||
-          step === undefined ||
-          step.workspace !== 'base' ||
-          !gated(step, run) ||
-          !!run.steps[name]?.taskId ||
-          !(asks ?? []).some((x) => step.after.includes(x.step))
         );
       },
     },

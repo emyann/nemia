@@ -3,6 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
+import type { WaitRefused } from '../../contracts/upgrade-apply.contract.ts';
 import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, STEP_KEYS, type StepSpec, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
@@ -146,6 +147,21 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
 const WAIT_TAKES: readonly string[] = ['name', 'body', 'after', 'when', 'gate', 'place', 'waitsFor', 'checks'];
 
 /**
+ * The keys of a step's frontmatter that a wait node cannot take, in the order the step names them, each once as the frontmatter
+ * holds it: none where the step names no `waitsFor`.
+ * @param keys the keys the step's frontmatter holds
+ */
+export const waitRefused: WaitRefused = (keys) => (keys.includes('waitsFor') ? keys.filter((key) => !WAIT_TAKES.includes(key)) : []);
+
+/**
+ * The sentence that refuses a key a wait node cannot take, naming the line to delete.
+ * @param step the step's name
+ * @param key the key it cannot take
+ */
+export const waitKeyRefusal = (step: string, key: string) =>
+  `${step}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${key}:\`. Delete the \`${key}:\` line, or the \`waitsFor:\` line to make it a step.`;
+
+/**
  * Refused: a command node (`run:`) with a key it cannot take (`COMMAND_REFUSED`), an instruction of its own, or no `agent:`. A command acts
  * as the agent it names, under a token bound to its try; one with no agent would have no caller but the person's own credential, and a
  * session's token narrowed to reads is not a token the store mints yet, so it is refused until one is.
@@ -180,11 +196,8 @@ function validateWaits(steps: readonly StepSpec[]) {
   const inLoop = new Set(steps.filter((s) => s.loop).flatMap((s) => loopSpan(steps, s)));
   for (const s of steps) {
     if (s.waitsFor === undefined) continue;
-    const refused = STEP_KEYS.find((key) => !WAIT_TAKES.includes(key) && s[key] !== undefined);
-    if (refused)
-      throw new WorkflowError(
-        `${s.name}: \`waitsFor:\` makes it a wait node, which runs no session and no command, so it takes no \`${refused}:\`. Delete the \`${refused}:\` line, or the \`waitsFor:\` line to make it a step.`,
-      );
+    const [refused] = waitRefused(STEP_KEYS.filter((key) => s[key] !== undefined));
+    if (refused !== undefined) throw new WorkflowError(waitKeyRefusal(s.name, refused));
     if (s.body.trim())
       throw new WorkflowError(
         `${s.name}: a wait node (\`waitsFor:\`) runs no session, so nothing reads an instruction: empty ${s.name}.md below its frontmatter, or delete \`waitsFor:\` to make it a step.`,

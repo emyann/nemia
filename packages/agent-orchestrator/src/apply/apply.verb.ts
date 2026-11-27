@@ -65,7 +65,7 @@ const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal)
 const doNext = (again: ResolvedAgain | undefined, otherwise: string) =>
   again === undefined
     ? otherwise
-    : `it resolves the upgrade's conflicts of ${again.owner}, so resolve them again on what the tree holds now: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
+    : `it resolves the upgrade's conflicts of ${again.owner}, so propose it again on what the tree holds now, your choices kept: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
 
 /**
  * The tree a Workflow of `proposal` is judged against as it is written: where it resolves an upgrade's conflicts (`resolutionOf`) and an

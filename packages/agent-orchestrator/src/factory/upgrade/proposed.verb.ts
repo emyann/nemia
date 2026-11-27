@@ -17,34 +17,34 @@ import { proposeProgram } from '../../propose/propose.verb.ts';
 import { currentOf, type ProposalPlace } from '../../propose/current.verb.ts';
 import { ResolutionProposer, type ResolutionProposed } from './proposer.verb.ts';
 
-/**
- * The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by `caller` at `place`, at the version it is at now:
- * the proposal's name.
- */
+/** The objects of `factory` proposed as their specs, or their removal, in one proposal by `caller` at `place`, each at the version
+ * it is at now: the proposal's name. */
 const proposedBy = (caller: ProposalCaller, place: ProposalPlace) =>
-  ((factory, kind, name, spec, why) =>
+  ((factory, owned, why) =>
     Effect.gen(function* () {
-      const now = yield* currentOf(place, factory, kind, name);
-      const verb = spec === undefined ? 'delete' : now.version === null && kind !== 'Factory' ? 'create' : 'update';
-      const object: ProposedObject = {
-        kind,
-        metadata: { name, ...(now.version !== null && { resourceVersion: now.version }) },
-        verb,
-        ...(spec === undefined ? {} : { spec }),
-      };
-      const proposal = yield* proposeProgram(caller, factory, { objects: [object], why }, place);
+      const objects: ProposedObject[] = [];
+      for (const { kind, name, spec } of owned) {
+        const now = yield* currentOf(place, factory, kind, name);
+        const verb = spec === undefined ? 'delete' : now.version === null && kind !== 'Factory' ? 'create' : 'update';
+        objects.push({
+          kind,
+          metadata: { name, ...(now.version !== null && { resourceVersion: now.version }) },
+          verb,
+          ...(spec === undefined ? {} : { spec }),
+        });
+      }
+      const proposal = yield* proposeProgram(caller, factory, { objects, why }, place);
       return proposal.metadata.name;
     })) satisfies ResolutionProposed;
 
 /**
- * The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name.
+ * The objects of `factory` proposed as their specs, or their removal, in one proposal by the session's caller: the proposal's name.
  * @param factory The factory's name.
- * @param kind The owner's kind: a Workflow, an Agent, a Skill, a Hire or the Factory.
- * @param name The owner's name.
- * @param spec The spec proposed, or undefined to propose the owner's removal.
+ * @param owned Each object: its kind (a Workflow, an Agent, a Skill, a Hire or the Factory), its name, and its spec or undefined
+ * for a removal.
  * @param why What the proposal says of itself, shown with it.
  */
-const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
+const resolutionProposed: ResolutionProposed = (factory, owned, why) =>
   Effect.gen(function* () {
     const place: ProposalPlace = { home: yield* StoreRoot };
     const caller = yield* sessionCaller(yield* setting('sessionToken'));
@@ -54,7 +54,7 @@ const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) 
           message: `nemia factory resolve: the session token in WF_SESSION_TOKEN is refused (${caller.reason}): run it from the session its run filed, or from your own shell, where none is set. Nothing was proposed; your choice is kept.`,
         }),
       );
-    return yield* proposedBy(caller, place)(factory, kind, name, spec, why);
+    return yield* proposedBy(caller, place)(factory, owned, why);
   });
 
 /**

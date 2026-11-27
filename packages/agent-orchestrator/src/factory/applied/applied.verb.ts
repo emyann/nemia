@@ -37,6 +37,7 @@ import {
   swapTree,
   treeDir,
   choicesFor,
+  choicesHeld,
   proposalsFor,
   type Condition,
   type Entry,
@@ -55,6 +56,7 @@ import {
   mergeBaseOf,
   mergeTrees,
   resolveLine,
+  keptChoiceLine,
   sameVersionChange,
   switchTrees,
   takenFromTree,
@@ -316,16 +318,27 @@ export const ownerSaid = (key: string) => {
 
 /**
  * The line that settles the conflict `conflict` of the factory `name`: where an owner's proposal resolves it, the approve line while the
- * proposal waits, or the resolve line again, saying why, once it ended unapplied; else the resolve line.
+ * proposal waits; once it ended unapplied, the resolve line again for a conflict whose choice no longer holds, and, where every choice of
+ * the owner's conflicts still holds (`choices`), one line that proposes the owner again from them, said by its first conflict alone; else
+ * the resolve line. None for a held conflict that is not its owner's first.
  */
-function settleLine(name: string, conflict: Conflict, read: UpgradeMerge) {
+function settleLine(name: string, conflict: Conflict, read: UpgradeMerge, choices: Readonly<Record<string, Choice>>) {
   const owner = read.owners.get(conflict.at);
   const resolved = owner === undefined ? undefined : read.resolved.get(owner);
   const proposal = resolved?.proposal;
   if (owner !== undefined && proposal !== undefined && resolved?.resolution === 'proposed')
     return `${ownerSaid(owner)} waits on its resolution's proposal ${proposal.name}: ${approveLine(name, proposal.name)}`;
-  if (proposal !== undefined && resolved?.resolution === 'refused')
-    return `${resolveLine(name, conflict.at)} again, since its proposal ${proposal.name} ${proposal.phase === 'gone' ? 'is gone' : `was ${proposal.phase}`}`;
+  if (proposal !== undefined && resolved?.resolution === 'refused') {
+    const why = `its proposal ${proposal.name} ${proposal.phase === 'gone' ? 'is gone' : `was ${proposal.phase}`}`;
+    const own = read.merge.conflicts.map((c) => c.at).filter((at) => read.owners.get(at) === owner);
+    const held = choices[conflict.at];
+    if (held === undefined) return `${resolveLine(name, conflict.at)} again, since ${why} or the conflict changed`;
+    if (own.every((at) => choices[at] !== undefined))
+      return own.sort()[0] === conflict.at
+        ? `${keptChoiceLine(name, conflict.at, held)} to propose ${ownerSaid(owner ?? '')} again from your kept choices, since ${why}`
+        : undefined;
+    return undefined;
+  }
   return resolveLine(name, conflict.at);
 }
 
@@ -348,6 +361,7 @@ function waiting(
   pending: readonly Conflict[],
   switched: Switched | undefined,
   read: UpgradeMerge,
+  choices: Readonly<Record<string, Choice>>,
 ) {
   const { name, template } = factory;
   const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
@@ -369,7 +383,7 @@ function waiting(
       'ConflictsPending',
       true,
       'Conflicts',
-      `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${[...new Set(pending.map((c) => settleLine(name, c, read)))].join('; ')}.`,
+      `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${[...new Set(pending.map((c) => settleLine(name, c, read, choices)).filter((line) => line !== undefined))].join('; ')}.`,
     ),
   ] satisfies Condition[] as Condition[];
 }
@@ -413,7 +427,7 @@ function upgradeRead(
   const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
   const resolutions = readResolutions(home, name);
   const read = upgradeMerge(name, base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
-  return { ours, switched, choices: choicesFor(resolutions, merging), read };
+  return { ours, switched, choices: choicesHeld(choicesFor(resolutions, merging), resolutions?.seen, read.merge.conflicts), read };
 }
 
 /**
@@ -443,7 +457,7 @@ function upgradePass(
       ...(last.template === undefined ? {} : { template: last.template }),
       digest: digestOf(base),
       params: last.params,
-      conditions: waiting(factory, last.version, composed.pending, switched, read),
+      conditions: waiting(factory, last.version, composed.pending, switched, read, choices),
       upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictKept(c, read)) },
     };
     return stamped(status, last, at, factory);

@@ -23,14 +23,14 @@ import { templated as programsAt } from '../../../test/templated.ts';
 import { FACTORY_RULES, factoryRules, runWith as runEngine } from '../../runner.ts';
 import { factoryText, keysUnder, readFactoryAt, recordText } from '../../../testing.ts';
 import { factoryTyped } from '../../../test/factory-typed.ts';
-import { appliedDir, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
+import { appliedDir, conflictDigest, digestOf, entriesIn, resolutionsFile, swapTree, treeDir } from '../applied/applied.store.ts';
 import { dropRecord, factoriesNow, recordRevision } from '../../../testing.ts';
 import { appliedKey, factoryKey } from '../door/index.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
 import { withBuiltins } from '../../../test/templated.ts';
 import type { Env } from '../../config/config.store.ts';
-import { approveProgram } from '../../approval/approve.verb.ts';
+import { approveProgram, declineProgram } from '../../approval/approve.verb.ts';
 import { PERSON } from '../../caller/caller.ts';
 
 const ROOT = scratch('wf-upgrade-');
@@ -557,6 +557,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
       base: digestOf(entriesIn(appliedDir(ROOT, 'clash'))),
       choices: { [`${REVIEW}#budget`]: 'theirs' },
       proposals: { 'Workflow/dev': proposal },
+      seen: { [`${REVIEW}#budget`]: conflictDigest(waiting.upgrade?.conflicts.find((c) => c.at === `${REVIEW}#budget`) as never) },
     });
     assert.equal((await reconciled(templated('clash'))).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
     await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT }));
@@ -571,6 +572,102 @@ describe('a parameter set again at the version applied: previewed, filed with it
       'the choice made before the last merge landed answers no conflict of the next',
     );
     assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 6$/m);
+  });
+});
+
+const SHIP = 'workflows/dev/ship.md';
+
+/**
+ * The tests' team as a template at 0.1.0, its ship step filled by a hire of an agent, `closer`, that only 0.1.0 holds, applied as `name`;
+ * the person's tree then gives the ship step a key of its own, `disallowedTools`. At 0.2.0 the template drops the agent and its hire and
+ * turns the ship step into a wait node.
+ */
+async function appliedWithHire(name: string) {
+  const repo = repoWithTeam();
+  const dir = path.join(scratch('wf-upgrade-template-'), 'team');
+  exportTemplate({ dir, from: repo });
+  fs.cpSync(path.join(dir, 'agents/shipper'), path.join(dir, 'agents/closer'), { recursive: true });
+  const agentFile = path.join(dir, 'agents/closer/agent.yaml');
+  const agentDoc = parse(fs.readFileSync(agentFile, 'utf8'));
+  agentDoc.metadata.name = 'closer';
+  fs.writeFileSync(agentFile, stringify(agentDoc, { lineWidth: 0 }));
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    delete spec.steps[2].agent;
+  });
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.hires = { ...spec.hires, 'dev/ship': 'closer' };
+  });
+  await main(['factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`], noEngine());
+  await reconciled(templated(name));
+  return dir;
+}
+
+describe('an upgrade that removes an agent and turns a step it fills into a wait node, in one round of approvals', () => {
+  test('diff lists the key the wait node refuses as a conflict with its reason; one resolve and one approval apply it, the hire gone', async () => {
+    vi.spyOn(console, 'log');
+    const dir = await appliedWithHire('wait');
+    const tree = treeDir(ROOT, 'wait');
+    fs.writeFileSync(path.join(tree, SHIP), textIn(tree, SHIP).replace(/^---\n/, '---\ndisallowedTools: Bash(git push)\n'));
+    fs.rmSync(path.join(dir, 'agents/closer'), { recursive: true });
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.version = '0.2.0';
+      delete spec.hires['dev/ship'];
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[2] = { name: 'ship', after: 'review', waitsFor: ['shipped'] };
+    });
+    const preview = (await previewOf('wait', '--to', '0.2.0')) as Previewed & {
+      merge: { conflicts: { at: string; message?: string }[] };
+    };
+    const refused = preview.merge.conflicts.find((c) => c.at === `${SHIP}#disallowedTools`);
+    assert.ok(refused?.message, preview.merge.conflicts.map((c) => c.at).join(', '));
+    await main(['factory', 'upgrade', 'wait', '--to', '0.2.0'], noEngine());
+    assert.equal((await reconciled(templated('wait'))).upgrade?.conflicts.find((c) => c.at === refused.at)?.message, refused.message);
+    await main(['factory', 'resolve', 'wait', refused.at, '--theirs'], noEngine());
+    const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'wait'), 'utf8')).proposals?.['Workflow/dev'] ?? '';
+    assert.ok(proposal, 'the workflow is proposed');
+    await runWith(noEngine(), approveProgram(PERSON, 'wait', proposal, { home: ROOT }));
+    const merged = await reconciled(templated('wait'));
+    assert.equal(merged.version, '0.2.0');
+    assert.equal(merged.conditions[0].reason, 'Upgraded');
+    assert.doesNotMatch(textIn(tree, SHIP), /disallowedTools/);
+    assert.deepEqual(JSON.parse(textIn(tree, 'factory.json')).hires['dev/ship'], undefined);
+  });
+  test('a refused proposal keeps the choices whose conflict did not change, and asks again only for the one that did', async () => {
+    vi.spyOn(console, 'log');
+    const dir = await appliedWithHire('kept');
+    const tree = treeDir(ROOT, 'kept');
+    fs.writeFileSync(path.join(tree, SHIP), textIn(tree, SHIP).replace(/^---\n/, '---\ndisallowedTools: Bash(git push)\n'));
+    rewrite(tree, REVIEW, 'rounds: 3', 'rounds: 4');
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.version = '0.2.0';
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.steps[1].rounds = 2;
+      spec.steps[2] = { name: 'ship', after: 'review', waitsFor: ['shipped'] };
+    });
+    await main(['factory', 'upgrade', 'kept', '--to', '0.2.0'], noEngine());
+    const at = [`${SHIP}#disallowedTools`, `${REVIEW}#rounds`];
+    const waiting = await reconciled(templated('kept'));
+    assert.deepEqual(waiting.upgrade?.conflicts.map((c) => c.at).sort(), at.sort());
+    await main(['factory', 'resolve', 'kept', at[0] ?? '', '--theirs'], noEngine());
+    await main(['factory', 'resolve', 'kept', at[1] ?? '', '--theirs'], noEngine());
+    const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'kept'), 'utf8'));
+    const proposal: string = kept.proposals?.['Workflow/dev'] ?? '';
+    assert.ok(proposal, 'both choices proposed the workflow');
+    await runWith(noEngine(), declineProgram(PERSON, 'kept', proposal));
+    const declined = await reconciled(templated('kept'));
+    assert.equal(
+      (declined.conditions[1].message.match(/nemia factory resolve kept/g) ?? []).length,
+      1,
+      'one line proposes the owner again from the kept choices',
+    );
+    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'kept'), 'utf8')).choices, kept.choices, 'every choice is kept');
+    rewrite(tree, SHIP, 'Bash(git push)', 'Bash(git push:*)');
+    const changed = await reconciled(templated('kept'));
+    const asked = changed.conditions[1].message;
+    assert.match(asked, new RegExp(`resolve kept '${SHIP}#disallowedTools'`));
+    assert.doesNotMatch(asked, /rounds/, 'the conflict that did not change is not asked again');
   });
 });
 

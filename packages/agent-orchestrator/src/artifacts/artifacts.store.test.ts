@@ -247,10 +247,11 @@ describe('artifactsContract: what a step is told of its files', () => {
       /Refused, and not read: an absolute\npath anywhere else, and a path that climbs out of the workspace with `\.\.`/,
     );
   });
-  test('a file under a configuration folder is not handed over, naming the folder; a step in the checkout is told none of it', () => {
-    for (const contract of [artifactsContract(FILES), artifactsContract(FILES, false, true)])
-      assert.match(contract, /A file whose path passes through `\.claude`, a folder a harness reads as its own configuration, is\nrefused/);
-    assert.doesNotMatch(artifactsContract(FILES, true), /configuration/, 'nothing follows a step in the checkout to read it');
+  test('a file under a configuration folder is not handed over, naming the folder', () => {
+    assert.match(
+      artifactsContract(FILES),
+      /A file whose path passes through `\.claude`, a folder a harness reads as its own configuration, is\nrefused/,
+    );
   });
 });
 

@@ -24,7 +24,7 @@ const TRIAGE: StepSpec[] = [
   { ...step('build-backend', ['triage']), when: ['backend'] },
 ];
 const PLANNED: StepSpec[] = [step('plan'), step('implement', ['plan'])];
-const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true }];
+const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), gate: true }];
 
 const done = (surface?: string) =>
   ({

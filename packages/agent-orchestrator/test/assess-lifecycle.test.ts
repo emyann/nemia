@@ -721,9 +721,9 @@ describe('handOffDue: which finished steps are handed off', () => {
     );
   });
   test('REFUSED at shipped defaults: a step is handed off once for each try — what a person leaves in its workspace afterwards is not committed under its name', () => {
-    const chain: StepSpec[] = [step('review'), { ...step('ship', ['review']), workspace: 'base', gate: true }];
+    const chain: StepSpec[] = [step('review'), { ...step('ship', ['review']), gate: true }];
     const p = phases({ t1: 'succeeded', t2: 'succeeded', t9: 'failed' });
-    const at = (review: Run['steps'][string]) => run({}, { steps: { review, ship: { taskId: 't9', workspace: '/repo' } } });
+    const at = (review: Run['steps'][string]) => run({}, { steps: { review, ship: { taskId: 't9', workspace: '/wt' } } });
     assert.deepEqual(handOffDue(chain, at({ taskId: 't1', workspace: '/w' }), p), ['review'], 'not yet handed off: due');
     assert.deepEqual(
       handOffDue(chain, at({ taskId: 't1', workspace: '/w', handedOff: 't1' }), p),

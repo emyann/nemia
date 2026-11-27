@@ -194,7 +194,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       await pass();
       assert.deepEqual(b.filings, filings, 'nothing of the folder run is filed under the pause');
       const standing = await stage.runWith(b.e, pausedRead());
-      assert.deepEqual([standing.finishing, standing.staged, standing.held], [[], [], []], 'a folder run holds no merge staged');
+      assert.deepEqual([standing.finishing, standing.held], [[], []], 'a folder run holds nothing');
       assert.match(pausedWords(standing) ?? '', /^Paused since /);
       markCancelled(ROOT, loose.id);
       await stage.main(['resume']);

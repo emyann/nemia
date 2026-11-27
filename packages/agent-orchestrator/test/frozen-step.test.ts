@@ -61,7 +61,6 @@ test('a step with every key the parser types, its agent and its output reads as 
     resume: 'implement',
     input: ['implement'],
     place: 'folder',
-    workspace: 'base',
     slot: 'none',
     harness: 'claude',
     model: 'opus',

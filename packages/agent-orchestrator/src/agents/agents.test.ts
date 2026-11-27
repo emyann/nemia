@@ -665,7 +665,7 @@ const filed = (step: StepSpec) =>
     step,
     [step],
     { gates: [] },
-    { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
+    { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {} },
   );
 const fromRecord = (step: StepSpec) => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
 

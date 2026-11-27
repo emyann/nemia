@@ -1,9 +1,8 @@
 /**
  * A measured run, end to end, told as one story on the stage (`story.ts`): a run of `plan` (gated) → `implement` (checked, `retries: 1`)
- * → `review` (looping back to implement, its findings tallied) → `ship` (the landing, gated, checked), walked by the store's tick
+ * → `review` (looping back to implement, its findings tallied) → `ship` (gated, checked), walked by the store's tick
  * (`tickRun`) on the engine's stand-in, a daemon restarted once on the way. Its plan signs off blocked and is answered in its session,
- * then approved; implement's first try's check refuses and its second passes; review sends the work round once; ship is approved, merged
- * and lands on its check. What it is measured by, each read off the same walk: the steps' metrics, each recorded once whatever daemon
+ * then approved; implement's first try's check refuses and its second passes; review sends the work round once; ship passes its check and is approved, and its branch is merged by hand. What it is measured by, each read off the same walk: the steps' metrics, each recorded once whatever daemon
  * reads the settle (`recordStepMetrics`, `settledOnce`, `onceFacts`); the run's timeline handed to the traces as spans, row for row the
  * rows its page reads (`timelineFacts`, `timelineRows`); its clock's parts adding up to its wall (`clockOf`); `nemia stats --json`; the
  * spans of a pass nested under it, and the wait, denied and timeline spans roots of their own; and the series rolled to minutes and hours.
@@ -68,7 +67,7 @@ const folder = (files: Record<string, string>) => {
   return dir;
 };
 
-/** `plan` (gated) → `implement` (checked, one retry) → `review` (looping, its findings tallied) → `ship` (gated, the landing, checked). */
+/** `plan` (gated) → `implement` (checked, one retry) → `review` (looping, its findings tallied) → `ship` (gated, checked). */
 const MEASURED = {
   'plan.md': '---\nplace: git\ngate: true\n---\nPlan it.\n',
   'implement.md': '---\nafter: plan\nplace: git\ncheck: npm test\nretries: 1\n---\nBuild it.\n',
@@ -80,7 +79,7 @@ const MEASURED = {
     additionalProperties: false,
   }),
   'ship.md':
-    '---\nafter: review\nplace: git\nworkspace: base\ngate: true\ncheck: npm test\n---\nStage the merge, and sign off with its message.\n',
+    '---\nafter: review\nplace: git\ngate: true\ncheck: npm test\n---\nSay what the run changed, and sign off with its message.\n',
 };
 
 /** A daemon's life: its memo of runs at rest, and the spans its passes leave, kept by a tracer of the test's own. */
@@ -361,16 +360,12 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     later(2);
     sign(second, { ...SIGNED, findings: [], again: false }, { usage: used(0.5) });
     await tick(2);
-    assert.deepEqual(spansOf(TIMELINE_SPAN, id), [], 'none while the run waits at its ending');
+    assert.deepEqual(spansOf(TIMELINE_SPAN, id), [], 'none while the run is still going');
   });
-  s.test('ship approved 7 minutes on, merges and lands on its check: the timeline is handed over once, row for row the page', async () => {
-    later(7);
-    await stage.runWith(b.e, approveRun(id, 'ship', 'Merge it.'));
-    await tick();
+  s.test('ship passes its check and is approved 7 minutes on: the timeline is handed over once, row for row the page', async () => {
     const ship = steps().ship.taskId!;
     later(1);
     spawn(ship);
-    stage.place().world.stage(repo, steps().implement.branch!);
     later(2);
     sign(ship, { ...SIGNED, message: 'Add sub\n\nadd.ts exports sub.\n' }, { usage: used(0.25) });
     await tick();
@@ -379,8 +374,12 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     spawn(check);
     later(1);
     exits(check, 0);
+    await tick();
+    later(7);
+    await stage.runWith(b.e, approveRun(id, 'ship', 'Merge it.'));
+    stage.place().world.stage(repo, steps().implement.branch!);
+    stage.place().world.commit(repo, 'Add sub');
     await tick(2);
-    assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
     assert.equal(runRecord(ROOT, id).runTimed, true, 'marked handed over on its record');
     const spans = spansOf(TIMELINE_SPAN, id);
     const rows = await pageRows(id);
@@ -439,14 +438,14 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     assert.equal(gateWaitOf(run, tl, planStep, tl.steps.plan[1]), 9 * MIN, "K17: the timeline's gate wait from the answer's end");
   });
   s.test(
-    "`nemia stats --json`: landed on its first try, two rounds, the gate waits from the answer's end, the calls refused, the skills, the tally",
+    "`nemia stats --json`: merged, two rounds, the gate waits from the answer's end, the calls refused, the skills, the tally",
     async () => {
       const stats = JSON.parse(JSON.stringify(await stage.main(['stats', '--json']))) as Stats;
       const { total } = stats.all;
       assert.deepEqual(
-        [total.runs, total.merged, total.firstTry, total.rounds, total.refused],
-        [1, 1, 1, 2, 1],
-        'landed on its first try, two rounds, a check refused',
+        [total.runs, total.merged, total.rounds, total.refused],
+        [1, 1, 2, 1],
+        'merged, two rounds, a check refused',
       );
       assert.equal(total.gateWaitMs, 8 * MIN, "the mean of plan's 9 minutes and ship's 7");
       const row = (step: string) => stats.all.steps.find((x) => x.step === step)!;

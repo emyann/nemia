@@ -620,7 +620,7 @@ export const MOMENTUM = 1;
 
 /**
  * The priority of a turn a person is waiting on: the next turn after they answered a step, a try or a round they asked for (a `Retry` or
- * a `Round` `by: 'ask'`), and an upgrade they started. Above every filing of the work (`LANDING_MOMENTUM` and below), below Nemia's own
+ * a `Round` `by: 'ask'`), and an upgrade they started. Above every filing of the work (`MOMENTUM` and below), below Nemia's own
  * session, so it goes before every waiting task but hers; and the threshold of the room the engine keeps for such turns (`keptRoom`,
  * `WF_KEPT_TURNS`), which nothing below it takes. Nothing running is stopped for it, and it is read at admission and nowhere else.
  */

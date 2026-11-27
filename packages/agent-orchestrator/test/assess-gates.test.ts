@@ -310,10 +310,10 @@ describe('slotNeed at a gate', () => {
   });
 });
 
-/** `implement → review → ship`: the ending step works in the repository's checkout, and is gated. */
-const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
+/** `implement → review → ship`: the last step is gated. */
+const SHIP: StepSpec = { name: 'ship', after: ['review'], gate: true, body: 'Ship it.' };
 const ENDS: StepSpec[] = [step('implement'), step('review', ['implement']), SHIP];
-/** implement and review done on the run's branch, ship never filed. */
+/** implement, review and ship done on the run's branch, ship at its gate. */
 const atEnd = (extra: Partial<RepositoryRun> = {}) =>
   run(
     {},
@@ -322,7 +322,7 @@ const atEnd = (extra: Partial<RepositoryRun> = {}) =>
       steps: {
         implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' },
         review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' },
-        ship: { taskId: null },
+        ship: { taskId: 't3', workspace: '/wt', branch: 'wf/r-1/implement' },
       },
     },
   );
@@ -358,34 +358,6 @@ describe('cancelPlan and forgetRefusal at a gate', () => {
   });
   test('called off, it files nothing: forgettable', () => {
     assert.equal(forgetRefusal(PLANNED, atPlan(CANCELLED), PLAN_DONE, [], signedDone, asked), null);
-  });
-  test('REFUSED forgetting a run at a gate whose step never ran: the approval files the step itself', () => {
-    names(
-      forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked),
-      'ship waits at its gate',
-      'it is filed once it is approved',
-      'nemia approve r-1 ship',
-    );
-  });
-  test('REFUSED forgetting a run at two gates whose steps never ran: each is filed once approved', () => {
-    const two = [step('implement'), { ...SHIP, after: ['implement'] }, { ...SHIP, name: 'land', after: ['implement'] }];
-    names(
-      forgetRefusal(two, run({ implement: 't1', ship: null, land: null }), phases({ t1: 'succeeded' }), [], signedDone, asked),
-      'ship and land wait at their gates',
-      'each is filed once each is approved',
-      'nemia approve r-1 ship',
-      'nemia approve r-1 land',
-    );
-  });
-  test('REFUSED forgetting a run at a gate that ran and one that never did: each, or what waits on it, is filed', () => {
-    const mixed: StepSpec[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
-    names(
-      forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), DONE, [], signedDone, asked),
-      'plan and ship wait at their gates',
-      'each is filed, or what waits on it is',
-      'nemia approve r-1 plan',
-      'nemia approve r-1 ship',
-    );
   });
 });
 
@@ -449,22 +421,23 @@ describe('composeBrief after an approved gate', () => {
 
 describe('REFUSED once pruned: a step at its gate is offered no approval and no send-back', () => {
   const pruned = { at: '2026-09-17T01:00:00.000Z', worktrees: [] };
+  const ALL = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
   const r = atEnd({ pruned });
   const PRUNED_LINE =
     'not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (nemia prune)';
   test('gateLines says it can never be approved, a marker written by hand read all the same', () => {
-    assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), { ship: PRUNED_LINE });
+    assert.deepEqual(gateLines(ENDS, r, ALL, signedDone, asked), { ship: PRUNED_LINE });
   });
   test('its approval is refused, so it is not what is left to decide', () => {
-    assert.equal(assess(aRead(ENDS, r, { phaseOf: DONE, signedOff: signedDone, asked })).toDecide, undefined);
+    assert.equal(assess(aRead(ENDS, r, { phaseOf: ALL, signedOff: signedDone, asked })).toDecide, undefined);
   });
   test('nemia ls says it, waits on nobody, and offers no verb a pruned run refuses', () => {
-    const l = listing({ steps: ENDS, run: r, phaseOf: DONE, closeoutOf: signedDone, askedCloseout: asked });
+    const l = listing({ steps: ENDS, run: r, phaseOf: ALL, closeoutOf: signedDone, askedCloseout: asked });
     assert.deepEqual([l.steps[2].note, l.waitingOnYou, l.toDecide], [PRUNED_LINE, [], undefined]);
     assert.doesNotMatch(JSON.stringify(l), /nemia (approve|retry|round|accept) /);
   });
   test('the approval given before the prune is still said: it is a fact about the run, not an offer', () => {
-    assert.deepEqual(gateLines(ENDS, atEnd({ pruned, approvals: [approval('ship', 1)] }), DONE, signedDone, asked), {
+    assert.deepEqual(gateLines(ENDS, atEnd({ pruned, approvals: [approval('ship', 1)] }), ALL, signedDone, asked), {
       ship: 'approved 23:10Z',
     });
   });

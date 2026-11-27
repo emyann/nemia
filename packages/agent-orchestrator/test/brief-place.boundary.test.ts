@@ -1,5 +1,5 @@
 /**
- * A step's git words come from its run's place: six briefs of a repository run of the tests' team, composed with the shipped place's
+ * A step's git words come from its run's place: four briefs of a repository run of the tests' team, composed with the shipped place's
  * words, equal what they said before the words moved, line for line (`fixtures/briefs/`); a planted place's words replace every one; with
  * none the briefs send the step to its place's skill and print no command; and a folder run's briefs say no git at all.
  */
@@ -61,28 +61,21 @@ type Telling = (run: Run, step: StepSpec) => BriefPlace;
 /** What `placeTold` tells a step, by `place`, the package's git place when given none. */
 const toldBy = (place: Place = builtinGitPlace) => ((run, step) => placeTold(run, STEPS, step, place)) satisfies Telling;
 
-/** The six briefs of a repository run, by the name of their pinned file, each told what `told` says. */
+/** The four briefs of a repository run, by the name of their pinned file, each told what `told` says. */
 function briefs(told: Telling) {
   const implement = stepNamed('implement');
   const review = stepNamed('review');
-  const ship = stepNamed('ship');
   const first = runOf({ implement: { taskId: null }, review: { taskId: null } });
   const run = runOf();
   const merge = { onto: 'main', sha: 'def4567890' };
-  const round = (landing?: boolean) => ({
+  const round = () => ({
     loop: 'review',
     round: 2,
     rounds: 3,
     by: 'merge' as const,
     resumed: false,
-    merge: landing
-      ? {
-          ...merge,
-          landing: { step: 'ship', check: 't9', command: 'npm test', unreadable: 'its task is gone' },
-        }
-      : merge,
+    merge,
   });
-  const ending = runOf({ review: { taskId: 't2', workspace: '/wt/review', branch: 'wf/r-1/review' } });
   const [, , ...afterRound] = NONE;
   const merging = (briefed: ReturnType<typeof round>) =>
     composeBrief(
@@ -103,9 +96,7 @@ function briefs(told: Telling) {
   return {
     'first.txt': composeBrief(implement, first, STEPS, () => undefined, '/art/implement', ...NONE, undefined, told(first, implement)),
     'later.txt': composeBrief(review, run, STEPS, () => undefined, '/art/review', ...NONE, undefined, told(run, review)),
-    'ending.txt': composeBrief(ship, ending, STEPS, () => undefined, '/art/ship', ...NONE, undefined, told(ending, ship)),
     'merge-textual.txt': merging(round()),
-    'merge-semantic.txt': merging(round(true)),
     'merge-review.txt': composeBrief(
       review,
       mergedRun,
@@ -138,16 +129,13 @@ function hgPlace() {
   return {
     ...builtinGitPlace,
     declared: {
-      denyWhileLanding: ['Bash(hg commit:*)'],
       say: {
         ...say,
         look: ['hg diff -r {baseRef}', 'hg status'],
         results: ['hg log -r {base}::{branch}', 'hg diff -r {base} -r {branch}'],
         merge: 'hg merge -r {sha}',
-        mergeUncommitted: 'hg merge -r {sha} --tool :merge3',
         showMerge: 'hg diff -c .',
         lastMerge: "hg log -r 'last(merge())'",
-        stage: 'hg -R {repo} merge {branches}',
       },
     },
   } satisfies Place;
@@ -169,11 +157,7 @@ test("a planted place's words replace every git command of a repository run's br
   const composed = briefs(toldBy(hgPlace()));
   for (const [name, brief] of Object.entries(composed)) assert.deepEqual(gitLines(brief), [], name);
   assert.match(composed['later.txt'], /```\nhg diff -r abc123\nhg status\n```/);
-  assert.match(composed['ending.txt'], /```\nhg log -r main::wf\/r-1\/review\nhg diff -r main -r wf\/r-1\/review\n```/);
-  assert.match(composed['ending.txt'], /`hg -R \/repo merge <result branch>`/);
   assert.match(composed['merge-textual.txt'], /\n {4}hg merge -r def4567890\n/);
-  assert.match(composed['merge-semantic.txt'], /\n {4}hg merge -r def4567890 --tool :merge3\n/);
-  assert.match(composed['merge-semantic.txt'], /so `hg diff -c \.` shows the fix/);
   assert.match(composed['merge-review.txt'], /`hg diff -c \.` of the merge commit \(`hg log -r 'last\(merge\(\)\)'`\)/);
 });
 
@@ -186,9 +170,7 @@ test("a repository run's briefs told no place's words send the step to its place
   const read = `as your place's skill says under *${SKILL_SECTIONS.read}*`;
   const merge = `as your place's skill says under *${SKILL_SECTIONS.merge}*`;
   assert.ok(composed['later.txt'].includes(`against \`abc123\` you can see exactly what changed, ${read}.`), composed['later.txt']);
-  assert.ok(composed['ending.txt'].includes(`Read each against \`main\` ${read}.`), composed['ending.txt']);
   assert.ok(composed['merge-textual.txt'].includes(`at the commit their trial merge read, \`def4567890\`, ${merge}.`));
-  assert.ok(composed['merge-semantic.txt'].includes(`Merge it in at that commit, without committing, ${merge}.`));
   assert.ok(composed['merge-review.txt'].includes(`- What the merge resolved, ${merge}, and what \`main\` changed`));
 });
 

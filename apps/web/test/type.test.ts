@@ -64,6 +64,8 @@ export const OUTSIDE: Outside[] = [
   { file: 'src/components/look/Plate.tsx', size: 'tracking-[-0.02em]', why: NUMERAL },
   { file: 'src/components/look/Sticker.tsx', size: 'text-[22px]', why: NUMERAL },
   { file: 'src/components/look/Sticker.tsx', size: 'leading-[26px]', why: NUMERAL },
+  { file: 'src/components/agent/FactoryAgentPage.tsx', size: 'text-[17px]', why: NUMERAL },
+  { file: 'src/components/agent/FactoryAgentPage.tsx', size: 'leading-[22px]', why: NUMERAL },
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[1.15em]', why: PROSE },
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[1.08em]', why: PROSE },
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[0.95em]', why: PROSE },
@@ -140,6 +142,11 @@ export const DRESSED: { file: string; classes: string; why: string }[] = [
     file: 'src/components/look/Plate.tsx',
     classes: 'text-label-large m-0 font-label font-extrabold uppercase',
     why: "a plate's title stands beside its numeral in the label face (Archivo, weight 800), as the Runs page settled it",
+  },
+  {
+    file: 'src/components/agent/FactoryAgentPage.tsx',
+    classes: 'text-title-large m-0 font-semibold',
+    why: "an agent's role heads its page at 22/28 semibold, as its board (B5) draws it, where the title role is regular",
   },
 ];
 

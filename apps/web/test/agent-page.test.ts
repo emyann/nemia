@@ -10,15 +10,19 @@ import type { HarnessModels } from 'objects';
 import { longestFirstOf, type AtWorkRow } from '../contracts/agent-activity.contract.ts';
 import type { KeyForm } from '../src/lib/api/builder.ts';
 import type { SkillPlace } from '../src/lib/api/skills.ts';
+import type { SkillSource } from '../src/lib/api/library.ts';
 import {
   editedDayOf,
   historyOf,
   lastEndedOf,
   permissionsOf,
+  modelWords,
   plateOf,
-  serverGroupsOf,
+  serversOf,
   skillGroupsOf,
+  whereOf,
   wordsOf,
+  workflowsSelector,
   type Mark,
   type StepGives,
 } from '../src/lib/agentPage.ts';
@@ -69,6 +73,31 @@ describe("an agent page's plate and permissions", () => {
     assert.equal(model?.value, 'Opus 5.5');
     assert.equal(model?.note, 'claude-opus-5-5');
     assert.deepEqual(effort?.pips, { total: 4, filled: 3 });
+  });
+
+  test("the model's name says its version where the harness's name does not, the name alone where it says more", () => {
+    assert.equal(modelWords('claude-opus-5-5', 'Opus'), 'Opus 5.5');
+    assert.equal(modelWords('claude-sonnet-5-5', 'Default (recommended)'), 'Default (recommended)');
+    assert.equal(modelWords('gpt-x', 'Pro'), 'Pro');
+    assert.equal(modelWords('unlisted', undefined), 'unlisted');
+  });
+
+  test('each note is one short line in plain words, the mode saying what it does', () => {
+    const rows = plateOf(
+      { harness: 'claude', model: 'claude-opus-5-5', effort: 'high', permissionMode: 'dontAsk', context: '400k' },
+      keyForm,
+      models,
+    );
+    assert.deepEqual(
+      rows.map((r) => r.note),
+      [
+        'Claude Code, on the Agent SDK',
+        'claude-opus-5-5',
+        'How hard it thinks per turn',
+        'Acts without asking first',
+        'Its context window, in tokens',
+      ],
+    );
   });
 
   test("a model the harness does not list reads as its id, and the effort key's choices give the pips where the model lists none", () => {
@@ -147,26 +176,74 @@ describe("an agent page's skills and servers", () => {
   ];
 
   test("the file's skills come first and a step's add only those the file does not give, one group for a step name across workflows", () => {
-    const groups = skillGroupsOf(given, steps, places);
+    const groups = skillGroupsOf(given, steps, places, 'acme');
     assert.deepEqual(
       groups.map((g) => [g.title, g.tiles.map((t) => t.name)]),
       [
-        ['In its file', ['git']],
-        ['From its review step', ['look']],
+        ['In its file · 1', ['git']],
+        ['From its review step · 1', ['look']],
       ],
     );
     assert.equal(groups[1]?.tiles[0]?.description, 'Looks at a page.');
   });
 
-  test('the servers group the same way, leaving out those the file names', () => {
+  test('the servers are each said with where they come from, a step adding only those the file does not name', () => {
     assert.deepEqual(
-      serverGroupsOf('docs, playwright', steps).map((g) => [g.title, g.tiles.map((t) => t.name)]),
-      [['In its file', ['docs', 'playwright']]],
+      serversOf('docs, playwright', steps).map((t) => [t.name, t.where]),
+      [
+        ['docs', 'In its file'],
+        ['playwright', 'In its file'],
+      ],
     );
     assert.deepEqual(
-      serverGroupsOf(null, steps).map((g) => [g.title, g.tiles.map((t) => t.name)]),
-      [['From its review step', ['playwright']]],
+      serversOf(null, steps).map((t) => [t.name, t.where]),
+      [['playwright', 'From its review step']],
     );
+  });
+});
+
+describe('where a skill on an agent page comes from', () => {
+  const skill = (name: string, from: SkillSource | null, foundIn: string | null) =>
+    ({ name, from, foundIn, entry: null, error: null, preload: false, cost: null }) satisfies Parameters<typeof skillGroupsOf>[0][number];
+  const tiles = (given: Parameters<typeof skillGroupsOf>[0]) =>
+    skillGroupsOf(given, [], [], 'nemia').flatMap((g) => g.tiles.map((t) => [t.name, t.where]));
+
+  test("the skill of Nemia's builtin place is built into Nemia", () => {
+    assert.deepEqual(tiles([skill('git', 'builtin', null)]), [['git', 'Built into Nemia']]);
+  });
+
+  test('a skill named with its folder is shown by its own name, from the repository and that folder of skills', () => {
+    assert.deepEqual(tiles([skill('apps/web:ds-build', null, 'apps/web/.claude/skills/ds-build')]), [
+      ['ds-build', 'From the repository, apps/web/.claude/skills'],
+    ]);
+  });
+
+  test("a skill of the repository's own place says that folder of skills", () => {
+    assert.deepEqual(tiles([skill('shadcn', 'repo', '.claude/skills/shadcn')]), [['shadcn', 'From the repository, .claude/skills']]);
+  });
+
+  test("a skill of the factory's own is the factory's, by its name", () => {
+    assert.deepEqual(tiles([skill('review-a-change', 'factory', null)]), [['review-a-change', 'Factory nemia']]);
+  });
+
+  test("a step's skill is said the same way, and one found nowhere says so", () => {
+    const step: StepGives = {
+      step: 'review',
+      added: ['apps/web:ds-spec', 'gone'],
+      skillsFrom: [
+        { name: 'apps/web:ds-spec', from: null, foundIn: 'apps/web/.claude/skills/ds-spec' },
+        { name: 'gone', from: null, foundIn: null },
+      ],
+      mcp: [],
+    };
+    assert.deepEqual(
+      skillGroupsOf([], [step], [], 'nemia').flatMap((g) => g.tiles.map((t) => [t.name, t.where])),
+      [
+        ['ds-spec', 'From the repository, apps/web/.claude/skills'],
+        ['gone', 'Not found'],
+      ],
+    );
+    assert.equal(whereOf('user', null, 'nemia'), 'From your library');
   });
 });
 
@@ -174,6 +251,12 @@ describe("an agent page's small counts", () => {
   test('words are the runs of characters between spaces and lines', () => {
     assert.equal(wordsOf('one two\n\nthree   four\n'), 4);
     assert.equal(wordsOf(''), 0);
+  });
+
+  test('the finished runs read for its last session are those of the workflows it is in, once each', () => {
+    const fill = (workflow: string) => ({ from: 'factory' as const, workflow, step: 'review', hired: true });
+    assert.equal(workflowsSelector({ usedBy: [], fills: [fill('quick'), fill('build'), fill('quick')] }), 'workflow in (build,quick)');
+    assert.equal(workflowsSelector({ usedBy: [], fills: [] }), undefined);
   });
 
   test('the last session ended is the latest end of a step given to the agent, null with none', () => {

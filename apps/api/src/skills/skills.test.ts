@@ -426,10 +426,14 @@ test("the skill of Nemia's builtin place, the git place's, is Nemia's builtin, a
   assert.equal(foundInOf(place, repo, root), null);
 });
 
-test('REFUSED: where the repository has a skill is said for none of yours or Nemia\'s, nor the repository itself, nor a folder outside it', () => {
+test("REFUSED: where the repository has a skill is said for none of yours or Nemia's, nor the repository itself, nor a folder outside it", () => {
   assert.equal(foundInOf(path.join(repo, 'apps', 'site', '.claude', 'skills', 'lay-out'), repo, root), 'apps/site/.claude/skills/lay-out');
   assert.equal(foundInOf(path.join(THEIRS, 'review'), repo, root), '.claude/skills/review', "the repository's own place says its folder");
-  assert.equal(foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root), 'workflows/skills/beside', 'and the one beside its agents');
+  assert.equal(
+    foundInOf(path.join(repo, 'workflows', 'skills', 'beside'), repo, root),
+    'workflows/skills/beside',
+    'and the one beside its agents',
+  );
   assert.equal(foundInOf(path.join(LIBRARY, 'mine'), repo, root), null, 'yours is no folder of the repository');
   assert.equal(foundInOf(path.join(BUILTIN, 'grill-me'), repo, root), null, "nor is Nemia's");
   assert.equal(foundInOf(repo, repo, root), null, 'the repository itself');

@@ -11,8 +11,8 @@ import { agentMarksQuery } from '@/lib/api/stats';
 import { stepQuery } from '@/lib/api/workflows';
 import { FactoryAgentPage } from './FactoryAgentPage';
 import {
-  reviewer,
-  REVIEWER,
+  agora,
+  AGENT,
   FACTORY,
   finished,
   four,
@@ -23,7 +23,7 @@ import {
   one,
   reviewStep,
   skillPlaces,
-} from '../../../.storybook/fixtures/reviewer';
+} from '../../../.storybook/fixtures/agora';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /** The page with its reads seeded, the runs not finished being what the story is about. */
@@ -32,19 +32,19 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
   const page = (
     <QueryClientProvider
       client={seeded([
-        [agentQuery('factory', REVIEWER, place).queryKey, reviewer],
+        [agentQuery('factory', AGENT, place).queryKey, agora],
         [keyFormQuery.queryKey, keyForm],
         [modelsQuery.queryKey, models],
         [openRunsQuery(FACTORY).queryKey, runs],
-        [finishedRunsQuery(FACTORY, []).queryKey, finished],
+        [finishedRunsQuery(FACTORY, [], 'workflow in (build,quick)').queryKey, finished],
         [stepQuery('factory', 'build', 'review', place).queryKey, reviewStep('build')],
         [stepQuery('factory', 'quick', 'review', place).queryKey, reviewStep('quick')],
         [factorySkillsQuery(FACTORY).queryKey, skillPlaces],
-        [agentMarksQuery(REVIEWER, FACTORY).queryKey, marks],
+        [agentMarksQuery(AGENT, FACTORY).queryKey, marks],
       ])}
     >
       <Suspense>
-        <FactoryAgentPage name={REVIEWER} factory={FACTORY} />
+        <FactoryAgentPage name={AGENT} factory={FACTORY} />
       </Suspense>
     </QueryClientProvider>
   );
@@ -58,8 +58,9 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
 }
 
 /**
- * A factory's agent, read only (B5): who it is in a ring that shows whether it is at work, its spec and permissions, the steps it is
- * hired into, its instructions with Show all, its history, and its skills and servers by where each comes from. Its reads are seeded.
+ * A factory's agent, read only (B5): who it is in a ring that shows whether it is at work, its spec and permissions on the plate, the
+ * steps it is hired into, its instructions with Show all, its history, and its skills and servers in tiles of one height, each saying
+ * where it comes from. Agora of the factory nemia, its reads seeded.
  */
 const meta: Meta<typeof Seeded> = {
   title: 'Pages/Factory agent',
@@ -70,7 +71,11 @@ export default meta;
 
 type Story = StoryObj<typeof Seeded>;
 
-/** Nothing at work: the ring is quiet and grey, the line says so with when its last session ended, and no Working section is drawn. */
+/**
+ * Nothing at work: the ring is quiet and grey, the line says so with when its last session ended, and no Working section is drawn. The
+ * plate's head names its file over a rule, each value in the plate's numerals, the model with its version; the tiles are one height
+ * whatever their words, the board's skills named by their own name and the folder they are in.
+ */
 export const Idle: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
@@ -80,19 +85,56 @@ export const Idle: Story = {
     await expect(canvasElement.querySelector('section[aria-label="Working"]')).toBeNull();
     const [left, right] = ['left', 'right'].map((side) => canvasElement.querySelector(`[data-column="${side}"]`)?.getBoundingClientRect());
     await expect(Math.abs((left?.top ?? 0) - (right?.top ?? 1))).toBeLessThan(2);
+    await expect(canvasElement.querySelector('[data-edited]')?.textContent).toBe('Edited 26 Nov');
+    await waitFor(() => expect(canvasElement.querySelector('[data-plate-head]')).not.toBeNull());
+    await expect(canvasElement.querySelector('[data-plate-head]')?.textContent).toBe('Specagents/agora.md');
+    await expect(page.getByText('Opus 5.5')).toBeVisible();
+    await expect(page.getByText('Acts without asking first')).toHaveAttribute('title', 'Acts without asking first');
+    await expect(canvasElement.querySelector('[data-plate-row="Effort"] [data-pips]')?.getAttribute('data-pips')).toBe('3');
+    await waitFor(() => expect(canvasElement.querySelector('[data-skill-tile="ds-build"]')).not.toBeNull());
+    const frameOf = (name: string) => canvasElement.querySelector(`[data-skill-tile="${name}"]`)?.closest('[data-cut-frame]');
+    const heights = ['review-a-change', 'react-aria', 'ds-build'].map((name) => frameOf(name)?.getBoundingClientRect().height);
+    await expect(heights[0]).toBeGreaterThan(0);
+    await expect(new Set(heights).size).toBe(1);
+    await expect(frameOf('git')?.textContent).toContain('Built into Nemia');
+    await expect(frameOf('ds-build')?.textContent).toContain('From the repository, apps/web/.claude/skills');
+    await expect(frameOf('shadcn')?.textContent).toContain('From the repository, .claude/skills');
+    await expect(frameOf('review-a-change')?.textContent).toContain('Factory nemia');
+    await expect(canvasElement.querySelector('[data-server-tile="playwright"]')?.textContent).toContain('From its review step');
   },
 };
 
-/** One session at work: the working tag, what it is working on as a link, where its step is, and the ring lit. No Working section. */
+/**
+ * One session at work: the working tag, what it is working on as a link, where its step is, and the ring lit. No Working section. The
+ * steps are a row each, and the history shows its newest six, then Show all.
+ */
 export const WorkingOnce: Story = {
   args: { runs: one },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
     await waitFor(() => expect(page.getByText('working')).toBeVisible());
-    await expect(page.getByRole('link', { name: /approve modal uses the step/ })).toHaveAttribute('href', '/runs/r-7k2m-quick');
+    await expect(page.getByRole('link', { name: /Two tests that fail/ })).toHaveAttribute(
+      'href',
+      '/runs/board-two-tests-that-fail-ma-1xu6',
+    );
     await expect(canvasElement.querySelector('[data-activity="one"]')?.textContent).toContain('quick › review · try 1 · for 2m');
     await expect(canvasElement.querySelector('[data-ring="alive"]')).not.toBeNull();
     await expect(canvasElement.querySelector('section[aria-label="Working"]')).toBeNull();
+    await waitFor(() => expect(canvasElement.querySelectorAll('[data-history-row]')).toHaveLength(6));
+    const rows = [...canvasElement.querySelectorAll('[data-step-row]')];
+    await expect(rows.map((row) => row.textContent)).toEqual(['build › review', 'quick › review']);
+    await expect(rows[0]?.getBoundingClientRect().bottom ?? 0).toBeLessThanOrEqual(rows[1]?.getBoundingClientRect().top ?? 0);
+    await expect(page.getByRole('button', { name: 'Show all 25' })).toBeVisible();
+  },
+};
+
+/** The whole history: Show all lists the rows past the newest six in place, and goes. */
+export const HistoryAll: Story = {
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    await userEvent.click(await page.findByRole('button', { name: 'Show all 25' }));
+    await waitFor(() => expect(canvasElement.querySelectorAll('[data-history-row]')).toHaveLength(25));
+    await expect(page.queryByRole('button', { name: /Show all \d+/ })).toBeNull();
   },
 };
 
@@ -106,14 +148,14 @@ export const WorkingFour: Story = {
     await expect(section).not.toBeNull();
     const rows = [...(section?.querySelectorAll('[data-working-row]') ?? [])];
     await expect(rows.map((row) => row.getAttribute('data-working-row'))).toEqual([
-      'r-3i4j-y5z6',
-      'r-4e5f-p7q8',
-      'r-1a2b-9c3d',
-      'r-9g0h-w1x2',
+      'run-core-a-card-is-parsed-on-dlkf',
+      'runtime-a-long-session-keeps-yrfr',
+      'board-a-factory-s-agents-pag-izma',
+      'board-two-tests-that-fail-ma-1xu6',
     ]);
     await expect(rows[1]?.textContent).toContain('round 2');
     await expect(rows[0]?.textContent).not.toContain('round');
-    await expect(rows[0]?.textContent).toContain('…y5z6');
+    await expect(rows[0]?.textContent).toContain('…dlkf');
     await expect(canvasElement.querySelector('[data-ring="alive"]')).not.toBeNull();
   },
 };
@@ -124,8 +166,8 @@ export const Instructions: Story = {
     const page = within(canvasElement);
     const show = await page.findByRole('button', { name: 'Show all' });
     await userEvent.click(show);
-    const dialog = await within(document.body).findByRole('dialog', { name: "Reviewer's instructions" });
-    await waitFor(() => expect(within(dialog).getByText(/agents\/reviewer\.md · \d+ words/)).toBeVisible());
+    const dialog = await within(document.body).findByRole('dialog', { name: "Agora's instructions" });
+    await waitFor(() => expect(within(dialog).getByText(/agents\/agora\.md · \d+ words/)).toBeVisible());
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     await userEvent.tab();
     await userEvent.tab();

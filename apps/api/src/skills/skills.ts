@@ -315,8 +315,8 @@ export type GivenSkill = {
 /**
  * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, as the package's `agentSkillsFound`
  * finds them). A skill no place has is a row with the refusal the card says; one found in the repository says its folder in `foundIn`,
- * and where the board pages nothing there, as a skill named with its folder is, reads `from: null`. One found in the `skills/` of the factory's tree
- * `tree`, where an agent of that tree finds it first, is the factory's.
+ * and where the board pages nothing there, as a skill named with its folder is, reads `from: null`. One found in the `skills/` of the
+ * factory's tree `tree`, where an agent of that tree finds it first, is the factory's.
  * @param skills The skills the agent gives, in its order.
  * @param found Where a start finds each.
  * @param repo The repository's folder, or undefined where there is none.

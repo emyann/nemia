@@ -4,19 +4,22 @@ import { expect, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import type { InboxEntry } from '@/lib/api/inbox';
 import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
-import { CARD_LEAST, InboxCard, InboxCardRow, type CardSize } from './InboxCard';
+import { CARD_LEAST, InboxCard, InboxList, type CardSize } from './InboxCard';
 
-/** A card drawn in `size`, or as a row where `row` is given, over a store that holds the factory `nemia`, `width` wide. */
-const drawn = (entry: InboxEntry, size: CardSize | undefined, row = false, width: number | string = row ? 920 : 340) => (
+/** A card drawn in `size`, over a store that holds the factory `nemia`, `width` wide. */
+const drawn = (entry: InboxEntry, size: CardSize | undefined, width: number | string = 340) => (
   <QueryClientProvider client={seeded([[factoriesQuery.queryKey, [factoryView(FACTORY)]]])}>
     <div style={{ width }}>
-      {row ? (
-        <ul>
-          <InboxCardRow entry={entry} />
-        </ul>
-      ) : (
-        <InboxCard entry={entry} size={size} />
-      )}
+      <InboxCard entry={entry} size={size} />
+    </div>
+  </QueryClientProvider>
+);
+
+/** The cards `entries` as the list, in a page column of its own (`@container/page`) `width` wide, over the same store. */
+const listed = (entries: readonly InboxEntry[], width: number) => (
+  <QueryClientProvider client={seeded([[factoriesQuery.queryKey, [factoryView(FACTORY)]]])}>
+    <div className="@container/page" style={{ width }}>
+      <InboxList entries={entries} />
     </div>
   </QueryClientProvider>
 );
@@ -34,8 +37,8 @@ const started = (state: InboxEntry['state'], phase: InboxEntry['phase']) => ({
 
 /**
  * A card of the Inbox, one story a state: filed with its one Start, queued behind a chain, at work, waiting on its person, done,
- * refused, stuck behind a card only a person can release, in the compact size of a chain, and as a row. The frame takes a colour only for
- * a card at work, waiting, refused or stuck.
+ * refused, stuck behind a card only a person can release, in the compact size of a chain, and as the list, wide and narrow. The frame
+ * takes a colour only for a card at work, waiting, refused or stuck.
  */
 const meta: Meta<typeof InboxCard> = { title: 'Store/InboxCard', component: InboxCard, tags: ['network'] };
 export default meta;
@@ -140,12 +143,74 @@ export const Compact: Story = {
   },
 };
 
-/** A card as a row of the list: the card first, then its tag, where it runs, when it was filed, and its actions. */
-export const Row: Story = {
-  args: { entry: started('running', 'working'), size: 'regular' },
-  render: (args) => drawn(args.entry, args.size, true),
+/** The list's rows, one of each kind: at work with its tag, filed and not started, one that reads a run, one with a long title. */
+const ROWS: readonly InboxEntry[] = [
+  started('running', 'working'),
+  { ...unstartedCard('decode-the-reads', FACTORY), title: 'Decode the reads', labels: { area: 'board', work: 'feature' } },
+  { ...unstartedCard('read-the-run', FACTORY), title: 'Read the run before it', from: ['ship-it-k2rq'] },
+  {
+    ...unstartedCard('tools-touched-runs-at-most-h-a599', FACTORY),
+    title: 'Touched runs at most half of a workspace, and names each file it refuses where it refuses one of them',
+  },
+];
+
+/** The left edge of what each cell of the list's rows draws, column by column, to the pixel; an empty or hidden cell is left out. */
+const edgesOf = (root: HTMLElement) => {
+  const rows = [...root.querySelectorAll('tbody tr')];
+  const columns = rows[0]?.children.length ?? 0;
+  return Array.from({ length: columns }, (_, column) =>
+    rows.flatMap((row) => {
+      const drawn = row.children[column]?.firstElementChild;
+      return drawn && drawn.getClientRects().length > 0 ? [Math.round(drawn.getBoundingClientRect().left)] : [];
+    }),
+  );
+};
+
+/**
+ * The cards as the list, wide: one header row of five columns, and every column's content standing at one x down the rows, whatever the
+ * tag, the time or the button says. A row lights under the pointer, and a press on it opens the card's page.
+ */
+export const List: Story = {
+  args: { entry: started('running', 'working') },
+  render: () => listed(ROWS, 1040),
+  play: async ({ canvasElement, userEvent }) => {
+    const table = within(canvasElement).getByRole('grid', { name: 'Cards' });
+    await expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((head) => head.textContent),
+    ).toEqual(['Card', 'State', 'Factory / workflow', 'Filed', 'Actions']);
+    const edges = edgesOf(table);
+    await expect(edges.map((column) => column.length)).toEqual([4, 1, 4, 4, 4]);
+    await expect(edges.map((column) => new Set(column).size)).toEqual([1, 1, 1, 1, 1]);
+    const row = table.querySelector<HTMLElement>('tr[data-card="decode-the-reads"]');
+    if (row === null) throw new Error('the row of decode-the-reads is not drawn');
+    await userEvent.hover(row);
+    await waitFor(() => expect(row).toHaveAttribute('data-hovered'));
+    const filed = row.querySelector<HTMLElement>('[data-card-filed]');
+    if (filed === null) throw new Error('the Filed cell of decode-the-reads is not drawn');
+    await userEvent.click(filed);
+    const ground = canvasElement.querySelector('[data-story-ground]');
+    await waitFor(() => expect(ground?.getAttribute('data-at')).toBe('/inbox/decode-the-reads'));
+  },
+};
+
+/** The list in a page column under the frame grid's 768-pixel step: Factory / workflow and Filed fold under each title. */
+export const ListNarrow: Story = {
+  args: { entry: started('running', 'working') },
+  render: () => listed(ROWS, 600),
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('listitem', { name: 'Card ship-it' })).toBeVisible();
+    const table = within(canvasElement).getByRole('grid', { name: 'Cards' });
+    await expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((head) => head.textContent),
+    ).toEqual(['Card', 'State', 'Actions']);
+    const folded = table.querySelector('tr[data-card="ship-it"] [data-card-folded]');
+    await expect(folded).toBeVisible();
+    await expect(folded).toHaveTextContent('nemia / quick');
+    const edges = edgesOf(table).filter((column) => column.length > 0);
+    await expect(edges.map((column) => new Set(column).size)).toEqual([1, 1, 1]);
   },
 };
 
@@ -155,7 +220,7 @@ export const Row: Story = {
  */
 export const LongestName: Story = {
   args: { entry: { ...unstartedCard('tools-touched-runs-at-most-h-a599', FACTORY), title: 'Touched runs at most half of a workspace' } },
-  render: (args) => drawn(args.entry, args.size, false, CARD_LEAST),
+  render: (args) => drawn(args.entry, args.size, CARD_LEAST),
   play: async ({ canvasElement }) => {
     const card = within(canvasElement).getByRole('article', { name: 'Card tools-touched-runs-at-most-h-a599' });
     const edge = card.getBoundingClientRect().right + 0.5;

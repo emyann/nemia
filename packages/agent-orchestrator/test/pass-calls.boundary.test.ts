@@ -304,11 +304,7 @@ row(FILED, 'an approved ending is filed in the checkout, once the pass has read 
   await runWith(b.e, approveRun(run.id, 'ship', 'Merge it.'));
   const landing = await pass(b, run.id);
   assert.deepEqual(landing.advanced.filed, ['ship']);
-  assert.deepEqual(
-    landing.calls,
-    ['view R-implement', 'view R-implement', 'file R-ship'],
-    "the pass's read, the checkout's claim read afresh (`checkoutHold`), and the filing",
-  );
+  assert.deepEqual(landing.calls, ['view R-implement', 'view R-implement', 'file R-ship'], "the pass's read, and the filing");
   assert.deepEqual(landing.counted, { journals: 2, act: 5 });
 });
 

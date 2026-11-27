@@ -1,6 +1,6 @@
 /**
  * What one pass of the tick reads, counted on a store of runs not at rest: each task's view once a pass (`reportedEngine`), the cap's slots
- * once a pass and only where a claim on a repository's checkout waits on one (`passRead`, `checkoutHold`), each run another waits on once a
+ * once a pass (`passRead`), each run another waits on once a
  * pass (`Parents`), one `standing` for each repository, place and base branch (`passStanding`), and a run's asks folder listed once a read
  * (`readAsks`, `runRecord`). Identities on the reads, never a time.
  *

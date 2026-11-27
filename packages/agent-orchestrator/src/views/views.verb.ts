@@ -715,7 +715,7 @@ export const keptParent = Effect.fn('keptParent')(function* (id: string, read: M
 
 /**
  * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id: what the pass's `admit`,
- * `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs (`needOf`) all read through. Made by the pass and dropped with it,
+ * `liftHold` and the cap's needs (`needOf`) all read through. Made by the pass and dropped with it,
  * so a parent the pass succeeds is read succeeded on the next.
  */
 export type Parents = { read: Map<string, ParentRun> };

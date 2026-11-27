@@ -129,9 +129,8 @@ export function remoteRetryRefusal(step: StepSpec, flag: 'model' | 'budget', val
 export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
 
 /**
- * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: base`, or its
- * former spelling `main`, whose checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading
- * assumes a harness of ours.
+ * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent. Nothing else is judged
+ * against a remote harness: the key's own reading assumes a harness of ours.
  * @param step The step file, as the refusal names it.
  * @param meta The step's lines, by key, its agent's given among them.
  * @param harness The step's harness, a remote agent's.

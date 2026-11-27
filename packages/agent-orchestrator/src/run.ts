@@ -102,8 +102,8 @@ export { heldRefusal, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneR
 export type { Pruning } from './forget/prune/prune.ts';
 export { endingSteps, gateRefusal, ownNote, toDecide, toDecideWords } from './ending/ending.ts';
 export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
-export { admissionOrder, ceilingLines, heldCheckouts, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
-export type { MainClaim, RunSlot } from './cap/cap.ts';
+export { admissionOrder, ceilingLines, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
+export type { RunSlot } from './cap/cap.ts';
 export { resultSteps, tipBranches, tipsSeen } from './branches/index.ts';
 export { cutName, GIVEN, givenPlan, handOffDue, LINE_NAME, workspacePlan } from './workspace/workspace.ts';
 export type { Given } from './workspace/workspace.ts';

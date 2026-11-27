@@ -604,10 +604,7 @@ const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string
  *
  * A folder run's steps work in folders the run makes, and nothing here is git's (`places.store.ts`). Without
  * isolation every step works in the repository itself, which is safe only as `validate` refuses a
- * workflow that could run two steps at once in that mode. `workspace: base` is the repository's own
- * checkout, as a person left it, for a workflow's last step: it merges onto the base branch, which is
- * checked out there and so in no worktree. Nothing is cut, merged or provisioned, and `validate` keeps
- * any other step from running beside it.
+ * workflow that could run two steps at once in that mode.
  *
  * `inherit` costs nothing — the step continues where the last one left off. `fork` and `merge` are cut by the run's place, its `make` asked
  * off the event loop of `place`, for a workspace of their own at `<home>/worktrees/<run>/<leaf>` on the branch its place names for the run

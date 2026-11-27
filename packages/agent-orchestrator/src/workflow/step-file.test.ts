@@ -1015,19 +1015,11 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
       },
     },
     {
-      row: 'workspace: base, after place, before harness',
+      row: 'slot: none, after place, before harness',
       run: () =>
         assert.equal(
-          roundTrip('ship', '---\nafter: review\nplace: git\ngate: true\nworkspace: base\nharness: claude\n---\nShip it.\n'),
-          ['---', 'after: review', 'place: git', 'workspace: base', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
-        ),
-    },
-    {
-      row: 'slot: none, after workspace, before harness',
-      run: () =>
-        assert.equal(
-          roundTrip('supervise', '---\nplace: git\nharness: claude\nslot: none\nworkspace: base\n---\nWatch the runs.\n'),
-          ['---', 'place: git', 'workspace: base', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
+          roundTrip('supervise', '---\nplace: git\nharness: claude\nslot: none\n---\nWatch the runs.\n'),
+          ['---', 'place: git', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
         ),
     },
     {

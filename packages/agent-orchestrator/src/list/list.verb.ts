@@ -1,8 +1,7 @@
 /**
  * The package's one reading of a run (`listReading`), which `nemia ls` (`list`, `runsListed`) and the api's list answer from: the pure
  * listing over one read of each task, and what `assess` says of the run on the same inputs. And the runs nobody judged (`unjudgedOf`).
- * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
- * controller, reaching the runtime through the client (`runtime-client.ts`).
+ * A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { StoreRoot } from '../config/root.store.ts';
 import { StoreConfig } from '../config/config.store.ts';

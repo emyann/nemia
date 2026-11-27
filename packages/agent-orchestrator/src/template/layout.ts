@@ -277,7 +277,6 @@ const STEP: Shape = {
     after: 'strings',
     input: 'strings',
     place: 'string',
-    workspace: 'string',
     gate: 'boolean',
     budget: 'count',
     check: 'words',

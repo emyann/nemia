@@ -308,7 +308,7 @@ describe('a2a-agents.json, the secrets a remote step is given and the keys it ma
     );
     assert.match(
       loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nworkspace: base\n---\nx\n')),
-      /^ask: `workspace: base` runs the step in the repository's own checkout/,
+      /^ask: a step may not set `workspace`/,
     );
     assert.deepEqual(
       REMOTE_REFUSED_KEYS,

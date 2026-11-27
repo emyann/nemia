@@ -76,7 +76,6 @@ const withAgent = (id: string) => {
     tools: ['Read'],
     retries: 2,
     gate: true,
-    workspace: 'base',
     output: {
       file: 'review.json',
       schema: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false },
@@ -89,11 +88,7 @@ const withAgent = (id: string) => {
 /** Each frozen step key the parser types, broken as a person's edit would break it: where it is, and what `runRecord` says is there. */
 const BROKEN: ReadonlyArray<[string, (step: Record<string, unknown>) => void, string]> = [
   ['retries', (step) => (step.retries = '2'), 'its `workflow.1.retries` is "2", where nemia writes number'],
-  [
-    'workspace',
-    (step) => (step.workspace = 'shelf'),
-    'its `workflow.1.workspace` is "shelf", where nemia writes "main" | "base" | "folder"',
-  ],
+  ['workspace', (step) => (step.workspace = 5), 'its `workflow.1.workspace` is 5, where nemia writes string'],
   ['gate', (step) => (step.gate = 'yes'), 'its `workflow.1.gate` is "yes", where nemia writes true'],
   ['tools', (step) => (step.tools = 'Read'), 'its `workflow.1.tools` is "Read", where nemia writes array'],
   [
@@ -205,6 +200,13 @@ describe("a record the tick did not write is refused by `runRecord` at its field
     assert.equal('factory' in runRecord(ROOT, 'r-nofactory'), false);
     put('r-other', { ...aRecord('r-other'), factory: 'acme' });
     assert.equal(runRecord(ROOT, 'r-other').factory, 'acme');
+  });
+  test('a run frozen with a step that worked in the repository checkout (`workspace: base`, retired) still reads', () => {
+    const record = aRecord('r-retired');
+    (record.workflow as Array<Record<string, unknown>>)[0].workspace = 'base';
+    put('r-retired', record);
+    assert.equal(runRecord(ROOT, 'r-retired').id, 'r-retired');
+    dropRecord(ROOT, runKey('r-retired'));
   });
   test('`listRuns` leaves out each record refused above, says each with its fix, and lists every other run', () => {
     const said: string[] = [];

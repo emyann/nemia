@@ -723,8 +723,8 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * judged in full gives the event loop up once it is (`Effect.yieldNow`), so the api's requests are answered between two runs and not
  * only once the pass ends: a pass's reads are synchronous, and it yields to no other fiber of its own accord (`meteredPass`).
  *
- * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout are
- * read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot` is
+ * `pass` holds the pass's one listing, `run` among them, handed to every full pass: the store is not listed again, nor the
+ * cap's slots read, nor a run others wait on, twice in a pass. `slot` is
  * `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like any
  * other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a step
  * ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.

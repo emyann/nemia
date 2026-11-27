@@ -3,7 +3,9 @@
  * `factory`, `workflow` and `state`, which every factory has. The keys come from the cards in view, never from a list written for one
  * factory: a factory whose cards hold no label of their own offers exactly the three. `factory` and `workflow` are read off the labels
  * the card list counts (the orchestrator's `cardLabels` gives every card both); `state` is the card's phase, read off the list's counts,
- * never a label, so a label a card names `state` is not offered as a second `state`.
+ * never a label, so a label a card names `state` is not offered as a second `state`. What the verifier does not reach, that each key
+ * is offered once, that every label key held is offered, and that each offers exactly the values its cards hold with their counts, is a
+ * test's (`test/search-bar.test.ts`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { CardPhase } from 'objects';
@@ -21,57 +23,45 @@ export type SearchKey = { readonly key: string; readonly values: readonly KeyVal
 const fixed = (key: string) => key === 'factory' || key === 'workflow' || key === 'state';
 
 /** Whether no two of `items` are the same. */
-const once = (items: readonly string[]) => new Set(items).size === items.length;
-
-/** The labels of `labels` under `key`. */
-const under = (labels: readonly LabelInUse[], key: string) => labels.filter((label) => label.key === key);
+const once = (items: readonly string[]) => items.every((one, at) => !items.slice(0, at).includes(one));
 
 const searchKeysSpec = spec<(labels: readonly LabelInUse[], counts: Readonly<Record<CardPhase, number>>) => readonly SearchKey[]>({
-  requires: ({ input: [labels] }) => once(labels.map((label) => `${label.key}=${label.value}`)),
+  requires: ({ input: [labels, counts] }) =>
+    once(labels.map((label) => `${label.key}=${label.value}`)) &&
+    [counts.notStarted, counts.blocked, counts.waiting, counts.working, counts.done, counts.failed, counts.cancelled].every((n) => n >= 0),
   ensures: {
     theThreeComeLast: {
       description: 'The last three keys are factory, workflow and state, in that order, whatever the cards hold',
       condition: ({ output }) =>
-        output.length >= 3 &&
-        output[output.length - 3]?.key === 'factory' &&
-        output[output.length - 2]?.key === 'workflow' &&
-        output[output.length - 1]?.key === 'state',
-    },
-    noKeyTwice: {
-      description: 'No key is offered twice',
-      condition: ({ output }) => once(output.map((one) => one.key)),
+        output.length >= 3 && output.at(-3)?.key === 'factory' && output.at(-2)?.key === 'workflow' && output.at(-1)?.key === 'state',
     },
     labelKeysAreHeld: {
       description: 'Every key before the three is a key some card in view holds as a label, and none of the three',
       condition: ({ input: [labels], output }) =>
         output.slice(0, -3).every((one) => !fixed(one.key) && labels.some((label) => label.key === one.key)),
     },
-    everyHeldKeyOffered: {
-      description: 'Every label key a card in view holds is offered',
-      condition: ({ input: [labels], output }) => labels.every((label) => output.some((one) => one.key === label.key)),
-    },
-    labelValuesAreTheLabels: {
-      description: 'A key other than state offers exactly the values the cards hold under it, each with how many hold it',
-      condition: ({ input: [labels], output }) =>
-        output
-          .filter((one) => one.key !== 'state')
-          .every(
-            (one) =>
-              one.values.length === under(labels, one.key).length &&
-              under(labels, one.key).every((label) =>
-                one.values.some((value) => value.value === label.value && value.cards === label.cards),
-              ),
-          ),
-    },
     stateOffersEveryPhase: {
-      description: 'state offers every phase once, each with how many cards in view are in it',
+      description: 'state offers every phase once, in the order the chips draw them, each with how many cards in view are in it',
       condition: ({ input: [, counts], output }) => {
-        const state = output.find((one) => one.key === 'state');
-        const phases = Object.keys(counts) as CardPhase[];
+        const state = output.at(-1);
         return (
           state !== undefined &&
-          state.values.length === phases.length &&
-          phases.every((phase) => state.values.some((value) => value.value === phase && value.cards === counts[phase]))
+          state.key === 'state' &&
+          state.values.length === 7 &&
+          state.values.at(0)?.value === 'waiting' &&
+          state.values.at(0)?.cards === counts.waiting &&
+          state.values.at(1)?.value === 'working' &&
+          state.values.at(1)?.cards === counts.working &&
+          state.values.at(2)?.value === 'blocked' &&
+          state.values.at(2)?.cards === counts.blocked &&
+          state.values.at(3)?.value === 'notStarted' &&
+          state.values.at(3)?.cards === counts.notStarted &&
+          state.values.at(4)?.value === 'done' &&
+          state.values.at(4)?.cards === counts.done &&
+          state.values.at(5)?.value === 'failed' &&
+          state.values.at(5)?.cards === counts.failed &&
+          state.values.at(6)?.value === 'cancelled' &&
+          state.values.at(6)?.cards === counts.cancelled
         );
       },
     },

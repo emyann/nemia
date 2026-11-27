@@ -55,7 +55,7 @@ const readAgain = (factory: string, object: ProposedObject) =>
     ? `nemia get ${RESOURCE_PLURALS.Factory} ${object.metadata.name}`
     : `nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}`;
 
-/** Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the lines that resolve them again; else none. */
+/** Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the line that proposes its owner again; else none. */
 const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal) => {
   const kept = readResolutions(place.home, factory);
   return kept === undefined ? undefined : resolvedAgain(factory, proposal.metadata.name, kept.proposals ?? {}, kept.choices);

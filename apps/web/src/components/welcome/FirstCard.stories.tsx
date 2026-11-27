@@ -92,15 +92,19 @@ export const NoQuick: Story = {
   },
 };
 
-/** A start the api refuses: its words are said, and the page stays. */
+/**
+ * A start the api refuses: its words are said, and the page stays. Start is pressed once it is enabled: the cost line shows before the
+ * workflow's listing is read, and a press on the disabled Start starts nothing.
+ */
 export const Refused: Story = {
   parameters: { msw: firstCardStore({ refuses: 'the factory acme wires quick to no repository: attach it first' }) },
   play: async ({ canvasElement, userEvent }) => {
     const page = await loaded(canvasElement);
     await userEvent.click(page.querySelector<HTMLElement>('[data-first-suggestion="Fix a typo"]')!);
-    await userEvent.click(within(page).getByRole('button', { name: /^Start/ }));
-    await waitFor(() => expect(page.querySelector('[data-first-refused]')).toHaveTextContent('wires quick to no repository'), {
-      timeout: 5000,
-    });
+    const start = within(page).getByRole('button', { name: /^Start/ });
+    await waitFor(() => expect(start).toHaveAccessibleName('Start, gated before it lands'));
+    await expect(start).toBeEnabled();
+    await userEvent.click(start);
+    await waitFor(() => expect(page.querySelector('[data-first-refused]')).toHaveTextContent('wires quick to no repository'));
   },
 };

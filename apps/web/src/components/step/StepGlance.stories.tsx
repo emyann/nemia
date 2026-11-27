@@ -32,7 +32,7 @@ const SURFACE: CSSProperties = {
 /** The glance of the one step of `run`, on the tooltip's surface, with the run's own answer read. */
 const glance = (run: RunDetail) => (
   <div style={SURFACE}>
-    <StepGlance head={headOf({ run, step: run.steps[0]!.name, detail: run, now: NOW })} />
+    <StepGlance head={headOf({ run, step: run.steps[0].name, detail: run, now: NOW })} />
   </div>
 );
 

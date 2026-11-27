@@ -216,7 +216,7 @@ Its arguments:
     park an idea as a card in the inbox, named from its first line;
     each --file is uploaded and carried by the card, as is each file
     beside an idea file that its text names as an image or a link;
-    each --after names a card it waits on, and it starts once they land
+    each --after names a card it waits on, and it starts once they have succeeded
 ```
 
 Files a new card in the inbox, in the namespace's factory (none, in default), from the CardFile body. Answers the Card filed with a 201, naming any label it left out.

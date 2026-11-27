@@ -289,7 +289,7 @@
     },
     {
       "term": "Hold",
-      "meaning": "only a person's hold of a run until other runs land (`nemia hold --until`), or, naming none, until a person lifts it (`nemia hold`, lifted by `nemia hold --off` alone): the run is pending, reason `Waiting`, `on` run while the hold names runs and `on` hold while it names none; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the run object's status (`RunStatus`).",
+      "meaning": "only a person's hold of a run until other runs succeed (`nemia hold --until`), or, naming none, until a person lifts it (`nemia hold`, lifted by `nemia hold --off` alone): the run is pending, reason `Waiting`, `on` run while the hold names runs and `on` hold while it names none; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the run object's status (`RunStatus`).",
       "type": "Run",
       "retired": [
         {
@@ -322,7 +322,7 @@
     },
     {
       "term": "Landed",
-      "meaning": "a run's result is on its base: asked of the place's standing on each pass, never stored. A run lands; `nemia decide` says it has landed, and a run waiting on it (`--after`, a hold's `--until`) goes on.",
+      "meaning": "a run's result is on its base: asked of the place's standing on each pass, never stored. A run lands; `nemia decide` says it has landed. A wait never reads it: a run waiting on another (`--after`, a hold's `--until`) goes on once that run has succeeded, or released (`Released`).",
       "type": "Landed",
       "retired": [
         {
@@ -334,6 +334,12 @@
           "card": "decision 13a: 'landed' for a run's result on its base"
         }
       ]
+    },
+    {
+      "term": "Released",
+      "meaning": "a wait ended by a person: `nemia release <run>` puts a marker beside the run's record (`Run.released`, `/registry/runmarks/<id>/released`), and each run waiting on it (`--after`, a hold's `--until`) goes on as if it had succeeded, whatever its status. A wait otherwise ends when the run it waits on has succeeded, as `nemia ls` says it; the wait reads no git, so a merge by hand releases nothing. A run that failed or was cancelled keeps its waiters waiting on a person (`waitingOnYou`) until it is retried or released. Put once: a run already succeeded or released is refused.",
+      "type": "Run",
+      "retired": []
     },
     {
       "term": "Landing",
@@ -876,7 +882,7 @@
     },
     {
       "term": "Waiting on you",
-      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it — on a hold, where a run it names never lands, and never for a hold that names none, the person's word already given; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name. Whether a run waits on you is `waitsOnYou` alone: something of it is asked of a person (`asksOfAPerson`) and nobody has it in hand (`Assignee`); a run someone has in hand is listed in flight, its asks still asked.",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it — on a hold, where a run it names never succeeds, and never for a hold that names none, the person's word already given; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name. Whether a run waits on you is `waitsOnYou` alone: something of it is asked of a person (`asksOfAPerson`) and nobody has it in hand (`Assignee`); a run someone has in hand is listed in flight, its asks still asked.",
       "type": "RunWaiting",
       "retired": [
         {

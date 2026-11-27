@@ -78,7 +78,7 @@ const stateOn = (row: WaitingRow, step: CodedStep) => stepState(step, Boolean(ro
 
 /**
  * What `row` waits on a person for: a hold only a person lifts first; then the first of its steps, in the run's order, that the api
- * says waits on a person (`waitingOnYou`), by its kind (`kindOn`); then a run it waits on that never lands without a person. None for a
+ * says waits on a person (`waitingOnYou`), by its kind (`kindOn`); then a run it waits on that never succeeds without a person. None for a
  * row that waits on nobody, and for one whose waiting step says a word the board has no kind for.
  * @param row The run's row: its steps with their codes, its hold, the run it waits on and the steps that wait on you.
  */

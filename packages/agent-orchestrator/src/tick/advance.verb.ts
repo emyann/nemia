@@ -57,7 +57,7 @@ import { runOver } from '../run-ending/run-ending.ts';
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass reads settled and not counted before
  * (`settledOf`) with the waits they ended, each round granted, each gate wait not timed and each denied call not counted before
  * (`markedOnce`), and each number of the run's timeline once it is over (`timedOnce`); absent where there is none.
- * `waiting` names the runs whose landing this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
+ * `waiting` names the runs whose success this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
  * them.
@@ -113,13 +113,15 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   reads it landed, and no try of it is filed over a merge still staged.
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
- * - lifts a person's hold on the pass that reads every run it names landed (`keptParent`), and goes on on that pass. A lift sticks, as a
+ * - lifts a person's hold on the pass that reads every run it names succeeded or released (`keptParent`), and goes on on that pass. A
+ * lift sticks, as a
  *   start after `--after` does; only the hold this pass read is lifted, so one put again since stays; and one that names
  *   no run is never lifted here (`holdAdvice`).
  * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
  *   person approved, a run called off. What waits on it is filed on this same pass, since the run reads it settled once it signed
  *   (`phaseOfView`); a close the engine refuses is a note, and asked again by the next pass.
- * - files a run's roots only while it has nothing filed, once every run it waits on (`--after`) has landed (`runReady`), and while the
+ * - files a run's roots only while it has nothing filed, once every run it waits on (`--after`) has succeeded or been released
+ * (`runReady`), and while the
  *   cap on runs in flight leaves it a slot (`runAdmitted`); a run that has started never reads its parents again.
  * - words the feed (`feedWords`) off what it read before it filed anything, and reads nothing again for it: a step it files reaches the
  *   feed on the next pass, as the engine's `pending`.
@@ -477,7 +479,7 @@ const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: RunRead, closer:
 
 /**
  * Whether the run files its roots on this pass: the runs it waits on as they stand (`parent`), whether it has started, what it needs of a
- * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose landing it waits on (`waitsOf`).
+ * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose success it waits on (`waitsOf`).
  */
 type Admission = {
   parent: (id: string) => ParentRun;

@@ -727,8 +727,10 @@ export const wiredRepoFor = Effect.fnUntraced(function* (name: string, workflow:
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
  *
- * `after` names the runs this one waits on (`nemia start --after`): refused before anything is written when one could never land on
- * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
+ * `after` names the runs this one waits on (`nemia start --after`): refused before anything is written when one is not in the
+ * store, is named twice, is this run or is one that waits on it, or is cancelled (`afterRefusal`), and frozen on the record. Any other
+ * run may
+ * be waited on, a folder run's included: the wait ends when it has succeeded, or when a person releases it (`nemia release`). Left out,
  * the record has no `after`.
  *
  * `context` names the runs this one is handed as context (`nemia start --from`): refused before anything is written when one is not in the

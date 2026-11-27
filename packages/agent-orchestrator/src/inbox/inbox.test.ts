@@ -989,6 +989,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     const stalled = lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'failed', stalled: true });
     assert.match(stalled, /needs you/);
     assert.match(stalled, /nemia inbox resend a-1x2y/);
+    assert.match(stalled, /nemia release <the run of a-1x2y>/);
     assert.match(stalled, /nemia inbox edit b-3z4w/);
     assert.match(stalled, /nemia start b-3z4w/);
     assert.match(lineOf({ card: 'a-1x2y', kind: 'missing', stalled: true }), /waiting on a-1x2y \(no such card\)/);

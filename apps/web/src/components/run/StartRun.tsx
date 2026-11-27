@@ -6,7 +6,6 @@ import type { RunView } from '../../lib/api/judged.ts';
 import { files as startFiles } from '../../lib/api/objects.ts';
 import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
-import { afterFor } from '../../lib/inbox';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
@@ -28,9 +27,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * picks, with no rule of its own above it. `place` starts it in a factory, on one of its repositories, which `repo` then is too; a card's
  * start sends the factory alone, and the workflow by its name (`startCard`), for the factory places its run.
  *
- * A team whose every step works in a folder runs on no repository, and the CLI's `start` refuses `--after` for one, since there is no
- * branch to wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks
- * (`afterFor`), none for such a team. A start reads the list of runs again alone (`exact`): a prefix would reach every run's decision,
+ * A start reads the list of runs again alone (`exact`): a prefix would reach every run's decision,
  * which is keyed by the run's state and read again under a key of its own.
  *
  * Files the run is handed (`StartInputs`), as the client hands a start its inputs, are uploaded when Start is pressed, one after another,
@@ -64,7 +61,6 @@ export function StartRun({
   const [after, setAfter] = useState<string[]>([]);
   const [context, setContext] = useState<string[]>([]);
   const handed = useHandedFiles();
-  const inFolders = workflow.folderTeam;
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[]; context: string[]; files: File[] }) => {
       const start = {
@@ -99,7 +95,7 @@ export function StartRun({
       className={card ? 'space-y-2' : 'space-y-2 border-t border-outline-variant pt-4'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after: afterFor(workflow, after), context, files: handed.files });
+        start.mutate({ brief, after, context, files: handed.files });
       }}
     >
       <TextField
@@ -111,7 +107,7 @@ export function StartRun({
         className="w-full"
       />
       <StartInputs {...handed.drawn(start.isPending)} />
-      {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
+      <AfterPicker selected={after} onChange={setAfter} />
       <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
         <StartPress pending={start.isPending} held={!brief.trim() || handed.files.some(pastLimit)}>
@@ -234,18 +230,17 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowRow; repo?
 }
 
 /**
- * The runs a new run waits on (the CLI's `start --after`): the runs on `repo`, the repository a start runs in, those not finished newest
+ * The runs a new run waits on (the CLI's `start --after`): every run of the store, those not finished newest
  * created first, then the finished newest finished first, a page of them at a time with Show older for the next (`usePickerRuns`), each
  * by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which runs it may
- * wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is the one a factory wires for the
- * workflow; with none, the default factory working on no repository, no run is listed, and the form says why. The runs not finished are
+ * wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's.  The runs not finished are
  * read as the picker opens, not on the list's beat, and read again with the feed. A title wraps within its row, read whole, and no row
  * runs past the card it is in, however long the title.
  */
-function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]; onChange: (after: string[]) => void; repo?: string }) {
+function AfterPicker({ selected, onChange }: { selected: readonly string[]; onChange: (after: string[]) => void }) {
   const runs = usePickerRuns();
   const legend = useId();
-  const onRepo: RunView[] | null = repo && !runs.reading ? [...runs.open, ...runs.finished].filter((run) => run.repo === repo) : null;
+  const offered: RunView[] | null = runs.reading ? null : [...runs.open, ...runs.finished];
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
@@ -255,13 +250,9 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       <Body size="small">
         Waits until it succeeds: nothing of it is filed until each has succeeded, and it is handed what each concluded.
       </Body>
-      {!repo ? (
-        <Body size="small" data-no-repo>
-          No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
-        </Body>
-      ) : runs.error ? (
+      {runs.error ? (
         <ReadTrouble what="the runs to wait on" error={runs.error} size="small" />
-      ) : !onRepo ? (
+      ) : !offered ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (
             <Body size="medium" component="div" key={at} className="flex items-center gap-2 px-2 py-1">
@@ -270,11 +261,11 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
             </Body>
           ))}
         </Reading>
-      ) : !onRepo.length ? (
-        <Body size="small">No run on this repository to wait on.</Body>
+      ) : !offered.length ? (
+        <Body size="small">No run to wait on.</Body>
       ) : (
         <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
-          {onRepo.map((run) => (
+          {offered.map((run) => (
             <li key={run.id} data-run={run.id}>
               <Checkbox
                 value={run.id}
@@ -305,7 +296,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           ))}
         </ul>
       )}
-      {repo && !runs.error && runs.more && <ShowOlder onPress={runs.older} />}
+      {!runs.error && runs.more && <ShowOlder onPress={runs.older} />}
     </fieldset>
   );
 }

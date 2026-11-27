@@ -69,7 +69,6 @@ import { sayRun } from '../src/say/say.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { Invalid, isRefusal, type Refusal } from '../src/refusal/refusal.ts';
 import * as views from '../src/views/views.verb.ts';
-import { NOTHING_READ, standingLiveOf as liveOf, standingReader } from '../src/standing/standing.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-');
@@ -1090,7 +1089,6 @@ async function _verbProgramTypes() {
 
 /** The views' programs, a runner of one over `e` as its plain face runs it, and an engine over `e` whose feed says `entries`. */
 const viewPrograms = async () => {
-  const live = (ids: readonly string[]) => runPlaced(liveOf(ids));
   const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>) =>
     Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e)))) satisfies Promise<A>;
   const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']) =>
@@ -1098,7 +1096,7 @@ const viewPrograms = async () => {
       ...e,
       feed: (after = 0) => Effect.succeed({ entries: entries.slice(after), cursor: entries.length }),
     }) satisfies Engine;
-  return { Effect, over, fed, live, nothingRead: () => standingReader(NOTHING_READ), ...views };
+  return { Effect, over, fed, ...views };
 };
 
 /**

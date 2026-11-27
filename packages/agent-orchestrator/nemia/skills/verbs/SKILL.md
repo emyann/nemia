@@ -418,7 +418,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                park an idea as a card in the inbox, named from its first line;
                                each --file is uploaded and carried by the card, as is each file
                                beside an idea file that its text names as an image or a link;
-                               each --after names a card it waits on, and it starts once they land
+                               each --after names a card it waits on, and it starts once they have succeeded
                                each tool's words: tools.md#inbox_add
                                on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]

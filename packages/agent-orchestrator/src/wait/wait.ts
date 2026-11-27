@@ -284,12 +284,9 @@ function stopWords(run: Run, stop: HoldStop, until: readonly string[]) {
   if (stop === 'pruned')
     return `${id} was ${run.pruned ? prunedWords(run.pruned) : 'pruned'}: nothing of it is filed again, so there is nothing to hold.`;
   if (stop === 'succeeded') return `${id} has succeeded: nothing of it is left to file, so there is nothing to hold.`;
-  if (stop === 'held') {
-    const held = run.hold ?? { at: '', until: [] };
-    const all = [...new Set([...held.until, ...until])];
-    return `${id} is already ${holdWord(held.until.map((u) => ({ run: u })))} (nemia hold, at ${held.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — nemia hold ${id} --off, then ${holdAgain(id, all, held.why)}.`;
-  }
-  return `${id} cannot be held.`;
+  const held = run.hold ?? { at: '', until: [] };
+  const all = [...new Set([...held.until, ...until])];
+  return `${id} is already ${holdWord(held.until.map((u) => ({ run: u })))} (nemia hold, at ${held.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — nemia hold ${id} --off, then ${holdAgain(id, all, held.why)}.`;
 }
 
 /**

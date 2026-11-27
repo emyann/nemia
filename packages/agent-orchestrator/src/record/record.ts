@@ -84,7 +84,7 @@ export const placeOf = (run: Pick<Run, 'place'>) => run.place?.kind ?? 'git';
 export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'git';
 
 /**
- * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
+ * A person's hold on a run, as its file says it: when it was put, the runs it waits on to succeed, in the order they were named, the
  * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line; and
  * the caller who put it (`actor`, objects' `Actor`): absent on a hold put in-process, and on a file older code wrote.
  */

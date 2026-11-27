@@ -41,7 +41,7 @@
     },
     {
       "term": "Landed",
-      "meaning": "a run's result is on its base, as the board says it: a hold or a start that waits until a run lands, a context run not landed, the decision's `land it`.",
+      "meaning": "a run's result is on its base, as the board says it: a context run not landed, the decision's `land it`. A hold or a start waits until a run has succeeded, never until it lands.",
       "retired": [
         {
           "spelling": "shipped",

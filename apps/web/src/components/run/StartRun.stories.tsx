@@ -14,7 +14,7 @@ const fileOf = (name: string, size: number, type = 'image/png') => {
   return file;
 };
 
-/** A workflow whose every step works in a folder, so the form draws no runs to wait on. */
+/** A workflow whose every step works in a folder: its form draws the runs to wait on all the same. */
 const NOTE: WorkflowListing = {
   name: 'note',
   from: 'user',

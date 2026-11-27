@@ -110,7 +110,7 @@
     },
     {
       "term": "Card wait",
-      "meaning": "a card not started whose `after:` names a card that has not landed: it is listed with each (`waits`, the Card's `status.waitingOn`), queued by no trigger and started by no tick until the last lands. A named card has landed when a run started from it has, as its own `nemia decide` says, or the card its run passed the work on to has (a workflow node's card, `nemia inbox resend`); a wait on a card the store does not know, on a cycle of `after:`, or at a card whose run ended unlanded or whose start was refused is stalled, waiting on a person (`cardLanded`, `waitStalled`, `packages/agent-orchestrator/src/inbox/waits.ts`). A start by hand starts it all the same.",
+      "meaning": "a card not started whose `after:` names a card that has not succeeded: it is listed with each (`waits`, the Card's `status.waitingOn`), queued by no trigger and started by no tick until the last has succeeded. A named card has succeeded when a run started from it has, as `nemia ls` says it, or the card its run passed the work on to has (a workflow node's card, `nemia inbox resend`); a wait on a card the store does not know, on a cycle of `after:`, or at a card whose run ended without succeeding or whose start was refused is stalled, waiting on a person (`nemia release <run>` frees a run's waiters) (`cardLanded`, `waitStalled`, `packages/agent-orchestrator/src/inbox/waits.ts`). A start by hand starts it all the same.",
       "type": "ListedWait"
     }
   ]

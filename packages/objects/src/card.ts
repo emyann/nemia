@@ -202,7 +202,7 @@ export const CardWait = Schema.Struct({
   ),
   stalled: Schema.Boolean.annotate({
     description:
-      'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without succeeding or whose start was refused. Fix it with nemia inbox resend <card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
+      'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without succeeding or whose start was refused. Fix it with nemia inbox resend <card>, nemia release <the run of that card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
   }),
 }).annotate({ description: 'One card a card waits on that has not succeeded, and where its work stands.' });
 export type CardWait = typeof CardWait.Type;

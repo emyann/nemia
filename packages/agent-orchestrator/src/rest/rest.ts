@@ -44,7 +44,7 @@ export type RestFacts = {
    * run.
    */
   checkoutAsked: boolean;
-  /** The runs it waits on (`waitsOf`): whether they landed is theirs. */
+  /** The runs it waits on (`waitsOf`): whether they succeeded is theirs. */
   waiting: readonly unknown[];
   /** Whether it counts against the cap on runs in flight, or the cap holds it: both read other runs. */
   inFlight: boolean;
@@ -71,7 +71,7 @@ export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
 export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
 /**
- * The files a person keeps beside a run that keep it out of the memo while it is not called off: a hold, whose runs land on their own,
+ * The files a person keeps beside a run that keep it out of the memo while it is not called off: a hold, whose runs succeed on their own,
  * and an assignee, who lapses with time. Pure.
  * @param run The run's record: its hold, its assignee and whether it was called off.
  */

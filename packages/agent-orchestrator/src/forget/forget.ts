@@ -91,7 +91,8 @@ export const askOffLine = (id: string, ask: AskName) =>
  *   still stopping. Cancelling and forgetting are two decisions, and this never takes the first: a task the engine no longer knows is not
  *   in flight, so a run whose board was cleared is forgotten.
  * - **anything a pass would file** (`assess`): a step ready, a check, a try or a round due, on a run nobody called off. A pass may be
- *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they land, and
+ *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they succeed,
+ * and
  *   is held the same way.
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by its verb's `--off` (`offOf`).
@@ -104,7 +105,7 @@ export const askOffLine = (id: string, ask: AskName) =>
  *
  * An ending that has not run whose result git already has (`resultOnBase`) is not named at its gate: its approval is refused
  * (`approvalRefusal`). A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers
- * then, hold it too. A cancelled run never lands, so for a run held until it does, the fix named is lifting that hold.
+ * then, hold it too. A cancelled run never succeeds, so for a run held until it does, the fix named is lifting that hold.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
  * record that froze no workflow and whose folder does not read (`stepsOf`): nothing ready can be judged, and nothing needs to be, since
@@ -376,12 +377,12 @@ function unlandedHeld(c: Facts) {
     : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`;
 }
 
-/** What the run files once the runs it waits on have landed. */
+/** What the run files once the runs it waits on have succeeded. */
 function waitsHeld(c: Facts) {
   const { run, ready, waits } = c;
   const after = run.after;
   if (!waits || !after) return undefined;
-  return `it waits on ${andList(after)}, and files ${andList(ready)} once ${after.length > 1 ? 'they have' : 'it has'} landed`;
+  return `it waits on ${andList(after)}, and files ${andList(ready)} once ${after.length > 1 ? 'they have' : 'it has'} succeeded`;
 }
 
 /** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */

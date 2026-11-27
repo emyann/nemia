@@ -119,7 +119,7 @@ export type RunSummary = {
    * first step that waits on a person for a run a person's word stops (`runCodes`).
    */
   reason: RunReason;
-  /** What a `Waiting` run waits on (`run`, a person's hold until other runs land); null for any other reason. */
+  /** What a `Waiting` run waits on (`run`, a person's hold until other runs succeed); null for any other reason. */
   on: WaitOn | null;
   /** Where an `AwaitingAnswer` run's answer is asked, the step's it stopped on; null for any other reason, or where none is known. */
   via: AnswerVia | null;
@@ -128,8 +128,8 @@ export type RunSummary = {
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    *
-   * A run waiting on runs moves: the tick files its roots once they land. Not one waiting on a run that never lands without a
-   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
+   * A run waiting on runs moves: the tick files its roots once they succeed. Not one waiting on a run that never succeeds without a
+   * person — no such run, a failed or cancelled one (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
    * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing
    * until then.
    */

@@ -593,7 +593,6 @@ const PINNED: Record<string, string[]> = {
     'staleAfterMs',
     'standingLine',
     'standingLive',
-    'standingLiveOf',
     'standingReader',
     'standingSnapshot',
     'startFromInbox',

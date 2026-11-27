@@ -646,6 +646,17 @@ describe('`nemia start --after` reads no branch: a parent whose branch is droppe
     assert.equal(world().head(wt), tip, 'cut at the base branch’s tip');
     assert.equal(fs.existsSync(path.join(wt, 'unmerged.txt')), false, 'without the parent’s commits');
   });
+  test('a parent started with no worktree, so with no result branch, succeeds and frees its child all the same', async () => {
+    const p = await started({ brief: 'the parent on the base itself', repo, workflowDir: oneStep(), isolate: false });
+    await tick(p.id);
+    assert.equal(runRecord(ROOT, p.id).steps.implement.branch, undefined, 'it cuts no branch');
+    const child = await started({ brief: 'the child of a parent with no branch', repo, workflowDir: twoSteps(), after: [p.id] });
+    assert.deepEqual((await tick(child.id)).filed, [], 'the parent has not succeeded');
+    board().settle(`${p.id}-implement`, 'succeeded', SIGNED);
+    await tick(p.id);
+    assert.equal(await releasedNow(p.id), true);
+    assert.deepEqual((await tick(child.id)).filed, ['implement'], 'it needs no branch to release its waiter');
+  });
   test('a hold until a run that succeeds lifts, and a hold until a failed one waits on you until that run is released', async () => {
     const ok = await aParent(repo, { signed: false });
     const failed = await aParent(repo, { signed: false });

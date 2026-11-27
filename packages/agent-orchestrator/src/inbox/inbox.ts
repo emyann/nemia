@@ -529,7 +529,7 @@ export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
 export const cardInPlay = (l: Pick<InboxListing, 'state'>) => CARD_IN_PLAY[l.state];
 
 /**
- * One card a card waits on that has not landed, as the listing says it: the card named; `waiting` at the card its work stands at (`at`,
+ * One card a card waits on that has not succeeded, as the listing says it: the card named; `waiting` at the card its work stands at (`at`,
  * where it is another), `missing` where the store knows nothing of it, or `cycle` where its `after:` leads back to the waiting card, by
  * the route (`cycle`); the state of the card the work stands at as listed, where it was read; and whether only a person can release it
  * (`waitStalled`). The objects' `CardWait`.
@@ -685,7 +685,8 @@ const unread = (name: string, file: string, startedAs: string[], error: string) 
   }) satisfies CardListing;
 
 /**
- * The cards of a card's `after:` that have not landed (`cardWaitsOf`), each a `ListedWait` with no state yet: a wait on a card on a cycle
+ * The cards of a card's `after:` that have not succeeded (`cardWaitsOf`), each a `ListedWait` with no state yet: a wait on a card on a
+ * cycle
  * of `after:` lines back to this card (`afterCycle`) said as the cycle. Nothing for a card started, one that names none, or where no
  * `waiting` is handed.
  */
@@ -931,7 +932,8 @@ export function waitSaid(name: string, w: ListedWait) {
       : w.kind === 'cycle'
         ? `(a cycle: ${(w.cycle ?? []).join(' → ')})`
         : `${w.at === undefined ? '' : `at ${w.at} `}(${w.state ?? 'not read'})`;
-  const resend = w.kind === 'waiting' && w.state !== 'refused' ? `nemia inbox resend ${w.at ?? w.card}, ` : '';
+  const ended = w.kind === 'waiting' && w.state !== 'refused';
+  const resend = ended ? `nemia inbox resend ${w.at ?? w.card}, nemia release <the run of ${w.at ?? w.card}>, ` : '';
   const fix = w.stalled ? ` — needs you: ${resend}nemia inbox edit ${name} to change after:, or nemia start ${name}` : '';
   return `waiting on ${w.card} ${where}${fix}`;
 }

@@ -279,6 +279,30 @@ test("a folder team whose agent is given one of Nemia's builtin skills starts: i
   assert.deepEqual(gitAsked(), []);
 });
 
+test('a folder run started --after another folder run waits for it, and files its roots once that run has succeeded, with no git asked', async () => {
+  const solo = path.join(ROOT, 'workflows', 'solo');
+  fs.mkdirSync(solo, { recursive: true });
+  fs.writeFileSync(path.join(solo, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite the note\n');
+  const parent = await runPlaced(startRun({ brief: 'the first note', repo: NOT_A_REPO, workflowDir: solo }));
+  const child = await runPlaced(startRun({ brief: 'the second note', repo: NOT_A_REPO, workflowDir: solo, after: [parent.id] }));
+  assert.deepEqual(runRecord(ROOT, child.id).after, [parent.id]);
+  const { e, settle } = board();
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, parent.id)))).filed, ['write']);
+  assert.deepEqual(
+    (await runWith(e, advanceRun(runRecord(ROOT, child.id)))).filed,
+    [],
+    'nothing of the child is filed while its parent works',
+  );
+  settle(`${parent.id}-write`, 'succeeded', WROTE_NONE);
+  await runWith(e, advanceRun(runRecord(ROOT, parent.id)));
+  assert.deepEqual(
+    (await runWith(e, advanceRun(runRecord(ROOT, child.id)))).filed,
+    ['write'],
+    'its parent has succeeded: its roots are filed',
+  );
+  assert.deepEqual(gitAsked(), []);
+});
+
 test('a git team is still a repository run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });

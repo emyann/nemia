@@ -33,7 +33,7 @@ export const INBOX_COLUMNS: readonly TableColumnDefinition[] = [
   column('Last start', "the tick's last start of the queued card that did not happen, and what to do, empty where none", 1),
   column(
     'Waits',
-    'the cards of its after: that have not landed, where the work of each stands, and what to do where only a person can release it; empty where none',
+    'the cards of its after: that have not succeeded, where the work of each stands, and what to do where only a person can release it; empty where none',
   ),
   column('State', 'where the card is in its life: its run\'s phase once started, "waiting on you" where its run waits on a person'),
   column('Runs', 'the runs the card was started as, comma-separated'),

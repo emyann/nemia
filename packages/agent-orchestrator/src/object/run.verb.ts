@@ -126,6 +126,7 @@ const specOf = (run: Run, at: RunReading) =>
     after: [...(run.after ?? [])],
     context: [...(run.context ?? [])],
     from: run.from ? { inbox: run.from.inbox } : null,
+    startedBy: run.startedBy ? { run: run.startedBy.run, node: run.startedBy.node } : null,
   }) satisfies RunSpec;
 
 /**
@@ -248,6 +249,10 @@ const asksOf = (judged: RunReading['judged'], name: string) => {
   return asks ? { asks } : {};
 };
 
+/** What a step sent, as the Run serves it (`RunStepStatus.sent`): the run its workflow node started or the card its backlog node filed. */
+const sentOf = (sent: { run: string; at: string } | { card: string; at: string } | undefined) =>
+  sent === undefined ? {} : { sent: 'run' in sent ? { run: sent.run, at: sent.at } : { card: sent.card, at: sent.at } };
+
 /**
  * One step's status (`RunStepStatus`), off what `runObject` read once for the run (`StepAt`), its current try's short read off its tries.
  * One more observation for a blocked session's last line (`lastLineOf`).
@@ -265,6 +270,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     name,
     ...stepSaid(judged, name),
     status: stepWord(at, name),
+    ...sentOf(run.steps[name]?.sent),
     timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
     current: latest ? tryShort(latest) : null,
     filed: filedIn(filedOf(run.steps[name], views, yield* StoreRoot)),

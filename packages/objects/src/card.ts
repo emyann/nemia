@@ -223,7 +223,7 @@ export const CardStatus = Schema.Struct({
   state: Schema.Literals(CARD_STATES).annotate({
     description: "Where the card is in its life: its own word until it starts, and its run's phase from then on.",
   }),
-  runs: Schema.Array(Schema.String).annotate({ description: 'The ids of the runs the card was started as.' }),
+  runs: Schema.Array(Schema.String).annotate({ description: "The ids of the runs the card's work went through, in the order they were started: the run started from the card, then each run a workflow node of those started." }),
   lastStart: Schema.optionalKey(CardLastStart.annotate({ description: "The tick's last start of the card that did not happen." })),
   title: Schema.optionalKey(Schema.String.annotate({ description: "The first line of the card's body; absent where it has none." })),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why the entry does not read as a card; absent on a card.' })),

@@ -133,7 +133,8 @@ const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
   ['resume', 'it continues no session'],
   ['routes', 'a condition is a node of its own'],
   ['route', 'a condition is a node of its own'],
-  ['workflow', 'a workflow node files a card and runs nothing'],
+  ['workflow', 'a workflow node starts a run and runs nothing'],
+  ['brief', 'a workflow node starts a run and runs nothing'],
   ['card', 'a card node files a card and runs nothing'],
   ['loop', 'it asks for no round'],
 ];

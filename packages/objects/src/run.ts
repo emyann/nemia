@@ -192,6 +192,12 @@ export const RunSpec = Schema.Struct({
   from: Schema.NullOr(Schema.Struct({ inbox: Schema.String.annotate({ description: "The inbox card's id." }) })).annotate({
     description: 'The inbox card it was started from; null for none.',
   }),
+  startedBy: Schema.NullOr(
+    Schema.Struct({
+      run: Schema.String.annotate({ description: "The id of the run whose workflow node started this run." }),
+      node: Schema.String.annotate({ description: "The workflow node's name in that run." }),
+    }),
+  ).annotate({ description: 'The run and the workflow node that started it directly; null for a run started any other way.' }),
 }).annotate({
   identifier: 'RunSpec',
   description: 'What the run was asked to do: its brief, its workflow, and where it works. Never changes.',
@@ -282,6 +288,20 @@ export const RunStepStatus = Schema.Struct({
     description: 'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session or closeout. Null otherwise.',
   }),
   message: Schema.String.annotate({ description: 'Where the step stands, in the sentence a person reads.' }),
+  sent: Schema.optionalKey(
+    Schema.Union([
+      Schema.Struct({
+        run: Schema.String.annotate({ description: 'The id of the run the workflow node started.' }),
+        at: Schema.String.annotate({ description: 'When the run was started, ISO.' }),
+      }),
+      Schema.Struct({
+        card: Schema.String.annotate({ description: 'The name of the card the backlog node filed.' }),
+        at: Schema.String.annotate({ description: 'When the card was filed, ISO.' }),
+      }),
+    ]).annotate({
+      description: 'What a workflow node started (a run) or a backlog node filed (a card), and when; absent on any other step.',
+    }),
+  ),
   verdict: Schema.NullOr(CheckVerdict).annotate({
     description: "Its current try's check verdict, a result and the exit; null where it has none.",
   }),

@@ -37,7 +37,7 @@ export function judgeRefusal(s: StepSpec, fence: JudgeFence, hireable: boolean) 
 }
 
 /**
- * What a target says it is for: a step's own note's first line; or, for a workflow node, the card it files and what its workflow says it is
+ * What a target says it is for: a step's own note's first line; or, for a workflow node, the run it starts and what its workflow says it is
  * for (`targets`, the workflow's description), else the node's own note.
  */
 function described(target: StepSpec, targets: Readonly<Record<string, string>>) {
@@ -45,7 +45,7 @@ function described(target: StepSpec, targets: Readonly<Record<string, string>>) 
   if (target.card === 'backlog') return `files the card back to the inbox, unqueued (${target.name}${note ? `: ${note}` : ''})`;
   if (target.workflow === undefined) return `the step ${target.name}${note ? `: ${note}` : ''}`;
   const about = targets[target.workflow] ?? note;
-  return `a card for the workflow ${target.workflow} (${target.name}${about ? `: ${about}` : ''})`;
+  return `a run of the workflow ${target.workflow} (${target.name}${about ? `: ${about}` : ''})`;
 }
 
 /**

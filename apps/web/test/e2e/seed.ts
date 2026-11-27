@@ -2035,17 +2035,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
       path.join(files, ENDING.artifact),
     ]),
   );
-  shipRun(
-    ENDING.id,
-    ENDING.title,
-    'implement and review signed off, and review waits at its gate for your word.',
-    ENDING.branch,
-    0.9,
-    {
-      implement: { taskId: `${ENDING.id}-implement`, workspace: lane, branch: ENDING.branch },
-      review: { taskId: `${ENDING.id}-review`, workspace: lane, branch: ENDING.branch },
-    },
-  );
+  shipRun(ENDING.id, ENDING.title, 'implement and review signed off, and review waits at its gate for your word.', ENDING.branch, 0.9, {
+    implement: { taskId: `${ENDING.id}-implement`, workspace: lane, branch: ENDING.branch },
+    review: { taskId: `${ENDING.id}-review`, workspace: lane, branch: ENDING.branch },
+  });
 
   const landedLane = path.join(root, 'worktrees', LANDED.id, 'implement');
   signedOff(`${LANDED.id}-implement`, landedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
@@ -2057,7 +2050,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
     0.4,
     done('One reading of it, and nothing to change.', [path.join(root, 'runs', LANDED.id, 'artifacts', 'review', LANDED.shot)]),
   );
-  write(path.join(root, 'runs', `${LANDED.id}.asks`, 'approve-review-1'), JSON.stringify({ step: 'review', try: 1, at: ago(0.35) }, null, 2));
+  write(
+    path.join(root, 'runs', `${LANDED.id}.asks`, 'approve-review-1'),
+    JSON.stringify({ step: 'review', try: 1, at: ago(0.35) }, null, 2),
+  );
   const prunedAt = ago(0.1);
   write(
     path.join(root, 'runs', `${LANDED.id}.pruned`),

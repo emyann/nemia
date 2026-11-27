@@ -146,10 +146,10 @@ const decidableOf = async (id: string) => {
 
 const { repo, base } = aRepo();
 
-describe("a run at its gate: `to decide` says the approval on the list and the page, the decision offers the approval and the send-back, and whether it still merges onto the base as the base moves", () => {
+describe('a run at its gate: `to decide` says the approval on the list and the page, the decision offers the approval and the send-back, and whether it still merges onto the base as the base moves', () => {
   const s = story(test);
   s.test(
-    "a run at its gate: `to decide` says the step signed off at it and the command that approves it, on the list and on the detail — with no `git` asked about it",
+    'a run at its gate: `to decide` says the step signed off at it and the command that approves it, on the list and on the detail — with no `git` asked about it',
     async () => {
       const id = 'r-ending';
       branchOff(repo, `wf/${id}/implement`, 'src/a.ts', 'export const a = 1;\n');
@@ -186,15 +186,11 @@ describe("a run at its gate: `to decide` says the approval on the list and the p
         `the whole of nemia ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.status.toDecide.said}`,
       );
       assert.deepEqual((await listedOf(id)).toDecide, detail.status.toDecide, 'the list says the same, in the same words');
-      assert.equal(
-        gitCount(),
-        before,
-        'no git call for a run at its gate: a gate says it is one to decide',
-      );
+      assert.equal(gitCount(), before, 'no git call for a run at its gate: a gate says it is one to decide');
     },
   );
   s.test(
-    "the decision of a run at its gate, once a pass has read where its branch stands, offers the approval and the send-back, and no `git merge` by hand",
+    'the decision of a run at its gate, once a pass has read where its branch stands, offers the approval and the send-back, and no `git merge` by hand',
     async () => {
       await aPass();
       const { commands, standings } = await decidableOf('r-ending');
@@ -339,7 +335,7 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
     }
   });
   s.test(
-    "an approved gate whose branch is merged leaves nothing to decide: its approval with no words, no `message` in it, as `nemia approve` writes one",
+    'an approved gate whose branch is merged leaves nothing to decide: its approval with no words, no `message` in it, as `nemia approve` writes one',
     async () => {
       const id = 'r-done';
       const branch = `wf/${id}/implement`;
@@ -368,11 +364,7 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   await aPass();
 
   const first = gitCount();
-  assert.equal(
-    (await listedOf(id)).toDecide,
-    null,
-    'on the base, merged by a person before the board first read it, nothing to decide',
-  );
+  assert.equal((await listedOf(id)).toDecide, null, 'on the base, merged by a person before the board first read it, nothing to decide');
   assert.equal((await listedOf(id)).toDecide, null, 'and it still says nothing to decide');
   assert.equal(gitCount(), first, 'with no git call at all: the list reads what the pass read');
 
@@ -444,7 +436,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 
-test("at its gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
+test('at its gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none', async () => {
   const own = aRepo();
   const runOn = (id: string, file: string, text: string, done: boolean, workflow = GATED) => {
     const branch = `wf/${id}/implement`;

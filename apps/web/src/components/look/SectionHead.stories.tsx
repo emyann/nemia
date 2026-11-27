@@ -11,9 +11,10 @@ type Story = StoryObj<typeof SectionHead>;
 
 /** One head a tone: waiting on you, at work, at rest; and quiet where the count is zero. */
 export const Tones: Story = {
-  render: () => (
+  args: { count: 3, word: 'Waiting', tone: 'yours' },
+  render: (args) => (
     <div style={{ ...ON_PLAIN, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <SectionHead count={3} word="Waiting" tone="yours" />
+      <SectionHead {...args} />
       <SectionHead count={2} word="Working" tone="alive" />
       <SectionHead count={12} word="Cards" tone="rest" />
       <SectionHead count={0} word="Chains" tone="rest" />

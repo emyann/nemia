@@ -7,7 +7,7 @@ import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../.
 import { InboxCard, InboxCardRow, type CardSize } from './InboxCard';
 
 /** A card drawn in `size`, or as a row where `row` is given, over a store that holds the factory `nemia`. */
-const drawn = (entry: InboxEntry, size: CardSize = 'regular', row = false) => (
+const drawn = (entry: InboxEntry, size: CardSize | undefined, row = false) => (
   <QueryClientProvider client={seeded([[factoriesQuery.queryKey, [factoryView(FACTORY)]]])}>
     <div style={{ width: row ? 920 : 340 }}>
       {row ? (
@@ -37,15 +37,15 @@ const started = (state: InboxEntry['state'], phase: InboxEntry['phase']) => ({
  * refused, stuck behind a card only a person can release, in the compact size of a chain, and as a row. The frame takes a colour only for
  * a card at work, waiting, refused or stuck.
  */
-const meta: Meta = { title: 'Store/InboxCard', tags: ['network'] };
+const meta: Meta<typeof InboxCard> = { title: 'Store/InboxCard', component: InboxCard, tags: ['network'] };
 export default meta;
 
-type Story = StoryObj;
+type Story = StoryObj<typeof InboxCard>;
 
 /** A card filed and not started: its tag says nothing, its labels show their values, and its one filled-out press is Start. */
 export const Filed: Story = {
-  render: () =>
-    drawn({ ...unstartedCard('decode-the-reads', FACTORY), title: 'Decode the reads', labels: { area: 'board', work: 'feature' } }),
+  args: { entry: { ...unstartedCard('decode-the-reads', FACTORY), title: 'Decode the reads', labels: { area: 'board', work: 'feature' } } },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     const card = within(canvasElement).getByRole('article', { name: 'Card decode-the-reads' });
     await expect(within(card).getByRole('button', { name: 'Start' })).toBeVisible();
@@ -56,14 +56,16 @@ export const Filed: Story = {
 
 /** A card queued behind cards not done: blocked, with what it waits on said in a line; no Start, the menu takes the start back. */
 export const Blocked: Story = {
-  render: () =>
-    drawn({
+  args: {
+    entry: {
       ...queuedCard('second-slice', FACTORY, 1),
       title: 'The second slice',
       phase: 'blocked',
       chained: true,
       waits: [{ card: 'first-slice', kind: 'waiting', state: 'filed', stalled: false }],
-    }),
+    },
+  },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-card-state="blocked"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-card-waits]')).toHaveTextContent('Runs once the cards before it are done.');
@@ -73,7 +75,8 @@ export const Blocked: Story = {
 
 /** A card whose run is at work: its frame in the colour of a session at work, and Open run. */
 export const Working: Story = {
-  render: () => drawn(started('running', 'working')),
+  args: { entry: started('running', 'working') },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'alive');
     await expect(within(canvasElement).getByRole('link', { name: 'Open run' })).toBeVisible();
@@ -82,7 +85,8 @@ export const Working: Story = {
 
 /** A card whose run waits on its person: the frame in the colour of what is yours, and the tag filled. */
 export const Waiting: Story = {
-  render: () => drawn(started('waiting', 'waiting')),
+  args: { entry: started('waiting', 'waiting') },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'yours');
   },
@@ -90,7 +94,8 @@ export const Waiting: Story = {
 
 /** A card whose run is done: no colour on its frame. */
 export const Done: Story = {
-  render: () => drawn(started('succeeded', 'done')),
+  args: { entry: started('succeeded', 'done') },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'none');
   },
@@ -98,13 +103,15 @@ export const Done: Story = {
 
 /** A card whose start was refused: the frame in the failure's colour, the tick's try said, and Edit in place of Start. */
 export const Refused: Story = {
-  render: () =>
-    drawn({
+  args: {
+    entry: {
       ...queuedCard('route-the-idea', FACTORY, 1),
       state: 'refused',
       workflow: 'gone',
       tried: { at: '2026-11-19T00:00:00.000Z', repo: '/work/nemia', why: 'no workflow gone.', refused: true },
-    }),
+    },
+  },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-cut-frame]')).toHaveAttribute('data-cut-frame', 'failure');
     await expect(within(canvasElement).getByRole('link', { name: 'Edit' })).toBeVisible();
@@ -113,7 +120,8 @@ export const Refused: Story = {
 
 /** A card that waits on one only a person can release: stuck, and Edit, which opens what it runs after. */
 export const Stuck: Story = {
-  render: () => drawn({ ...unstartedCard('third-slice', FACTORY), waits: [{ card: 'no-such-slice', kind: 'missing', stalled: true }] }),
+  args: { entry: { ...unstartedCard('third-slice', FACTORY), waits: [{ card: 'no-such-slice', kind: 'missing', stalled: true }] } },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement, userEvent }) => {
     await expect(canvasElement.querySelector('[data-card-state="stuck"]')).not.toBeNull();
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Edit' }));
@@ -123,7 +131,8 @@ export const Stuck: Story = {
 
 /** The compact size, in a chain: no labels, no line of what it waits on, its name short. */
 export const Compact: Story = {
-  render: () => drawn({ ...unstartedCard('decode-the-reads', FACTORY), labels: { area: 'board' }, chained: true }, 'compact'),
+  args: { entry: { ...unstartedCard('decode-the-reads', FACTORY), labels: { area: 'board' }, chained: true }, size: 'compact' },
+  render: (args) => drawn(args.entry, args.size),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-card-labels]')).toBeNull();
   },
@@ -131,7 +140,8 @@ export const Compact: Story = {
 
 /** A card as a row of the list: the card first, then its tag, where it runs, when it was filed, and its actions. */
 export const Row: Story = {
-  render: () => drawn(started('running', 'working'), 'regular', true),
+  args: { entry: started('running', 'working'), size: 'regular' },
+  render: (args) => drawn(args.entry, args.size, true),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('listitem', { name: 'Card ship-it' })).toBeVisible();
   },

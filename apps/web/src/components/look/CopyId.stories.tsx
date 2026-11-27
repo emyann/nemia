@@ -124,10 +124,11 @@ export const Lined: StoryObj = {
 };
 
 /** A card's name, copied the same way: the control says it copies a card name, never a run id. */
-export const OfACard: StoryObj = {
-  render: () => (
+export const OfACard: StoryObj<typeof CopyId> = {
+  args: { id: 'decode-the-reads', of: 'card' },
+  render: (args) => (
     <div style={ON_CARD}>
-      <CopyId id="decode-the-reads" of="card" />
+      <CopyId {...args} />
     </div>
   ),
   play: async ({ canvasElement }) => {

@@ -31,14 +31,15 @@ const drawn = (factory?: string) => (
 );
 
 /** The page's New card, the one filled press of the Inbox, and the side sheet it opens: the new card's fields. */
-const meta: Meta = { title: 'Store/NewCardSheet', tags: ['network'] };
+const meta: Meta<typeof NewCard> = { title: 'Store/NewCardSheet', component: NewCard, tags: ['network'] };
 export default meta;
 
-type Story = StoryObj;
+type Story = StoryObj<typeof NewCard>;
 
 /** The press alone, as the page's head draws it. */
 export const Closed: Story = {
-  render: () => drawn(),
+  args: { factory: undefined },
+  render: (args) => drawn(args.factory),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('button', { name: 'New card' })).toBeVisible();
   },
@@ -46,7 +47,8 @@ export const Closed: Story = {
 
 /** Pressed: the sheet opens with every field of a new card in the look's cut field, and File card the one filled press. */
 export const Open: Story = {
-  render: () => drawn(FACTORY),
+  args: { factory: FACTORY },
+  render: (args) => drawn(args.factory),
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'New card' }));
     const sheet = await within(document.body).findByRole('dialog', { name: 'New card' });

@@ -1,8 +1,8 @@
 /**
- * `tools/touched/touched.ts` planned over a scratch git repository of two workspaces, `packages/a` and `packages/b`, each with a
- * `vitest.config.ts`, a source and its test: the test files a change reaches are given by a fake of Vitest's listing (a source's test
- * is `test/<its name>.test.ts`, a test is its own, the config reaches every test), and the run goes to a stub `vitest` on the PATH
- * that records its folder and its arguments. No real suite runs.
+ * `tools/touched/touched.ts` planned over a scratch git repository of two workspaces, `packages/a` (four sources, each with its
+ * test) and `packages/b` (two), each with a `vitest.config.ts`: the test files a change reaches are given by a fake of Vitest's
+ * listing (a source's test is `test/<its name>.test.ts`, a test is its own, the config reaches every test), and the run goes to a
+ * stub `vitest` on the PATH that records its folder and its arguments. No real suite runs.
  */
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
@@ -32,6 +32,9 @@ const write = (root: string, file: string, text: string) => {
 /** One call of the stub `vitest`: the folder it ran in and its arguments. */
 type Call = { cwd: string; argv: string[] };
 
+/** The sources of each workspace, each with its test: `a` has four, so more than half of it is not all of it. */
+const NAMES: Record<string, string[]> = { a: ['one', 'two', 'three', 'four'], b: ['one', 'two'] };
+
 /** A repository of two workspaces committed and tagged `base`, the stub `vitest` beside it, and the file its calls are logged to. */
 const planted = () => {
   const root = scratch('guards-touched-');
@@ -43,7 +46,7 @@ const planted = () => {
   for (const ws of ['a', 'b']) {
     write(repo, `packages/${ws}/package.json`, JSON.stringify({ name: ws, scripts: { test: 'vitest run' } }));
     write(repo, `packages/${ws}/vitest.config.ts`, 'export default {};\n');
-    for (const name of ['one', 'two']) {
+    for (const name of NAMES[ws]) {
       write(repo, `packages/${ws}/src/${name}.ts`, `export const ${name} = 1;\n`);
       write(repo, `packages/${ws}/test/${name}.test.ts`, `import '../src/${name}.ts';\n`);
     }
@@ -62,7 +65,7 @@ const planted = () => {
   const listings: string[] = [];
   const list = async (dir: string, files: string[]) => {
     listings.push(dir);
-    const total = ['one', 'two'].map((name) => path.join(dir, 'test', `${name}.test.ts`));
+    const total = NAMES[path.basename(dir)].map((name) => path.join(dir, 'test', `${name}.test.ts`));
     if (files.some((file) => file.endsWith('vitest.config.ts'))) return { due: total, total } satisfies Listed;
     const due = files.map((file) => (file.includes('/test/') ? file : path.join(dir, 'test', `${path.basename(file, '.ts')}.test.ts`)));
     return { due: [...new Set(due)].filter((file) => total.includes(file)), total } satisfies Listed;
@@ -163,6 +166,7 @@ test('a change reaching more than half of a workspace runs nothing there, says t
   const { repo, touched, calls } = planted();
   write(repo, 'packages/a/src/one.ts', 'export const one = 2;\n');
   write(repo, 'packages/a/src/two.ts', 'export const two = 2;\n');
+  write(repo, 'packages/a/src/three.ts', 'export const three = 2;\n');
   write(repo, 'packages/b/src/one.ts', 'export const one = 2;\n');
   const said: string[] = [];
   const spy = vi.spyOn(console, 'error');
@@ -176,7 +180,7 @@ test('a change reaching more than half of a workspace runs nothing there, says t
   assert.deepEqual(
     made.map(({ cwd }) => path.basename(cwd)),
     ['b'],
-    'no vitest ran in a; b, at half, ran',
+    'no vitest ran in a, at 3 of 4; b, at half, ran',
   );
   assert.ok(
     said.some((line) => line.includes('packages/a') && line.includes('npm run touched -- <test file>')),
@@ -187,16 +191,24 @@ test('a change reaching more than half of a workspace runs nothing there, says t
 
 test('a change reaching half or less of a workspace runs related as before', async () => {
   const { repo, touched, calls } = planted();
-  write(repo, 'packages/b/src/two.ts', 'export const two = 2;\n');
+  write(repo, 'packages/a/src/one.ts', 'export const one = 2;\n');
+  write(repo, 'packages/a/src/two.ts', 'export const two = 2;\n');
   assert.equal(await touched(), 0);
   const made = calls();
-  assert.equal(made.length, 1);
-  assert.deepEqual(made[0].argv.slice(0, 2), ['related', '--run']);
+  assert.equal(made.length, 1, 'a, at 2 of 4, ran');
+  assert.deepEqual(
+    made[0].argv.filter((arg) => !arg.startsWith('--') && arg !== 'related'),
+    [path.join(repo, 'packages/a/src/one.ts'), path.join(repo, 'packages/a/src/two.ts')],
+  );
+  assertNoBareRun(made);
 });
 
-test('naming more than half of a workspace test files is refused, and nothing runs there', async () => {
+test('naming more than half of a workspace test files is refused, and nothing runs there; naming half runs them', async () => {
   const { repo, touched, calls } = planted();
   write(repo, 'packages/a/src/one.ts', 'export const one = 2;\n');
-  assert.equal(await touched(path.join(repo, 'packages/a/test/one.test.ts'), path.join(repo, 'packages/a/test/two.test.ts')), 2);
-  assert.deepEqual(calls(), [], 'no vitest ran in a');
+  const named = ['one', 'two', 'three'].map((name) => path.join(repo, 'packages/a/test', `${name}.test.ts`));
+  assert.equal(await touched(...named), 2);
+  assert.deepEqual(calls(), [], 'no vitest ran in a, at 3 of 4 named');
+  assert.equal(await touched(...named.slice(0, 2)), 0);
+  assert.equal(calls().length, 1, 'a, at 2 of 4 named, ran');
 });

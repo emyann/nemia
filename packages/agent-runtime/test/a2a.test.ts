@@ -339,7 +339,8 @@ const request: SpawnRequest = {
 
 /**
  * A driver a test moves by hand, what it was asked, and the same driver behind the A2A client. Each verb answers its value,
- * or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect.
+ * or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect. Its two listings, `observe` and `observeFor`,
+ * fail as `o.observeFails` says instead.
  */
 const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: string; fails?: unknown; bare?: boolean } = {}) => {
   const sessions = new Map<string, Sighting>();
@@ -381,10 +382,14 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
           quota: answer('quota', undefined, { kind: 'unanswered' as const, subscription: 'max' }),
           /** Told what is expected, the sessions it names alone. */
           observeFor: (expected: readonly ExpectedSession[]) =>
-            answer('observeFor', expected, {
-              seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
-              /** A name it was told to leave unread, as a driver whose registry could not be read leaves one. */
-              unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
+            Effect.suspend(() => {
+              asked.push(['observeFor', expected]);
+              if (o.observeFails) return Effect.fail(new RunnerError({ verb: 'observeFor', message: o.observeFails }));
+              return Effect.succeed({
+                seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
+                /** A name it was told to leave unread, as a driver whose registry could not be read leaves one. */
+                unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
+              });
             }),
         }),
   };
@@ -564,7 +569,9 @@ describe('the conformance walk: each verb through the client reaches the driver 
     d.sessions.set(request.name, { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
     await Effect.runPromise(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'and again'));
     assert.deepEqual(d.acted().slice(1), [
+      ['observeFor', [{ name: request.name }]],
       ['say', [{ name: request.name, sessionId: 's-1' }, 'look again']],
+      ['observeFor', [{ name: request.name }]],
       ['say', [{ name: request.name, sessionId: 's-1' }, 'and again']],
     ]);
   });

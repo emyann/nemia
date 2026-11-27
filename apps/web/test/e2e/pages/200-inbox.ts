@@ -80,6 +80,7 @@ async function stated(page: Page) {
   const chip = ((await selected.textContent()) ?? '').toLowerCase();
   if (!chip.startsWith(word.toLowerCase()))
     throw new Refused(`the state picked in the bar is the chip selected — ${word}; the chip says ${chip}`);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /^Take off state: / }).click();
   await page.waitForURL((url) => !url.searchParams.has('phase'), { timeout: WAIT_MS });
   await idle(page);

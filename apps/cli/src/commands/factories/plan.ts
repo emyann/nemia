@@ -60,6 +60,7 @@ export function planLines(plan: FactoryUpgradePlan) {
   for (const conflict of merge.conflicts)
     lines.push(
       `  ${conflict.at}`,
+      ...(conflict.message === undefined ? [] : [`    ${conflict.message}`]),
       ...(merge.base === 'none' ? [] : sideLines('base', conflict.base)),
       ...sideLines('ours', conflict.ours),
       ...sideLines('theirs', conflict.theirs),

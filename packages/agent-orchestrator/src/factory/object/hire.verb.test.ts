@@ -29,12 +29,13 @@ write(path.join(wf, 'agents', 'reviewer.md'), '---\nmodel: sonnet\n---\nYou are 
 write(path.join(wf, 'agents', 'implementer.md'), '---\neffort: high\n---\nYou are implementer.\n');
 write(path.join(wf, 'a.b', 'c.md'), '---\nplace: git\n---\nDo c.\n');
 write(path.join(wf, 'a', 'b.c.md'), '---\nplace: git\n---\nDo b.c.\n');
+write(path.join(wf, 'sets', 'work.md'), '---\nplace: git\nskills: grill-me\n---\nWork.\n');
 write(path.join(wf, 'other', 'x.md'), '---\nplace: git\n---\nDo x.\n');
 
 const acme: HiringFactory = {
   name: 'acme',
-  hires: { 'make/implement': 'implementer', 'make/review': 'implementer' },
-  workflows: ['make', 'a.b', 'a'],
+  hires: { 'make/implement': 'implementer', 'make/review': 'implementer', 'sets/work': 'implementer' },
+  workflows: ['make', 'a.b', 'a', 'sets'],
   repo,
 };
 
@@ -46,7 +47,15 @@ const hires = await Effect.runPromise(
 const named = (name: string) => hires.find((h) => h.metadata.name === name);
 
 test('one Hire per step of each workflow the factory offers, named <workflow>.<step>, each a Hire of objects', () => {
-  assert.deepEqual(hires.map((h) => h.metadata.name).sort(), ['a.b.c', 'a.b.c', 'make.implement', 'make.land', 'make.plan', 'make.review']);
+  assert.deepEqual(hires.map((h) => h.metadata.name).sort(), [
+    'a.b.c',
+    'a.b.c',
+    'make.implement',
+    'make.land',
+    'make.plan',
+    'make.review',
+    'sets.work',
+  ]);
   for (const h of hires) assert.ok(Schema.is(Hire)(h), h.metadata.name);
   assert.equal(named('make.implement')?.metadata.namespace, 'acme');
 });
@@ -81,4 +90,9 @@ test('two steps whose names join to one are both listed with an error naming the
   const none = await Effect.runPromiseExit(hireNamedIn(hires, 'acme', 'make.none'));
   assert.ok(Exit.isFailure(none) && JSON.stringify(none.cause).includes('"_tag":"Missing"'));
   assert.equal((await Effect.runPromise(hireNamedIn(hires, 'acme', 'make.plan'))).metadata.name, 'make.plan');
+});
+
+test('a step that sets `skills:` and gets its agent only from the hire carries no error: the read without hires is no row', () => {
+  assert.equal(named('sets.work')?.status.error, undefined);
+  assert.equal(named('sets.work')?.status.agent, 'implementer');
 });

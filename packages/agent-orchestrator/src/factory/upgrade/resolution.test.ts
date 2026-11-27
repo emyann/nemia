@@ -21,7 +21,7 @@ const LOGO = Buffer.from([0x89, 0x50, 0x00, 0x47]);
 
 describe("an upgrade's resolution, row by row: an address's segments, and a taken workflow's files from the tree", () => {
   let base!: TreeFile[];
-  test("a proposal an owner's resolution is names each conflict of that owner to resolve again; another proposal none", () => {
+  test("a proposal an owner's resolution is gives one line that proposes that owner again from its kept choices; another proposal none", () => {
     const choices = {
       'workflows/flow/check.ts:3-3': { text: 'x' },
       'workflows/flow/review.md#rounds': 'theirs' as const,
@@ -29,17 +29,20 @@ describe("an upgrade's resolution, row by row: an address's segments, and a take
       'workflows/carried/land.ts:1-1': 'theirs' as const,
     };
     const proposals = { 'Workflow/flow': 'person-a', other: 'person-b' };
-    assert.deepEqual(resolvedAgain('crew', 'person-a', proposals, choices), {
+    const held = Object.keys(choices);
+    assert.deepEqual(resolvedAgain('crew', 'person-a', proposals, choices, held), {
       owner: 'the Workflow flow',
-      lines: [
-        "nemia factory resolve crew 'workflows/flow/check.ts:3-3' --ours|--theirs|--file <path>",
-        "nemia factory resolve crew 'workflows/flow/review.md#rounds' --ours|--theirs|--file <path>",
-      ],
+      lines: ["nemia factory resolve crew 'workflows/flow/check.ts:3-3' --file <path>"],
     });
-    assert.deepEqual(resolvedAgain('crew', 'person-b', proposals, choices)?.lines, [
-      "nemia factory resolve crew 'workflows/other/plan.md#budget' --ours|--theirs|--file <path>",
+    assert.deepEqual(resolvedAgain('crew', 'person-b', proposals, choices, held)?.lines, [
+      "nemia factory resolve crew 'workflows/other/plan.md#budget' --ours",
     ]);
-    assert.equal(resolvedAgain('crew', 'person-c', proposals, choices), undefined);
+    assert.equal(resolvedAgain('crew', 'person-c', proposals, choices, held), undefined);
+    assert.deepEqual(
+      resolvedAgain('crew', 'person-a', proposals, choices, [...held, 'workflows/flow/review.md#budget'])?.lines,
+      [],
+      'a conflict of the owner whose choice no longer holds: no line proposes it from the kept ones',
+    );
   });
   test("an address is cut to its file's path and split: a whole file, a key, base lines, the wiring's key", () => {
     assert.deepEqual(segmentsOf('workflows/flow/check.ts'), ['workflows', 'flow', 'check.ts']);

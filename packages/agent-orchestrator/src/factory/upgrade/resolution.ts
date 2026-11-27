@@ -9,7 +9,7 @@
  */
 import type { ResolutionKind, ResolutionOf, ResolutionOwner, ResolvedBy } from '../../../contracts/resolution.contract.ts';
 import { textIn } from '../../folder/folder.ts';
-import { isJsonObject, resolveLine, type Choice, type Conflict, type TreeFile } from './merge.ts';
+import { isJsonObject, type Choice, type Conflict, type TreeFile } from './merge.ts';
 
 /** The folders beside the workflows in a tree's `workflows/` that hold no workflow: its agents, its skills, the carried files. */
 const HELD_FOLDERS: readonly string[] = ['agents', 'skills', 'carried'];
@@ -231,34 +231,49 @@ export function conflictOwners(conflicts: readonly Conflict[], factory: string, 
   return owners;
 }
 
-/** What resolves again the conflicts of an owner whose proposal cannot apply: the owner as a person reads it, and a line per conflict. */
+/** What proposes again an owner whose proposal cannot apply: the owner as a person reads it, and the one line that does. */
 export type ResolvedAgain = { readonly owner: string; readonly lines: readonly string[] };
 
 /**
- * The lines that resolve again, in the factory `factory`, the conflicts the proposal `proposal` resolves, where `proposals` (by owner key,
- * as `resolutions.json` records them) names it as an owner's: each conflict of that owner the person chose for (`choices`), as
- * `resolveLine` says it. None where no owner's resolution is that proposal.
+ * The line that gives the conflict `at` of the factory `factory` the choice it already has, which proposes its owner again where each of
+ * the owner's conflicts has one: `--ours`, `--theirs`, or `--file <path>` for text of the person's own.
+ * @param factory The factory's name.
+ * @param at The conflict's address.
+ * @param choice The choice kept for it.
+ */
+export const keptChoiceLine = (factory: string, at: string, choice: Choice) =>
+  `nemia factory resolve ${factory} '${at}' ${choice === 'ours' ? '--ours' : choice === 'theirs' ? '--theirs' : '--file <path>'}`;
+
+/**
+ * The line that proposes again, in the factory `factory`, the owner whose resolution is the proposal `proposal`, where `proposals` (by
+ * owner key, as `resolutions.json` records them) names it: where each conflict of that owner has a choice that holds (`choices`), its first
+ * given its choice again (`keptChoiceLine`), which proposes the owner from every kept choice; no line where one does not. None where no
+ * owner's resolution is that proposal.
  * @param factory The factory's name.
  * @param proposal The name of the proposal that cannot apply.
  * @param proposals The proposal recorded for each owner, by owner key.
- * @param choices The person's choice for each conflict, by its address.
+ * @param choices The person's choice for each conflict that still holds, by its address.
+ * @param conflicts The address of each conflict the merge has now; the line is given only where each of the owner's has a choice.
  */
 export function resolvedAgain(
   factory: string,
   proposal: string,
   proposals: Readonly<Record<string, string>>,
   choices: Readonly<Record<string, Choice>>,
+  conflicts: readonly string[],
 ) {
   const recorded = Object.entries(proposals).find(([, name]) => name === proposal);
   if (recorded === undefined) return undefined;
   const owner = ownerOfKey(recorded[0]);
   const key = ownerKey(owner);
-  const lines = Object.keys(choices)
-    .filter((at) => {
-      const of = resolvedBy(segmentsOf(at), keyOf(at), true, factory);
-      return of !== null && ownerKey(of) === key;
-    })
-    .sort()
-    .map((at) => resolveLine(factory, at));
-  return { owner: `the ${owner.kind} ${owner.name}`, lines };
+  const own = conflicts.filter((at) => {
+    const of = resolvedBy(segmentsOf(at), keyOf(at), true, factory);
+    return of !== null && ownerKey(of) === key;
+  });
+  const [first] = own.every((at) => Object.hasOwn(choices, at)) ? own.sort() : [];
+  const choice = first === undefined ? undefined : choices[first];
+  return {
+    owner: `the ${owner.kind} ${owner.name}`,
+    lines: first === undefined || choice === undefined ? [] : [keptChoiceLine(factory, first, choice)],
+  };
 }

@@ -116,8 +116,8 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  *
  * `asOf` is the instant its clock is said at. `pick` makes each node of the panel's graph a button that shows its step (`data-tile`,
  * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd`
- * stands after the title (the floor's chevron), `action` before Open the run at lg (the waiting card's Approve), which then says the
- * wait's words in the line's stead and stands Open the run at its own height (`CutButton`'s `beside`), `children` under
+ * stands after the title (the floor's chevron), `action` before Open the run at lg (the waiting card's Approve or Answer), which then
+ * says the wait's words in the line's stead and stands Open the run at its own height (`CutButton`'s `beside`), `children` under
  * what the part says (the floor's lines), and `still` is the class of every
  * control the part draws (`nodrag` on the floor). A finished run is drawn at rest, by its last step and how it ended.
  * @param props The run, the size to draw it at, and what the surface gives it (`RunProps`).

@@ -208,8 +208,8 @@ async function secondGate(page: Page, open: OpenRuns) {
 
 /**
  * A waiting run's card says its meta line (its id's end, its whole id on hover), its title as a link, the yellow chip of the step it
- * waits on you at and the words of what is asked (`nowOf`), left to its Approve where it holds one, its own steps as a short rail,
- * each bar a button that opens its step's card, and one quiet button, which opens the run's page.
+ * waits on you at and the words of what is asked (`nowOf`), left to its Approve or Answer where it holds one, its own steps as a short
+ * rail, each bar a button that opens its step's card, and one quiet button, which opens the run's page.
  */
 async function cardSays(page: Page, run: WaitingRun) {
   const card = cardOf(page, run.id);
@@ -218,8 +218,9 @@ async function cardSays(page: Page, run: WaitingRun) {
   if (!now) throw new Refused(`${run.id}, which waits on you, has a step it is on now`);
   const chip = await card.locator('[data-now-word]').evaluate((tag) => `${tag.textContent} ${tag.getAttribute('data-tone')}`);
   if (chip !== `${now.step} yours`) throw new Refused(`the card of ${run.id} draws its step in the yellow chip — it draws ${chip}`);
-  const approvals = await card.locator('[data-approve]').count();
-  if (approvals > 0) await expectCount(card.locator('[data-now-words]'), 0, `the card of ${run.id} leaves what is asked to its Approve`);
+  const actions = await card.locator('[data-approve], [data-answer]').count();
+  if (actions > 0)
+    await expectCount(card.locator('[data-now-words]'), 0, `the card of ${run.id} leaves what is asked to its Approve or Answer`);
   else
     await expectTexts(
       card.locator('[data-now-words]'),

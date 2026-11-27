@@ -62,7 +62,7 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
  * hired into, its instructions with Show all, its history, and its skills and servers by where each comes from. Its reads are seeded.
  */
 const meta: Meta<typeof Seeded> = {
-  title: "Pages/Agent, a factory's",
+  title: 'Pages/Factory agent',
   component: Seeded,
   args: { runs: idle },
 };
@@ -74,7 +74,7 @@ type Story = StoryObj<typeof Seeded>;
 export const Idle: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(await page.findByText(/Not working now\./)).toBeVisible();
+    await waitFor(() => expect(page.getByText(/Not working now\./)).toBeVisible());
     await expect(page.getByText(/Its last session ended 51 minutes ago\./)).toBeVisible();
     await expect(canvasElement.querySelector('[data-ring="rest"]')).not.toBeNull();
     await expect(canvasElement.querySelector('section[aria-label="Working"]')).toBeNull();
@@ -88,7 +88,7 @@ export const WorkingOnce: Story = {
   args: { runs: one },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(await page.findByText('working')).toBeVisible();
+    await waitFor(() => expect(page.getByText('working')).toBeVisible());
     await expect(page.getByRole('link', { name: /approve modal uses the step/ })).toHaveAttribute('href', '/runs/r-7k2m-quick');
     await expect(canvasElement.querySelector('[data-activity="one"]')?.textContent).toContain('quick › review · try 1 · for 2m');
     await expect(canvasElement.querySelector('[data-ring="alive"]')).not.toBeNull();
@@ -101,7 +101,7 @@ export const WorkingFour: Story = {
   args: { runs: four },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(await page.findByText('4 sessions at once')).toBeVisible();
+    await waitFor(() => expect(page.getByText('4 sessions at once')).toBeVisible());
     const section = canvasElement.querySelector('section[aria-label="Working"]');
     await expect(section).not.toBeNull();
     const rows = [...(section?.querySelectorAll('[data-working-row]') ?? [])];

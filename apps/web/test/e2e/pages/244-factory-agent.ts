@@ -30,7 +30,10 @@ function written() {
     path.join(flow, 'agents', `${AGENT.name}.md`),
     `---\nrole: ${AGENT.role}\ndescription: Use this when a gate needs watching.\nharness: claude\nmodel: sonnet\n---\n${AGENT.body}\n`,
   );
-  storeFactory(FACTORY, `${JSON.stringify({ volumes: worked([path.join(store!, 'elsewhere')]) }, null, 2)}\n`);
+  storeFactory(
+    FACTORY,
+    `${JSON.stringify({ volumes: worked([path.join(store!, 'elsewhere')]), template: { source: '/drafts/team', version: '0.1.0', params: {} } }, null, 2)}\n`,
+  );
   const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
   const task = `${RUN.id}-${WORKFLOW.step}`;
   const work = path.join(store!, 'runs', RUN.id, 'work');

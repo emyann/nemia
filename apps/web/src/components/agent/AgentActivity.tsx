@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Body, Label } from '@/components/ui/ds';
+import { Body } from '@/components/ui/ds';
 import { CutFrame, CutTag, MeaningTag, SectionHead, TextLink } from '@/components/look';
 import { judged, type RunView } from '@/lib/api/judged';
 import { openRunsQuery } from '@/lib/api/runs';
@@ -109,9 +109,9 @@ export function WorkingSection({ activity }: { activity: Activity }) {
                   {row.round > 1 && ` · round ${row.round}`}
                 </Body>
               </div>
-              <Label size="large" component="span" className="shrink-0 font-mono text-on-surface-variant">
+              <Body size="medium" component="span" className="shrink-0 font-mono text-on-surface-variant">
                 {forWords(row.minutes)}
-              </Label>
+              </Body>
             </li>
           ))}
         </ul>

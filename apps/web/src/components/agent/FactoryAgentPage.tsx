@@ -33,6 +33,7 @@ import type { Activity } from '@/lib/atWork';
 import { ActivityLine, useAgentActivity, WorkingSection } from './AgentActivity';
 import { AgentInstructions } from './AgentInstructions';
 import { AgentFace, NodeLink, nodesOf } from './AgentParts';
+import { readGone } from '@/lib/api/gone';
 import { Hovered } from './Hovered';
 
 /**
@@ -140,7 +141,12 @@ type Listing = Awaited<ReturnType<typeof readAgent>>;
  * @param idle Whether it is at work nowhere, which is when the finished runs are read.
  */
 function useAgentReads(agent: Listing, factory: string, idle: boolean) {
-  const pages = useQueries({ queries: nodesOf(agent).map((node) => stepQuery(node.from, node.workflow, node.step, { factory })) });
+  const pages = useQueries({
+    queries: nodesOf(agent).map((node) => ({
+      ...stepQuery(node.from, node.workflow, node.step, { factory }),
+      retry: (tries: number, error: unknown) => !readGone(error) && tries < 3,
+    })),
+  });
   const skills = useQuery(factorySkillsQuery(factory));
   const marks = useQuery(agentMarksQuery(agent.name, factory));
   const open = useQuery(openRunsQuery(factory));
@@ -162,7 +168,7 @@ function useAgentReads(agent: Listing, factory: string, idle: boolean) {
     gives,
     skills,
     stepsRead: pages.every((page) => !page.isPending),
-    stepsFailed: pages.find((page) => page.error)?.error,
+    stepsFailed: pages.find((page) => page.error && !readGone(page.error))?.error,
     marks: marks.data ?? [],
     ended: lastEndedOf(runs, agent.name),
   };
@@ -192,7 +198,7 @@ function Who({
             {agent.role ?? 'No role yet'}
           </Title>
           <Hovered said={`${personOf(name)} belongs to factory ${factory}, so it can't be edited here.`}>
-            <span data-read-only data-way="factory">
+            <span data-read-only data-way="factory" className="inline-flex">
               <CutTag edge>
                 <Tag variant="outlined" color="neutral">
                   Read only

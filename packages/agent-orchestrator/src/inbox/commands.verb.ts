@@ -17,6 +17,7 @@ import {
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_RESEND_WORDS,
+  RESEND_WORDS,
   INBOX_RM_WORDS,
   CardFileRef,
   DEFAULT_NAMESPACE,
@@ -38,7 +39,7 @@ import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 import { editCard } from '../card-write/card-edit.verb.ts';
 import { attachToCard, type CardReplaced, detachFromCard, filesKept } from '../card-write/card-write.verb.ts';
 import { FileDoor } from '../start/files.store.ts';
-import { resendCard, type Resent } from './resend.verb.ts';
+import { resendCard, resendRun, type Resent } from './resend.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string) => {
@@ -188,6 +189,32 @@ export const INBOX_RESEND: Served<Resent, InboxResendInput> = {
 };
 
 /**
+ * What `nemia resend`'s handler takes: the run with no card behind it, by id, the workflow it is sent on to by name (none for its
+ * factory's card triggers), and who sends it (`actor`, objects' `Actor`), which the api hands of its caller and the cancel of the run
+ * keeps.
+ */
+export const ResendInput = Schema.Struct({
+  runId: Schema.String,
+  workflow: Schema.optionalKey(Schema.String),
+  actor: Schema.optionalKey(Actor),
+});
+export type ResendInput = typeof ResendInput.Type;
+
+/**
+ * `nemia resend`: a run no card started sent on as a card of its own, `<run>-resent`, from its brief and labels, and the run cancelled
+ * when it waits on a person (`resendRun`), its words the client's (`objects`' `RESEND_WORDS`). Its phase is judged through the informer
+ * the caller keeps (`kept.runs`).
+ */
+export const RESEND: Served<Resent, ResendInput> = {
+  ...RESEND_WORDS,
+  input: ResendInput,
+  handler: ({ runId, workflow, actor }, kept) =>
+    Effect.gen(function* () {
+      return yield* resendRun({ run: runId, ...(workflow === undefined ? {} : { workflow }), ...(actor === undefined ? {} : { actor }) }, yield* howOf(kept));
+    }),
+};
+
+/**
  * `nemia inbox from`: the runs a card's run is handed as context (its `from:`), set, or with `--off` taken off, its words the client's
  * (`objects`' `INBOX_FROM_WORDS`), which writes the card whole through the Card's `update`. Context is no wait: the run reads what each
  * concluded when its steps are filed, succeeded or in flight, and waits on none (`setFrom`).
@@ -280,6 +307,7 @@ export const INBOXES: readonly (Command | Served)[] = [
   tableEntry(INBOX_ADD),
   tableEntry(INBOX_QUEUE),
   tableEntry(INBOX_RESEND),
+  tableEntry(RESEND),
   INBOX_FROM,
   tableEntry(INBOX_EDIT),
   tableEntry(INBOX_RM),

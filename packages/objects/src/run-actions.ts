@@ -16,6 +16,7 @@ import { describedNumber } from './meta.ts';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { Paused } from './server-api.ts';
+import { Card } from './card.ts';
 import { StepCondition } from './run-step.ts';
 import { RETRY_MODES, SAID_AFTER, WRITTEN_CONDITION_STATUSES } from './words.ts';
 
@@ -816,3 +817,36 @@ export const RunPruned = Schema.Struct({
   bytes: Schema.optionalKey(Schema.Finite.annotate({ description: 'The bytes a prune would free, of a preview.' })),
 }).annotate({ identifier: 'RunPruned' });
 export type RunPruned = typeof RunPruned.Type;
+
+/**
+ * A run with no card behind it sent on (resend): the workflow its new card is queued on, by its name; absent, the new card names none and
+ * is left unqueued, for its factory's card triggers to take. In the body, as a filing takes one.
+ */
+export const RunResend = Schema.Struct({
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.",
+    }),
+  ),
+});
+export type RunResend = typeof RunResend.Type;
+
+/**
+ * What a run sent on answers (resend): the card filed from the run's brief and labels, the run it was sent on from, and the run
+ * cancelled, or why it was not, when that run waited on a person.
+ */
+export const RunResent = Schema.Struct({
+  card: Card.annotate({ description: 'The card filed, `<run>-resent`, in the namespace of the run it was sent on from.' }),
+  from: Schema.Struct({
+    run: Schema.String.annotate({ description: 'The run it was sent on from, by id: what the card filed is named after.' }),
+  }).annotate({ description: 'The run it was sent on from.' }),
+  cancelled: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The run it was sent on from, by id, cancelled since it waited on a person.' }),
+  ),
+  cancelLeft: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'Why the run it was sent on from, which waited on a person, was not cancelled, and the command that cancels it.',
+    }),
+  ),
+}).annotate({ identifier: 'RunResent' });
+export type RunResent = typeof RunResent.Type;

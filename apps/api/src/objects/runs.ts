@@ -25,6 +25,7 @@ import {
   dropInformed,
   HOLD,
   RELEASE,
+  RESEND,
   Informer,
   informerMemo,
   LABEL_RUN,
@@ -45,6 +46,7 @@ import {
 } from 'agent-orchestrator';
 import {
   Api,
+  Invalid as Refused,
   Missing,
   type RunApprove,
   type RunConditionWrite,
@@ -56,6 +58,7 @@ import {
   WriteFailed,
 } from 'objects';
 import type { Served } from '../layer.ts';
+import { cardIn } from './cards.ts';
 import { workflowPageOf } from '../step/step.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
 import { forgottenOf } from './forgotten.ts';
@@ -354,6 +357,26 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     )
     .handle('cancel', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name, actor: actorOf(s.caller) }))),
+    )
+    .handle('resend', ({ params: { namespace, name }, payload }) =>
+      acted({ namespace, name }, async (s) => {
+        if (payload.workflow !== undefined && (payload.workflow === '' || /[\\/]/.test(payload.workflow)))
+          throw new Refused({
+            error: `\`workflow\` is a workflow's name, with no \`/\`: send the run on to one by name — nemia resend ${name} --workflow <name> — or leave it out for its factory's card triggers. Nothing was filed.`,
+          });
+        const done = await s.inRequest(
+          RESEND.handler(
+            { runId: name, ...(payload.workflow === undefined ? {} : { workflow: payload.workflow }), actor: actorOf(s.caller) },
+            s.informer ? { runs: s.informer } : undefined,
+          ),
+        );
+        return {
+          card: await cardIn(s, namespace, done.card.name),
+          from: { run: done.from.run },
+          ...(done.cancelled === undefined ? {} : { cancelled: done.cancelled }),
+          ...(done.cancelLeft === undefined ? {} : { cancelLeft: done.cancelLeft }),
+        };
+      }),
     )
     .handle('retry', ({ params, payload }) => retried(params, payload))
     .handle('approve', ({ params, payload }) => approved(params, payload))

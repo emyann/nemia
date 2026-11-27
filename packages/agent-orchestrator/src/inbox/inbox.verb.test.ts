@@ -12,12 +12,13 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest } from '../../test/placed.ts';
 import { CardDoor, cardDoorOver, type CardDoorShape } from '../cards/cards.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
-import { releasedThrough, startQueued, waitingOf } from './inbox.verb.ts';
+import { inboxNow, releasedThrough, startQueued, waitingOf } from './inbox.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { testEngine } from 'agent-runtime/testing';
 import type { ParentRun } from '../wait/wait.ts';
 import type { MissedStart } from './index.ts';
 import { CardName } from './inbox.model.ts';
+import { Informer, informerMemo } from '../rest/informer.verb.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
 import { aCard } from '../../test/card-walks.ts';
 import { aRun } from '../../test/run-walks.ts';
@@ -105,6 +106,25 @@ test("through the pass's landing read (`releasedThrough` over `Parents.read`), a
     );
   assert.equal(await pass(false), undefined, 'its run is not released its waiters: nothing is taken');
   assert.equal((await pass(true))?.card, 'b-3z4w', 'its run released its waiters: the queue takes it');
+});
+
+test("the pass's reads fill the informer's kept parses: a card is parsed once across `inboxNow` and `startQueued`", async () => {
+  const memo = informerMemo();
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const door = yield* CardDoor;
+      yield* door.cards.add(CardName.read('a-1x2y'), aCard('First', { workflow: 'dev' }));
+      yield* door.cards.add(CardName.read('b-3z4w'), aCard('Second', { workflow: 'dev' }));
+      yield* inboxNow([]);
+      assert.equal(memo.cards.parsed, 2, 'the pass reads each card once');
+      yield* startQueued('/repo', []);
+      yield* inboxNow([]);
+      assert.equal(memo.cards.parsed, 2, 'no later read of the pass parses a card again');
+    }).pipe(
+      Effect.provideService(Informer, memo),
+      Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env))),
+    ),
+  );
 });
 
 test("`waitingOf` follows a card's work to the run a node of its run started: the parent hands its work on and releases nothing, the child is judged", () => {

@@ -40,7 +40,7 @@ import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 import { inboxDir, parseArgv, START, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
-import { informerMemo } from '../rest/informer.verb.ts';
+import { informerMemo, passStarted } from '../rest/informer.verb.ts';
 import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
 import { inboxLines, type InboxListing } from './inbox.ts';
@@ -842,6 +842,33 @@ test("a warm read of the inbox, through the informer the api keeps, answers a co
     [[card.name, 'filed', []]],
     'its run removed, the card is free again: filed, started as nothing',
   );
+});
+
+test("a card is parsed once per change, across passes: a changed card is served changed, and a removed card's entry goes", async () => {
+  emptyInbox();
+  const a = addToInbox({ text: 'Alpha card' });
+  const b = addToInbox({ text: 'Bravo card' });
+  const c = addToInbox({ text: 'Charlie card' });
+  const fileOf = (added: { card: { name: string } }) => `${added.card.name}.md`;
+  const memo = informerMemo();
+  const titles = async () => (await judgedInbox(memo)).map((l) => l.title ?? '').sort((x, y) => x.localeCompare(y));
+  assert.deepEqual(await titles(), ['Alpha card', 'Bravo card', 'Charlie card']);
+  assert.equal(memo.cards.parsed, 3, 'each card is parsed once');
+  const kept = [...memo.cards.kept.values()][0];
+  assert.ok(kept !== undefined && 'card' in kept.read);
+  assert.ok(Object.isFrozen(kept.read.card) && Object.isFrozen(kept.read.card.labels), 'a kept parse is frozen');
+
+  passStarted(memo);
+  const changed = cardAt(a.file).replace('Alpha card', 'Alpha changed');
+  await runPlaced(Effect.flatMap(CardDoor, (door) => door.cards.rewrite(CardName.read(a.card.name), changed)));
+  assert.deepEqual(await titles(), ['Alpha changed', 'Bravo card', 'Charlie card'], 'the change is served');
+  assert.equal(memo.cards.parsed, 4, 'only the changed card is parsed again');
+
+  passStarted(memo);
+  dropFromInbox(c.card.name);
+  assert.deepEqual(await titles(), ['Alpha changed', 'Bravo card']);
+  assert.equal(memo.cards.parsed, 4, 'a removed card costs no parse');
+  assert.deepEqual([...memo.cards.kept.keys()].sort(), [fileOf(a), fileOf(b)].sort(), "a removed card's entry goes");
 });
 
 test("a card's labels: filed with --label, inherited from its from: runs, selected with -l, shown with --show-labels and -L, and copied to the run it starts", async () => {

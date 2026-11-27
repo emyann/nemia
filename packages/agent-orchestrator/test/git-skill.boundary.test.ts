@@ -89,7 +89,7 @@ test('the place keeps its skill folder free of any script', () => {
  * The sections of the skill a read-only step cannot act on, each of which opens by saying whose it is and naming the section such a step
  * works from instead: committing, merging the base and landing all write the repository.
  */
-const WRITE_SECTIONS = ['Commit as you go', SKILL_SECTIONS.merge, 'Stage a landing'];
+const WRITE_SECTIONS = ['Commit as you go', SKILL_SECTIONS.merge];
 
 /** The read forms *Read what changed* names, each one a read-only step of any factory may type. */
 const READ_FORMS = [
@@ -150,9 +150,9 @@ test('REFUSED: an opener that points a direction rather than naming the section,
   assert.notEqual(directed, skill, 'each write section names the section a read-only step works from');
   for (const name of WRITE_SECTIONS)
     assert.ok(!openerOf(directed, name).includes(`*${SKILL_SECTIONS.read}*`), `${name}: a direction in place of the name`);
-  const forbidding = skill.replace(/^## Stage a landing\n\n[^\n]+/m, '## Stage a landing\n\nA read-only step never commits here.');
-  assert.notEqual(forbidding, skill, 'Stage a landing opens with one line');
-  assert.match(openerOf(forbidding, 'Stage a landing'), /\bnever\b/i);
+  const forbidding = skill.replace(/^## Commit as you go\n\n[^\n]+/m, '## Commit as you go\n\nA read-only step never commits here.');
+  assert.notEqual(forbidding, skill, 'Commit as you go opens with one line');
+  assert.match(openerOf(forbidding, 'Commit as you go'), /\bnever\b/i);
   const cut = skill.replace('`git blame', '`git praise');
   assert.notEqual(cut, skill, 'Read what changed names git blame');
   assert.ok(!sectionOf(cut, SKILL_SECTIONS.read).includes('`git blame'));

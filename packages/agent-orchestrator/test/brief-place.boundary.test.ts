@@ -150,7 +150,7 @@ test('a run is told the words of the place it is given, whatever place its recor
   const run = runOf();
   const named: RepositoryRun = { ...run, placeSkill: { skill: 'git', version: 'a'.repeat(64) } };
   for (const each of [run, named])
-    assert.deepEqual(toldBy()(each, stepNamed('review')), { words: undefined, say: builtinGitPlace.declared.say });
+    assert.deepEqual(toldBy()(each, stepNamed('review')), { say: builtinGitPlace.declared.say });
 });
 
 test("a planted place's words replace every git command of a repository run's briefs", () => {
@@ -190,7 +190,7 @@ test('a folder run is told nothing by a place, and its briefs say no git', () =>
   };
   const review = stepNamed('review');
   const told = toldBy()(folderRun, review);
-  assert.deepEqual(told, { words: undefined, say: undefined });
+  assert.deepEqual(told, { say: undefined });
   const brief = composeBrief(review, folderRun, STEPS, () => undefined, '/art/review', ...NONE, undefined, told);
   assert.deepEqual(
     brief.split('\n').filter((line) => /\bgit\b/.test(line)),

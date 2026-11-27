@@ -118,7 +118,6 @@ test('a step with every key the parser types, its agent and its output reads as 
     ['tally', 3],
     ['tally', 'verdict'],
     ['place', 'cloud'],
-    ['workspace', 'worktree'],
     ['background', 'true'],
     ['checkFailurePolicy', { rules: [{ action: 'Ignore', onExitCodes: { operator: 'In', values: [78] } }] }],
     ['checkFailurePolicy', { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: ['78'] } }] }],

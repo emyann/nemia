@@ -408,8 +408,8 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     );
     assert.deepEqual(
       ['answer', 'gate', 'check', 'queued', 'wall'].map((part) => value('run', part)[0]?.[1]),
-      [6 * MIN, 16 * MIN, 7 * MIN, 12 * MIN, 75 * MIN],
-      "the minutes the story let pass: the answer waited on 6, plan's gate 9 and ship's 7, the checks ran 7, the wall 10:00 to 11:15",
+      [6 * MIN, 16 * MIN, 7 * MIN, 12 * MIN, 68 * MIN],
+      "the minutes the story let pass: the answer waited on 6, plan's gate 9 and ship's 7, the checks ran 7, the wall 10:00 to 11:08",
     );
     const labels = { factory: 'default', workflow: path.basename(workflowDir), outcome: 'succeeded' };
     assert.deepEqual(
@@ -418,7 +418,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
     );
     assert.deepEqual(
       spans.find((x) => x.row === 'run' && x.part === 'wall'),
-      { run: id, of: 'run', row: 'run', part: 'wall', value: 75 * MIN, ...labels },
+      { run: id, of: 'run', row: 'run', part: 'wall', value: 68 * MIN, ...labels },
       "the run's row is no step's and no try's",
     );
   });
@@ -432,7 +432,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
       }),
     );
     const clock = clockOf(run, views, runSteps, [], Date.now());
-    assert.deepEqual(clock, { wallMs: 75 * MIN, sessionsMs: 34 * MIN, checksMs: 7 * MIN, personMs: 22 * MIN, slotMs: 12 * MIN, restMs: 0 });
+    assert.deepEqual(clock, { wallMs: 68 * MIN, sessionsMs: 34 * MIN, checksMs: 7 * MIN, personMs: 15 * MIN, slotMs: 12 * MIN, restMs: 0 });
     assert.equal(clock.sessionsMs + clock.checksMs + clock.personMs + clock.slotMs + clock.restMs, clock.wallMs);
     const tl = timeline(run, views, runSteps);
     const planStep = runSteps.find((x) => x.name === 'plan')!;

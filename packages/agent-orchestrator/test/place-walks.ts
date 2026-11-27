@@ -91,7 +91,10 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
 }
 
 /** `open` of `root`: its repository, its branch and its commit, or the refusal. */
-const opened = ({ place }: Side, root: string) => place.askNow('open', { root, isolate: false }) satisfies unknown;
+function opened({ place }: Side, root: string) {
+  const outcome = place.askNow('open', { root, isolate: false });
+  return ('answer' in outcome ? outcome.answer : outcome) satisfies unknown;
+}
 
 /** `standing` of `branches` in `root` against main. */
 const stand = ({ place }: Side, root: string, branches: PlaceRequests['standing']['branches'] = []) =>

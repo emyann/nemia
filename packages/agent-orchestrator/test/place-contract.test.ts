@@ -71,7 +71,7 @@ for (const verb of PLACE_VERBS)
 test('REFUSED: a verb with no walk — one added to the place, and one whose walks were taken away — is named', () => {
   assert.deepEqual(unwalked(PLACE_VERBS, WALKS), [], 'every verb of the place is walked');
   assert.deepEqual(unwalked([...PLACE_VERBS, 'mirror'], WALKS), ['mirror']);
-  assert.deepEqual(unwalked(PLACE_VERBS, { ...WALKS, land: [] }), ['land']);
+  assert.deepEqual(unwalked(PLACE_VERBS, { ...WALKS, trial: [] }), ['trial']);
 });
 
 test("the test place's commits are told apart by their first seven characters, as a screen that shortens an id tells git's", () => {

@@ -988,7 +988,7 @@ test("REFUSED: a place's file that imports a package, the rest of src or another
   for (const file of [
     'src/tick/tick.verb.ts',
     'src/place/place.store.ts',
-    'src/place/builtin.store.ts',
+    'src/branches/branches.store.ts',
     'src/cli/main.ts',
     'bin/nemia.ts',
   ]) {

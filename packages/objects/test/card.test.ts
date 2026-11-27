@@ -12,6 +12,7 @@ import {
   Api,
   CARD_KEYS,
   CARD_KEY_MEANINGS,
+  CARD_PHASES,
   CARD_STATES,
   Card,
   CardEdit,
@@ -39,6 +40,9 @@ const filed = {
     lastStart: { at: '2026-11-04T02:00:00.000Z', repo: '/repo', why: 'no workflow build', refused: true },
     title: 'Cache the views.',
     inPlay: true,
+    phase: 'waiting',
+    followedBy: [],
+    chained: false,
     place: 1,
   },
 } as const;
@@ -48,7 +52,7 @@ const broken = {
   kind: 'Card',
   metadata: { name: 'broken', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'd2' },
   spec: {},
-  status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have', inPlay: true },
+  status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have', inPlay: true, phase: 'notStarted', followedBy: [], chained: false },
 } as const;
 
 test("the Api's get answers a card and its list a page of cards, every key kept, absent keys left absent; another kind refused", () => {
@@ -57,7 +61,12 @@ test("the Api's get answers a card and its list a page of cards, every key kept,
   const page = {
     apiVersion: API_VERSION,
     kind: 'CardList',
-    metadata: { continue: 'YnJva2Vu', remainingItemCount: 1 },
+    metadata: {
+      continue: 'YnJva2Vu',
+      remainingItemCount: 1,
+      counts: { notStarted: 1, blocked: 0, waiting: 1, working: 0, done: 0, failed: 0, cancelled: 0 },
+      labelsInUse: [{ key: 'team', value: 'core', cards: 1 }],
+    },
     items: [filed, broken],
   };
   assert.deepEqual(answered('cards', 'list', page), listedPage(LISTED_WITHOUT.Card, page));
@@ -88,6 +97,12 @@ test("the verbs' bodies are taken by the Api's endpoints as the api is sent them
   assert.deepEqual(taken('cards', 'labels', { labels: ['team=core'], overwrite: true }), { labels: ['team=core'], overwrite: true });
   assert.equal(taken('cards', 'create', start), undefined);
   assert.equal(taken('cards', 'labels', file), undefined);
+});
+
+test('a card list carries its counts per phase and the labels in use, and REFUSED: a phase of none of the seven words', () => {
+  const decode = Schema.decodeUnknownSync(Card);
+  assert.deepEqual(CARD_PHASES, ['notStarted', 'blocked', 'waiting', 'working', 'done', 'failed', 'cancelled']);
+  assert.throws(() => decode({ ...filed, status: { ...filed.status, phase: 'stuck' } }));
 });
 
 test('REFUSED: a card whose state is no card state, whose kind is another, or a filing with no body', () => {

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Paperclip } from 'lucide-react';
-import { Body } from '@/components/ui/ds';
-import { CopyId, CutFrame, CutTag, MeaningTag } from '@/components/look';
+import { useNavigate } from '@tanstack/react-router';
+import { Body, Cell, Column, Label, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
+import { cn } from '@/components/ui/ds/utils';
+import { CopyId, CutFrame, CutTag, FRAMED_ROW, FRAMED_TABLE, MeaningTag, TableAtCut } from '@/components/look';
 import { factoriesQuery } from '@/lib/api/factories';
 import { workflowNameOf } from '@/lib/api/workflows';
 import type { InboxEntry } from '@/lib/api/inbox';
@@ -146,37 +148,128 @@ export function InboxCard({
   );
 }
 
+/** A column's heading, in the look's small caps. */
+const HEAD = 'uppercase';
+
+/** What the Filed column wears: drawn from the frame grid's 768-pixel step of the page column, folded under the title below it. */
+const FILED_SHOWN = 'hidden @3xl/page:table-cell';
+
 /**
- * A card of the Inbox as a row of the list: its title first, linked to its page, with its name and copy control under it, then its
- * state's tag, its factory and workflow, when it was filed, and its actions at the end.
+ * What the Factory / workflow column wears: drawn from the page column's 1024-pixel step, folded under the title below it, so that
+ * between the two steps the set widths leave the Card column room for a title.
  */
-export function InboxCardRow({ entry, chain = null }: { entry: InboxEntry; chain?: readonly InboxEntry[] | null }) {
+const WHERE_SHOWN = 'hidden @5xl/page:table-cell';
+
+/**
+ * A card of the Inbox as a row of the list: its title linked to its page, its name with the control that copies it, its labels and what
+ * it reads under it; its state's tag, or nothing; its factory and workflow; when it was filed; and its actions. The factory folds under
+ * the title below the page column's 1024-pixel step, and the filing time below the frame grid's 768-pixel step. The row opens the
+ * card's page on a press or Enter, through the board's router; a control inside it does its own thing.
+ */
+function InboxRow({ entry }: { entry: InboxEntry }) {
   const [refusal, setRefusal] = useState<Omit<CardRefusal, 'entry'> | null>(null);
-  const stuck = stuckOf(entry);
+  const navigate = useNavigate();
+  const filed = entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />;
   return (
-    <li aria-label={`Card ${entry.name}`} data-card={entry.name} className="space-y-1 border-b border-outline-variant py-2">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,12rem)_auto_auto] items-center gap-x-4">
-        <div className="min-w-0">
-          <Body size="medium" component="p" data-title className="truncate font-medium">
-            <CardLink entry={entry} className="underline decoration-outline underline-offset-4 hover:decoration-current" />
+    <Row
+      id={entry.file}
+      textValue={entry.title ?? entry.file}
+      data-card={entry.name}
+      className={FRAMED_ROW}
+      onAction={() => void navigate({ to: '/inbox/$name', params: { name: entry.name } })}
+    >
+      <Cell data-card-cell className="py-2.5">
+        <span className="flex min-w-0 flex-col gap-1">
+          <Body size="medium" component="span" data-title className="block min-w-0 font-medium" title={entry.title ?? entry.file}>
+            <CardLink
+              entry={entry}
+              className="block w-fit max-w-full truncate underline decoration-outline underline-offset-4 hover:decoration-current"
+            />
           </Body>
-          <CopyId id={entry.name} of="card" />
-        </div>
-        <div className="flex">
-          <StateTag entry={entry} />
-        </div>
-        <Body size="small" colorRole="on-surface-variant" component="span" title="Factory / workflow" className="truncate">
+          <CopyId id={entry.name} of="card" wrap />
+          <Body
+            size="small"
+            colorRole="on-surface-variant"
+            component="span"
+            data-card-folded
+            className="flex flex-wrap gap-x-3 @5xl/page:hidden"
+          >
+            <span title="Factory / workflow">{whereOf(entry)}</span>
+            {filed && <span className="@3xl/page:hidden">{filed}</span>}
+          </Body>
+          <LabelValues labels={entry.labels} />
+          <Facts entry={entry} compact={false} />
+          {refusal && <Refused refusal={{ ...refusal, entry }} />}
+        </span>
+      </Cell>
+      <Cell data-card-tag>
+        <StateTag entry={entry} />
+      </Cell>
+      <Cell data-card-where className={WHERE_SHOWN}>
+        <Body size="small" colorRole="on-surface-variant" component="span" title="Factory / workflow" className="block truncate">
           {whereOf(entry)}
         </Body>
-        <Body size="small" colorRole="on-surface-variant" component="span" className="whitespace-nowrap">
-          {entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />}
+      </Cell>
+      <Cell data-card-filed className={FILED_SHOWN}>
+        <Body size="small" colorRole="on-surface-variant" component="span" className="block truncate">
+          {filed}
         </Body>
-        <div className="flex items-center justify-end gap-2">
-          <CardActions entry={entry} chain={chain} stuck={stuck} onRefused={setRefusal} />
-        </div>
-      </div>
-      <Facts entry={entry} compact={false} />
-      {refusal && <Refused refusal={{ ...refusal, entry }} />}
-    </li>
+      </Cell>
+      <Cell data-card-actions>
+        <span className="flex items-center justify-end gap-2">
+          <CardActions entry={entry} chain={null} stuck={stuckOf(entry)} onRefused={setRefusal} />
+        </span>
+      </Cell>
+    </Row>
+  );
+}
+
+/**
+ * The Inbox's cards as a list: the kit's dense table in the look's cut frame, as the runs' finished table is, one header row and the
+ * same five columns on every row (Card, State, Factory / workflow, Filed, Actions). The Card column takes what the others leave, each
+ * of which keeps its set width, so every column's left edge is one x down the list at any width of the page column; Factory / workflow
+ * folds under the title below the page column's 1024-pixel step, and Filed below the frame grid's 768-pixel step. Narrower than its
+ * columns, the table scrolls sideways inside its frame. `entries` are the cards, in the page's order.
+ */
+export function InboxList({ entries }: { entries: readonly InboxEntry[] }) {
+  return (
+    <CutFrame size={24}>
+      <TableAtCut data-table-box>
+        <Table aria-label="Cards" density="dense" className={cn('min-w-[480px] table-fixed', FRAMED_TABLE)}>
+          <TableHeader>
+            <Column id="card" isRowHeader className={HEAD}>
+              <Label size="small" component="span">
+                Card
+              </Label>
+            </Column>
+            <Column id="state" className={cn(HEAD, 'w-[128px]')}>
+              <Label size="small" component="span">
+                State
+              </Label>
+            </Column>
+            <Column id="where" className={cn(HEAD, 'w-[200px]', WHERE_SHOWN)}>
+              <Label size="small" component="span">
+                Factory / workflow
+              </Label>
+            </Column>
+            <Column id="filed" className={cn(HEAD, 'w-[150px]', FILED_SHOWN)}>
+              <Label size="small" component="span">
+                Filed
+              </Label>
+            </Column>
+            <Column id="actions" align="end" className={cn(HEAD, 'w-[176px]')}>
+              <Label size="small" component="span">
+                Actions
+              </Label>
+            </Column>
+          </TableHeader>
+          <TableBody>
+            {entries.map((entry) => (
+              <InboxRow key={entry.file} entry={entry} />
+            ))}
+          </TableBody>
+        </Table>
+      </TableAtCut>
+    </CutFrame>
   );
 }

@@ -9,7 +9,7 @@ import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, TRAIL_MARK, type Inbo
 import { elsewhereLine, everyFactory, suggestedAsk, withoutFactory } from '@/lib/searchBar';
 import { readStored, store } from '@/lib/stored';
 import { CardChain } from './CardChain';
-import { CARD_LEAST, InboxCard, InboxCardRow } from './InboxCard';
+import { CARD_LEAST, InboxCard, InboxList } from './InboxCard';
 import { InboxSides, InboxToolbar, type Layout } from './InboxToolbar';
 
 /** The key the browser keeps the layout under: Grid until a person picks List. */
@@ -171,11 +171,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
             ))}
           </ul>
         ) : (
-          <ul>
-            {page.entries.map((entry) => (
-              <InboxCardRow key={entry.file} entry={entry} />
-            ))}
-          </ul>
+          page.entries.length > 0 && <InboxList entries={page.entries} />
         )}
         {(trail.length > 0 || page.next !== null) && (
           <Pager

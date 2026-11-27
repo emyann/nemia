@@ -34,7 +34,7 @@ export function CutTextArea({
           <TextArea
             rows={rows}
             placeholder={placeholder}
-            className="block min-w-0 flex-1 resize-y bg-transparent py-2 pl-3.5 pr-3 text-on-surface outline-none placeholder:text-on-surface-variant"
+            className="block w-full min-w-0 flex-1 resize-y bg-transparent py-2 pl-3.5 pr-3 text-on-surface outline-none placeholder:text-on-surface-variant"
           />
         </Body>
       </CutField>

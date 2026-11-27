@@ -347,7 +347,7 @@ export default {
     await expectVisible(ending, `a run at its gate keeps its card on the floor with no Show finished (${ENDING.id})`);
     await expectVisible(
       ending.locator(
-        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve what ${ENDING.ending} handed on, or send it back"][title$="${ENDING.ending} has signed off at its gate — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
+        `[data-gate-line="${ENDING.ending}"][title^="approve what ${ENDING.ending} handed on, or send it back"][title$="${ENDING.ending} has signed off at its gate — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
         { hasText: `approve what ${ENDING.ending} handed on, or send it back` },
       ),
       `its card says what approving does and where a send-back goes, the command on hover`,

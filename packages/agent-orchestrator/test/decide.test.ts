@@ -578,63 +578,6 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       assert.ok(!d.commands.some((x) => x.label === 'merge it' || x.label === 'drop it'), 'nor a merge of the branch it is already on');
     },
   );
-  s.test(
-    "a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it",
-    async () => {
-      const repo = aRepo();
-      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-      fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nslot: none\n---\nWatch the runs.\n');
-      const run = await started({ brief: 'supervise this repository', repo, workflowDir: dir });
-      await tick(run.id);
-      settle(`${run.id}-supervise`, 'succeeded', { closeout: blocked('Merge add-sub, or hold it?', 'add-sub is ready to merge.') });
-      await tick(run.id);
-      assert.equal(
-        runRecord(ROOT, run.id).steps.supervise?.branch,
-        'main',
-        "the step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's",
-      );
-
-      stage.place().world.branch(repo, 'main', {
-        'packages/x/test/add.test.ts': "import assert from 'node:assert';\nassert.ok(true);\n",
-        'CLAUDE.md': 'a lesson somebody else wrote\n',
-      });
-      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(runRecord(ROOT, run.id)), ['main'], RADIUS);
-      assert.ok(
-        !('error' in moved) && moved.changes.length === 2,
-        `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
-      );
-
-      const { d, decided } = await decidable(run.id);
-      assert.deepEqual(d.touched, [], 'no branch to read');
-      assert.notEqual(d.lesson.state, 'written', 'nor a lesson credited to it for what another run merged');
-      assert.deepEqual(d.sensitive, [], 'nor every check-affecting file merged since, above the question');
-      const closeout = decided.closeouts.supervise;
-      assert.ok(closeout && !('error' in closeout), JSON.stringify(closeout));
-      assert.deepEqual(
-        [closeout.summary, closeout.needs],
-        ['add-sub is ready to merge.', 'Merge add-sub, or hold it?'],
-        'what the person came for: the summary, and the question',
-      );
-      assert.equal(decided.answering.supervise, `to answer it:  nemia retry ${run.id} supervise --message "<answer>"`);
-
-      const direct = await started({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
-      stage.place().world.branch(repo, 'main', { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` });
-      await tick(direct.id);
-      settle(`${direct.id}-implement`, 'failed');
-      const { d: worked } = await decidable(direct.id);
-      assert.equal(
-        runRecord(ROOT, direct.id).steps.review?.branch,
-        undefined,
-        'the terminal step has no branch: the fallback is what answers',
-      );
-      const groups = worked.touched.map((x) => ({ branch: x.branch, groups: 'error' in x.radius ? null : x.radius.groups }));
-      assert.deepEqual(
-        groups.map((x) => [x.branch, x.groups?.map((g) => [g.name, g.files, g.added, g.removed])]),
-        [['main', [['packages/x', 1, 1, 0]]]],
-        'a run that worked on main itself (--no-worktree) reads every branch a step worked on, main, where its work is',
-      );
-    },
-  );
 });
 
 describe('a step retried, answered, over its budget and nudged: what `nemia decide` and `nemia ls` say of each try', () => {

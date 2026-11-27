@@ -183,7 +183,12 @@ export default {
     await photograph(page, path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
     dropStoredAsks(id);
     fed(id, ending, 'awaiting approval');
-    await expectVisible(approveOf(page), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
+    await page.reload();
+    await settled(page);
+    await expectVisible(
+      approveOf(page),
+      'with the send-back taken back and the page read again, the card offers the gate again, and the page ends as it began',
+    );
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);

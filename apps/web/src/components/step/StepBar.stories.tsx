@@ -120,8 +120,10 @@ export const TheCard: StoryObj<typeof meta> = {
     const items = await within(canvasElement.ownerDocument.body).findAllByRole('menuitem');
     await expect(items.map((item) => item.textContent)).toEqual(['Open', 'Open conversation']);
 
+    await userEvent.keyboard('{Escape}');
+
     const streams = await streamsOf(async () => {
-      await userEvent.click(items[1]);
+      await pick(canvasElement, 'Open conversation');
       await canvas.findByText('The panel is the step’s card now.');
       await waitFor(() => expect(canvas.getByText('Followed as it runs.')).toBeVisible());
       await userEvent.click(canvas.getByRole('button', { name: 'Back to the step' }));

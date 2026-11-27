@@ -23,6 +23,7 @@ export const CODES = {
     verdict: { result: 'passed', exit: 0 },
     message: 'verified ✓',
   },
+  checking: { phase: 'running', reason: 'Checking', on: null, via: null, verdict: null, message: 'checking' },
   refused: {
     phase: 'failed',
     reason: 'CheckFailed',
@@ -272,3 +273,63 @@ export const toldInLayers = (step: StepView) => ({
     { kind: 'from', run: 'r-0', asked: 'Build the cache.', body: '### Its work\n\nIt built the cache.', how: 'waited' },
   ],
 }) satisfies StepView;
+
+/** The conditions the wait node of the stories waits on, in its `waitsFor:` order. */
+export const WAITS = ['turn', 'ci', 'merged', 'base-ci'] as const;
+
+/** A condition check of a wait node as the api serves it, written `status` for try 1, or not written yet where null. */
+const conditionCheck = (name: string, status: 'True' | 'False' | 'Unknown' | null) => ({
+  name,
+  command: `condition: ${name}`,
+  started: null,
+  ended: null,
+  taskId: `t-land-1-${name}`,
+  verdict: null,
+  refused: null,
+  condition: {
+    name,
+    try: 1,
+    status,
+    message: status === null ? null : `${name} written ${status}`,
+    writtenAt: status === null ? null : NOW.toISOString(),
+    lastTransitionTime: status === null ? null : NOW.toISOString(),
+  },
+});
+
+/**
+ * `step` as the wait node `land` (`waitsFor: WAITS`, after `review`): no agent, no budget and no task. With `written`, it is
+ * filed, its conditions laid as its checks, each written with its status there or not yet; without, it is not filed yet, and has no check.
+ */
+export const waitNode = (step: StepView, written?: Partial<Record<(typeof WAITS)[number], 'True' | 'False' | 'Unknown'>>) => {
+  const checks = written ? WAITS.map((name) => conditionCheck(name, written[name] ?? null)) : null;
+  return {
+    ...step,
+    name: 'land',
+    spec: {
+      after: ['review'],
+      loop: null,
+      rounds: null,
+      harness: null,
+      model: null,
+      effort: null,
+      context: null,
+      workspace: null,
+      place: null,
+      resume: null,
+      fence: null,
+      sandbox: null,
+      tools: null,
+      deadlineSeconds: null,
+      waitsFor: [...WAITS],
+    },
+    filed: null,
+    taskId: null,
+    budget: null,
+    spent: null,
+    check: checks?.find((check) => check.condition.status !== 'True') ?? checks?.[0] ?? null,
+    ...(checks && { checks }),
+  } satisfies StepView;
+};
+
+/** The one try of a wait node waiting on its conditions: no task and no attempt, its checks standing. */
+export const waitingTry = () => ({ ...tryOf(1, CODES.checking, false, null), taskId: null, attempts: { count: 0, latest: null } }) satisfies StepTry;

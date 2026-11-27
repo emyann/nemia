@@ -311,7 +311,7 @@ describe("stepStamp: a step's tries and told are read again when it moves, and w
 
 describe('runsNoSession: a step with no task that runs no session, so the board does not say it is not filed yet', () => {
   test('a wait node runs no session, before its conditions are laid and after', () => {
-    const wait = { spec: { waitsFor: ['turn', 'ci', 'landed', 'base-ci'] } };
+    const wait = { spec: { waitsFor: ['turn', 'ci', 'merged', 'base-ci'] } };
     assert.equal(runsNoSession({ taskId: null, check: null, ...wait }), true);
     assert.equal(runsNoSession({ taskId: null, check: { name: 'turn' }, ...wait }), true);
   });

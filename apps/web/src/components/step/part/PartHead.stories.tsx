@@ -26,7 +26,7 @@ export const ReadingTheStep: StoryObj<typeof meta> = { play: saysReading('Readin
 
 /** A wait node not filed yet, then waiting with each condition written or not, both with the run's own answer read. */
 const WAIT_TO_COME = runOf(waitNode(stepOf(CODES.come, [])));
-const WAITING = runOf(waitNode(stepOf(CODES.checking, [waitingTry()]), { turn: 'True', ci: 'False', landed: 'Unknown' }));
+const WAITING = runOf(waitNode(stepOf(CODES.checking, [waitingTry()]), { turn: 'True', ci: 'False', merged: 'Unknown' }));
 
 /** What a wait node's head holds in place of an agent: the conditions in order, each with `words` (null before it is filed), no budget. */
 const waitsOn =
@@ -37,7 +37,7 @@ const waitsOn =
     await expect(head.querySelector('[data-step-agent]')).toBeNull();
     await expect(head.querySelector('[data-step-spend]'), 'no budget line').toBeNull();
     const conditions = [...head.querySelectorAll('[data-waits-on]')];
-    await expect(conditions.map((c) => c.getAttribute('data-waits-on'))).toEqual(['turn', 'ci', 'landed', 'base-ci']);
+    await expect(conditions.map((c) => c.getAttribute('data-waits-on'))).toEqual(['turn', 'ci', 'merged', 'base-ci']);
     await expect(conditions.map((c) => c.getAttribute('data-condition-word'))).toEqual(words);
   };
 

@@ -274,8 +274,8 @@ export const toldInLayers = (step: StepView) => ({
   ],
 }) satisfies StepView;
 
-/** The conditions the land step of a quick or build run waits on, in its `waitsFor:` order. */
-export const LAND_WAITS = ['turn', 'ci', 'landed', 'base-ci'] as const;
+/** The conditions the wait node of the stories waits on, in its `waitsFor:` order. */
+export const WAITS = ['turn', 'ci', 'merged', 'base-ci'] as const;
 
 /** A condition check of a wait node as the api serves it, written `status` for try 1, or not written yet where null. */
 const conditionCheck = (name: string, status: 'True' | 'False' | 'Unknown' | null) => ({
@@ -297,11 +297,11 @@ const conditionCheck = (name: string, status: 'True' | 'False' | 'Unknown' | nul
 });
 
 /**
- * `step` as the wait node `land` (`waitsFor: LAND_WAITS`, after `review`): no agent, no budget and no task. With `written`, it is
+ * `step` as the wait node `land` (`waitsFor: WAITS`, after `review`): no agent, no budget and no task. With `written`, it is
  * filed, its conditions laid as its checks, each written with its status there or not yet; without, it is not filed yet, and has no check.
  */
-export const waitNode = (step: StepView, written?: Partial<Record<(typeof LAND_WAITS)[number], 'True' | 'False' | 'Unknown'>>) => {
-  const checks = written ? LAND_WAITS.map((name) => conditionCheck(name, written[name] ?? null)) : null;
+export const waitNode = (step: StepView, written?: Partial<Record<(typeof WAITS)[number], 'True' | 'False' | 'Unknown'>>) => {
+  const checks = written ? WAITS.map((name) => conditionCheck(name, written[name] ?? null)) : null;
   return {
     ...step,
     name: 'land',
@@ -320,7 +320,7 @@ export const waitNode = (step: StepView, written?: Partial<Record<(typeof LAND_W
       sandbox: null,
       tools: null,
       deadlineSeconds: null,
-      waitsFor: [...LAND_WAITS],
+      waitsFor: [...WAITS],
     },
     filed: null,
     taskId: null,

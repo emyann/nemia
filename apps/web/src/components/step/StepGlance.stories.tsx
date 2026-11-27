@@ -17,7 +17,7 @@ const RUNS = {
   come: runOf(stepOf(CODES.come, [])),
   failed: runOf(stepOf(CODES.refused, [tryOf(1, CODES.refused, true, PLAN)])),
   waitToCome: runOf(waitNode(stepOf(CODES.come, []))),
-  waiting: runOf(waitNode(stepOf(CODES.checking, [waitingTry()]), { turn: 'True', ci: 'False', landed: 'Unknown' })),
+  waiting: runOf(waitNode(stepOf(CODES.checking, [waitingTry()]), { turn: 'True', ci: 'False', merged: 'Unknown' })),
 } as const;
 
 /** The surface of the kit's rich tooltip, which the card is drawn on. */
@@ -43,7 +43,7 @@ const waitsOn = async (canvas: HTMLElement, words: ReadonlyArray<string | null>)
   await expect(card.querySelector('[data-step-agent]')).toBeNull();
   await expect(card.querySelector('[data-step-spend]'), 'no budget line').toBeNull();
   const conditions = [...card.querySelectorAll('[data-waits-on]')];
-  await expect(conditions.map((c) => c.getAttribute('data-waits-on'))).toEqual(['turn', 'ci', 'landed', 'base-ci']);
+  await expect(conditions.map((c) => c.getAttribute('data-waits-on'))).toEqual(['turn', 'ci', 'merged', 'base-ci']);
   await expect(conditions.map((c) => c.getAttribute('data-condition-word'))).toEqual(words);
 };
 

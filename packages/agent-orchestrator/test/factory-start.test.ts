@@ -680,6 +680,21 @@ describe('a start in a factory refused step by step, each naming its fix, until 
       'nemia factory attach pipao dev',
     );
   });
+  s.test('REFUSED: a workflow node that starts a run of a workflow the factory does not offer, naming the node and the attach', async () => {
+    const door = path.join(path.dirname(build), 'door');
+    fs.mkdirSync(door);
+    fs.writeFileSync(path.join(door, 'to-build.md'), '---\nplace: git\nworkflow: build\n---\nHand it on.\n');
+    detached(ROOT, 'pipao', 'build');
+    attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'door' });
+    await startRefused(
+      () => runPlaced(startRun({ brief: 'door it', repo, workflowDir: door, isolate: false, factory: 'pipao' })),
+      'Invalid',
+      'to-build',
+      'pipao',
+      'nemia factory attach pipao build',
+    );
+    attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
+  });
   s.test('REFUSED: once attached, every step no one fills, a hire line for each', async () => {
     await startRefused(
       start,

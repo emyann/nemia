@@ -1,6 +1,6 @@
 /**
  * `to decide` on the board: what a person has to decide about a run's result, as the api carries it on the list and on a run's detail —
- * the ending step's gate with the command that approves it, or a result branch nobody merged — and the facts under the result on
+ * a step at its gate with the command that approves it, or a result branch nobody merged — and the facts under the result on
  * `GET /api/runs/:runId/decision`: where each branch stands, and how much it changed.
  *
  * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `countsLine`), and the branches are read off a real repository.
@@ -107,15 +107,8 @@ const running = (taskId: string, cwd: string) =>
     ]),
   );
 
-/** What `ship.md` says first, which is what a person is deciding on: `toDecide.says`, and the whole of `nemia ls`'s line with it. */
-const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
-const SHIP_BODY = `${SHIPS}\n\nLook at the checkout first.`;
-
-/** A workflow that ends in a step acting on the base branch itself, gated: implement → ship. */
-const ENDING = [
-  { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-  { name: 'ship', after: ['implement'], body: SHIP_BODY, harness: 'claude', gate: true },
-];
+/** A workflow whose one step is gated: a person's approval is what it waits on once it has signed off. */
+const GATED = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex', gate: true }];
 /** A workflow that says nothing about what happens when the work is done: its branch is a person's. */
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
@@ -153,10 +146,10 @@ const decidableOf = async (id: string) => {
 
 const { repo, base } = aRepo();
 
-describe("a run at its ending's gate: `to decide` says what the ending would do on the list and the page, the decision offers the approval and the send-back, and whether it still merges onto the base as the base moves", () => {
+describe("a run at its gate: `to decide` says the approval on the list and the page, the decision offers the approval and the send-back, and whether it still merges onto the base as the base moves", () => {
   const s = story(test);
   s.test(
-    "a run at its ending's gate: `to decide` says what the ending would do and the command that approves it, on the list and on the detail — with no `git` asked about it",
+    "a run at its gate: `to decide` says the step signed off at it and the command that approves it, on the list and on the detail — with no `git` asked about it",
     async () => {
       const id = 'r-ending';
       branchOff(repo, `wf/${id}/implement`, 'src/a.ts', 'export const a = 1;\n');
@@ -165,37 +158,28 @@ describe("a run at its ending's gate: `to decide` says what the ending would do 
         id,
         repo,
         baseRef: base,
-        workflow: ENDING,
-        steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, ship: { taskId: null } },
+        workflow: GATED,
+        steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` } },
       });
 
       const before = gitCount();
       const detail = await detailOf(id);
       assert.deepEqual(
         detail.status.steps.map((s) => [s.name, s.message]),
-        [
-          ['implement', 'unverified · done'],
-          ['ship', 'awaiting approval'],
-        ],
+        [['implement', 'awaiting approval']],
       );
-      assert.deepEqual([detail.status.waitingOnYou, detail.status.waitingOnYouWords], [['ship'], ['approve ship']]);
+      assert.deepEqual([detail.status.waitingOnYou, detail.status.waitingOnYouWords], [['implement'], ['approve implement']]);
       assert.deepEqual(
         detail.status.toDecide,
         {
           kind: 'approve',
-          step: 'ship',
-          says: SHIPS,
-          filed: false,
-          /**
-           * What the card answers it with: a send-back goes to the work ship waits on (`sendBackTo`), and the result is on its way to
-           * main.
-           */
+          step: 'implement',
           back: ['implement'],
           onto: 'main',
-          said: `${SHIPS} — nemia approve ${id} ship`,
-          command: `nemia approve ${id} ship`,
+          said: `implement has signed off at its gate — nemia approve ${id} implement`,
+          command: `nemia approve ${id} implement`,
         },
-        "the ending has not run: what there is to decide is what it would do, in the folder's own first line, and the command that runs it",
+        'what there is to decide is the step at its gate, and the command that approves it; a send-back asks the step itself',
       );
       assert.ok(
         detail.status.toDecide.said.endsWith(detail.status.toDecide.command),
@@ -205,12 +189,12 @@ describe("a run at its ending's gate: `to decide` says what the ending would do 
       assert.equal(
         gitCount(),
         before,
-        "no git call for a run whose folder has an ending step: a gate says it is one to decide, and the branch is the ending step's to merge",
+        'no git call for a run at its gate: a gate says it is one to decide',
       );
     },
   );
   s.test(
-    "the decision of a run at its ending's gate, once a pass has read where its branch stands, offers the approval and the send-back, and never `git merge` by hand: its ending is what merges",
+    "the decision of a run at its gate, once a pass has read where its branch stands, offers the approval and the send-back, and no `git merge` by hand",
     async () => {
       await aPass();
       const { commands, standings } = await decidableOf('r-ending');
@@ -220,12 +204,12 @@ describe("a run at its ending's gate: `to decide` says what the ending would do 
       );
       assert.deepEqual(
         commands.map((c) => c.command),
-        [`nemia approve r-ending ship`, `nemia retry r-ending implement --message "<objection>"`],
+        [`nemia approve r-ending implement`, `nemia retry r-ending implement --message "<objection>"`],
       );
       assert.deepEqual(
         standings.map((b) => [b.branch, b.where]),
         [['wf/r-ending/implement', 'ahead']],
-        "the result it would act on is the work's branch, not the ending step's own, which has none, working in the repository's checkout (resultSteps); read for the facts under the run, whatever the list is spared",
+        "the result is the gated step's branch; read for the facts under the run, whatever the list is spared",
       );
     },
   );
@@ -281,152 +265,7 @@ describe("a run at its ending's gate: `to decide` says what the ending would do 
   );
 });
 
-describe("the gate's commands are never empty, by what the ending waits on and where it stopped", () => {
-  test("an ending that waits on several steps offers a send-back to each, and one that waits on nothing offers only the approval — the gate's commands are never empty", async () => {
-    const fan = 'r-fan';
-    const wide = [
-      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-      { name: 'docs', after: [], body: 'Write the docs.', harness: 'codex' },
-      { name: 'ship', after: ['implement', 'docs'], body: SHIP_BODY, harness: 'claude', gate: true },
-    ];
-    branchOff(repo, `wf/${fan}/implement`, 'src/fan.ts', 'export const fan = 1;\n');
-    signedOff(`${fan}-implement`, repo);
-    signedOff(`${fan}-docs`, repo);
-    writeRun({
-      id: fan,
-      repo,
-      baseRef: base,
-      workflow: wide,
-      steps: {
-        implement: { taskId: `${fan}-implement`, branch: `wf/${fan}/implement` },
-        docs: { taskId: `${fan}-docs`, branch: `wf/${fan}/implement` },
-        ship: { taskId: null },
-      },
-    });
-    const wideGate = await decidableOf(fan);
-    assert.deepEqual(
-      wideGate.commands.map((c) => c.label),
-      ['approve', 'send back', 'send back'],
-      'a send-back for each step the objection could be about',
-    );
-    assert.deepEqual(
-      wideGate.commands.map((c) => c.command),
-      [
-        `nemia approve ${fan} ship`,
-        `nemia retry ${fan} implement --message "<objection>"`,
-        `nemia retry ${fan} docs --message "<objection>"`,
-      ],
-      'a fan-in ending, which the loader allows: ship after implement and docs, nothing waiting on it and nothing ending beside it',
-    );
-
-    const alone = 'r-alone';
-    writeRun({
-      id: alone,
-      repo,
-      baseRef: base,
-      workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', gate: true }],
-      steps: { ship: { taskId: null } },
-    });
-    process.env.WF_MAX_RUNS = '0';
-    const lone = await decidableOf(alone).finally(() => (process.env.WF_MAX_RUNS = 'set-it-in-the-test'));
-    assert.deepEqual(
-      lone.commands.map((c) => [c.label, c.command]),
-      [['approve', `nemia approve ${alone} ship`]],
-      'an ending that waits on nothing, a workflow of one step in the checkout, which the loader allows too: no work to send back, so the approval is the only command, and it is there',
-    );
-    for (const { commands } of [wideGate, lone]) {
-      assert.deepEqual(
-        commands.filter((c) => c.label === 'merge it' || c.label === 'drop it'),
-        [],
-        'neither is handed git merge by hand: the ending step is what merges',
-      );
-    }
-  });
-  test('an ending that ran on its approval and stopped on the base branch offers both ways on: land again, and a send-back through the loop with its words', async () => {
-    const id = 'r-stopped';
-    const loop = [
-      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-      {
-        name: 'review',
-        after: ['implement'],
-        body: 'Review it.',
-        harness: 'codex',
-        loop: 'implement',
-        rounds: 3,
-        output: {
-          file: 'review.json',
-          schema: {
-            type: 'object',
-            properties: { again: { type: 'boolean' } },
-            required: ['again'],
-            additionalProperties: false,
-          },
-        },
-      },
-      { name: 'ship', after: ['review'], body: SHIP_BODY, harness: 'claude', gate: true },
-    ];
-    branchOff(repo, `wf/${id}/implement`, 'src/stopped.ts', 'export const stopped = 1;\n');
-    signedOff(`${id}-implement`, repo);
-    write(
-      path.join(root, 'engine', 'tasks', `${id}-review.jsonl`),
-      jsonl([
-        { kind: 'filed', at, brief: 'Review it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
-        { kind: 'starting', at, attempt: 1 },
-        { kind: 'spawned', at, attempt: 1 },
-        {
-          kind: 'ended',
-          at,
-          attempt: 1,
-          sessionId: `ae/${id}-review/1`,
-          observed: 'done',
-          reason: 'harness',
-          /** Review handed on: `again: false`, flat beside the outcome as a harness writes it. */
-          closeout: { outcome: 'done', summary: 'Holds.', needs: null, artifacts: [], again: false },
-        },
-        { kind: 'settled', at, outcome: 'succeeded' },
-      ]),
-    );
-    write(
-      path.join(root, 'engine', 'tasks', `${id}-ship.jsonl`),
-      jsonl([
-        { kind: 'filed', at, brief: 'Ship it.', cwd: repo, maxAttempts: 1, harness: 'claude' },
-        { kind: 'starting', at, attempt: 1 },
-        { kind: 'spawned', at, attempt: 1 },
-        {
-          kind: 'ended',
-          at,
-          attempt: 1,
-          sessionId: `ae/${id}-ship/1`,
-          observed: 'done',
-          reason: 'harness',
-          closeout: { outcome: 'blocked', summary: 'The trial merge conflicts.', needs: 'the branch has to take main', artifacts: [] },
-        },
-        { kind: 'settled', at, outcome: 'succeeded' },
-      ]),
-    );
-    writeRun({
-      id,
-      repo,
-      baseRef: base,
-      workflow: loop,
-      steps: {
-        implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` },
-        review: { taskId: `${id}-review`, branch: `wf/${id}/implement` },
-        ship: { taskId: `${id}-ship`, workspace: repo, branch: 'main' },
-      },
-    });
-    const { commands } = await decidableOf(id);
-    assert.deepEqual(
-      commands.map((c) => [c.label, c.command]),
-      [
-        ['send back', `nemia retry ${id} review --message "<objection>"`],
-        ['once more', `nemia retry ${id} ship`],
-      ],
-    );
-  });
-});
-
-describe("a finished run's `to decide`, level-triggered: its branch ahead of the base until it is merged by hand, and nothing once its approved ending has run", () => {
+describe("a finished run's `to decide`, level-triggered: its branch ahead of the base until it is merged by hand, and nothing once its approved gate's branch is merged", () => {
   const s = story(test);
   s.test(
     'a finished run whose folder says nothing about landing: `to decide` is its branch ahead of the base, and the command is `nemia decide`',
@@ -500,30 +339,20 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
     }
   });
   s.test(
-    'an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `nemia approve` writes one',
+    "an approved gate whose branch is merged leaves nothing to decide: its approval with no words, no `message` in it, as `nemia approve` writes one",
     async () => {
       const id = 'r-done';
       const branch = `wf/${id}/implement`;
       branchOff(repo, branch, 'src/c.ts', 'export const c = 3;\n');
       signedOff(`${id}-implement`, repo);
-      signedOff(`${id}-ship`, repo);
-      writeRun({
-        id,
-        repo,
-        baseRef: base,
-        workflow: ENDING,
-        steps: { implement: { taskId: `${id}-implement`, branch }, ship: { taskId: `${id}-ship`, workspace: repo } },
-      });
-      plantAsk(root, id, 'approve-ship-1', JSON.stringify({ step: 'ship', try: 1, at }));
+      writeRun({ id, repo, baseRef: base, workflow: GATED, steps: { implement: { taskId: `${id}-implement`, branch } } });
+      plantAsk(root, id, 'approve-implement-1', JSON.stringify({ step: 'implement', try: 1, at }));
       git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
+      await aPass();
 
       const detail = await detailOf(id);
-      assert.deepEqual(
-        detail.status.steps.map((s) => s.message),
-        ['unverified · done', 'unverified · done'],
-      );
       assert.deepEqual([detail.status.status, detail.status.waitingOnYou], ['succeeded', []]);
-      assert.equal(detail.status.toDecide, null, 'its ending merged it: nobody is handed the branch');
+      assert.equal(detail.status.toDecide, null, 'approved, and its branch is on the base: nobody is handed anything');
       assert.equal((await listedOf(id)).toDecide, null);
     },
   );
@@ -542,7 +371,7 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   assert.equal(
     (await listedOf(id)).toDecide,
     null,
-    'on the base, merged by a person before the board first read it, in a folder with no ending step: nothing to decide',
+    'on the base, merged by a person before the board first read it, nothing to decide',
   );
   assert.equal((await listedOf(id)).toDecide, null, 'and it still says nothing to decide');
   assert.equal(gitCount(), first, 'with no git call at all: the list reads what the pass read');
@@ -615,13 +444,13 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 
-test("at an ending's gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
+test("at its gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
   const own = aRepo();
-  const runOn = (id: string, file: string, text: string, done: boolean, workflow = ENDING) => {
+  const runOn = (id: string, file: string, text: string, done: boolean, workflow = GATED) => {
     const branch = `wf/${id}/implement`;
     branchOff(own.repo, branch, file, text);
     (done ? signedOff : running)(`${id}-implement`, own.repo);
-    const steps = { implement: { taskId: `${id}-implement`, branch }, ...(workflow === ENDING ? { ship: { taskId: null } } : {}) };
+    const steps = { implement: { taskId: `${id}-implement`, branch } };
     writeRun({ id, repo: own.repo, baseRef: own.base, workflow, steps });
   };
   runOn('r-gate', 'src/c.ts', 'export const c = 1;\n', true);
@@ -637,7 +466,7 @@ test("at an ending's gate, once a pass has read where the branches stand, the de
     .filter(Boolean)
     .slice(read)
     .filter((call) => call.startsWith('merge-tree'));
-  assert.ok(collisions, 'an ending at its gate carries its collisions');
+  assert.ok(collisions, 'a run at its gate carries its collisions');
   assert.deepEqual([...collisions.inFlight].sort(), ['r-apart', 'r-flight']);
   assert.deepEqual(
     collisions.colliding.map((c) => [c.run, c.branch, c.said]),
@@ -656,5 +485,5 @@ test("at an ending's gate, once a pass has read where the branches stand, the de
   );
 
   runOn('r-handed', 'src/g.ts', 'export const g = 7;\n', true, PLAIN);
-  assert.equal((await decidableOf('r-handed')).collisions, null, 'a branch handed to a person to merge is at no ending');
+  assert.equal((await decidableOf('r-handed')).collisions, null, 'a branch handed to a person to merge is at no gate');
 });

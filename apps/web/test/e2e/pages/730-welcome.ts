@@ -292,8 +292,8 @@ async function startsTheFirstCard(page: Page, filed: string[]) {
       throw new Refused(`Start files the card labelled ${FIRST_LABEL} — the api answered ${answer.status()} ${JSON.stringify(body)}`);
     await page.waitForURL((url) => url.pathname.endsWith(`/runs/${GATED.id}`));
     const asked = started[0] as { workflow?: string; gates?: string[] } | undefined;
-    if (asked?.workflow !== 'quick' || JSON.stringify(asked.gates) !== JSON.stringify(['land']))
-      throw new Refused(`Start starts the card in quick, gated at land — it sent ${JSON.stringify(asked)}`);
+    if (asked?.workflow !== 'quick' || JSON.stringify(asked.gates) !== JSON.stringify(['implement']))
+      throw new Refused(`Start starts the card in quick, gated at implement, the step before its wait — it sent ${JSON.stringify(asked)}`);
   } finally {
     await page.unroute(`**/api/namespaces/${MADE}/cards/*/start`, start);
   }

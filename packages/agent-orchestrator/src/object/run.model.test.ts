@@ -179,6 +179,7 @@ const fixture = {
     after: [],
     context: [],
     from: { inbox: 'c-1' },
+    startedBy: null,
   },
   status: {
     status: 'waiting',

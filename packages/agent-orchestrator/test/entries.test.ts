@@ -83,6 +83,7 @@ const PINNED: Record<string, string[]> = {
     'LS',
     'REFRESH',
     'RELEASE',
+    'RESEND',
     'RETRY',
     'RUN_COLUMNS',
     'AGENT_COLUMNS',

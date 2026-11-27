@@ -100,7 +100,7 @@ Kubernetes, such as sdlc/stage. sdlc's [front door](/sdlc/#its-workflows) is a r
 A card can list the cards it **waits on** in its `after:`, by name and comma-separated, or when it is created, with one
 `--after <card>` per card. Until all of them have succeeded, no trigger queues the card and the tick doesn't start it, even if it was
 queued by hand. A listed card has succeeded when a run started from it has (as `nemia ls` says its status), when a person ran `nemia release`
-on that run, or when the card its run passed the work on to has succeeded. That is the card a routing workflow's card node created for it, or the card it was sent on as. When
+on that run, or when the work of the card has: a run a workflow node started from it counts, and the last run of its work decides, as does the card its run passed the work on to or the card it was sent on as. When
 the last one has succeeded, the next pass queues the card like any other, and its run starts from the base branch as it is then. So you can
 put a whole chain in the sprint at once, each card waiting on the one before, and the factory runs them in order.
 

@@ -61,8 +61,9 @@ Enterprise organization, an administrator must turn channels on first, with the 
   - `up`: the API answers again. The notice says how many lines were written in the meantime and after which `resource_version`.
     It says whether the server's daemon restarted in that time ("restarted at 9:40 PM" or "did not restart"), as the feed's
     `DaemonStarted` lines show, whatever the channel's selectors. It also lists each run and step among those lines that waits for a
-    person, one per line. Its attributes `caught_up`, `after`, `restarted` (`yes`, `no`, or `unknown` when it could not be read) and
-    `restarted_at` say the same for an agent.
+    person, one per line. If it can't read those lines from where it lost the API (for example, the feed was replaced in the
+    meantime), it says it can't tell whether the daemon restarted. Its attributes `caught_up`, `after`, `restarted` (`yes`, `no`, or
+    `unknown`) and `restarted_at` say the same for an agent.
 
     Times are in the local time of the machine the channel runs on. When the channel can't tell the time zone, it uses UTC and says so.
 

@@ -20,6 +20,16 @@ export type Gap = { readonly from: number; readonly to: number };
 export const gapOf = (lastRan: number, now: number) =>
   now - lastRan > RAN_GAP_AFTER_MS ? ({ from: lastRan, to: now } satisfies Gap) : undefined;
 
+/**
+ * The stretch a loss of the api is said with: one seen by the loss itself (its last beat too long ago), else the one the beats kept where
+ * it ended within `RAN_GAP_AFTER_MS` of the loss, else none.
+ * @param lastRan When the channel last beat before the loss.
+ * @param kept The last stretch the beats saw the channel did not run, none where they saw none.
+ * @param now When the channel lost the api.
+ */
+export const gapAtLoss = (lastRan: number, kept: Gap | undefined, now: number) =>
+  gapOf(lastRan, now) ?? (kept !== undefined && now - kept.to <= RAN_GAP_AFTER_MS ? kept : undefined);
+
 /** The zones whose clock is UTC's, said as UTC. */
 const UTC_ZONES = new Set(['UTC', 'Etc/UTC', 'Etc/GMT', 'GMT', 'Etc/Universal', 'Etc/Zulu']);
 
@@ -80,7 +90,7 @@ export function downNotice(lost: Lost) {
     gap === undefined
       ? `The channel has had no answer from ${base} since ${clockOf(at, zone)} (${why}). ${again}`
       : `The channel did not run from ${clockOf(gap.from, zone)} to ${clockOf(gap.to, zone)} (its clock jumped ${lastedOf(gap.to - gap.from)}), ` +
-        `and has had no answer from ${base} since (${why}). ${again}`;
+        `and has had no answer from ${base} since ${clockOf(at, zone)} (${why}). ${again}`;
   return { content, meta } satisfies LivenessNotice;
 }
 

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import type { Event } from 'objects';
-import { clockOf, downNotice, gapOf, lastedOf, RAN_GAP_AFTER_MS, upNotice } from '../src/watch/channel-liveness.ts';
+import { clockOf, downNotice, gapAtLoss, gapOf, lastedOf, RAN_GAP_AFTER_MS, upNotice } from '../src/watch/channel-liveness.ts';
 
 const BASE = 'http://127.0.0.1:7357';
 const ZONE = 'America/Montreal';
@@ -41,7 +41,18 @@ test('a clock jump of 30 min during a drop is said as the stretch the channel di
   assert.ok(notice.content.includes('9:22 PM'), notice.content);
   assert.ok(notice.content.includes('9:52 PM'), notice.content);
   assert.ok(notice.content.includes('30 min'), notice.content);
+  assert.match(notice.content, /since 9:52 PM/);
   assert.doesNotMatch(notice.content, CAUSES);
+});
+
+test('a loss says the stretch it saw itself, or one the beats kept that ended within the bound, and none older', () => {
+  assert.deepEqual(gapAtLoss(AT_0222, undefined, AT_0252), { from: AT_0222, to: AT_0252 }, 'seen by the loss itself');
+  const kept = { from: AT_0222, to: AT_0252 };
+  const tenAfter = AT_0252 + 10_000;
+  assert.deepEqual(gapAtLoss(tenAfter - 1_000, kept, tenAfter), kept, 'kept, ended 10 s before');
+  const fiveAfter = AT_0252 + 5 * 60_000;
+  assert.equal(gapAtLoss(fiveAfter - 1_000, kept, fiveAfter), undefined, 'kept, ended 5 min before');
+  assert.equal(gapAtLoss(AT_0222, undefined, AT_0222 + 1_000), undefined, 'none seen');
 });
 
 test('a drop with no clock jump is said as no answer from the api since its time, naming neither network nor server', () => {

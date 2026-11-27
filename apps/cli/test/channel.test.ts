@@ -5,7 +5,8 @@
  * port, its url written into the store's lease as a daemon's would be. What the server declares; a line written after the start sent as
  * one notification of the Event, and none written before; a selector; a cursor file resumed with no line lost or repeated, and past the
  * resume cap one notice in place of the lines; a saved cursor the feed cannot be read from; the api killed under the channel and started
- * again; and the refusals, exit 2.
+ * again, its `up` saying whether a DaemonStarted was written meanwhile, and saying it cannot tell where the feed was replaced; and the
+ * refusals, exit 2.
  *
  * Every child is bounded (`timeout`) and killed when its test is done; every wait is on what it counts, never on a length of time.
  */
@@ -350,6 +351,46 @@ test(
     assert.ok(c.notices.find((n) => n.meta.notice === 'down')?.meta.since, 'the drop said with its time');
   },
 );
+
+/** A daemon's line written at `at`, as a daemon's start appends it to the feed, in the shape the feed reads back. */
+const daemonLine = (at: string) => `${JSON.stringify({ at, daemon: 4242, word: 'daemon started' })}\n`;
+
+test('a DaemonStarted written while the api was down is said on the `up` with its time, though the selector takes no daemon line', async (t) => {
+  const store = storeOf();
+  await store.pass({ 'r-1': teamCore('r-1', stepAt('running')) });
+  let api = await apiOver(t, store.root);
+  const c = await channel(t, store.root, ['-l', 'team=core']);
+  await followingFrom(c, store.size());
+  api.proc.kill('SIGTERM');
+  await api.ended;
+  await c.got((all) => all.some((n) => n.meta.notice === 'down') || undefined);
+  const at = '2026-11-27T02:40:00.000Z';
+  fs.appendFileSync(path.join(store.root, 'feed.jsonl'), daemonLine(at));
+  await store.pass({ 'r-1': teamCore('r-1', stepAt('succeeded')) });
+  api = await apiOver(t, store.root);
+  const up = await c.got((all) => all.find((n) => n.meta.notice === 'up'));
+  assert.equal(up.meta.restarted, 'yes');
+  assert.equal(up.meta.restarted_at, at);
+  assert.equal(events(c.notices).filter((n) => n.meta.reason === 'DaemonStarted').length, 0, 'the selector still keeps it out');
+});
+
+test('a cursor the replaced feed cannot be read from while the api was down ends in an `up` that does not say the daemon did not restart', async (t) => {
+  const store = storeOf();
+  await store.pass({ 'r-1': stepAt('running'), 'r-2': stepAt('running') });
+  let api = await apiOver(t, store.root);
+  const c = await channel(t, store.root, []);
+  const held = store.size();
+  await followingFrom(c, held);
+  api.proc.kill('SIGTERM');
+  await api.ended;
+  await c.got((all) => all.some((n) => n.meta.notice === 'down') || undefined);
+  fs.writeFileSync(path.join(store.root, 'feed.jsonl'), daemonLine('2026-11-27T02:40:00.000Z'));
+  assert.ok(store.size() < held, 'the replaced feed ends before the cursor the channel holds');
+  api = await apiOver(t, store.root);
+  await c.got((all) => all.some((n) => n.meta.notice === 'missed') || undefined);
+  const up = await c.got((all) => all.find((n) => n.meta.notice === 'up'));
+  assert.equal(up.meta.restarted, 'unknown');
+});
 
 test('an unknown flag is refused, exit 2, naming the usage; --help prints it', async (t) => {
   const store = storeOf();

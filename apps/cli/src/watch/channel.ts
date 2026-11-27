@@ -27,7 +27,7 @@ import { CONTEXT_VARIABLE, chosenOf, LOCAL_CONTEXT } from '../context.ts';
 import { served } from '../daemon.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
-import { downNotice, gapOf, RAN_GAP_AFTER_MS, upNotice, zoneOf, type Gap } from './channel-liveness.ts';
+import { downNotice, gapAtLoss, gapOf, upNotice, zoneOf, type Gap } from './channel-liveness.ts';
 import { kept, RECONNECT_EVERY, savedIn, SIGNALS } from './watch.ts';
 
 /** The most lines of a backlog a resumed channel sends; past it, one notice says how many it skipped and where to read them. */
@@ -195,7 +195,7 @@ const sent = (f: Following, notice: Notice | undefined, cursor?: string) => void
 
 /**
  * Where the channel is: what it was asked, the api it follows, the cursor it has sent up to (none: from now), its liveness, when it last
- * beat and the last stretch it did not run between two beats.
+ * beat, the last stretch it did not run between two beats, and the cursor it held when it lost the api (none: it held none then).
  */
 type Following = {
   readonly asked: ChannelAsked;
@@ -205,6 +205,7 @@ type Following = {
   live: 'up' | 'down';
   lastRan: number;
   gap: Gap | undefined;
+  lostFrom?: string | undefined;
 };
 
 /** How often the channel beats, to see a stretch its own process did not run. */
@@ -215,7 +216,6 @@ function beat(f: Following) {
   const now = Date.now();
   f.gap = gapOf(f.lastRan, now) ?? f.gap;
   f.lastRan = now;
-  return now;
 }
 
 /** What a request came to: an answer, refused by the api with a status and its words, or no answer at all. */
@@ -327,7 +327,8 @@ const contextName = () => {
 
 /**
  * Where an open watch is: the Events it held before its first BOOKMARK (none once it came), the cursor it opened at, and, where it
- * reached the api again after losing it, the daemon's starts written meanwhile (none where they could not be read).
+ * reached the api again after losing it, the daemon's starts written meanwhile (none where they could not be read, or where the watch
+ * opened from another cursor than the one held at the loss: after a 410, or a loss with no cursor, what lies between is unread).
  */
 type Opened = { held: Event[] | undefined; readonly from: string; readonly back?: { restarts: readonly Event[] | undefined } };
 
@@ -378,8 +379,10 @@ async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: stri
 function lost(f: Following, why: string) {
   if (f.live === 'down') return;
   f.live = 'down';
-  const at = beat(f);
-  const gap = f.gap !== undefined && at - f.gap.to <= RAN_GAP_AFTER_MS ? f.gap : undefined;
+  f.lostFrom = f.cursor;
+  const at = Date.now();
+  const gap = gapAtLoss(f.lastRan, f.gap, at);
+  f.lastRan = at;
   f.gap = undefined;
   sent(f, downNotice({ base: f.base, at, why, every: RECONNECT_EVERY, gap, zone: zoneOf() }));
 }
@@ -465,7 +468,8 @@ async function stretch(f: Following, signal: AbortSignal) {
     f.cursor = now.at;
   }
   const from = f.cursor;
-  const back = f.live === 'down' ? { restarts: await restartsAfter(f, from, signal) } : undefined;
+  const readable = f.lostFrom !== undefined && f.lostFrom === from;
+  const back = f.live === 'down' ? { restarts: readable ? await restartsAfter(f, from, signal) : undefined } : undefined;
   const got = await answerAt(watchUrl(f, from), 'text/event-stream', signal);
   if (got.kind === 'refused' && got.status === 410) return (startedOver(f, from, got.said), 'again');
   if (got.kind !== 'ok') return failedWith(f, got);

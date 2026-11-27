@@ -31,7 +31,8 @@ const guards = fs
 /**
  * The rule tests, by package: each reads a whole folder for a rule a file it never imports can break, so `vitest related` never picks it.
  * Left to `ci` for their cost, each its group's slowest file by far: the orchestrator's `contract` (31 s) and `layout` (12 s), the
- * client's `structure` (5 s) and the docs' `names` (6 s).
+ * client's `structure` (5 s), the docs' `names` (6 s), and the templates' `fences` (5 s) and `released` (7 s). The test kit's tests read
+ * planted trees alone, so none of them is a rule a file of the tree can break.
  */
 export const RULES: readonly Group[] = [
   { dir: 'tools/guards', loads: [], files: guards },
@@ -72,6 +73,7 @@ export const RULES: readonly Group[] = [
     files: ['test/harness.test.ts', 'test/layout.test.ts', 'test/kinds.test.ts', 'test/source.test.ts', 'test/waits.test.ts'],
   },
   { dir: 'apps/cli', loads: [], files: ['test/layout.test.ts'] },
+  { dir: 'packages/templates', loads: [], files: ['test/portable.test.ts', 'test/check-scripts.test.ts'] },
   { dir: 'apps/docs', loads: [], files: ['test/structure.test.ts', 'test/waits.test.ts'] },
   {
     dir: 'apps/web',

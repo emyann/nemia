@@ -107,6 +107,40 @@ test("through the pass's landing read (`releasedThrough` over `Parents.read`), a
   assert.equal((await pass(true))?.card, 'b-3z4w', 'its run released its waiters: the queue takes it');
 });
 
+test("`waitingOf` follows a card's work to the run a node of its run started: the parent hands its work on and releases nothing, the child is judged", () => {
+  const at = '2026-11-01T10:00:00.000Z';
+  const parent: Run = {
+    ...aRun('a-run-k2q9'),
+    from: { inbox: 'a-1x2y' },
+    createdAt: '2026-11-01T09:00:00.000Z',
+    steps: { handoff: { taskId: null, sent: { run: 'a-child-m5n6', at } } },
+  };
+  const child: Run = { ...aRun('a-child-m5n6'), startedBy: { run: 'a-run-k2q9', node: 'handoff' }, createdAt: at };
+  const files = [
+    { file: 'b-9r8s.md', text: '---\nworkflow: dev\nafter: a-1x2y\n---\nSecond.\n' },
+    { file: 'a-1x2y.md', text: '---\nworkflow: dev\n---\nFirst.\n' },
+  ];
+  const lookWith = (childReleased: boolean) => {
+    const asked: string[] = [];
+    const released = (id: string) => Effect.sync(() => (asked.push(id), id === child.id && childReleased));
+    const waiting = Effect.runSync(waitingOf(files, [child, parent], released));
+    assert.ok(waiting, 'a card not started names a card in its after:, so it is read');
+    return { look: waiting.look('a-1x2y'), asked };
+  };
+  const running = lookWith(false);
+  assert.deepEqual(running.look.runs, [
+    { id: 'a-run-k2q9', released: false },
+    { id: 'a-child-m5n6', released: false },
+  ]);
+  assert.deepEqual(running.asked, ['a-child-m5n6'], 'only the child is read: the parent handed its work on');
+  const done = lookWith(true);
+  assert.deepEqual(
+    done.look.runs.map((r) => r.released),
+    [false, true],
+    'the child released its waiters, the parent still releases none of its own',
+  );
+});
+
 test('`waitingOf` follows a card to the card a node of its run filed (`sent`) and to the card it was sent on as (`<run>-resent`), reading the landing of each run once', () => {
   const at = '2026-11-01T10:00:00.000Z';
   const routed: Run = {

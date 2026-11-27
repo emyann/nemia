@@ -375,6 +375,21 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
   );
 });
 
+test("a card whose run started a child through a node lists both runs in the order they were made, and stands where the child does", () => {
+  const card = [{ file: 'parse-the-flag-1x2y.md', text: '---\nworkflow: dev\n---\nParse the flag.\n' }];
+  const runs = (parent: CardRun['phase'], child: CardRun['phase']): CardRun[] => [
+    { id: 'child-ef56', startedBy: { run: 'parent-ab12', node: 'handoff' }, createdAt: '2026-11-01T10:05:00.000Z', phase: child },
+    { id: 'parent-ab12', from: { inbox: 'parse-the-flag-1x2y' }, createdAt: '2026-11-01T10:00:00.000Z', phase: parent },
+  ];
+  const [running] = inboxListing(card, runs('succeeded', 'running'));
+  assert.deepEqual(running?.startedAs, ['parent-ab12', 'child-ef56'], 'both, the parent first whatever order the store lists them');
+  assert.equal(running?.state, 'running', "the child's phase while it runs, though the parent ended");
+  const [ended] = inboxListing(card, runs('succeeded', 'failed'));
+  assert.equal(ended?.state, 'failed', "the child's end once it ends");
+  const [unrelated] = inboxListing(card, [{ id: 'loose-9z9z', startedBy: { run: 'nobody', node: 'x' }, phase: 'running' }]);
+  assert.deepEqual(unrelated?.startedAs, [], 'a run started by a run that is no card work is no work of the card');
+});
+
 test("`nemia inbox` prints a line per entry: the name, the first line of the body, workflow and an old card's retired repo when set, and started as — or why it is not a card", () => {
   const listing = inboxListing(
     [

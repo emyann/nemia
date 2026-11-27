@@ -317,6 +317,16 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
     },
     { name: 'a workflow with no loop has no rounds', check: () => assert.deepEqual(factsOf(twoRounds('r3', noLoop)).runs[0].rounds, []) },
     {
+      name: 'a run whose last node started a run of its own (`sent`) is finished, its end the last step that ran',
+      check: () => {
+        const steps = [step('design', [], { by: 'planner' }), step('handoff', ['design'], { workflow: 'dev' })];
+        const r = readOf('r-sent', steps, { design: [{ end: at(1) }] });
+        assert.equal(factsOf(r).runs.length, 0, 'a node never filed nor sent is work left to do');
+        r.run.steps.handoff = { taskId: null, sent: { run: 'r-sent-child', at: at(2) } };
+        assert.equal(factsOf(r).runs.length, 1, 'the node that sent is done, the run finished');
+      },
+    },
+    {
       name: 'a loop that has not ended accepted is no finished run; an acceptance of the try the loop is on ends it',
       check: () => {
         const r = readOf(

@@ -245,7 +245,7 @@ named checks. What was planned here, for the record:
   bound, the pictures, the probes, the types and the lint whole, and the tests of the packages whose turbo inputs cover the
   diff; the whole forced suite and the whole e2e become CI's, and the laptop stops paying for them.
 - **What went away.** The landing's whole-suite check on the merged tree, and the hand push of main. The trial merge at the gate stays
-  as advice a person reads, and `landingDue` and the git place are untouched: the tick still takes back a merge left staged on main.
+  as advice a person reads, and the retired landing decision and the git place are untouched: the tick still takes back a merge left staged on main.
 
 CLAUDE.md sections to rewrite then: *Git* (push, merge, the ship's exception), *Rules the code keeps* ("No command from a
 checkout" as CODEOWNERS), and every lesson about the ship's check.

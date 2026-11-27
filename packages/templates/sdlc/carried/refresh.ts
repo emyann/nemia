@@ -24,7 +24,7 @@ import path from 'node:path';
 import { Refusal, git, run } from './exec.ts';
 
 /** What the program hands the refresh: the pull request at the reviewed tip of `branch`, the base, the factory's command and paths. */
-export type Asked = {
+type Asked = {
   pr: number;
   branch: string;
   tip: string;

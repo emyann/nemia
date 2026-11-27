@@ -11,7 +11,7 @@ import type { Baseline } from './words.test.ts';
  * The agents that left the team, whose names stay out of the product all the same: no file of sdlc names them, so they are held here,
  * in a file the team's rules do not read.
  */
-export const FORMER_TEAM: readonly string[] = ['ada'];
+export const FORMER_TEAM: readonly string[] = ['ada', 'otto'];
 
 /** The moves that clear the team's debt, each with where it goes: the later cards of decision 5. */
 const TEAM_MOVES = {

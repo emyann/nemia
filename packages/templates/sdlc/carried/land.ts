@@ -206,7 +206,7 @@ function readGithub(served: ServedRun, given: Given, holder: string | undefined)
 }
 
 /** The turn: what the program does for `turn`, and the condition it writes for it. */
-function turnOf(served: ServedRun, step: ServedStep, waiting: ServedCheck, given: Given, holder: string | undefined, due: boolean) {
+function turnOf(served: ServedRun, waiting: ServedCheck, given: Given, holder: string | undefined, due: boolean) {
   const r = readGithub(served, given, holder);
   const refreshes = given.refresh !== '';
   const lacks = refreshes && r.ours && r.pr !== undefined && lacksBase(r.onto, r.pr.headRefOid, retryLine(r.id));
@@ -464,7 +464,7 @@ function landedHere(served: ServedRun, waiting: ServedCheck, given: Given, due: 
 function actOn(served: ServedRun, step: ServedStep, name: 'turn' | 'landed', given: Given, holder: string | undefined) {
   const waiting = waitOn(step, name);
   if (!waiting) return undefined;
-  if (name === 'turn') return turnOf(served, step, waiting, given, holder, true);
+  if (name === 'turn') return turnOf(served, waiting, given, holder, true);
   return given.github ? landedOn(served, waiting, given, true) : landedHere(served, waiting, given, true);
 }
 

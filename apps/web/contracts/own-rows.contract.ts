@@ -15,6 +15,11 @@ const ownRowsSpec = spec<(rows: readonly AtWorkRow[], agent: string) => readonly
       description: 'Every row that comes out is one that went in',
       condition: ({ input: [rows], output }) => output.every((row) => rows.some((r) => r.run === row.run && r.step === row.step)),
     },
+    keepsEveryOne: {
+      description: "Every row of the agent's that goes in comes out",
+      condition: ({ input: [rows, agent], output }) =>
+        rows.every((r) => r.agent !== agent || output.some((o) => o.run === r.run && o.step === r.step)),
+    },
   },
 });
 

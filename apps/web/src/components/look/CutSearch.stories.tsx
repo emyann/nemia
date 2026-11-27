@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { CutSearch } from './CutSearch';
 import { ON_PLAIN } from './stories.fixture';
 
@@ -64,5 +64,40 @@ export const WithChips: Story = {
     await expect(within(canvasElement).getByRole('button', { name: 'Take off area: board' })).toBeVisible();
     await userEvent.keyboard('{Backspace}');
     await expect(args.onRemove).toHaveBeenCalledWith('area=board');
+  },
+};
+
+/** Words kept with Enter become a chip, and the suggestions close: the chip's key is found by its role, which an open list would hide. */
+export const Kept: Story = {
+  args: {
+    label: 'Search the cards',
+    chips: [],
+    suggestions: [{ id: 'work=feature', label: 'work: feature', hint: '2' }],
+    onRemove: fn(),
+    onPick: fn(),
+    onSubmit: fn(),
+  },
+  render: (args) => {
+    const [text, setText] = useState('');
+    const [kept, setKept] = useState<string | null>(null);
+    return (
+      <div style={{ ...ON_PLAIN, width: 560 }}>
+        <CutSearch
+          {...args}
+          chips={kept === null ? [] : [{ id: 'q', label: `“${kept}”` }]}
+          text={text}
+          onText={setText}
+          onSubmit={(words) => {
+            setKept(words);
+            setText('');
+          }}
+        />
+      </div>
+    );
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }), 'reads{Enter}');
+    await waitFor(() => expect(within(document.body).getByRole('button', { name: 'Take off “reads”' })).toBeVisible());
+    await expect(within(document.body).queryByRole('listbox')).toBeNull();
   },
 };

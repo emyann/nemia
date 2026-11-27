@@ -1,6 +1,6 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { useContext, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { Search, X } from 'lucide-react';
-import { ComboBox, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
+import { ComboBox, ComboBoxStateContext, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
 import { Body, IconButton } from '@/components/ui/ds';
 import { CutField } from './CutField';
 import { CutTag } from './CutTag';
@@ -40,6 +40,43 @@ function SearchChip({ chip, onRemove }: { chip: CutChip; onRemove: (id: string) 
         </span>
       </CutTag>
     </span>
+  );
+}
+
+/**
+ * The bar's input: its keys (`keyed`), and the suggestions closed once the words are kept, since a person who pressed Enter has finished
+ * choosing and an open list hides the rest of the bar from a screen reader.
+ */
+function BarInput({
+  input,
+  placeholder,
+  bar,
+}: {
+  input: RefObject<HTMLInputElement | null>;
+  placeholder: string | undefined;
+  bar: Parameters<typeof keyed>[1];
+}) {
+  const state = useContext(ComboBoxStateContext);
+  const kept = useRef(false);
+  const open = state?.isOpen ?? false;
+  useEffect(() => {
+    if (open && kept.current) state?.close();
+  }, [open, state]);
+  return (
+    <Input
+      ref={input}
+      placeholder={placeholder}
+      onChange={() => {
+        kept.current = false;
+      }}
+      onKeyDown={(event) => {
+        keyed(event, bar);
+        if (!event.defaultPrevented) return;
+        kept.current = true;
+        state?.close();
+      }}
+      className="min-w-0 flex-1 bg-transparent py-1 text-on-surface outline-none placeholder:text-on-surface-variant"
+    />
   );
 }
 
@@ -114,12 +151,7 @@ export function CutSearch({
             items={suggestions}
             className="flex min-w-32 flex-1"
           >
-            <Input
-              ref={input}
-              placeholder={chips.length === 0 ? placeholder : undefined}
-              onKeyDown={(event) => keyed(event, { text, chips, onRemove, onSubmit })}
-              className="min-w-0 flex-1 bg-transparent py-1 text-on-surface outline-none placeholder:text-on-surface-variant"
-            />
+            <BarInput input={input} placeholder={chips.length === 0 ? placeholder : undefined} bar={{ text, chips, onRemove, onSubmit }} />
             <Popover className={CHOICES} placement="bottom start" triggerRef={bar}>
               <ListBox className="max-h-72 overflow-auto outline-none">
                 {(suggestion: CutSuggestion) => (

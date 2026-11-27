@@ -435,10 +435,10 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
 });
 
 test("`nemia inbox` asks one page: --search, --phase, --sort and --limit are the list's own, and the last line names the next page", async () => {
-  const before = api.said().length;
-  const page = await nemia(['inbox', '--all', '--sort', 'oldest', '--limit', '1']);
+  const page = await nemia(['inbox', '--all', '--sort', 'name', '--limit', '1']);
   assert.equal(page.code, 0, page.err);
-  assert.match(api.said().slice(before), /orderBy=metadata\.creationTimestamp/, 'oldest asks the list ordered by when it was filed');
+  assert.match(page.out, /^cache-the-views /m, 'by name the first card leads the page');
+  assert.doesNotMatch(page.out, /^(called-off|hold-the-reads) /m, 'and the page holds no more than the limit');
   assert.match(page.out, /nemia inbox --continue \S+/, 'a page with more says where the next one is');
   assert.equal(page.out.split('\n').filter((line) => /^[a-z-]+ +/.test(line) && !line.startsWith('NAME')).length >= 1, true);
   const found = await nemia(['inbox', '--all', '--search', 'HOLD', '--phase', 'waiting']);

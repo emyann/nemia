@@ -542,6 +542,9 @@ test('the inbox is judged once while the keyspace head and the pass stand, again
       five,
       Effect.gen(function* () {
         const door = yield* CardDoor;
+        const unpassed = yield* inboxJudged(e, how);
+        const again = yield* inboxJudged(e, how);
+        passStarted(how.memo);
         const first = yield* inboxJudged(e, how);
         const second = yield* inboxJudged(e, how);
         yield* door.cards.add(CardName.read('foxtrot'), aCard('Foxtrot'));
@@ -549,10 +552,11 @@ test('the inbox is judged once while the keyspace head and the pass stand, again
         passStarted(how.memo);
         const fourth = yield* inboxJudged(e, how);
         const fifth = yield* inboxJudged(e, how);
-        return { first, second, third, fourth, fifth };
+        return { unpassed, again, first, second, third, fourth, fifth };
       }),
     ),
   );
+  assert.notEqual(reads.again, reads.unpassed, 'before a pass has started every read is now, and none is kept');
   assert.equal(reads.second, reads.first, 'the same listing is served while nothing it was judged on moved');
   assert.notEqual(reads.third, reads.second, 'a card written moves the head');
   assert.equal(reads.third.length, 6);
@@ -566,6 +570,7 @@ test('WF_VERIFY_REST judges the inbox afresh each read and dies where the inform
   const exit = over(
     five,
     Effect.gen(function* () {
+      passStarted(how.memo);
       const first = yield* inboxJudged(e, how);
       assert.notEqual(yield* inboxJudged(e, how), first, 'a verified read judges afresh');
       how.memo.inbox = { key: how.memo.inbox?.key ?? '', listing: first.slice(1) };

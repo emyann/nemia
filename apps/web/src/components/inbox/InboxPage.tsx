@@ -5,7 +5,7 @@ import { Body } from '@/components/ui/ds';
 import { Pager, SectionHead } from '@/components/look';
 import { chainsQuery, inboxPageQuery } from '@/lib/api/inbox';
 import { trailOf } from '@/lib/finished';
-import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, type InboxView } from '@/lib/inbox';
+import { chainsOf, chainsPulled, inboxAskedOf, INBOX_PAGE, TRAIL_MARK, type InboxView } from '@/lib/inbox';
 import { readStored, store } from '@/lib/stored';
 import { CardChain } from './CardChain';
 import { InboxCard, InboxCardRow } from './InboxCard';
@@ -108,7 +108,7 @@ export function InboxPage({ at, onSearch }: { at: InboxView; onSearch: (patch: P
           <Pager
             noun="Cards"
             trail={trail}
-            next={page.next}
+            next={page.next === null ? null : `${TRAIL_MARK}${page.next}`}
             count={page.entries.length}
             total={trail.length * INBOX_PAGE + page.entries.length + page.remaining}
             size={INBOX_PAGE}

@@ -138,7 +138,7 @@ export const Closed: Story = {
   render: () =>
     drawn({
       at: { cards: 'closed' },
-      cards: [started('shipped', 'succeeded', 'done'), started('broke', 'failed', 'failed')],
+      cards: [started('merged-it', 'succeeded', 'done'), started('broke', 'failed', 'failed')],
       counts: { ...NONE, notStarted: 1, done: 1, failed: 1 },
     }),
   play: async ({ canvasElement }) => {

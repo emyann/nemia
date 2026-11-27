@@ -24,7 +24,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Context, Effect, Layer } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import type { InboxListing } from '../inbox/inbox.ts';
+import type { InboxListing } from '../inbox/index.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';

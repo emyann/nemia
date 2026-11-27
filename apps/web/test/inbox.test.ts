@@ -141,7 +141,7 @@ const cardAnswer = (name: string, namespace = 'default') => ({
   kind: 'Card',
   metadata: { name, namespace, creationTimestamp: '2026-09-16T10:00:00.000Z', resourceVersion: 'v1' },
   spec: { body: 'Cache the views' },
-  status: { state: 'filed', runs: [], inPlay: true },
+  status: { state: 'filed', runs: [], inPlay: true, phase: 'notStarted', followedBy: [], chained: false },
 });
 /** Each request sent: its path, method, content type and body. */
 const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
@@ -578,14 +578,18 @@ describe("cardPlace, cardFiling, factoriesOffered: a card's factory and place, t
   });
   test("a Card is the board's entry: its factory its namespace, its file its name, its place the one the api answers", () => {
     const queued = (name: string, at: string, place: number, namespace = 'pair') =>
-      cardObject({ metadata: { name, namespace }, spec: { queued: at }, status: { state: 'queued', runs: [], inPlay: true, place } });
+      cardObject({
+        metadata: { name, namespace },
+        spec: { queued: at },
+        status: { state: 'queued', runs: [], inPlay: true, place, phase: 'notStarted', followedBy: [], chained: false },
+      });
     const whole = cardList(
       queued('late', '2026-09-16T11:00:00.000Z', 3),
       queued('early-b', '2026-09-16T10:00:00.000Z', 2, 'default'),
       cardObject({
         metadata: { name: 'started' },
         spec: { queued: '2026-09-16T09:00:00.000Z' },
-        status: { state: 'running', runs: ['r-9'], inPlay: true },
+        status: { state: 'running', runs: ['r-9'], inPlay: true, phase: 'working', followedBy: [], chained: false },
       }),
     );
     const byName = new Map(entriesOf(whole).map((e) => [e.name, e]));
@@ -670,7 +674,7 @@ describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in 
       limit: INBOX_PAGE,
     });
     assert.equal(chainsPulled({}), true);
-    assert.deepEqual(inboxAskedOf({ q: 'reads', l: 'team=core', sort: 'oldest', older: 'abc' }), {
+    assert.deepEqual(inboxAskedOf({ q: 'reads', l: 'team=core', sort: 'oldest', older: 'f.abc' }), {
       fieldSelector: 'status.inPlay=true',
       labelSelector: 'team=core',
       search: 'reads',

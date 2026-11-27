@@ -540,7 +540,8 @@ const factoryLists = async (ofFactory: OfFactory) => ({
 });
 
 /**
- * The Inbox's reads: every card, as a fresh app and an app after a pass read it, and the board's page of cards and its page of one.
+ * The Inbox's reads: every card, as a fresh app and an app after a pass read it, and the board's page of cards and its page of one, each
+ * after a pass, since the inbox is kept only once a pass has started.
  * @param fresh Builds an app afresh.
  * @param passed Builds an app after a pass has filled its informer.
  * @param get Reads a URL of an app.
@@ -554,8 +555,8 @@ const cardReads = async (
 ) => ({
   inbox: await overApps(fresh, (app) => get(app, INBOX_URL), repeat),
   inboxAfterPass: await overApps(passed, (app) => get(app, INBOX_URL), repeat),
-  cardPage: await overApps(fresh, (app) => get(app, CARD_PAGE_URL), repeat),
-  cardCounts: await overApps(fresh, (app) => get(app, CARD_COUNTS_URL), repeat),
+  cardPage: await overApps(passed, (app) => get(app, CARD_PAGE_URL), repeat),
+  cardCounts: await overApps(passed, (app) => get(app, CARD_COUNTS_URL), repeat),
 });
 
 /** The measure on the copy at `root`: `wf`, the workflows' store, and `ae`, the runtime's. */

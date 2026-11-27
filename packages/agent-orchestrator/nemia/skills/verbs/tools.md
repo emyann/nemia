@@ -168,24 +168,28 @@ Its arguments:
 
 ```text
   nemia inbox
-    the cards still in play: name, first line, workflow when set,
+    a page of the cards still in play: name, first line, workflow when set,
     and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-    run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-    their labels on each line; -o wide: every column
+    run ended too; -l: the cards whose labels match; --search <words>: those
+    whose title or name hold them; --phase <phase>: those in it; --sort
+    newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+    -L <key>: their labels on each line; -o wide: every column
 ```
 
-Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, and ?fieldSelector= those still in play or not. Answers a CardList, or the same page as a Table where the request asks for one.
+Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, ?fieldSelector= those in a phase, in play or chained, ?orderBy= sorts them and ?search= keeps those whose title or name hold its words. Its metadata counts the cards per phase and lists the labels in use, counted before the fieldSelector and the page. Answers a CardList, or the same page as a Table where the request asks for one.
 
 Calls `GET /api/cards`.
 
 Its arguments:
 
-- limit: The most items a page holds, a whole number from 1.
-- continue: The token the page before answered, to read the page after it; absent, the first page.
+- limit (--limit at a shell): The most items a page holds, a whole number from 1.
+- continue (--continue at a shell): The token the page before answered, to read the page after it; absent, the first page.
 - labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
 - selector (-l at a shell): The retired spelling of labelSelector, read the same.
 - resourceVersion: With watch=true, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from: a keyspace revision for a watched kind (410 once compacted, 400 past the head), a byte of the feed for the Event lists; the runs list refuses one.
-- fieldSelector: A fieldSelector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.
+- fieldSelector: A fieldSelector in Kubernetes' spelling, comma-joined terms that must all hold: status.inPlay=true|false, status.chained=true|false, status.phase=<notStarted|blocked|waiting|working|done|failed|cancelled>, each with =, == or !=; empty or absent, every card.
+- orderBy: How the cards are ordered: metadata.name (the default) or metadata.creationTimestamp, ascending, or with a trailing " desc" for descending. One field; ties are broken by name.
+- search (--search at a shell): Words a card's title or name must hold, each of them, whatever their case; empty or absent, every card.
 
 - On the port: Answers a line per item, as `inbox -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
@@ -195,10 +199,12 @@ Its arguments:
 
 ```text
   nemia inbox
-    the cards still in play: name, first line, workflow when set,
+    a page of the cards still in play: name, first line, workflow when set,
     and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-    run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
-    their labels on each line; -o wide: every column
+    run ended too; -l: the cards whose labels match; --search <words>: those
+    whose title or name hold them; --phase <phase>: those in it; --sort
+    newest|oldest|name; --limit <n>, --continue <token>: the page; --show-labels,
+    -L <key>: their labels on each line; -o wide: every column
 ```
 
 Reads one card by its name in any namespace, with its file as written. Answers the Card.

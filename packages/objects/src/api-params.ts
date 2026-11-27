@@ -58,8 +58,8 @@ export const factoryOwnParams = { factory: Schema.String.annotate({ description:
 /**
  * The query of a list of cards: a list's (`listQuery`), `fieldSelector` in Kubernetes' spelling (comma-joined terms, each `=`, `==` or
  * `!=`, all of which must hold) of `status.inPlay`, `status.chained` (`true` or `false`) and `status.phase` (a card phase); `orderBy`, as
- * AIP-132 spells `order_by` (one field, ` desc` for descending); and `search`, words matched in a card's title and name. Any other
- * selector or order is refused `Invalid`, naming the forms it takes.
+ * AIP-132 spells order_by (one field, ` desc` for descending); and `search`, words matched in a card's title and name. Any other
+ * field term or order is refused `Invalid`, naming the forms it takes.
  */
 export const cardListQuery = {
   ...listQuery,

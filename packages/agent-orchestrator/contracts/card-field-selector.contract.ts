@@ -4,7 +4,7 @@
  * field. Three fields: `status.inPlay` and `status.chained`, each `true` or `false`, and `status.phase`, one of the card's seven phases
  * (`CardPhase`). Anything else is no term (null), which the list refuses `Invalid`, naming the forms it takes. A selector is its terms
  * joined by commas, every one of which a card must keep: splitting it, and reading an empty one as every card, are the list's to do
- * before this is asked of each term. Replaces `card-play-selector.contract.ts` (`cardPlaySelector`), whose one field it keeps.
+ * before this is asked of each term. Replaces `card-play-selector.contract.ts`, whose one field it keeps.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { CardPhase } from 'objects';

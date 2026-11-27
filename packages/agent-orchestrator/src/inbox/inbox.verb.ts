@@ -673,11 +673,13 @@ const inboxKey = Effect.fnUntraced(function* (memo: SummaryHow['memo']) {
 
 /**
  * The inbox as `nemia inbox` and the Cards list read it now, each entry with its state and phase: judged afresh (`inboxJudgedAfresh`)
- * where the informer holds none of it, or it was judged on another keyspace head or pass; else the listing the informer kept, which is
+ * where the informer holds none of it, or it was judged on another keyspace head or pass, or no pass has started (a run still moving is
+ * kept only within the pass that judged it, so before one every read is now); else the listing the informer kept, which is
  * a cache of that pure judgement and nothing more. Where `how.verify` (`WF_VERIFY_REST=1`) it is judged afresh each time too and a
  * difference from what the informer held dies. A caller that keeps no informer (a fresh one is empty) judges every read afresh.
  */
 export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: SummaryHow) {
+  if (how.memo.pass === undefined) return yield* inboxJudgedAfresh(e, how);
   const key = yield* inboxKey(how.memo);
   const kept = how.memo.inbox;
   if (kept !== undefined && kept.key === key && !how.verify) {

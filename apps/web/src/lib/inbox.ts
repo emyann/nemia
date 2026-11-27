@@ -342,6 +342,9 @@ export function inboxSearch(search: Record<string, unknown>) {
 export const chainsPulled = (view: Pick<InboxView, 'l' | 'q' | 'cards' | 'state'>) =>
   view.cards !== 'closed' && view.state === undefined && view.q === undefined && view.l === undefined;
 
+/** What a card list's token wears on the address's trail, the mark the trail's tokens carry: the api's own token follows it. */
+export const TRAIL_MARK = 'f.';
+
 /**
  * What the api's card list is asked for the page `view` shows: its side and state as a field selector, its labels and words, its order
  * and the page its trail leads to. Cards in chains are left to the chains' own read (`chainsQuery`) where the page pulls them out.
@@ -350,7 +353,7 @@ export const chainsPulled = (view: Pick<InboxView, 'l' | 'q' | 'cards' | 'state'
 export function inboxAskedOf(view: InboxView) {
   const side = view.cards === 'closed' ? 'status.inPlay=false' : 'status.inPlay=true';
   const terms = view.state !== undefined ? [`status.phase=${view.state}`] : chainsPulled(view) ? [side, 'status.chained=false'] : [side];
-  const continued = trailOf(view).at(-1);
+  const continued = trailOf(view).at(-1)?.slice(TRAIL_MARK.length);
   return {
     fieldSelector: terms.join(','),
     ...(view.l === undefined ? {} : { labelSelector: view.l }),

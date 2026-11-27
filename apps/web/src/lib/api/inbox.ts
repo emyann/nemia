@@ -182,7 +182,7 @@ export const inboxSelectedQuery = (selector: string | undefined) =>
 
 /**
  * What a page of the Inbox is asked: the labels, the field selector, the words, the order and the page, as the api's card list takes
- * them (`cardQueryOf`, lib/inbox.ts).
+ * them (`inboxAskedOf`, lib/inbox.ts).
  */
 export type InboxAsked = {
   labelSelector?: string;

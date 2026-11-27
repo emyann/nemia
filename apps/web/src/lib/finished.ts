@@ -13,11 +13,8 @@ const JOIN = '~';
  */
 export type PageAt = { trail: readonly string[]; next: string | null; count: number; total: number; size: number };
 
-/**
- * A token of a list as the api writes one: the finished runs' `f.` and base64url, a card's base64url alone. Any other text is no place
- * in a list.
- */
-const TOKEN = /^(f\.)?[A-Za-z0-9_-]+$/;
+/** A token of the finished runs' list as the api writes one: `f.`, then base64url. Any other text is no place in that list. */
+const TOKEN = /^f\.[A-Za-z0-9_-]+$/;
 
 /**
  * `value` as a trail held in the address: tokens joined by `~`, each shaped as the finished list writes one (`TOKEN`); none for anything

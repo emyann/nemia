@@ -1,6 +1,7 @@
 # S20 (the inbox's card page, on 031a8e253) against S19
 # node --expose-gc tools/store-measure/report.ts --engine <empty folder> --compare tools/store-measure/baselines/s19.json --json tools/store-measure/baselines/s20.json (taken on the server, on a copy of the live store, which keeps the runtime's journals under ~/.agent-workflows/engine and has no ~/.agent-engine)
 # 1-minute load average 4.22 with seven runs in flight. The store grew from 3250 to 4653 tasks and from 395 to 436 cards, so the rows this change does not touch (openRun x4.6, libraryAgents, hireList, factoryGet) compare different stores and a different open run, and are the machine's and the store's, not this change's. cardPage reads in 50 ms warm (2701 ms cold, the first read after a restart, which fills the memo), cardCounts in 10.6 ms warm, and cardList in 19.4 ms warm against 647.6 ms in s19 (x0.03).
+# s20 was taken before the inbox was kept only once a pass has started: its cardPage and cardCounts were read on a fresh app, which then served the kept inbox without a pass. The report now reads them after a pass, as the daemon's requests are, so the next baseline's cardPage and cardCounts are of that path.
 
 against 886b4282560b of 2026-11-26T07:46:01.866Z: 309 runs now, 309 then; 4653 tasks now, 3250 then; 436 cards now, 395 then
 

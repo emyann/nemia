@@ -1,5 +1,5 @@
 /**
- * A CardList's `?orderBy=` (`cardOrderBy`, proved by contracts/card-order.contract.ts), as AIP-132 writes `order_by`: one field of a
+ * A CardList's `?orderBy=` (`cardOrderBy`, proved by contracts/card-order.contract.ts), as AIP-132 writes order_by: one field of a
  * closed list, ascending unless ` desc` follows. Pure.
  */
 import type { CardOrderByOf } from '../../contracts/card-order.contract.ts';

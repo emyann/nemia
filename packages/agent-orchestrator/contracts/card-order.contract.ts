@@ -1,5 +1,5 @@
 /**
- * A CardList's `?orderBy=` (agent-orchestrator, src/inbox/card-order.ts, `cardOrderBy`), as Google's API guidelines write `order_by`
+ * A CardList's `?orderBy=` (agent-orchestrator, src/inbox/card-order.ts, `cardOrderBy`), as Google's API guidelines write order_by
  * (AIP-132): a field, ascending by default, ` desc` after it for descending, ` asc` allowed. One field of a closed list:
  * `metadata.creationTimestamp`, when the card was filed, and `metadata.name`. A card list orders by one field, and ties by name, so a
  * list of several fields is no order of it (null), which the list refuses `Invalid`, naming the forms it takes. An empty one is the

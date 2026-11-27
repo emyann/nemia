@@ -78,17 +78,22 @@ type RowReads = {
   readonly needsOf: (step: string) => string | undefined;
 };
 
-/** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
-function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads) {
-  const record = run.steps[step.name];
+/** The row of a node that sent, was refused or was skipped; undefined for any other step. */
+function nodeRow(step: StepSpec, steps: readonly StepSpec[], record: Run['steps'][string] | undefined, word: StepStatus, reads: RowReads) {
   if (word === 'sent' && record?.sent)
     return { message: `sent → ${'run' in record.sent ? record.sent.run : record.sent.card}`, ...codedStep(REASON_OF.sent) };
   if (record?.refused && step.workflow !== undefined) return { besides: record.refused.message };
-  if (word === 'skipped') {
-    const condition = conditionBefore(step, steps);
-    const route = condition ? reads.routeOf(condition) : undefined;
-    return { message: condition && route ? `skipped (${condition.name}: ${route})` : 'skipped', ...codedStep(REASON_OF.skipped) };
-  }
+  if (word !== 'skipped') return undefined;
+  const condition = conditionBefore(step, steps);
+  const route = condition ? reads.routeOf(condition) : undefined;
+  return { message: condition && route ? `skipped (${condition.name}: ${route})` : 'skipped', ...codedStep(REASON_OF.skipped) };
+}
+
+/** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
+function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads) {
+  const record = run.steps[step.name];
+  const own = nodeRow(step, steps, record, word, reads);
+  if (own !== undefined) return own;
   if (step.routes === undefined) return undefined;
   const settled = steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
   const offer = settled ? {} : { note: `route it by hand: ${routeLine(run, step)}` };

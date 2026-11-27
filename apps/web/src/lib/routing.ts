@@ -2,7 +2,8 @@
  * What the canvases draw of a routed workflow: which node is a condition or a workflow node (the graph's `nodes`), and on a run, the route
  * each condition took. The run object carries no route of its own, so it is read off the step's sentence, in the words the orchestrator's
  * listing writes them (`routedRows`): `routed: <route>` on a condition, `skipped (<condition>: <route>)` on a node off the route, and
- * `· proposes <route>` after a gated condition's word. What a workflow node sent is the step's own `sent`, never read from a sentence. Its state is never read from there: that is the codes' (`status.ts`). Pure.
+ * `· proposes <route>` after a gated condition's word. What a workflow node sent is the step's own `sent`, never read from a sentence.
+ * Its state is never read from there: that is the codes' (`status.ts`). Pure.
  */
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';

@@ -111,10 +111,7 @@ export const Step = Schema.Struct({
   conditions: Schema.optional(Schema.Record(Schema.String, ConditionWritten)),
   route: Schema.optional(RouteRecord),
   sent: Schema.optional(
-    Schema.Union([
-      Schema.Struct({ run: Schema.String, at: Schema.String }),
-      Schema.Struct({ card: Schema.String, at: Schema.String }),
-    ]),
+    Schema.Union([Schema.Struct({ run: Schema.String, at: Schema.String }), Schema.Struct({ card: Schema.String, at: Schema.String })]),
   ),
   refused: Schema.optional(Schema.Struct({ message: Schema.String, at: Schema.String })),
   pinned: Schema.optional(Schema.Array(Pin)),

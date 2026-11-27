@@ -35,7 +35,7 @@ const filed = (keys: string, given = GIVEN) =>
   parseInboxCard('sent.md', sentCardText(RUN, nodeOf('to', keys), WHY, { team: 'core' }, given));
 
 describe('the brief of the run a workflow node starts, by its brief:', () => {
-  test('title, the default: the producer\'s title, then why it was started, with no reason', () => {
+  test("title, the default: the producer's title, then why it was started, with no reason", () => {
     const brief = childBrief(RUN, nodeOf('to', 'workflow: quick'), WHY, 'A title', GIVEN);
     assert.ok(brief.startsWith('A title'));
     assert.ok(brief.includes('## From run r-door'));
@@ -82,7 +82,7 @@ describe("the given card's files, on what a node carries on", () => {
     test(what, () => {
       assert.deepEqual(filesLeftOff(RUN, nodeOf('to', keys), { ...GIVEN, files, namespace }), leftOff);
     });
-  test('a backlog card of the run\'s factory carries the files, the same Files', () => {
+  test("a backlog card of the run's factory carries the files, the same Files", () => {
     assert.deepEqual(filed('card: backlog', { ...GIVEN, files, namespace: 'mill' } as typeof GIVEN).files, files);
   });
 });

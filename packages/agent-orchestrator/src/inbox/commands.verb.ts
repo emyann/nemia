@@ -210,7 +210,10 @@ export const RESEND: Served<Resent, ResendInput> = {
   input: ResendInput,
   handler: ({ runId, workflow, actor }, kept) =>
     Effect.gen(function* () {
-      return yield* resendRun({ run: runId, ...(workflow === undefined ? {} : { workflow }), ...(actor === undefined ? {} : { actor }) }, yield* howOf(kept));
+      return yield* resendRun(
+        { run: runId, ...(workflow === undefined ? {} : { workflow }), ...(actor === undefined ? {} : { actor }) },
+        yield* howOf(kept),
+      );
     }),
 };
 

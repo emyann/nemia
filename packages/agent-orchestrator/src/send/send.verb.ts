@@ -6,7 +6,7 @@
  */
 import { Effect } from 'effect';
 import type { StepSpec } from '../workflow.ts';
-import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { stepStatus, type SpendOf } from '../status/status.ts';
 import { CardDoor, type CardDoorShape } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -114,7 +114,8 @@ const sameFactory = (run: Run, given: GivenCard | undefined) =>
 /** The `files:` pair a backlog card carries: the given card's files, kept in the run's factory. */
 const filesCarried = (run: Run, given: GivenCard | undefined) => {
   const files = given?.files ?? [];
-  const pairs: FrontmatterPair[] = files.length && sameFactory(run, given) ? [['files', Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
+  const pairs: FrontmatterPair[] =
+    files.length && sameFactory(run, given) ? [['files', Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
   return pairs;
 };
 
@@ -265,6 +266,79 @@ const startChild = Effect.fnUntraced(function* (
   return { child: started.id, leftOff: filesLeftOff(run, node, given) };
 });
 
+type Sending = { run: Run; reads: SendReads; notes: string[] };
+
+/** File a `card: backlog` node's card back to the inbox and write `sent` on the node; false where the card could not be filed this pass. */
+const fileBacklog = Effect.fnUntraced(function* (
+  f: Sending,
+  door: CardDoorShape,
+  node: StepSpec,
+  at: StepRecord,
+  wordOf: ReturnType<typeof wordReader>,
+) {
+  const { run, reads } = f;
+  const card = backlogCardName(run.id, node.name);
+  const { why } = whyOf(run, reads, node, wordOf);
+  const given = yield* givenCard(door, run);
+  const text = sentCardText(run, node, why, yield* storedLabels(run), given);
+  const filed = yield* Effect.result(door.cards.add(CardName.read(card), text));
+  if (filed._tag === 'Failure' && filed.failure._tag !== 'Conflict') {
+    f.notes.push(`${node.name}: its card ${card} could not be filed — ${filed.failure.message}. The next pass files it again.`);
+    return false;
+  }
+  const filedAt =
+    filed._tag === 'Failure' ? ((yield* door.cards.filedAt(CardName.read(card))) ?? new Date().toISOString()) : new Date().toISOString();
+  run.steps[node.name] = { ...at, sent: { card, at: filedAt } };
+  f.notes.push(`${node.name}: filed the card ${card} back to the inbox, unqueued.`);
+  const leftOff = filesLeftOff(run, node, given);
+  if (leftOff.length)
+    f.notes.push(
+      `${node.name}: its card ${card} carries none of ${leftOff.join(', ')}: the card it was given from is of another factory than the run's, ${run.factory ?? DEFAULT_NAMESPACE}, which keeps none of its Files. Attach them to ${card} with nemia inbox attach ${card} <path>.`,
+    );
+  return true;
+});
+
+/** Start a workflow node's run, or adopt the run it already claimed, and write `sent` on the node; a refusal is written as `refused`. */
+const startNode = Effect.fnUntraced(function* (
+  f: Sending,
+  door: CardDoorShape,
+  node: StepSpec,
+  at: StepRecord,
+  wordOf: ReturnType<typeof wordReader>,
+) {
+  const { run } = f;
+  const name = node.name;
+  const claimed = yield* childOf(run, name);
+  if (claimed !== undefined) {
+    run.steps[name] = { ...at, sent: { run: claimed.id, at: claimed.createdAt } };
+    f.notes.push(startedNote(node, claimed.id));
+    return true;
+  }
+  const now = new Date().toISOString();
+  const started = yield* Effect.result(startChild(door, f, node, wordOf));
+  if (started._tag === 'Success') {
+    const { child, leftOff } = started.success;
+    run.steps[name] = { ...at, sent: { run: child, at: now } };
+    f.notes.push(startedNote(node, child));
+    if (leftOff.length)
+      f.notes.push(
+        `${name}: the run ${child} carries none of ${leftOff.join(', ')}: the card it was given from is of another factory than the run's, ${run.factory ?? DEFAULT_NAMESPACE}, which keeps none of its Files.`,
+      );
+    return true;
+  }
+  const raced = yield* childOf(run, name);
+  if (raced !== undefined) {
+    run.steps[name] = { ...at, sent: { run: raced.id, at: raced.createdAt } };
+    f.notes.push(startedNote(node, raced.id));
+    return true;
+  }
+  const message = refusalText(node, started.failure);
+  if (run.steps[name]?.refused?.message === message) return false;
+  run.steps[name] = { ...at, refused: { message, at: now } };
+  f.notes.push(`${message}. The next pass tries again.`);
+  return true;
+});
+
 /**
  * Send each workflow node in `send`: start its run (`startChild`) or, on a `card: backlog` node, file the card back to the inbox,
  * exclusively, and write `sent` on its record — `sent: { run, at }`, or `sent: { card, at }` — answering with the nodes written.
@@ -272,72 +346,20 @@ const startChild = Effect.fnUntraced(function* (
  * written — is adopted, dated when it was made, so a pass never sends twice. A node already `sent` is left as it is. A start the factory
  * refuses is written on the node as `refused` and tried again on each pass, so a factory that is fixed is picked up.
  */
-export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads: SendReads; notes: string[] }, send: readonly string[]) {
-  const { run, reads } = f;
+export const sendCards = Effect.fn('sendCards')(function* (f: Sending, send: readonly string[]) {
   const door = yield* CardDoor;
-  const wordOf = wordReader(run, reads);
+  const wordOf = wordReader(f.run, f.reads);
   const sent: string[] = [];
   for (const name of send) {
     const node = found(
-      reads.steps.find((s) => s.name === name),
+      f.reads.steps.find((s) => s.name === name),
       `the workflow node ${name}`,
     );
-    if ((node.workflow === undefined && node.card !== 'backlog') || run.steps[name]?.sent) continue;
-    const now = new Date().toISOString();
-    const at = { ...(run.steps[name] ?? { taskId: null }) };
+    if ((node.workflow === undefined && node.card !== 'backlog') || f.run.steps[name]?.sent) continue;
+    const at = { ...(f.run.steps[name] ?? { taskId: null }) };
     delete at.refused;
-    if (node.card === 'backlog') {
-      const card = backlogCardName(run.id, name);
-      const { why } = whyOf(run, reads, node, wordOf);
-      const given = yield* givenCard(door, run);
-      const text = sentCardText(run, node, why, yield* storedLabels(run), given);
-      const filed = yield* Effect.result(door.cards.add(CardName.read(card), text));
-      if (filed._tag === 'Failure' && filed.failure._tag !== 'Conflict') {
-        f.notes.push(`${name}: its card ${card} could not be filed — ${filed.failure.message}. The next pass files it again.`);
-        continue;
-      }
-      const filedAt = filed._tag === 'Failure' ? ((yield* door.cards.filedAt(CardName.read(card))) ?? now) : now;
-      run.steps[name] = { ...at, sent: { card, at: filedAt } };
-      f.notes.push(`${name}: filed the card ${card} back to the inbox, unqueued.`);
-      const leftOff = filesLeftOff(run, node, given);
-      if (leftOff.length)
-        f.notes.push(
-          `${name}: its card ${card} carries none of ${leftOff.join(', ')}: the card it was given from is of another factory than the run's, ${run.factory ?? DEFAULT_NAMESPACE}, which keeps none of its Files. Attach them to ${card} with nemia inbox attach ${card} <path>.`,
-        );
-      sent.push(name);
-      continue;
-    }
-    const claimed = yield* childOf(run, name);
-    if (claimed !== undefined) {
-      run.steps[name] = { ...at, sent: { run: claimed.id, at: claimed.createdAt } };
-      f.notes.push(startedNote(node, claimed.id));
-      sent.push(name);
-      continue;
-    }
-    const started = yield* Effect.result(startChild(door, f, node, wordOf));
-    if (started._tag === 'Success') {
-      const { child, leftOff } = started.success;
-      run.steps[name] = { ...at, sent: { run: child, at: now } };
-      f.notes.push(startedNote(node, child));
-      if (leftOff.length)
-        f.notes.push(
-          `${name}: the run ${child} carries none of ${leftOff.join(', ')}: the card it was given from is of another factory than the run's, ${run.factory ?? DEFAULT_NAMESPACE}, which keeps none of its Files.`,
-        );
-      sent.push(name);
-      continue;
-    }
-    const raced = yield* childOf(run, name);
-    if (raced !== undefined) {
-      run.steps[name] = { ...at, sent: { run: raced.id, at: raced.createdAt } };
-      f.notes.push(startedNote(node, raced.id));
-      sent.push(name);
-      continue;
-    }
-    const message = refusalText(node, started.failure);
-    if (run.steps[name]?.refused?.message === message) continue;
-    run.steps[name] = { ...at, refused: { message, at: now } };
-    f.notes.push(`${message}. The next pass tries again.`);
-    sent.push(name);
+    const written = yield* node.card === 'backlog' ? fileBacklog(f, door, node, at, wordOf) : startNode(f, door, node, at, wordOf);
+    if (written) sent.push(name);
   }
   return sent;
 });

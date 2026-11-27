@@ -19,7 +19,6 @@ import type { TryMemory } from '../out-of-memory/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { hasChecks, type StepSpec } from '../step/step.ts';
 import { askedAgain } from '../status/status.ts';
-import type { StepStatus } from '../record/record.ts';
 import { answeredRoute } from '../route/routed/index.ts';
 import { conditionOf } from '../route/index.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
@@ -339,9 +338,9 @@ function runCostOf(t: Timeline) {
 function offRoute(r: RunRead, step: StepSpec) {
   const condition = conditionOf(step, r.steps);
   if (condition === undefined || step.when === undefined) return false;
-  const wordOf = (name: string): StepStatus => {
+  const wordOf = (name: string) => {
     const parent = r.steps.find((s) => s.name === name);
-    return parent !== undefined && doneStep(r, parent) ? 'verified' : 'pending';
+    return parent !== undefined && doneStep(r, parent) ? ('verified' as const) : ('pending' as const);
   };
   const said = answeredRoute(condition, r.run, r.closeoutOf, wordOf, r.steps);
   return said?.kind === 'route' && !step.when.includes(said.route);
@@ -351,6 +350,7 @@ function offRoute(r: RunRead, step: StepSpec) {
  * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
  * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it is recursive through `offRoute`, whose type inference cannot give
 function doneStep(r: RunRead, step: StepSpec): boolean {
   const record = r.run.steps[step.name];
   if (record?.sent !== undefined) return true;

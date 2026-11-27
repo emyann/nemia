@@ -20,7 +20,8 @@ const belongs = (run: WorkRun, runs: readonly WorkRun[], card: string) => {
 };
 
 /**
- * The ids of the runs of `runs` that belong to the work of `card`, in the order `runs` lists them, which is the order they were made (`byCreated`).
+ * The ids of the runs of `runs` that belong to the work of `card`, in the order `runs` lists them, which is the order they were made
+ * (`byCreated`).
  * @param card The card's name.
  * @param runs Every run the store lists, as the walk reads them.
  */
@@ -35,8 +36,12 @@ export const byCreated = <R extends { readonly id: string; readonly created: num
   [...runs].sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 /** What `workRuns` reads of a run: its id, the card it was started from, the run whose node started it and when it was made. */
-export type Worked = { readonly id: string;
-  readonly from?: { readonly inbox: string } | undefined; readonly startedBy?: { readonly run: string } | undefined; readonly createdAt?: string };
+export type Worked = {
+  readonly id: string;
+  readonly from?: { readonly inbox: string } | undefined;
+  readonly startedBy?: { readonly run: string } | undefined;
+  readonly createdAt?: string;
+};
 
 /**
  * The runs `cardWork` may be asked over, once for a pass: those started from a card or by a node, as it reads them, in the order they

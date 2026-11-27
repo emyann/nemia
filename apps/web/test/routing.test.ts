@@ -10,7 +10,7 @@ import type { RunGraph } from '../src/lib/api/graph.ts';
 test('routedOf reads the words the listing writes of a routed step, and nothing else', () => {
   assert.deepEqual(routedOf('routed: web'), { kind: 'routed', route: 'web' });
   assert.deepEqual(routedOf('skipped (triage: web)'), { kind: 'skipped', condition: 'triage', route: 'web' });
-  assert.equal(routedOf('sent → r-1-handoff'), null, 'what a node sent is the step\'s own sent, not read from its sentence');
+  assert.equal(routedOf('sent → r-1-handoff'), null, "what a node sent is the step's own sent, not read from its sentence");
   assert.deepEqual(routedOf('awaiting approval · proposes docs'), { kind: 'proposes', route: 'docs' });
   assert.equal(routedOf('skipped'), null, 'a skipped node whose condition is not said names no route');
   assert.equal(routedOf('unverified · done'), null);

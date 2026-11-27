@@ -510,7 +510,7 @@ export { CARD_STATES };
 export type CardState = (typeof CARD_STATES)[number];
 
 /** A run as the inbox reads it: its id, the card it was started from, and its phase as the runs list judges it, read now. */
-export type CardRun = Pick<Run, 'id' | 'from' | 'startedBy' | 'createdAt'> & { phase: RunPhase };
+export type CardRun = Pick<Run, 'id' | 'from'> & Partial<Pick<Run, 'startedBy' | 'createdAt'>> & { phase: RunPhase };
 
 /**
  * A listed entry's state, from what the listing read of it: the phase of its run when a record names it, whatever the card carries — the
@@ -724,11 +724,7 @@ function waitsOf(
  * as `phaseOf` read them), or off the runs started from it where the inbox no longer has it, none where a phase was not read — and
  * whether only a person can release it (`waitStalled`). Writes the waits in place, as the queue's places are written.
  */
-function statesOfWaits(
-  listed: readonly CardListing[],
-  runs: readonly Worked[],
-  phaseOf: Waiting['phaseOf'],
-) {
+function statesOfWaits(listed: readonly CardListing[], runs: readonly Worked[], phaseOf: Waiting['phaseOf']) {
   const work = workRuns(runs);
   const byName = new Map(listed.map((l) => [l.name, l]));
   const stateOf = (name: string) => {

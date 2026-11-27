@@ -194,7 +194,7 @@ export const RunSpec = Schema.Struct({
   }),
   startedBy: Schema.NullOr(
     Schema.Struct({
-      run: Schema.String.annotate({ description: "The id of the run whose workflow node started this run." }),
+      run: Schema.String.annotate({ description: 'The id of the run whose workflow node started this run.' }),
       node: Schema.String.annotate({ description: "The workflow node's name in that run." }),
     }),
   ).annotate({ description: 'The run and the workflow node that started it directly; null for a run started any other way.' }),

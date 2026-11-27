@@ -38,7 +38,7 @@ function ToPart({ run, step }: { run: string; step: string }) {
   );
 }
 
-/** What a node that runs no session did: the run a workflow node started, linked, or the route a condition took, as its sentence says it. */
+/** What a node that runs no session did: the run a workflow node started, linked, or the route a condition took, as its sentence says. */
 function Routed({ message, sent }: { message: string; sent: StepView['sent'] | null }) {
   const routed = routedOf(message);
   if (sent && 'run' in sent)

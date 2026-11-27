@@ -487,7 +487,7 @@ const cardWorkRuns = <R extends { readonly id: string; readonly from?: unknown; 
   all: readonly R[],
 ) => {
   const inWork = new Set(all.filter((run) => run.from !== undefined).map((run) => run.id));
-  for (let grew = true; grew; ) {
+  for (let grew = true; grew;) {
     grew = false;
     for (const run of all)
       if (!inWork.has(run.id) && run.from === undefined && run.startedBy !== undefined && inWork.has(run.startedBy.run)) {
@@ -499,7 +499,8 @@ const cardWorkRuns = <R extends { readonly id: string; readonly from?: unknown; 
 };
 
 /**
- * Each run of a card's work (`cardWork`): those started from it (`from.inbox`) and those its workflow nodes started, with its phase as the list judges it, read through the informer `how.memo` as
+ * Each run of a card's work (`cardWork`): those started from it (`from.inbox`) and those its workflow nodes started, with its phase as
+ * the list judges it, read through the informer `how.memo` as
  * `runsSummarized` reads it: the card's state once it has started (`cardState`). One listing gives both which runs name a card and their
  * phases, so a card whose run is listed always has its phase. A run that could not be judged reads `running`, as the list counts it
  * (`unjudgedFields`). Every listed run is kept in the informer, so a read of the inbox leaves the list's runs where they were.

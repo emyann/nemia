@@ -157,7 +157,8 @@ const cardPlace = Effect.fn('cardPlace')(function* (
  * default factory `callerRepo`, and the workflow's folder, looked up as a factory looks a name up. Refused by name, `Invalid`: a workflow
  * the factory does not offer (`unattachedRefusal`) or wires no repository for; and a folder that does not load, as a `WorkflowError`, in
  * the words of `card`'s own `workflow:` line where it is one.
- * @param place Where it is looked up: the factory (`filed`, undefined for the default), the workflow's `name`, the `callerRepo` of the default factory, and the `card` whose `workflow:` line names it, where one does.
+ * @param place Where it is looked up: the factory (`filed`, undefined for the default), the workflow's `name`, the `callerRepo` of the
+ * default factory, and the `card` whose `workflow:` line names it, where one does.
  */
 export const workflowPlace = Effect.fn('workflowPlace')(function* (place: {
   filed: Factory | undefined;

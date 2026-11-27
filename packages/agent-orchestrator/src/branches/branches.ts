@@ -34,8 +34,9 @@ export function resultSteps(steps: readonly StepSpec[], run?: Run) {
 }
 
 /**
- * The result of a run that routed on to another workflow: for each workflow node that started its run or filed its card (`StepRecord.sent`), what its
- * condition read — its `input:`, or the steps it waits on where it names none. What the routed run is handed. Empty for any other run.
+ * The result of a run that routed on to another workflow: for each workflow node that started its run or filed its card
+ * (`StepRecord.sent`), what its condition read — its `input:`, or the steps it waits on where it names none. What the routed run is
+ * handed. Empty for any other run.
  * @param steps The run's steps.
  * @param run The run, whose step records say which workflow node filed its card.
  */

@@ -1,14 +1,16 @@
 /**
  * A route to a workflow, as a person meets it: a condition routes to a workflow node, which starts one run of its workflow, handed the
  * caller as context and named by `startedBy`, with no card filed; the node reads `sent`, and no pass — a second one, or one after a crash
- * between the start and the record — starts a second run; the caller's result is then what the condition read. And `nemia route`: a person's route wins over the table,
+ * between the start and the record — starts a second run; the caller's result is then what the condition read.
+ * And `nemia route`: a person's
+ * route wins over the table,
  * refused off the route list, on a step that is no condition, and once a node after the condition is filed or sent. And a gated table
  * condition on the tests' team, approved with `nemia approve` once its table answered, which sends its workflow node. Each story one test
  * on the stage (`story.ts`).
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { cardNames, cardText, rewriteRun, runRecord, runsNow } from '../testing.ts';
+import { cardNames, rewriteRun, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,12 +19,11 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { TEAM } from './team.ts';
-import { advanceRun, startRun, startFromInbox, runWith, list } from '../src/runner.ts';
+import { advanceRun, startRun, runWith, list } from '../src/runner.ts';
 import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import { resultSteps } from '../src/branches/branches.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
-import { parseInboxCard } from '../src/inbox/inbox.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -225,7 +226,6 @@ describe("the run a node starts takes its title from the producer's closeout, el
 describe("the run a node starts mounts the caller's artifacts and inputs read-only on every step, and each brief names them", () => {
   let notes!: string;
   let id!: string;
-  let repo!: string;
   let routed!: string;
   let artifacts!: string;
   let inputs!: string;
@@ -234,7 +234,6 @@ describe("the run a node starts mounts the caller's artifacts and inputs read-on
     notes = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
     fs.writeFileSync(notes, 'the rows\n');
     id = await planned('web', { inputs: [notes] });
-    repo = runRecord(ROOT, id).repo ?? '';
     await pass(id);
     routed = childOf(id).id;
     artifacts = path.dirname(artifactsDir(ROOT, runRecord(ROOT, id), 'plan'));

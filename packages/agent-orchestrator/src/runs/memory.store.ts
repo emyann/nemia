@@ -209,7 +209,8 @@ function runsOf(st: State) {
       const other = card === undefined ? undefined : [...st.records.values()].find((r) => r.from?.inbox === card);
       if (card !== undefined && other) throw cardStartedTwice(card, other.id);
       const by = run.startedBy;
-      const sibling = by === undefined ? undefined : [...st.records.values()].find((r) => r.startedBy?.run === by.run && r.startedBy.node === by.node);
+      const sibling =
+        by === undefined ? undefined : [...st.records.values()].find((r) => r.startedBy?.run === by.run && r.startedBy.node === by.node);
       if (by !== undefined && sibling) throw childStartedTwice(by.run, by.node, sibling.id);
       st.records.set(run.id, recordOf(run));
       touch(st, run.id);

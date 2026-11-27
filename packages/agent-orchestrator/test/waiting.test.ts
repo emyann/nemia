@@ -649,7 +649,11 @@ describe('`nemia start --after` reads no branch: a parent whose branch is droppe
   test('a parent started with no worktree, so with no result branch, succeeds and frees its child all the same', async () => {
     const p = await started({ brief: 'the parent on the base itself', repo, workflowDir: oneStep(), isolate: false });
     await tick(p.id);
-    assert.equal(runRecord(ROOT, p.id).steps.implement.branch, undefined, 'it cuts no branch');
+    assert.equal(
+      runRecord(ROOT, p.id).steps.implement.branch,
+      repositoryRunOf(runRecord(ROOT, p.id)).branch,
+      'it works on the base itself: no branch of its own',
+    );
     const child = await started({ brief: 'the child of a parent with no branch', repo, workflowDir: twoSteps(), after: [p.id] });
     assert.deepEqual((await tick(child.id)).filed, [], 'the parent has not succeeded');
     board().settle(`${p.id}-implement`, 'succeeded', SIGNED);

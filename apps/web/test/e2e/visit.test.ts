@@ -236,12 +236,31 @@ test(
   },
 );
 
-test('a process that visits two pages says where its browser is once', { timeout: 60_000 }, async () => {
-  const ended = await e2eOn('none', '--again');
-  assert.equal(ended.code, 0, said(ended));
-  assert.equal(ended.stdout.match(/the none page \(\/none\) in the dark theme ✓/g)?.length, 2, said(ended));
-  assert.equal(ended.stdout.match(/the dark theme's browser is in /g)?.length, 1, said(ended));
-});
+/** Where the dark theme's browser was said to be, each time it was said: its zone and the time of day there. */
+const zonesSaid = (ended: Ended) =>
+  [...ended.stdout.matchAll(/the dark theme's browser is in (\S+), where it is (\d\d:\d\d)/g)].map(([, zone, time]) => `${zone} ${time}`);
+
+/**
+ * A process that visits two pages, by the clock the visits read where their browser is placed (`--at`), and where it says that browser
+ * is: once, in the zone where it is midday, when the hour does not turn between the visits; again, an hour west at its own noon, when it
+ * turns between them. 16:59:59.999 UTC turns a millisecond into the first visit, which takes longer.
+ */
+const SAID_WHERE = [
+  { clock: '2026-11-27T16:30:00.000Z', zones: ['Etc/GMT+4 12:30'], what: 'says where its browser is once' },
+  {
+    clock: '2026-11-27T16:59:59.999Z',
+    zones: ['Etc/GMT+4 12:59', 'Etc/GMT+5 12:00'],
+    what: 'says it again, an hour west at its own noon, when the hour turns between them',
+  },
+];
+
+for (const { clock, zones, what } of SAID_WHERE)
+  test(`a process that visits two pages ${what}`, { timeout: 60_000 }, async () => {
+    const ended = await e2eOn('none', '--again', '--at', clock);
+    assert.equal(ended.code, 0, said(ended));
+    assert.equal(ended.stdout.match(/the none page \(\/none\) in the dark theme ✓/g)?.length, 2, said(ended));
+    assert.deepEqual(zonesSaid(ended), zones, said(ended));
+  });
 
 test("a run that pictures no page leaves the runner's pictures an earlier run took of it", { timeout: 60_000 }, async () => {
   const out = planted('none-dark.png', 'none-light.png');

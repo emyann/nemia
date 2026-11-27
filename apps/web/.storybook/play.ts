@@ -80,6 +80,12 @@ export async function tipOf(user: User, trigger: Element) {
  * Opens the kit's tooltip of `trigger`, inside a row of the kit's table, as a person who reaches it by the keyboard does: the focus put
  * on its row, then the right arrow pressed, from mark to mark of the row, until it reaches `trigger`. A table's row takes back a focus
  * a script puts on a mark inside it, so no other way reaches one. Answers the tooltip that describes it.
+ *
+ * The arrows start once the page has drawn a frame after the row took the focus. The Tab press may focus a field at the page's top and
+ * scroll the window there, and the row's focus scrolls it back: the browser fires the scroll event of both at its next frame, and a
+ * React Aria tooltip closes on any scroll around its trigger, so a tooltip opened before that frame was closed by it
+ * and opened by nothing again (RunsPage's Nothing Waits, one CI run in twenty-five). A frame's scroll events fire before its animation
+ * frame callbacks.
  * @param user The user the play function is handed.
  * @param row The row of the table that holds `trigger`.
  * @param trigger The mark or link the tooltip hangs off.
@@ -87,6 +93,7 @@ export async function tipOf(user: User, trigger: Element) {
 export async function tipInRow(user: User & Keys, row: HTMLElement, trigger: Element) {
   await user.tab();
   row.focus();
+  await new Promise((drawn) => requestAnimationFrame(drawn));
   for (let i = 0; i < 20 && document.activeElement !== trigger; i += 1) await user.keyboard('{ArrowRight}');
   if (document.activeElement !== trigger) throw new Error(`the right arrow never reached ${trigger.outerHTML.slice(0, 80)}`);
   return describing(trigger);

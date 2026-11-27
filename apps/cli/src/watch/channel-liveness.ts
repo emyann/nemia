@@ -44,8 +44,8 @@ export function clockOf(ms: number, zone: string | undefined) {
  * @param ms The length, in milliseconds.
  */
 export function lastedOf(ms: number) {
+  if (ms < 60_000) return `${Math.floor(ms / 1000)} s`;
   const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return `${Math.round(ms / 1000)} s`;
   if (minutes < 60) return `${minutes} min`;
   const rest = minutes % 60;
   return rest === 0 ? `${Math.floor(minutes / 60)} h` : `${Math.floor(minutes / 60)} h ${rest} min`;

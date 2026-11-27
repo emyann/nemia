@@ -324,7 +324,7 @@ test("a cursor file past the feed's end starts from now, with one notice that li
 });
 
 test(
-  'the api killed under a channel is one `down` notice; started again one `up`, and the lines written between arrive',
+  'the api killed under a channel is one `down` notice with its time; started again one `up` saying the daemon did not restart, and the lines written between arrive',
   { timeout: 90_000 },
   async (t) => {
     const store = storeOf();
@@ -344,6 +344,10 @@ test(
       ['down', 'up'],
       'down once, up once',
     );
+    const up = c.notices.find((n) => n.meta.notice === 'up');
+    assert.equal(up?.meta.restarted, 'no', 'an api started --no-tick writes no DaemonStarted');
+    assert.ok(Number(up?.meta.caught_up) >= 1, 'the lines written while it was down counted');
+    assert.ok(c.notices.find((n) => n.meta.notice === 'down')?.meta.since, 'the drop said with its time');
   },
 );
 

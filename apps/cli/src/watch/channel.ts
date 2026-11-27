@@ -8,7 +8,10 @@
  *
  * What a watch sends before its first BOOKMARK is the backlog since its cursor: held, then sent whole where it is `RESUME_MOST` lines or
  * fewer, else replaced by one notice of how many were skipped and where to read them. Its other notices: a cursor the feed cannot be read
- * from (410), started over from now; the api down and up again, once each, reconnecting every `RECONNECT_EVERY`; and a refusal of the api
+ * from (410), started over from now; the api lost and reached again, once each, reconnecting every `RECONNECT_EVERY`, each said as
+ * observed (`channel-liveness.ts`): a stretch the channel's own process did not run, no answer since a time, and on reconnect the lines
+ * written meanwhile, whether a `DaemonStarted` is among them (read by a watch of its own, whatever the selectors) and those that wait on
+ * a person; and a refusal of the api
  * (a selector, a namespace), said on stderr and in a notice, then exit 2. Every notice waits until the session has opened the connection,
  * as Claude Code drops one sent before. The words of Claude Code's channels are this file's alone.
  */
@@ -24,6 +27,7 @@ import { CONTEXT_VARIABLE, chosenOf, LOCAL_CONTEXT } from '../context.ts';
 import { served } from '../daemon.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
+import { downNotice, gapOf, RAN_GAP_AFTER_MS, upNotice, zoneOf, type Gap } from './channel-liveness.ts';
 import { kept, RECONNECT_EVERY, savedIn, SIGNALS } from './watch.ts';
 
 /** The most lines of a backlog a resumed channel sends; past it, one notice says how many it skipped and where to read them. */
@@ -129,8 +133,12 @@ function channelInstructions(selectors: readonly string[], namespace: string | u
       'asks a person), on, via, call and try.',
     'A tag with a notice attribute is the channel speaking of itself: notice="skipped" (lines written while it was stopped, past what it ' +
       'sends on a resume: the tag says how many and from which resource_version to read them), "missed" (it started over from now, and ' +
-      'lines may have been missed), "down" and "up" (the store\'s api stopped answering, and answers again), "refused" (the api refused ' +
-      'what the channel asked: it stops).',
+      'lines may have been missed), "down" (the channel lost the store\'s api: it says only what it observed, either that its own process ' +
+      'did not run from one time to another, its clock having jumped, or that it has had no answer from the api since a time; it names no ' +
+      'cause), "up" (the api answers again: how many lines were written meanwhile and after which resource_version, whether the ' +
+      "server's daemon restarted in that time as the feed's DaemonStarted lines show, and each run and step among those lines that waits " +
+      'on a person), "refused" (the api refused what the channel asked: it stops). Times are in the local time of the machine the channel ' +
+      'runs on where it knows it, else said as UTC.',
     'This channel is one-way: there is nothing to reply to it. To act on an event, use nemia as you would otherwise.',
   ].join('\n');
 }
@@ -185,14 +193,30 @@ async function outboxOf(asked: ChannelAsked) {
 /** Sends `notice` (and keeps `cursor`) in its turn, its failure, a connection gone, being the close's to say. */
 const sent = (f: Following, notice: Notice | undefined, cursor?: string) => void f.out.send(notice, cursor).catch(() => undefined);
 
-/** Where the channel is: what it was asked, the api it follows, the cursor it has sent up to (none: from now), and its liveness. */
+/**
+ * Where the channel is: what it was asked, the api it follows, the cursor it has sent up to (none: from now), its liveness, when it last
+ * beat and the last stretch it did not run between two beats.
+ */
 type Following = {
   readonly asked: ChannelAsked;
   readonly out: Outbox;
   base: string;
   cursor: string | undefined;
   live: 'up' | 'down';
+  lastRan: number;
+  gap: Gap | undefined;
 };
+
+/** How often the channel beats, to see a stretch its own process did not run. */
+const BEAT_EVERY_MS = 1_000;
+
+/** One beat: the stretch since the last one kept where the channel did not run, and now its last beat. */
+function beat(f: Following) {
+  const now = Date.now();
+  f.gap = gapOf(f.lastRan, now) ?? f.gap;
+  f.lastRan = now;
+  return now;
+}
 
 /** What a request came to: an answer, refused by the api with a status and its words, or no answer at all. */
 type Answer = { kind: 'ok'; response: Response } | { kind: 'refused'; status: number; said: string } | { kind: 'none'; why: string };
@@ -301,8 +325,11 @@ const contextName = () => {
   return chosen.kind === 'local' ? LOCAL_CONTEXT : chosen.name;
 };
 
-/** Where an open watch is: the Events it held before its first BOOKMARK (none once it came), and the cursor it opened at. */
-type Opened = { held: Event[] | undefined; readonly from: string };
+/**
+ * Where an open watch is: the Events it held before its first BOOKMARK (none once it came), the cursor it opened at, and, where it
+ * reached the api again after losing it, the daemon's starts written meanwhile (none where they could not be read).
+ */
+type Opened = { held: Event[] | undefined; readonly from: string; readonly back?: { restarts: readonly Event[] | undefined } };
 
 /** One frame of an open watch: an Event sent (or held, before the first BOOKMARK), a BOOKMARK's cursor kept and the backlog released. */
 function onFrame(f: Following, data: string, state: Opened) {
@@ -314,6 +341,7 @@ function onFrame(f: Following, data: string, state: Opened) {
     return;
   }
   if (watched.type === 'BOOKMARK') {
+    if (state.held !== undefined && state.back !== undefined) reached(f, state.held, state.from, state.back.restarts);
     if (state.held !== undefined) released(f, state.held, state.from);
     state.held = undefined;
     f.cursor = watched.object.metadata.resourceVersion;
@@ -326,10 +354,10 @@ function onFrame(f: Following, data: string, state: Opened) {
 }
 
 /** Reads an open watch until it drops: a watch never ends of itself. */
-async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: string) {
+async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: string, back: Opened['back']) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  const state: Opened = { held: [], from };
+  const state: Opened = { held: [], from, ...(back === undefined ? {} : { back }) };
   let text = '';
   try {
     for (;;) {
@@ -346,15 +374,71 @@ async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: stri
   }
 }
 
-/** The liveness said once per change: `down` where it was up, `up` where it was down. */
-function liveness(f: Following, live: 'up' | 'down', why?: string) {
-  if (f.live === live) return;
-  f.live = live;
-  const content =
-    live === 'down'
-      ? `Nemia's api at ${f.base} stopped answering (${why ?? 'the watch dropped'}): the channel tries again every ${RECONNECT_EVERY}, and sends what was written meanwhile.`
-      : `Nemia's api at ${f.base} answers again: the channel goes on from resourceVersion ${f.cursor ?? 'now'}.`;
-  sent(f, noticeOf(live, content, { base: f.base }));
+/** The api lost, said once where it was up: the stretch the channel did not run where it saw one lately, else no answer since now. */
+function lost(f: Following, why: string) {
+  if (f.live === 'down') return;
+  f.live = 'down';
+  const at = beat(f);
+  const gap = f.gap !== undefined && at - f.gap.to <= RAN_GAP_AFTER_MS ? f.gap : undefined;
+  f.gap = undefined;
+  sent(f, downNotice({ base: f.base, at, why, every: RECONNECT_EVERY, gap, zone: zoneOf() }));
+}
+
+/** The api reached again, said at the first BOOKMARK of the watch that reached it, with what the lines written meanwhile show. */
+function reached(f: Following, held: readonly Event[], from: string, restarts: readonly Event[] | undefined) {
+  f.live = 'up';
+  f.gap = undefined;
+  sent(f, upNotice({ base: f.base, from, held, restarts, zone: zoneOf() }));
+}
+
+/** How long the read of the daemon's starts may take before the channel says it could not read them. */
+const RESTARTS_WITHIN_MS = 10_000;
+
+/**
+ * The daemon's starts written after `from`, whatever the channel's selectors and namespace take: a watch of every Event of reason
+ * `DaemonStarted` from that cursor, read until its first BOOKMARK; none where it could not be read within `RESTARTS_WITHIN_MS`.
+ */
+async function restartsAfter(f: Following, from: string, signal: AbortSignal) {
+  const stop = new AbortController();
+  const onAbort = () => stop.abort();
+  signal.addEventListener('abort', onAbort, { once: true });
+  const bound = setTimeout(onAbort, RESTARTS_WITHIN_MS).unref();
+  const url = urlOf(f.base, '/api/events', { watch: 'true', resourceVersion: from, labelSelector: ['reason=DaemonStarted'] });
+  try {
+    const got = await answerAt(url, 'text/event-stream', stop.signal);
+    if (got.kind !== 'ok' || got.response.body === null) return undefined;
+    return await bookmarked(got.response.body);
+  } catch (err) {
+    if (signal.aborted) throw err;
+    return undefined;
+  } finally {
+    clearTimeout(bound);
+    signal.removeEventListener('abort', onAbort);
+    stop.abort();
+  }
+}
+
+/** The Events a watch sends before its first BOOKMARK; none where it ends before one. */
+async function bookmarked(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const seen: Event[] = [];
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return undefined;
+      const { data, rest } = framesOf(text + decoder.decode(value, { stream: true }));
+      text = rest;
+      for (const one of data) {
+        const watched = decodeWatched(one);
+        if (watched.type === 'BOOKMARK') return seen;
+        if (watched.type === 'ADDED') seen.push(watched.object);
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }
 
 /** A cursor the feed cannot be read from (410): started over from now, said once on stderr and in a notice. */
@@ -368,7 +452,7 @@ function startedOver(f: Following, cursor: string, why: string) {
 /** What a refused or unanswered request makes of the stretch: a 4xx of the api ends the channel; anything else is the api down. */
 function failedWith(f: Following, got: Exclude<Answer, { kind: 'ok' }>) {
   if (got.kind === 'refused' && got.status >= 400 && got.status < 500) return { code: 2, said: got.said };
-  liveness(f, 'down', got.kind === 'none' ? got.why : got.said);
+  lost(f, got.kind === 'none' ? got.why : got.said);
   return 'later';
 }
 
@@ -381,13 +465,13 @@ async function stretch(f: Following, signal: AbortSignal) {
     f.cursor = now.at;
   }
   const from = f.cursor;
+  const back = f.live === 'down' ? { restarts: await restartsAfter(f, from, signal) } : undefined;
   const got = await answerAt(watchUrl(f, from), 'text/event-stream', signal);
   if (got.kind === 'refused' && got.status === 410) return (startedOver(f, from, got.said), 'again');
   if (got.kind !== 'ok') return failedWith(f, got);
-  liveness(f, 'up');
   console.error(`nemia channel: following ${listPath(f.asked)} at ${f.base} from resourceVersion ${from}`);
-  if (got.response.body !== null) await readOn(f, got.response.body, from);
-  liveness(f, 'down', 'the watch dropped');
+  if (got.response.body !== null) await readOn(f, got.response.body, from, back);
+  lost(f, 'its watch dropped');
   return 'later';
 }
 
@@ -436,14 +520,18 @@ export async function channel(args: readonly string[]) {
     return [signal, one] as const;
   });
   void out.closed.then(() => stop.abort());
+  let beats: NodeJS.Timeout | undefined;
   try {
     const base = await served('channel');
-    return await follow({ asked, out, base, cursor, live: 'up' }, stop.signal);
+    const f: Following = { asked, out, base, cursor, live: 'up', lastRan: Date.now(), gap: undefined };
+    beats = setInterval(() => beat(f), BEAT_EVERY_MS).unref();
+    return await follow(f, stop.signal);
   } catch (err) {
     if (stop.signal.aborted) return code;
     if (err instanceof Refused) return refusedWith(out, err.message, err.code);
     throw err;
   } finally {
+    clearInterval(beats);
     for (const [signal, one] of stops) process.off(signal, one);
     await out.close().catch(() => undefined);
   }

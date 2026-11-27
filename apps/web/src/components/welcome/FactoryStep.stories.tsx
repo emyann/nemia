@@ -5,6 +5,7 @@ import { HerSheetProvider, useHerSheet } from '@/components/frame/HerSheet';
 import { factoryFiled, factoryNext, filedInHerChat, herFiling, volumeGiven } from '../../../.storybook/fixtures/readiness';
 import { factoriesHeld, templatesServed } from '../../../.storybook/fixtures/templates';
 import { FactoryStep } from './FactoryStep';
+import { readingColumn } from '../../../.storybook/reading';
 
 /** Says whether her sheet is open, beside the step, for a play to read: the story's own, no seam of `src`. */
 function HerProbe() {
@@ -20,6 +21,7 @@ const meta: Meta<typeof FactoryStep> = {
   tags: ['network'],
   title: 'Pages/Welcome factory',
   component: FactoryStep,
+  decorators: [readingColumn],
   args: {},
   parameters: { msw: [...factoryNext, ...templatesServed] },
   render: () => (

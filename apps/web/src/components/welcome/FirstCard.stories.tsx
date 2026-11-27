@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor, within } from 'storybook/test';
 import { filed, firstCardStore, STARTED_RUN } from '../../../.storybook/fixtures/firstCard';
 import { FirstCard } from './FirstCard';
+import { readingColumn } from '../../../.storybook/reading';
 
 /**
  * The welcome's first card, "What first?", its reads and writes answered by MSW from typed fixtures (`.storybook/fixtures/firstCard.ts`),
@@ -10,6 +11,7 @@ import { FirstCard } from './FirstCard';
 const meta: Meta<typeof FirstCard> = {
   tags: ['network'],
   title: 'Pages/Welcome first card',
+  decorators: [readingColumn],
   args: {},
   parameters: { msw: firstCardStore() },
   render: () => <FirstCard />,

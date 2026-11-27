@@ -2,11 +2,13 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
 import { firstCardStore } from '../../../.storybook/fixtures/firstCard';
 import { YouAreSet } from './YouAreSet';
+import { readingColumn } from '../../../.storybook/reading';
 
 /** "You are set", its reads answered by MSW from typed fixtures (`.storybook/fixtures/firstCard.ts`), one story a state. */
 const meta: Meta<typeof YouAreSet> = {
   tags: ['network'],
   title: 'Pages/You are set',
+  decorators: [readingColumn],
   args: {},
   parameters: { msw: firstCardStore({ succeeded: true }) },
   render: () => <YouAreSet />,

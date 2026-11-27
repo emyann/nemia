@@ -94,15 +94,13 @@ async function frameFits(from: Page) {
     await idle(page);
     const reading = (await spanOf(page)).width;
     if (reading > 768) throw new Refused(`the reading span is ${reading} wide at 2560, past its 48rem measure`);
-    const select = page.getByRole('button', { name: /^Level/ }).first();
-    if (await select.count()) {
-      await movesNothing(
-        page,
-        "Settings' select",
-        () => select.click(),
-        () => expectVisible(page.getByRole('listbox'), 'the select opens'),
-      );
-    }
+    const select = page.locator('[data-nemia-pick] button').first();
+    await movesNothing(
+      page,
+      "Settings' select",
+      () => select.click(),
+      () => expectVisible(page.getByRole('listbox'), 'the select opens'),
+    );
     if (photographing) await photograph(page, path.join(OUT, `frame-grid-settings-2560-${await themeOf(page)}.png`));
   } finally {
     await browser.close();

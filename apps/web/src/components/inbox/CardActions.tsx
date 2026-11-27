@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Ellipsis, X } from 'lucide-react';
-import { Body, Button, IconButton, Menu, SideSheet, Checkbox } from '@/components/ui/ds';
+import { Body, Button, IconButton, Menu, SideSheet, Checkbox, snackbar } from '@/components/ui/ds';
 import { CutComboBox } from '@/components/look';
 import { factoriesQuery } from '@/lib/api/factories';
 import { cardBodyQuery, dropCard, inboxPageQuery, queueCard, setCardAfter, setCardFrom, startCard, type InboxEntry } from '@/lib/api/inbox';
 import { type Started } from '@/lib/api/workflows';
 import { queueable, startedCard, unassigned, type CardRefusal } from '@/lib/inbox';
 import { sayWritten } from '@/lib/written';
+import { copyAndSay, type CopySaid } from '@/lib/useCopy';
 import { FactoryCardStart, UnassignedStart } from '../factory/FactoryCardStart';
 import { ContextPicker } from '../agent/ContextPicker';
 import { ResendCard } from './ResendCard';
@@ -126,8 +127,20 @@ function CardPrimary({
 }
 
 /**
+ * Say in the kit's snackbar what came of copying a card's name: that it copied, or that it could not, so a person selects it instead.
+ * The rest after it says nothing.
+ * @param said What the copy says.
+ * @param name The card's name.
+ */
+const sayCopied = (said: CopySaid, name: string) => {
+  if (said === 'copied') snackbar(`Copied ${name}`);
+  if (said === 'failed') snackbar(`Could not copy ${name}: select it and copy it`);
+};
+
+/**
  * A card's menu, behind one button: Start now, ahead of its chain; Cancel start; Start chain…; Edit; Run it after…; Runs it reads…; Copy
- * its name; Send on; Remove: each where it applies to the card. `chain` is the cards of its chain where the page draws it whole.
+ * its name, which says in the snackbar that it copied or could not, since the menu closes as it copies; Send on; Remove: each where it
+ * applies to the card. `chain` is the cards of its chain where the page draws it whole.
  */
 function CardMenu({
   entry,
@@ -162,7 +175,7 @@ function CardMenu({
     ...(open ? [{ id: 'edit', label: 'Edit', onAction: () => void navigate({ to: '/inbox/$name', params: { name: entry.name } }) }] : []),
     ...(open ? [{ id: 'after', label: 'Run it after…', onAction: () => onSheet('after') }] : []),
     ...(open ? [{ id: 'reads', label: 'Runs it reads…', onAction: () => onSheet('reads') }] : []),
-    { id: 'copy', label: 'Copy its name', onAction: () => void navigator.clipboard?.writeText(entry.name).catch(() => undefined) },
+    { id: 'copy', label: 'Copy its name', onAction: () => copyAndSay(entry.name, (said) => sayCopied(said, entry.name)) },
     ...(startedCard(entry) && entry.error === null ? [{ id: 'send', label: 'Send on', onAction: () => onSheet('send') }] : []),
     ...(entry.file.endsWith('.md') ? [{ id: 'remove', label: 'Remove', onAction: () => remove.mutate() }] : []),
   ];

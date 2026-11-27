@@ -4,12 +4,12 @@
  * Off a real repository, though a wait reads none of it, in the harness's scratch store (`root`), the api and the
  * package's programs given this file's environment (`ENV`).
  *
- * The runs: `a-landed`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
+ * The runs: `a-done`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
  * still working, its branch not merged; `c-cancelled`, called off before anything of it was filed; `x-failed`, whose one step failed.
  * Their children, none filed: `d-waits`, `e-cancelled-parent`, `f-no-such-parent`,
- * `g-parents-landed`, `h-failed-parent`; and `i-started`, a child that started, whose parents are never read again. Their tasks' journals,
+ * `g-parents-done`, `h-failed-parent`; and `i-started`, a child that started, whose parents are never read again. Their tasks' journals,
  * which the engine's views read, say `b-running` and `i-started` were filed an hour and more after they were created, as a run started
- * `--after` runs is once they land, and `a-landed` and `x-failed` when they were created; the engine's feed holds none of it. A pass has
+ * `--after` runs is once they land, and `a-done` and `x-failed` when they were created; the engine's feed holds none of it. A pass has
  * read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { root } from './harness.ts';
@@ -137,12 +137,12 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
 
 const cancelledAt = '2026-09-14T00:20:00.000Z';
 
-branch('wf/a-landed/implement', true);
+branch('wf/a-done/implement', true);
 signedOff('t-a');
-writeRun('a-landed', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-landed/implement' } } });
+writeRun('a-done', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-done/implement' } } });
 branch('wf/b-running/implement', false);
 working('t-b', filedB);
-writeRun('b-running', { after: ['a-landed'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
+writeRun('b-running', { after: ['a-done'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
 writeRun('c-cancelled', { cancelledAt });
 journal('t-x', [
   filed(),
@@ -153,10 +153,10 @@ journal('t-x', [
 ]);
 writeRun('x-failed', { steps: { implement: { taskId: 't-x', workspace: repo, branch: 'wf/x-failed/implement' } } });
 
-writeRun('d-waits', { after: ['a-landed', 'b-running'] });
+writeRun('d-waits', { after: ['a-done', 'b-running'] });
 writeRun('e-cancelled-parent', { after: ['c-cancelled'] });
 writeRun('f-no-such-parent', { after: ['no-such-run'] });
-writeRun('g-parents-landed', { after: ['a-landed'] });
+writeRun('g-parents-done', { after: ['a-done'] });
 writeRun('h-failed-parent', { after: ['x-failed'] });
 working('t-i', filedI);
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
@@ -187,7 +187,7 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
     async () => {
       const runs = await listedRuns();
       const d = runs.get('d-waits')!;
-      assert.deepEqual(d.after, ['a-landed', 'b-running']);
+      assert.deepEqual(d.after, ['a-done', 'b-running']);
       assert.deepEqual(
         d.waiting,
         {
@@ -196,7 +196,7 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
           advice: 'nothing of d-waits is filed until b-running has succeeded; nothing to decide yet',
           waitingOnYou: false,
         },
-        'a-landed has succeeded, so only b-running is waited on',
+        'a-done has succeeded, so only b-running is waited on',
       );
       assert.deepEqual(
         d.steps.map((s) => [s.name, s.message]),
@@ -218,8 +218,8 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
       assert.equal(runs.get('h-failed-parent')!.waiting?.word, 'waiting on x-failed (failed)');
 
       assert.deepEqual(
-        [runs.get('g-parents-landed')!.after, runs.get('g-parents-landed')!.waiting],
-        [['a-landed'], null],
+        [runs.get('g-parents-done')!.after, runs.get('g-parents-done')!.waiting],
+        [['a-done'], null],
         'every parent landed: nothing to wait on, and the next tick files the roots',
       );
       assert.deepEqual(
@@ -227,7 +227,7 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
         [['b-running'], null],
         'started: its parents are not read, whatever they say',
       );
-      assert.deepEqual([runs.get('a-landed')!.after, runs.get('a-landed')!.waiting], [[], null], 'started without --after');
+      assert.deepEqual([runs.get('a-done')!.after, runs.get('a-done')!.waiting], [[], null], 'started without --after');
     },
   );
   s.test("the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`", async () => {
@@ -237,10 +237,10 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
       'd-waits',
       'e-cancelled-parent',
       'f-no-such-parent',
-      'g-parents-landed',
+      'g-parents-done',
       'h-failed-parent',
       'i-started',
-      'a-landed',
+      'a-done',
       'b-running',
       'c-cancelled',
     ]) {
@@ -268,14 +268,11 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
     async () => {
       const runs = await listedRuns();
       const moving = Object.fromEntries(
-        ['d-waits', 'g-parents-landed', 'e-cancelled-parent', 'f-no-such-parent', 'h-failed-parent'].map((id) => [
-          id,
-          runs.get(id)!.moving,
-        ]),
+        ['d-waits', 'g-parents-done', 'e-cancelled-parent', 'f-no-such-parent', 'h-failed-parent'].map((id) => [id, runs.get(id)!.moving]),
       );
       assert.deepEqual(moving, {
         'd-waits': true,
-        'g-parents-landed': true,
+        'g-parents-done': true,
         'e-cancelled-parent': false,
         'f-no-such-parent': false,
         'h-failed-parent': false,
@@ -310,16 +307,16 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
     async () => {
       const runs = await listedRuns();
       const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
-      assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-landed for an hour: that hour is not time at work');
+      assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-done for an hour: that hour is not time at work');
       assert.deepEqual(started('i-started'), [at, filedI]);
-      assert.deepEqual(started('a-landed'), [at, at], 'started, filed when it was created');
-      for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-landed', 'c-cancelled'])
+      assert.deepEqual(started('a-done'), [at, at], 'started, filed when it was created');
+      for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-done', 'c-cancelled'])
         assert.equal(
           runs.get(id)!.startedAt,
           null,
-          `${id}: waiting on runs that may still succeed or never will, or its parents landed and the tick yet to file it: not started`,
+          `${id}: waiting on runs that may still succeed or never will, or its parents succeeded and the tick yet to file it: not started`,
         );
-      for (const id of ['b-running', 'i-started', 'a-landed', 'd-waits']) {
+      for (const id of ['b-running', 'i-started', 'a-done', 'd-waits']) {
         assert.equal((await objectOf(app, id)).status.startedAt, runs.get(id)!.startedAt, id);
       }
     },
@@ -339,7 +336,7 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
       assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);
     }
     assert.deepEqual(
-      await (await app.request('/api/runs/g-parents-landed/decision')).json(),
+      await (await app.request('/api/runs/g-parents-done/decision')).json(),
       { running: true },
       'every parent landed, and not yet filed: it runs, and there is nothing to decide yet',
     );

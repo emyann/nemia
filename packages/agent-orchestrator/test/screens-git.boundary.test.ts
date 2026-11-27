@@ -638,7 +638,7 @@ const waiting = (run: RepositoryRun, branch: string, inFull: unknown[]) => ({
   standings: [`${branch} is ahead of main by 1 commit`],
   collisions: null,
   commands: [
-    ['land it', `git -C ${run.repo} merge --no-ff ${branch}`],
+    ['merge it', `git -C ${run.repo} merge --no-ff ${branch}`],
     ['drop it', `git -C ${run.repo} branch -D ${branch}`],
   ],
 });
@@ -924,7 +924,7 @@ describe('the whole decisions of a run through its tries and on two branches', (
         standings: [`${runBranch} is ahead of main by 1 commit`, `${implementBranch} is ahead of main by 1 commit`],
         collisions: null,
         commands: [
-          ['land it', `git -C ${run.repo} merge --no-ff ${runBranch}`],
+          ['merge it', `git -C ${run.repo} merge --no-ff ${runBranch}`],
           ['drop it', `git -C ${run.repo} branch -D ${runBranch} ${implementBranch}`],
         ],
       });

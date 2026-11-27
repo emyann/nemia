@@ -12,7 +12,7 @@ Install Nemia with one line, on:
 Each Nemia release is one archive per platform. It includes its own Node, the code, the production dependencies, the board's built
 pages, and the templates. It doesn't include a harness: you activate one afterwards ([Activate a harness](#activate-a-harness)).
 Nothing else is installed system-wide, and you don't need root. [Getting started](/getting-started/) takes a first laptop install
-through to a first landed change. [On a server](#on-a-server) explains what changes on a dedicated machine, and
+through to a first run that succeeded. [On a server](#on-a-server) explains what changes on a dedicated machine, and
 [Self-hosting](/self-hosting/) takes such a machine from fresh to a factory's first run, GitHub included.
 
 ## Install
@@ -342,7 +342,7 @@ A factory's MCP server can sign in from your own browser wherever the daemon run
 open the page it gives you, and approve. Your browser is then sent to an address like
 `http://localhost:8791/callback?code=…&state=…`, which doesn't load, since nothing on your laptop is listening for it. Copy that
 address from the browser's address bar, paste it into the field the board shows under the waiting sign-in, _the address your browser
-landed on_, and click _Complete_. The daemon passes it to the waiting sign-in, and the server shows `connected`. The address contains
+was sent to_, and click _Complete_. The daemon passes it to the waiting sign-in, and the server shows `connected`. The address contains
 a one-time code, and Nemia never logs or stores it.
 
 Alternatively, forward the port over SSH and open the page on your laptop, so the callback reaches the server itself:

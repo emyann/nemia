@@ -1,6 +1,6 @@
 /**
  * The commands `nemia decide` offers (`choicesOf`): each offer's bare command beside its sentence, a gate's approval and send-backs, and
- * land it and drop it, read it or forget it by the run's place — none on a run that awaits nobody. And who gave a person's word, said
+ * merge it and drop it, read it or forget it by the run's place — none on a run that awaits nobody. And who gave a person's word, said
  * after its line (`saidBy`).
  */
 import { describe, test } from 'vitest';
@@ -67,7 +67,7 @@ describe('choicesOf', () => {
       choicesOf(STEPS, RUN, awaiting(), offers).map((c) => [c.label, c.command, c.said, c.step]),
       [
         ...offers.map((o, i) => [labels[i], o.command, o.said, o.step]),
-        ['land it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
+        ['merge it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
         ['drop it', 'git -C /code/app branch -D wf/r-1/implement', null, null],
       ],
     );
@@ -91,7 +91,7 @@ describe('choicesOf', () => {
       { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
     ]);
   });
-  test('a workflow whose step merges is offered no land it nor drop it', () => {
+  test('a workflow whose step merges is offered no merge it nor drop it', () => {
     const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as StepSpec[];
     assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   });
@@ -113,7 +113,7 @@ describe('choicesOf', () => {
   });
   for (const [row, decided] of [
     ['a running run is offered nothing', { kind: 'running', waiting: ['implement'] }],
-    ['a landed run is offered nothing', { kind: 'landed', branches: ['wf/r-1/implement'] }],
+    ['a landed run is offered nothing', { kind: 'merged', branches: ['wf/r-1/implement'] }],
   ] as Array<[string, Decision]>) {
     test(row, () => {
       assert.deepEqual(choicesOf(STEPS, RUN, decided, [offer('nemia retry r-1 implement')]), []);

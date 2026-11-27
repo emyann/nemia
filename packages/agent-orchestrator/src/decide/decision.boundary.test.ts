@@ -353,7 +353,7 @@ describe("a finished run's decision: what its branch touched, the lesson, the di
       assert.deepEqual(
         body.commands,
         [
-          { label: 'land it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null, step: null },
+          { label: 'merge it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null, step: null },
           { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null, step: null },
         ],
         'printed, never run',
@@ -481,7 +481,7 @@ describe('the commands a decision offers are bare `nemia` lines, by the state th
     const body = await decidable('r-d9');
     assert.deepEqual(
       body.commands
-        .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
+        .filter((c: { label: string }) => c.label !== 'merge it' && c.label !== 'drop it')
         .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
       [
         { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
@@ -796,7 +796,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
   );
   assert.deepEqual(
     decided.commands.map((c: { label: string }) => c.label),
-    ['once more', 'land it', 'drop it'],
+    ['once more', 'merge it', 'drop it'],
   );
 });
 

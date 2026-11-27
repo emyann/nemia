@@ -20,7 +20,7 @@ export type CheckoutHold = { run: string; step: string };
  * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: base` step that works there,
  * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
  * the time of the word that would file it (`claimedAt`): a person's approval or ask, or the run's creation for an ending its workflow
- * files with no gate, and for the try the run files itself of an ending whose try landed no commit. That time orders the runs waiting
+ * files with no gate, and for the try the run files itself of an ending whose try made no commit. That time orders the runs waiting
  * for it.
  */
 export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
@@ -82,14 +82,14 @@ export type RunSlot = { inFlight: number; cap: number };
  * @param run The run's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
  * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the checkout or the pause holds.
- * @param landed Whether the run of that id has succeeded or been released, which a run waiting on runs (`--after`) asks.
+ * @param released Whether the run of that id has succeeded or been released, which a run waiting on runs (`--after`) asks.
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
-  landed: (runId: string) => boolean,
+  released: (runId: string) => boolean,
   steps: readonly Pick<StepSpec, 'slot'>[] = [],
 ) {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
@@ -99,7 +99,7 @@ export function slotNeed(
     0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
-    wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, landed),
+    wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, released),
   };
 }
 

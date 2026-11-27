@@ -508,7 +508,7 @@ What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.32
 
 - **`Query.mcpSubmitOAuthCallbackUrl(name, callbackUrl)` is now relied on**, for a browser that runs on another machine than the
   daemon, whose redirect to `http://localhost:<callbackPort>/callback` never reaches the Claude Code child listening there: the person
-  pastes the address the browser landed on, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322, 0.3.323 and 0.3.325
+  pastes the address the browser was sent to, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322, 0.3.323 and 0.3.325
   (`mcpSubmitOAuthCallbackUrl(e,t)`, a control request of the subtype `mcp_oauth_callback_url` carrying `serverName` and
   `callbackUrl`), and it is absent from `sdk.d.ts` and from the SDK's TypeScript reference, so it is called through the one
   `Authenticating` type, as `mcpAuthenticate` is, and a missing method throws naming `sdk.mjs`. The table above measured it refusing a

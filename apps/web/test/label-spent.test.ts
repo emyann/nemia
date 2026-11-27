@@ -6,8 +6,8 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spentOf } from '../src/lib/api/labels.ts';
 
-const stats = (costs: (number | null)[], costPerLanded: number | null = null) => ({
-  all: { total: { runs: costs.length, landed: null, costPerLanded }, steps: costs.map((costUsd) => ({ costUsd })) },
+const stats = (costs: (number | null)[], costPerMerged: number | null = null) => ({
+  all: { total: { runs: costs.length, merged: null, costPerMerged }, steps: costs.map((costUsd) => ({ costUsd })) },
 });
 
 describe('the label page spends what every step of its runs cost, landed or not, and says none where none was measured', () => {

@@ -92,7 +92,7 @@ test("the verbs' bodies are taken by the Api's endpoints as the api is sent them
 
 test('REFUSED: a card whose state is no card state, whose kind is another, or a filing with no body', () => {
   const decode = Schema.decodeUnknownSync(Card);
-  assert.throws(() => decode({ ...filed, status: { ...filed.status, state: 'landed' } }));
+  assert.throws(() => decode({ ...filed, status: { ...filed.status, state: 'shipped' } }));
   assert.throws(() => decode({ ...filed, kind: 'Run' }));
   assert.throws(() => Schema.decodeUnknownSync(CardFile)({ workflow: 'build' }));
   assert.throws(() => Schema.decodeUnknownSync(CardFile)({ body: 'x', from: 'elsewhere' }));

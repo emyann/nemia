@@ -283,7 +283,7 @@ function slotWaitOf(run: Run, views: ReadonlyMap<string, Filed>) {
  * run none of whose tasks' views says one. Pure.
  *
  * Not the record's `createdAt`: a run started `--after` runs, or held for a run slot, is created long before anything of it is filed. And
- * not when its parents landed, which nothing writes down: the tick files the roots on the pass that reads them landed.
+ * not when its parents succeeded, which nothing writes down: the tick files the roots on the pass that reads them succeeded.
  * @param run The run whose tries' tasks are read.
  * @param views What the engine knows of when each task was filed, by task id.
  */

@@ -8,7 +8,7 @@ export default {
    * The other side of an ending's gate: approved, run in the checkout, and the branch merged — so there is nothing left to decide. The run
    * is pruned since, its files with it: its facts say when, what it freed and what it kept, and its steps still read as they ended.
    */
-  name: 'landed',
+  name: 'merged',
   route: `/runs/${LANDED.id}`,
   expect: async (page) => {
     await sidebar(page);

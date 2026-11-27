@@ -444,7 +444,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
       const stats = JSON.parse(JSON.stringify(await stage.main(['stats', '--json']))) as Stats;
       const { total } = stats.all;
       assert.deepEqual(
-        [total.runs, total.landed, total.firstTry, total.rounds, total.refused],
+        [total.runs, total.merged, total.firstTry, total.rounds, total.refused],
         [1, 1, 1, 2, 1],
         'landed on its first try, two rounds, a check refused',
       );

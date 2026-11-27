@@ -218,7 +218,7 @@ async function endings(stage: Stage, root: string) {
     /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
     aPass: (e: Engine) => stage.runWith(e, passStanding(rooted.runs.list())),
     /** Whether `branch` of `r` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
-    isLanded: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).landed(r, branch),
+    isLanded: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).merged(r, branch),
     /** Every branch of a run's repository and its commit, asked of this test's place now (`headsNow`). */
     liveHeads: (r: RepositoryRun) => headsNow(r, stage.place().place),
     /** A run this file started on a repository: a repository run. */
@@ -484,7 +484,7 @@ describe("a run waits at its ending's gate, is approved, stages its merge, lands
     assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
     assert.notEqual(world().head(repo), base);
     await at.aPass(e);
-    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
+    assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'merged');
   });
   s.test(
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",
@@ -519,7 +519,7 @@ describe('a landing a pass reads again — after a restart, under a pause, or wi
       assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { commit: head }, "the next pass reads the result on the checkout's HEAD");
       assert.equal(world().head(repo), head, 'nothing committed again');
       await at.aPass(stage.board().e);
-      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
+      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'merged');
     },
   );
   s.test('a refused merge aborted by hand is recorded as nothing landed', async () => {
@@ -995,7 +995,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       assert.equal(world().head(repo), base);
       assert.deepEqual(runRecord(ROOT, id).steps.ship.landed, { aborted: 'ship ended blocked with its merge staged' });
       assert.ok(
-        pass.notes.includes('ship: ship ended blocked with its merge staged, so the run aborted its merge; nothing landed on main'),
+        pass.notes.includes('ship: ship ended blocked with its merge staged, so the run aborted its merge; nothing merged into main'),
         pass.notes.join('\n'),
       );
     },
@@ -1033,7 +1033,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       const { id, decided, awaiting, d } = checked;
       assert.deepEqual([awaiting.unfinishedCheck, awaiting.failedCheck], [['ship'], []]);
       assert.deepEqual(decided.offers, [
-        `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry ${id} ship`,
+        `ship: its check did not finish, so the run aborted the merge and nothing merged into main. Merge and check again:  nemia retry ${id} ship`,
       ]);
       const check = decided.checks.ship;
       assert.deepEqual(check && [check.command, verdictWord(check.verdict), check.passed, check.stdout], [
@@ -1053,7 +1053,7 @@ describe('an ending that stops on its own word, or whose check refuses the merge
       const { id, decided, awaiting, d, base } = checked;
       assert.deepEqual([awaiting.unfinishedCheck, awaiting.failedCheck], [[], ['ship']]);
       assert.deepEqual(decided.offers, [
-        `ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (--fresh, or --model <m>, for a new session)`,
+        `ship: failed (check) — nothing merged into main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (--fresh, or --model <m>, for a new session)`,
       ]);
       const check = decided.checks.ship;
       assert.deepEqual(check && [check.command, verdictWord(check.verdict), check.passed, check.stdout], [
@@ -1109,20 +1109,21 @@ describe('a result a person merged by hand before its ending ran: the run has la
         [ship.message, ship.note],
         [
           'awaiting approval',
-          `${branch} is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
+          `${branch} is on main — nothing is left for ship to merge: every branch is merged as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
         ],
       );
     },
   );
   s.test(
-    'the decision says the same before anybody closes the record: landed, its ending never run, and no approval above a branch on main',
+    'the decision says the same before anybody closes the record: merged, its ending never run, and no approval above a branch on main',
     async () => {
       const { id, branch } = gate;
       const { decision } = await stage.runWith(e(), decideRun(id));
-      assert.deepEqual([decision.kind, decision.kind === 'landed' ? decision.branches : []], ['landed', [branch]]);
-      assert.deepEqual((await decisionOn(stage, id)).decision, {
-        nothing: `landed — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${id}`,
-      });
+      assert.deepEqual([decision.kind, decision.kind === 'merged' ? decision.branches : []], ['merged', [branch]]);
+      const decided = (await decisionOn(stage, id)).decision;
+      const said = 'nothing' in decided ? decided.nothing : '';
+      assert.match(said, new RegExp(`^awaiting approval — ${branch} merged into main\\n  ship never ran`));
+      assert.ok(said.endsWith(`nemia cancel ${id}`));
     },
   );
   s.test('REFUSED at shipped defaults: `nemia approve` names `nemia cancel` instead, and writes nothing', async () => {
@@ -1468,7 +1469,7 @@ describe('two runs of one repository land close together: each records the commi
       assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
       assert.equal(world().head(repo), mergedB, 'nothing committed by the run');
       await at.aPass(e());
-      assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
+      assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'merged');
     },
   );
   s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {

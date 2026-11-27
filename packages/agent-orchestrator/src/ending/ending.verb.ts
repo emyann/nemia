@@ -245,7 +245,7 @@ export const landEnding = Effect.fnUntraced(function* (
   const refused = abortedThrough(run, memo);
   if (refused) return again(`${due.why}, and the run could not abort its merge (${refused})`);
   const aborted = { aborted: due.why, ...(due.refusedOn ? { refusedOn: due.refusedOn } : {}) };
-  return write(aborted, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
+  return write(aborted, `${due.why}, so the run aborted its merge; nothing merged into ${run.branch}`);
 });
 
 /**
@@ -272,7 +272,7 @@ function committedThrough(run: RepositoryRun, message: string, memo: StatusMemo)
     return { again: `${why}; and the run could not abort the merge either (${refused})` } satisfies
       | { landed: LandingRecord; note: string }
       | { again: string } as { landed: LandingRecord; note: string } | { again: string };
-  return { landed: { aborted: why }, note: `${why}, so the run aborted the merge; nothing landed on ${run.branch}` } satisfies
+  return { landed: { aborted: why }, note: `${why}, so the run aborted the merge; nothing merged into ${run.branch}` } satisfies
     | { landed: LandingRecord; note: string }
     | { again: string } as { landed: LandingRecord; note: string } | { again: string };
 }

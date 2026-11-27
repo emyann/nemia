@@ -1,16 +1,19 @@
 /**
  * The store's milestones read now (`milestonesNow`), each off what the store holds, the needs' readings planted in this process's memory
  * (`NeedsMemory`) and the runs on the Run door's memory: an empty store has the harness next and the rest later; a harness installed and
- * signed in, a factory filed, a writable volume that is there, no mount refuses and every harness trusts, and a run whose step landed a
- * commit each make theirs done; a read-only volume, an untrusted one and one a mount would refuse do not.
+ * signed in, a factory filed, a writable volume that is there, no mount refuses and every harness trusts, and a run that succeeded as
+ * `nemia ls` says it each make theirs done; a read-only volume, an untrusted one and one a mount would refuse do not.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { aRun } from '../../test/run-walks.ts';
+import { eachTest } from '../../test/placed.ts';
+import { engineOf, EngineService } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { testPlace } from '../../place/memory/index.ts';
@@ -23,6 +26,8 @@ import { trustPlaces } from '../trust/trust.verb.ts';
 import { volumeWaitsOnTrust } from './milestones.ts';
 import { milestonesNow } from './milestones.verb.ts';
 
+const engine = eachTest(testEngine);
+
 /** The milestones of the store `root`, its harness's needs read `harness`, its runs `runs`, as the read answers them. */
 const milestonesOf = (root: string, harness: 'met' | 'missing', runs: readonly Run[] = []) => {
   const memo = needsMemo(root);
@@ -34,7 +39,7 @@ const milestonesOf = (root: string, harness: 'met' | 'missing', runs: readonly R
   const read = Effect.runSync(
     Effect.provide(
       Effect.provideService(Effect.provideService(program, StoreRoot, root), NeedsMemory, memo),
-      Layer.mergeAll(runDoorMemory(), PlaceService.layer(testPlace().place)),
+      Layer.mergeAll(runDoorMemory(), PlaceService.layer(testPlace().place), EngineService.layer(engineOf(engine().layer))),
     ),
   );
   return read.milestones;
@@ -50,15 +55,15 @@ describe('a store meets its milestones in order, each read from what it holds no
       harness: 'next',
       factory: 'later',
       volume: 'later',
-      landed: 'later',
+      succeeded: 'later',
     });
   });
-  test('a harness signed in, a factory filed, a writable volume mounted and trusted, and a run landed are each done', () => {
+  test('a harness signed in, a factory filed, a writable volume mounted and trusted, and a run that succeeded are each done', () => {
     const root = scratch('wf-milestones-');
     assert.equal(statesOf(root, 'met').harness, 'done');
     assert.equal(statesOf(root, 'met').factory, 'next');
     createFactoryAt(root, { name: 'acme', volumes: [], workflows: [], hires: {}, schedules: {} });
-    assert.deepEqual(statesOf(root, 'met'), { harness: 'done', factory: 'done', volume: 'next', landed: 'later' });
+    assert.deepEqual(statesOf(root, 'met'), { harness: 'done', factory: 'done', volume: 'next', succeeded: 'later' });
     const shelf = scratch('wf-milestones-volume-');
     createFactoryAt(root, {
       name: 'shelved',
@@ -74,9 +79,10 @@ describe('a store meets its milestones in order, each read from what it holds no
     assert.deepEqual([waiting?.state, waiting?.message], ['next', volumeWaitsOnTrust('worked')]);
     Effect.runSync(trustPlaces([work]).pipe(Effect.provide(PlaceService.layer(testPlace().place))));
     assert.equal(statesOf(root, 'met').volume, 'done');
-    const run = aRun('r-landed');
-    const landed: Run = { ...run, steps: { ...run.steps, implement: { taskId: 'r-landed-implement', landed: { commit: 'abc' } } } };
-    assert.deepEqual(statesOf(root, 'met', [landed]), { harness: 'done', factory: 'done', volume: 'done', landed: 'done' });
+    const done: Run = { ...aRun('r-done'), workflow: [], steps: {} };
+    assert.equal(statesOf(root, 'met', [done]).succeeded, 'done', 'a run with no ending step counts once its status is succeeded');
+    const called: Run = { ...done, id: 'r-called', cancelledAt: '2026-09-02T00:00:00.000Z' };
+    assert.equal(statesOf(root, 'met', [called]).succeeded, 'next', 'a run called off is not one that succeeded');
   });
   test('REFUSED: a volume a mount would refuse is no milestone', () => {
     const root = scratch('wf-milestones-');

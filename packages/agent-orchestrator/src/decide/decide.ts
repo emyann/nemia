@@ -35,22 +35,22 @@ import { checksPhase } from '../check/index.ts';
  * the repository to an answer. So the run ends by handing the choice over, deliberately, instead
  * of settling `succeeded` and going quiet.
  *
- * `landed` is ASKED, not stored. Whether the work landed is a question git can already answer —
+ * `merged` is ASKED, not stored. Whether the work merged is a question git can already answer —
  * is the result branch an ancestor of the base branch — and a stored decision would be a second
  * copy of it, wrong the moment somebody merges by hand. A run still holds no status of its own;
  * cancellation remains the single exception, and it is one because nothing else knows it.
  *
  * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
  * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
- * as landed, a run whose last step failed with nothing committed would say `landed`: `nemia decide` would
- * hide the failure. So `landed` says which yes it is (`Landed`). A run waiting on this one reads none of it: it waits for the run to
+ * as merged, a run whose last step failed with nothing committed would say `merged`: `nemia decide` would
+ * hide the failure. So `merged` says which yes it is (`Merged`). A run waiting on this one reads none of it: it waits for the run to
  * succeed
- * (`waitStanding`), not for its branch to land.
+ * (`waitStanding`), not for its branch to merge.
  */
 export type Decision =
   | { kind: 'running'; waiting: string[] }
   | { kind: 'cancelled'; at: string }
-  | { kind: 'landed'; branches: string[] }
+  | { kind: 'merged'; branches: string[] }
   | {
       kind: 'awaiting';
       outcome: Extract<RunStatusWord, 'succeeded' | 'failed' | 'waiting'>;
@@ -92,18 +92,18 @@ export type Decision =
     };
 
 /**
- * Whether a result branch is on the run's base branch, as its place's `standing` says it (`landed` on a `BranchReader`):
+ * Whether a result branch is on the run's base branch, as its place's `standing` says it (`merged` on a `BranchReader`):
  *
  *   false        it is not
  *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut
  *   true         it is, with commits past the run's base: work a person merged
  *
- * `decision` calls a run landed on `true` whatever its steps said, and on `'unchanged'` only when every
- * step succeeded: a branch that never moved says nothing landed, and a run that failed or waits on a
- * person has not landed for having nothing to merge. Neither while a step waits at its gate: the gate
+ * `decision` calls a run merged on `true` whatever its steps said, and on `'unchanged'` only when every
+ * step succeeded: a branch that never moved says nothing merged, and a run that failed or waits on a
+ * person has not merged for having nothing to merge. Neither while a step waits at its gate: the gate
  * is a person's word on the record, and a merge is not that word — a run `--after` it waits for both.
  */
-export type Landed = boolean | 'unchanged';
+export type Merged = boolean | 'unchanged';
 
 /** Whether a step's task is still live, `pending` or `running`: never for a step with no task. */
 function liveTask(taskId: string | null | undefined, phaseOf: (taskId: string) => TaskPhase) {
@@ -116,16 +116,16 @@ function refusedOwnCheck(run: Run, name: string, phaseOf: (taskId: string) => Ta
   return check !== undefined && refusedCheck(checksPhase(check, phaseOf), verdictOf(name));
 }
 
-/** `landed`, asked once per branch: a second call for the same branch returns what the first read. */
-function once(landed: (branch: string) => Landed) {
-  const said = new Map<string, Landed>();
+/** `merged`, asked once per branch: a second call for the same branch returns what the first read. */
+function once(merged: (branch: string) => Merged) {
+  const said = new Map<string, Merged>();
   return ((branch) => {
     const known = said.get(branch);
     if (known !== undefined) return known;
-    const read = landed(branch);
+    const read = merged(branch);
     said.set(branch, read);
     return read;
-  }) satisfies (branch: string) => Landed;
+  }) satisfies (branch: string) => Merged;
 }
 
 /**
@@ -136,11 +136,11 @@ function once(landed: (branch: string) => Landed) {
  * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
  * repository's own checkout (`waitsOnCheckout`), a step the next tick tries again and a loop going round again.
  *
- * A run that worked directly on its base branch is never asked whether it landed: git's answer is always yes. Every result branch is
- * asked, not some — a fan-out that ends in two branches has not landed because one did — each once, and none after the first that is
- * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not landed while one does, save
+ * A run that worked directly on its base branch is never asked whether it merged: git's answer is always yes. Every result branch is
+ * asked, not some — a fan-out that ends in two branches has not merged because one did — each once, and none after the first that is
+ * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not merged while one does, save
  * an ending at its gate that has not run whose result git already has (`resultOnBase`): the merge its gate holds was made by hand, so
- * the run is landed, since its approval is refused with nothing left to merge.
+ * the run is merged, since its approval is refused with nothing left to merge.
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
@@ -150,10 +150,10 @@ function once(landed: (branch: string) => Landed) {
  * Off the one read of the run (`AssessRead`) and its assessment (`assessed`, `assess` on that read where a caller has not judged it): each
  * step's standing is the assessment's (`stepWords`), so `nemia decide` stands no step the pass does not.
  * @param read The one read of the run: its steps, its record and what the store says of each of its tasks.
- * @param landed Asks git whether a result branch is on the base branch.
+ * @param merged Asks git whether a result branch is on the base branch.
  * @param assessed The run's assessment off `read`; `assess` on it by default.
  */
-export function decision(read: AssessRead, landed: (branch: string) => Landed, assessed: Assessment = assess(read)) {
+export function decision(read: AssessRead, merged: (branch: string) => Merged, assessed: Assessment = assess(read)) {
   const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf, checkout } = read;
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt } satisfies Decision;
 
@@ -180,7 +180,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
 
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
-  const stands = once(landed);
+  const stands = once(merged);
   const atGate = waitingAtGates(steps, run, statusOf, runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf));
   const byHand =
     atGate.length > 0 &&
@@ -190,7 +190,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
     branches.every((b) => stands(b) !== false);
   const awaitingApproval = byHand ? [] : atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(stands);
-  if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches } satisfies Decision;
+  if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'merged', branches } satisfies Decision;
 
   const named = (...want: StepStatus[]) =>
     [...standingOf]
@@ -223,7 +223,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
           awaitingApproval.length
         ? 'waiting'
         : 'succeeded';
-  if (onBase && outcome === 'succeeded') return { kind: 'landed', branches } satisfies Decision;
+  if (onBase && outcome === 'succeeded') return { kind: 'merged', branches } satisfies Decision;
   return {
     kind: 'awaiting',
     outcome,
@@ -309,7 +309,7 @@ export function runCostWords(run: Run, spendOf: SpendOf) {
 export type Offer = { step: string; command: string; said: string };
 
 /**
- * A command `nemia decide` offers, and runs none of: land it, drop it, read it for a run worked on its base branch, forget it for a folder
+ * A command `nemia decide` offers, and runs none of: merge it, drop it, read it for a run worked on its base branch, forget it for a folder
  * run, each once-more (`nemia retry`, `nemia retry --round`), approve (`nemia approve` of a loop) and refresh (`nemia refresh --base`)
  * with the line it prints it in, and for a step waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry
  * --message`) for each step it names. `said` is null where the label is all it says; `step`, the step it acts on, null for a command on
@@ -378,10 +378,10 @@ function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly str
 
 /**
  * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, approve or a send-back for each
- * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then land it and drop
+ * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then merge it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
  * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
- * (`merges`) is offered no land it nor drop it: its ending step is what merges, one approval away.
+ * (`merges`) is offered no merge it nor drop it: its ending step is what merges, one approval away.
  *
  * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
  * @param steps The workflow's steps.
@@ -411,7 +411,7 @@ export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, off
   if (!first) return once satisfies DecideCommand[];
   return [
     ...once,
-    { label: 'land it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
+    { label: 'merge it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
     { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null, step: null },
   ] satisfies DecideCommand[];
 }

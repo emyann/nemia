@@ -39,14 +39,14 @@ git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'base');
 const base = git(repo, 'rev-parse', 'HEAD').trim();
 
-/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `landed`. */
-function worked(branch: string, landed = false) {
+/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `merged`. */
+function worked(branch: string, merged = false) {
   git(repo, 'checkout', '-q', '-b', branch);
   write(path.join(repo, `${branch.replaceAll('/', '-')}.txt`), branch);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', `the work of ${branch}`);
   git(repo, 'checkout', '-q', 'main');
-  if (landed) git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
+  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
 }
 
 const at = '2026-09-28T09:00:00.000Z';

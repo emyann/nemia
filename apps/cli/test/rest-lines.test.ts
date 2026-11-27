@@ -16,11 +16,11 @@ import { healthLines, statsLine, statsLines, type StatsRead } from '../src/comma
 const headline = (more: Partial<StatsHeadline> = {}) =>
   ({
     runs: 0,
-    landed: null,
+    merged: null,
     rounds: null,
     firstTry: null,
-    costPerLanded: null,
-    timePerLanded: null,
+    costPerMerged: null,
+    timePerMerged: null,
     tries: 0,
     refused: 0,
     gateWaitMs: null,
@@ -257,7 +257,7 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
   test('the recap line is one line, — where no round or landing was measured', () => {
     assert.equal(empty.split('\n').length, 1);
     assert.match(empty, /— \(—\) rounds/);
-    assert.match(empty, /— \(—\) landed/);
+    assert.match(empty, /— \(—\) merged/);
     assert.match(empty, /— \(—\) skills loaded$/);
   });
   test('an empty store says nothing has ended, and no recap line', () => {
@@ -265,7 +265,7 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
     assert.ok(words.includes('no try has ended, and no run has finished'), words.join('\n'));
     assert.ok(!words.some((l) => l.includes('runs finished')));
   });
-  test('the day row reads — under landed where no run recorded it, not 0', () => {
+  test('the day row reads — under merged where no run recorded it, not 0', () => {
     const day = { ...headline({ runs: 2, tries: 2 }), day: '2026-09-28' };
     hasLine(statsLines(stats(group({ days: [day] }), { from: '2026-09-28' })), /^2026-09-28\s+2\s+—\s/);
   });

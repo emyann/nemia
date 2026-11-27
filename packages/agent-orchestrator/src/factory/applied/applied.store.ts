@@ -415,7 +415,7 @@ export function readResolutions(home: string, name: string) {
 /**
  * The choices of `resolutions` that apply to the merge `merge` (`choicesApply`): those made for its version, its template or one no name
  * was recorded for, and its base; none else, so a choice made for one template is never applied to another's merge, nor one made before
- * a merge landed to the next change at the same version.
+ * a merge since made to the next change at the same version.
  * @param resolutions The person's choices as read, or undefined where there are none.
  * @param merge The merge the choices are asked for: its version, template and base.
  */

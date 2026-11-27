@@ -99,10 +99,11 @@ export type InboxStart = {
   /** The card trigger that queued the card, which the run records as where it came from (`from.trigger`): the queue's start alone. */
   trigger?: string;
   /**
-   * Whether a run has landed, read once for the start: given, the cards of the card's `after:` not landed are answered on `waitedOn`, and
+   * Whether a run has succeeded or been released, read once for the start: given, the cards of the card's `after:` not released are
+   * answered on `waitedOn`, and
    * the card started all the same; absent, none is read.
    */
-  landed?: RunLanded;
+  released?: RunReleased;
 };
 
 /**
@@ -114,7 +115,8 @@ export type InboxStart = {
  * run is started all the same, on the repository its factory places it on, and the line says the path was not read: said, not refused,
  * since an old card on disk would be stranded by a refusal.
  *
- * `waitedOn` is the cards of its `after:` that had not landed, on a start that is not the queue's (`landed` given): a person's start goes
+ * `waitedOn` is the cards of its `after:` that had not released their waiters, on a start that is not the queue's (`released` given): a
+ * person's start goes
  * ahead of the wait, and says so.
  */
 type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: string; queueLeft?: string; waitedOn?: string[] };
@@ -266,7 +268,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const context = cardContext(card, opts, (id) => ids.has(id));
 
   const cardFiles = yield* cardFilesAt(yield* StoreRoot, card);
-  const waitedOn = yield* waitedOnNow(card, opts.landed);
+  const waitedOn = yield* waitedOnNow(card, opts.released);
 
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
@@ -438,7 +440,7 @@ const triggeredStart = (card: Pick<InboxListing, 'workflow' | 'queued'>) => {
  * Whether a run has released its waiters — it succeeded, or a person released them (`keptParent` over a pass's `Parents`, so each run is
  * read once): what the cards' waits read through. A read that fails releases nothing: the card waits, and the next pass reads it again.
  */
-export type RunLanded = (run: string) => Effect.Effect<boolean>;
+export type RunReleased = (run: string) => Effect.Effect<boolean>;
 
 /**
  * Whether each run has released its waiters, read through `parents` with the engine `e`, each run once for as long as `parents` stands
@@ -452,10 +454,10 @@ export const releasedThrough = (e: Engine, parents: Parents) =>
       Effect.map((p) => p.standing.kind === 'released'),
       over(e),
       Effect.orElseSucceed(() => false),
-    )) satisfies RunLanded;
+    )) satisfies RunReleased;
 
-/** A run's landing that reads none: every run is read as not landed, so a card that waits on a known card is never started for it. */
-const NONE_LANDED: RunLanded = () => Effect.succeed(false);
+/** A run's release that reads none: every run is read as not released, so a card that waits on a known card is never started for it. */
+const NONE_RELEASED: RunReleased = () => Effect.succeed(false);
 
 /**
  * The names of the cards the inbox's cards not yet started wait on (`after:`), each once; none where no such card names one.
@@ -475,16 +477,16 @@ const namedAfter = (files: readonly PlanFile[], started: (name: string) => boole
  * What the listing reads of the cards a card waits on (`Waiting`), or undefined where no card not yet started names one in its `after:`,
  * which then costs nothing. From each card named, through the cards each run of it passed its work on to — the card each workflow node of
  * its steps filed (`StepRecord.sent`) and the card it was sent on as (`resentCardName`) where the inbox has it — each card's runs are read
- * for whether they landed, each once (`landed`). A name is known where the inbox has a card of it or a run was started from it.
+ * for whether they were released, each once (`released`). A name is known where the inbox has a card of it or a run was started from it.
  * @param files The inbox folder's entries, each with its text.
  * @param runs The store's runs, with the cards they were started from and their steps.
- * @param landed Whether a run has landed, read once for the pass.
+ * @param released Whether a run has succeeded or been released, read once for the pass.
  * @param phaseOf A run's phase as read now, by id; undefined where it was not read.
  */
 export const waitingOf = Effect.fnUntraced(function* (
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from' | 'steps'>[],
-  landed: RunLanded,
+  released: RunReleased,
   phaseOf: (run: string) => RunPhase | undefined = () => undefined,
 ) {
   const byCard = new Map<string, Pick<Run, 'id' | 'from' | 'steps'>[]>();
@@ -507,7 +509,7 @@ export const waitingOf = Effect.fnUntraced(function* (
     const own = byCard.get(name) ?? [];
     const onward = [...new Set(own.flatMap(onwardOf))];
     const ran: { id: string; released: boolean }[] = [];
-    for (const run of own) ran.push({ id: run.id, released: yield* landed(run.id) });
+    for (const run of own) ran.push({ id: run.id, released: yield* released(run.id) });
     looks.set(name, { known: inInbox.has(name) || own.length > 0, runs: ran, onward });
     queue.push(...onward);
   }
@@ -519,16 +521,17 @@ export const waitingOf = Effect.fnUntraced(function* (
 });
 
 /**
- * The cards of `card`'s `after:` that have not landed, by name, as the inbox lists them now: what a start by hand answers on `waitedOn`.
+ * The cards of `card`'s `after:` that have not released their waiters, by name, as the inbox lists them now: what a start by hand
+ * answers on `waitedOn`.
  * @param card The card started.
- * @param landed Whether a run has landed; none read, and no card answered, where not given.
+ * @param released Whether a run has succeeded or been released; none read, and no card answered, where not given.
  */
-const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, landed: RunLanded | undefined) {
-  if (landed === undefined || !card.after?.length) return [];
+const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, released: RunReleased | undefined) {
+  if (released === undefined || !card.after?.length) return [];
   const door = yield* CardDoor;
   const files = yield* door.cards.entries();
   const runs = yield* (yield* RunDoor).runs.list();
-  const listed = cardsListed(files, runs, new Map(), new Map(), undefined, yield* waitingOf(files, runs, landed));
+  const listed = cardsListed(files, runs, new Map(), new Map(), undefined, yield* waitingOf(files, runs, released));
   return (listed.find((l) => l.name === card.name)?.waits ?? []).map((w) => w.card);
 });
 
@@ -545,19 +548,20 @@ type StalledWait = { factory: string; card: string; waits: string[] };
  * record of its own: a card's runs are the pass's `runs`, so a pass costs what is in flight; no clash where no factory has a card
  * trigger, and no wait where no card names one.
  * @param runs The runs the pass read, which say which cards were started and what each passed its work on to.
- * @param landed Whether a run has landed, read once for the pass; none read, every run as not landed, where not given.
+ * @param released Whether a run has succeeded or been released, read once for the pass; none read, every run as not released, where not
+ * given.
  * @param phaseOf A run's phase as the pass judged it, by id; undefined where it was not.
  */
 export const inboxNow = Effect.fn('inboxNow')(function* (
   runs: readonly Pick<Run, 'id' | 'from' | 'steps'>[],
-  landed: RunLanded = NONE_LANDED,
+  released: RunReleased = NONE_RELEASED,
   phaseOf?: (run: string) => RunPhase | undefined,
 ) {
   const door = yield* CardDoor;
   const files = yield* door.cards.entries();
   const factories = yield* readableFactories();
   const triggering = yield* triggeringOf(files, factories.values());
-  const waiting = yield* waitingOf(files, runs, landed, phaseOf);
+  const waiting = yield* waitingOf(files, runs, released, phaseOf);
   if (triggering === undefined && waiting === undefined) return { clashes: [], stalled: [] };
   const listed = cardsListed(files, runs, yield* door.tries.list(), factories, triggering, waiting);
   const clashes = listed.flatMap((l) =>
@@ -587,17 +591,21 @@ export const inboxNow = Effect.fn('inboxNow')(function* (
  * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer
  * queued as it was is removed on the way, or on a later pass when it cannot be.
  *
- * A card that waits on a card of its `after:` not landed is not started (`queueOrder`), each run read through `landed` — none landed,
+ * A card that waits on a card of its `after:` not released is not started (`queueOrder`), each run read through `released` — none released,
  * so none such started, where it is not given — and once the last lands, the next pass starts it from the base as it is then.
  */
-export const startQueued = Effect.fn('startQueued')(function* (repo: string, given?: readonly Run[], landed: RunLanded = NONE_LANDED) {
+export const startQueued = Effect.fn('startQueued')(function* (
+  repo: string,
+  given?: readonly Run[],
+  released: RunReleased = NONE_RELEASED,
+) {
   const door = yield* CardDoor;
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
   const files = yield* door.cards.entries();
   const tries = yield* door.tries.list();
   const factories = yield* readableFactories();
   const triggering = yield* triggeringOf(files, factories.values());
-  const listing = cardsListed(files, runs, tries, factories, triggering, yield* waitingOf(files, runs, landed));
+  const listing = cardsListed(files, runs, tries, factories, triggering, yield* waitingOf(files, runs, released));
   yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
   const next = nextQueued(listing, repo, factories);
@@ -648,7 +656,7 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
   const factories = yield* readableFactories();
   const started = new Set(runs.flatMap((r) => (r.from?.inbox === undefined ? [] : [r.from.inbox])));
   const waiting = namedAfter(entries, (name) => started.has(name)).length
-    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), requestLanded(e))
+    ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), requestReleased(e))
     : undefined;
   return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()), waiting);
 });
@@ -657,4 +665,4 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
  * Whether each run has released its waiters for one request, each run once (`releasedThrough`).
  * @param e The engine.
  */
-export const requestLanded = (e: Engine) => releasedThrough(e, passParents());
+export const requestReleased = (e: Engine) => releasedThrough(e, passParents());

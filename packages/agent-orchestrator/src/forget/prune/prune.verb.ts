@@ -22,7 +22,7 @@ import { RunDoor } from '../../runs/runs.store.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../place/place.ts';
-import { landedOf, standingsOf } from '../../branches/branches.store.ts';
+import { mergedOf, standingsOf } from '../../branches/branches.store.ts';
 import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../../place/landing.store.ts';
 import { headsOver, standingLive } from '../../standing/standing.verb.ts';
 import { handOffOwed } from '../../tick/advance.verb.ts';
@@ -32,7 +32,7 @@ import { StoreRoot } from '../../config/root.store.ts';
 
 /**
  * Whose merge is in the repository's checkout, for a run whose ending lands on its check (`forgetRefusal`): none where the file its place
- * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not landed; else as its
+ * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not merged; else as its
  * place's `status` reads it (`checkoutStatus`), through `memo`. Refuses (`Conflict`) a checkout the place did not read, in its words:
  * nothing is removed on a guess.
  * @param run The run whose checkout is asked of.
@@ -58,7 +58,7 @@ function readsCheckout(run: Run, steps: readonly StepSpec[] | undefined): run is
 /**
  * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its
  * files directory, its check logs and inputs, and the engine's record of its sessions are kept, so `nemia decide`, `nemia ls` and the board
- * still read it, and a run waiting on it still reads whether it landed.
+ * still read it, and a run waiting on it still reads whether it succeeded.
  *
  * With `artifacts` — `nemia prune --artifacts` — its files directory too (`runs/<id>/artifacts/`: the screenshots and logs its steps and
  * checks left, which are on no branch), by far the most of what a run keeps once its worktrees are gone. It is judged exactly as the
@@ -278,7 +278,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const checkout = statusMemo(headsOver(git), placed);
   if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
   return {
-    decided: decision(read, landedOf(run, git)).kind,
+    decided: decision(read, mergedOf(run, git)).kind,
     held: forgetRefusal(
       steps,
       run,

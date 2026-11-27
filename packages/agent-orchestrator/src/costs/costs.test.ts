@@ -47,7 +47,7 @@ const aRun = (run: string, costUsd: number | null, more: Partial<RunFact> = {}) 
   steps: ['design', 'implement'],
   agents: [null],
   rounds: [],
-  landed: null,
+  merged: null,
   firstTry: null,
   costUsd,
   wallMs: null,

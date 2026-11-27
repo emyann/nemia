@@ -191,7 +191,7 @@ function WorkflowChoice({
 }
 
 /**
- * The cost line above Start: what one landed run of `workflow` cost and took on this store, where it measured any, else the stated
+ * The cost line above Start: what one merged run of `workflow` cost and took on this store, where it measured any, else the stated
  * estimate (`costLineOf`), with the harness's current quota beside it where it was read.
  */
 function CostLine({ workflow }: { workflow: string }) {
@@ -203,7 +203,7 @@ function CostLine({ workflow }: { workflow: string }) {
   return (
     <p data-cost-line={line.kind} className="m-0 text-body-medium text-on-surface-variant">
       {line.kind === 'measured'
-        ? `A ${workflow} run that landed here took about ${durationWords(line.ms, 'minute')} and cost about ${dollars(line.dollars)}.`
+        ? `A ${workflow} run that merged here took about ${durationWords(line.ms, 'minute')} and cost about ${dollars(line.dollars)}.`
         : `A small run takes ${ESTIMATE_WORDS}: an estimate, since this store has measured none yet.`}
       {short === undefined ? '' : ` Your plan's windows now: ${short}.`}
     </p>

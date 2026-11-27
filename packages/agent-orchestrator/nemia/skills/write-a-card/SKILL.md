@@ -20,13 +20,13 @@ schema says its arguments. The `verbs` skill names each verb's tools, and which 
 5. **What to measure first**: the number to read before building — what it costs today, how often it happens, how long it takes — and
    the command that reads it.
 6. **Its size**: what a run of it should cost, from what runs cost, never a guess. `nemia stats --workflow <workflow>` says what a
-   landed run of it cost, and `--by step` each step's, day by day. A step of the workflow is handed the same runs as a cost table in its
+   merged run of it cost, and `--by step` each step's, day by day. A step of the workflow is handed the same runs as a cost table in its
    brief, each step's median and p90 (*What runs of this workflow cost*): where a recent run's step quoted it (`nemia decide <run>`),
    use it. Say the figures and where they came from, and set the estimate against the person's line, the most they want one card to
    cost. Over it, propose the cut: two cards, each a whole slice, and what each proves.
    The person's line is the `cost-line` fact in your memory, or their custom instruction; with neither, ask it now, once, and keep it
    (your instruction's *What you learn of the person*).
-7. **Where it goes**: the factory and the workflow; `--after <run>` where it builds on a run not yet landed; and the runs in flight it
+7. **Where it goes**: the factory and the workflow; `--after <run>` where it builds on a run not yet succeeded; and the runs in flight it
    would collide with (`nemia ls`): the same files, the same feature, or a run that changes what it reads.
    A card whose next workflow nobody knows is filed with `workflow: intake`, and intake's ending routes it.
 

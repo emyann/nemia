@@ -4,16 +4,13 @@ import type { RunView } from '@/lib/api/judged';
 import { FirstHint } from './FirstHint';
 
 /**
- * A first card's run as the hints read it: labelled, in `status`, its first step filed where `filed`, and `land` its ending step
- * (`workspace: base`), so a run that succeeded landed.
+ * A first card's run as the hints read it: labelled, in `status`, its first step filed where `filed`; a run that succeeded draws
+ * the beat whatever its steps.
  */
 const runOf = (status: RunView['status'], filed: boolean) => ({
   labels: { onboarding: 'first-card', workflow: 'quick' },
   status,
-  steps: [
-    { name: 'implement', filed: filed ? {} : null, spec: { workspace: null } },
-    { name: 'land', filed: null, spec: { workspace: 'base' } },
-  ] as unknown as RunView['steps'],
+  steps: [{ name: 'implement', filed: filed ? {} : null, spec: { workspace: null } }] as unknown as RunView['steps'],
 });
 
 /** The hint of one beat, on a run that stands at it: one story a beat. */
@@ -44,9 +41,9 @@ export const Gate: Story = {
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint="gate"]')).not.toBeNull(),
 };
 
-/** Landed: the hint leads to what is next. */
-export const Landed: Story = {
-  args: { run: runOf('succeeded', true), beat: 'landed' },
+/** Succeeded: the hint leads to what is next. */
+export const Succeeded: Story = {
+  args: { run: runOf('succeeded', true), beat: 'succeeded' },
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-next]')).not.toBeNull(),
 };
 

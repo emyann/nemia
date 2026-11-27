@@ -48,11 +48,11 @@ function durationWord(ms: number) {
 const wordsOf = (h: StatsHeadline) =>
   ({
     runs: String(h.runs),
-    landed: or(h.landed, String),
+    merged: or(h.merged, String),
     rounds: or(h.rounds, oneDecimal),
     'first try': or(h.firstTry, percent),
-    'cost/landed': or(h.costPerLanded, dollars),
-    'time/landed': or(h.timePerLanded, durationWord),
+    'cost/merged': or(h.costPerMerged, dollars),
+    'time/merged': or(h.timePerMerged, durationWord),
     tries: String(h.tries),
     refused: String(h.refused),
     'gate wait': or(h.gateWaitMs, durationWord),
@@ -280,8 +280,8 @@ export function statsLine(s: StatsRead) {
   const then = wordsOf(s.all.tiles.before);
   const was = (name: string) => `${now[name]} (${then[name]})`;
   return (
-    `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('landed')} landed, ${was('first try')} on the first try, ` +
-    `${was('rounds')} rounds, ${was('cost/landed')} and ${was('time/landed')} per landed run, ${was('tries')} tries, ` +
+    `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('merged')} merged, ${was('first try')} on the first try, ` +
+    `${was('rounds')} rounds, ${was('cost/merged')} and ${was('time/merged')} per merged run, ${was('tries')} tries, ` +
     `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded` +
     slowLandingWord(s)
   );

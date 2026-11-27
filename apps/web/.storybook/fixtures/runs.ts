@@ -320,8 +320,8 @@ const ON_THE_CHECKOUT = [
   }),
 ];
 
-/** A finished run of the targets, landed `ago` minutes before `AS_OF`. */
-const landed = (name: string, brief: string, workflow: keyof typeof STEPS_OF, labels: Record<string, string>, ago: number, minutes: number, usd: number) =>
+/** A finished run of the targets, finished `ago` minutes before `AS_OF`. */
+const finished = (name: string, brief: string, workflow: keyof typeof STEPS_OF, labels: Record<string, string>, ago: number, minutes: number, usd: number) =>
   staged({
     name,
     brief,
@@ -342,12 +342,12 @@ const landed = (name: string, brief: string, workflow: keyof typeof STEPS_OF, la
   });
 
 /** The targets' five finished runs, newest finished first. */
-const LANDED = [
-  landed('board-the-design-system-kit-moves-yaic', 'board: the design system kit moves from 0.5.1 to its newest published release', 'quick', { area: 'board', initiative: 'visual', work: 'feature' }, 17, 53, 3.54),
-  landed('factory-a-workflow-proposal-that-4i8f', 'factory: a Workflow proposal that changes no fence says same, not widens', 'quick', { area: 'factory', work: 'fix' }, 60, 41, 4.92),
-  landed('board-stories-in-storybook-72wy', 'board: agents build and check the look in Storybook, not by serving the whole board', 'build', { area: 'board', initiative: 'visual', work: 'feature' }, 120, 118, 5.54),
-  landed('runtime-the-spawn-again-test-40gt', 'runtime: the spawn-again test waits for the second run, and passes on every runner', 'quick', { area: 'runtime', work: 'fix' }, 180, 38, 4.04),
-  landed('board-the-floor-holds-the-floor-x57v', 'board: the Floor holds the floor alone; the template moves to Settings, the proposals to a page of their own', 'quick', { area: 'board', work: 'feature' }, 240, 46, 4.76),
+const FINISHED = [
+  finished('board-the-design-system-kit-moves-yaic', 'board: the design system kit moves from 0.5.1 to its newest published release', 'quick', { area: 'board', initiative: 'visual', work: 'feature' }, 17, 53, 3.54),
+  finished('factory-a-workflow-proposal-that-4i8f', 'factory: a Workflow proposal that changes no fence says same, not widens', 'quick', { area: 'factory', work: 'fix' }, 60, 41, 4.92),
+  finished('board-stories-in-storybook-72wy', 'board: agents build and check the look in Storybook, not by serving the whole board', 'build', { area: 'board', initiative: 'visual', work: 'feature' }, 120, 118, 5.54),
+  finished('runtime-the-spawn-again-test-40gt', 'runtime: the spawn-again test waits for the second run, and passes on every runner', 'quick', { area: 'runtime', work: 'fix' }, 180, 38, 4.04),
+  finished('board-the-floor-holds-the-floor-x57v', 'board: the Floor holds the floor alone; the template moves to Settings, the proposals to a page of their own', 'quick', { area: 'board', work: 'feature' }, 240, 46, 4.76),
 ];
 
 /** The run that waits on you because its land failed its check. */
@@ -480,7 +480,7 @@ const FINISHED_COUNT = 123;
 
 /** A RunList of the finished runs, its next page's token given, as the api answers the first page of many. */
 const finishedOf = (counts: { waiting: number; inFlight: number; finished: number }) => ({
-  ...listOf(LANDED, counts),
+  ...listOf(FINISHED, counts),
   metadata: { asOf: AS_OF, counts, continue: 'f.older' },
 }) satisfies RunList;
 
@@ -517,7 +517,7 @@ export const TARGET_RUNS = {
   k2rq: FOR_A_SLOT,
   c7un: HELD,
   f41l: FAILED_RUN,
-  x57v: LANDED[4],
+  x57v: FINISHED[4],
 } as const;
 
 /** A step as the run read alone answers it, for the panel: its attempts, filing, cost and its session's last line. */

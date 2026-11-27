@@ -139,7 +139,7 @@ export type { AskName, ForgetHow, Forgot } from './forget/forget.ts';
 export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/index.ts';
 export type { InputFile } from './start/index.ts';
 export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';
-export type { DecideCommand, Decision, Offer, Landed } from './decide/decide.ts';
+export type { DecideCommand, Decision, Offer, Merged } from './decide/decide.ts';
 export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, shownNote, shownStatus, waitingWords } from './list/list.ts';
 export type { ListedPhase, Listing } from './list/list.ts';
 export { feedPhase, feedWords } from './feed/index.ts';

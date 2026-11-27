@@ -171,8 +171,8 @@ function inputsSaid(
  * producer's deliberate product, like the file; its summary is its account, and stays with the person.
  *
  * One level up, a run that waited on runs is handed what they concluded, summaries included, on its roots
- * (`## From run <id>`): by then a person has read those summaries and landed the work — see `fromRunSection`. A run handed others as
- * context (`--from`) is handed theirs the same way, after, each labelled landed or not landed, not judged — see `contextSection`.
+ * (`## From run <id>`): by then a person has read those summaries and merged the work — see `fromRunSection`. A run handed others as
+ * context (`--from`) is handed theirs the same way, after, each labelled merged or not merged, not judged — see `contextSection`.
  *
  * A step's first try is handed what was said to it before it was filed (`## Said before you started`), beside what was asked for, and
  * no later try is — see `saidBeforeSection`.

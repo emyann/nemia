@@ -21,7 +21,7 @@ import type { RunStatusWord } from 'objects';
  *   - **finished** — it ended on its own, and there is nothing left for anyone to do: no step in
  *     flight, none ready to file, and none waiting on a person. It is deliberately NOT relabelled —
  *     a run that succeeded succeeded, and overwriting that would make `nemia ls` lie about work that
- *     landed; a run whose only failure is a task the engine ended on its own stays failed.
+ *     succeeded; a run whose only failure is a task the engine ended on its own stays failed.
  *
  * "Finished" has to mean all three, because `failed` does not mean a run has stopped moving: in a
  * fan-out where `a` failed and `b` succeeded, a step waiting only on `b` is still READY while the

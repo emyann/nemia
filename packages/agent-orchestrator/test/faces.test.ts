@@ -349,8 +349,8 @@ describe("each verb's program, given its services, answers what its plain face a
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     await same(
       'nemia approve',
-      () => over(b.e, approveRun(run.id, 'ship', 'land it')),
-      () => runWith(b.e, approveRun(run.id, 'ship', 'land it')),
+      () => over(b.e, approveRun(run.id, 'ship', 'merge it')),
+      () => runWith(b.e, approveRun(run.id, 'ship', 'merge it')),
     );
 
     const failed = await started(folder());

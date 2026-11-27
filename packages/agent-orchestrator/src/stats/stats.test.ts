@@ -401,12 +401,12 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
             TEAM.map((s) => (s.name === 'land' ? { ...s, name: 'ship' } : s)),
           ),
         ).runs;
-        assert.deepEqual([run.landed, run.firstTry], [true, true]);
+        assert.deepEqual([run.merged, run.firstTry], [true, true]);
       },
     },
     {
       name: 'a landing on try 2 is landed, not first-try',
-      check: () => assert.deepEqual([factsOf(secondTry()).runs[0].landed, factsOf(secondTry()).runs[0].firstTry], [true, false]),
+      check: () => assert.deepEqual([factsOf(secondTry()).runs[0].merged, factsOf(secondTry()).runs[0].firstTry], [true, false]),
     },
     {
       name: 'no ending: its landing is absent, null',
@@ -414,7 +414,7 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
         const [run] = factsOf(
           readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] }),
         ).runs;
-        assert.deepEqual([run.landed, run.firstTry], [null, null]);
+        assert.deepEqual([run.merged, run.firstTry], [null, null]);
       },
     },
     {
@@ -432,7 +432,7 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
       name: 'an ending that commits in its own prose finishes once done: its run and rounds counted, its landing unknown',
       check: () => {
         const [old] = factsOf(readOf('old', prose, proseTries([{ end: at(7) }]))).runs;
-        assert.deepEqual([old?.day, old?.rounds, old?.landed, old?.firstTry], [DAY, [2], null, null]);
+        assert.deepEqual([old?.day, old?.rounds, old?.merged, old?.firstTry], [DAY, [2], null, null]);
       },
     },
     {
@@ -445,7 +445,7 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
         const staged = readOf('staged', TEAM, proseTries([{ end: at(7), check: 'passed' }]));
         assert.equal(factsOf(staged).runs.length, 0);
         assert.deepEqual(
-          factsOf(withLanded(staged, 'land', { commit: 'abc' })).runs.map((r) => r.landed),
+          factsOf(withLanded(staged, 'land', { commit: 'abc' })).runs.map((r) => r.merged),
           [true],
         );
       },
@@ -738,21 +738,21 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
       check: () => {
         const none = readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] });
         const h = headline(twoRounds('first'), secondTry(), none);
-        assert.deepEqual([h.firstTry, h.landed, h.runs], [0.5, 2, 3]);
+        assert.deepEqual([h.firstTry, h.merged, h.runs], [0.5, 2, 3]);
       },
     },
     {
       name: 'the cost of a landed run is a mean over the measured ones only, never diluted by an unmeasured run',
       check: () => {
         for (const big of [1, 1000])
-          assert.equal(headline(twoRounds('measured'), partly(big)).costPerLanded, 6, `unmeasured run at ${big}`);
+          assert.equal(headline(twoRounds('measured'), partly(big)).costPerMerged, 6, `unmeasured run at ${big}`);
       },
     },
     {
       name: 'runs that never recorded their landing have no landed count: null, never 0',
       check: () =>
         assert.deepEqual(
-          [headline(old('o1'), old('o2')).runs, headline(old('o1'), old('o2')).landed, headline(old('o1'), old('o2')).firstTry],
+          [headline(old('o1'), old('o2')).runs, headline(old('o1'), old('o2')).merged, headline(old('o1'), old('o2')).firstTry],
           [2, null, null],
         ),
     },
@@ -760,13 +760,13 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
       name: 'one run of the day that recorded its landing counts it',
       check: () =>
         assert.deepEqual(
-          [headline(old('o1'), old('o2'), twoRounds('l')).runs, headline(old('o1'), old('o2'), twoRounds('l')).landed],
+          [headline(old('o1'), old('o2'), twoRounds('l')).runs, headline(old('o1'), old('o2'), twoRounds('l')).merged],
           [3, 1],
         ),
     },
     {
       name: 'a run recorded as not landing is counted: 0, not null',
-      check: () => assert.equal(headline(twoRounds('aborted', TEAM, { aborted: 'its check refused' })).landed, 0),
+      check: () => assert.equal(headline(twoRounds('aborted', TEAM, { aborted: 'its check refused' })).merged, 0),
     },
     {
       name: 'refused calls are a mean per measured try: three calls over two, the codex try not one of them',
@@ -1071,7 +1071,7 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
         const old = (id: string) =>
           readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
         const s = statsOf(factsOfAll(old('old-1'), old('old-2')), { by: 'workflow' }, NOW);
-        assert.equal(s.groups[0].days.find((d) => d.day === DAY)?.landed, null);
+        assert.equal(s.groups[0].days.find((d) => d.day === DAY)?.merged, null);
       },
     },
     {
@@ -1347,7 +1347,7 @@ describe('what `nemia stats` prints is made of: null where nothing was measured,
     {
       name: 'a fortnight with no run finished measured no round and recorded no landing',
       check: () => {
-        for (const tile of [empty.all.tiles.last, empty.all.tiles.before]) assert.deepEqual([tile.rounds, tile.landed], [null, null]);
+        for (const tile of [empty.all.tiles.last, empty.all.tiles.before]) assert.deepEqual([tile.rounds, tile.merged], [null, null]);
       },
     },
     {
@@ -1356,7 +1356,7 @@ describe('what `nemia stats` prints is made of: null where nothing was measured,
         const old = (id: string) =>
           readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
         const day = statsOfReads([old('old-1'), old('old-2')], { by: 'workflow' }).groups[0]?.days.find((d) => d.day === DAY);
-        assert.deepEqual([day?.runs, day?.landed], [2, null]);
+        assert.deepEqual([day?.runs, day?.merged], [2, null]);
       },
     },
     {

@@ -1,8 +1,8 @@
 /**
  * The Overview's strip (src/lib/strip.ts): the factories' day counted off the two reads it is handed — the light answer of the runs not
  * finished, each in the state the list puts it in, and the runs finished since the day began, each with the outcome the list gives it —
- * on runs that cross midnight: landed and failed either side of it, one called off, one undecided, one waiting on a person, one that moves
- * and waits, and runs the list could not judge; the agents at work, the readout's caps and the quota's line. Each assertion names the
+ * on runs that cross midnight: succeeded and failed either side of it, one called off, one undecided, one waiting on a person, one that
+ * moves and waits, and runs the list could not judge; the agents at work, the readout's caps and the quota's line. Each assertion names the
  * line of `stripOf` it guards. `npm run e2e` reads the strip on `/` (`overview-strip`).
  */
 import { describe, test } from 'vitest';
@@ -26,7 +26,7 @@ const at = (ms: number) => new Date(ms).toISOString();
 
 /**
  * A run the list of the finished answers: its work stopped at `end`, it ended as `outcome` says, costing `usd`. Its status is `succeeded`
- * unless it failed, so a reader of the status in place of the outcome would count one called off or undecided as landed.
+ * unless it failed, so a reader of the status in place of the outcome would count one called off or undecided as succeeded.
  */
 const ended = (id: string, outcome: RunOutcome, end: number, usd: number, extra: Partial<RunView> = {}) =>
   ({
@@ -75,8 +75,8 @@ const atWorkBy = (run: RunView, step: string, agent: string, since: number) =>
 /** A run the list could not judge, of no factory. */
 const unjudged = (id: string) => ({ id, factory: null, unjudged: 'its journal does not read' }) satisfies UnjudgedRun;
 
-const landedToday = ended('r-landed', 'succeeded', DAY + 10 * MIN, 6);
-const landedYesterday = ended('r-old', 'succeeded', DAY - 10 * MIN, 100);
+const succeededToday = ended('r-succeeded', 'succeeded', DAY + 10 * MIN, 6);
+const succeededYesterday = ended('r-old', 'succeeded', DAY - 10 * MIN, 100);
 const failedAtMidnight = ended('r-failed', 'failed', DAY, 3);
 const cancelledToday = ended('r-off', 'cancelled', DAY + 60 * MIN, 1, { cancelledAt: at(DAY + 60 * MIN) });
 const undecided = ended('r-undecided', 'undecided', DAY + 90 * MIN, 5, {
@@ -131,7 +131,7 @@ const open = (waitingRuns: OpenRuns['waiting'] = [], inFlightRuns: OpenRuns['inF
   }) satisfies Pick<OpenRuns, 'waiting' | 'inFlight'>;
 
 const OPEN = open([waiting, movesAndWaits], [flying, kitFlying]);
-const FINISHED = [undecided, cancelledToday, landedToday, failedAtMidnight, landedYesterday];
+const FINISHED = [undecided, cancelledToday, succeededToday, failedAtMidnight, succeededYesterday];
 const FACTORIES = [factory('default', {}), factory('kit', { 'build/land': 'otto', 'build/implement': 'ada', 'build/review': 'ada' })];
 
 /** Of the factory `name` (null the default), as its reads answer it: `openRunsQuery(factory)` and `finishedTodayQuery(factory, …)`. */
@@ -164,11 +164,11 @@ const bare = (given: { open?: Pick<OpenRuns, 'waiting' | 'inFlight'>; finished?:
 
 describe('stripOf and readoutOf: the factory in view, its agents at work, and the readout', () => {
   test("the numbers are those of the reads handed, the factory in view's when it names one, the default's those of none", () => {
-    console.log(`stripOf: waitsOnYou, inFlight, landed: each counts what its read hands in, never a run of another factory.`);
+    console.log(`stripOf: waitsOnYou, inFlight, succeeded: each counts what its read hands in, never a run of another factory.`);
     const kit = strip('kit');
-    assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.landed], [1, 0, 0]);
+    assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.succeeded], [1, 0, 0]);
     const home = strip('default');
-    assert.deepEqual([home.inFlight, home.waitsOnYou, home.landed], [1, 2, 1]);
+    assert.deepEqual([home.inFlight, home.waitsOnYou, home.succeeded], [1, 2, 1]);
   });
   test('the agents at work are counted once each against those hired in view, their steps longest at work first', () => {
     console.log(`stripOf: agents: agentsOf(rows, hiredIn(...)); rows: rows.slice(0, ROWS_SHOWN), rowsOf(open, now) sorted longest first.`);
@@ -286,21 +286,21 @@ const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunVi
     ...more,
   }) satisfies RunView['tokens'];
 
-describe('stripOf: what counts today, landed, failed, waiting and spent', () => {
-  test("a run finished at or after the day's start counts today, landed or failed; one before it counts for nothing", () => {
+describe('stripOf: what counts today, succeeded, failed, waiting and spent', () => {
+  test("a run finished at or after the day's start counts today, succeeded or failed; one before it counts for nothing", () => {
     console.log(
-      `stripOf: finishedToday: finishedAt >= dayStart; landed: outcome 'succeeded'; failed: outcome 'failed'; perLanding: today's priced landings.`,
+      `stripOf: finishedToday: finishedAt >= dayStart; succeeded: outcome 'succeeded'; failed: outcome 'failed'; perLanding: today's priced landings.`,
     );
     const s = strip();
-    assert.equal(s.landed, 1, 'landed 10 minutes after midnight, not 10 minutes before');
+    assert.equal(s.succeeded, 1, 'succeeded 10 minutes after midnight, not 10 minutes before');
     assert.equal(s.failed, 1, 'failed on the stroke of midnight');
     assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
   });
-  test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', () => {
-    console.log(`stripOf: priced: landed with a cost; perLanding: the mean of the priced.`);
+  test('a landing whose cost was not measured succeeded, and left out of the mean cost of a landing', () => {
+    console.log(`stripOf: priced: succeeded with a cost; perLanding: the mean of the priced.`);
     const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
-    const s = bare({ finished: [landedToday, unpriced] });
-    assert.deepEqual([s.landed, s.perLanding], [2, 6]);
+    const s = bare({ finished: [succeededToday, unpriced] });
+    assert.deepEqual([s.succeeded, s.perLanding], [2, 6]);
   });
   test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
     console.log(`stripOf: rows and sessions: working(run, step), by stepState.`);
@@ -309,12 +309,12 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     const s = bare({ open: open([], [asks]) });
     assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
   });
-  test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', () => {
+  test('a run called off or with its result undecided is neither succeeded nor failed, though its cost is spent today', () => {
     console.log(
-      `stripOf: landed and failed: by the list's outcome, never the status (both runs say succeeded); spentUsd: finishedToday in worked.`,
+      `stripOf: succeeded and failed: by the list's outcome, never the status (both runs say succeeded); spentUsd: finishedToday in worked.`,
     );
     const s = bare({ finished: [cancelledToday, undecided] });
-    assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
+    assert.deepEqual([s.succeeded, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
   });
   test('a run counts in Wait on you or In flight as the list puts it, one that moves and waits with the waiting alone', () => {
     console.log(`stripOf: waitsOnYou: open.waiting; inFlight: open.inFlight.`);
@@ -369,8 +369,8 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
   });
   test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
     console.log(`stripOf: spentTokens: tokensOf(worked), the same runs as spentUsd.`);
-    const today = { ...landedToday, tokens: tokensOf(800, 1) };
-    const yesterday = { ...landedYesterday, tokens: tokensOf(8_000_000) };
+    const today = { ...succeededToday, tokens: tokensOf(800, 1) };
+    const yesterday = { ...succeededYesterday, tokens: tokensOf(8_000_000) };
     const unmeasured = { ...failedAtMidnight, tokens: null };
     const s = bare({ finished: [today, yesterday, unmeasured] });
     assert.deepEqual(
@@ -389,12 +389,12 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
   });
   test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', () => {
     console.log(`stripOf: spentTokens: tokensOf's partSum and its null where no run measured any.`);
-    const parted = { ...landedToday, tokens: tokensOf(800) };
+    const parted = { ...succeededToday, tokens: tokensOf(800) };
     const whole = { ...cancelledToday, tokens: tokensOf(80, 0, { cacheRead: null, cacheWrite: null, uncached: null }) };
     const s = bare({ finished: [parted, whole] });
     assert.equal(s.spentTokens?.total, 880);
     assert.deepEqual([s.spentTokens?.cacheRead, s.spentTokens?.cacheWrite, s.spentTokens?.uncached], [null, null, null]);
     assert.equal(s.spentTokens?.input, 440);
-    assert.equal(bare({ finished: [landedToday] }).spentTokens, null);
+    assert.equal(bare({ finished: [succeededToday] }).spentTokens, null);
   });
 });

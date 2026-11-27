@@ -65,7 +65,7 @@ const addedOf = (added: Added | undefined, untrusted: readonly { place: string }
 
 /** The milestone after the volume not done yet, with the page that does it: where the step's Next leads. */
 const nextOf = (milestones: readonly { name: Milestone; state: string }[] | undefined) => {
-  const name = milestones?.find((m) => m.name === 'landed' && m.state !== 'done')?.name;
+  const name = milestones?.find((m) => m.name === 'succeeded' && m.state !== 'done')?.name;
   return name === undefined ? undefined : { name, link: MILESTONE_LINKS[name] };
 };
 

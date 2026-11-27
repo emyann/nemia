@@ -26,14 +26,14 @@ export const memoryBytesWord = (n: number) => {
 /** A number, or null where nothing measured it. */
 const Measured = Schema.NullOr(Schema.Number);
 
-/** The numbers of a group, a day or a tile: runs, landings, rounds, first tries, cost and time per landed run, tries and waits. */
+/** The numbers of a group, a day or a tile: runs, merges, rounds, first tries, cost and time per merged run, tries and waits. */
 export const StatsHeadline = Schema.Struct({
   runs: Schema.Number,
-  landed: Measured,
+  merged: Measured,
   rounds: Measured,
   firstTry: Measured,
-  costPerLanded: Measured,
-  timePerLanded: Measured,
+  costPerMerged: Measured,
+  timePerMerged: Measured,
   tries: Schema.Number,
   refused: Schema.Number,
   gateWaitMs: Measured,

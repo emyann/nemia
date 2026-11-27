@@ -81,7 +81,7 @@ const FRESH_MILESTONES: Milestones = {
     { name: 'harness', state: 'next', message: 'activate a harness: it runs every session in your factories' },
     { name: 'factory', state: 'later', message: 'file a factory' },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+    { name: 'succeeded', state: 'later', message: 'see a first run succeed' },
   ],
 };
 
@@ -91,7 +91,7 @@ const FACTORY_NEXT: Milestones = {
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'next', message: 'make a first factory: with Nemia, from a template, or from scratch; it may start with no volume' },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+    { name: 'succeeded', state: 'later', message: 'see a first run succeed' },
   ],
 };
 
@@ -101,7 +101,7 @@ const FACTORY_FILED: Milestones = {
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'done', message: 'a factory is filed' },
     { name: 'volume', state: 'next', message: 'give a factory a volume its runs mount' },
-    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+    { name: 'succeeded', state: 'later', message: 'see a first run succeed' },
   ],
 };
 
@@ -111,7 +111,7 @@ const VOLUME_DONE: Milestones = {
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'done', message: 'a factory is filed' },
     { name: 'volume', state: 'done', message: 'a factory has a volume' },
-    { name: 'landed', state: 'next', message: 'merge a first change into its base branch' },
+    { name: 'succeeded', state: 'next', message: 'see a first run succeed' },
   ],
 };
 

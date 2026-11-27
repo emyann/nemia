@@ -11,7 +11,7 @@
  *
  * By the browser, where the daemon runs on another machine than the person's browser, the provider sends the browser back to a
  * `localhost` address the daemon's machine alone listens on, and that page fails to load. So the person may paste the address the
- * browser landed on, and Complete hands it to the waiting sign-in (`completeSignIn`); a refusal is said in the panel, and the state is
+ * browser was sent to, and Complete hands it to the waiting sign-in (`completeSignIn`); a refusal is said in the panel, and the state is
  * read again. The pasted address is sent once and kept nowhere.
  */
 import { useEffect, useState } from 'react';
@@ -56,14 +56,14 @@ type Pasting = {
 const NOT_PASTING: Pasting = { pasted: '', onPasted: () => {}, onComplete: () => {} };
 
 /**
- * The field a waiting sign-in takes the address the browser landed on in, for a browser that runs on another machine than the daemon,
+ * The field a waiting sign-in takes the address the browser was sent to in, for a browser that runs on another machine than the daemon,
  * and the press that hands it on: pressed only once something is pasted.
  */
 function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting }) {
   return (
     <div data-sign-in-paste className="flex flex-wrap items-start gap-3">
       <TextField
-        label="the address your browser landed on"
+        label="the address your browser was sent to"
         name="callback"
         value={pasting.pasted}
         onChange={pasting.onPasted}
@@ -90,7 +90,7 @@ function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting })
 
 /**
  * What a waiting sign-in draws by its road: by a code, the code in large type, the provider's page to type it at and when it stops
- * being good; by the browser, the link to open and the field to paste the address the browser landed on. Either has a Cancel.
+ * being good; by the browser, the link to open and the field to paste the address the browser was sent to. Either has a Cancel.
  */
 function Waiting({
   name,

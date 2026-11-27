@@ -693,7 +693,7 @@ const abortedWords = (run: Run, command: string, unfinished: boolean, raise: Rai
   (unfinished
     ? [
         command,
-        `its check did not finish, so the run aborted the merge and nothing landed on ${run.branch}. Merge and check again`,
+        `its check did not finish, so the run aborted the merge and nothing merged into ${run.branch}. Merge and check again`,
         sessionNeeds(raise),
       ]
     : [

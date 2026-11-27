@@ -426,7 +426,7 @@ export const decidable = (extra: Partial<Decidable> = {}) =>
     total: used(),
     cost: '$1.25',
     overBudget: null,
-    commands: [{ label: 'land it', command: 'git merge wf/r-1/b', said: null, step: null }],
+    commands: [{ label: 'merge it', command: 'git merge wf/r-1/b', said: null, step: null }],
     awaiting: { branches: ['wf/r-1/b'], direct: false },
     collisions: {
       onto: 'main',

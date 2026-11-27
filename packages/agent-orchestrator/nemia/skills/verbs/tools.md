@@ -1530,7 +1530,7 @@ Its arguments:
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
     what every run in the store adds up to, by UTC day: rounds to
     acceptance of each loop: step, landings of the workspace: base step
-    and on which try, cost and time per landed run, and each step's
+    and on which try, cost and time per merged run, and each step's
     tries, time, cost, checks and gate waits; first the last 14 days
     against the 14 before. A number nothing measured reads —, never 0.
     --line: one line, for a recap; --json: the whole answer; -l: the
@@ -3241,11 +3241,11 @@ Calls `GET /api/store`.
 
 ```text
   nemia milestones [--json]
-    how far the store is towards its first landed change, each milestone
+    how far the store is towards its first run that succeeded, each milestone
     done or not, as YAML; --json: as JSON
 ```
 
-Reads where the store stands on the way to its first landed change: a harness, a factory, a volume and a run landed, each done by what the store holds now. Answers Milestones.
+Reads where the store stands on the way to its first run that succeeded: a harness, a factory, a volume and a run that succeeded, each done by what the store holds now. Answers Milestones.
 
 Calls `GET /api/readiness/milestones`.
 

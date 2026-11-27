@@ -108,8 +108,8 @@ export default {
       'the run total says not measured, since not every step was',
     );
     await expectVisible(
-      decide.locator('[data-command="land it"] code', { hasText: `merge --no-ff ${FAKE.branch}` }),
-      'land it: the merge, as a line',
+      decide.locator('[data-command="merge it"] code', { hasText: `merge --no-ff ${FAKE.branch}` }),
+      'merge it: the merge, as a line',
     );
     await expectVisible(
       decide.locator('[data-command="drop it"] code', { hasText: `branch -D ${FAKE.branch}` }),

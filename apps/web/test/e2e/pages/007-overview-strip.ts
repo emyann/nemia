@@ -86,9 +86,9 @@ async function expectStickers(strip: Locator, want: Strip) {
   const stickers: Array<[string, string]> = [
     ['Wait on you', String(want.waitsOnYou)],
     ['In flight', String(want.inFlight)],
-    ['Landed', String(want.landed)],
+    ['Succeeded', String(want.succeeded)],
     ['Spent', dollars(want.spentUsd)],
-    ['Per landing', dollars(want.perLanding)],
+    ['Per succeeded run', dollars(want.perLanding)],
     ['Failed', String(want.failed)],
   ];
   for (const [label, value] of stickers)
@@ -158,7 +158,7 @@ async function expectSpentPreview(page: Page, strip: Locator, want: Strip) {
 export default {
   /**
    * The Overview's strip at `/`, at 1440 pixels with the rail open: its three cut frames on one row, the six stickers on one line. Each
-   * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
+   * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Succeeded and Failed are the finished
    * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
    * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. At 1024 the
@@ -179,8 +179,8 @@ export default {
       const finished = finishedOf(await answer<RunList>(page, `/api/runs?fieldSelector=${encodeURIComponent(FINISHED_SELECTOR)}`));
       const today = finished.runs.filter((run) => Date.parse(run.finishedAt) >= dayStart);
       const said = (outcome: string) => today.filter((run) => run.outcome === outcome).length;
-      if (said('succeeded') !== want.landed || said('failed') !== want.failed)
-        throw new Refused(`Landed and Failed agree with the finished page's today: ${said('succeeded')} and ${said('failed')}`);
+      if (said('succeeded') !== want.succeeded || said('failed') !== want.failed)
+        throw new Refused(`Succeeded and Failed agree with the finished page's today: ${said('succeeded')} and ${said('failed')}`);
       await expectTexts(strip.locator('[data-strip-readout]'), [readoutOf(want)], 'the readout says what is at work against the caps');
       const dot = daemonDot(await answer<Daemon>(page, '/api/daemon'), null, new Date());
       await expectTexts(strip.locator('[data-strip-daemon]'), [dot.word], "the daemon's tag says what the api judged of it");

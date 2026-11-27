@@ -22,7 +22,7 @@
  *   installed or not signed in, naming the fix; 403 for a session's token, since a turn spends the person's money or quota (`personOnly`).
  * - `GET /api/readiness/turns/:id` — the turn as it stands (`turnOf`): running, passed on its answer with its cost, or failed saying why.
  *   404 for an id no turn was started under.
- * - `GET /api/readiness/milestones` — where the store stands on the way to its first landed change (`milestonesNow`).
+ * - `GET /api/readiness/milestones` — where the store stands on the way to its first run that succeeded (`milestonesNow`).
  */
 import { Context, Effect, Stream } from 'effect';
 import { readsBounded } from '../objects/answer-bound.ts';

@@ -723,13 +723,13 @@ export const RunStatus = Schema.Struct({
       'The agents, skills and workflow the run pinned that have changed in the files since: each with the revision pinned and the one now.',
   }),
   /**
-   * Where its work ended up (`resultBranches`): the branches of its result steps that have one, named as soon as one does, landed or
+   * Where its work ended up (`resultBranches`): the branches of its result steps that have one, named as soon as one does, merged or
    * not; left out where none has.
    */
   result: Schema.optionalKey(
     Strings.annotate({
       description:
-        "The branches the run's work ended up on, named as soon as a result step has one, landed or not. Left out where none has.",
+        "The branches the run's work ended up on, named as soon as a result step has one, merged or not. Left out where none has.",
     }),
   ),
   /**

@@ -69,7 +69,7 @@ const milestones = (volume: 'done' | 'next', waiting = false) => ({
             ? `the factory ${ACME} has a writable volume that waits on your trust: trust it from the factory's Settings, or type nemia factory trust ${ACME}`
             : 'give a factory a writable volume, trusted, that its runs work in',
     },
-    { name: 'landed', state: volume === 'done' ? 'next' : 'later', message: 'start a first card, and merge its change into the base branch' },
+    { name: 'succeeded', state: volume === 'done' ? 'next' : 'later', message: 'see a first run succeed' },
   ],
 }) satisfies Milestones;
 

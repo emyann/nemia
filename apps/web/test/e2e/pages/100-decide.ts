@@ -105,7 +105,7 @@ export default {
       'and the send-back, to the work',
     );
     await expectCount(
-      decide.locator('[data-command="land it"], [data-command="drop it"]'),
+      decide.locator('[data-command="merge it"], [data-command="drop it"]'),
       0,
       'and no git merge by hand: the ending step is what merges this branch',
     );

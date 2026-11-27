@@ -16,7 +16,7 @@ export type SelectingTrigger = CardTrigger & { readonly selector: string };
 /**
  * What the card triggers that select a card do with it on this pass.
  * @param card The card as a trigger reads it: its factory and workflow, whether it is queued by hand, started, reads, and waits on a card
- *   of its `after:` not landed.
+ *   of its `after:` not released.
  * @param matching The triggers whose selector selects the card's labels, every factory's.
  */
 export const cardTriggered: CardTriggered = (card, matching) => {
@@ -42,7 +42,7 @@ export const matchingTriggers = <T extends SelectingTrigger>(labels: Readonly<Re
 /**
  * The card `card` as `cardTriggered` reads it, from what the listing knows of it.
  * @param card The entry's factory and workflow (null or empty for none), whether it is queued by hand, started, reads, and waits on a
- *   card of its `after:` not landed.
+ *   card of its `after:` not released.
  */
 export const triggerCardOf = (card: {
   readonly factory: string | null;

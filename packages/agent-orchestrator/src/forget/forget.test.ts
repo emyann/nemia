@@ -120,7 +120,7 @@ const saidIn = (n: number, again: unknown) => (name: string) =>
 
 /** `implement → ship`, the ending gated, in the repository's checkout, with a check (`landsOnCheck`). */
 const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
-const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
+const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'merge it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) =>

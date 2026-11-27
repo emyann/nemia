@@ -215,7 +215,7 @@ test('the Decide section copies its commands and runs none: a button per command
       said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)',
       step: 'implement',
     },
-    { label: 'land it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
+    { label: 'merge it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
     { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null, step: null },
   ] as const;
   const decision: Decidable = {
@@ -467,7 +467,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     cost: null,
     overBudget: null,
     collisions: null,
-    commands: [{ label: 'land it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
+    commands: [{ label: 'merge it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
   const offers = createElement(

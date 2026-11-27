@@ -13,7 +13,7 @@ import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
-import { requestLanded, startFromInbox } from '../inbox/inbox.verb.ts';
+import { requestReleased, startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { cardsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
@@ -182,7 +182,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
     fix: given.fix ?? '--factory <name>',
-    landed: requestLanded(yield* EngineService),
+    released: requestReleased(yield* EngineService),
   });
   return {
     id: started.run.id,

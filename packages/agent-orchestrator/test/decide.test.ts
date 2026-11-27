@@ -308,7 +308,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       assert.deepEqual([queued, ran, wall], ['36s', '14m24s', '25m00s'], "the run's timeline");
       assert.deepEqual(decided.timeline.rounds, [], "no loop, so no round: the run's total alone");
 
-      const [land, drop] = [offered(d, 'land it'), offered(d, 'drop it')];
+      const [land, drop] = [offered(d, 'merge it'), offered(d, 'drop it')];
       assert.ok(land.includes(a.branch) && land.includes(a.repo), land);
       assert.ok(drop.includes(a.branch) && drop.includes(a.repo), drop);
       assert.notEqual(stage.place().world.tip(a.repo, a.branch), null, 'none of the commands is run: the branch is still there');
@@ -461,10 +461,11 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       world.stage(a.repo, a.branch);
       world.commit(a.repo, 'land it by hand');
       await aPass();
-      assert.deepEqual(
-        (await decisionOn(stage, a.run.id)).decision,
-        { nothing: `landed — ${a.branch} is already on main` },
-        'merged by hand, as a person lands a run with no ending step: the run reads landed, and there is nothing left to decide',
+      const decided = (await decisionOn(stage, a.run.id)).decision;
+      assert.match(
+        'nothing' in decided ? decided.nothing : '',
+        new RegExp(`^succeeded — ${a.branch} merged into main$`),
+        'merged by hand, as a person merges a run with no ending step: it reads its status and the merge, and there is nothing left to decide',
       );
 
       const workspaces = Object.values(runRecord(ROOT, other.run.id).steps).flatMap((step) => (step.workspace ? [step.workspace] : []));
@@ -500,7 +501,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
         [`nemia approve ${run.id} ship`, `nemia retry ${run.id} implement --message "<objection>"`],
       );
       assert.ok(
-        !d.commands.some((x) => x.label === 'land it' || x.label === 'drop it'),
+        !d.commands.some((x) => x.label === 'merge it' || x.label === 'drop it'),
         'the folder says what landing is, so nobody is told to type it',
       );
 
@@ -646,7 +647,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
 
       approveByHand(run.id, 'review', 1);
       const { d } = await decidable(run.id);
-      const [land, drop] = [offered(d, 'land it'), offered(d, 'drop it')];
+      const [land, drop] = [offered(d, 'merge it'), offered(d, 'drop it')];
       assert.ok(
         land.includes(branch) && drop.includes(branch),
         "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
@@ -676,7 +677,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
         JSON.stringify(d),
       );
       assert.deepEqual(d.standings, [], 'no standing: it would read `main is on main`');
-      assert.ok(!d.commands.some((x) => x.label === 'land it' || x.label === 'drop it'), 'nor a merge of the branch it is already on');
+      assert.ok(!d.commands.some((x) => x.label === 'merge it' || x.label === 'drop it'), 'nor a merge of the branch it is already on');
     },
   );
   s.test(
@@ -956,7 +957,7 @@ describe('a run on two branches, side by side: each read, each in full, the long
         [`wf/${id}/implement`, `wf/${id}/implement is ahead of main by 1 commit`],
       ],
     );
-    const [land, drop] = [offered(read.d, 'land it'), offered(read.d, 'drop it')];
+    const [land, drop] = [offered(read.d, 'merge it'), offered(read.d, 'drop it')];
     assert.ok(land.includes(`wf/${id}/run`) && !land.includes(`wf/${id}/implement`), land);
     assert.ok(drop.includes(`wf/${id}/run`) && drop.includes(`wf/${id}/implement`), drop);
   });

@@ -46,31 +46,31 @@ export const firstWorkflowOf: FirstWorkflowOf = (offered, declared) =>
   declared !== undefined && offered.some((name) => name === declared) ? declared : undefined;
 
 /**
- * The cost line's figures: what one landed run of the workflow cost and took here, where the store measured any, else the estimate.
- * @param stats What the stats say of the workflow's landed runs; undefined where they were not read.
+ * The cost line's figures: what one merged run of the workflow cost and took here, where the store measured any, else the estimate.
+ * @param stats What the stats say of the workflow's merged runs; undefined where they were not read.
  * @param estimate The stated estimate.
  */
 export const costLineOf: CostLineOf = (stats, estimate) =>
-  stats !== undefined && stats.landed !== null && stats.landed > 0 && stats.costPerLanded !== null && stats.timePerLanded !== null
-    ? { kind: 'measured', ms: stats.timePerLanded, dollars: stats.costPerLanded }
+  stats !== undefined && stats.merged !== null && stats.merged > 0 && stats.costPerMerged !== null && stats.timePerMerged !== null
+    ? { kind: 'measured', ms: stats.timePerMerged, dollars: stats.costPerMerged }
     : { kind: 'estimate', ms: estimate.ms, dollars: estimate.dollars };
 
 /**
- * The hint a run's page draws: none for a run that is not the first card's, or that ended unlanded; else landed, the gate, the steps at
+ * The hint a run's page draws: none for a run that is not the first card's, or that ended without succeeding; else succeeded, the gate,
+ * the steps at
  * work, or the card, by where the run stands.
  * @param run The run as the hints read it.
  */
 export const firstBeatOf: FirstBeatOf = (run) => {
   if (!run.first) return null;
-  if (run.landed) return 'landed';
+  if (run.succeeded) return 'succeeded';
   if (run.ended) return null;
   if (run.waitsOnYou) return 'gate';
   return run.filed ? 'steps' : 'card';
 };
 
 /**
- * The run as the hints read it: the first card's where it carries `FIRST_CARD_LABEL`, a step filed, at a gate, landed — succeeded with
- * an ending step (`workspace: base`) or a wait node, which is what lands; a run of a workflow with none lands nothing — or ended.
+ * The run as the hints read it: the first card's where it carries `FIRST_CARD_LABEL`, a step filed, at a gate, succeeded or ended.
  * @param run The run's view, as its page reads it.
  */
 export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>) => {
@@ -79,8 +79,7 @@ export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>) =>
     first: run.labels[key] === value,
     filed: run.steps.some((step) => step.filed !== null),
     waitsOnYou: run.status === 'awaiting approval',
-    landed:
-      run.status === 'succeeded' && run.steps.some((step) => step.spec?.workspace === 'base' || (step.spec?.waitsFor?.length ?? 0) > 0),
+    succeeded: run.status === 'succeeded',
     ended: run.status === 'failed' || run.status === 'cancelled',
   };
 };

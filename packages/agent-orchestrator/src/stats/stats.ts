@@ -1,6 +1,6 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
- * to acceptance, the tries of the `workspace: base` step to a landing, what a landed run cost and how long it took, and every step's tries,
+ * to acceptance, the tries of the `workspace: base` step to a merge, what a merged run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
  * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
  * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day; and each landing check
@@ -204,7 +204,7 @@ const checkFactsOf = (r: RunRead, t: TimelineTry) =>
 
 /**
  * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
- * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: base` step committed, and
+ * `loop:` step whose loop ended accepted, how many rounds it ran. `merged` says whether its `workspace: base` step committed, and
  * `firstTry` whether it did so on its first try: null with no such step or where its record does not say, and `firstTry` null on a run
  * that did not land. `costUsd` is every
  * session's cost, null unless each was measured; `wallMs` its first filing to its last end. A run counts under every step and agent it has.
@@ -214,7 +214,7 @@ export type RunFact = RunKeys & {
   steps: string[];
   agents: Array<string | null>;
   rounds: number[];
-  landed: boolean | null;
+  merged: boolean | null;
   firstTry: boolean | null;
   costUsd: number | null;
   wallMs: number | null;
@@ -356,7 +356,7 @@ function doneStep(r: RunRead, step: StepSpec) {
 }
 
 /**
- * Whether a run is finished, and the time it finished: its ending's last try's end once the record says how the ending landed. Else, once
+ * Whether a run is finished, and the time it finished: its ending's last try's end once the record says how the ending merged. Else, once
  * nothing is in flight, its last task's end when its ending's current try is done (`doneStep`) — an ending that commits in its own prose,
  * whose record never says — or, with no ending, when every step's is. Null for a run cancelled, a run whose ending lands on its check
  * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked, a loop that asked for
@@ -385,7 +385,7 @@ function runFactOf(r: RunRead) {
   const at = finishedAt(r, ending);
   if (!at) return [];
   const how = ending && r.run.steps[ending.name]?.landed;
-  const landed = how ? 'commit' in how : null;
+  const merged = how ? 'commit' in how : null;
   return [
     {
       ...keysOf(r.run),
@@ -393,8 +393,8 @@ function runFactOf(r: RunRead) {
       steps: r.steps.map((s) => s.name),
       agents: [...new Set(r.steps.map((s) => s.agent?.name ?? null))],
       rounds: roundsOf(r),
-      landed,
-      firstTry: ending && landed ? tryOf(r.run, ending.name) === 1 : null,
+      merged,
+      firstTry: ending && merged ? tryOf(r.run, ending.name) === 1 : null,
       costUsd: runCostOf(r.timeline),
       wallMs: r.timeline.run.wallMs,
     },
@@ -408,20 +408,20 @@ function runFactOf(r: RunRead) {
 export const factsOf = (r: RunRead) => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
- * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed, null where no run recorded
- * whether it landed. `rounds` is the mean rounds
- * to acceptance, `firstTry` the share of landed runs that landed on their first try, `costPerLanded` and `timePerLanded` the mean cost and
- * wall time of a landed run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
+ * The headline numbers of a set of facts. `runs` counts the runs finished and `merged` those that merged, null where no run recorded
+ * whether it merged. `rounds` is the mean rounds
+ * to acceptance, `firstTry` the share of merged runs that merged on their first try, `costPerMerged` and `timePerMerged` the mean cost and
+ * wall time of a merged run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
  * wait at a gate. `deniedPerTry` is the mean count of calls refused per try, over the tries whose harness records them, and `skillsPerTry`
  * the mean count of skills loaded per try, over the tries whose sessions' ends say. Each mean over nothing is null.
  */
 type Headline = {
   runs: number;
-  landed: number | null;
+  merged: number | null;
   rounds: number | null;
   firstTry: number | null;
-  costPerLanded: number | null;
-  timePerLanded: number | null;
+  costPerMerged: number | null;
+  timePerMerged: number | null;
   tries: number;
   refused: number;
   gateWaitMs: number | null;
@@ -523,14 +523,14 @@ const mean = (values: ReadonlyArray<number | null>) => {
  * @param f The facts of the tries and of the runs.
  */
 export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>) {
-  const landed = f.runs.filter((r) => r.landed === true);
+  const merged = f.runs.filter((r) => r.merged === true);
   return {
     runs: f.runs.length,
-    landed: f.runs.some((r) => r.landed !== null) ? landed.length : null,
+    merged: f.runs.some((r) => r.merged !== null) ? merged.length : null,
     rounds: mean(f.runs.flatMap((r) => r.rounds)),
-    firstTry: landed.length ? landed.filter((r) => r.firstTry === true).length / landed.length : null,
-    costPerLanded: mean(landed.map((r) => r.costUsd)),
-    timePerLanded: mean(landed.map((r) => r.wallMs)),
+    firstTry: merged.length ? merged.filter((r) => r.firstTry === true).length / merged.length : null,
+    costPerMerged: mean(merged.map((r) => r.costUsd)),
+    timePerMerged: mean(merged.map((r) => r.wallMs)),
     tries: f.tries.length,
     refused: f.tries.filter((t) => t.check === 'refused').length,
     gateWaitMs: mean(f.tries.map((t) => t.gateWaitMs)),

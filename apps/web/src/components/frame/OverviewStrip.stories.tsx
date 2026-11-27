@@ -21,7 +21,7 @@ const NARROW: CSSProperties = { width: 360 };
 const BUSY: Strip = {
   waitsOnYou: 2,
   inFlight: 5,
-  landed: 12,
+  succeeded: 12,
   failed: 1,
   spentUsd: 230.4,
   spentTokens: {
@@ -56,7 +56,7 @@ const QUIET: Strip = {
   ...BUSY,
   waitsOnYou: 0,
   inFlight: 0,
-  landed: 0,
+  succeeded: 0,
   failed: 0,
   spentUsd: 0,
   spentTokens: null,

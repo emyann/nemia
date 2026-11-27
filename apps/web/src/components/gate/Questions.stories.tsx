@@ -12,7 +12,7 @@ const CUT: Frozen<Question> = {
   body: 'It is **big**: four packages and the board.',
   options: [
     { label: 'Shape first', meaning: 'The api and the answer first, the board in a second card.' },
-    { label: 'All at once', meaning: 'One card, one review: longer, and nothing half landed.' },
+    { label: 'All at once', meaning: 'One card, one review: longer, and nothing half merged.' },
   ],
   recommended: 'Shape first',
   multiple: false,

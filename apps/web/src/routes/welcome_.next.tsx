@@ -5,7 +5,7 @@ import { milestonesQuery } from '@/lib/api/readiness';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
- * The welcome's last page, "You are set", at /welcome/next: `welcome_` draws it on its own. Reached by the landed hint of a first card's
+ * The welcome's last page, "You are set", at /welcome/next: `welcome_` draws it on its own. Reached by the succeeded hint of a first card's
  * run; no redirect. Its loader reads the milestones and the factories.
  */
 export const Route = createFileRoute('/welcome_/next')({

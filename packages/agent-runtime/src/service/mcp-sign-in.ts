@@ -60,15 +60,15 @@ const callbackWords = (name: string, port: number, why: CallbackRefusal) => {
   const redirect = redirectUriOf(port);
   switch (why) {
     case 'unreadable':
-      return `what was pasted for \`${name}\` is no address. Paste the whole address your browser landed on after you approved, starting ${redirect}.`;
+      return `what was pasted for \`${name}\` is no address. Paste the whole address your browser was sent to after you approved, starting ${redirect}.`;
     case 'elsewhere':
-      return `what was pasted for \`${name}\` is not the address its sign-in sends the browser back to. Paste the address your browser landed on after you approved, starting ${redirect}.`;
+      return `what was pasted for \`${name}\` is not the address its sign-in sends the browser back to. Paste the address your browser was sent to after you approved, starting ${redirect}.`;
     case 'denied':
       return `the address pasted for \`${name}\` says the sign-in was refused at the provider. Sign in again, and approve the app there.`;
     case 'no-code':
-      return `the address pasted for \`${name}\` carries no \`code\`. Paste the whole address your browser landed on after you approved, query included.`;
+      return `the address pasted for \`${name}\` carries no \`code\`. Paste the whole address your browser was sent to after you approved, query included.`;
     case 'no-state':
-      return `the address pasted for \`${name}\` carries no \`state\`. Paste the whole address your browser landed on after you approved, query included.`;
+      return `the address pasted for \`${name}\` carries no \`state\`. Paste the whole address your browser was sent to after you approved, query included.`;
   }
 };
 

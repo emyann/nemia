@@ -5,7 +5,7 @@
  * rendered with (so the template did not change under its version, and the render wanted differs only by the parameters); else a
  * template changed under the same version, which no upgrade takes. `nemia factory diff`, `upgrade` and `resolve` and the factory
  * controller judge by it alike. `choicesApply` says whether the person's choices kept in `resolutions.json` answer the merge under way:
- * those made for its version, its template and the base it merges from, so a merge that landed leaves no choice to the next one at the
+ * those made for its version, its template and the base it merges from, so a merge since made leaves no choice to the next one at the
  * same version; a file written before the base was recorded holds choices made for a version's upgrade, never for a change of
  * parameters alone.
  */
@@ -70,7 +70,7 @@ const choicesApplySpec = spec<(recorded: ChoicesRecorded, merge: MergeAt) => boo
         recorded.template === undefined || recorded.template === merge.template || !output,
     },
     otherBaseNever: {
-      description: 'Choices made against another base, such as one a merge since landed replaced, answer no conflict of this merge',
+      description: 'Choices made against another base, such as one a merge since made replaced, answer no conflict of this merge',
       condition: ({ input: [recorded, merge], output }) => recorded.base === undefined || recorded.base === merge.base || !output,
     },
     unrecordedBaseNotForParams: {

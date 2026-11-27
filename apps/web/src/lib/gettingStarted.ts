@@ -9,7 +9,7 @@ export const MILESTONE_LINKS: Readonly<Record<Milestone, '/setup' | '/welcome/fa
   harness: '/setup',
   factory: '/welcome/factory',
   volume: '/welcome/volume',
-  landed: '/welcome/card',
+  succeeded: '/welcome/card',
 };
 
 /** Each milestone's name, as a page's Next says it. */
@@ -17,5 +17,5 @@ export const MILESTONE_NAMES: Readonly<Record<Milestone, string>> = {
   harness: 'A harness',
   factory: 'A factory',
   volume: 'A volume',
-  landed: 'A first change merged',
+  succeeded: 'A first run that succeeded',
 };

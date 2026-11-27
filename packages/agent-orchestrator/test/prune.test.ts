@@ -304,7 +304,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.deepEqual([row.run.brief, row.run.pruned?.at], ['add a flag', pruned.at], 'still on the board, with the word beside it');
       await aPass(b.e);
       const d = await runWith(b.e, decideRun(run.id));
-      assert.equal(d.decision.kind, 'landed');
+      assert.equal(d.decision.kind, 'merged');
       assert.equal((d.closeouts.implement as { summary?: string }).summary, 'did it', "its closeout is the engine's, and still read");
       names(await prunedSaid(run.id), `pruned at ${pruned.at}`, 'nemia prune', 'its branches, record and files are kept');
 
@@ -371,7 +371,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(pruned.artifacts?.at);
 
       await aPass(b.e);
-      assert.equal((await runWith(b.e, decideRun(id))).decision.kind, 'landed');
+      assert.equal((await runWith(b.e, decideRun(id))).decision.kind, 'merged');
       const landed = await decisionOn(stage, id);
       assert.ok('nothing' in landed.decision, `a landed run is said landed, as before: ${JSON.stringify(landed.decision)}`);
       names(await prunedSaid(id), `pruned at ${pruned.at}`, `its files were removed at ${pruned.artifacts.at}`, 'nemia prune --artifacts');
@@ -613,7 +613,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
       const landed = await aFinished(b, { merged: true });
       plantAsk(ROOT, landed.run.id, 'retry-implement-2', JSON.stringify({ mode: 'continue' }));
       await aPass(b.e);
-      assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'landed');
+      assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'merged');
       const asked = await runWith(b.e, prune(landed.run.id, { yes: true }));
       assert.equal(asked.kind, 'refused', 'a retry asked of a step that landed, which no pass files: the ask alone holds it');
       names(asked.refusal, 'try 2 of implement', `nemia prune ${landed.run.id}`, `nemia retry ${landed.run.id} implement --off`);
@@ -820,7 +820,7 @@ describe('after a prune: a retry, a round, an approval and an acceptance are ref
       assert.deepEqual(
         w.commands.map((x) => [x.label, x.command]),
         [
-          ['land it', `git -C ${repo} merge --no-ff wf/${run.id}/run`],
+          ['merge it', `git -C ${repo} merge --no-ff wf/${run.id}/run`],
           ['drop it', `git -C ${repo} branch -D wf/${run.id}/run`],
         ],
       );

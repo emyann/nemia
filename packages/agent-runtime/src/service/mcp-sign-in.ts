@@ -3,8 +3,8 @@
  * person holds open, and signed out of. None of them touches a task, and nothing of them is journalled.
  *
  * A server signs in by one of two roads, chosen from what its provider advertises (`routeOf`): by a **code** the person types at the
- * provider (`device`, RFC 8628), which this engine polls for and then holds the token of (`mcp-token.ts`), handing it to each session
- * in the server's `Authorization` header; or by the **browser** (`browser`), Claude Code's own sign-in, whose redirect the person
+ * provider (`device`, RFC 8628), which this engine polls for and then holds the token of (`mcp-token.ts`), giving each session a
+ * `headersHelper` that reads it; or by the **browser** (`browser`), Claude Code's own sign-in, whose redirect the person
  * pastes back when their browser runs elsewhere (`mcpSignInCallback`) and which Claude Code files in its own store
  * (`harness/mcp-sign-in.ts`). The token, the device code and a pasted address are in no refusal, no log and no journal.
  *

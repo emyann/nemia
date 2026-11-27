@@ -124,7 +124,7 @@ export type HelperBounds = {
 };
 
 /** The helper's bounds as shipped, under Claude Code's 10 seconds. */
-export const HELPER_BOUNDS: HelperBounds = { totalMs: 9000, refreshMs: 6000, waitMs: 7000, pollMs: 100 };
+const HELPER_BOUNDS: HelperBounds = { totalMs: 9000, refreshMs: 6000, waitMs: 7000, pollMs: 100 };
 
 /** The refresh lock beside a token's file. */
 const lockOf = (file: string) => `${file}.lock`;
@@ -133,14 +133,17 @@ const lockOf = (file: string) => `${file}.lock`;
 const LockFile = Schema.Struct({ pid: Schema.Number, start: Schema.optional(Schema.String), id: Schema.String });
 const readLock = Schema.decodeUnknownOption(Schema.fromJsonString(LockFile));
 
-/** Whether the process that took the lock at `lock` is still running (`live`), is not (`gone`), or the file says none (`unreadable`). */
-const holderOf = (lock: string) => {
-  let text: string;
+/** The lock file's text, or `undefined` where there is none: a lock released as it was looked at is no lock to judge or break. */
+const lockText = (lock: string) => {
   try {
-    text = fs.readFileSync(lock, 'utf8');
+    return fs.readFileSync(lock, 'utf8');
   } catch {
-    return 'gone' satisfies LockHolder;
+    return undefined;
   }
+};
+
+/** Whether the process that wrote `text` into a lock is still running (`live`), is not (`gone`), or the text says none (`unreadable`). */
+const holderOf = (text: string) => {
   const read = readLock(text);
   if (Option.isNone(read)) return 'unreadable' satisfies LockHolder;
   const { pid, start } = read.value;
@@ -159,15 +162,23 @@ export const refreshLockOf: RefreshLockOf = (holder, waitedMs, boundMs) => {
   return holder === 'live' ? 'stand' : 'break';
 };
 
-/** The lock at `lock` taken whole by an exclusive create, with the id that says it is ours; `undefined` where another process holds it. */
+/**
+ * The lock at `lock` taken whole by an exclusive create: the id that says it is ours; `taken` where another process holds it;
+ * `unwritable` where it cannot be made at all (a folder that refuses the write), which no wait mends.
+ */
 const takeLock = (lock: string) => {
   const id = randomUUID();
   try {
     fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, start: processStart(process.pid), id }), { flag: 'wx', mode: 0o600 });
     return id;
-  } catch {
-    return undefined;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EEXIST' ? ('taken' as const) : ('unwritable' as const);
   }
+};
+
+/** The lock at `lock` removed, but only while it still holds `text`, what its breaker judged: a lock another process took since stays. */
+const breakLock = (lock: string, text: string) => {
+  if (lockText(lock) === text) fs.rmSync(lock, { force: true });
 };
 
 /** The lock at `lock` removed, but only while it is still the one `id` took. */
@@ -248,9 +259,14 @@ const refreshedHolding = async (
 
 /** What a process that finds the lock taken does: hands the token as read once its wait is spent, else waits or breaks, then `again`. */
 const waitedOn = async (lock: string, held: HeldFile, now: number, wait: { readonly waitedMs: number; readonly bounds: HelperBounds }) => {
-  const move = refreshLockOf(holderOf(lock), wait.waitedMs, wait.bounds.waitMs);
+  const text = lockText(lock);
+  if (text === undefined) {
+    await pause(wait.bounds.pollMs);
+    return 'again' as const;
+  }
+  const move = refreshLockOf(holderOf(text), wait.waitedMs, wait.bounds.waitMs);
   if (move === 'stand') return { token: asRead(held, now) };
-  if (move === 'break') fs.rmSync(lock, { force: true });
+  if (move === 'break') breakLock(lock, text);
   else await pause(wait.bounds.pollMs);
   return 'again' as const;
 };
@@ -277,11 +293,14 @@ export const heldToken = async (file: string, now: number = Date.now(), bounds: 
       fs.rmSync(file, { force: true });
       return undefined;
     }
+    const spent = elapsedMs(began, instantNow());
+    if (spent >= bounds.totalMs) return asRead(held, now);
     const id = takeLock(lock);
+    if (id === 'unwritable') return asRead(held, now);
     const done =
-      id === undefined
-        ? await waitedOn(lock, held, now, { waitedMs: elapsedMs(began, instantNow()), bounds })
-        : await refreshedHolding(file, lock, id, held, { now, left: bounds.totalMs - elapsedMs(began, instantNow()), bounds });
+      id === 'taken'
+        ? await waitedOn(lock, held, now, { waitedMs: spent, bounds })
+        : await refreshedHolding(file, lock, id, held, { now, left: bounds.totalMs - spent, bounds });
     if (done !== 'again') return done.token;
   }
 };

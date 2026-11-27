@@ -17,6 +17,7 @@ import { keptRequest } from './claude/attached-file.ts';
 import {
   dropToken,
   heldToken,
+  type HelperBounds,
   holdToken,
   MCP_HEADERS_BIN,
   REFRESH_MARGIN_MS,
@@ -44,7 +45,7 @@ const T0 = Date.UTC(2026, 10, 26, 12, 0, 0);
 const HOUR = 3_600_000;
 
 /** The bounds of a helper's run, shortened: no test waits a shipped bound out. */
-const SHORT = { totalMs: 9000, refreshMs: 2000, waitMs: 300, pollMs: 10 };
+const SHORT: HelperBounds = { totalMs: 9000, refreshMs: 2000, waitMs: 300, pollMs: 10 };
 
 /** `heldToken` of the file a server's token is held in under `root`. */
 const held = (root: string, name: string, server: RemoteMcpServer, now?: number) => heldToken(tokenFileOf(root, name, server), now, SHORT);
@@ -58,7 +59,7 @@ const grant = (accessToken: string, seconds: number | null = 8 * 3600) => ({
 });
 
 /** A token endpoint that answers each refresh with `answer`, writing down how many it was asked. */
-const refreshing = (answer: () => Response) => {
+const refreshing = (answer: () => Response | Promise<Response>) => {
   const asked: URLSearchParams[] = [];
   server.use(
     http.post(FROM.tokenEndpoint, async ({ request }) => {
@@ -148,6 +149,20 @@ describe('heldToken: a token due is refreshed before a session is handed it', ()
     assert.equal(await held(root, 'github', GITHUB, T0 + 9 * HOUR), 'at-2');
     assert.equal(asked.length, 1);
     assert.equal(fs.existsSync(`${tokenFileOf(root, 'github', GITHUB)}.lock`), false, 'the lock is released');
+  });
+
+  test('two asks that find a dead holder’s lock make one refresh: a lock another took since is never broken', async () => {
+    const root = scratch('ae-mcp-token-');
+    holdToken(root, 'github', GITHUB, grant('at-1'), FROM, T0);
+    fs.writeFileSync(`${tokenFileOf(root, 'github', GITHUB)}.lock`, JSON.stringify({ pid: 2 ** 22 + 12345, start: '1', id: 'old' }));
+    const asked = refreshing(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      return HttpResponse.json({ access_token: 'at-2', refresh_token: 'rt-2', expires_in: 28800 });
+    });
+    const now = T0 + 9 * HOUR;
+    const both = await Promise.all([held(root, 'github', GITHUB, now), held(root, 'github', GITHUB, now)]);
+    assert.deepEqual(both, ['at-2', 'at-2']);
+    assert.equal(asked.length, 1);
   });
 
   test('a lock a running process holds is waited for, and past the bound the token is handed as read, not refreshed again', async () => {

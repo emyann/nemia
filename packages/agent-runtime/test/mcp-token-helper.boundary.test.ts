@@ -122,12 +122,14 @@ describe('a job whose MCP server’s token lapsed while it ran keeps calling the
 
     mcp.state.accepts.clear();
     mcp.state.accepts.add('at-2');
+    const before = calls();
     holdToken(root, 'github', server, grant, { tokenEndpoint: provider.url, clientId: 'cid' }, Date.now() - 9 * HOUR);
     fs.writeFileSync(path.join(dir, 'mcp-call'), '');
-    await until(t, () => calls() === 2, 'the call after the token lapsed was made', { everyMs: 50 });
+    await until(t, () => calls() === before + 2, 'the call after the token lapsed was refused, then retried', { everyMs: 50 });
 
     assert.deepEqual(mcp.state.log, [
       { bearer: 'at-1', status: 200 },
+      { bearer: 'at-1', status: 401 },
       { bearer: 'at-2', status: 200 },
     ]);
     assert.deepEqual(provider.asked, ['rt-1'], 'one refresh, with the refresh token held');

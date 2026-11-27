@@ -1,7 +1,7 @@
 /**
  * The three decisions of a remote MCP server signed in to by a code (agent-runtime, src/harness/mcp-device.ts): the OAuth 2.0 device
  * authorization grant (RFC 8628), offered where the server's provider advertises it, and the token it yields held by the runtime and
- * handed to each session in the server's `headers`.
+ * read by each session through a `headersHelper`.
  *
  * - `signInRouteOf`: which road a sign-in takes, read off the provider's authorization server metadata (RFC 8414), found through the
  *   server's protected resource metadata (RFC 9728): a code typed at the provider (`device`), or the harness's own browser sign-in

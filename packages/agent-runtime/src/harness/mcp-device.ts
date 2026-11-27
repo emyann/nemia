@@ -1,7 +1,7 @@
 /**
  * A remote MCP server signed in to by a code (RFC 8628): the provider's metadata read to choose the road, the code asked, the poll of
- * the token endpoint, and the refresh of a token. The runtime holds the token (`mcp-token.ts`) and hands it to each session in the
- * server's `headers`, which is the road the Agent SDK documents for a host that runs the OAuth flow itself.
+ * the token endpoint, and the refresh of a token. The runtime holds the token (`mcp-token.ts`) and lets each session read it through a
+ * `headersHelper` (`bin/ae-mcp-headers.ts`) that Claude Code runs at each connection, so a token that lapses or is replaced is read again.
  *
  * The three decisions — `signInRouteOf`, `pollOutcomeOf`, `tokenDueOf` — are proved by `contracts/mcp-device.contract.ts`. Nothing
  * here sends a client secret: GitHub's documentation lists none for a device flow's poll or its refresh, and a token that came by a

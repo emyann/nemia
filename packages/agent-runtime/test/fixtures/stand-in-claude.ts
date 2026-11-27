@@ -49,8 +49,8 @@ import readline from 'node:readline';
  * `mcp` makes it act as Claude Code's MCP client for the remote servers its `--mcp-config` names (https://code.claude.com/docs/en/mcp,
  * *Use dynamic headers for authentication*): `mcp.calls` times, once the file `mcp-call` appears in its folder, it posts to each such
  * server's `url` with the server's static `headers`, then the JSON its `headersHelper` printed laid over them — the helper run by `sh -c`
- * in the session's cwd with `CLAUDE_CODE_MCP_SERVER_NAME` and `CLAUDE_CODE_MCP_SERVER_URL`, given up on after 10 seconds. A 401 or 403
- * runs the helper again and retries the call once. Each call's final status is a line of `mcp.jsonl`.
+ * once per connection, in the session's cwd with `CLAUDE_CODE_MCP_SERVER_NAME` and `CLAUDE_CODE_MCP_SERVER_URL`, given up on after
+ * 10 seconds. A 401 or 403 runs the helper again, reconnects and retries the call once. Each answer's status is a line of `mcp.jsonl`.
  *
  * `turns` says what it does after its first result: `one`, close its stdin as a job does, and `many`, keep it open and work each
  * further user message as another turn, as a session on streaming input does. `fold` works a message that came while a turn ran into
@@ -328,24 +328,30 @@ const helped = (helper: string, name: string, url: string) =>
     });
   });
 
+/** The headers each remote server was last connected with, by name: the helper runs at a connection, not at each call. */
+const connected = new Map<string, Record<string, string>>();
+
 /** One call to every remote server of `--mcp-config`, as Claude Code makes it, and each answer's status noted in `mcp.jsonl`. */
 const mcpCalled = async () => {
   const config = JSON.parse(argv[argv.indexOf('--mcp-config') + 1] ?? '{}') as {
     mcpServers?: Record<string, { url?: string; headers?: Record<string, string>; headersHelper?: string }>;
   };
   for (const [name, server] of Object.entries(config.mcpServers ?? {})) {
-    if (server.url === undefined) continue;
-    const post = async () =>
-      (
-        await fetch(server.url!, {
-          method: 'POST',
-          headers: { ...server.headers, ...(server.headersHelper === undefined ? {} : await helped(server.headersHelper, name, server.url!)) },
-          body: '{}',
-        })
-      ).status;
+    const url = server.url;
+    if (url === undefined) continue;
+    const connect = async () => {
+      const dynamic = server.headersHelper === undefined ? {} : await helped(server.headersHelper, name, url);
+      connected.set(name, { ...server.headers, ...dynamic });
+    };
+    const post = async () => (await fetch(url, { method: 'POST', headers: connected.get(name), body: '{}' })).status;
+    if (!connected.has(name)) await connect();
     let status = await post();
-    if (status === 401 || status === 403) status = await post();
     note('mcp.jsonl', { name, status });
+    if (status === 401 || status === 403) {
+      await connect();
+      status = await post();
+      note('mcp.jsonl', { name, status, retried: true });
+    }
   }
 };
 

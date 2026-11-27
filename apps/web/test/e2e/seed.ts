@@ -1,9 +1,9 @@
 /**
  * The store `npm run e2e` serves: six fake runs and the diamond's, written the way `wf` and the engine write theirs.
  *
- * Written by hand, all of it: nothing here ticks, so a run's record, a step's pins and a kind's revisions ledger are planted in the
+ * Written by hand, all of it: nothing here ticks, so a run's record, a step's pins are planted in the
  * shapes the store holds, never by a filing. What those shapes are is held where they are written — the orchestrator's
- * `test/revisions.test.ts` and the api's `drift.test.ts` for the pins and the ledger. Here the pages are the subject.
+ * `test/revisions.test.ts` and the api's `drift.test.ts` for the pins. Here the pages are the subject.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
@@ -70,9 +70,9 @@ export const FAKE = {
    * line per kind, the step's saying it already ran.
    */
   behind: {
-    agent: 'agent coder: rev 5, files at rev 7',
-    skill: 'skill look: rev 1, files at rev 3',
-    ran: 'agent coder: theme ran on rev 4, files at rev 7',
+    agent: /agent coder: rev 5, files at rev \d+/,
+    skill: /skill look: rev 1, files at rev \d+/,
+    ran: /agent coder: theme ran on rev 4, files at rev \d+/,
     kinds: 3,
   },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
@@ -2293,8 +2293,8 @@ export function writeRegated(root: string, now: number) {
  * question for a person, and a budget to raise with the answer.
  *
  * FAKE's folder has `theme`'s agent, `coder`, and the skill it gives, `look`, beside it, where a step's agent is looked for first
- * (`lookupRoots`): their bytes are none of the hashes their ledgers and the run's pins hold, so the run page's band says each behind,
- * at the number its next filing would take (`driftNow`), the last of its ledger plus one.
+ * (`lookupRoots`): their bytes are none of the hashes the run's pins hold, so the run page's band says each behind, at the
+ * revision its next filing would take (`driftNow`), which is whatever the definition index numbers a folder it does not hold.
  */
 export function seed(root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -2311,17 +2311,6 @@ export function seed(root: string, now = Date.now()) {
   const check = `${id}-theme-check`;
   const repo = path.join(root, 'hkb-v2');
   const baseRef = seedRepo(repo, laneBranch);
-  const ledger = (kind: string, name: string, upTo: number) =>
-    write(
-      path.join(root, 'revisions', kind, `${name}.json`),
-      JSON.stringify(
-        Array.from({ length: upTo }, (_, i) => ({ n: i + 1, hash: `${name}${i + 1}`.padEnd(16, '0'), at: ago(60 - i) })),
-        null,
-        2,
-      ),
-    );
-  ledger('agent', 'coder', 6);
-  ledger('skill', 'look', 2);
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify(

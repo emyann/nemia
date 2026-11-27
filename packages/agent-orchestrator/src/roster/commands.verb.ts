@@ -4,8 +4,9 @@
  * repository the request names.
  */
 import { Effect } from 'effect';
-import { AGENTS_CARD_WORDS, AGENTS_WORDS } from 'objects';
+import { AGENTS_CARD_WORDS, AGENTS_WORDS, DEFAULT_NAMESPACE } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
+import { definitionRevisionsNow } from '../definition-index/definition-index.store.ts';
 import { agentCardRead, agentsRead } from './roster.store.ts';
 import type { AgentsRead, CardRead } from './roster.ts';
 import type { Served } from '../command/entry.verb.ts';
@@ -16,7 +17,11 @@ export const AGENTS: Served<AgentsRead, AgentsInput> = {
   ...AGENTS_WORDS,
   input: AgentsInput,
   /** None given, no repository's read: the api gives the repository the request is served on. */
-  handler: ({ repo }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
+  handler: ({ repo }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      return yield* agentsRead({ repo, home: root, namespace: DEFAULT_NAMESPACE, revisions: yield* definitionRevisionsNow() });
+    }),
 };
 
 /** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
@@ -25,5 +30,13 @@ export const AGENT_CARD: Served<CardRead, AgentCardInput> = {
   input: AgentCardInput,
   /** None given, no repository's read: the api gives the repository the request is served on. */
   handler: ({ name, repo, from }) =>
-    Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      return yield* agentCardRead(name, {
+        repo,
+        home: root,
+        revisions: yield* definitionRevisionsNow(),
+        ...(from !== undefined && { from }),
+      });
+    }),
 };

@@ -7,7 +7,7 @@
  * has numbered it), the text the files hold now (none where they hold no such definition), and the keyspace head read beside them.
  * A record that still holds the files is the definition's revision; a definition the index holds no record of, or one whose files
  * moved since the record was written, reads as the next revision, the one a sweep would give it now — as `driftNow` numbers a content
- * nobody has resolved off the ledger with no write. Pure.
+ * nobody has swept with no write. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

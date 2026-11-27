@@ -4,7 +4,7 @@
  * digest of what it holds — of an agent, a skill or a workflow of a factory's tree (its scope the factory's name), of the person's library
  * (`_library`) or of Nemia's builtin (`_builtin`, where a builtin template and a builtin skill are). The daemon's sweep (`indexSweep`)
  * reads each file and writes a record only where it differs from what the index holds (`recordDue`), a record whose file is gone
- * deleted, so a revision moves exactly when a definition's files do. The name is escaped by `encodeURIComponent`, as the ledger's is.
+ * deleted, so a revision moves exactly when a definition's files do. The name is escaped by `encodeURIComponent`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -260,7 +260,7 @@ const DERIVED = new Map<string, { readonly print: string; readonly wanted: Reado
  * The text of each definition the files of the store `StoreRoot` names hold now, by the key of its record: the files read again only
  * where their print moved. It writes nothing, so a read and a sweep see the same definitions.
  */
-const definitionsWanted = Effect.fn('definitionsWanted')(function* () {
+const definitionsWanted = Effect.fn('definitionsWanted')(function* (withFactoryWords: boolean) {
   const home = yield* StoreRoot;
   const templates = yield* BuiltinTemplates;
   const listings = yield* listedAt(home);
@@ -279,16 +279,18 @@ const definitionsWanted = Effect.fn('definitionsWanted')(function* () {
       : new Map((yield* definitionsFound(home, factories, templates)).map((d) => [definitionKey(d.scope, d.kind, d.name), textOf(d)]));
   DERIVED.set(home, { print, wanted });
   const words = new Map(wanted);
-  for (const f of factories) for (const d of yield* factoryWordsOf(f)) words.set(definitionKey(d.scope, d.kind, d.name), textOf(d));
+  if (withFactoryWords)
+    for (const f of factories) for (const d of yield* factoryWordsOf(f)) words.set(definitionKey(d.scope, d.kind, d.name), textOf(d));
   return words;
 });
 
 /**
  * The revision each definition the files hold stands at now, worked out with no write (`indexedRevision`): the index's record where it
  * still holds the files, otherwise the revision a sweep would give it, one past the head the records were read at.
+ * @param withFactoryWords Whether each factory's rules and instruction are read too, for the records of the factories.
  */
-export const definitionsNumbered = Effect.fn('definitionsNumbered')(function* () {
-  const wanted = yield* definitionsWanted();
+export const definitionsNumbered = Effect.fn('definitionsNumbered')(function* (withFactoryWords = true) {
+  const wanted = yield* definitionsWanted(withFactoryWords);
   const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot)).pipe(Effect.orDie);
   const { records, revision: head } = yield* keyspace.list(DEFINITIONS_PREFIX);
   const held = new Map(records.map((r) => [r.key, r] as const));
@@ -308,7 +310,7 @@ export const definitionsNumbered = Effect.fn('definitionsNumbered')(function* ()
  * the index: the daemon's loop, and a writer of a definition after its write.
  */
 export const indexSweep = Effect.fn('indexSweep')(function* () {
-  const wanted = yield* definitionsWanted();
+  const wanted = yield* definitionsWanted(true);
   const keyspace = yield* keyspaceAt(keyspaceFile(yield* StoreRoot));
   return yield* keyspace
     .within((tx) =>
@@ -329,8 +331,34 @@ export const indexSweep = Effect.fn('indexSweep')(function* () {
 });
 
 /**
- * The revision a library definition stands at now, worked out with no write (`definitionsNumbered`): what a write of it compares the
- * revision its writer read to, the revision a reader is served (`revisionTable`), the highest among the records that name it.
+ * The revision of each definition, worked out with no write (`definitionsNumbered`) and read once: `of` is the revision a reader is
+ * served for an agent, a skill or a workflow in a namespace (`revisionTable`, the highest among the records that name it), and `words`
+ * the revision of the index's record of a factory's rules and instruction, one past the head where a sweep has not written it yet.
+ * @param withFactoryWords Whether each factory's rules and instruction are read too, which `words` answers from and a reader of agents,
+ * skills and workflows has no need of; off by default, since reading them costs each factory's files on every call.
+ */
+export const definitionRevisionsNow = Effect.fn('definitionRevisionsNow')(function* (withFactoryWords = false) {
+  const { head, held } = yield* definitionsNumbered(withFactoryWords);
+  const tables = new Map([[DEFINITIONS_PREFIX, held]]);
+  const kinds = {
+    Agent: revisionTable('Agent', tables),
+    Skill: revisionTable('Skill', tables),
+    Workflow: revisionTable('Workflow', tables),
+  };
+  return {
+    head,
+    of: (kind: 'Agent' | 'Skill' | 'Workflow', namespace: string | undefined, name: string) => kinds[kind](namespace, name),
+    words: (factory: string) => {
+      if (!withFactoryWords)
+        throw new Error('definitionRevisionsNow reads no factory words unless it is called with `true`: ask for them.');
+      return held.get(definitionKey(factory, 'factory', factory)) ?? head + 1;
+    },
+  };
+});
+
+/**
+ * The revision a definition stands at now, worked out with no write (`definitionsNumbered`): what a write of it compares the revision
+ * its writer read to, the revision a reader is served (`revisionTable`), the highest among the records that name it.
  * @param kind What the definition is.
  * @param namespace The namespace it is served in, none for the library's.
  * @param name The definition's name.
@@ -340,8 +368,7 @@ export const definitionRevisionNow = Effect.fn('definitionRevisionNow')(function
   namespace: string | undefined,
   name: string,
 ) {
-  const held = new Map([[DEFINITIONS_PREFIX, (yield* definitionsNumbered()).held]]);
-  return revisionTable(kind, held)(namespace, name);
+  return (yield* definitionRevisionsNow()).of(kind, namespace, name);
 });
 
 /**

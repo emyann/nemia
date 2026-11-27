@@ -25,7 +25,6 @@ const workflow = {
   spec: { readme: null, steps: [{ name: 'design', keys: { agent: 'architect' }, body: '' }] },
   status: {
     origin: 'factory',
-    revision: 3,
     dir: '/store/factories/acme/tree/workflows/dev',
     description: 'An intent to main.',
     needs: [],

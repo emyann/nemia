@@ -345,11 +345,6 @@
       }
     },
     {
-      "term": "Ledger door",
-      "meaning": "the one way the revision ledger is read and appended to: `LedgerDoor` in `packages/agent-orchestrator/src/revisions/revisions.store.ts`, addressed by `RevisionOf` (a kind and a name), its keyspace layer at the store's root a program is given and a memory one over a keyspace in memory, each refusing an append whose kind, name, digest or time breaks the model's `Revision`.",
-      "type": "LedgerDoorShape"
-    },
-    {
       "term": "Lint",
       "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
       "retired": [
@@ -539,23 +534,13 @@
       "type": "Retention"
     },
     {
-      "term": "Revision",
-      "meaning": "one entry of a kind and name's ledger: its number, a whole one from 1, the digest of the content it was given for, and when it was first seen — the model's `Revision` (`packages/agent-orchestrator/src/revisions/revisions.model.ts`), checked on an append and read nominally.",
-      "type": "Revision"
-    },
-    {
-      "term": "Revision ledger",
-      "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one record per kind and name in the store's keyspace, `/registry/revisions/<kind>/<name>`, appended to in one transaction (a ledger file of before the keyspace imported and moved aside): a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
-      "type": "LedgerDoorShape"
-    },
-    {
       "term": "Keyspace",
-      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, the revision ledger, session and standing tokens, the inbox's cards and the tick's tries of them, and the factories' records (a factory under `/registry/factories/<name>`, its level, its servers and what the controller last observed of it) follow, and the definition index beside them (`/registry/definitions/<scope>/<kind>/<name>`), each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`; delegations, subscriptions and their deliveries, session and standing tokens, the inbox's cards and the tick's tries of them, and the factories' records (a factory under `/registry/factories/<name>`, its level, its servers and what the controller last observed of it) follow, and the definition index beside them (`/registry/definitions/<scope>/<kind>/<name>`), each kind's files of before the keyspace imported once and moved aside under `<store>/imported/` (`packages/agent-orchestrator/src/keyspace/import.store.ts`).",
       "type": "Keyspace"
     },
     {
       "term": "Keyspace revision",
-      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, an object's `resourceVersion` (the highest revision among the records it is made of, `WATCHED_KINDS`) and the revision a list was read at (the keyspace head). A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`). Not a ledger's `Revision`.",
+      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, an object's `resourceVersion` (the highest revision among the records it is made of, `WATCHED_KINDS`) and the revision a list was read at (the keyspace head). A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`).",
       "type": "WriteRefusal"
     },
     {

@@ -662,7 +662,7 @@ resolves it on every pass, so each new filing (a step, a retry, a round) takes t
 removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
 filing after it. Between those a pinned run never takes `agents/` again, from a worktree or
 anywhere — it reads the files only to say how far it is behind them (`driftNow`: the run page's band, and the feed's `revisions
-behind`), compared by digest with its pins and numbered without a write to the ledger: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
+behind`), compared by digest with its pins and numbered at the definitions' revisions without a write: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory
@@ -828,8 +828,8 @@ Three things it is honest about. It is **not a valid Agent Card**: A2A marks `su
 interface is a transport and a URL, and there is no URL — nothing here answers A2A, there is no `/.well-known/agent-card.json`,
 and a card is left where a reader would have to be told it is only a description. That is why the last line goes to
 stderr, where a pipe does not carry it. `capabilities` in A2A is protocol features — streaming, push notifications,
-extensions — not reach, so all three are `false` and mean it. And `version` is the content digest `agentVersion` computes,
-not a semantic version: it changes when the agent's file, its result schema or one of its skills does, which is what the board needs it for.
+extensions — not reach, so all three are `false` and mean it. And `version` is the agent's revision in the definition index, not a semantic version: it moves when the agent's file, its result schema
+or one of its skills does, which is what the board needs it for.
 
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.
@@ -4336,7 +4336,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `revisions` (the workflow folders,
-  agents, skills and factory rules a run's kinds are resolved from, and the ledger they are numbered in — one read of each folder a pass,
+  agents, skills and factory rules a run's kinds are resolved from, and the revisions they are numbered at — one read of each folder a pass,
   shared by every run on it), `observe` (asking each harness what runs), `runtime` (the
   runtime's own pass, less its observe), `place` (every question asked of the place, a call each: the git processes it starts and
   its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`

@@ -4,7 +4,7 @@
  * each with the keys its own file writes and its own note, and its other files. Its `status` is what Nemia works out of it: where it was
  * found (`origin`), its description, its needs and its README's instruction, its typed graph (every node with its kind, decision 12),
  * each step resolved — its keys with its agent's, what its agent is told, the agent the factory hires into it,
- * its told layers and MCP servers — the schemas beside it, why a run of it cannot start in the factory, and the ledger's revision.
+ * its told layers and MCP servers — the schemas beside it, and why a run of it cannot start in the factory.
  *
  * Beside it, the bodies a write is sent (`WorkflowWrite`, `WorkflowCreate`). Plain Schemas of JSON, as every object of this package is.
  */

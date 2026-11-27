@@ -1,20 +1,23 @@
 /**
- * Revisions: the ledger per kind and name, the pins a run records of what it resolved, the drift between the two, and `nemia refresh`.
+ * Revisions: the definition index's revision of each kind and name, the pins a run records of what it resolved, the drift between the
+ * two, and `nemia refresh`.
  *
  * What is proven here, each at shipped defaults: a run that has filed nothing resolves the folder afresh on every pass, so an edit made
- * while it waits `--after` reaches its first step's prompt and its pins; a run that has filed keeps its freeze; the ledger appends only
- * where the digest moved; the verb re-pins and the next try is filed on the new revision with the prompt re-rendered; a filing whose
+ * while it waits `--after` reaches its first step's prompt and its pins; a run that has filed keeps its freeze; a pin is the
+ * definition's revision, which an edit moves; the verb re-pins and the next try is filed on the new revision with the prompt
+ * re-rendered; a filing whose
  * closeout schema has moved starts a fresh session, and one whose schema has not still resumes; a try a pass filed and died before writing
  * down is adopted on the fields, schema and pins its filing wrote; a folder whose steps are a set
  * `nemia start` refuses is not taken, and a kind that stops reading between passes stops that run alone; and the verb's refusals.
  *
- * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
+ * The place is the stand-in (`testPlace`): the subject is the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
  */
 import { askKeyOf, askNames, plantRecord, recordText, rewriteRun, runKey, runRecord, markerText } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
@@ -22,7 +25,7 @@ import type { StoreRoot as Root } from '../src/config/root.store.ts';
 import type { Kept, Resolved } from '../src/revisions/pin.verb.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
-import { digestOf, kindsDrift, revisionNow, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
+import { digestOf, kindsDrift, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
 import { advanceRun, approveRun, driftNow, startRun, retryRun, runWith as runEngine } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../testing.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -31,7 +34,7 @@ import { main } from '../src/cli/main.ts';
 import { stepTaskId } from '../src/record/record.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
-import { ledgerOf } from '../src/revisions/revisions.store.ts';
+import { definitionRevisionsNow } from '../src/definition-index/definition-index.store.ts';
 import { behindNow, followPass, passRevisions, pinPass, resolvedNow } from '../src/revisions/pin.verb.ts';
 import { refreshRun } from '../src/revisions/pin.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
@@ -55,10 +58,13 @@ const { runWith, runPlaced } = stage;
 const rooted = <A, E>(program: Effect.Effect<A, E, Root>) =>
   Effect.runSync(program.pipe(Effect.provideService(StoreRoot, ROOT))) satisfies A;
 /** A pass's reader of what a resolve reads, made at this file's store: one per pass, shared by every resolve handed it. */
+/** `program` run at this file's store to its end, for a program that reads the keyspace and so cannot be run at once. */
+const rootedLater = <A, E>(program: Effect.Effect<A, E, Root>) =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, ROOT))) satisfies Promise<A>;
 const aPass = () => rooted(passRevisions());
 /** What `resolvedNow` answers a run, at this file's store, read as the verb's own three answers. */
-const resolve = (...args: Parameters<typeof resolvedNow>) => {
-  const made: Resolved | Kept | undefined = rooted(resolvedNow(...args));
+const resolve = async (...args: Parameters<typeof resolvedNow>) => {
+  const made: Resolved | Kept | undefined = await rootedLater(resolvedNow(...args));
   return made;
 };
 
@@ -80,7 +86,7 @@ function team(note = "The step's own note.") {
   teams += 1;
   const name = `team-${teams}`;
   const [agent, skill] = [`builder-${teams}`, `build-a-thing-${teams}`];
-  const root = fs.mkdtempSync(path.join(ROOT, 'tree-'));
+  const root = ROOT;
   const dir = path.join(root, 'workflows', name);
   fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
   fs.mkdirSync(path.join(root, 'workflows', 'skills', skill), { recursive: true });
@@ -112,6 +118,14 @@ const promptOf = (id: string, step: string) => fs.readFileSync(path.join(agentFi
 const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: string) =>
   (pinned ?? []).find((p) => p.kind === kind && p.name === name) satisfies Pin | undefined;
 
+const KINDS = { workflow: 'Workflow', agent: 'Agent', skill: 'Skill' } as const;
+
+/** The revision the definition index numbers a definition at now, as a run's pin is numbered: the factory's rules by the factory's name. */
+const revisionOf = (kind: Pin['kind'], name: string, namespace = 'default') =>
+  rootedLater(
+    Effect.map(definitionRevisionsNow(true), (table) => (kind === 'rules' ? table.words(name) : table.of(KINDS[kind], namespace, name))),
+  );
+
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
@@ -142,7 +156,7 @@ const shippedByHand = (repo: string, branch: string) => {
   stage.place().world.commit(repo, `merge ${branch}`);
 };
 
-describe('a folder edited around a run: what it pins, what the ledger numbers, and what `nemia refresh` takes', () => {
+describe('a folder edited around a run: what it pins, what the index numbers, and what `nemia refresh` takes', () => {
   const s = story(test);
   s.test(
     'a run that has filed nothing resolves the folder afresh: an edit made while it waits `--after` reaches its first step',
@@ -159,9 +173,10 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
 
       const t = team('Do it as asked.');
       const run = await started(t.dir, repo, { after: [parent.id], isolate: true });
+      const before = runRecord(ROOT, run.id).pinned;
       assert.equal(
-        pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n,
-        1,
+        pinOf(before, 'agent', t.agent)!.n,
+        await revisionOf('agent', t.agent),
         'the run records the revision of each kind it resolved at the start',
       );
 
@@ -171,16 +186,26 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(pass.filed, ['build'], 'the parent landed, so the first step is filed');
       const after = runRecord(ROOT, run.id);
-      assert.equal(pinOf(after.pinned, 'agent', t.agent)!.n, 2, 'the edited agent is pinned at its new revision');
-      assert.equal(pinOf(after.pinned, 'workflow', t.name)!.n, 2, 'and so is the folder, whose files and agents it digests');
-      assert.equal(pinOf(after.pinned, 'skill', t.skill)!.n, 1, 'the skill nobody edited keeps revision 1');
+      const agentNow = pinOf(after.pinned, 'agent', t.agent)!.n;
+      assert.equal(agentNow, await revisionOf('agent', t.agent), 'the edited agent is pinned at its new revision');
+      assert.ok(agentNow > pinOf(before, 'agent', t.agent)!.n, 'which is past the one it was pinned at');
+      assert.equal(
+        pinOf(after.pinned, 'workflow', t.name)!.n,
+        await revisionOf('workflow', t.name),
+        'and so is the folder, whose files and agents it digests',
+      );
+      assert.equal(
+        pinOf(after.pinned, 'skill', t.skill)!.n,
+        pinOf(before, 'skill', t.skill)!.n,
+        'the skill nobody edited keeps its revision',
+      );
       assert.match(promptOf(run.id, 'build'), /You build it differently/, 'the edit reaches the prompt the session reads');
       assert.match(b.tasks.get(`${run.id}-build`)!.spec.brief, /Do it differently/, 'and the edited step reaches the brief');
       assert.deepEqual(
         after.steps.build?.pinned?.map((p) => [p.kind, p.n]),
         [
-          ['agent', 2],
-          ['skill', 1],
+          ['agent', agentNow],
+          ['skill', pinOf(before, 'skill', t.skill)!.n],
         ],
         "the step's own record says which revisions its try ran on",
       );
@@ -198,27 +223,16 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       const parent = await started(team().dir, repo, { isolate: true });
       const run = await started(t.dir, repo, { after: [parent.id], isolate: true, factory });
 
-      assert.equal(
-        pinOf(runRecord(ROOT, run.id).pinned, 'rules', factory)!.n,
-        1,
-        "the run records the revision of its factory's rules, beside the rest",
-      );
-      assert.equal(ledgerOf(ROOT, 'rules', factory).length, 1, 'and the ledger of the kind holds the one content it was given');
+      const rulesAt = pinOf(runRecord(ROOT, run.id).pinned, 'rules', factory)!.n;
+      assert.equal(rulesAt, await revisionOf('rules', factory), "the run records the revision of its factory's rules, beside the rest");
 
       writeRules(ROOT, { name: factory }, 'Never push on a Friday, nor on a Monday.');
       const b = board();
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
 
-      assert.equal(
-        pinOf(runRecord(ROOT, run.id).pinned, 'rules', factory)!.n,
-        2,
-        'the rules edited while the run waits are pinned at their new revision',
-      );
-      assert.deepEqual(
-        ledgerOf(ROOT, 'rules', factory).map((r) => r.n),
-        [1, 2],
-        'which the ledger numbered as it numbers any other kind',
-      );
+      const rulesNow = pinOf(runRecord(ROOT, run.id).pinned, 'rules', factory)!.n;
+      assert.equal(rulesNow, await revisionOf('rules', factory), 'the rules edited while the run waits are pinned at their new revision');
+      assert.ok(rulesNow > rulesAt, 'which is past the one the run was started on');
       assert.match(promptOf(run.id, 'build'), /nor on a Monday/, "and the new rules reach the prompt the step's session reads");
     },
   );
@@ -236,11 +250,6 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
 
       assert.deepEqual(runRecord(ROOT, run.id).pinned, pinned, 'the pins are the ones it filed on');
       assert.doesNotMatch(promptOf(run.id, 'build'), /Something else/, 'and the prompt is the one it was rendered with');
-      assert.deepEqual(
-        ledgerOf(ROOT, 'agent', t.agent).map((r) => r.n),
-        [1],
-        'and nothing of the edit is numbered on its account: a filed run nobody asked appends nothing to the ledger',
-      );
     },
   );
   s.test(
@@ -276,13 +285,12 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       const b = board();
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-build`, 'failed');
-      const ledger = ledgerOf(ROOT, 'agent', t.agent).length;
+      const filedAt = pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n;
       assert.equal(
-        rooted(followPass(runRecord(ROOT, run.id), new Date().toISOString(), true)).wrote,
+        (await rootedLater(followPass(runRecord(ROOT, run.id), true))).wrote,
         false,
         'a filing due with no edit re-pins nothing',
       );
-      assert.equal(ledgerOf(ROOT, 'agent', t.agent).length, ledger, 'and numbers nothing new');
 
       fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou follow the files.\n`);
       fs.writeFileSync(path.join(t.dir, 'extra.md'), `---\nplace: git\nagent: ${t.agent}\n---\nA step added since.\n`);
@@ -290,12 +298,14 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       await runWith(b.e, retryRun(run.id, 'build', { mode: 'fresh' }));
       const repinned = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(repinned.tried, [], 'the pass that re-pins files nothing');
-      assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'the run takes the edited agent with no refresh asked');
+      const followedTo = pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n;
+      assert.equal(followedTo, await revisionOf('agent', t.agent), 'the run takes the edited agent with no refresh asked');
+      assert.ok(followedTo > filedAt, 'at a revision past the one it filed on');
       const filed = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(filed.tried, ['build'], 'and the next pass files the retry');
 
       const after = runRecord(ROOT, run.id);
-      assert.equal(after.steps.build?.pinned?.[0].n, 2, 'and the retry is filed on it');
+      assert.equal(pinOf(after.steps.build?.pinned, 'agent', t.agent)!.n, followedTo, 'and the retry is filed on it');
       assert.match(promptOf(run.id, 'build'), /You follow the files/, 'its prompt rendered again');
       assert.deepEqual(Object.keys(after.steps), ['build'], 'the step added to the folder is not added to the run');
       assert.equal(markerText(ROOT, run.id, 'refresh') !== undefined, false, 'and no refresh ask was written');
@@ -328,39 +338,31 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       assert.equal(promptOf(run.id, 'build'), prompt, 'and so is the prompt its step was given');
     },
   );
-  s.test('the ledger appends only where the digest moved, and a content it already holds keeps the number it was given', async () => {
+  s.test("a pin's number is the definition's revision: an edit moves it, and the content back as it was takes a higher one", async () => {
     const t = team();
     const run = await started(t.dir, aRepo());
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(
-      ledgerOf(ROOT, 'agent', t.agent).map((r) => r.n),
-      [1],
-      'resolved at the start and again on the pass, with no edit, the ledger holds one entry',
+    const first = pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n;
+    assert.equal(
+      first,
+      await revisionOf('agent', t.agent),
+      'resolved at the start and again on the pass, with no edit, the pin is the revision',
     );
-    assert.match(ledgerOf(ROOT, 'agent', t.agent)[0].at, /^\d{4}-\d{2}-\d{2}T/, 'and says when it was first seen');
 
-    const first = fs.readFileSync(t.agentFile, 'utf8');
+    const was = fs.readFileSync(t.agentFile, 'utf8');
     fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
     await runPlaced(refreshRun(run.id));
-    assert.deepEqual(
-      ledgerOf(ROOT, 'agent', t.agent).map((r) => r.n),
-      [1, 2],
-      'the edit takes the next number',
-    );
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const edited = pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n;
+    assert.equal(edited, await revisionOf('agent', t.agent), 'the edit is pinned at the revision it stands at');
+    assert.ok(edited > first, 'which is past the one before it');
 
-    fs.writeFileSync(t.agentFile, first);
+    fs.writeFileSync(t.agentFile, was);
     const again = await started(t.dir, aRepo());
-    assert.deepEqual(
-      ledgerOf(ROOT, 'agent', t.agent).map((r) => r.n),
-      [1, 2],
-      'and the content back as it was takes no third number',
-    );
-    assert.equal(
-      pinOf(runRecord(ROOT, again.id).pinned, 'agent', t.agent)!.n,
-      1,
-      'a run resolving it now is pinned at the number that content has',
-    );
+    const back = pinOf(runRecord(ROOT, again.id).pinned, 'agent', t.agent)!.n;
+    assert.equal(back, await revisionOf('agent', t.agent), 'a run resolving the content as it was is pinned at the revision it stands at');
+    assert.ok(back > edited, 'a revert is a new, higher revision, never the old number again');
   });
   s.test('`nemia refresh` re-pins, and the next try is filed on the new revision with its prompt rendered again', async () => {
     const t = team();
@@ -370,29 +372,38 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     b.settle(`${run.id}-build`, 'failed');
 
     fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
+    const [workflowWas, agentWas] = [
+      pinOf(runRecord(ROOT, run.id).pinned, 'workflow', t.name)!.n,
+      pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n,
+    ];
     const drift = await runPlaced(refreshRun(run.id));
     assert.deepEqual(
       drift.map((d) => [d.kind, d.name, d.pinned, d.now]),
       [
-        ['workflow', t.name, 1, 2],
-        ['agent', t.agent, 1, 2],
+        ['workflow', t.name, workflowWas, await revisionOf('workflow', t.name)],
+        ['agent', t.agent, agentWas, await revisionOf('agent', t.agent)],
       ],
       'the verb answers with the drift it was asked on, per kind',
     );
 
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'the pass takes the new revisions');
+    const agentNow = pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n;
+    assert.equal(agentNow, await revisionOf('agent', t.agent), 'the pass takes the new revisions');
     assert.match(promptOf(run.id, 'build'), /You build it differently/, 'and renders the prompt again');
     assert.equal(markerText(ROOT, run.id, 'refresh') !== undefined, false, 'the ask is spent, its file taken off');
-    assert.equal(runRecord(ROOT, run.id).steps.build?.pinned?.[0].n, 1, 'the try that already ran keeps the revision it ran on');
+    assert.equal(
+      pinOf(runRecord(ROOT, run.id).steps.build?.pinned, 'agent', t.agent)!.n,
+      agentWas,
+      'the try that already ran keeps the revision it ran on',
+    );
 
     await runWith(b.e, retryRun(run.id, 'build', { mode: 'fresh' }));
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(
       runRecord(ROOT, run.id).steps.build?.pinned?.map((p) => [p.kind, p.n]),
       [
-        ['agent', 2],
-        ['skill', 1],
+        ['agent', agentNow],
+        ['skill', pinOf(runRecord(ROOT, run.id).pinned, 'skill', t.skill)!.n],
       ],
       'and the retry is filed on them',
     );
@@ -459,6 +470,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal(b.tasks.get(`${run.id}-build-check`)!.spec.config?.env?.WF_CARRIED_FILES, again, 'the check is told the new copy');
+    fs.rmSync(carried, { recursive: true, force: true });
   });
   s.test('a run whose workflows hold no carried folder records none, and its check is told none', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
@@ -527,7 +539,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       'the schema moved, so try 2 is a fresh session rather than one asked in the wrong shape',
     );
   });
-  describe("`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the ledger", () => {
+  describe("`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the index", () => {
     let b!: ReturnType<typeof board>;
     beforeAll(() => {
       b = board();
@@ -537,39 +549,42 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       return runRecord(ROOT, run.id);
     };
-    const agentDrift = (run: Parameters<typeof driftNow>[0], name: string) =>
-      rooted(driftNow(run)).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
-    test('an edit later reverted is no drift, though the ledger numbered the edit', async () => {
+    const agentDrift = async (run: Parameters<typeof driftNow>[0], name: string) =>
+      (await rootedLater(driftNow(run))).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
+    test('an edit later reverted is no drift, though another start numbered the edit', async () => {
       const on = team();
       const run = await filed(on);
       const first = fs.readFileSync(on.agentFile, 'utf8');
       fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nAn edit someone took back.\n`);
       await started(on.dir, aRepo());
-      assert.deepEqual(
-        ledgerOf(ROOT, 'agent', on.agent).map((r) => r.n),
-        [1, 2],
-        'another start numbered the edit',
-      );
+      assert.notEqual(await revisionOf('agent', on.agent), pinOf(run.pinned, 'agent', on.agent)!.n, 'another start numbered the edit');
       fs.writeFileSync(on.agentFile, first);
-      assert.deepEqual(rooted(driftNow(run)), [], 'the files hold the bytes the run pins: nothing is behind');
+      assert.deepEqual(await rootedLater(driftNow(run)), [], 'the files hold the bytes the run pins: nothing is behind');
     });
-    test('content reverted to an older revision is drift, its `now` that older number', async () => {
+    test('content reverted to an older content is drift, its `now` a revision past the pin', async () => {
       const on = team();
       const first = fs.readFileSync(on.agentFile, 'utf8');
       await started(on.dir, aRepo());
       fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nThe second content.\n`);
       const run = await filed(on);
-      assert.equal(pinOf(run.pinned, 'agent', on.agent)!.n, 2, 'the run pins the second content');
+      const pinned = pinOf(run.pinned, 'agent', on.agent)!.n;
+      assert.equal(pinned, await revisionOf('agent', on.agent), 'the run pins the second content');
       fs.writeFileSync(on.agentFile, first);
-      assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 2, now: 1 }]);
+      const [drift] = await agentDrift(run, on.agent);
+      assert.deepEqual(drift, { kind: 'agent', name: on.agent, pinned, now: await revisionOf('agent', on.agent) });
+      assert.ok(drift.now > pinned, 'a revert is a new, higher revision');
     });
-    test('content nobody resolved reads as the next number, and the ledger stays as it was', async () => {
+    test('content nobody resolved reads as the next revision, and the index stays as it was', async () => {
       const on = team();
       const run = await filed(on);
+      const pinned = pinOf(run.pinned, 'agent', on.agent)!.n;
       fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nNever resolved.\n`);
-      const before = [ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)];
-      assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 1, now: 2 }]);
-      assert.deepEqual([ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)], before, 'nothing was appended');
+      const head = () => rootedLater(Effect.map(definitionRevisionsNow(), (table) => table.head));
+      const before = await head();
+      const [drift] = await agentDrift(run, on.agent);
+      assert.deepEqual(drift, { kind: 'agent', name: on.agent, pinned, now: await revisionOf('agent', on.agent) });
+      assert.ok(drift.now > pinned, 'the edit stands past the pin');
+      assert.equal(await head(), before, 'nothing was written');
     });
   });
   s.test(
@@ -661,30 +676,6 @@ const waiting = async (t: Team, repo: string) => {
   const parent = await started(team().dir, repo, { isolate: true });
   return await started(t.dir, repo, { after: [parent.id], isolate: true });
 };
-
-test('a kind that stops reading between passes stops that run alone: it keeps the revisions it had, and the pass judges it', async () => {
-  const repo = aRepo();
-  const t = team();
-  const run = await waiting(t, repo);
-  const b = board();
-  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-  const before = runRecord(ROOT, run.id);
-  const prompt = promptOf(run.id, 'build');
-
-  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
-  plantRecord(ROOT, `/registry/revisions/agent/${encodeURIComponent(t.agent)}`, 'not a ledger');
-  const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-
-  assert.match(
-    pass.notes.join('\n'),
-    /keeps the revisions it had, since resolving them did not read: the ledger at \/registry\/revisions\/agent\//,
-    'the pass says the run took nothing of the world, and what did not read',
-  );
-  assert.equal(pass.status, 'running', 'and the pass judged the run all the same, rather than dying of what did not read');
-  assert.deepEqual(runRecord(ROOT, run.id).pinned, before.pinned, 'the run keeps the pins it had');
-  assert.deepEqual(Object.keys(runRecord(ROOT, run.id).steps), Object.keys(before.steps), 'and the step set it froze');
-  assert.equal(promptOf(run.id, 'build'), prompt, 'and the prompt its next filing reads, since the record is changed after the render');
-});
 
 test('a run that has filed nothing keeps the step set it froze where the folder holds a set `nemia start` refuses', async () => {
   const repo = aRepo();
@@ -817,7 +808,11 @@ test('a try a pass filed and died before writing down is adopted on what filing 
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
   await runPlaced(refreshRun(run.id));
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-  assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'a pass takes the refresh, with nothing yet to file');
+  assert.equal(
+    pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n,
+    await revisionOf('agent', t.agent),
+    'a pass takes the refresh, with nothing yet to file',
+  );
   await runWith(b.e, retryRun(run.id, 'build', { mode: 'continue' }));
   const beforeFiling = runRecord(ROOT, run.id);
   const asked = askNames(ROOT, run.id).map((name) => [name, recordText(ROOT, askKeyOf(run.id, name)) ?? ''] as const);
@@ -887,7 +882,11 @@ describe('a step that ended is judged by the fields it was filed with: a run tha
     );
     const repinned = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(repinned.tried, [], 'the pass that re-pins files nothing');
-    assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', team0.agent)?.n, 2, 'the run follows the edited agent');
+    assert.equal(
+      pinOf(runRecord(ROOT, run.id).pinned, 'agent', team0.agent)?.n,
+      await revisionOf('agent', team0.agent),
+      'the run follows the edited agent',
+    );
     const build = runRecord(ROOT, run.id).workflow?.find((w) => w.name === 'build');
     assert.deepEqual(Object.keys(build?.output?.schema.properties ?? {}), ['goal', 'why'], 'and its frozen build declares both');
   });
@@ -921,7 +920,7 @@ describe('a step that ended is judged by the fields it was filed with: a run tha
 });
 
 /** What the `revisions` phase counted while `f` ran as one metered pass: the reads of the world a resolve made. */
-const resolveCalls = async (f: () => void) => {
+const resolveCalls = async (f: () => Promise<void>) => {
   const { tallies } = await metered(async () => f());
   assert.ok(tallies, 'the work was metered');
   return tallies.kinds.revisions.calls;
@@ -935,26 +934,30 @@ const twoOnOneFolder = async () => {
   return { repo, t, one: runRecord(ROOT, one.id), two: runRecord(ROOT, two.id) };
 };
 
-const AT = '2026-10-16T12:00:00.000Z';
-
 test('a pass resolves one workflow folder once for every run on it, and each run is given the pins it would be given alone', async () => {
   const { one, two } = await twoOnOneFolder();
-  const alone = await resolveCalls(() => resolve(one, AT, aPass()));
+  const alone = await resolveCalls(async () => void (await resolve(one, aPass())));
   assert.ok(alone > 0, 'resolving a run reads the world');
 
   const shared = aPass();
   let pins: Pin[][] = [];
-  const together = await resolveCalls(() => {
-    pins = [one, two].map((run) => {
-      const resolved = resolve(run, AT, shared);
-      assert.ok(resolved && 'pins' in resolved, 'each run resolved');
-      return resolved.pins;
-    });
+  const together = await resolveCalls(async () => {
+    pins = await Promise.all(
+      [one, two].map(async (run) => {
+        const resolved = await resolve(run, shared);
+        assert.ok(resolved && 'pins' in resolved, 'each run resolved');
+        return resolved.pins;
+      }),
+    );
   });
-  assert.equal(together, alone, 'the second run on the folder costs no read of its own: the folder, its digests and its ledger are shared');
+  assert.equal(
+    together,
+    alone,
+    'the second run on the folder costs no read of its own: the folder, its digests and its revisions are shared',
+  );
 
-  const apart = await resolveCalls(() => {
-    for (const run of [one, two]) resolve(run, AT, aPass());
+  const apart = await resolveCalls(async () => {
+    for (const run of [one, two]) await resolve(run, aPass());
   });
   assert.equal(apart, alone * 2, 'a reader each — a one-off verb, which is handed no pass — pays for each run, as it did before');
   assert.deepEqual(pins[0], pins[1], 'and the pins the two runs are given are the same');
@@ -967,7 +970,7 @@ test('a pass resolves one workflow folder once for every run on it, and each run
 
 test('a memo is keyed by what it reads: one folder read once, and again for another repository or another factory', async () => {
   const { one, t } = await twoOnOneFolder();
-  const alone = await resolveCalls(() => resolve(one, AT, aPass()));
+  const alone = await resolveCalls(async () => void (await resolve(one, aPass())));
   const elsewhere = { ...one, repo: aRepo() };
   const factory = `factory-${t.name}`;
   addFactoryAt(ROOT, { name: factory, volumes: [one.repo!].map((r) => `${r}:rw`) });
@@ -992,13 +995,13 @@ test('a memo is keyed by what it reads: one folder read once, and again for anot
     "and a digest is keyed by the factory it was taken of, so the hired run's rules are digested rather than answered as none",
   );
 
-  const twoRepos = await resolveCalls(() => {
+  const twoRepos = await resolveCalls(async () => {
     const apart = aPass();
-    for (const run of [one, elsewhere]) resolve(run, AT, apart);
+    for (const run of [one, elsewhere]) await resolve(run, apart);
   });
   assert.ok(
     twoRepos > alone,
-    `two repositories cost a second read of the folder and its digests, the ledger entries of one content apart — ${twoRepos} reads against ${alone}`,
+    `two repositories cost a second read of the folder and its digests, the revisions of one content apart — ${twoRepos} reads against ${alone}`,
   );
 });
 
@@ -1027,30 +1030,30 @@ test('a run with no repository is keyed apart, never as the ticking process\u201
 test('a workflow folder that has stopped reading is read once a pass, and every run on it keeps what it froze', async () => {
   const { one, two, t } = await twoOnOneFolder();
   const read = aPass();
-  const alone = await resolveCalls(() => resolve(one, AT, read));
+  const alone = await resolveCalls(async () => void (await resolve(one, read)));
   fs.rmSync(t.dir, { recursive: true, force: true });
 
   const gone = aPass();
   let answers: unknown[] = [];
-  const both = await resolveCalls(() => {
-    answers = [one, two].map((run) => resolve(run, AT, gone));
+  const both = await resolveCalls(async () => {
+    answers = await Promise.all([one, two].map((run) => resolve(run, gone)));
   });
   assert.deepEqual(answers, [undefined, undefined], 'each run keeps the workflow and the revisions it froze');
   assert.ok(both < alone, `the folder that does not load costs less than one that does — ${both} reads against ${alone}`);
 
-  const apart = await resolveCalls(() => {
-    for (const run of [one, two]) resolve(run, AT, aPass());
+  const apart = await resolveCalls(async () => {
+    for (const run of [one, two]) await resolve(run, aPass());
   });
   assert.equal(both * 2, apart, 'and the throw is kept, so the second run on it reads nothing: one read a pass, not one a run');
 
-  const took = rooted(pinPass(two, AT, gone));
+  const took = await rootedLater(pinPass(two, gone));
   assert.deepEqual(took, { wrote: false, notes: [], lift: false }, 'the pass writes nothing for it, and judges every other run');
 });
 
 test('each run on one folder is handed its own steps, so a write onto one run’s record leaves the other’s alone', async () => {
   const { one, two } = await twoOnOneFolder();
   const read = aPass();
-  const [first, second] = [one, two].map((run) => resolve(run, AT, read));
+  const [first, second] = await Promise.all([one, two].map((run) => resolve(run, read)));
   assert.ok(first && 'steps' in first && second && 'steps' in second, 'both resolved');
   assert.notEqual(first.steps, second.steps, 'not the one array');
   assert.notEqual(first.steps[0], second.steps[0], 'nor the one step object');
@@ -1059,27 +1062,7 @@ test('each run on one folder is handed its own steps, so a write onto one run’
   assert.deepEqual(second.steps[0].after, [], "a write onto one run's steps leaves the other's as the folder holds them");
 });
 
-test('the pure parts: a revision already given keeps its number, a gap gives no number twice, and the drift reads per kind and per step', () => {
-  const entries = [
-    { n: 1, hash: 'a', at: 'then' },
-    { n: 2, hash: 'b', at: 'later' },
-  ];
-  assert.deepEqual(revisionNow(entries, 'a', 'now'), { n: 1, hash: 'a', at: 'then' }, 'a content the ledger holds keeps its number');
-  assert.deepEqual(revisionNow(entries, 'c', 'now'), { n: 3, hash: 'c', at: 'now' }, 'a new content takes one past the highest');
-  assert.deepEqual(revisionNow([], 'a', 'now'), { n: 1, hash: 'a', at: 'now' }, 'an empty ledger gives revision 1');
-  assert.deepEqual(
-    revisionNow(
-      [
-        { n: 1, hash: 'a', at: 'then' },
-        { n: 3, hash: 'c', at: 'later' },
-      ],
-      'd',
-      'now',
-    ),
-    { n: 4, hash: 'd', at: 'now' },
-    'a ledger with a gap in it — an entry that did not decode, or a hand edit — gives one past its highest, never its count, which would give a number twice',
-  );
-
+test('the pure parts: the drift reads per kind and per step', () => {
   const pinned: Pin[] = [{ kind: 'agent', name: 'coder', n: 5, hash: 'e' }];
   const moved: Pin[] = [{ kind: 'agent', name: 'coder', n: 5, hash: 'f' }];
   assert.deepEqual(
@@ -1107,23 +1090,23 @@ test('the pure parts: a revision already given keeps its number, a gap gives no 
 test('a folder edited while a run waits to give a step a tool nothing allows keeps the set it froze, says why, and stops no other run', async () => {
   const { one, two, t } = await twoOnOneFolder();
   const read = aPass();
-  const before = resolve(one, AT, read);
+  const before = await resolve(one, read);
   assert.ok(before && 'pins' in before, 'the folder resolves while its agent can call what it is given');
 
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\npermissionMode: dontAsk\ntools: Read, Grep, Skill, WebFetch\n---\nYou build.\n`);
   const after = aPass();
-  const kept = resolve(one, AT, after);
+  const kept = await resolve(one, after);
   assert.ok(kept && 'kept' in kept, 'the run keeps the step set it froze');
   assert.match(kept.kept, /^build: /);
   assert.match(kept.kept, /gives its session `WebFetch`/);
   assert.equal(kept.kept.includes('\n'), false, 'the note is the refusal’s first line');
-  const other = resolve(two, AT, after);
+  const other = await resolve(two, after);
   assert.ok(other && 'kept' in other, 'the other run on the folder is judged too, and kept for the same reason');
 
   const allowed = aPass();
   fs.mkdirSync(path.join(one.repo!, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(one.repo!, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['WebFetch'] } }));
-  const now = resolve(one, AT, allowed);
+  const now = await resolve(one, allowed);
   assert.ok(now && 'pins' in now, "the repository's own rule makes the call reachable, and the run takes the folder again");
 });
 
@@ -1135,7 +1118,7 @@ test("the allow rules of a run's repository are read once a pass for every run o
   assert.notEqual(read.allows(one), read.allows({ ...one, repo: aRepo() }), 'the repository is the key: its own settings are what is read');
 });
 
-test('the pin pass reads through the doors: an agent the Agent door holds in memory alone is pinned at the version that door gives it', () => {
+test('the pin pass reads through the doors: an agent the Agent door holds in memory alone is pinned at the version that door gives it', async () => {
   const holder = fs.mkdtempSync(path.join(ROOT, 'doors-'));
   const dir = path.join(holder, 'through-doors');
   fs.mkdirSync(dir, { recursive: true });
@@ -1148,10 +1131,10 @@ test('the pin pass reads through the doors: an agent the Agent door holds in mem
     return yield* door.agents.there(AgentName.read('door-agent'), { dir: agents });
   });
   const run = { workflowDir: dir, isolate: true };
-  const { held, resolved } = Effect.runSync(
+  const { held, resolved } = await Effect.runPromise(
     Effect.gen(function* () {
       const held = yield* there;
-      const resolved: Resolved | Kept | undefined = yield* resolvedNow(run, AT, yield* passRevisions());
+      const resolved: Resolved | Kept | undefined = yield* resolvedNow(run, yield* passRevisions());
       return { held, resolved };
     }).pipe(Effect.provide(memory), Effect.provideService(StoreRoot, ROOT)),
   );
@@ -1182,7 +1165,7 @@ test('a read that fails is kept for the pass: asked again it fails again with no
       },
     }),
   );
-  const { first, second, lookedThen, took } = Effect.runSync(
+  const { first, second, lookedThen, took, kept } = await Effect.runPromise(
     Effect.gen(function* () {
       const read = yield* passRevisions();
       yield* read.steps(one);
@@ -1190,14 +1173,16 @@ test('a read that fails is kept for the pass: asked again it fails again with no
       const first = yield* Effect.result(read.skills(one));
       const second = yield* Effect.result(read.skills(one));
       const lookedThen = looked;
-      const took = yield* pinPass(one, AT, read);
-      return { first, second, lookedThen, took };
+      const [pinned, steps] = [structuredClone(one.pinned), Object.keys(one.steps)];
+      const took = yield* pinPass(one, read);
+      return { first, second, lookedThen, took, kept: isDeepStrictEqual([pinned, steps], [one.pinned, Object.keys(one.steps)]) };
     }).pipe(Effect.provide(unreadable), Effect.provideService(StoreRoot, ROOT)),
   );
   assert.equal(first._tag, 'Failure', 'the lookup fails');
   assert.equal(second._tag, 'Failure', 'and asked again within the pass, fails again');
   assert.equal(lookedThen, 1, 'the Skill door was asked once: the failure is kept, not looked up again');
   assert.equal(took.wrote, false, 'the pass writes nothing for the run');
+  assert.ok(kept, 'and the run keeps the revisions it had and the step set it froze: a kind that stops reading stops that run alone');
   assert.equal(took.notes.length, 1, 'and says one note');
   const note = took.notes[0] ?? '';
   assert.ok(note.includes('the skills beside the folder did not read'), 'the note names the failure');
@@ -1219,21 +1204,20 @@ test('a held run is read and pinned as one that files again once the hold lifts;
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   b.settle(`${run.id}-build`, 'failed');
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build, held.\n`);
-  const now = new Date().toISOString();
-  const follow = (marks: object) => rooted(followPass({ ...runRecord(ROOT, run.id), ...marks }, now, true)).wrote;
-  assert.equal(follow(CALLED_OFF), false, 'a run called off takes no edit');
-  assert.equal(follow(PRUNED), false, 'nor does a pruned one');
-  assert.equal(follow({ hold: HOLD }), true, 'a held run with a filing due takes the edit, for the filing after the lift');
+  const follow = async (marks: object) => (await rootedLater(followPass({ ...runRecord(ROOT, run.id), ...marks }, true))).wrote;
+  assert.equal(await follow(CALLED_OFF), false, 'a run called off takes no edit');
+  assert.equal(await follow(PRUNED), false, 'nor does a pruned one');
+  assert.equal(await follow({ hold: HOLD }), true, 'a held run with a filing due takes the edit, for the filing after the lift');
 
   const still = team();
   const pinned = await started(still.dir, aRepo());
   await runWith(b.e, advanceRun(runRecord(ROOT, pinned.id)));
   b.settle(`${pinned.id}-build`, 'failed');
   fs.writeFileSync(still.agentFile, `---\nskills: ${still.skill}\n---\nYou build, edited since.\n`);
-  const behind = (marks: object) => rooted(behindNow({ ...runRecord(ROOT, pinned.id), ...marks }, false)).length;
-  assert.equal(behind(CALLED_OFF), 0, 'a run called off is behind nothing: it files nothing again');
-  assert.equal(behind(PRUNED), 0, 'nor is a pruned one');
-  assert.ok(behind({ hold: HOLD }) > 0, 'a held run is behind the edited agent: it files again once the hold lifts');
-  const pin = (marks: object) => rooted(pinPass({ ...runRecord(ROOT, pinned.id), ...marks }, now));
-  assert.deepEqual(pin(CALLED_OFF), { wrote: false, notes: [], lift: false }, 'a run called off is never resolved');
+  const behind = async (marks: object) => (await rootedLater(behindNow({ ...runRecord(ROOT, pinned.id), ...marks }, false))).length;
+  assert.equal(await behind(CALLED_OFF), 0, 'a run called off is behind nothing: it files nothing again');
+  assert.equal(await behind(PRUNED), 0, 'nor is a pruned one');
+  assert.ok((await behind({ hold: HOLD })) > 0, 'a held run is behind the edited agent: it files again once the hold lifts');
+  const pin = (marks: object) => rootedLater(pinPass({ ...runRecord(ROOT, pinned.id), ...marks }));
+  assert.deepEqual(await pin(CALLED_OFF), { wrote: false, notes: [], lift: false }, 'a run called off is never resolved');
 });

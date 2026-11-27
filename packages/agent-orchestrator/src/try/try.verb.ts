@@ -14,6 +14,8 @@ import { startRun } from '../start/start.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { skillNamesIn } from '../agents/read.store.ts';
+import { definitionRevisionsNow } from '../definition-index/definition-index.store.ts';
+import { digestOf } from '../revisions/revisions.ts';
 import { agentRead, agentSkillsFound } from '../roster/roster.store.ts';
 import type { AgentReading } from '../roster/roster.ts';
 import type { SkillsFound } from '../agents/agents.ts';
@@ -55,7 +57,7 @@ const triedAgent = Effect.fnUntraced(function* ({ who, from, name, brief, repo, 
     );
   }
   const dir = yourAgentsDir(home);
-  const reading = yield* agentRead('user', dir, name, { repo, home });
+  const reading = yield* agentRead('user', dir, name, { repo, home, revisions: yield* definitionRevisionsNow() });
   if (!reading) {
     return yield* Effect.fail(
       new Missing({
@@ -86,7 +88,7 @@ export const tryAgent = Effect.fnUntraced(function* (asked: TryAsked) {
       }),
     );
   }
-  const workflowDir = yield* tried(() => tryFolder(asked.name, reading.version, reading.keys, asked.home));
+  const workflowDir = yield* tried(() => tryFolder(asked.name, digestOf([reading.source]), reading.keys, asked.home));
   const run = yield* Effect.provideService(startRun({ brief: asked.brief.trim(), repo: '', workflowDir }), StoreRoot, asked.home);
   return { id: run.id };
 });

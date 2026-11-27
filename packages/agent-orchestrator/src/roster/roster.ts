@@ -55,8 +55,9 @@ export function inFactory<L extends { file: string }>(
 /**
  * One agent as it is read: its file's keys as written, its instructions, the result schema its `output:` names as that file holds it, the
  * skills its `skills:` gives its sessions and its `harnessPrompt:`, each as written, what its card says it can do, the file's text, its
- * version (`agentVersion`, what a write carries), the nodes that name it, and the file of a person's custom instructions for it. `error` is
- * the parser's refusal of a file that does not read, whose keys are then its lines as written, so a form can show what to fix.
+ * version (its revision, the `resourceVersion` a write carries), the nodes that name it, and the file of a person's custom instructions
+ * for it. `error` is the parser's refusal of a file that does not read, whose keys are then its lines as written, so a form can show
+ * what to fix.
  */
 export type AgentReading = {
   name: string;
@@ -102,6 +103,9 @@ export type AgentReading = {
   copied: AgentCopiedFrom | null;
 };
 
+/** The revision each agent stands at, as the definition index numbers it: `of` an agent in a namespace, none for the library's. */
+export type AgentRevisions = { of: (kind: 'Agent', namespace: string | undefined, name: string) => number };
+
 /** Where an agent of yours was copied from, the version it was at then, and how that file stands now. */
 export type AgentCopiedFrom = { source: string; version: string; now: 'same' | 'changed' | 'gone' };
 
@@ -138,7 +142,7 @@ function harnessPromptOf(source: string) {
  * @param dir The folder of that place.
  * @param file The agent's file.
  * @param name The agent's name.
- * @param version The agent's version.
+ * @param version The agent's revision.
  * @param usedBy The nodes that name the agent.
  */
 export const emptyReading = (from: AgentPlace, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]) => ({

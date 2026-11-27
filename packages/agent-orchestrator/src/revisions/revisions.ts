@@ -1,10 +1,10 @@
 /**
- * What a revision is, and the drift between what a run resolved and what the files hold now. The face of the folder: the ledger on disk
- * is `revisions.store.ts`'s, and resolving a run's kinds is `pin.verb.ts`'s. Pure.
+ * What a revision is, and the drift between what a run resolved and what the files hold now. The face of the folder: resolving a run's
+ * kinds is `pin.verb.ts`'s. Pure.
  *
- * A revision is a number given to the content of one kind and name — a workflow folder, an agent, a skill, a factory's rules — the first
- * time anyone resolves that content. The content itself is never kept here: a run keeps its own frozen copy, and the ledger keeps only the
- * digest, so a number can be compared.
+ * A pin's number is the revision of one kind and name — a workflow folder, an agent, a skill, a factory's rules — in the definition
+ * index, in the run's namespace: the number its `metadata.resourceVersion` carries. The content itself is never kept here: a run keeps its
+ * own frozen copy and the pin keeps the digest, so two contents can be compared.
  */
 import { createHash } from 'node:crypto';
 import type { RevisionKind } from 'objects';
@@ -21,43 +21,30 @@ export const REVISION_KINDS = ['workflow', 'agent', 'skill', 'rules'] as const s
 /** One thing a revision is kept for: its kind, and its name within the kind — a workflow folder's, an agent's, a skill's, a factory's. */
 export type KindName = { kind: RevisionKind; name: string };
 
-/** One entry of a kind and name's ledger: its number, from 1, the digest of the content it was given for, and when it was first seen. */
-export type Revision = { n: number; hash: string; at: string };
-
-/** What a run resolved of one kind and name: the revision's number and the digest it was given for. */
+/** What a run resolved of one kind and name: the definition's revision and the digest of what it held. */
 export type Pin = KindName & { n: number; hash: string };
 
 /**
  * One kind and name a run or one of its steps is behind the files on: what it resolved (`pinned`), the revision of what the files hold now
- * (`now`, which may be lower than `pinned` where the files went back to an older content), and the step that already ran on it (`step`),
- * absent for the run's own pin, which a filing after this takes.
+ * (`now`, never lower than `pinned` for a run's own pins: a revert is a new, higher revision), and the step that already ran on it
+ * (`step`), absent for the run's own pin, which a filing after this takes.
  */
 export type Drift = KindName & { pinned: number; now: number; step?: string };
 
 /**
- * The digest the ledger and a closeout schema's hash are taken by: a sha256 of `parts` as JSON, cut to 16 hex characters.
+ * The digest a pin and a closeout schema's hash are taken by: a sha256 of `parts` as JSON, cut to 16 hex characters.
  * @param parts What the digest is taken of.
  */
 export const digestOf = (parts: readonly unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
-
-/**
- * The revision `hash` stands at in `entries`: the entry already given for that content, whatever its place in the ledger, else the next
- * number, which is one past the highest there — never the count, so a ledger a hand edit left a gap in gives no number twice.
- * @param entries The ledger's entries for one kind and name.
- * @param hash The digest of the content.
- * @param at When a new entry is given, written on it.
- */
-export const revisionNow = (entries: readonly Revision[], hash: string, at: string) =>
-  entries.find((e) => e.hash === hash) ?? { n: Math.max(0, ...entries.map((e) => e.n)) + 1, hash, at };
 
 /** The pin of `pins` for `of`, or undefined where it holds none. */
 const pinFor = (pins: readonly Pin[], of: KindName) => pins.find((t) => t.kind === of.kind && t.name === of.name);
 
 /**
  * The kinds `pinned` differs from `now` on, in `pinned`'s order: one `Drift` per kind and name whose content `now` holds other bytes of, by
- * the digest — never by the number, which is only the ledger's reading of a content: a kind edited and reverted is the pin's number again,
- * and a kind reverted to an older content is that older number, so `now` may be lower than `pinned`. `[]` when nothing differs, a kind
- * `now` does not hold included, and for a record written before this slice, which pinned nothing.
+ * the digest — never by the number, which only says when the index counted it: a kind edited and reverted is a new, higher
+ * revision. `[]` when nothing differs,
+ * a kind `now` does not hold included, and for a record written before this slice, which pinned nothing.
  * @param pinned What the run resolved, or undefined on a record that pinned nothing.
  * @param now What the files hold now.
  */

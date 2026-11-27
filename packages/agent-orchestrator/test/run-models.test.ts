@@ -143,7 +143,7 @@ describe("a step's model named at start, from `nemia start --model` to the step 
     assert.equal(b.tasks.get(`${id}-implement`)?.spec.config?.model, 'fable');
   });
   s.test('a revision the run takes of its folder keeps the model it was started with', async () => {
-    const resolved = await runPlaced(resolvedNow(runRecord(ROOT, id), '2026-11-12T00:00:00.000Z'));
+    const resolved = await runPlaced(resolvedNow(runRecord(ROOT, id)));
     const steps = resolved !== undefined && 'steps' in resolved ? (resolved.steps ?? []) : [];
     assert.deepEqual(Object.fromEntries(steps.map((st) => [st.name, st.model])), {
       plan: 'opus',

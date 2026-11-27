@@ -26,7 +26,6 @@ const agent = {
   status: {
     origin: 'user',
     shadowedBy: 'repo',
-    revision: 1,
     dir: '/store/workflows/agents',
     file: '/store/workflows/agents/architect.md',
     source: '---\nrole: Architect\n---\nDesign.\n',

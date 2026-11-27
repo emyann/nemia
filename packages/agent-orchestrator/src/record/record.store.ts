@@ -36,7 +36,7 @@ import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, SaidBefore } from './record.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { Pins } from '../revisions/revisions.store.ts';
+import { Pins } from '../revisions/revisions.model.ts';
 import { countRead, countRecord, within, withinEffect } from '../meter/tally.store.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
 

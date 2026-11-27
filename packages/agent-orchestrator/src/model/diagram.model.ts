@@ -10,19 +10,9 @@ import { factoryModel } from '../factory/factory.model.ts';
 import { templateModel } from '../template/door/templates.model.ts';
 import { agentsModel } from '../agents/agents.model.ts';
 import { feedModel } from '../feed/feed.model.ts';
-import { revisionsModel } from '../revisions/revisions.model.ts';
 
 /** Each context's part of the model, in the order the diagram draws them. */
-const MODELS: readonly ErModel[] = [
-  recordModel,
-  folderModel,
-  inboxModel,
-  factoryModel,
-  templateModel,
-  agentsModel,
-  feedModel,
-  revisionsModel,
-];
+const MODELS: readonly ErModel[] = [recordModel, folderModel, inboxModel, factoryModel, templateModel, agentsModel, feedModel];
 
 /** The orchestrator's `erDiagram`, printed between the `diagram:orchestrator-model` markers of `docs/model.md`. */
 export const orchestratorModelDiagram = () =>

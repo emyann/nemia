@@ -45,7 +45,7 @@ import {
 import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import type { Refusal } from '../guard.ts';
 import { StoreRoot, type Engine, type RunsOn } from '../store.ts';
-import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
+import { definitionRevisionsNow, graphOf, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
 import type { DefinitionOrigin, StepKeys, WorkflowFile } from 'objects';
 
@@ -91,8 +91,8 @@ export type WorkflowListing = {
    */
   folderTeam: boolean;
   /**
-   * What the folder's files held when it was listed (`workflowVersion`): a builder's save carries it, and is refused when the folder holds
-   * something else, rather than written over what changed.
+   * The workflow's revision when it was listed (`definitionRevisionNow`), the `resourceVersion` it is served at: a builder's save carries
+   * it, and is refused when the workflow stands at another, rather than written over what changed.
    */
   version: string;
   error: string | null;
@@ -244,10 +244,10 @@ export async function listWorkflows(e: Engine['Service'], on: RunsOn, repo: stri
     home,
     factory,
   );
-  const versioned = await inRequest(
-    Effect.forEach(folders, (f) => Effect.map(workflowVersion(f.dir, placesOf(repo, home)), (version) => ({ ...f, version }))),
+  const revisions = await inRequest(definitionRevisionsNow());
+  return folders.map(({ name, from, dir }) =>
+    listed(name, from, dir, loadedAt(loaded, dir), String(revisions.of('Workflow', factory?.name, name)), factory),
   );
-  return versioned.map(({ name, from, dir, version }) => listed(name, from, dir, loadedAt(loaded, dir), version, factory));
 }
 
 /**
@@ -267,7 +267,7 @@ export const placesOf = (repo: string | undefined, home: string) => (repo === un
 /**
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
  * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
- * agent named (`unfilled`). Its `version` is the folder's now (`workflowVersion`), read by the caller over the request's services.
+ * agent named (`unfilled`). Its `version` is the workflow's revision now (`definitionRevisionsNow`), read by the caller.
  * @param name The workflow's name.
  * @param from Where it is read from.
  * @param dir The workflow's folder.

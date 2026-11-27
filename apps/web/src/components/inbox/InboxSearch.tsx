@@ -198,7 +198,7 @@ export function InboxSearch({
   return (
     <CutSearch
       label="Search the cards"
-      placeholder="Search the cards"
+      placeholder="Search cards, or filter by label, factory, workflow or state"
       chips={chips}
       onRemove={remove}
       text={text}

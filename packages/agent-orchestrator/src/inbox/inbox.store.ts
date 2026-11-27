@@ -36,7 +36,7 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { inheritedLabels, parseLabelEdits, type LeftOut } from '../labels/labels.ts';
-import { CardDoor, cardNameAt } from '../cards/cards.store.ts';
+import { CardDoor, cardNameAt, type CardEntry } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError } from '../step/step.ts';
@@ -347,20 +347,13 @@ export const inboxNameAt = Effect.fn('inboxNameAt')(function* (home: string, giv
 /**
  * What the card triggers read on a pass (`Triggering`): every factory's that reads, and when each card of `files` was filed, read once
  * through the Card door; none where no factory has a card trigger.
- * @param files The inbox's entries.
+ * @param files The inbox's entries, each with when it was filed.
  * @param factories The store's factories that read.
  */
-export const triggeringOf = Effect.fn('triggeringOf')(function* (files: readonly PlanFile[], factories: Iterable<Factory>) {
+export const triggeringOf = Effect.fn('triggeringOf')(function* (files: readonly CardEntry[], factories: Iterable<Factory>) {
   const triggers = everyCardTrigger(yield* StoreRoot, factories);
   if (!triggers.length) return undefined;
-  const door = yield* CardDoor;
-  const filed = new Map<string, string>();
-  for (const { file } of files) {
-    if (!file.endsWith('.md')) continue;
-    const name = file.slice(0, -'.md'.length);
-    const at = yield* Effect.orElseSucceed(door.cards.filedAt(CardName.read(name)), () => null);
-    if (at !== null) filed.set(name, at);
-  }
+  const filed = new Map(files.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), f.filedAt] as const));
   const triggering: Triggering = { triggers, filedAt: (name) => filed.get(name) ?? null };
   return triggering;
 });

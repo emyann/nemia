@@ -27,6 +27,8 @@ import { eachTest } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { engineOf } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
+import { passStarted } from '../rest/informer.verb.ts';
+import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery, cardTable, cardTableOf } from './card.verb.ts';
 
 const engine = eachTest(testEngine);
@@ -367,9 +369,13 @@ test('a field selector on status.inPlay keeps the cards in play, or those whose 
   assert.equal(table.rows.length, 3, 'the table holds the rows of the same page');
 });
 
-test('REFUSED: a field selector that is no status.inPlay selector is Invalid', () => {
+test('REFUSED: a field selector, an order or a term that is none a card list takes is Invalid', () => {
   assert.equal(kindOf(over(five, list({ fieldSelector: 'status.inPlay=maybe' }))), 'Invalid');
   assert.equal(kindOf(over(five, list({ fieldSelector: 'status.state=x' }))), 'Invalid');
+  assert.equal(kindOf(over(five, list({ fieldSelector: 'status.phase=nope' }))), 'Invalid');
+  assert.equal(kindOf(over(five, list({ fieldSelector: 'status.inPlay=true,status.phase=nope' }))), 'Invalid');
+  assert.equal(kindOf(over(five, list({ orderBy: 'title' }))), 'Invalid');
+  assert.equal(kindOf(over(five, list({ orderBy: 'metadata.name,metadata.creationTimestamp' }))), 'Invalid');
 });
 
 test("a card's after: is served on its spec, and the cards of it not landed on its status, each with where it stands and whether it is stalled", () => {
@@ -396,4 +402,172 @@ test("a card's after: is served on its spec, and the cards of it not landed on i
     { card: 'a-1x2y', kind: 'waiting', state: 'filed', stalled: false },
     { card: 'gone-9z9z', kind: 'missing', stalled: true },
   ]);
+});
+
+/** The five cards listed as the inbox reads them, each filed one minute after the one before it in `filed`'s order and in a phase of `phased`. */
+const dated = (phased: Readonly<Record<string, 'blocked' | 'working' | 'done' | 'notStarted'>> = {}) =>
+  Effect.map(listed, (l) =>
+    l.map((entry) => ({
+      ...entry,
+      filedAt: `2026-11-0${['echo', 'alpha', 'delta', 'bravo', 'charlie'].indexOf(entry.name) + 1}T00:00:00.000Z`,
+      phase: phased[entry.name] ?? entry.phase,
+      state: phased[entry.name] === 'done' ? ('succeeded' as const) : entry.state,
+    })),
+  );
+
+const names = (list: { items: readonly { metadata: { name: string } }[] }) => list.items.map((card) => card.metadata.name);
+
+test('orderBy sorts by when a card was filed, newest first with desc, and a token resumes after the last card answered though it is gone', () => {
+  const first = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(), (l) => cardListOf(l, { orderBy: 'metadata.creationTimestamp desc', limit: 2 })),
+    ),
+  );
+  assert.deepEqual(names(first), ['charlie', 'bravo']);
+  const later = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(), (l) =>
+        cardListOf(
+          l.filter((entry) => entry.name !== 'bravo'),
+          { orderBy: 'metadata.creationTimestamp desc', limit: 2, continue: first.metadata.continue },
+        ),
+      ),
+    ),
+  );
+  assert.deepEqual(names(later), ['delta', 'alpha']);
+  const oldest = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(), (l) => cardListOf(l, { orderBy: 'metadata.creationTimestamp' })),
+    ),
+  );
+  assert.deepEqual(names(oldest), ['echo', 'alpha', 'delta', 'bravo', 'charlie']);
+  const byName = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(), (l) => cardListOf(l, { orderBy: 'metadata.name desc' })),
+    ),
+  );
+  assert.deepEqual(names(byName), ['echo', 'delta', 'charlie', 'bravo', 'alpha']);
+});
+
+test('the counts and the labels in use are counted after the labels and the words, and before the field selector and the page', () => {
+  const phased = { alpha: 'blocked', bravo: 'working', charlie: 'done' } as const;
+  const asked = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(phased), (l) => cardListOf(l, { fieldSelector: 'status.phase=working', limit: 1 })),
+    ),
+  );
+  assert.deepEqual(names(asked), ['bravo']);
+  assert.deepEqual(asked.metadata.counts, { notStarted: 2, blocked: 1, waiting: 0, working: 1, done: 1, failed: 0, cancelled: 0 });
+  assert.deepEqual(
+    asked.metadata.labelsInUse.filter((l) => l.key === 'team'),
+    [
+      { key: 'team', value: 'core', cards: 1 },
+      { key: 'team', value: 'web', cards: 1 },
+    ],
+  );
+  const searched = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(phased), (l) => cardListOf(l, { search: 'ECHO delta' })),
+    ),
+  );
+  assert.deepEqual(names(searched), [], 'every word is required, whatever its case');
+  assert.equal(
+    valueOf(
+      over(
+        five,
+        Effect.flatMap(dated(phased), (l) => cardListOf(l, { search: 'ALPHA' })),
+      ),
+    ).items.length,
+    1,
+  );
+  const narrowed = valueOf(
+    over(
+      five,
+      Effect.flatMap(dated(phased), (l) => cardListOf(l, { labelSelector: ['team=core'], fieldSelector: 'status.phase=done' })),
+    ),
+  );
+  assert.deepEqual(narrowed.metadata.counts.notStarted, 0, 'the counts hold the cards the labels keep');
+  assert.deepEqual(names(narrowed), []);
+});
+
+test('the terms of a field selector all hold, a != term differs, and a card says whether it is chained and what follows it', () => {
+  const cards = { 'a-1x2y': aCard('First'), 'b-3z4w': aCard('Second', { after: 'a-1x2y' }), 'c-5v6u': aCard('Third') };
+  const listing = valueOf(over(cards, listed));
+  const chained = valueOf(over(cards, cardListOf(listing, { fieldSelector: 'status.inPlay=true,status.chained=true' })));
+  assert.deepEqual(names(chained), ['a-1x2y', 'b-3z4w']);
+  assert.deepEqual(chained.items[0]?.status.followedBy, ['b-3z4w']);
+  const loose = valueOf(over(cards, cardListOf(listing, { fieldSelector: 'status.inPlay=true, status.chained!=true' })));
+  assert.deepEqual(names(loose), ['c-5v6u']);
+  assert.equal(loose.items[0]?.status.phase, 'notStarted');
+});
+
+test('only the cards of the page are built: a page of one of thirty reads one card through the door', () => {
+  const thirty = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`card-${String(i).padStart(2, '0')}`, aCard(`Card ${i}`)]));
+  const reads: string[] = [];
+  const page = valueOf(
+    over(
+      thirty,
+      Effect.gen(function* () {
+        const door = yield* CardDoor;
+        const counted = {
+          ...door,
+          cards: { ...door.cards, read: (name: CardName) => (reads.push(name), door.cards.read(name)) },
+        };
+        return yield* Effect.provideService(
+          Effect.flatMap(listed, (l) => cardListOf(l, { limit: 5 })),
+          CardDoor,
+          counted,
+        );
+      }),
+    ),
+  );
+  assert.equal(page.items.length, 5);
+  assert.equal(reads.length, 5);
+});
+
+test('the inbox is judged once while the keyspace head and the pass stand, again after a card is written or a pass starts, and again after a pass', () => {
+  const e = engineOf(engine().layer);
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE))));
+  const reads = valueOf(
+    over(
+      five,
+      Effect.gen(function* () {
+        const door = yield* CardDoor;
+        const first = yield* inboxJudged(e, how);
+        const second = yield* inboxJudged(e, how);
+        yield* door.cards.add(CardName.read('foxtrot'), aCard('Foxtrot'));
+        const third = yield* inboxJudged(e, how);
+        passStarted(how.memo);
+        const fourth = yield* inboxJudged(e, how);
+        const fifth = yield* inboxJudged(e, how);
+        return { first, second, third, fourth, fifth };
+      }),
+    ),
+  );
+  assert.equal(reads.second, reads.first, 'the same listing is served while nothing it was judged on moved');
+  assert.notEqual(reads.third, reads.second, 'a card written moves the head');
+  assert.equal(reads.third.length, 6);
+  assert.notEqual(reads.fourth, reads.third, 'a pass started judges again');
+  assert.equal(reads.fifth, reads.fourth);
+});
+
+test('WF_VERIFY_REST judges the inbox afresh each read and dies where the informer held another', () => {
+  const e = engineOf(engine().layer);
+  const how = { ...Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE)))), verify: true };
+  const exit = over(
+    five,
+    Effect.gen(function* () {
+      const first = yield* inboxJudged(e, how);
+      assert.notEqual(yield* inboxJudged(e, how), first, 'a verified read judges afresh');
+      how.memo.inbox = { key: how.memo.inbox?.key ?? '', listing: first.slice(1) };
+      return yield* inboxJudged(e, how);
+    }),
+  );
+  assert.equal(kindOf(exit), 'defect');
 });

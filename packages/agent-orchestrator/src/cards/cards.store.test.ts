@@ -35,7 +35,12 @@ test("a card file dropped into the inbox is filed at its file's time and moved a
   const filed = new Date('2026-01-01T00:00:00.000Z');
   fs.utimesSync(path.join(inbox, 'an-idea.md'), filed, filed);
   fs.writeFileSync(path.join(inbox, 'notes.txt'), 'not a card');
-  assert.deepEqual(done(door.cards.entries()), [{ file: 'an-idea.md', text: 'an idea\n' }]);
+  const [entry, ...rest] = done(door.cards.entries());
+  assert.deepEqual(
+    { file: entry?.file, text: entry?.text, filedAt: entry?.filedAt, others: rest.length },
+    { file: 'an-idea.md', text: 'an idea\n', filedAt: filed.toISOString(), others: 0 },
+  );
+  assert.equal(typeof entry?.revision, 'number', 'with the revision of its record');
   assert.equal(done(door.cards.filedAt(nameOf('an-idea'))), filed.toISOString());
   assert.deepEqual(fs.readdirSync(inbox).sort(), ['a-folder', 'notes.txt']);
   assert.equal(fs.readFileSync(path.join(root, 'imported', 'inbox', 'an-idea.md'), 'utf8'), 'an idea\n');

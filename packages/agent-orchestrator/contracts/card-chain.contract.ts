@@ -21,7 +21,7 @@ const tied = (card: Linked, other: Linked) => other.after.includes(card.name) ||
 const chainOfSpec = spec<(card: Linked, cards: readonly Linked[]) => ChainPlace>({
   ensures: {
     followersNameIt: {
-      description: "Each card it is followed by names it in its after:, and is a card of the inbox",
+      description: 'Each card it is followed by names it in its after:, and is a card of the inbox',
       condition: ({ input: [card, cards], output }) =>
         output.followedBy.every((name) => cards.some((other) => other.name === name && other.after.includes(card.name))),
     },

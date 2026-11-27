@@ -35,13 +35,20 @@ export const cardFieldTerm: CardFieldTermOf = (text) => {
     const value = operator === null ? null : phaseOf(rest.slice(operator.length));
     return operator === null || value === null ? null : { field: 'status.phase', equals: operator !== '!=', value };
   }
-  const field = text.startsWith('status.inPlay') ? ('status.inPlay' as const) : text.startsWith('status.chained') ? ('status.chained' as const) : null;
+  const field = text.startsWith('status.inPlay')
+    ? ('status.inPlay' as const)
+    : text.startsWith('status.chained')
+      ? ('status.chained' as const)
+      : null;
   if (field === null) return null;
   const rest = text.slice(field.length);
   const operator = operatorOf(rest);
   const value = operator === null ? null : flagOf(rest.slice(operator.length));
   return operator === null || value === null ? null : { field, equals: operator !== '!=', value };
 };
+
+/** One term of a field selector, as `cardFieldTerm` reads it. */
+export type FieldTerm = NonNullable<ReturnType<CardFieldTermOf>>;
 
 /** What a term reads of a card: whether it is in play, whether it is chained, and its phase. */
 export type FieldRead = { readonly inPlay: boolean; readonly chained: boolean; readonly phase: CardPhase };
@@ -51,8 +58,11 @@ export type FieldRead = { readonly inPlay: boolean; readonly chained: boolean; r
  * @param terms The terms of a field selector, each from `cardFieldTerm`.
  * @param card What the terms read of the card.
  */
-export const fieldSelects = (terms: readonly NonNullable<ReturnType<CardFieldTermOf>>[], card: FieldRead) =>
+export const fieldSelects = (terms: readonly FieldTerm[], card: FieldRead) =>
   terms.every((term) => {
-    const held = term.field === 'status.phase' ? card.phase === term.value : (term.field === 'status.inPlay' ? card.inPlay : card.chained) === term.value;
+    const held =
+      term.field === 'status.phase'
+        ? card.phase === term.value
+        : (term.field === 'status.inPlay' ? card.inPlay : card.chained) === term.value;
     return held === term.equals;
   });

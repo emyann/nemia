@@ -35,8 +35,7 @@ const cardOrderBySpec = spec<(text: string) => CardOrder | null>({
     readAsWritten: {
       description: 'An order taken is the field written first, descending exactly when desc follows it, and nothing more',
       condition: ({ input: [text], output }) =>
-        output === null ||
-        (output.descending ? spelled(text, output.field, ' desc') : asksAsc(text, output.field)),
+        output === null || (output.descending ? spelled(text, output.field, ' desc') : asksAsc(text, output.field)),
     },
   },
 });

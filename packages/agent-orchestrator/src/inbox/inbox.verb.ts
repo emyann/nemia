@@ -55,6 +55,7 @@ import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, unattachedRefusal, wiredRepo, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { isDeepStrictEqual } from 'node:util';
 import { FileDoor, filesDir } from '../start/files.store.ts';
 import { keptParent, passParents, type Parents } from '../views/views.verb.ts';
 import { over, type Engine } from '../runtime-client.ts';
@@ -648,7 +649,7 @@ export const startQueued = Effect.fn('startQueued')(function* (
  * (`cardRuns`) — so a started card reads its run's phase, read now and never stored on the card. Reading a phase takes the engine, which
  * `inbox.store.ts` does not import.
  */
-export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: SummaryHow) {
+const inboxJudgedAfresh = Effect.fnUntraced(function* (e: Engine, how: SummaryHow) {
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
@@ -659,6 +660,39 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
     ? yield* waitingOf(entries, yield* (yield* RunDoor).runs.list(), requestReleased(e))
     : undefined;
   return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()), waiting);
+});
+
+/**
+ * What the inbox is judged on, read before it is judged: the keyspace head, which every write to a card, a try, a claim, a factory or a
+ * run's record moves, and the informer's pass, which a run's phase is judged within.
+ * @param memo The informer.
+ */
+const inboxKey = Effect.fnUntraced(function* (memo: SummaryHow['memo']) {
+  return `${yield* (yield* CardDoor).cards.head()}|${memo.pass ?? ''}`;
+});
+
+/**
+ * The inbox as `nemia inbox` and the Cards list read it now, each entry with its state and phase: judged afresh (`inboxJudgedAfresh`)
+ * where the informer holds none of it, or it was judged on another keyspace head or pass; else the listing the informer kept, which is
+ * a cache of that pure judgement and nothing more. Where `how.verify` (`WF_VERIFY_REST=1`) it is judged afresh each time too and a
+ * difference from what the informer held dies. A caller that keeps no informer (a fresh one is empty) judges every read afresh.
+ */
+export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: SummaryHow) {
+  const key = yield* inboxKey(how.memo);
+  const kept = how.memo.inbox;
+  if (kept !== undefined && kept.key === key && !how.verify) {
+    how.memo.hits += 1;
+    return kept.listing;
+  }
+  const listing = yield* inboxJudgedAfresh(e, how);
+  if (kept !== undefined && kept.key === key && !isDeepStrictEqual(kept.listing, listing))
+    return yield* Effect.die(
+      new Error(
+        'The informer answered the inbox differently from a fresh judgement (WF_VERIFY_REST): something it was judged on is not watched.',
+      ),
+    );
+  how.memo.inbox = { key, listing };
+  return listing;
 });
 
 /**

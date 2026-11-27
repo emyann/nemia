@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, scrollFrame, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -77,7 +77,7 @@ export default {
       await expectCount(listed, 0, 'removed, its page goes back to the Workflows page, its card gone');
       if (fs.existsSync(dir)) throw new Refused(`removed, the folder goes from the disk — ${dir} is still there`);
       await idle(page);
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await scrollFrame(page, 0);
       await photograph(page, path.join(OUT, `workflow-remove-done-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       await page.setViewportSize(WIDE);

@@ -58,6 +58,7 @@ const FILES = [
   'components/step/StepGlance.tsx',
   'components/conversation/TalkReading.tsx',
   'components/frame/BarPanel.tsx',
+  'components/frame/FrameGrid.tsx',
   'components/run/RunGone.tsx',
   'components/step/StepBar.tsx',
   'components/step/StepInspector.tsx',

@@ -59,7 +59,8 @@ const placeOf = (now: Element | null, self: HTMLElement | null) =>
 /**
  * Gives `bar` the focus as it opens, and as it closes gives it back to what held it last before it came into the bar — what opened the bar,
  * or what the focus left for the bar since, as a step switched to from its node — while that is still on the page and the bar still holds
- * the focus (`focusGoesBack`). Taking the focus scrolls nothing: the sheet stands sticky beside the page, and a focus that scrolled to it
+ * the focus (`focusGoesBack`). Taking the focus scrolls nothing: the sheet stands beside the page's column,
+ * outside what scrolls, and a focus that scrolled to it
  * would move the page under a person's eyes. The focus leaving the bar is read as it happens, not where it has ended up by the close: a
  * press
  * on the page leaves the focus on nothing, which is where the close must leave it, whenever the close itself lands.

@@ -25,8 +25,11 @@ const [COPY, COPIED] = [glyphOf(Copy), glyphOf(Check)];
  */
 const PULLED = '-my-2 -ml-0.75';
 
-/** How the id is drawn: the mono face, on one line, quiet. */
+/** How the id is drawn: the mono face, quiet, on one line (`WRAPPED_ID`, where the id may break). */
 const ID = 'font-mono whitespace-nowrap text-on-surface-variant';
+
+/** How a whole id is drawn where it may wrap: it breaks anywhere inside its line, and the control stays beside its last line. */
+const WRAPPED_ID = 'min-w-0 font-mono whitespace-normal text-on-surface-variant [overflow-wrap:anywhere]';
 
 /**
  * A run's id or a card's name, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve
@@ -35,13 +38,32 @@ const ID = 'font-mono whitespace-nowrap text-on-surface-variant';
  * moment (`data-copied`), or that it could not. `short` shows the id's last four characters, quiet beside a run's title, which take
  * the hue of a session at work for that moment, and the whole id in the kit's tooltip, on hover and on focus; what is copied is always
  * the whole id. `room` is how many characters wide the id is drawn at least, so that ids of different lengths given the same room hold
- * their controls, and what follows, at one edge.
+ * their controls, and what follows, at one edge. `wrap` lets the whole id break across lines inside the room it is given, the control
+ * staying inside beside it, for a card whose name may be longer than the card is wide.
+ *
+ * @param props.id - the run's id or the card's name, which is what is copied.
+ * @param props.short - show the id's last four characters alone.
+ * @param props.room - how many characters wide the id is drawn at least.
+ * @param props.of - what the id names, for the control's label.
+ * @param props.wrap - let the whole id wrap inside its line.
  */
-export function CopyId({ id, short = false, room, of = 'run' }: { id: string; short?: boolean; room?: number; of?: 'run' | 'card' }) {
+export function CopyId({
+  id,
+  short = false,
+  room,
+  of = 'run',
+  wrap = false,
+}: {
+  id: string;
+  short?: boolean;
+  room?: number;
+  of?: 'run' | 'card';
+  wrap?: boolean;
+}) {
   const { said, copy } = useCopy(id);
   const copied = said === 'copied';
   return (
-    <span data-copy-id={id} data-copied={copied || undefined} className="inline-flex items-center">
+    <span data-copy-id={id} data-copied={copied || undefined} className={wrap ? 'flex max-w-full items-start' : 'inline-flex items-center'}>
       {short ? (
         <TooltipTrigger delay={300}>
           <Focusable>
@@ -62,7 +84,13 @@ export function CopyId({ id, short = false, room, of = 'run' }: { id: string; sh
           <HeldTooltip>{id}</HeldTooltip>
         </TooltipTrigger>
       ) : (
-        <Body size="small" component="span" data-run-id style={room ? { minWidth: `${room}ch` } : undefined} className={ID}>
+        <Body
+          size="small"
+          component="span"
+          data-run-id
+          style={room ? { minWidth: `${room}ch` } : undefined}
+          className={wrap ? WRAPPED_ID : ID}
+        >
           {id}
         </Body>
       )}
@@ -72,7 +100,7 @@ export function CopyId({ id, short = false, room, of = 'run' }: { id: string; sh
         icon={copied ? COPIED : COPY}
         aria-label={`Copy the ${of === 'run' ? 'run id' : 'card name'} ${id}`}
         onPress={copy}
-        className={PULLED}
+        className={cn(PULLED, wrap && 'shrink-0')}
       />
       <span role="status" className="sr-only">
         {SAID[said]}

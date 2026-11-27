@@ -4,6 +4,7 @@ import { expect, waitFor, within } from 'storybook/test';
 import { checkFailed, freshStore, harnessReady } from '../../../.storybook/fixtures/readiness';
 import { atRest } from '../../../.storybook/play';
 import { WELCOME_LINE, WelcomePage } from './WelcomePage';
+import { readingColumn } from '../../../.storybook/reading';
 
 /**
  * The welcome's body, its reads answered by MSW from typed fixtures (`.storybook/fixtures/readiness.ts`), one story a state: a fresh
@@ -12,6 +13,7 @@ import { WELCOME_LINE, WelcomePage } from './WelcomePage';
 const meta: Meta<typeof WelcomePage> = {
   title: 'Pages/Welcome',
   component: WelcomePage,
+  decorators: [readingColumn],
   args: {},
   render: () => (
     <Suspense fallback={<p>Reading…</p>}>

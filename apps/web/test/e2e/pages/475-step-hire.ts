@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, themeOf, widthPast } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -58,8 +58,8 @@ async function onPhone(page: Page) {
   await page.setViewportSize(PHONE);
   try {
     await settled(page);
-    const wide = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, phone: innerWidth }));
-    if (wide.page > wide.phone) throw new Refused(`the step's page fits a phone — it is ${wide.page}px on ${wide.phone}px`);
+    const past = await widthPast(page);
+    if (past > 0) throw new Refused(`the step's page fits a phone — it runs ${past}px past it`);
     await photograph(page, path.join(OUT, `step-hire-phone-${await themeOf(page)}.png`));
   } finally {
     if (was) await page.setViewportSize(was);

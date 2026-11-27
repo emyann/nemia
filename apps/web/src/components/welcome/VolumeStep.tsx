@@ -24,7 +24,7 @@ export function VolumeStep({ factory: given, again = false }: { factory?: string
   return (
     <article
       data-volume-step={step.noFactory ? 'no-factory' : step.factory === undefined ? 'reading' : step.screen}
-      className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6"
+      className="flex flex-col gap-8"
     >
       <header className="flex flex-col gap-1">
         <PageName>Where is the work?</PageName>

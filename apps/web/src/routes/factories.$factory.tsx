@@ -24,7 +24,7 @@ export const Route = createFileRoute('/factories/$factory')({
       context.queryClient.ensureQueryData(openRunsQuery(params.factory)),
     ]);
   },
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
   component: FactoryPage,
   errorComponent: ({ error }) => <ReadTrouble what="the factories and their runs" error={error} className="p-4" />,
 });

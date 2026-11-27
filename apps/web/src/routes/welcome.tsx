@@ -11,6 +11,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * use. Its loader reads the readiness read.
  */
 export const Route = createFileRoute('/welcome')({
+  staticData: { frame: 'reading' },
   beforeLoad: async ({ context, cause }) => {
     if (cause !== 'enter') return;
     const read = await context.queryClient.ensureQueryData(readinessQuery).catch(() => undefined);

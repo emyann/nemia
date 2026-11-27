@@ -12,6 +12,7 @@ import { versionQuery } from '@/lib/api/version';
  * upgrades, Nemia's level, her rules at Auto and her memory.
  */
 export const Route = createFileRoute('/settings')({
+  staticData: { frame: 'reading' },
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.prefetchQuery(versionQuery),
@@ -30,7 +31,7 @@ export const Route = createFileRoute('/settings')({
  */
 function SettingsPage() {
   return (
-    <article data-settings className="mx-auto flex max-w-3xl flex-col gap-8">
+    <article data-settings className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-title-large">Settings</h1>
         <p className="text-body-medium text-on-surface-variant">What is set for the whole store, across every factory.</p>

@@ -43,10 +43,6 @@
 }
 
 @layer base {
-  html {
-    scroll-padding-top: var(--frame-top);
-  }
-
   body {
     @apply bg-background text-on-surface antialiased;
   }
@@ -276,18 +272,15 @@
  * `--frame-top`; under it the frame's lines (a newer release, the setup banner, a refused link), as tall as `--frame-lines`, which the
  * frame measures and sets on the column the page stands in (`__root.tsx`); and at the window's foot the machine bar (`MachineBar.tsx`), as
  * tall as `--frame-foot`. A page that fills the window is `100svh` less the three. What stands in the page's column and is brought into
- * view, by a focus or by `scrollIntoView`, stops under the page's head, which stays over the window's top (the window's
- * `scroll-padding-top`, the head's own height), and above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
- * popover, portaled over the frame and the bar alike, keeps the window's whole height.
+ * view, by a focus or by `scrollIntoView`, stands inside the column, which alone scrolls: the window never does, so the head and the
+ * machine bar stand outside what scrolls and nothing needs to stop under them. `--frame-measure` is the most a reading page's line runs to.
  */
 :root {
   --frame-top: 3.5rem;
   --frame-lines: 0px;
   --frame-foot: 2.25rem;
-}
-
-main[data-frame-page] * {
-  scroll-margin-bottom: var(--frame-foot);
+  --frame-measure: 48rem;
+  --frame-gutter: 1rem;
 }
 
 /*

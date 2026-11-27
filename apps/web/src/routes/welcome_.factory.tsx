@@ -10,6 +10,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
  * milestones and the templates.
  */
 export const Route = createFileRoute('/welcome_/factory')({
+  staticData: { frame: 'reading' },
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(milestonesQuery), context.queryClient.ensureQueryData(templatesQuery)]),
   component: FactoryStep,

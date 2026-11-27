@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor, within } from 'storybook/test';
 import { ACME, sent, volumeStore } from '../../../.storybook/fixtures/folders';
 import { VolumeStep } from './VolumeStep';
+import { readingColumn } from '../../../.storybook/reading';
 
 /** What a story of the step draws: the factory the path names (none at the welcome), and whether it was opened from Settings. */
 type Args = { factory?: string; again: boolean };
@@ -13,6 +14,7 @@ type Args = { factory?: string; again: boolean };
 const meta: Meta<Args> = {
   tags: ['network'],
   title: 'Pages/Welcome volume',
+  decorators: [readingColumn],
   args: { again: false },
   parameters: { msw: volumeStore() },
   render: (args) => <VolumeStep {...args} />,

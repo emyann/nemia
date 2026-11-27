@@ -1,8 +1,9 @@
 /**
- * `photograph`'s full-page picture made to refuse: a page taller than the window, framed as the board is — a sticky header, a fixed sidebar
- * as tall as the window less the header and the footer, a sticky footer — is pictured with each part of the frame once, where a person
- * sees it, and every row of its content visible; the same page taken as Chromium takes a picture beyond the window is refused, its frame
- * drawn where the window was. A page that fits is taken without a resize.
+ * `photograph`'s full-page picture made to refuse: a page taller than the window, framed as the board is — a header, a sidebar and a
+ * column that
+ * scrolls between a header and a footer, in a shell as tall as the window — is pictured with each part of the frame once, where a person
+ * sees it, and every row of its content visible; the same page taken as Playwright takes the window is refused, its column's rows
+ * left out, as the window's own picture shows it. A page that fits is taken without a resize.
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
 import { afterAll, beforeAll, test } from 'vitest';
@@ -39,14 +40,13 @@ const css = ([r, g, b]: Rgb) => `rgb(${r},${g},${b})`;
 
 /** The board's frame in solid colours, around `rows` content rows of `ROW` pixels each. */
 const framed = (rows: number) => `<!doctype html><body style="margin:0;background:#fff">
-<div style="min-height:100svh;display:flex;flex-direction:column">
-  <header style="position:sticky;top:0;height:${HEADER}px;flex:none;z-index:2;background:${css(H)}"></header>
-  <div style="display:flex;flex:1">
-    <div style="width:${SIDEBAR}px;flex:none"></div>
-    <aside style="position:fixed;top:${HEADER}px;left:0;width:${SIDEBAR}px;height:calc(100svh - 5rem);z-index:1;background:${css(S)}"></aside>
-    <main style="flex:1">${Array.from({ length: rows }, (_, i) => `<div style="height:${ROW}px;background:${css(rowColour(i))}"></div>`).join('')}</main>
+<div style="height:100vh;display:flex;flex-direction:column;overflow:hidden">
+  <header style="height:${HEADER}px;flex:none;background:${css(H)}"></header>
+  <div style="display:flex;flex:1;min-height:0">
+    <aside style="width:${SIDEBAR}px;flex:none;background:${css(S)}"></aside>
+    <main data-frame-page style="flex:1;min-height:0;overflow-y:auto">${Array.from({ length: rows }, (_, i) => `<div style="height:${ROW}px;background:${css(rowColour(i))}"></div>`).join('')}</main>
   </div>
-  <footer style="position:sticky;bottom:0;height:${FOOTER}px;flex:none;z-index:2;background:${css(F)}"></footer>
+  <footer style="height:${FOOTER}px;flex:none;background:${css(F)}"></footer>
 </div>
 <script>window.resized = 0; addEventListener('resize', () => window.resized++);</script>
 </body>`;
@@ -57,7 +57,7 @@ async function framedPage(rows: number, scrollY = 0) {
   // oxlint-disable-next-line landmines-testing/no-test-doubles -- the runner's check needs a page, not a board
   await page.route('http://e2e.test/**', (route) => route.fulfill({ contentType: 'text/html', body: framed(rows) }));
   await page.goto('http://e2e.test/');
-  await page.evaluate((y) => scrollTo(0, y), scrollY);
+  await page.evaluate((y) => document.querySelector('main')?.scrollTo(0, y), scrollY);
   return page;
 }
 
@@ -116,7 +116,7 @@ async function wrongIn(file: string, rows: number) {
 /** The window's size and how far it is scrolled, with how many times the page heard a resize. */
 const stateOf = async (page: Page) => ({
   window: page.viewportSize(),
-  scrollY: await page.evaluate(() => window.scrollY),
+  scrollY: await page.evaluate(() => document.querySelector('main')?.scrollTop ?? 0),
   resized: await page.evaluate(() => (window as unknown as { resized: number }).resized),
 });
 
@@ -134,7 +134,7 @@ test('a tall page is pictured with its frame once, where a person sees it, at th
   }
 });
 
-test('REFUSED: a tall page taken as Chromium takes a picture beyond the window, its frame drawn where the window was', async () => {
+test('REFUSED: a tall page taken as the window alone, the rows its column holds past it left out', async () => {
   const out = scratch('nemia-photograph-old-');
   const said: Record<number, string[]> = {};
   for (const scrollY of [0, 900]) {
@@ -144,20 +144,17 @@ test('REFUSED: a tall page taken as Chromium takes a picture beyond the window, 
     said[scrollY] = await wrongIn(file, 20);
     await page.context().close();
   }
-  const top = said[0] ?? [];
-  const scrolled = said[900] ?? [];
-  assert.ok(
-    top.some((s) => s.startsWith('the footer is drawn outside its band')),
-    `at the top, the footer is refused mid-picture: ${top.join('; ')}`,
-  );
-  assert.ok(
-    scrolled.some((s) => s.startsWith('the header is drawn outside its band')),
-    `scrolled, the header is refused mid-picture: ${scrolled.join('; ')}`,
-  );
-  assert.ok(
-    scrolled.some((s) => /^content row \d+ is covered/.test(s)),
-    `scrolled, a content row is refused as covered: ${scrolled.join('; ')}`,
-  );
+  for (const scrollY of [0, 900]) {
+    const wrong = said[scrollY] ?? [];
+    assert.ok(
+      wrong.some((s) => s.startsWith('the picture is')),
+      `scrolled ${scrollY}, the window's own picture is refused as shorter than the page: ${wrong.join('; ')}`,
+    );
+    assert.ok(
+      wrong.some((s) => /^content row \d+ is covered/.test(s)),
+      `scrolled ${scrollY}, a content row the column holds past its window is refused as missing: ${wrong.join('; ')}`,
+    );
+  }
 });
 
 test('a page that fits the window is pictured as it is, with no resize', async () => {

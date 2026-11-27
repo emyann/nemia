@@ -11,6 +11,7 @@ import { waitsOnYou } from '../lib/factory.ts';
 import { startedCard } from '../lib/inbox';
 import type { Hue } from '../lib/meaning';
 import { dollars } from '../lib/money';
+import { FrameGrid } from '../components/frame/FrameGrid';
 
 /** A bucket a run of the label page is counted in, by its phase and whether it waits on a person. */
 type Bucket = 'waiting' | 'running' | 'needs a person' | 'succeeded' | 'failed' | 'stopped';
@@ -56,7 +57,7 @@ export const Route = createFileRoute('/labels/$key/$value')({
     ]);
   },
   component: LabelPage,
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
 });
 
 function Section({ name, plate, children }: { name: string; plate: ReactNode; children: ReactNode }) {
@@ -85,57 +86,59 @@ function LabelPage() {
   const spent = spentOf(stats);
   const cost = stats.all.total.costPerMerged;
   return (
-    <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
-      <article data-label-page={selector} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        <PageName>{selector}</PageName>
-        <Section
-          name="in play"
-          plate={<Plate count={cards.length} title={cards.length === 1 ? 'Card in play' : 'Cards in play'} quiet={cards.length === 0} />}
-        >
-          {cards.length === 0 ? (
-            <p className="m-0 text-body-medium text-on-surface-variant">
-              No card with this label is in play: none waits to start, and no run started from one is at work or waits.
-            </p>
-          ) : (
-            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-              {cards.map((card) => (
-                <li key={card.file} data-card={card.name} className="flex flex-wrap items-center gap-2">
-                  <TextLink to="/inbox/$name" params={{ name: card.name }} className="text-body-medium">
-                    {card.title ?? card.name}
-                  </TextLink>
-                  {startedCard(card) && <CardStateChip state={card.state} />}
-                </li>
+    <ScanLines className="min-h-full">
+      <FrameGrid span="wide">
+        <article data-label-page={selector} className="flex w-full flex-col gap-10">
+          <PageName>{selector}</PageName>
+          <Section
+            name="in play"
+            plate={<Plate count={cards.length} title={cards.length === 1 ? 'Card in play' : 'Cards in play'} quiet={cards.length === 0} />}
+          >
+            {cards.length === 0 ? (
+              <p className="m-0 text-body-medium text-on-surface-variant">
+                No card with this label is in play: none waits to start, and no run started from one is at work or waits.
+              </p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {cards.map((card) => (
+                  <li key={card.file} data-card={card.name} className="flex flex-wrap items-center gap-2">
+                    <TextLink to="/inbox/$name" params={{ name: card.name }} className="text-body-medium">
+                      {card.title ?? card.name}
+                    </TextLink>
+                    {startedCard(card) && <CardStateChip state={card.state} />}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <TextLink to="/inbox" search={{ l: selector }} className="w-fit text-body-medium underline">
+              The inbox filtered by {selector}
+            </TextLink>
+          </Section>
+          <Section
+            name="runs"
+            plate={<Plate count={runs.length} title={runs.length === 1 ? 'Run' : 'Runs'} hue="alive" quiet={runs.length === 0} />}
+          >
+            <div data-buckets className="flex flex-wrap gap-3">
+              {BUCKETS.map(({ bucket, hue }) => (
+                <span key={bucket} data-bucket={bucket}>
+                  <Sticker hue={hue} label={bucket}>
+                    {counts.get(bucket) ?? 0}
+                  </Sticker>
+                </span>
               ))}
-            </ul>
-          )}
-          <TextLink to="/inbox" search={{ l: selector }} className="w-fit text-body-medium underline">
-            The inbox filtered by {selector}
-          </TextLink>
-        </Section>
-        <Section
-          name="runs"
-          plate={<Plate count={runs.length} title={runs.length === 1 ? 'Run' : 'Runs'} hue="alive" quiet={runs.length === 0} />}
-        >
-          <div data-buckets className="flex flex-wrap gap-3">
-            {BUCKETS.map(({ bucket, hue }) => (
-              <span key={bucket} data-bucket={bucket}>
-                <Sticker hue={hue} label={bucket}>
-                  {counts.get(bucket) ?? 0}
-                </Sticker>
+              <span data-label-spent>
+                <StatTile hue="ink" label="Spent" value={dollars(spent)} breakdown={null} />
               </span>
-            ))}
-            <span data-label-spent>
-              <StatTile hue="ink" label="Spent" value={dollars(spent)} breakdown={null} />
-            </span>
-            <span data-label-cost>
-              <StatTile hue="ink" label="Cost per merged run" value={dollars(cost)} breakdown={null} />
-            </span>
-          </div>
-          <TextLink to="/runs" search={{ l: selector }} className="w-fit text-body-medium underline">
-            The runs filtered by {selector}
-          </TextLink>
-        </Section>
-      </article>
+              <span data-label-cost>
+                <StatTile hue="ink" label="Cost per merged run" value={dollars(cost)} breakdown={null} />
+              </span>
+            </div>
+            <TextLink to="/runs" search={{ l: selector }} className="w-fit text-body-medium underline">
+              The runs filtered by {selector}
+            </TextLink>
+          </Section>
+        </article>
+      </FrameGrid>
     </ScanLines>
   );
 }

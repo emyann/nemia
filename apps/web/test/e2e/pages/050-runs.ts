@@ -36,6 +36,7 @@ import {
   openAnswered,
   runListPath,
   tipsOf,
+  widthPast,
 } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectTwoDeep, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
@@ -471,9 +472,12 @@ const missed = (control: Locator, across: number, up: number, down: number) =>
         [cx, cy - above],
         [cx, cy + below],
       ];
-      return points.flatMap(([x, y]) =>
-        document.elementFromPoint(x, y)?.closest('button') === button ? [] : [`${Math.round(x - cx)},${Math.round(y - cy)}`],
-      );
+      return points.flatMap(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        if (hit?.closest('button') === button) return [];
+        const at = hit ? `${hit.tagName.toLowerCase()}.${hit.className.toString().slice(0, 60)}` : 'nothing';
+        return [`${Math.round(x - cx)},${Math.round(y - cy)} (${at})`];
+      });
     },
     [across, up, down] as const,
   ) satisfies Promise<string[]>;
@@ -491,9 +495,12 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage) {
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
   await page.mouse.move(0, 0);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expectCount(page.locator('[data-slot="tooltip"]'), 0, 'no tooltip left open by an earlier step, over a control it probes');
   await expectCount(page.locator('[data-slot="tooltip"] [data-step-glance]'), 0, 'no glance left open by a pointer resting on a bar');
   for (const [control, up, down, where] of controls) {
-    await control.scrollIntoViewIfNeeded();
+    await control.evaluate((button) => button.scrollIntoView({ block: 'center' }));
     const off = await missed(control, 23, up, down);
     if (off.length)
       throw new Refused(
@@ -1116,8 +1123,8 @@ async function narrow(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   try {
     await expectNone(async () => {
-      const [wide, window] = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
-      return wide <= window ? null : `the document is ${wide} wide in a window of ${window}`;
+      const past = await widthPast(page);
+      return past <= 0 ? null : `the page runs ${past}px past its window`;
     }, 'at 390 wide the page does not scroll sideways');
     const lefts = await section(page, 'waiting')
       .locator('article[data-run]')

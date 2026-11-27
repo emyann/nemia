@@ -105,11 +105,7 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
   const top = groups.slice(0, -1);
   const foot = groups.at(-1);
   return (
-    <div
-      data-frame-rail
-      data-rail-scroll
-      className="sticky top-0 z-30 flex h-[calc(100svh-var(--frame-foot))] w-20 shrink-0 flex-col overflow-y-auto bg-background"
-    >
+    <div data-frame-rail data-rail-scroll className="z-30 flex w-20 shrink-0 flex-col overflow-y-auto bg-background">
       <div className="flex flex-col items-center gap-2 pt-3 pb-2">
         <HerFace path={path} />
         {seat?.level === 'factory' && <MenuButton />}

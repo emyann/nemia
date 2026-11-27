@@ -4,6 +4,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet, redirect, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
+import { FrameGrid, type PageSpan } from '@/components/frame/FrameGrid';
 import { FrameHeader } from '@/components/frame/FrameHeader';
 import { FrameRail } from '@/components/frame/FrameRail';
 import { FrameTabs } from '@/components/frame/FrameTabs';
@@ -51,10 +52,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * browser's `sidebar_state` cookie, `paneOpenOf`, held by `FramePaneProvider`) and covered by the docked sheet under 1600 (`frameFold`);
  * then the page's column: its head (`FrameHeader`), as tall as `--frame-top`, naming the page, then the frame's lines: the line saying a
  * newer release is out where one is (`NewerRelease`), the line saying a run waits on a piece the server misses, linking to Setup
- * (`SetupBanner`), and a first-visit link refused on a board that asks no token (`LinkRefusal`). The lines are measured as they come and go
+ * (`SetupBanner`), and a first-visit link refused on a board that asks no token (`LinkRefusal`). The shell is as tall as the window and
+ * the page's column is the one thing that scrolls, between the head and the machine bar, which never move: the window has no scroll lane to
+ * lock, so opening a menu moves nothing. The lines are measured as they come and go
  * into `--frame-lines`, which a page that fills the window takes off its height beside `--frame-top` and `--frame-foot`, so no page's
- * height assumes they are not there. Then the page, under the strip of Settings' tabs on one of them (`FrameTabs`), in a centred column
- * unless a matched route's `staticData` asks for `fullBleed`. The page's column (`<main data-frame-page>`) is the named container
+ * height assumes they are not there. Then the page, under the strip of Settings' tabs on one of them (`FrameTabs`), in the frame's grid
+ * (`FrameGrid`), by the span the deepest matched route's `staticData.frame` names (`wide` by default), and bare for `bleed`. The page's
+ * column (`<main data-frame-page>`) is the named container
  * `@container/page`, and a page lays out by it (`@<size>/page:`), never by the window: beside the pane and the docked sheet it is narrower
  * than the window (`test/page-room.test.ts`). At the right of the frame's row, the frame's one side sheet (`FrameSheet`): docked, the third
  * pane at 1600 and wider, or the kit's modal sheet on a narrow screen. It shows one thing at a time: what the address's `?bar=` names
@@ -73,7 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
-  const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
+  const frame = useMatches({
+    select: (matches) => matches.reduce<PageSpan>((span, match) => match.staticData?.frame ?? span, 'wide'),
+  });
   const search: Record<string, unknown> = useRouterState({ select: (state) => state.location.search });
   const router = useRouter();
   const feed = useFeed();
@@ -86,13 +92,16 @@ function Root() {
       <NemiaChatProvider>
         <HerSheetProvider>
           <FramePaneProvider shortcut={seatOf(path)?.level === 'factory'}>
-            <div className="flex min-h-svh w-full flex-col">
-              <div data-frame-row className="flex min-h-[calc(100svh-var(--frame-foot))] w-full">
+            <div className="flex h-svh w-full flex-col overflow-hidden">
+              <div data-frame-row className="flex min-h-0 w-full flex-1">
                 <FrameRail path={path} search={search} />
                 <FrameFactoryPane path={path} search={search} />
-                <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
                   <FrameHeader path={path} />
-                  <main data-frame-page className="@container/page relative flex min-w-0 flex-1 flex-col bg-background">
+                  <main
+                    data-frame-page
+                    className="@container/page relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
+                  >
                     <div ref={lines} data-frame-lines>
                       <NewerRelease />
                       <SetupBanner path={path} />
@@ -101,12 +110,12 @@ function Root() {
                       </div>
                     </div>
                     <FrameTabs path={path}>
-                      {fullBleed ? (
+                      {frame === 'bleed' ? (
                         <Outlet />
                       ) : (
-                        <div className="mx-auto w-full max-w-4xl px-4 py-6">
+                        <FrameGrid span={frame}>
                           <Outlet />
-                        </div>
+                        </FrameGrid>
                       )}
                     </FrameTabs>
                   </main>

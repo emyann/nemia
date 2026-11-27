@@ -40,7 +40,7 @@ export function WelcomePage() {
     void navigate({ to: '/' });
   };
   return (
-    <article data-welcome className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
+    <article data-welcome className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <PageName>Welcome to Nemia</PageName>
         <p className="text-body-medium text-on-surface-variant">Nothing runs without a harness: activate one, and see it answer.</p>

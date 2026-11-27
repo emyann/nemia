@@ -79,8 +79,28 @@ function windowTokens(text: string) {
 /** The breakpoint a token names, its `max-` kept, to say the variant that replaces it. */
 const breakpointOf = (token: string) => /(?:^|:)((?:max-)?(?:2xl|sm|md|lg|xl)):/.exec(token)?.[1] ?? '';
 
+/** A centred column a file keeps, by its file (from `apps/web`), with why it is not the frame grid's. */
+interface KeptColumn {
+  readonly file: string;
+  readonly why: string;
+}
+
+const KEPT_COLUMNS: readonly KeptColumn[] = [
+  {
+    file: 'src/components/step/StepPage.tsx',
+    why: "A conversation's measure in a page that fills the window by height: its centred 48rem column is the step page's own.",
+  },
+];
+
+/** The class strings of a text that centre a column by hand: `mx-auto` beside a `max-w-*` in one string. */
+function centred(text: string) {
+  return [...text.matchAll(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g)]
+    .map(([whole]) => whole)
+    .filter((whole) => /(?:^|[\s"'`])mx-auto(?:[\s"'`])/.test(whole) && /(?:^|[\s"'`:])max-w-\S/.test(whole));
+}
+
 /** What the rule refuses in the files given (path from `apps/web` to text): one line each, saying what to write instead. */
-function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]) {
+function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[], columns: readonly KeptColumn[] = []) {
   const refused: string[] = [];
   for (const [file, text] of files) {
     for (const token of windowTokens(text)) {
@@ -89,7 +109,14 @@ function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]) {
         `${file}: '${token}' lays out by the window; ${insteadOf(token)}, or add it to KEPT in apps/web/test/page-room.test.ts with why the window is right there`,
       );
     }
-    if (file !== FRAME && text.includes('@container/page')) {
+    if (file !== 'src/components/frame/FrameGrid.tsx' && !columns.some((c) => c.file === file)) {
+      for (const string of centred(text)) {
+        refused.push(
+          `${file}: ${string} centres a column of its own; take the frame's grid, set the route's staticData.frame ('wide', 'reading' or 'bleed') and use FrameGrid, or add the file to KEPT_COLUMNS in apps/web/test/page-room.test.ts with why`,
+        );
+      }
+    }
+    if (file !== FRAME && !file.endsWith('.stories.tsx') && text.includes('@container/page')) {
       refused.push(`${file}: '@container/page' is the frame's main alone (${FRAME}); query it with '@<size>/page:' instead`);
     }
   }
@@ -97,6 +124,10 @@ function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]) {
     if (!windowTokens(files.get(k.file) ?? '').includes(k.token)) {
       refused.push(`${k.file}: KEPT names '${k.token}', which the file no longer holds; take the entry out of KEPT`);
     }
+  }
+  for (const c of columns) {
+    if (centred(files.get(c.file) ?? '').length === 0)
+      refused.push(`${c.file}: KEPT_COLUMNS names it, which no longer centres a column; take the entry out`);
   }
   const frame = files.get(FRAME) ?? '';
   if (!/<main\s+data-frame-page\s+className="[^"]*@container\/page[\s"]/.test(frame)) {
@@ -120,11 +151,11 @@ function sources() {
 test('no page or part of the board lays out by the window but those kept, and the page column is one container', () => {
   const files = sources();
   assert.ok(files.has(FRAME), `${FRAME} is read`);
-  assert.deepEqual(judge(files, KEPT), []);
+  assert.deepEqual(judge(files, KEPT, KEPT_COLUMNS), []);
 });
 
-test('every kept window breakpoint says why', () => {
-  for (const k of KEPT) assert.ok(k.why.length > 20, `${k.file} ${k.token}`);
+test('every kept window breakpoint and column says why', () => {
+  for (const k of [...KEPT, ...KEPT_COLUMNS]) assert.ok(k.why.length > 20, k.file);
 });
 
 test('the scanner finds a window breakpoint as a class token and nothing that only looks like one', () => {
@@ -161,4 +192,17 @@ test('REFUSED: a second page container outside the frame', () => {
 
 test("REFUSED: the frame's main that is no container", () => {
   assert.equal(judge(new Map([[FRAME, '<main data-frame-page className="relative flex">']]), []).length, 1);
+});
+
+test('REFUSED: a page that centres a column of its own, and a kept column that no longer does', () => {
+  const page = (text: string) =>
+    new Map([
+      [FRAME, FRAME_OK],
+      ['src/routes/x.tsx', text],
+    ]);
+  assert.equal(judge(page('<article className="mx-auto flex max-w-3xl">'), []).length, 1);
+  assert.deepEqual(judge(page('<article className="flex max-w-xs">'), []), []);
+  assert.deepEqual(judge(page('<article className="mx-auto flex">'), []), []);
+  assert.deepEqual(judge(page('<article className="mx-auto flex max-w-3xl">'), [], [{ file: 'src/routes/x.tsx', why: 'planted' }]), []);
+  assert.equal(judge(page('<article className="flex">'), [], [{ file: 'src/routes/x.tsx', why: 'planted' }]).length, 1);
 });

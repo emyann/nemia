@@ -10,6 +10,7 @@ const MINT = commandLine(TOKEN_ADD_WORDS, {});
 
 /** Settings' Tokens, at /tokens: the person's standing tokens, each retired here. Its loader reads the list. */
 export const Route = createFileRoute('/tokens')({
+  staticData: { frame: 'reading' },
   loader: ({ context }) => context.queryClient.prefetchQuery(tokensQuery),
   component: TokensPage,
 });
@@ -22,10 +23,7 @@ export const Route = createFileRoute('/tokens')({
 function TokensPage() {
   const read = useQuery(tokensQuery);
   return (
-    <article
-      data-tokens-page={read.isError ? 'refused' : read.data ? 'loaded' : 'reading'}
-      className="mx-auto flex max-w-4xl flex-col gap-6"
-    >
+    <article data-tokens-page={read.isError ? 'refused' : read.data ? 'loaded' : 'reading'} className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-title-large">Tokens</h1>
         <p className="text-body-medium text-on-surface-variant">

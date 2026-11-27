@@ -1,8 +1,7 @@
 import path from 'node:path';
-import type { Browser, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectNone, facesLoaded, idle, Refused } from '../checks.ts';
-import { seated } from '../served.ts';
+import type { Page } from 'playwright';
+import { photograph, sameIn, scrollFrame, themeOf } from '../board.ts';
+import { expectCount, expectNone, idle, Refused } from '../checks.ts';
 import { launch, type Bars, type PageSpec } from '../visit.ts';
 import { OUT, photographing } from '../world.ts';
 
@@ -68,8 +67,8 @@ async function noRowsNoLine(page: Page) {
 /** The mark on the page's root, awaited until it reads `word`. */
 const rootMarked = (page: Page, word: string, what: string) =>
   expectNone(async () => {
-    const found = await page.locator('html').getAttribute('data-scroll-bar');
-    return found === word ? null : `the root's mark reads ${found}`;
+    const found = await page.locator('main[data-frame-page]').getAttribute('data-scroll-bar');
+    return found === word ? null : `the column's mark reads ${found}`;
   }, what);
 
 /** The page that scrolls is marked while it scrolls and at rest after, by the frame's own listener; then put back at its top. */
@@ -78,30 +77,14 @@ async function pageIsMarked(page: Page) {
   await page.mouse.wheel(0, 200);
   await rootMarked(page, 'shown', 'the page that scrolls is marked shown');
   await rootMarked(page, 'rest', 'and at rest once it scrolls no more');
-  await page.evaluate(() => scrollTo(0, 0));
+  await scrollFrame(page, 0);
   await rootMarked(page, 'rest', 'put back at its top, it comes to rest');
 }
 
-/** The page `from` is on, opened in a window of `browser` in the same theme, `scale` times as fine, once its reads are answered. */
-async function sameIn(browser: Browser, from: Page, width: number, height: number, scale = 1) {
-  const theme = await themeOf(from);
-  const context = await browser.newContext({
-    colorScheme: theme,
-    viewport: { width, height },
-    deviceScaleFactor: scale,
-    reducedMotion: 'reduce',
-  });
-  await seated(context, from.url());
-  const page = await context.newPage();
-  await page.goto(from.url(), { waitUntil: 'load' });
-  await facesLoaded(page);
-  await idle(page);
-  return page;
-}
-
 /**
- * In a browser whose bars take room: no table's box gives room to an upright bar; the page, longer than its window, keeps the look's
- * 8-pixel lane; the sidebar's list, in a window shorter than it, keeps the same lane; and 390 wide, the table in flight is narrower
+ * In a browser whose bars take room: no table's box gives room to an upright bar; the page's column, longer than its room, keeps the
+ * look's 8-pixel lane and the window has none; the sidebar's list, in a window shorter than it, keeps the same lane; and 390 wide, the
+ * table in flight is narrower
  * than its columns and scrolls sideways, still with no upright bar.
  */
 async function barsTakeTheLooksRoom(from: Page) {
@@ -112,12 +95,16 @@ async function barsTakeTheLooksRoom(from: Page) {
       const { upright } = await measured(page, selector);
       if (upright !== 0) throw new Refused(`${what} shows no upright scroll bar — one takes ${upright} pixels`);
     }
-    const lane = await page.evaluate(() => ({
-      taken: innerWidth - document.documentElement.clientWidth,
-      scrolls: document.documentElement.scrollHeight > innerHeight,
-    }));
-    if (!lane.scrolls || lane.taken !== 8)
-      throw new Refused(`the page is longer than its window and keeps an 8-pixel lane — ${JSON.stringify(lane)}`);
+    const lane = await page.evaluate(() => {
+      const main = document.querySelector('main[data-frame-page]') as HTMLElement;
+      return {
+        taken: main.offsetWidth - main.clientWidth,
+        scrolls: main.scrollHeight > main.clientHeight,
+        window: innerWidth - document.documentElement.clientWidth,
+      };
+    });
+    if (!lane.scrolls || lane.taken !== 8 || lane.window !== 0)
+      throw new Refused(`the page's column is longer than its room and keeps an 8-pixel lane, the window none — ${JSON.stringify(lane)}`);
     await page.setViewportSize({ width: 1280, height: 300 });
     const list = await measured(page, '[data-rail-scroll]');
     if (list.inside[1] <= list.room[1] || list.upright !== 8)
@@ -157,18 +144,18 @@ async function pictured(from: Page, kind: Bars) {
   const fileOf = (what: string) => path.join(OUT, `runs-bars-${what}-${kind}-${theme}.png`);
   try {
     const page = await sameIn(browser, from, 1280, 800);
-    await shown(page, 'html');
+    await shown(page, 'main[data-frame-page]');
     await photograph(page, fileOf('page'));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator(BOXES[0][0]).evaluate((box) => box.scrollIntoView({ block: 'center' }));
-    await shown(page, 'html');
+    await shown(page, 'main[data-frame-page]');
     await shown(page, BOXES[0][0]);
     await photograph(page, fileOf('table'));
     const short = await sameIn(browser, from, 1280, 300);
     await shown(short, '[data-rail-scroll]');
     await photograph(short, fileOf('rail'));
     const large = await sameIn(browser, from, 1280, 800, 4);
-    await shown(large, 'html');
+    await shown(large, 'main[data-frame-page]');
     await photograph(large, fileOf('lane'), { clip: { x: 1280 - 200, y: 0, width: 200, height: 260 } });
   } finally {
     await browser.close();

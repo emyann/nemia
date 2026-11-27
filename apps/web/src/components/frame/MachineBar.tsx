@@ -69,7 +69,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
     <footer
       aria-label="The machine"
       data-machine-bar
-      className="sticky bottom-0 z-40 flex h-(--frame-foot) w-full shrink-0 items-center gap-2 bg-surface-container px-3 font-mono text-body-small text-on-surface-variant"
+      className="z-40 flex h-(--frame-foot) w-full shrink-0 items-center gap-2 bg-surface-container px-3 font-mono text-body-small text-on-surface-variant"
     >
       <Pressable
         data-gauges-button

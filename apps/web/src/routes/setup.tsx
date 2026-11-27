@@ -18,6 +18,7 @@ import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
 export const Route = createFileRoute('/setup')({
+  staticData: { frame: 'reading' },
   loader: ({ context }) => context.queryClient.ensureQueryData(readinessQuery),
   component: SetupPage,
   pendingComponent: SetupReading,
@@ -137,7 +138,7 @@ function SetupHead() {
 /** Setup while its readiness is read: its head, and the shape of the readiness list. */
 function SetupReading() {
   return (
-    <article data-setup-reading className="mx-auto flex max-w-3xl flex-col gap-8">
+    <article data-setup-reading className="flex flex-col gap-8">
       <SetupHead />
       <ReadinessReading />
     </article>
@@ -147,7 +148,7 @@ function SetupReading() {
 /** Setup: what the server needs to run its factories, each piece's fix, and the clients that wait to pair. */
 function SetupPage() {
   return (
-    <article data-setup className="mx-auto flex max-w-3xl flex-col gap-8">
+    <article data-setup className="flex flex-col gap-8">
       <SetupHead />
       <Readiness />
       <Pairings />

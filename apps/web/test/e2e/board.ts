@@ -1,8 +1,20 @@
 /** What several pages of the e2e look for or do on the board, beyond checks.ts: the menu, a next visit, a page's files and markdown. */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { BrowserContext, Locator, Page } from 'playwright';
-import { expectCount, expectNone, expectTexts, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import type { Browser, BrowserContext, Locator, Page } from 'playwright';
+import {
+  expectCount,
+  expectNone,
+  expectTexts,
+  expectUncut,
+  expectVisible,
+  facesLoaded,
+  idle,
+  Refused,
+  settled,
+  WAIT_MS,
+  watch,
+} from './checks.ts';
 import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, LIST_PAGE, type RunList } from 'objects';
 import { FINISHED_SELECTOR, FINISHED_SIZE, finishedOf, OPEN_SELECTOR, openOf, rowsOf } from '../../src/lib/api/runs.ts';
 import { judged } from '../../src/lib/api/judged.ts';
@@ -10,6 +22,7 @@ import { factoryViewOf } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
+import { seated } from './served.ts';
 import { API, measuring, photographing, store, storedMarker } from './world.ts';
 
 /** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none for the store's. */
@@ -288,12 +301,59 @@ export async function photograph(
 /** The tallest window a picture is taken in: Chromium draws no texture taller, and a page past it is taken as Playwright takes it. */
 const TALLEST_WINDOW = 16_384;
 
-/** How tall `page`'s document is, measured as Playwright measures a full-page picture. */
+/** The page's column, the one thing of the frame that scrolls: the window itself never does. */
+const COLUMN = 'main[data-frame-page]';
+
+/** How tall `page`'s document is, measured as Playwright measures a full-page picture, with what its column holds past its window. */
 const pageHeight = (page: Page) =>
-  page.evaluate(() => {
+  page.evaluate((column) => {
     const { body, documentElement: root } = document;
-    return Math.max(body.scrollHeight, root.scrollHeight, body.offsetHeight, root.offsetHeight, body.clientHeight, root.clientHeight);
-  }) satisfies Promise<number>;
+    const over = Math.max(0, (document.querySelector(column)?.scrollHeight ?? 0) - (document.querySelector(column)?.clientHeight ?? 0));
+    return (
+      Math.max(body.scrollHeight, root.scrollHeight, body.offsetHeight, root.offsetHeight, body.clientHeight, root.clientHeight) + over
+    );
+  }, COLUMN) satisfies Promise<number>;
+
+/** Scrolls `page`'s column to `to` pixels from its top (to its end where `to` is `'end'`). */
+export const scrollFrame = (page: Page, to: number | 'end') =>
+  page.evaluate(
+    ([column, at]) => {
+      const main = document.querySelector(column as string);
+      if (main) main.scrollTop = at === 'end' ? main.scrollHeight : at;
+    },
+    [COLUMN, to] as const,
+  );
+
+/** How far `page`'s column is scrolled from its top. */
+export const frameScrolled = (page: Page) => page.evaluate((column) => document.querySelector(column)?.scrollTop ?? 0, COLUMN);
+
+/** How many pixels `page`'s width runs past its window: the larger of the root's and the column's, which scrolls sideways in its place. */
+export const widthPast = (page: Page) =>
+  page.evaluate((column) => {
+    const main = document.querySelector(column);
+    return Math.max(
+      0,
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      main ? main.scrollWidth - main.clientWidth : 0,
+    );
+  }, COLUMN);
+
+/** The page `from` is on, opened in a window of `browser` in the same theme, `scale` times as fine, once its reads are answered. */
+export async function sameIn(browser: Browser, from: Page, width: number, height: number, scale = 1) {
+  const theme = await themeOf(from);
+  const context = await browser.newContext({
+    colorScheme: theme,
+    viewport: { width, height },
+    deviceScaleFactor: scale,
+    reducedMotion: 'reduce',
+  });
+  await seated(context, from.url());
+  const page = await context.newPage();
+  await page.goto(from.url(), { waitUntil: 'load' });
+  await facesLoaded(page);
+  await idle(page);
+  return page;
+}
 
 /** Resolves once `page` has drawn two more frames: what a resize or a scroll changes is laid out and painted. */
 const twoFrames = (page: Page) =>
@@ -315,10 +375,10 @@ async function grownToPage(page: Page, file: string) {
     );
     return undefined;
   }
-  const scrolled = await page.evaluate(() => window.scrollY);
+  const scrolled = await frameScrolled(page);
   const putBack = async () => {
     await page.setViewportSize(size);
-    await page.evaluate((y) => scrollTo(0, y), scrolled);
+    await scrollFrame(page, scrolled);
     await twoFrames(page);
   };
   try {

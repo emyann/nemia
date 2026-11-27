@@ -18,7 +18,7 @@ export const Route = createFileRoute('/factories/$factory_/runs/$runId_/steps/$s
     if (home) throw redirect({ href: `${home}${location.searchStr}`, replace: true });
     return loaded;
   },
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
   component: Page,
   errorComponent: Failed,
 });

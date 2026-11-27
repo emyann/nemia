@@ -26,7 +26,7 @@ export function YouAreSet() {
   const follow = factory?.follow;
   const steps = nextStepsOf({ local: first !== undefined && first.origin === null, follows: follow !== undefined });
   return (
-    <article data-you-are-set={succeeded ? 'set' : 'not-yet'} className="mx-auto flex max-w-3xl flex-col gap-8 px-3 py-6 @lg/page:px-6">
+    <article data-you-are-set={succeeded ? 'set' : 'not-yet'} className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <PageName>{succeeded ? 'You are set' : 'Not there yet'}</PageName>
         <p className="text-body-medium text-on-surface-variant">

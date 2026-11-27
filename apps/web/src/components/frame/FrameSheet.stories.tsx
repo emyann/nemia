@@ -34,5 +34,10 @@ export default meta;
 export const Docked: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-frame-sheet="docked"]')).not.toBeNull();
+    const [row, sheet] = [
+      canvasElement.querySelector('[data-frame-sheet]')!.parentElement!,
+      canvasElement.querySelector('[data-slot="side-sheet"]')!,
+    ];
+    await expect(sheet.getBoundingClientRect().height).toBe(row.getBoundingClientRect().height);
   },
 };

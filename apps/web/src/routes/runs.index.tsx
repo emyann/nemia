@@ -12,7 +12,7 @@ export const Route = createFileRoute('/runs/')({
       throw redirect({ to: '/runs', search: (prev) => trailSearch(prev, []), replace: true });
     }),
   component: Page,
-  staticData: { fullBleed: true },
+  staticData: { frame: 'bleed' },
   pendingComponent: RunsLoading,
   errorComponent: RunsFailed,
 });

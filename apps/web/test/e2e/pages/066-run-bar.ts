@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page, Request } from 'playwright';
-import { openConversation, openFromBar, photograph, stepBar, themeOf } from '../board.ts';
+import { frameScrolled, openConversation, openFromBar, photograph, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, FOLDER, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -88,10 +88,10 @@ async function presses(page: Page) {
 /** The presses of `presses`, in the window it sets. */
 async function pressed(page: Page) {
   await nodeOf(page, FIRST).scrollIntoViewIfNeeded();
-  const scrolled = await page.evaluate(() => window.scrollY);
+  const scrolled = await frameScrolled(page);
   await nodeOf(page, FIRST).click();
   await expectShows(page, FIRST, `a click on ${FIRST} shows it in the bar`);
-  const now = await page.evaluate(() => window.scrollY);
+  const now = await frameScrolled(page);
   if (now !== scrolled)
     throw new Refused(`the bar opens in the sheet beside the page and leaves it where it was scrolled — ${scrolled} became ${now}`);
   await nodeOf(page, FIRST).click();

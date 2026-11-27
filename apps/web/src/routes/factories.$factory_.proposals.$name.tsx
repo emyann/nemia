@@ -9,6 +9,7 @@ import { proposalQuery } from '@/lib/api/proposals';
  * prefetches the proposal, which never throws: a proposal that is not there says so in its part.
  */
 export const Route = createFileRoute('/factories/$factory_/proposals/$name')({
+  staticData: { frame: 'reading' },
   loader: ({ context, params }) => context.queryClient.prefetchQuery(proposalQuery(params.factory, params.name)),
   component: ProposalPage,
 });
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/factories/$factory_/proposals/$name')({
 function ProposalPage() {
   const { factory, name } = Route.useParams();
   return (
-    <article data-proposal-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
+    <article data-proposal-page={name} className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
         <Trail
           levels={[

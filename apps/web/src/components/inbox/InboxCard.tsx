@@ -151,14 +151,20 @@ export function InboxCard({
 /** A column's heading, in the look's small caps. */
 const HEAD = 'uppercase';
 
-/** What a column folded under the title at a narrow page wears: drawn from the frame grid's 768-pixel step of the page column. */
-const WIDE_ONLY = 'hidden @3xl/page:table-cell';
+/** What the Filed column wears: drawn from the frame grid's 768-pixel step of the page column, folded under the title below it. */
+const FILED_SHOWN = 'hidden @3xl/page:table-cell';
+
+/**
+ * What the Factory / workflow column wears: drawn from the page column's 1024-pixel step, folded under the title below it, so that
+ * between the two steps the set widths leave the Card column room for a title.
+ */
+const WHERE_SHOWN = 'hidden @5xl/page:table-cell';
 
 /**
  * A card of the Inbox as a row of the list: its title linked to its page, its name with the control that copies it, its labels and what
- * it reads under it; its state's tag, or nothing; its factory and workflow; when it was filed; and its actions. Below the frame grid's
- * 768-pixel step the factory and the filing time fold under the title. The row opens the card's page on a press or Enter, through the
- * board's router; a control inside it does its own thing.
+ * it reads under it; its state's tag, or nothing; its factory and workflow; when it was filed; and its actions. The factory folds under
+ * the title below the page column's 1024-pixel step, and the filing time below the frame grid's 768-pixel step. The row opens the
+ * card's page on a press or Enter, through the board's router; a control inside it does its own thing.
  */
 function InboxRow({ entry }: { entry: InboxEntry }) {
   const [refusal, setRefusal] = useState<Omit<CardRefusal, 'entry'> | null>(null);
@@ -180,16 +186,16 @@ function InboxRow({ entry }: { entry: InboxEntry }) {
               className="block w-fit max-w-full truncate underline decoration-outline underline-offset-4 hover:decoration-current"
             />
           </Body>
-          <CopyId id={entry.name} of="card" />
+          <CopyId id={entry.name} of="card" wrap />
           <Body
             size="small"
             colorRole="on-surface-variant"
             component="span"
             data-card-folded
-            className="flex flex-wrap gap-x-3 @3xl/page:hidden"
+            className="flex flex-wrap gap-x-3 @5xl/page:hidden"
           >
             <span title="Factory / workflow">{whereOf(entry)}</span>
-            {filed}
+            {filed && <span className="@3xl/page:hidden">{filed}</span>}
           </Body>
           <LabelValues labels={entry.labels} />
           <Facts entry={entry} compact={false} />
@@ -199,12 +205,12 @@ function InboxRow({ entry }: { entry: InboxEntry }) {
       <Cell data-card-tag>
         <StateTag entry={entry} />
       </Cell>
-      <Cell data-card-where className={WIDE_ONLY}>
+      <Cell data-card-where className={WHERE_SHOWN}>
         <Body size="small" colorRole="on-surface-variant" component="span" title="Factory / workflow" className="block truncate">
           {whereOf(entry)}
         </Body>
       </Cell>
-      <Cell data-card-filed className={WIDE_ONLY}>
+      <Cell data-card-filed className={FILED_SHOWN}>
         <Body size="small" colorRole="on-surface-variant" component="span" className="block truncate">
           {filed}
         </Body>
@@ -221,9 +227,9 @@ function InboxRow({ entry }: { entry: InboxEntry }) {
 /**
  * The Inbox's cards as a list: the kit's dense table in the look's cut frame, as the runs' finished table is, one header row and the
  * same five columns on every row (Card, State, Factory / workflow, Filed, Actions). The Card column takes what the others leave, each
- * of which keeps its set width, so every column's left edge is one x down the list at any width of the page column; below the frame
- * grid's 768-pixel step, Factory / workflow and Filed fold under the title. Narrower than its columns, the table scrolls sideways
- * inside its frame. `entries` are the cards, in the page's order.
+ * of which keeps its set width, so every column's left edge is one x down the list at any width of the page column; Factory / workflow
+ * folds under the title below the page column's 1024-pixel step, and Filed below the frame grid's 768-pixel step. Narrower than its
+ * columns, the table scrolls sideways inside its frame. `entries` are the cards, in the page's order.
  */
 export function InboxList({ entries }: { entries: readonly InboxEntry[] }) {
   return (
@@ -241,12 +247,12 @@ export function InboxList({ entries }: { entries: readonly InboxEntry[] }) {
                 State
               </Label>
             </Column>
-            <Column id="where" className={cn(HEAD, 'w-[200px]', WIDE_ONLY)}>
+            <Column id="where" className={cn(HEAD, 'w-[200px]', WHERE_SHOWN)}>
               <Label size="small" component="span">
                 Factory / workflow
               </Label>
             </Column>
-            <Column id="filed" className={cn(HEAD, 'w-[150px]', WIDE_ONLY)}>
+            <Column id="filed" className={cn(HEAD, 'w-[150px]', FILED_SHOWN)}>
               <Label size="small" component="span">
                 Filed
               </Label>

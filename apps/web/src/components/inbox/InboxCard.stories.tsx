@@ -166,6 +166,18 @@ const edgesOf = (root: HTMLElement) => {
   );
 };
 
+/** What each row's Card cell draws past the State column's left edge: its tag and the row's card, for each part that runs over. */
+const pastCardOf = (root: HTMLElement) =>
+  [...root.querySelectorAll('tbody tr')].flatMap((row) => {
+    const state = row.querySelector('[data-card-tag]');
+    const card = row.querySelector('[data-card-cell]');
+    if (state === null || card === null) return [`${row.getAttribute('data-card')}: no Card or State cell`];
+    const edge = state.getBoundingClientRect().left + 0.5;
+    return [...card.querySelectorAll('*')]
+      .filter((part) => part.getClientRects().length > 0 && part.getBoundingClientRect().right > edge)
+      .map((part) => `${row.getAttribute('data-card')}: ${part.tagName}`);
+  });
+
 /**
  * The cards as the list, wide: one header row of five columns, and every column's content standing at one x down the rows, whatever the
  * tag, the time or the button says. A row lights under the pointer, and a press on it opens the card's page.
@@ -183,6 +195,7 @@ export const List: Story = {
     const edges = edgesOf(table);
     await expect(edges.map((column) => column.length)).toEqual([4, 1, 4, 4, 4]);
     await expect(edges.map((column) => new Set(column).size)).toEqual([1, 1, 1, 1, 1]);
+    await expect(pastCardOf(table)).toEqual([]);
     const row = table.querySelector<HTMLElement>('tr[data-card="decode-the-reads"]');
     if (row === null) throw new Error('the row of decode-the-reads is not drawn');
     await userEvent.hover(row);
@@ -192,6 +205,33 @@ export const List: Story = {
     await userEvent.click(filed);
     const ground = canvasElement.querySelector('[data-story-ground]');
     await waitFor(() => expect(ground?.getAttribute('data-at')).toBe('/inbox/decode-the-reads'));
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    await userEvent.unhover(row);
+    await waitFor(() => expect(row).not.toHaveAttribute('data-hovered'));
+  },
+};
+
+/**
+ * The list in a page column just past the frame grid's 768-pixel step, under the 1024-pixel one: Filed has its column, Factory /
+ * workflow folds under each title, and nothing a Card cell draws, its name and copy control included, reaches the State column.
+ */
+export const ListBetween: Story = {
+  args: { entry: started('running', 'working') },
+  render: () => listed(ROWS, 800),
+  play: async ({ canvasElement }) => {
+    const table = within(canvasElement).getByRole('grid', { name: 'Cards' });
+    await expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((head) => head.textContent),
+    ).toEqual(['Card', 'State', 'Filed', 'Actions']);
+    const folded = table.querySelector('tr[data-card="ship-it"] [data-card-folded]');
+    await expect(folded).toBeVisible();
+    await expect(folded).toHaveTextContent('nemia / quick');
+    await expect(folded?.querySelector('time')).not.toBeVisible();
+    await expect(pastCardOf(table)).toEqual([]);
+    const edges = edgesOf(table).filter((column) => column.length > 0);
+    await expect(edges.map((column) => new Set(column).size)).toEqual([1, 1, 1, 1]);
   },
 };
 
@@ -209,6 +249,7 @@ export const ListNarrow: Story = {
     const folded = table.querySelector('tr[data-card="ship-it"] [data-card-folded]');
     await expect(folded).toBeVisible();
     await expect(folded).toHaveTextContent('nemia / quick');
+    await expect(pastCardOf(table)).toEqual([]);
     const edges = edgesOf(table).filter((column) => column.length > 0);
     await expect(edges.map((column) => new Set(column).size)).toEqual([1, 1, 1]);
   },

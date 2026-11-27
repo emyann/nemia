@@ -2,7 +2,7 @@ import { Body } from '@/components/ui/ds';
 import type { PartHead as Head } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
 import { ReadingLines } from '@/components/look';
-import { StateTag } from './part/PartHead';
+import { StateTag, WaitsOn } from './part/PartHead';
 
 /** What a diamond's hover card holds: the head's live facts, a few lines that never scroll. */
 function Row({ name, children, className }: { name: string; children: React.ReactNode; className?: string }) {
@@ -14,9 +14,9 @@ function Row({ name, children, className }: { name: string; children: React.Reac
 }
 
 /**
- * The small card a step's diamond shows on hover or focus, read from the step part's head (`headOf`): who and its model; its word and
- * since when; its try and round and its spend of the cap; and its last line, cut at two lines. The static facts (harness, effort, context,
- * permission) stay in the step's sheet. A fact not read yet is a reading line.
+ * The small card a step's diamond shows on hover or focus, read from the step part's head (`headOf`): who and its model, or what a wait
+ * node waits on; its word and since when; its try and round and its spend of the cap; and its last line, cut at two lines. The static
+ * facts (harness, effort, context, permission) stay in the step's sheet. A fact not read yet is a reading line.
  * @param props.head The step's head, as the row knows it and the run's own answer, once read, completes it.
  */
 export function StepGlance({ head }: { head: Head }) {
@@ -31,9 +31,13 @@ export function StepGlance({ head }: { head: Head }) {
       className="flex w-60 max-w-full flex-col gap-1.5 text-on-surface"
     >
       <Row name="who">
-        <Body size="medium" component="span" data-step-agent className="truncate font-medium">
-          {who?.name ?? 'no agent'}
-        </Body>
+        {head.waits !== 'none' ? (
+          <WaitsOn waits={head.waits} />
+        ) : (
+          <Body size="medium" component="span" data-step-agent className="truncate font-medium">
+            {who?.name ?? 'no agent'}
+          </Body>
+        )}
         {model && (
           <Body size="small" component="span" colorRole="on-surface-variant" className="truncate font-mono">
             {model}

@@ -7,7 +7,7 @@
  * declared fields drawn by their widgets, its files, its values and how many files it left unnamed — and the detail of the try shown.
  * A slot that does not apply to the step says `none`. Pure, so each state is proven without a browser.
  */
-import type { HandedHow, StepPhase, TaskSource } from 'objects';
+import type { HandedHow, StepPhase, TaskSource, WRITTEN_CONDITION_STATUSES } from 'objects';
 import type { AgentListing } from './api/agents.ts';
 import type { StepArtifact, StepValue } from './api/tries.ts';
 import { agentOf, type RunView, type StepSpecView } from './api/judged.ts';
@@ -66,6 +66,9 @@ export type CardNote = { text: string; icon: 'info' | 'shield' | 'fail' };
 /** Who the step is given: its agent's name, its initial and its role. */
 type Who = { name: string; initial: string; role: string };
 
+/** A condition a wait node waits on: its name, and its state's one word once the step is filed, null before. */
+export type WaitOn = { name: string; word: string | null };
+
 /**
  * The head: the step's name, who it is given, its state and the word for it, its model, its time, its spend, its try and round, its
  * check, its gate, its session's five facts, its one note and its one action, and the tries a picker offers with the one shown. Each
@@ -79,6 +82,8 @@ export type PartHead = {
   state: StepState;
   word: string;
   who: Who | None;
+  /** The conditions a wait node waits on, in its `waitsFor:` order; `none` for every other step, which waits on none. */
+  waits: readonly WaitOn[] | None;
   /** Its model, as its try was filed with or the run froze it; `none` where neither names one. */
   model: string;
   time: CardTime | None;
@@ -304,6 +309,27 @@ function noteOf(step: StepView, now: Date) {
   return (gate ? { text: gate, icon: 'info' } : null) satisfies CardNote | null;
 }
 
+/** A written condition's state in the board's one word: passed, failed or unknown. */
+const CONDITION_WORD: Record<(typeof WRITTEN_CONDITION_STATUSES)[number], string> = {
+  True: 'passed',
+  False: 'failed',
+  Unknown: 'unknown',
+};
+
+/**
+ * The conditions a wait node waits on, named by its `waitsFor:` as the run's row or its own answer froze it, each with its word once the
+ * step is filed: its condition check's written status, or `pending` while nothing was written; `none` where the step waits on none.
+ */
+function waitsOf(row: RunView['steps'][number] | undefined, own: StepView | undefined) {
+  const names = row?.spec?.waitsFor ?? own?.spec?.waitsFor;
+  if (!names?.length) return 'none';
+  const checks = own ? (own.checks ?? (own.check ? [own.check] : [])) : [];
+  return names.map((name) => {
+    const condition = checks.find((check) => check.condition?.name === name)?.condition;
+    return { name, word: condition ? (condition.status ? CONDITION_WORD[condition.status] : 'pending') : null } satisfies WaitOn;
+  });
+}
+
 /** The agent of a step, as the run froze it (`agentOf`), with its role from the agents' listing; none for a step that names none. */
 function whoOf(name: string | null, agents: HeadInput['agents']) {
   if (!name) return 'none';
@@ -329,11 +355,11 @@ const UNREAD: OwnFacts = {
   shown: null,
 };
 
-/** The head's facts of `own`, a step of the run's own answer whose steps are `steps`, of kind `kind`. */
-const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date, unchecked: Unchecked | undefined) =>
+/** The head's facts of `own`, a step of the run's own answer whose steps are `steps`, of kind `kind`; a wait node (`waits`) no spend. */
+const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date, unchecked: Unchecked | undefined, waits: boolean) =>
   ({
     time: timeOf(own, kind, now),
-    spend: spendOf(own, kind),
+    spend: waits ? 'none' : spendOf(own, kind),
     round: placeOf(own, steps, kind),
     check: checkOf(own),
     gate: gateWords(own, now) ?? 'none',
@@ -355,8 +381,10 @@ export function hueOfStep(run: HeadInput['run'], step: string) {
 }
 
 /**
- * The head of the step `step` of `run`: what the run's row knows at once (its state, its agent, its model), and once the run's own answer
- * is read, its tries, time, facts, spend, check, gate and note — each `none` until then, or where it does not apply.
+ * The head of the step `step` of `run`: what the run's row knows at once (its state, its agent or the conditions it waits on, its
+ * model), and once the run's own answer
+ * is read, its tries, time, facts, spend, check, gate and note — each `none` until then, or where it does not apply, as a wait node's
+ * spend, which runs no session.
  */
 export function headOf({ run, step, detail, agents, unchecked, now }: HeadInput) {
   const row = run.steps.find((s) => s.name === step);
@@ -365,6 +393,7 @@ export function headOf({ run, step, detail, agents, unchecked, now }: HeadInput)
   const own = detail?.steps.find((s) => s.name === step);
   const kind = kindOf(codes.phase, state, Boolean(own?.tries.some((t) => t.taskId !== null)));
   const word = stateWordsOf(state, codes.on, run.holding != null).rail;
+  const waits = waitsOf(row, own);
   return {
     step,
     kind,
@@ -373,8 +402,9 @@ export function headOf({ run, step, detail, agents, unchecked, now }: HeadInput)
     state,
     word,
     who: whoOf(row ? agentOf(row) : null, agents),
+    waits,
     model: own?.filed?.model ?? own?.spec?.model ?? row?.spec?.model ?? 'none',
-    ...(own && detail ? ownFacts(own, detail.steps, kind, now, unchecked) : UNREAD),
+    ...(own && detail ? ownFacts(own, detail.steps, kind, now, unchecked, waits !== 'none') : UNREAD),
     action: { words: state === 'awaiting-approval' ? 'Read and approve' : 'Open the step', runId: run.id, step },
   } satisfies PartHead;
 }

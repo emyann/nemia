@@ -198,6 +198,43 @@ describe('nemia route: refused off the list and on a step that is no condition, 
   });
 });
 
+describe('a start the repository refuses is written on the node as refused, left alone while it is the same, and started once it is fixed', () => {
+  let id!: string;
+  let deliver!: string;
+  const files = { 'implement.md': '---\nplace: git\n---\nbuild it\n', 'review.md': '---\nplace: git\nafter: implement\n---\nreview it\n' };
+  beforeAll(async () => {
+    const t = teardowns();
+    id = await planned('web');
+    deliver = path.join(runRecord(ROOT, id).repo ?? '', 'workflows', 'deliver');
+    fs.rmSync(deliver, { recursive: true, force: true });
+    return t.end;
+  });
+  const s = story(test);
+  let refusedAt: string | undefined;
+  s.test('the pass starts nothing and writes the refusal on the node, which reads no sent', async () => {
+    await pass(id);
+    const node = runRecord(ROOT, id).steps.ship;
+    assert.equal(node?.sent, undefined);
+    assert.ok(node?.refused?.message, 'the refusal is written');
+    refusedAt = node?.refused?.at;
+    assert.equal(startedBy(id).length, 0);
+  });
+  s.test('the next pass leaves the same refusal as it is, undated again', async () => {
+    await pass(id);
+    assert.equal(runRecord(ROOT, id).steps.ship?.refused?.at, refusedAt);
+    assert.equal(startedBy(id).length, 0);
+  });
+  s.test('once the workflow is there, the next pass starts the run and the refusal is gone', async () => {
+    fs.mkdirSync(deliver, { recursive: true });
+    for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(deliver, name), text);
+    await pass(id);
+    const node = runRecord(ROOT, id).steps.ship;
+    assert.ok(node?.sent && 'run' in node.sent, 'the node started a run');
+    assert.equal(node.refused, undefined);
+    assert.equal(startedBy(id).length, 1);
+  });
+});
+
 describe("the run a node starts takes its title from the producer's closeout, else the run's, and carries the run's labels", () => {
   const s = story(test);
   const labels = { area: 'src', work: 'feature', initiative: 'routing' };

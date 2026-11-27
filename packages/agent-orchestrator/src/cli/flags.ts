@@ -91,12 +91,10 @@ with what, who may drive it, for how long, in how much memory and for how much. 
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
   it on the run's word) · budget exhausted (its harness ended its session at its budget:)
   · denied (its harness denied its try a call, and the step says denials: fail: nothing after it is filed)
-  · awaiting approval (at its gate: nothing after it is filed until nemia approve — and, on an ending step
-  that runs in the repository's checkout, nothing of it at all until then).
+  · awaiting approval (at its gate: nothing after it is filed until nemia approve).
 
-  → to decide names a run at its result that nobody has decided: its ending step's gate, in the folder's
-  words, with the nemia approve that runs it — or, in a folder with no ending step, its branch ahead of the
-  base branch with nothing having merged it.
+  → to decide names a run at its result that nobody has decided: a step at its gate, with the nemia approve
+  that answers it — or its branch ahead of the base branch with nothing having merged it.
 
   WF_ROOT            where runs and the engine's board live, an absolute path (default ~/.agent-workflows)
   WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude, codex

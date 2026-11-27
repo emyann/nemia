@@ -51,10 +51,8 @@ export const pauseLines = (answer: PauseAnswer, cost: string) => {
   return [
     kept
       ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is cut`
-      : `the store is paused at once ${sinceWords(pause)} — what runs is cut, and a landing finishes; ${RESUME_LINE} resumes it`,
-    interrupted.length
-      ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:`
-      : 'nothing outside a landing was at work: nothing was stopped',
+      : `the store is paused at once ${sinceWords(pause)} — what runs is cut; ${RESUME_LINE} resumes it`,
+    interrupted.length ? `cut ${interrupted.length}, each going on at ${RESUME_LINE}:` : 'nothing was at work: nothing was stopped',
     ...interrupted.map((i) => `   ${interruptWords(i)}`),
     ...skipped.map((i) => `   ${interruptWords(i)} — left at work: a try of it is asked for already`),
     ...(interrupted.length ? [cost] : []),
@@ -72,9 +70,9 @@ export const nowLines = (interrupts: readonly Interrupt[], standing: boolean, co
   return [
     interrupts.length
       ? `nemia pause --now ${pausing} and cut ${interrupts.length} at work, each going on at ${RESUME_LINE}:`
-      : `nemia pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
+      : `nemia pause --now ${pausing}; nothing is at work, so it stops nothing.`,
     ...interrupts.map((i) => `   ${interruptWords(i)}`),
-    `${cost} A landing that checks or merges is left to finish.`,
+    cost,
     `${NOW_LINE} does it.`,
   ];
 };

@@ -27,7 +27,7 @@ type Finishing = Paused['finishing'][number];
 
 const atWorkWords = (kind: Finishing['kind'], calling: string | undefined) => {
   if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
-  return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
+  return 'its check runs';
 };
 
 const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing) =>
@@ -49,9 +49,6 @@ export const pausedLines = (paused: Paused, now: Date = new Date()) => {
     ...paused.parked.map(
       ({ run, step, after, cut }) =>
         `   ${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`,
-    ),
-    ...paused.staged.map(
-      ({ run, step, repo }) => `   ${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`,
     ),
     ...paused.held.map(({ run, step }) => `   ${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`),
   ] satisfies string[];

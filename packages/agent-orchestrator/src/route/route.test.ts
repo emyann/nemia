@@ -80,7 +80,6 @@ describe('load refuses a workflow whose routes do not close', () => {
         agent: { name: 'implementer', keys: [], body: '', given: {} },
       })),
     ],
-    ['a workflow: node with a workspace', changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', workspace: 'base' }))],
     ['a workflow: node with a check', changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', check: 'npm test' }))],
     ['a workflow: node with a gate', changed('to-build', (s) => ({ ...s, after: ['notes'], workflow: 'build', gate: true }))],
     [
@@ -106,21 +105,6 @@ describe('load refuses a workflow whose routes do not close', () => {
         ...s,
         output: { file: 'plan.schema.json', schema: { ...PLAN_SCHEMA, properties: { surface: { type: 'string' } } } },
       })),
-    ],
-    [
-      'a workspace: on a table condition, the last step',
-      [
-        { ...step('plan'), output: { file: 'plan.schema.json', schema: PLAN_SCHEMA } },
-        {
-          ...step('triage', ['plan']),
-          input: ['plan'],
-          routes: ['web', 'docs'],
-          route: { ...TABLE, table: { web: 'web', backend: 'web', docs: 'docs' } },
-          ends: ['web', 'docs'],
-          workspace: 'base',
-          gate: true,
-        },
-      ],
     ],
     ['a check: on a table condition', changed('triage', (s) => ({ ...s, check: 'npm test' }))],
     ['a retries: on a table condition', changed('triage', (s) => ({ ...s, retries: 1 }))],

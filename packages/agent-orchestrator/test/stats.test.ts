@@ -1,7 +1,7 @@
 /**
  * `nemia stats` as a person reads it, told as three stories on the stage (`story.ts`), over a store of seeded records and the engine's
  * stand-in, each task's facts planted on the attempt it ended (`settle(id, phase, end)`): the numbers its handler answers over a store,
- * read through its words (`typed.ts`), a check that refused told from one that did not finish, the deadline a landing check was filed
+ * read through its words (`typed.ts`), a check that refused told from one that did not finish, the deadline a check was filed
  * with read off the engine; every try nothing measured — on codex, in the background, a recheck, filed before steps ran as jobs, a
  * session whose ends do not say — read as null, never 0, and left out of every mean; and a change to what a workflow's runs froze
  * marked once, on the later run of its workflow folder and factory.
@@ -150,23 +150,20 @@ function rendered(
 /** What `nemia stats argv` answered, over the stage's engine. */
 const answered = async (argv: string[]) => JSON.parse(JSON.stringify(await stage.main(['stats', ...argv]))) as Stats;
 
-/** A run of three steps that landed on its first try, its implement checked, its review accepting the first round. */
+/** A run of two steps, its implement checked, its review accepting the first round. */
 function aLanding() {
   ran('landed-implement', { from: 1, to: 2, costUsd: 2 });
   ran('landed-implement-check', { from: 2, to: 3, exitCode: 0 });
   ran('landed-review', { from: 3, to: 4, costUsd: 1, closeout: { ...SIGNED, again: false } });
-  ran('landed-land', { from: 4, to: 5, costUsd: 0.5 });
   writeRun(
     'landed',
     [
       { name: 'implement', after: [], body: 'Do it.', check: 'true', agent: agent('implementer') },
       { name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: 3, agent: agent('reviewer') },
-      { name: 'land', after: ['review'], body: 'Land it.', workspace: 'main' },
     ],
     {
       implement: { taskId: 'landed-implement', check: { taskId: 'landed-implement-check' } },
       review: { taskId: 'landed-review' },
-      land: { taskId: 'landed-land', landed: { commit: 'def' } },
     },
   );
 }
@@ -188,22 +185,6 @@ function aCheckedRun() {
       },
     },
     { factory: 'other', repo: '/repos/two', workspace: '/repos/two' },
-  );
-}
-
-const LANDING_DAY = '2026-10-01';
-
-/** A run whose one step lands it on its check: a session of an hour, then a check that ran `checkSeconds`, filed with `deadline`. */
-function aLandingCheck(id: string, checkSeconds: number, deadline: number) {
-  ran(`${id}-land`, { from: 9, to: 10, day: LANDING_DAY });
-  const check = `${id}-land-check`;
-  const endedAt = new Date(Date.parse(at(10, LANDING_DAY)) + checkSeconds * 1000).toISOString();
-  ran(check, { from: 10, to: 10, day: LANDING_DAY, exitCode: 0, deadline, endedAt });
-  writeRun(
-    id,
-    [{ name: 'land', after: [], body: 'Land it.', workspace: 'main', gate: true, check: 'npm test' }],
-    { land: { taskId: `${id}-land`, check: { taskId: check } } },
-    { factory: 'landings', createdAt: at(9, LANDING_DAY) },
   );
 }
 
@@ -238,28 +219,19 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
     plantedFor(t);
     aLanding();
     aCheckedRun();
-    aLandingCheck('s-old', 1033, 1200);
-    aLandingCheck('s-new', 1033, 2700);
     aTouchedRun();
     return t.end;
   });
   const s = story(test);
   s.test(
-    '--json answers a landing on its first try, its cost and rounds, and each check by its verdict; a run whose check did not finish has not finished',
+    '--json answers a run whose branches no tick has read as not merged, its rounds, and each check by its verdict; a run whose check did not finish has not finished',
     async () => {
       const all = await answered(['--from', DAY, '--to', DAY]);
       assert.deepEqual(
-        [
-          all.all.total.runs,
-          all.all.total.merged,
-          all.all.total.firstTry,
-          all.all.total.rounds,
-          all.all.total.costPerMerged,
-          all.all.total.timePerMerged,
-        ],
-        [1, 1, 1, 1, 3.5, 4 * 3_600_000],
+        [all.all.total.runs, all.all.total.merged, all.all.total.rounds, all.all.total.costPerMerged, all.all.total.timePerMerged],
+        [1, null, 1, null, null],
       );
-      assert.equal(all.all.total.tries, 5);
+      assert.equal(all.all.total.tries, 4);
       const build = all.all.steps.find((row) => row.step === 'build');
       assert.deepEqual(build?.checks, { passed: 0, refused: 1, unfinished: 1 }, 'no exit code is unfinished; exit 1 refused');
       assert.equal(build?.costUsd, null, 'no session of build was measured');
@@ -271,22 +243,18 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
     assert.deepEqual(
       (await answered(['--by', 'factory'])).groups.map((g) => [g.key, g.total.tries]),
       [
-        ['default', 3],
-        ['landings', 2],
+        ['default', 2],
         ['other', 2],
         ['touched', 2],
       ],
     );
     assert.equal((await answered(['--factory', 'other'])).all.total.tries, 2);
   });
-  s.test("the tiles span the last 14 days and the 14 before; the day's row is what it landed, and no change is marked", async () => {
+  s.test("the tiles span the last 14 days and the 14 before; the day's row is what it merged, and no change is marked", async () => {
     const { all } = await answered(['--from', DAY, '--to', DAY]);
     assert.ok(all.tiles.before.to < all.tiles.last.from, 'the 14 days before end before the last 14 begin');
     const day = all.days.find((d) => d.day === DAY);
-    assert.deepEqual(
-      [day?.runs, day?.merged, day?.rounds, day?.firstTry, day?.costPerMerged, day?.timePerMerged],
-      [1, 1, 1, 1, 3.5, 4 * 3_600_000],
-    );
+    assert.deepEqual([day?.runs, day?.merged, day?.rounds, day?.costPerMerged, day?.timePerMerged], [1, null, 1, null, null]);
     assert.deepEqual(all.marks, [], 'no run changed what it froze');
   });
   s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async () => {
@@ -295,19 +263,6 @@ describe('`nemia stats` over a store: the numbers it answers and the words it pr
       ['--from', '2026-13-40'],
     ])
       await assert.rejects(stage.main(['stats', ...argv]), (err: unknown) => err instanceof Invalid && err.exitCode === 2, argv.join(' '));
-  });
-  s.test('a landing check is judged against the deadline its task was filed with, read off the engine', async () => {
-    assert.deepEqual(
-      (await answered(['--factory', 'landings'])).all.slowLandings.map((x) => [
-        x.run,
-        x.step,
-        x.checkMs,
-        x.deadlineMs,
-        Math.round(x.share * 100),
-      ]),
-      [['s-old', 'land', 1_033_000, 1_200_000, 86]],
-      'the same 1033 s is over half of 1200 and under half of 2700',
-    );
   });
   s.test("the tries that touched a frozen skill's paths, and how many of them loaded it, are read off the sessions' ends", async () => {
     const range = ['--factory', 'touched', '--from', TOUCHED_DAY, '--to', TOUCHED_DAY];

@@ -20,7 +20,6 @@ const SPEC: StepSpecView = {
   effort: null,
   context: null,
   after: ['design'],
-  workspace: null,
   place: null,
   resume: null,
   fence: null,

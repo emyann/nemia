@@ -37,7 +37,7 @@ export const run = (steps: Record<string, string | null>, rest: Partial<Reposito
 /**
  * The one read of a run `assess` and its readers take (`AssessRead`), as the tables build it: `steps` and `run`, with `partial` over the
  * readers `readersOf` (told.verb.ts) makes of an empty view — no task's phase known, no closeout, nothing asked, no session blocked,
- * nothing spent — and no asks, no standings and no checkout. Written out here rather than called, since this file is imported before a
+ * nothing spent — and no asks, no standings. Written out here rather than called, since this file is imported before a
  * test sets `WF_ROOT` and a verb's imports read it as they load; `test/one-read.test.ts` holds the two equal. Save each check's verdict,
  * left out (`undefined`) — and a reader given as `undefined` is left out: on an empty view `exitVerdicts` reads every check on the
  * record as `unfinished`, which no table means by leaving it out.
@@ -50,7 +50,6 @@ export const aRead = (steps: readonly StepSpec[], r: Run, partial: Partial<Omit<
     asks: [],
     roundAsks: [],
     standings: [],
-    checkout: undefined,
     ...given(partial),
   }) satisfies AssessRead;
 
@@ -120,7 +119,7 @@ export type ListedInput = Omit<ListingInput, 'read' | 'assessed'> &
  * read as the routing reads them (one nobody can read is none), and the session `needs-human` blocked, as `harnessBlocked` reads a view.
  */
 export const listingInput = (input: ListedInput) => {
-  const { run: r, askedCloseout, verdictOf, asks, roundAsks, spendOf, standings, checkout, sessionBlocked, ...rest } = input;
+  const { run: r, askedCloseout, verdictOf, asks, roundAsks, spendOf, standings, sessionBlocked, ...rest } = input;
   const signedOff = (name: string) => {
     const c = input.closeoutOf(name);
     return (c && !('error' in c) ? c : undefined) satisfies Closeout | undefined;
@@ -134,7 +133,6 @@ export const listingInput = (input: ListedInput) => {
     ...(roundAsks ? { roundAsks } : {}),
     ...(spendOf ? { spendOf } : {}),
     ...(standings ? { standings } : {}),
-    ...(checkout ? { checkout } : {}),
     sessionBlocked: sessionBlocked ?? ((taskId) => input.phaseOf(taskId) === 'needs-human'),
   });
   return { ...rest, read } satisfies ListingInput;

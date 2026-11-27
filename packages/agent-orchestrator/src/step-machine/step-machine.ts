@@ -43,19 +43,16 @@ const isStepStatus = (word: string): word is StepStatus => word in STEP_STATES;
 
 /**
  * The moves `stepStatus` makes, each walked by the replay: a step filed and its session signing off, its check, its gate, the ways a try
- * stops and the try after it, being over its budget, a loop's round, and an ending held at its gate before it is filed.
+ * stops and the try after it, being over its budget, and a loop's round.
  *
  * A filed step reads `pending` again only where its try is moved behind with none in its place: a round unfiles every step of its loop but
- * its target (`roundFiled`), and an ending sent back with its work has its try moved behind (`sentBack`). And an ending held at its gate
- * before it is filed reads `pending` once approved, until the pass files it, and again when the work it waits on is sent back. A step in
- * flight — its session running, its check or its landing pending — is never unfiled.
+ * its target (`roundFiled`). A step in flight — its session running or its check pending — is never unfiled.
  *
  * Routing adds a node's moves before it is filed: a table condition answers unfiled (`unverified`, or `unsigned` where its table names no
  * route), a node off the route taken reads `skipped` until a new route takes it, and a workflow node reads `sent` once its card is filed.
  */
 export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'pending', to: 'running', event: 'filed' },
-  { from: 'pending', to: 'awaiting approval', event: 'its work handed on, at the gate of an ending' },
   { from: 'pending', to: 'unverified', event: 'answered by its table' },
   { from: 'pending', to: 'unsigned', event: 'its table answered no route' },
   { from: 'pending', to: 'skipped', event: 'its route not taken' },
@@ -73,9 +70,9 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'running', to: 'stopped', event: 'its session stopped' },
   { from: 'running', to: 'budget exhausted', event: 'cut off at its budget' },
   { from: 'running', to: 'over budget', event: 'failed, over its budget' },
-  { from: 'checking', to: 'verified', event: 'its check passed, or its landing committed' },
+  { from: 'checking', to: 'verified', event: 'its check passed' },
   { from: 'checking', to: 'awaiting approval', event: 'its check passed, at its gate' },
-  { from: 'checking', to: 'failed (check)', event: 'its check refused or did not finish, or its landing aborted' },
+  { from: 'checking', to: 'failed (check)', event: 'its check refused or did not finish' },
   { from: 'checking', to: 'over budget', event: 'its check refused, over its budget' },
   { from: 'verified', to: 'running', event: 'a round files its target again' },
   { from: 'verified', to: 'pending', event: 'a round unfiles its loop' },
@@ -83,7 +80,6 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'awaiting approval', to: 'verified', event: 'approved, checked' },
   { from: 'awaiting approval', to: 'unverified', event: 'approved' },
   { from: 'awaiting approval', to: 'running', event: 'sent back from its gate' },
-  { from: 'awaiting approval', to: 'pending', event: 'approved before it is filed, or its work sent back' },
   { from: 'exhausted', to: 'unverified', event: 'accepted at its rounds' },
   { from: 'exhausted', to: 'pending', event: 'a round on your word' },
   { from: 'blocked', to: 'running', event: 'tried again' },
@@ -93,7 +89,6 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'denied', to: 'running', event: 'tried again' },
   { from: 'failed (check)', to: 'running', event: 'tried again' },
   { from: 'failed (check)', to: 'checking', event: 'checked again, or a wait node tried again' },
-  { from: 'failed (check)', to: 'pending', event: 'an ending sent back with its work' },
   { from: 'failed', to: 'running', event: 'tried again' },
   { from: 'stopped', to: 'running', event: 'tried again' },
   { from: 'budget exhausted', to: 'running', event: 'tried again, with a budget' },

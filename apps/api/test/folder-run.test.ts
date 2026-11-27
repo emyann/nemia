@@ -164,11 +164,7 @@ describe("a folder run read on the board: listed by its kind and place, its page
       assert.deepEqual([run.repo, run.baseRef, run.branch, run.isolate, run.place], [null, null, null, null, 'folder']);
       const spec = specOf(object, 'write');
       assert.ok(spec, 'the run froze the spec of its step `write`');
-      assert.deepEqual(
-        [spec.place, spec.workspace],
-        ['folder', null],
-        'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
-      );
+      assert.deepEqual(spec.place, 'folder', 'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`');
       assert.equal(
         run.work,
         work,

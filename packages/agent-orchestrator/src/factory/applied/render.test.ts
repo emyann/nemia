@@ -126,7 +126,7 @@ describe("what a render writes into a factory's tree, read back as today's folde
     const repo = scratch('wf-render-repo-');
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
     const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
-    fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: /m, 'checkMemory: 256Mi\ncheck: '));
+    fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^gate: true$/m, 'gate: true\ncheckMemory: 256Mi\ncheck: true'));
     const dir = path.join(scratch('wf-render-out-'), 'team');
     exportTemplate({ dir, from: repo });
     const { tree, out } = rendered(dir);

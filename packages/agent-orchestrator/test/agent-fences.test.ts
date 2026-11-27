@@ -150,7 +150,7 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   if (harness !== 'claude') return [`${step.name}: on ${harness}, which this test does not know how to fence`] satisfies string[];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
-  const dontAsk = step.permissionMode === 'dontAsk' && step.workspace !== 'base';
+  const dontAsk = step.permissionMode === 'dontAsk';
   return calls
     .filter((call) => {
       if (deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
@@ -173,14 +173,6 @@ function unallowed(step: Step, commands: string[], allowed: readonly string[] = 
 
 /** The step of the tests' team that names an agent, as its folder resolves it. */
 const stepOf = (agent: string) => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)! satisfies Step;
-
-/** A folder of steps written from their frontmatter and a one-line body, beside no agents. */
-const folderOf = (steps: Record<string, string>) => {
-  const dir = scratch('wf-fences-folder-');
-  for (const [name, front] of Object.entries(steps))
-    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
-  return dir;
-};
 
 test("REFUSED: a rule on an MCP tool's parameter in an allow list is not read as allowing anything: the matcher throws on it", () => {
   const reviewer = stepOf('reviewer');
@@ -255,34 +247,6 @@ test('REFUSED: an auto step without its own deny, and a dontAsk step an allow re
   ]);
 });
 
-test("REFUSED: a watcher's step without its own deny of the forced delete is open, though it runs dontAsk and the settings allow it none", () => {
-  const supervise = loadWorkflows(
-    folderOf({
-      supervise:
-        'workspace: base\nslot: none\nharness: claude\npermissionMode: dontAsk\n' +
-        'disallowedTools: Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), ' +
-        'Bash(pkill:*), Bash(killall:*), ' +
-        'mcp__playwright__browser_run_code_unsafe',
-    }),
-  ).find((s) => s.name === 'supervise')!;
-  assert.deepEqual(unfenced(supervise), [], 'fenced by its own list');
-  assert.equal(supervise.permissionMode, 'dontAsk');
-  const bare = {
-    ...supervise,
-    disallowedTools: supervise.disallowedTools?.filter((rule) => !rule.startsWith('Bash(git branch')),
-  };
-  assert.deepEqual(
-    unfenced(bare),
-    ['supervise: Bash(git branch -D wf/r-1/implement)', 'supervise: Bash(git branch --delete --force wf/r-1/implement)'],
-    "a job in the checkout itself reads that checkout's working-tree settings.json, which a person may have edited",
-  );
-  assert.deepEqual(
-    unfenced({ ...bare, workspace: undefined, place: 'folder' }),
-    [],
-    'the same step as a job in a folder the run made reads only the settings shipped here, where no allow reaches a forced delete',
-  );
-});
-
 test("REFUSED: the team's implementer with its deny line cut back to the four it had is open, read from its file as a run reads it", () => {
   const root = teamCopy('wf-fences-');
   const file = path.join(root, 'agents', 'implementer.md');
@@ -349,7 +313,7 @@ function withFenceList(text: string, key: FenceList, edit: (value: string) => st
 }
 
 /** Whether a step is a dontAsk job, which runs only what an allow reaches. */
-const dontAskJob = (step: Step) => step.permissionMode === 'dontAsk' && step.workspace !== 'base';
+const dontAskJob = (step: Step) => step.permissionMode === 'dontAsk';
 
 /**
  * Git's read-only questions a read-only step asks, in the spellings a session types: a form for each rule of the set its agent's

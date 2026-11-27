@@ -58,7 +58,7 @@ type Held = {
 };
 
 /**
- * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
+ * What a person has to decide about the run's result, off the api's `toDecide`: a step's gate, or a branch nobody merged. Null
  * while there is nothing — and for a listing without `toDecide`, read tolerantly as `onYouOf` is, since the Factory polls the list and a
  * refusal would take the whole floor down for a word.
  * @param run The run, by the api's `toDecide`; absent or null where there is nothing to decide.
@@ -106,7 +106,7 @@ export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> &
  * Who a run waits on, as the CLI's `ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's
  * `waitingOnYouWords`; and for a run given without `waitingOnYouWords`, the steps by name (`waitingOnYou`).
  *
- * Without the ending step whose gate the to-decide line already says, as the CLI's `ls` prints it (cli/main.ts): that line is above, it
+ * Without the step whose gate the to-decide line already says, as the CLI's `ls` prints it (cli/main.ts): that line is above, it
  * names the step and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  * @param run The run: the steps that wait on you, the api's words for them where it gave them, and what it has to decide.

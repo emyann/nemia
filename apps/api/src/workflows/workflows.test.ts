@@ -116,7 +116,6 @@ const spec = (fields: Partial<WorkflowStepSpec>) => ({
   resume: null,
   input: [],
   place: 'git',
-  workspace: null,
   writable: [],
   reads: [],
   slot: null,

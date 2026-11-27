@@ -53,9 +53,9 @@ export function cancelPlan(read: AssessRead, assessed: Assessment = assess(read)
   if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop } satisfies CancelPlan;
   if (stop.length) return { kind: 'cancel', stop } satisfies CancelPlan;
 
-  const { ready, check, due, waitingOnCheckout, waitingOnPause, status } = assessed;
+  const { ready, check, due, waitingOnPause, status } = assessed;
   const waits = [...assessed.stepWords.values()].some((w) => holdsTheRun(w.status));
-  const moving = [ready, check, due.retry, due.round, waitingOnCheckout, waitingOnPause?.steps ?? []].some((names) => names.length > 0);
+  const moving = [ready, check, due.retry, due.round, waitingOnPause?.steps ?? []].some((names) => names.length > 0);
   if (!moving && !waits && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status } satisfies CancelPlan;
   return { kind: 'cancel', stop: [] } satisfies CancelPlan;
 }

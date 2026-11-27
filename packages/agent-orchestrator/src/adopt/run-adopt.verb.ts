@@ -7,7 +7,7 @@
 import { Effect } from 'effect';
 import { asked as engineAsked, type Engine } from '../runtime-client.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf } from '../record/record.ts';
-import { sentBack, stepStatus } from '../status/status.ts';
+import { stepStatus } from '../status/status.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import { nextTry, retriesDue, turnsOf } from '../retry/index.ts';
 import { answersIn } from '../views/views.verb.ts';
@@ -75,7 +75,6 @@ const adoptTries = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
     views.set(taskId, view);
     const record = recordNamed(run, r.step);
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : tryFiled(pins, step, record, r, taskId);
-    for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
     adopted.push(r.step);
   }
   return adopted;
@@ -113,7 +112,7 @@ const adoptRounds = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
 const unrecordedSteps = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
   const { run, views } = read;
   const { cancelledAt: _, ...live } = run;
-  const { ready } = assess({ ...read, run: live, sessionBlocked: () => false, standings: [], checkout: undefined });
+  const { ready } = assess({ ...read, run: live, sessionBlocked: () => false, standings: [] });
   const found: Array<{ name: string; taskId: string }> = [];
   for (const name of ready) {
     const taskId = stepTaskId(run, name, tryOf(run, name));

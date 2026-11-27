@@ -145,5 +145,4 @@ test('the test place declares every sentence the code prints of a place, with no
   assert.deepEqual(Object.keys(declared.say).sort(), [...PLACE_SAYS].sort());
   assert.deepEqual(unknownHoles(declared.say), []);
   assert.deepEqual(unknownHoles({ ...declared.say, commit: 'commit {path} as {who}' }), [{ key: 'commit', hole: 'who' }]);
-  assert.deepEqual(declared.denyWhileLanding, []);
 });

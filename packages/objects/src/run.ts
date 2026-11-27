@@ -34,7 +34,6 @@ import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
   FIELD_SHAPES,
-  GATE_AT,
   OUTCOMES,
   PLACE_KINDS,
   RAISE_BY,
@@ -71,13 +70,6 @@ const codesRefused = (what: string, codes: { phase: string; reason: string; on?:
 export const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(step) || codesRefused('a step', step));
 const TRY_CODES = Schema.makeFilter((tried: TryCodes) => tryCodesLegal(tried) || codesRefused('a try', tried));
 const RUN_CODES = Schema.makeFilter((run: RunCodes) => runCodesLegal(run) || codesRefused('a run', run));
-
-/** The check that a step names the run whose ending holds the base (`baseHeldBy`) exactly when it waits on it (`on: base`). */
-const BASE_HELD = Schema.makeFilter(
-  (step: { on: (typeof WAIT_ON)[number] | null; baseHeldBy?: unknown }) =>
-    (step.on === 'base') === (step.baseHeldBy !== undefined) ||
-    `a step is served ${step.on === 'base' ? 'waiting on the base with no baseHeldBy' : `with a baseHeldBy while it waits on ${String(step.on)}`}: set baseHeldBy, the run whose ending holds the base, exactly where on is base.`,
-);
 
 const StepStatusWord = Schema.Literals(STEP_STATUSES);
 const StepPhase = Schema.Literals(STEP_PHASES);
@@ -131,10 +123,6 @@ export const RunSpecStep = Schema.Struct({
   effort: NullString.annotate({ description: 'How hard the harness thinks, in its own words (effort:); null where unset.' }),
   context: NullNumber.annotate({
     description: "Its session's context window in tokens (context:); null where unset, the model's whole window.",
-  }),
-  workspace: NullString.annotate({
-    description:
-      "base for a step that runs in the repository's own working tree rather than a worktree of its own (workspace:); null where unset.",
   }),
   place: NullString.annotate({
     description: 'Where its work is (place:): folder, a folder the run makes, or git, on branches of a repository; null where unset.',
@@ -247,21 +235,6 @@ export const StepRaise = Schema.Struct({
 export type StepRaise = typeof StepRaise.Type;
 
 /**
- * The run whose ending step works on the base branch in the repository's own working tree now, and that step (`CheckoutHold`, cap.ts):
- * what an ending of a run waits on while it waits on the base (`WAIT_ON`'s `base`), on the step that waits (`RunStepStatus`'s
- * `baseHeldBy`) and on its decision (`Decidable`'s).
- */
-export const BaseHold = Schema.Struct({
-  run: Schema.String.annotate({ description: "The run whose ending holds the base branch in the repository's own working tree." }),
-  step: Schema.String.annotate({ description: 'Its ending step that works there now.' }),
-}).annotate({
-  identifier: 'BaseHold',
-  description:
-    "The run whose ending step works on the base branch in the repository's own working tree now, which an ending of this run waits on: present only while it waits on the base (on: base), absent otherwise.",
-});
-export type BaseHold = typeof BaseHold.Type;
-
-/**
  * Why a task filed to start has not, as the engine last judged it: the machine's memory has no room for it (its need, the room left to
  * it and the memory kept for a person's turn, each in bytes), its pool is at its ceiling (the pool and the ceiling), or the server is
  * paused. Served on a step (`RunStepStatus.queuedFor`) and on an upgrade (`Upgrade.queuedFor`).
@@ -308,8 +281,6 @@ export const RunStepStatus = Schema.Struct({
   via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
     description: 'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session or closeout. Null otherwise.',
   }),
-  /** The run whose ending holds the base the step waits on, and that ending (`BaseHold`): present exactly when `on` is `base`. */
-  baseHeldBy: Schema.optionalKey(BaseHold),
   message: Schema.String.annotate({ description: 'Where the step stands, in the sentence a person reads.' }),
   verdict: Schema.NullOr(CheckVerdict).annotate({
     description: "Its current try's check verdict, a result and the exit; null where it has none.",
@@ -430,7 +401,7 @@ export const RunStepStatus = Schema.Struct({
     }),
   ),
 })
-  .check(STEP_CODES, BASE_HELD)
+  .check(STEP_CODES)
   .annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
@@ -523,11 +494,6 @@ const RunToDecide = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal('approve').annotate({ description: "An approval at the gate of the run's last step." }),
     step: Schema.String.annotate({ description: 'The step waiting at its gate, by name.' }),
-    says: NullString.annotate({
-      description:
-        "What it would do, the first line of the step's own note; null where it has none, and for a gated step that has signed off.",
-    }),
-    filed: Schema.Boolean.annotate({ description: 'Whether the step has run.' }),
     back: Strings.annotate({ description: 'The steps a send-back goes to.' }),
     onto: NullString.annotate({ description: "The base branch the run's result is on its way to; null where none." }),
     said: Schema.String.annotate({ description: 'What nemia ls prints after to decide:.' }),
@@ -543,13 +509,9 @@ const RunToDecide = Schema.Union([
   }),
 ]);
 
-/** A step of the run that is a gate, and where its approval is beside it (`GATE_AT`). */
+/** A step of the run that is a gate. */
 export const RunGate = Schema.Struct({
   step: Schema.String.annotate({ description: 'The step that is a gate, by name.' }),
-  at: Schema.Literals(GATE_AT).annotate({
-    description:
-      "Where the gate's approval is beside its step: after, its closeout waits for an approval before anything after it is filed; before, it is approved before it runs (an ending on the base branch).",
-  }),
 });
 
 /** One kind and name the run or a step of it is behind the files on (`Drift`, revisions.ts). */
@@ -714,8 +676,7 @@ export const RunStatus = Schema.Struct({
   waitingOnYou: Strings.annotate({ description: 'The steps a person has to act on, by name; empty where none waits on one.' }),
   waitingOnYouWords: Strings.annotate({ description: 'What each of those steps waits on a person for, in words, one line a step.' }),
   gates: List(RunGate).annotate({
-    description:
-      'The steps of the run that are gates, in the order they run, each with where its approval is: after the step, its closeout waiting on it, or before it, for an ending approved first.',
+    description: "The steps of the run that are gates, in the order they run: each waits for a person's approval after it has signed off.",
   }),
   warning: NullString.annotate({ description: "A warning about the run's workflow folder, in words; null where there is none." }),
   kinds: List(RunDrift).annotate({

@@ -56,7 +56,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 /**
  * Each step's need, in the run's order: what the Factory's card says.
  *
- * Without the ending step whose gate the run's to-decide line already says, as the CLI's `ls` leaves it out of `→ waiting on you`
+ * Without the step whose gate the run's to-decide line already says, as the CLI's `ls` leaves it out of `→ waiting on you`
  * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
  * @param run The run: its steps, the steps waiting on you, when it was called off, and its to-decide line where it has one.
  */

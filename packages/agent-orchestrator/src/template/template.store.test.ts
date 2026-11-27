@@ -195,7 +195,7 @@ describe('what export writes from a repository and a factory, read back as it wa
     const repo = repoWithTeam();
     const long = `npm test && ${Array.from({ length: 12 }, (_, i) => `node "scripts/check-${i}.ts" --mode: 'strict' # ${i}`).join(' && ')}`;
     const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
-    fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${JSON.stringify(long)}`));
+    fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^gate: true$/m, `gate: true\ncheck: ${JSON.stringify(long)}`));
     const review = path.join(repo, 'workflows', 'dev', 'review.md');
     fs.writeFileSync(
       review,
@@ -209,8 +209,8 @@ describe('what export writes from a repository and a factory, read back as it wa
     assert.ok(fs.readFileSync(path.join(dir, 'workflows/dev/workflow.yaml'), 'utf8').includes(`check: "${long.replace(/"/g, '\\"')}"`));
     assert.deepEqual(
       steps.get('ship'),
-      { name: 'ship', after: ['review'], place: 'git', workspace: 'base', gate: true, check: long },
-      'a step file that says `workspace: base`, the former spelling, is exported as `base`',
+      { name: 'ship', after: ['review'], place: 'git', gate: true, check: long },
+      'a gated step file is exported with its place, its gate and its check',
     );
     assert.equal(steps.get('implement')?.overrides, undefined, 'a step with no harness key of its own writes no overrides');
     assert.deepEqual(steps.get('review')?.overrides, { skills: ['review-a-change'], mcp: ['docs'], claude: { effort: 'low' } });

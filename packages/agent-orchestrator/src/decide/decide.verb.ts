@@ -9,7 +9,7 @@ import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts'
 import { Effect } from 'effect';
 import { actorWords, type Actor } from 'objects';
 import { asked as engineAsked, nameFor, over, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
-import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
+import type { RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
@@ -47,9 +47,8 @@ import {
 import { mergeOffers } from '../merge/merge.verb.ts';
 import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { collisionsDue, type Collisions } from '../collide/collide.ts';
+import type { Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
-import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { stepsReading, type StepsReading } from '../object/read.verb.ts';
 import { seenBy } from '../summary/reads.verb.ts';
@@ -167,19 +166,13 @@ export type Decided = {
    */
   standings: BranchStanding[];
   /**
-   * The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds
-   * it.
-   */
-  checkout?: CheckoutHold;
-  /**
-   * What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged (`assess`, on
+   * What is left for a person to decide about the result (`toDecide`): a step's gate, or a branch nobody has merged (`assess`, on
    * the same `standings`).
    */
   toDecide?: ToDecide;
   /**
-   * At an ending's decision (`collisionsDue`) — its gate, or its landing a check refused — whether the run's branches merge onto the base,
-   * which runs in flight they collide with, and the semantic conflict (`collisionsAt`), off the reading's branches; absent at any other
-   * decision.
+   * At a decision (`toDecide`), whether the run's branches merge onto the base and which runs in flight they collide with
+   * (`collisionsAt`), off the reading's branches; absent where nothing is to decide.
    */
   collisions?: Collisions;
 };
@@ -310,9 +303,9 @@ export const needsRefusedOf = (steps: readonly StepSpec[], run: Run, read: Asses
 
 /**
  * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
- * due, what is left to decide and the decision itself, the runs it waits on and is held until, the checkout's holder, every try's view —
+ * due, what is left to decide and the decision itself, the runs it waits on and is held until, every try's view —
  * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
- * tick's last reading): the standings, the collisions at an ending and the cap's parents are read through it, and git is asked nothing.
+ * tick's last reading): the standings, the collisions and the cap's parents are read through it, and git is asked nothing.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
@@ -323,7 +316,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
   const e = viewedOnce(seenBy(at.e, views));
-  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, checkout } = judged.read;
+  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, roundAsks: rounds } = judged.read;
   const steps = [...at.steps];
   const { decision: d, assessed, spendOf } = judged;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
@@ -333,8 +326,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const place = yield* PlaceService;
   const standings = [...judged.read.standings];
   const decide = assessed.toDecide;
-  const ending = collisionsDue(steps, run, decide);
-  const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
+  const collisions = decide ? yield* collisionsAt(run, standings, git, place) : undefined;
   const answers = yield* answersOf(e, run, views, judged.answers);
   const used = consumption(views, run);
   const runs = !hasStarted(run) && !run.cancelledAt ? yield* (yield* RunDoor).runs.list() : [];
@@ -342,19 +334,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
-    ...retryOffers(
-      steps,
-      run,
-      d,
-      phaseOf,
-      reader,
-      asked,
-      spendOf,
-      verdictOf,
-      () => landingDenies(run, place),
-      checkKillOf,
-      judged.read.tipOf,
-    ),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, checkKillOf, judged.read.tipOf),
   ];
   const answer: Decided = {
     run,
@@ -373,10 +353,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCostSaid: runCostWords(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefusedOf(steps, run, judged.read)),
-    gates: saidBy(
-      gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds, checkKillOf),
-      (name) => approvalOf(run, name)?.actor,
-    ),
+    gates: saidBy(gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf), (name) => approvalOf(run, name)?.actor),
     budgets: gatesBudgets(run, steps, reader, spendOf),
     accepted: saidBy(acceptedLines(steps, run), (name) => acceptanceOf(run, name)?.actor),
     waitingOn: waitingOnOf(run.id, run, views),
@@ -387,7 +364,6 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     timeline: timeline(run, views, steps),
     ...(held ? { held } : {}),
     standings,
-    ...(checkout ? { checkout } : {}),
     ...(decide ? { toDecide: decide } : {}),
     ...(collisions ? { collisions } : {}),
   };

@@ -136,10 +136,10 @@ const heldIn = (s: Served) => {
   ];
 };
 
-/** The spec of a step in the object's words: `workspace: main`, the former spelling, said `base`. */
+/** The spec of a step in the object's words: the keys it serves, `shape` (a key the listing holds for its own use) left out. */
 const keysOf = (spec: ListedStep['spec']) => {
   const { shape: _shape, ...keys } = spec as ListedStep['spec'] & { shape?: unknown };
-  return { ...keys, ...((keys.workspace as string | null) === 'main' && { workspace: 'base' as const }) };
+  return keys;
 };
 
 /**

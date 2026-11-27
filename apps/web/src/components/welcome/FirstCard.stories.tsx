@@ -33,7 +33,8 @@ const loaded = async (canvas: HTMLElement, kind?: string) => {
 
 /**
  * Quick offered, nothing measured yet: the cost line says the estimate. Picking a suggestion fills the card, and Start files it labelled
- * as the first card, in quick, then starts it gated at its landing and opens the run's page. The estimate shows before the stats are read,
+ * as the first card, in quick, then starts it gated at its last step before the wait and opens the run's page. The estimate
+ * shows before the stats are read,
  * so Start is pressed once its name says the gates its workflow's listing gives, the read that enables it.
  */
 export const Estimate: Story = {
@@ -55,7 +56,7 @@ export const Estimate: Story = {
     await waitFor(() => expect(ground?.getAttribute('data-at')).toBe(`/runs/${STARTED_RUN}`));
     await expect(filed.map((w) => w.route)).toEqual(['POST cards', 'POST start']);
     await expect(filed[0]?.body).toMatchObject({ workflow: 'quick', label: ['onboarding=first-card'] });
-    await expect(filed[1]?.body).toMatchObject({ workflow: 'quick', gates: ['land'] });
+    await expect(filed[1]?.body).toMatchObject({ workflow: 'quick', gates: ['implement'] });
   },
 };
 
@@ -85,7 +86,7 @@ export const NoQuick: Story = {
     filed.length = 0;
     await userEvent.click(start);
     await waitFor(() => expect(filed.map((w) => w.route)).toEqual(['POST cards', 'POST start']));
-    await expect(filed[1]?.body).toMatchObject({ workflow: 'build', gates: ['land'] });
+    await expect(filed[1]?.body).toMatchObject({ workflow: 'build', gates: ['implement'] });
   },
 };
 

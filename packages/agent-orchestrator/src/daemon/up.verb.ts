@@ -254,7 +254,7 @@ function advancedLines(advanced: Pass['runs']) {
 }
 
 /**
- * The store's pause (`pausedWords`) and each check it holds back (`heldLines`), a landing with its merge staged among them, once when it
+ * The store's pause (`pausedWords`) and each check it holds back (`heldLines`), once when it
  * is put, again each time their words change — Pausing with fewer finishing, then Paused, a check held — and once when it is resumed:
  * the lines said now, and the words to compare the next pass's with.
  * @param pause The store's pause as the pass read it, or undefined where the store is not paused.

@@ -1,5 +1,5 @@
 /**
- * A run's result branches: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the
+ * A run's result branches: the steps whose branch is its result (`resultSteps`), the
  * branch tips a pass records (`tipBranches`, `tipsSeen`), and the decider screen's reading of what a branch touched, told by where it is
  * and by what reads it (`radius`, `radiusLines`, `touchedLines`, `inFullLines`, `lessonLine`).
  *
@@ -11,7 +11,7 @@
  * `**` and its slash cross none as well, so the root's `package.json` is in the list — and a trailing
  * `/` takes everything below.
  */
-import { endsOnBase, type StepSpec } from '../step/step.ts';
+import { type StepSpec } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { conditionOf } from '../route/index.ts';
@@ -21,12 +21,8 @@ import type { LessonState } from 'objects';
 import type { BranchesAsked } from '../../contracts/branches-asked.contract.ts';
 
 /**
- * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
- * repository's own checkout (`workspace: base`), the steps it waits on instead. Pure.
+ * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) Pure.
  *
- * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
- * the result, its `main` would be the run's own branch, and every question about the run's result — has it merged, what did it touch,
- * what is there to decide — would be asked of the base branch and answered yes.
  * @param steps The run's steps.
  * @param run The run, read for the workflow nodes that routed it on; absent, none did.
  */
@@ -34,8 +30,7 @@ export function resultSteps(steps: readonly StepSpec[], run?: Run) {
   const routed = run ? routedResult(steps, run) : [];
   if (routed.length) return routed;
   const ends = terminalSteps(steps);
-  const result = ends.flatMap((s) => (endsOnBase(s) ? steps.filter((x) => s.after.includes(x.name)) : [s]));
-  return [...new Set(result)];
+  return [...new Set(ends)];
 }
 
 /**
@@ -51,16 +46,6 @@ function routedResult(steps: readonly StepSpec[], run: Run) {
     return steps.filter((x) => names.includes(x.name));
   });
   return [...new Set(read)];
-}
-
-/**
- * The checks the run's work was judged by: each distinct `check:` of a step that is not an ending, in the order the steps run. What an
- * ending step is told to run again on the merge, so a shipper written once reads its folder's check off its brief rather than carrying
- * one in its words. Pure.
- * @param steps The run's steps.
- */
-export function workChecks(steps: readonly StepSpec[]) {
-  return [...new Set(steps.flatMap((s) => (!endsOnBase(s) && s.check ? [s.check] : [])))];
 }
 
 /**
@@ -101,7 +86,7 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
 
 /**
  * The commit each of a run's result `branches` is at, as `heads` has it — or, for one `heads` does not have, the tip the run last saw
- * (`tipsSeen`): what a merge in the repository's checkout is read as this run's by (`checkoutStatus`). Pure: `heads` is every branch of
+ * (`tipsSeen`). Pure: `heads` is every branch of
  * the repository and its commit as its caller read them, none where it read nothing.
  * @param run The run, by the tips it last saw.
  * @param branches Its result branches.
@@ -320,7 +305,7 @@ export function radiusLines(r: Radius) {
  * where the work a person has to judge is.
  *
  * `base` is the run's own base branch, given only for a run that cut worktrees (`isolate`): it is dropped from that fallback, because
- * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: base`),
+ * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout,
  * where the run commits nothing — so the diff between the run's frozen base and that branch is not the run's work but the base moving
  * under it, which every other run's merge adds to, and read as the work it would show a person everything merged since the run
  * started. `tipBranches` refuses the same branch for the same reason.

@@ -48,8 +48,7 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
 export function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
   const gate = gateOfStep(run, step)!;
   const next = run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.from === step.name).map((e) => e.to);
-  const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : null;
-  const brief = gateBrief(gate, gate.ends ? says : null, next);
+  const brief = gateBrief(gate, next);
   const { data } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const facts = gateFacts(run, isDecidable(data) ? data : null);
 
@@ -79,7 +78,6 @@ export function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
           step={step.name}
           approveLine={step.commands.approve}
           back={gate.back}
-          acts={gate.ends}
           framed={false}
           questions={askedIn(step.closeout)}
           budgets={step.gate?.budgets}

@@ -89,7 +89,6 @@ export {
   SKILL_NAME,
   SLOTS,
   tokensOf,
-  WORKSPACES,
 } from './keys/index.ts';
 export type { DeniedAt } from './keys/index.ts';
 export {

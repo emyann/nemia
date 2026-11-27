@@ -81,7 +81,7 @@ export const RUN: WaitingRun = {
   pruned: null,
   onDisk: { worktrees: true, files: true },
   read: null,
-  gates: [{ step: 'land', at: 'before' }],
+  gates: [{ step: 'land' }],
   warning: null,
   kinds: [],
   after: [],
@@ -141,7 +141,7 @@ export const LONG_STEP = 'review-the-security-of-the-change';
 /** `RUN` with its last step, at its gate, named `LONG_STEP`: the button says Approve all the same. */
 export const LONG_APPROVAL: WaitingRun = {
   ...RUN,
-  gates: [{ step: LONG_STEP, at: 'before' }],
+  gates: [{ step: LONG_STEP }],
   steps: [...RUN.steps.slice(0, 3), step(LONG_STEP, APPROVAL, 3)],
   graph: {
     roots: ['design'],

@@ -2120,7 +2120,6 @@ describe("a blocked step's failed check run again (`blockedRecheck`): only on th
       undefined,
       undefined,
       undefined,
-      undefined,
       at('c0ffee1'),
     );
     assert.equal(offer?.command, 'nemia retry r-1 implement --recheck');

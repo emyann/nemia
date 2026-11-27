@@ -56,7 +56,6 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
         folder,
         true,
         placesOf(home, opts.repo),
-        place.declared.denyWhileLanding,
         factory,
         [],
         undefined,

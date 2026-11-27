@@ -1,6 +1,6 @@
 /**
  * What one pass of the tick reads, counted on a store of runs not at rest: each task's view once a pass (`reportedEngine`), the cap's slots
- * once a pass and only where a claim on a repository's checkout waits on one (`passRead`, `checkoutHold`), each run another waits on once a
+ * once a pass (`passRead`), each run another waits on once a
  * pass (`Parents`), one `standing` for each repository, place and base branch (`passStanding`), and a run's asks folder listed once a read
  * (`readAsks`, `runRecord`). Identities on the reads, never a time.
  *
@@ -14,8 +14,18 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
-import { acceptKey, askNames, plantMarker, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
-import { configGiven } from './config-given.ts';
+import {
+  acceptKey,
+  approvalKey,
+  askNames,
+  plantMarker,
+  plantRecord,
+  readAsks,
+  retryAskKey,
+  roundAskKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -36,7 +46,6 @@ import { placeOver, placeSplit, unreadBy } from './place-over.ts';
 import { gitPlace } from '../place/git/place.ts';
 import {
   advanceRun,
-  approveRun,
   hold,
   retryRun,
   runWith as runEngine,
@@ -46,12 +55,10 @@ import {
   startRun,
   tickRun,
 } from '../src/runner.ts';
-import { stepsNow as stepsOf } from './steps-now.ts';
 import { passRead } from '../src/cap/cap.verb.ts';
 import { passRevisions } from '../src/revisions/pin.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
-import { checkoutHold } from '../src/ending/ending.verb.ts';
-import { passParents, reportedEngine } from '../src/views/views.verb.ts';
+import { reportedEngine } from '../src/views/views.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { readStanding, standingFile } from '../src/standing/standing.store.ts';
@@ -59,7 +66,6 @@ import { runsListed } from '../src/list/list.verb.ts';
 import { onYouWords, shownNote, shownStatus, standingLine } from '../src/list/list.ts';
 import { toDecideWords } from '../src/ending/ending.ts';
 import { NOTHING_READ, standingReader, standingSnapshot } from '../src/standing/standing.verb.ts';
-import { statusMemo } from '../src/place/landing.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 
 const ROOT = scratch('wf-pass-reads-');
@@ -172,8 +178,8 @@ const board = () => {
   return { e: promised(e), reads, writes, lists, settle };
 };
 
-/** A run of `implement → ship` on `repo`, implement committed and signed: at the ending's gate. */
-const atTheGate = async (b: ReturnType<typeof board>, repo: string) => {
+/** A run of `implement → ship` on `repo`, implement committed and signed, its ending filed. */
+const withImplementDone = async (b: ReturnType<typeof board>, repo: string) => {
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const work = runRecord(ROOT, run.id).steps.implement;
@@ -206,23 +212,15 @@ const store = async () => {
   const b = board();
   const repo = aRepo();
   for (let i = 0; i < 3; i++) {
-    const failed = await atTheGate(b, repo);
-    await runWith(b.e, approveRun(failed.id, 'ship'));
-    assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)))).filed, ['ship'], 'the checkout is free for it');
+    const failed = await withImplementDone(b, repo);
+    assert.ok(failed.steps.ship?.taskId, 'its ending is filed once implement has signed off');
     b.settle(`${failed.id}-ship`, 'failed');
     await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)));
   }
-  const working = await atTheGate(b, repo);
-  await runWith(b.e, approveRun(working.id, 'ship'));
-  assert.deepEqual(
-    (await runWith(b.e, advanceRun(runRecord(ROOT, working.id)))).filed,
-    ['ship'],
-    "its ending is filed into the repository's checkout",
-  );
-  const waiting = await atTheGate(b, repo);
-  await runWith(b.e, approveRun(waiting.id, 'ship'));
-  const second = await atTheGate(b, repo);
-  await runWith(b.e, approveRun(second.id, 'ship'));
+  const working = await withImplementDone(b, repo);
+  assert.ok(working.steps.ship?.taskId, 'its ending is filed once implement has signed off');
+  const waiting = await withImplementDone(b, repo);
+  const second = await withImplementDone(b, repo);
   await waitingOn(b, repo, waiting.id);
   const trying = await settledOne(b, repo, 'failed');
   for (const n of [2, 3]) {
@@ -260,10 +258,9 @@ const VIEWS: Rows = [];
 const STANDING: Rows = [];
 
 row(ONCE, "a pass reads each task's view once, and once more after a write of the pass names it", async () => {
-  const { b, waiting } = await theStore();
+  const { b } = await theStore();
   await onePass(b);
-  assert.equal(runRecord(ROOT, waiting.id).steps.ship?.taskId ?? undefined, undefined, 'the approved ending still waits for the checkout');
-  assert.ok(b.reads.size > 20, `the pass read the store's tasks (${b.reads.size})`);
+  assert.ok(b.reads.size > 15, `the pass read the store's tasks (${b.reads.size})`);
   const over = [...b.reads].filter(([id, n]) => n > 1 + (b.writes.get(id) ?? 0));
   assert.deepEqual(over, [], 'no task is read twice with no write of the pass naming it between');
 });
@@ -306,38 +303,7 @@ row(ONCE, 'a one-off verb, handed no pass, resolves the folder for itself', asyn
   );
 });
 
-row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
-  const { b, waiting } = await theStore();
-  const run = runRecord(ROOT, waiting.id);
-  let asked = 0;
-  const slots = Effect.sync(() => {
-    asked++;
-    return new Map();
-  });
-  const hold = await Effect.runPromise(
-    checkoutHold(
-      b.e,
-      run,
-      stepsOf(run, ROOT),
-      {
-        read: {
-          runs: [run],
-          slots,
-          parents: passParents(),
-          standing: NOTHING_READ,
-          revisions: aPassRevisions(),
-        },
-        slot: undefined,
-      },
-      settingsOf(ENV),
-      statusMemo(() => undefined, builtinGitPlace),
-    ).pipe(Effect.provide(configGiven(ROOT, ENV))),
-  );
-  assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
-  assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
-});
-
-describe("a pass reads once what its runs share: each view, the cap's slots, a workflow folder, the slot a claim was given", told(ONCE));
+describe("a pass reads once what its runs share: each view, the cap's slots, a workflow folder", told(ONCE));
 
 row(GIT, 'a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
   const { b, repo, waiting, second } = await theStore();
@@ -365,7 +331,7 @@ row(
     const done = await settledOne(b, repo, 'succeeded');
     const pruned = await settledOne(b, repo, 'succeeded');
     const handed = await settledOne(b, repo, 'succeeded');
-    const until = await atTheGate(b, repo);
+    const until = await withImplementDone(b, repo);
     await runPlaced(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
     const held = await runPlaced(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
     await runWith(b.e, hold(held.id, [until.id]));
@@ -424,6 +390,7 @@ row(GIT, "a run's asks are listed once a read, and each file in them read once",
   const { waiting } = await theStore();
   const id = waiting.id;
   const at = new Date().toISOString();
+  plantRecord(ROOT, approvalKey(id, 'implement', 1), JSON.stringify({ at, message: 'go on' }));
   plantRecord(ROOT, acceptKey(id, 'implement', 1), JSON.stringify({ at, message: 'good enough' }));
   plantRecord(ROOT, retryAskKey(id, 'implement', 2), JSON.stringify({ mode: 'fresh', at }));
   plantRecord(ROOT, roundAskKey(id, 'implement', 2), JSON.stringify({ at }));
@@ -568,7 +535,7 @@ row(
   'a run waits on one whose standing is unread as on any other: the wait reads none of it, and it is filed once its parent is released',
   async () => {
     const { b, repo } = await theStore();
-    const parent = await atTheGate(b, repo);
+    const parent = await withImplementDone(b, repo);
     const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge it', parent.steps.implement.branch!);
     const unread = standingUnread('the standing broke');
@@ -637,7 +604,7 @@ row(
   'REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent released',
   async () => {
     const { b, repo } = await theStore();
-    const parent = await atTheGate(b, repo);
+    const parent = await withImplementDone(b, repo);
     const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge it', parent.steps.implement.branch!);
     await runWith(b.e, release(parent.id));

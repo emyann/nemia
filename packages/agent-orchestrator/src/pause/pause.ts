@@ -12,8 +12,7 @@ import type { Identity } from '../daemon/daemon.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
-import { endsOnBase, type StepSpec } from '../step/step.ts';
-import { landsOnCheck } from '../status/status.ts';
+import type { StepSpec } from '../step/step.ts';
 import { pausedModeOf, SESSIONS_UNDER, type PausedMode } from '../pause-machine/pause-machine.ts';
 import { blockedWord, parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 import type { Actor } from 'objects';
@@ -98,25 +97,19 @@ export const timeoutWords = (ms: number) =>
 export const pausingWords = (sessions: number, leftMs: number) =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
-/**
- * A landing the pause holds with its merge staged: the ending of `run`, `step`, whose session staged the merge in `repo`'s own checkout
- * and whose check is not filed until the resume, so MERGE_HEAD stays there meanwhile.
- */
-export type PauseStaged = { run: string; step: string; repo: string };
-
-/** A check the pause holds whose merge is not staged: `run`'s `step` has signed off, and its check is not filed until the resume. */
+/** A check the pause holds: `run`'s `step` has signed off, and its check is not filed until the resume. */
 export type PauseHeld = { run: string; step: string };
 
 /**
- * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
- * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
+ * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work. `stopping`
+ * once the engine was asked to stop it, and `resumed` while an ask
  * `nemia pause --now` wrote names it (`interrupted`), which runs a check again on the resume. A stop asked by another hand carries no
  * `resumed`. `calling` is the tool a session is in a call to, which a stop of the daemon waits for.
  */
 export type Finishing = {
   run: string;
   step: string;
-  kind: 'session' | 'check' | 'landing';
+  kind: 'session' | 'check';
   stopping?: true;
   resumed?: true;
   calling?: string;
@@ -124,7 +117,7 @@ export type Finishing = {
 
 /**
  * A task a pause at once cuts (`nemia pause --now`): `run`'s `step`, its `session` at work, whose tool call the sessions' drain cuts at
- * once and which goes on as the same try, or the `check` of its work, stopped and run again; by the task's id. A landing is never one.
+ * once and which goes on as the same try, or the `check` of its work, stopped and run again; by the task's id.
  */
 export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
 
@@ -136,16 +129,16 @@ export type Parked = { run: string; step: string; after?: string; cut?: string }
 
 /**
  * What a reader of the whole store is told of the pause: the pause, or null; each task still finishing under it, none once it is
- * "Paused"; each session it has parked (`parked`); each landing it holds with its merge staged; and each other check it keeps from being
+ * "Paused"; each session it has parked (`parked`); and each check it keeps from being
  * filed (`held`).
  */
-export type Paused = { pause: Pause | null; finishing: Finishing[]; parked: Parked[]; staged: PauseStaged[]; held: PauseHeld[] };
+export type Paused = { pause: Pause | null; finishing: Finishing[]; parked: Parked[]; held: PauseHeld[] };
 
 /**
- * The pause as a pass reads it while it stands: the pause, each task still finishing under it, each session it has parked, each landing
- * it holds staged, and each other check it holds.
+ * The pause as a pass reads it while it stands: the pause, each task still finishing under it, each session it has parked, and each check
+ * it holds.
  */
-export type PauseStanding = { pause: Pause; finishing: Finishing[]; parked: Parked[]; staged: PauseStaged[]; held: PauseHeld[] };
+export type PauseStanding = { pause: Pause; finishing: Finishing[]; parked: Parked[]; held: PauseHeld[] };
 
 /**
  * A task's view as `finishingOf` reads it: the words' view (`WordView`), whether the runtime holds it queued for a slot, and whether it was
@@ -184,7 +177,7 @@ export function finishingOf(
     stepAtWork(run, step, viewOf).map(({ taskId, kind, view }) => ({
       run: run.id,
       step: step.name,
-      kind: kind === 'check' && landsOnCheck(step, run) ? ('landing' as const) : kind,
+      kind,
       ...(view.state.stopRequested ? { stopping: true as const } : {}),
       ...(asks.some((a) => a.step === step.name && a.interrupted === taskId) ? { resumed: true as const } : {}),
       ...(kind === 'session' && view.calling ? { calling: view.calling.tool } : {}),
@@ -220,20 +213,17 @@ export const parkedAmong = (runs: readonly Run[], viewOf: (taskId: string) => Fi
   );
 
 /**
- * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
- * checkout (`workspace: base`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
+ * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but one the engine was already asked to stop.
  * @param run The run's record.
  * @param steps The run's steps.
  * @param viewOf The view of a task by its id, or undefined for a task with no view.
  */
 export function interruptsOf(run: Run, steps: readonly StepSpec[], viewOf: (taskId: string) => FinishingView | undefined) {
-  return steps
-    .filter((step) => !endsOnBase(step))
-    .flatMap((step) =>
-      stepAtWork(run, step, viewOf)
-        .filter(({ view }) => !view.state.stopRequested)
-        .map(({ taskId, kind }) => ({ run: run.id, step: step.name, kind, taskId })),
-    );
+  return steps.flatMap((step) =>
+    stepAtWork(run, step, viewOf)
+      .filter(({ view }) => !view.state.stopRequested)
+      .map(({ taskId, kind }) => ({ run: run.id, step: step.name, kind, taskId })),
+  );
 }
 
 /**
@@ -331,20 +321,20 @@ const COUNTS_DOWN: Readonly<Record<PausedMode, boolean>> = { holding: false, dra
  */
 export const pauseWords = (pause: Pause) => `the store is paused ${sinceWords(pause)} — ${pauseDoes(pause)}; ${RESUME_LINE} resumes it`;
 
-/** How many checks the pause holds back, staged landings among them, in words: `, 2 checks held`, or nothing for none. */
-const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>) => {
-  const n = staged.length + held.length;
+/** How many checks the pause holds back, in words: `, 2 checks held`, or nothing for none. */
+const heldCount = ({ held }: Pick<Paused, 'held'>) => {
+  const n = held.length;
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
 
 /**
  * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
- * it holds back (`staged` and `held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in
+ * it holds back (`held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in
  * how many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
  * @param paused The pause, or null for none, and the tasks still finishing and the checks it holds back.
  * @param now The time the minutes left are counted from; the present where none is given.
  */
-export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>, now: Date = new Date()) => {
+export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'held'>, now: Date = new Date()) => {
   const { pause, finishing } = paused;
   if (!pause) return null;
   const sessions = finishing.filter((f) => f.kind === 'session').length;
@@ -367,10 +357,10 @@ const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishi
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
     : `${run}'s ${step} is finishing: ${atWorkWords(kind, calling)}`;
 
-/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its landing's. */
+/** What of a step is at work, in words: its session, in its call to `calling` where it is in one, or its check. */
 const atWorkWords = (kind: Finishing['kind'], calling: string | undefined) => {
   if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
-  return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
+  return 'its check runs';
 };
 
 /**
@@ -398,8 +388,8 @@ const NOW_LINE = 'nemia pause --now --yes';
 
 /**
  * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
- * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), that a landing
- * finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
+ * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), and the line that
+ * acts (`NOW_LINE`). With nothing at work, it says so.
  * @param interrupts Each task it would cut.
  * @param standing Whether a pause stands already, which it would keep; false where none is said.
  */
@@ -408,25 +398,18 @@ export const nowLines = (interrupts: readonly Interrupt[], standing = false) => 
   return [
     interrupts.length
       ? `nemia pause --now ${pausing} and cut ${interrupts.length} at work, each going on at ${RESUME_LINE}:`
-      : `nemia pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
+      : `nemia pause --now ${pausing}; nothing is at work, so it stops nothing.`,
     ...interrupts.map((i) => `   ${interruptWords(i)}`),
-    `${NOW_COST} A landing that checks or merges is left to finish.`,
+    NOW_COST,
     `${NOW_LINE} does it.`,
   ];
 };
 
-/** A landing the pause holds, in one line: its run, and the checkout its merge is staged in until the resume. */
-const stagedWords = ({ run, step, repo }: PauseStaged) =>
-  `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`;
-
 /** A check the pause holds, in one line: its run and step, signed off, and that its check waits on the resume. */
 const heldWords = ({ run, step }: PauseHeld) => `${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`;
 
-/** Each check the pause holds back, a line each, indented: each landing with its merge staged (`stagedWords`), then each other. */
-export const heldLines = ({ staged, held }: Pick<Paused, 'staged' | 'held'>) => [
-  ...staged.map((s) => `   ${stagedWords(s)}`),
-  ...held.map((h) => `   ${heldWords(h)}`),
-];
+/** Each check the pause holds back, a line each, indented. */
+export const heldLines = ({ held }: Pick<Paused, 'held'>) => held.map((h) => `   ${heldWords(h)}`);
 
 /**
  * Every line said of the pause at `now`: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task

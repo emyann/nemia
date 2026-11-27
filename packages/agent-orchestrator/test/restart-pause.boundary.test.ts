@@ -2,7 +2,7 @@
  * A restart of the daemon, a person's story on the stage (`story.ts`): the pause a take-over puts names the process that runs it
  * (`heldBy`), so a `nemia service restart` killed while it waits — by `timeout`, ^C or SIGKILL — leaves the store paused no longer than
  * the daemon's next pass, which reads the pause file and the process table and lifts it (`liftLapsedPause`); a pause whose process still
- * runs stands. And a restart with only a landing's check running restarts at once: the check runs on its worker through the restart, is
+ * runs stands. And a restart with only a step's check running restarts at once: the check runs on its worker through the restart, is
  * not waited for, and the new daemon's pass reads its result.
  *
  * The take-over's process is a child spawned with the test's `WF_ROOT`, putting the pause through the live host's own `pause`, killed
@@ -10,7 +10,7 @@
  * boundary test. The tick is the store's pass (`tickRun`) on the stage's engine, given a pass of
  * its own that does nothing and no tally, as `pause.test.ts` gives it. The take-over runs on a host whose machine is the test's — a
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
- * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
+ * the take-over says is kept, so a take-over that waits is read from its events, not hung on.
  */
 import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -99,7 +99,7 @@ describe("a restart killed while it waits leaves the store paused no longer than
   });
 });
 
-describe("a restart with only a landing's check running restarts at once, and the check's result is read after", () => {
+describe("a restart with only a step's check running restarts at once, and the check's result is read after", () => {
   let b!: Board;
   let repo!: string;
   let dir!: string;
@@ -110,29 +110,26 @@ describe("a restart with only a landing's check running restarts at once, and th
     stage.place().world.repository(repo, {});
     dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
-    fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
+    fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\ncheck: "true"\n---\nship it\n');
     return t.end;
   });
   const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
   let id = '';
   const shipOf = () => runRecord(ROOT, id).steps.ship;
-  s.test("a run's ending signed off, its landing check filed and running", async () => {
+  s.test("a run's last step signed off, its check filed and running", async () => {
     id = (await stage.runPlaced(startRun({ brief: 'restart', repo, workflowDir: dir, isolate: true }))).id;
     await pass();
     const work = runRecord(ROOT, id).steps.work;
     fs.writeFileSync(path.join(work.workspace!, 'work.txt'), 'work\n');
     b.settle(work.taskId!, 'succeeded', SIGNED);
     await pass();
-    await stage.runWith(b.e, approveRun(id, 'ship'));
-    await pass();
-    stage.place().world.stage(repo, work.branch!);
     b.settle(shipOf().taskId!, 'succeeded', SIGNED);
     await pass();
     const check = shipOf().check?.taskId;
-    assert.ok(check, 'the landing check is filed');
+    assert.ok(check, 'the check is filed');
     b.settle(check, 'working');
-    assert.ok(!shipOf().landed, 'the landing waits on its check');
+    await assert.rejects(stage.runWith(b.e, approveRun(id, 'ship')), 'the gate waits on its check');
   });
   s.test('the restart pauses, signals the daemon at once, starts the service and resumes after its first pass', async () => {
     const events: string[] = [];
@@ -155,7 +152,6 @@ describe("a restart with only a landing's check running restarts at once, and th
       pause: (said: { why?: string; by?: string }) => (events.push('pause'), live.pause(said)),
       resume: () => (events.push('resume'), live.resume()),
       say: (line: string) => {
-        if (line.includes(' to land')) throw new Error(`the restart waits on the landing: ${line}`);
         events.push(`say ${line}`);
       },
       pollMs: 1,
@@ -180,10 +176,11 @@ describe("a restart with only a landing's check running restarts at once, and th
     );
     assert.equal(readPause(ROOT), null);
   });
-  s.test("the check ends on its worker, and the new daemon's pass records the landing", async () => {
+  s.test("the check ends on its worker, and the new daemon's pass reads its result: the gate is open", async () => {
     b.settle(shipOf().check!.taskId, 'succeeded', undefined, 0);
     await pass();
-    assert.ok(shipOf().landed, 'the landing is recorded off the check it did not wait for');
+    await stage.runWith(b.e, approveRun(id, 'ship'));
+    assert.equal(runRecord(ROOT, id).approvals?.[0]?.step, 'ship', 'approved off the check it did not wait for');
   });
 });
 

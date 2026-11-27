@@ -11,8 +11,8 @@
  * stand-in (`runDoorMemory`, `memory.store.ts`), plain synchronous methods made a door by `doorOf`, which a test gives its program. No
  * synchronous spelling of the door is left: a caller yields it. Both are checked by `runDoorOver`, so each write is checked the one way on
  * both: a new run decodes through the model's `Run` (`record/record.model.ts`) with its id as `RunId.OnCreate` checks it, and a run written
- * back through `Run`, its invariants among it — each try named by its step and number, no run waiting on itself, a landing with one outcome
- * — or `Invalid` names the check broken and nothing is written. A record already at a new run's id is `Conflict` (`runTaken`), and so is a
+ * back through `Run`, its invariants among it — each try named by its step and number, no run waiting on itself — or `Invalid`
+ * names the check broken and nothing is written. A record already at a new run's id is `Conflict` (`runTaken`), and so is a
  * run from a card another run from it stands for (`cardStartedTwice`), the claim made in the transaction that makes the run. The walks of
  * `test/run-walks.ts` hold both layers to one table.
  */

@@ -1,5 +1,5 @@
 /**
- * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift
+ * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, lift
  * a hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the continue
  * that answers a task held open; then keep the tips and write the run's record, which this file alone writes. It reads and adopts through
  * `readAndAdopt` (adopt/run-adopt.verb.ts), as `nemia cancel`, `nemia rm` and `nemia prune` do. Beside it, the steps owed a hand-off
@@ -7,9 +7,7 @@
  */
 import { RunId } from '../record/record.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { StoreConfig } from '../config/config.store.ts';
 import fs from 'node:fs';
-import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { EngineService, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
@@ -17,10 +15,9 @@ import type { StepSpec } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { tipBranches, tipsSeen } from '../branches/index.ts';
 import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } from '../cap/cap.ts';
-import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { isRepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
-import { landsOnCheck, stepStatus } from '../status/status.ts';
+import { stepStatus } from '../status/status.ts';
 import { hasStarted, runReady, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { behindNow, followPass, passRevisions, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
@@ -31,15 +28,13 @@ import type { FeedWords } from '../feed/index.ts';
 import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
-import { headsFor, headsNow, standingNow, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
+import { headsFor, headsNow, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/index.ts';
 import { everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } from '../meter/index.ts';
-import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
-import { statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads } from './file.verb.ts';
 import { withStandings, type RunRead } from './told.verb.ts';
@@ -109,10 +104,6 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   Nothing is handed off for a run `nemia rm` forgot after this pass read it: a `--no-worktree` run's workspace is a person's checkout. A
  *   hand-off is marked once for the try, unless git refused the commit, which the next pass tries again; a mark made is always written,
  *   or the next pass would commit a person's edits as the step's.
- * - lands or aborts an ending's staged merge (`landEnding`) before anything reads where the ending stands, so the pass that lands it
- *   reads it succeeded or released, and no try of it is filed over a merge still staged.
- * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
- *   what it has filed included, so the order a pass takes the runs in decides nothing.
  * - lifts a person's hold on the pass that reads every run it names succeeded or released (`keptParent`), and goes on on that pass. A
  * lift sticks, as a
  *   start after `--after` does; only the hold this pass read is lifted, so one put again since stays; and one that names
@@ -147,8 +138,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   same transaction (the Run door's `runs.settle`), never apart: a pass that died before settling leaves both for the next. An ask `nemia
  *   pause --now` wrote that is void on this pass (`pauseAsksVoid`) is set aside with them, paused or not.
  *
- * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
- * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its
+ * A try goes on in the workspace and on the branch the step had, under its next try's id; A try of a step whose task has not settled —
+ * its session blocked by its
  * harness, or asked for while it was and working again since — stops the session and files nothing; a later pass, once the task has
  * settled, files the try. A recheck files no session, only its check, under the new try's id. A continue of a step whose task is held
  * open and waits for their word is that task's next turn, in the session that signed, under the same id (`answerHeld`); any other try, and
@@ -159,8 +150,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *
  * A check is filed on the `check` harness, so it outlives the pass, has a deadline, and is stopped by a cancel; its command is the one
  * the run froze, never the workspace's it judges. It is filed once, with no attempt again: a suite run until it passes would let a
- * flaky suite decide what lands. An ending's check gets no `WF_BASE_REF`: it judges the merge staged in the checkout against HEAD, and
- * installs first what that merge's lockfile asks for (`checkoutParts`). Nothing is ready on a check in the pass that files it.
+ * flaky suite decide what lands. Nothing is ready on a check in the pass that files it.
  *
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
@@ -168,10 +158,10 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * Its span is annotated with the run, `run`, and so is every log said within it, the runtime's included; a filing of a step adds the
  * step, `step`, to the runtime's spans and logs under it (`forStep`).
  *
- * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, whose claims on the
- *   repository's checkout are read (`checkoutHold`), the runs the cap holds, and the runs others wait on, which lifting a hold (`liftHold`)
- *   and admitting the run (`admit`) read through. Left out, the store is listed afresh where the run's ending asks for the checkout, and
- *   the runs this run waits on are read for this call alone.
+ * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, the runs the cap
+ * holds, and the runs others wait on, which
+ *   lifting a hold (`liftHold`) and admitting the run (`admit`) read through. Left out, the runs this run waits on are read for this call
+ *   alone.
  */
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
@@ -184,36 +174,23 @@ export const advancePass = Effect.fn('advancePass')(
       askNotes,
       adopted,
     } = yield* readAndAdopt(e, run, { earlierTries: 'budgeted', unrecorded: Boolean(run.cancelledAt) });
-    const { steps, phaseOf, signedOff, asked, verdictOf, spendOf, asks, roundAsks } = reads;
+    const { steps, phaseOf, spendOf, asks, roundAsks } = reads;
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const place = yield* PlaceService;
     const handed = yield* withinEffect('act', handOffAll(run, reads, place));
     const lacking = readFiles(home, run, reads);
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
-    const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
-    const landing = yield* landEnding(home, run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? passParents();
-    const from = pass
-      ? { read: pass, slot }
-      : { standing: standingNow(yield* (yield* RunDoor).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const lift = yield* liftHold(e, run, parents);
-    const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass), heads);
+    const { assessed } = passAssessment(reads, yield* standingOf(pass), heads);
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(ran, reads, closer);
     const admission = yield* admit(e, ran, slot, reads, assessed, parents);
-    const feed = wordFeed(
-      ran,
-      reads,
-      assessed,
-      admission,
-      checkout,
-      lift.lifted,
-      yield* behindNow(ran, assessed.status === 'succeeded', revisions),
-    );
+    const feed = wordFeed(ran, reads, assessed, admission, lift.lifted, yield* behindNow(ran, assessed.status === 'succeeded', revisions));
     const { followed, pinned, ...due } = yield* followedDue(ran, took, assessed, admission, revisions);
 
-    const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
+    const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
     notes.push(...followed.notes);
     const f: Filing = {
@@ -234,7 +211,7 @@ export const advancePass = Effect.fn('advancePass')(
     const { tipped, tips } = keepTips(ran, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-      Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
+      Boolean(tips || heldFirst || handed.marked || lacking.read || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
     yield* pinsWritten(ran, pinned, wrote, { asks, rounds: roundAsks, voided: pauseAsksVoid(steps, ran, asks, phaseOf, spendOf) });
 
@@ -299,24 +276,19 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
 
 /**
  * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
- * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
- * (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's recheck of a blocked step is judged on), judged
+ * read (`reads`), where its branches stand (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's
+ * recheck of a blocked step is judged on), judged
  * by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ *
+ * @param reads The pass's one read of the run.
+ * @param standing Where the run's branches stand, as the pass read them.
+ * @param heads Where the branches are now, read once on demand; left out, a branch has no tip.
  */
-export const passAssessment = Effect.fnUntraced(function* (
-  e: Engine,
-  run: Run,
-  reads: RunRead,
-  from: Parameters<typeof checkoutHold>[3],
-  memo: StatusMemo,
-  standing: PassStanding,
-  heads?: Heads,
-) {
-  const checkout = yield* checkoutHold(e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
+export const passAssessment = (reads: RunRead, standing: PassStanding, heads?: Heads) => {
   const tipOf = heads ? { tipOf: (branch: string) => heads()?.[branch] } : {};
-  const read = withStandings({ ...reads, checkout, ...tipOf }, standing);
-  return { checkout, read, assessed: assess(read) };
-});
+  const read = withStandings({ ...reads, ...tipOf }, standing);
+  return { read, assessed: assess(read) };
+};
 
 /**
  * The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, what the last
@@ -567,12 +539,11 @@ function answerOf(
   done: Done,
   pass: { acted: boolean; tipped: string[] },
 ) {
-  const { steps, views, phaseOf, asks } = r;
+  const { steps, views, phaseOf } = r;
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
   const { status, unreachable } = assessed;
   const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
-  const ending = steps.find((s) => endsOnBase(s));
   const facts: RestFacts = {
     run,
     status,
@@ -584,8 +555,6 @@ function answerOf(
     settled: [...views.values()].every((v) => Boolean(v.state.settled)),
     acted: pass.acted,
     handOffDue: handOffOwed(steps, run, phaseOf),
-    landingOwed: steps.some((s) => landsOnCheck(s, run) && Boolean(run.steps[s.name]?.taskId) && !run.steps[s.name]?.landed),
-    checkoutAsked: Boolean(ending && !run.cancelledAt && endingAsked(run, ending, asks) !== undefined),
   };
   const blockers = restBlockers(facts);
   const advanced: Advanced = {

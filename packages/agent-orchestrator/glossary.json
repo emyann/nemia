@@ -144,7 +144,7 @@
     },
     {
       "term": "Checks",
-      "meaning": "a step's `checks:`, a list of named checks, each `{ name, run | condition, after?, enabled? }` and each a task of its own on the `check` harness: one with no `after:` waits on the one above it, `after: []` on none, and `enabled: false` takes one out and hands its waits on. On an ending, a `condition:` check runs nothing in the repository's own checkout: the checkout is given back to the next ending once every check that runs a command passed, while the condition is unwritten and still judges the step (`checksHoldCheckout`, `packages/agent-orchestrator/src/ending/ending.ts`). `check: <line>` is read as one check named `check`. Which are filed is decided on every pass by `checksDue` (`packages/agent-orchestrator/src/check/checks-due.ts`).",
+      "meaning": "a step's `checks:`, a list of named checks, each `{ name, run | condition, after?, enabled? }` and each a task of its own on the `check` harness: one with no `after:` waits on the one above it, `after: []` on none, and `enabled: false` takes one out and hands its waits on. `check: <line>` is read as one check named `check`. Which are filed is decided on every pass by `checksDue` (`packages/agent-orchestrator/src/check/checks-due.ts`).",
       "type": "CheckSpec"
     },
     {
@@ -196,42 +196,6 @@
       "term": "Door",
       "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `packages/agent-orchestrator/src/door/door.store.ts`; a door whose files are under the store's root is rooted (`rootedDoor`), reading the root a program is given when a method runs, as the Factory door does, while the Run door's default still reads its module's. A door whose records are in the keyspace (the Proposal door) answers its Effects itself, its stand-in the same code over a keyspace in memory.",
       "type": "DoorOf"
-    },
-    {
-      "term": "Ending",
-      "meaning": "a workflow's last step, run on the base (`workspace: base`, `endsOnBase`), filed once a person approves it or once the step before it that can send the work back passes.",
-      "retired": [
-        {
-          "spelling": "workspace: main",
-          "card": "decision 9: the step format says workspace: base, main read as its former spelling",
-          "kept": [
-            {
-              "path": "packages/agent-orchestrator/src/factory/applied/render.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            },
-            {
-              "path": "packages/agent-orchestrator/src/folder/folder.store.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            },
-            {
-              "path": "packages/agent-orchestrator/src/former/former.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            },
-            {
-              "path": "packages/agent-orchestrator/src/step/step.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            },
-            {
-              "path": "packages/agent-orchestrator/src/template/draft.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            },
-            {
-              "path": "packages/agent-orchestrator/src/workflow/step-file.ts",
-              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
-            }
-          ]
-        }
-      ]
     },
     {
       "term": "Gate",
@@ -346,15 +310,6 @@
       "retired": []
     },
     {
-      "term": "Landing",
-      "meaning": "the end of a run: the merge of its branch staged on the base, checked on the merged tree, and committed when the check passes.",
-      "type": "Landing",
-      "see": {
-        "label": "The landing",
-        "href": "/workflows/#the-landing"
-      }
-    },
-    {
       "term": "Lint",
       "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
       "retired": [
@@ -417,7 +372,7 @@
     },
     {
       "term": "Pause",
-      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted. A take-over's pause (`nemia service restart`, `nemia upgrade`, `nemia service install --take-over`) names the process that put it (`heldBy`), and the daemon's next pass lifts it once that process is gone (`liftLapsedPause`), so it never outlives its command; a person's names none. A pause at once (`nemia pause --now`, the board's **Stop now…**, `pauseNow`) is put with a timeout of 0: each step session at work but a landing's has its call cut at once and parks, going on as the same try at the resume, and each check is asked to stop and runs again; its words say so (`pauseDoes`: each working session is cut at once and parks).",
+      "meaning": "the whole store paused by a person (`nemia pause`, lifted by `nemia resume`): one file, `pauseFile`, composed on read onto every run, under which no pass files new work and what is in flight runs on. The file keeps its former name, `cordon` (`PAUSE_FILE`), so that a pause put before the verbs were renamed still stands and is lifted. A take-over's pause (`nemia service restart`, `nemia upgrade`, `nemia service install --take-over`) names the process that put it (`heldBy`), and the daemon's next pass lifts it once that process is gone (`liftLapsedPause`), so it never outlives its command; a person's names none. A pause at once (`nemia pause --now`, the board's **Stop now…**, `pauseNow`) is put with a timeout of 0: each step session at work has its call cut at once and parks, going on as the same try at the resume, and each check is asked to stop and runs again; its words say so (`pauseDoes`: each working session is cut at once and parks).",
       "type": "Pause",
       "retired": [
         {
@@ -860,12 +815,12 @@
     },
     {
       "term": "Waiting on",
-      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
+      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit or the pause), phase pending; an assessment names the steps waiting on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
       "type": "WaitOn",
       "retired": [
         {
           "spelling": "heldByCheckout",
-          "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+          "card": "4b: a step waiting on the checkout, which a run no longer takes"
         }
       ]
     },

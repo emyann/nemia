@@ -249,12 +249,12 @@ function rendered(name: string, workflows: readonly string[]) {
   const quick = path.join(tree, 'workflows', FIRST_WORKFLOW);
   fs.mkdirSync(quick, { recursive: true });
   fs.writeFileSync(path.join(quick, 'implement.md'), '---\nplace: git\nharness: claude\n---\nBuild the change.\n');
-  fs.writeFileSync(path.join(quick, 'land.md'), '---\nplace: git\nharness: claude\nafter: implement\nworkspace: base\n---\nLand it.\n');
+  fs.writeFileSync(path.join(quick, 'land.md'), '---\nafter: implement\nwaitsFor: [landed]\n---\n');
 }
 
 /**
  * The first card, at `/welcome/card` for the factory made: a suggestion taken, the cost line drawn above Start, and Start filing the
- * card through the real api, labelled as the first card, then starting it in quick gated at its landing, the start answered here with a
+ * card through the real api, labelled as the first card, then starting it in quick gated before it lands, the start answered here with a
  * seeded run at a gate, whose page the board opens. The card filed is answered back in `filed`.
  */
 async function startsTheFirstCard(page: Page, filed: string[]) {
@@ -292,8 +292,8 @@ async function startsTheFirstCard(page: Page, filed: string[]) {
       throw new Refused(`Start files the card labelled ${FIRST_LABEL} — the api answered ${answer.status()} ${JSON.stringify(body)}`);
     await page.waitForURL((url) => url.pathname.endsWith(`/runs/${GATED.id}`));
     const asked = started[0] as { workflow?: string; gates?: string[] } | undefined;
-    if (asked?.workflow !== 'quick' || JSON.stringify(asked.gates) !== JSON.stringify(['land']))
-      throw new Refused(`Start starts the card in quick, gated at land — it sent ${JSON.stringify(asked)}`);
+    if (asked?.workflow !== 'quick' || JSON.stringify(asked.gates) !== JSON.stringify(['implement']))
+      throw new Refused(`Start starts the card in quick, gated at implement, the step before its wait — it sent ${JSON.stringify(asked)}`);
   } finally {
     await page.unroute(`**/api/namespaces/${MADE}/cards/*/start`, start);
   }

@@ -96,7 +96,6 @@ const unset = {
   model: null,
   effort: null,
   context: null,
-  workspace: null,
   place: null,
   resume: null,
   fence: null,

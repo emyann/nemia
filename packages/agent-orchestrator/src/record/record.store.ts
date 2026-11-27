@@ -26,7 +26,7 @@ import {
   type Unassigned,
   type Pruned,
 } from './record.ts';
-import { workStands, type RoundAsk } from '../status/status.ts';
+import type { RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { personConditions, unconditioned, withConditions } from '../condition/condition.ts';
 
@@ -62,9 +62,6 @@ const EarlierTrySchema = Kept({
   retried: Schema.optional(Schema.Literal(true)),
 });
 
-const Aborted = { aborted: Schema.String, refusedOn: Schema.optional(Schema.String) };
-const LandedSchema = Schema.Union([Kept({ commit: Schema.String }), Kept(Aborted), Kept({ untouched: Schema.String })]);
-
 const StepRecordSchema = Kept({
   taskId: Schema.NullOr(Schema.String),
   workspace: Schema.optional(Schema.String),
@@ -72,7 +69,6 @@ const StepRecordSchema = Kept({
   check: Schema.optional(Kept({ taskId: Schema.String })),
   tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
   handedOff: Schema.optional(Schema.String),
-  landed: Schema.optional(LandedSchema),
   filesRead: Schema.optional(Kept({ taskId: Schema.String, lacked: Schema.Record(Schema.String, Schema.String) })),
   pinned: Pins,
   closeoutHash: Schema.optional(Schema.String),
@@ -121,7 +117,6 @@ const GitRecordSchema = Kept({
   branch: Schema.String,
   isolate: Schema.Boolean,
   placeSkill: Schema.optional(Schema.StructWithRest(Schema.Struct({ skill: Schema.String, version: Schema.String }), Rest)),
-  stagedFile: Schema.optional(Schema.String),
 });
 
 /** Each of `keys` as a field a record of its kind never holds. */
@@ -131,7 +126,7 @@ const absent = <const K extends string>(...keys: K[]) =>
 const FolderRecordSchema = Kept({
   ...runBase,
   place: Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('folder') }), Rest),
-  ...absent('repo', 'baseRef', 'branch', 'isolate', 'placeSkill', 'stagedFile'),
+  ...absent('repo', 'baseRef', 'branch', 'isolate', 'placeSkill'),
 });
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
@@ -426,7 +421,6 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
       (name) => heldText(asks.find((a) => a.name === name)?.text ?? ''),
     ),
   }));
-  const standing = approvals.filter((a) => workStands(run, a));
   return {
     ...withConditions(withRoutes(run, routes), conditions),
     ...(labels ? { labels } : {}),
@@ -437,7 +431,7 @@ export const composedRun = (run: Run, asks: readonly AskEntry[], marks: RunMarks
     ...(unheld ? { unheld } : {}),
     ...assignedIn(marks),
     ...(saidBefore ? { saidBefore } : {}),
-    ...(standing.length ? { approvals: standing } : {}),
+    ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   } satisfies Run;
 };
@@ -528,13 +522,10 @@ const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
 const Caps = Schema.Record(Schema.String, Dollars);
-/** The tries of the work an ending's approval approved (`Approval.work`): a try is counted from 1. */
-const Tries = Schema.Record(Schema.String, Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)));
 const ApprovalFileSchema = Kept({
   at: When,
   message: Schema.optionalKey(Said),
   budgets: Schema.optionalKey(Caps),
-  work: Schema.optionalKey(Tries),
 });
 const AcceptanceFileSchema = Kept({ at: When, message: Said });
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
@@ -592,7 +583,6 @@ const messageWords = (held: unknown) => (isText(fieldOf(held, 'message')) ? 'its
 const APPROVAL_WORDS: Record<string, string> = {
   at: 'it says no time it was given',
   budgets: 'its budgets are not dollars above zero',
-  work: 'the tries of the work it approved are not counts from 1',
 };
 const NO_APPROVAL = 'it is not an approval nemia approve wrote';
 
@@ -607,14 +597,13 @@ export function approvalIn(text: string, step: string, n: number) {
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(ApprovalFileSchema, held.read);
   if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
-  const { at, message, budgets, work } = read.read;
+  const { at, message, budgets } = read.read;
   return {
     step,
     try: n,
     at,
     ...(message === undefined ? {} : { message }),
     ...(budgets === undefined ? {} : { budgets: { ...budgets } }),
-    ...(work === undefined ? {} : { work: { ...work } }),
     ...actorIn(fieldOf(held.read, 'actor')),
   };
 }

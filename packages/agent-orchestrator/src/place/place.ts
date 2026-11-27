@@ -18,8 +18,6 @@ export const PLACE_VERBS = [
   'report',
   'standing',
   'trial',
-  'status',
-  'land',
   'inventory',
   'remove',
   'export',
@@ -44,8 +42,6 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   report: 120_000,
   standing: 120_000,
   trial: 120_000,
-  status: 120_000,
-  land: 120_000,
   inventory: 120_000,
   remove: 120_000,
   export: 120_000,
@@ -61,11 +57,9 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
 type Rooted = { readonly root: string | null };
 
 /**
- * What `open` answers at `nemia start`: the repo, the commit a run starts from, the line of work it is on, and, where the place names
- * one, `inProgressFile`: the absolute path of the file whose presence says a merge is in progress in that repo, which the code reads
- * with a `stat` and no process (`stagedHere`).
+ * What `open` answers at `nemia start`: the repo, the commit a run starts from, and the line of work it is on.
  */
-export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly inProgressFile?: string };
+export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string };
 
 /**
  * What `follow` answers of a checkout, once it has read its remote: the branch it is on follows `upstream` (the remote's branch, as git
@@ -164,24 +158,6 @@ export type Standing = { readonly tips: Readonly<Record<string, string>>; readon
 export type Trials = { readonly at: Readonly<Record<string, string | null>>; readonly trials: readonly TrialMerge[] };
 
 /**
- * What `status` answers of the repo an ending lands in: whose merge is in progress (`ours` when every commit it merges is one of the
- * run's tips), whether a path is unmerged, the result branches a commit now would leave out, the commit the repo is at, its `tip`,
- * when there is one, and `landedBy`: once every tip asked of is in the repo's tip, with no merge of them in progress, the first commit
- * of the line the tip follows by first parents that holds them all — the commit that merged them in, or the last tip itself where the
- * repo was moved onto it. Never `tip` once a commit has come on top of it; none where no tip was asked of.
- */
-export type MergeState = {
-  readonly merging: 'ours' | 'other' | 'none';
-  readonly conflicted: boolean;
-  readonly missing: readonly string[];
-  readonly tip?: string;
-  readonly landedBy?: string;
-};
-
-/** What `land` answers: the commit that landed the merge in progress, or that the merge was taken back. */
-type PlaceLanded = { readonly commit: string } | { readonly aborted: true };
-
-/**
  * One workspace a run left, as `inventory` reads it: where, for which step, on which branch, at which commit (`tip`), whether the place
  * may remove it (`removable`: `yes`, `gone` when its folder is no longer there and the place only forgets it, `held` when someone holds
  * it, their words in `heldBy`), whether its work is on a branch (`onBranch`: it is on one, or it is clean and its commit is in the
@@ -245,8 +221,6 @@ export type PlaceAnswers = {
   readonly report: Changes;
   readonly standing: Standing;
   readonly trial: Trials;
-  readonly status: MergeState;
-  readonly land: PlaceLanded;
   readonly inventory: Inventory;
   readonly remove: Removed;
   readonly export: Exported;
@@ -295,10 +269,6 @@ export type PlaceRequests = {
     readonly base: string;
   };
   readonly trial: { readonly repo: string; readonly trials: readonly { readonly onto: string; readonly branch: string }[] };
-  readonly status: { readonly repo: string; readonly tips: Readonly<Record<string, string>> };
-  readonly land:
-    | { readonly repo: string; readonly act: 'commit'; readonly message: string }
-    | { readonly repo: string; readonly act: 'abort' };
   readonly inventory: { readonly repo: string; readonly under: string; readonly run: string; readonly base: string };
   readonly remove: { readonly repo: string; readonly workspaces: readonly string[]; readonly branches: readonly string[] };
   readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
@@ -324,14 +294,12 @@ export const PLACE_SAYS = [
   'drop',
   'conflicts',
   'unlock',
-  'stage',
   'attach',
   'commit',
   'inspect',
   'orphans',
   'results',
   'merge',
-  'mergeUncommitted',
   'showMerge',
   'lastMerge',
 ] as const;
@@ -344,7 +312,7 @@ const SAY_LISTS = ['look', 'results'] as const;
 
 /**
  * The holes the code fills in each `say` template: `look` the commit a step's work started from, `results` each result branch and the
- * base it lands on, `merge` and `mergeUncommitted` the commit a round merges in, `showMerge` and `lastMerge` none.
+ * base it lands on, `merge` the commit a round merges in, `showMerge` and `lastMerge` none.
  */
 const SAY_HOLES: Readonly<Record<SayKey, readonly string[]>> = {
   look: ['baseRef'],
@@ -353,14 +321,12 @@ const SAY_HOLES: Readonly<Record<SayKey, readonly string[]>> = {
   drop: ['repo', 'branches'],
   conflicts: [],
   unlock: ['repo', 'path'],
-  stage: ['repo', 'branches'],
   attach: ['path'],
   commit: ['path'],
   inspect: ['path'],
   orphans: [],
   results: ['base', 'branch'],
   merge: ['sha'],
-  mergeUncommitted: ['sha'],
   showMerge: [],
   lastMerge: [],
 };
@@ -371,14 +337,13 @@ export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly st
 };
 
 /**
- * What a place declares of itself: the tools a landing session is denied, the sentences the code prints for it (`PlaceSay`), the
+ * What a place declares of itself: the sentences the code prints for it (`PlaceSay`), the
  * machine needs a run in it has (`needs`, src/needs/): each a check and the fixes that put it in place, which a run of a repository waits
  * on before its first session and the readiness read lists. A builtin place declares them, so its fixes are started for any caller. And
  * what the tools its fixes install need of the daemon's environment, each relative to the store's tools folder: `toolsEnv`, variables
  * set to a folder under it, and `toolsPath`, folders under it put on PATH right after its `bin/` (`toolsOnPath`, at the daemon's start).
  */
 export type PlaceDeclared = {
-  readonly denyWhileLanding: readonly string[];
   readonly say: PlaceSay;
   readonly needs?: readonly Need[];
   readonly toolsEnv?: Readonly<Record<string, string>>;

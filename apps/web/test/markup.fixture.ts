@@ -384,7 +384,7 @@ export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Part
     status: 'awaiting approval',
     phase: 'waiting',
     waitingOnYouWords: ['approve review'],
-    gates: [{ step: 'review', at: 'after' }],
+    gates: [{ step: 'review' }],
     ...run,
     steps: [
       {
@@ -404,25 +404,21 @@ export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Part
 export const withClient = (element: ReturnType<typeof createElement>) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
 
-/** What `wf ls` says of a run at its ending's gate, as the api gives it (`RunToDecide`). */
-export const SHIP_SAYS = 'Merge this run onto the base branch, or abort on any failure.';
+/** What `wf ls` says of a run at its gate, as the api gives it (`RunToDecide`). */
+const SHIP_SAYS = 'Merge this run onto the base branch, or abort on any failure.';
 
-export const toShip = {
+const toShip = {
   kind: 'approve' as const,
   step: 'ship',
-  says: SHIP_SAYS,
-  filed: false,
-  /** An ending's send-back goes to the work it waits on, not to the step itself. */
-  back: ['implement'],
+  back: ['ship'],
   onto: 'main',
   said: `${SHIP_SAYS} — wf approve r-1 ship`,
   command: 'wf approve r-1 ship',
 };
 
 /**
- * A run of implement → ship whose ship is the workflow's ending, at its gate: implement signed off with a summary and a file, ship is
- * unfiled and `awaiting approval`, and the run carries what there is to decide. Ship's `spec`, off the workflow the run froze, is what the
- * board tells an ending's gate from another gate by.
+ * A run of implement → ship at ship's gate: implement signed off with a summary and a file, ship is unfiled and `awaiting approval`, and
+ * the run carries what there is to decide.
  */
 export function endingRun(over: Partial<RunDetail> = {}) {
   const run = runWith(null);
@@ -456,7 +452,6 @@ export function endingRun(over: Partial<RunDetail> = {}) {
       effort: null,
       after: ['review'],
       context: null,
-      workspace: 'base',
       place: null,
       resume: null,
       fence: null,
@@ -474,7 +469,7 @@ export function endingRun(over: Partial<RunDetail> = {}) {
       waitingOnYou: ['ship'],
       waitingOnYouWords: ['approve ship'],
       toDecide: toShip,
-      gates: [{ step: 'ship', at: 'before' }],
+      gates: [{ step: 'ship' }],
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
       steps: [implement, ship],
       ...over,

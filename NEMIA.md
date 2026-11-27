@@ -44,22 +44,17 @@ to the person as a card to start, fold into another or drop, with what its stats
   and mergeable on GitHub: open it — its
   address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
   decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which
-  files (`others`, `collides`), and a clean merge whose landing check refused the merged tree (`semantic`). Say what both read. When it
+  files (`others`, `collides`). Say what both read. When it
   does not merge cleanly, or `ci` is red or missing, recommend `nemia refresh <run> --base` or a round of implement, not an approval: the
   landing refuses anything but a green pull request, so an approval given over a red one only spends a session. On `collides`,
   recommend an order: land the run at its gate first, unless the other is expensive or on its last round; then `nemia hold <run>
   --until <other>`. Either way, the one that lands second merges `main` after.
-  On `semantic`, recommend `nemia refresh <run> --base`: the text merges, the meaning does not.
 - A check that refused a step's work exited with a number: quote its last lines and its exit code. A check that did not finish (no
   numeric exit) refused nothing: run it again, `nemia retry <run> <step> --recheck`, and say so. A check that refused twice for the
   same reason wants a fix in content — a brief, a workflow folder, a `CLAUDE.md`, a test — say which.
 - A step whose approval must wait on another run's landing is held, not approved: `nemia hold <run> --until <run>`, and say why.
 - A change under `apps/web` is pictured by its implementer, in a light and a dark theme, and the reviewer reads the pictures: a landing
   step's gate of a web change whose implement closeout names none is sent back, not approved.
-- A landing check has its own deadline, 2700 s: one killed by it did not finish, and is no refusal (`--recheck`, above). It is a
-  receipt now — the pull request merged with a merge commit, the checkout clean on the base, every branch of the run an ancestor of
-  HEAD — and takes seconds, `ci` having judged the suite and the e2e on the head the review read. One that took more than half the
-  deadline is worth an inbox card.
 
 ## After a landing
 

@@ -38,7 +38,6 @@ import { CLOSEOUT_FIELDS, type OutputSchema, type StepSpec } from '../src/workfl
 import { lackedOf } from '../src/record/record.ts';
 import { nextTry } from '../src/retry/index.ts';
 import { roundFiled } from '../src/round/round.ts';
-import { sentBack } from '../src/status/status.ts';
 import { aRead, listing, names, phases, run, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -679,7 +678,6 @@ describe("what was read of a closeout's files: its own task's, dropped by a new 
     const rechecked = nextTry({ ...LACKING, check: { taskId: 't1-check' } }, { step: 'implement', try: 2, mode: 'recheck', by: 'ask' });
     assert.deepEqual([rechecked.taskId, rechecked.filesRead, rechecked.check], ['t1', LACKING.filesRead, undefined]);
   });
-  test('sentBack: a send-back drops it', () => assert.equal(sentBack(LACKING).filesRead, undefined));
   test('roundFiled: a new round drops it', () => {
     const round = { step: 'review', target: 'implement', round: 2, by: 'loop' } as unknown as Parameters<typeof roundFiled>[2];
     const r = { id: 'r-1', steps: { implement: LACKING }, settlesCounted: [] } as unknown as Run;

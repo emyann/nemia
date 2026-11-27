@@ -3,9 +3,9 @@
  * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
 import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
-import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
+import { slotWord, type RunSlot } from '../cap/cap.ts';
 import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
-import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
+import type { ToDecide } from '../ending/ending.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
 import { conditionWaitWords } from '../condition/condition.ts';
 import type { ConditionWriter } from '../program/program.ts';
@@ -16,18 +16,15 @@ import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/index.ts';
 import { routedRows, routedWords } from '../route/routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
-import { answerOf, dueNote, modeWord, tryNote, type RetryAsk } from '../retry/index.ts';
+import { answerOf, dueNote, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
   budgetOf,
-  waitsOnCheckout,
   loopOver,
   overBudget,
-  resultOnBase,
   roundSpans,
   runSpend,
   sendBackTo,
-  unfiledBack,
   spendKnown,
   spentWord,
   standing,
@@ -56,9 +53,7 @@ export type Listing = {
    * (`ranOnWords`), which `nemia ls` prints in the note beside them (`shownNote`) and the board shows off the run object. `roundDue`,
    * only on a looping step whose next round is due (`roundsDue`) and which no retry takes first: what its note words as
    * `roundDueNote`. `asks`, only on a step waiting on a person whose closeout asks questions: how many (`askedQuestions`), which
-   * `nemia ls` counts in the note and `nemia decide` prints whole. `baseHeldBy`, only on a step waiting on the checkout (`on: base`): the
-   * run whose ending has it and that ending (`CheckoutHold`), which its message says in words (`checkoutWord`).
-   *
+   * `nemia ls` counts in the note and `nemia decide` prints whole.   *
    * `reason` and `phase` are where the step stands as codes (`StepReason`, `StepPhase`), with `on`, what a `Waiting` step waits on, and
    * `via`, where an `AwaitingAnswer` step's answer is asked (`CodedStep`), set here from the facts the row's word is built from and never
    * read back off it: what every door carries and compares, the word (`message`) being what a person reads.
@@ -77,7 +72,6 @@ export type Listing = {
       ranOn?: string;
       roundDue?: true;
       asks?: number;
-      baseHeldBy?: CheckoutHold;
     }
   >;
   /**
@@ -105,8 +99,8 @@ export type Listing = {
    */
   cost?: string;
   /**
-   * What a person has to decide about the run's result (`toDecide`), as `assess` reads it on the same inputs: its ending step's gate, or
-   * its branch ahead of the base with no ending step to take it. Absent while there is nothing — which is every run still going.
+   * What a person has to decide about the run's result (`toDecide`), as `assess` reads it on the same inputs: a step at its gate, or
+   * its branch ahead of the base. Absent while there is nothing — which is every run still going.
    */
   toDecide?: ToDecide;
 };
@@ -159,7 +153,7 @@ export type ListedPhase = EnginePhase | 'unknown' | 'running';
 export interface ListingInput {
   /** The run's steps as they are shown, as the frozen folder names them, in its order. */
   readonly steps: readonly StepSpec[];
-  /** The run's one read (`AssessRead`): what judges each step, its tries and rounds due, its result and its checkout. */
+  /** The run's one read (`AssessRead`): what judges each step, its tries and rounds due, and its result. */
   readonly read: AssessRead;
   /** `assess` on `read`, where the caller judged it already: each step's standing and what is due. Left out, the listing assesses it. */
   readonly assessed?: Assessment;
@@ -392,19 +386,16 @@ const notedSaid = (run: Run, name: string, saidTo: (step: string) => number) =>
  * a gated step that signed off is: awaiting approval, waiting on you, its note the approval and the send-back of what it routes on.
  *
  * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
- * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
- * filed names the run whose step has the checkout (`checkoutWord`). The engine's word for a settled task
+ * called off, waits on a run or a slot. A root not filed names them. The engine's word for a settled task
  * is its outcome, and `input-required` reads as it signed (`phaseOfView`), while its line prints the word.
  *
  * Nothing waits on a person for a step the next tick tries again, nor for a loop going round again, and
  * none of either is due on a run cancelled, pruned or held, whose `waitingOnYou` is empty. A step a round
- * due files again reads no budget hold (`roundSpans`); an ending whose work is sent back reads `waiting`
- * (`unheld`); and an ending at its gate whose result git already has waits on nobody, its note saying
- * where the branch stands (`resultOnBase`).
+ * due files again reads no budget hold (`roundSpans`).
  *
- * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back says so (`waitsOnCheckout`) —
+ * A step's note says, in order: its try, or the try, round or send-back due
  * or that a person accepted its loop (`nemia approve`), never their words, which are free text in a padded column; at its gate, the
- * approval and the send-back; what the run did with an ending's merge (`landed`), unless it found nothing staged; how many times it was
+ * approval and the send-back; how many times it was
  * spoken to, and how many before it was filed while it is on its first try (`saidBeforeWord`); and what it was denied. Its cost goes beside
  * its word once measured, unless the word already shows it.
  *
@@ -432,14 +423,12 @@ function listedSteps(
   stoodOf: (step: StepSpec) => Stood,
   routed: ReadonlyMap<string, StepStatus>,
 ) {
-  const { run, verdictOf, spendOf, standings, checkout, sessionBlocked } = read;
+  const { run, verdictOf, spendOf, sessionBlocked } = read;
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   const due = assessed.due.retry;
   const rounds = assessed.due.round;
   const refiled = roundSpans(steps, rounds);
-  const waitingAgain = new Set(assessed.unheld);
-  const takenByHand = (name: string) => resultOnBase(standings) && unrunEnding(steps, run, name);
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
   const heldLoops = new Set<string>();
@@ -452,30 +441,19 @@ function listedSteps(
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
-    const heldOut = retry && checkout && waitsOnCheckout(steps, step.name, checkout) ? { retry, checkout } : undefined;
-    const tried = heldOut
-      ? `try ${heldOut.retry.try} asked (${modeWord(heldOut.retry)}) — ${checkoutWord(heldOut.checkout)}`
-      : retry
-        ? dueNote(step, run, retry)
-        : round
-          ? roundDueNote(steps, round)
-          : exhausted.has(step.name)
-            ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
-            : heldLoops.has(step.name)
-              ? heldNote(step, run)
-              : accepted
-                ? acceptedNote(step, run, accepted)
-                : waitingAgain.has(step.name) && run.steps[step.name]?.taskId
-                  ? `the work is sent back (${due
-                      .filter((r) => r.back?.includes(step.name))
-                      .map((r) => r.step)
-                      .join(', ')}) — it waits at its gate again once that settles`
-                  : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
-    const gate = atGates.has(step.name) && !retry ? atGateNote(step, run, takenByHand(step.name), standings) : '';
-    const back = waitingAgain.has(step.name) ? '' : backNote(step, run);
-    const note = [tried, gate || back, row.note, landingWord(run, step.name), notedSaid(run, step.name, saidTo)]
-      .filter(Boolean)
-      .join(' · ');
+    const tried = retry
+      ? dueNote(step, run, retry)
+      : round
+        ? roundDueNote(steps, round)
+        : exhausted.has(step.name)
+          ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
+          : heldLoops.has(step.name)
+            ? heldNote(step, run)
+            : accepted
+              ? acceptedNote(step, run, accepted)
+              : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
+    const gate = atGates.has(step.name) && !retry ? gateNote(run, step.name, sendBackTo(step, run)) : '';
+    const note = [tried, gate, row.note, notedSaid(run, step.name, saidTo)].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...taskRow(run.steps[step.name]?.taskId, ranOnOf, deniedOf), ...cost };
   });
@@ -486,16 +464,12 @@ function listedSteps(
     const branch = run.steps[name]?.branch ?? null;
     const { status: stoodAs, own } = stoodOf(step);
     const stands: StepStatus = notFiled(run, step) && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
-    if (notFiled(run, step) && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
-      if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), baseHeldBy: checkout, branch };
+    if (notFiled(run, step) && stands !== 'awaiting approval') {
       return { name, ...unfiled(step, waiting, held, assessed.waitingOnNeeds), branch };
     }
-    if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
-    if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
-      waitingOnYou.push(name);
+    if (holdsTheRun(status) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
@@ -722,12 +696,6 @@ export const answerIn = (session: string | null, remote?: { run: string; step: s
 export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }) =>
   `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
 
-/** What a step's landing adds to its note, cut to one line (`LANDED_CAP`): nothing for one that left the base untouched, or none yet. */
-function landingWord(run: Run, name: string) {
-  const landed = run.steps[name]?.landed;
-  return landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
-}
-
 /** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
 /**
  * What a step's current task says beside its note: what its session runs on (`ranOn`), then what it was denied (`denied`), each where
@@ -785,7 +753,7 @@ export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 
 
 /**
  * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to
- * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
+ * the step itself (`sendBackTo`).
  * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Cancelled, neither is either
  * (`approvalRefusal`): a cancelled run files nothing more, held or not. Held, neither is yet (`heldRefusal`).
  */
@@ -797,22 +765,6 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold' | 'cancelledAt'>, step
       : run.hold
         ? heldLater(run.hold, 'its approval')
         : `approve it: nemia approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
-
-/**
- * What `nemia ls` says beside a step at its gate: the merge a person made by hand, for an ending whose result is on the base branch
- * (`onBaseNote`), else the approval and the send-back (`gateNote`). Pure.
- */
-const atGateNote = (step: StepSpec, run: Run, byHand: boolean, standings: Parameters<typeof onBaseNote>[2]) =>
-  byHand ? onBaseNote(run, step.name, standings) : gateNote(run, step.name, sendBackTo(step, run));
-
-/**
- * The send-back an ending approved and not filed still offers (`unfiledBack`), beside what it waits for: the work it would act on, sent
- * back with words, which spends the approval. Pure.
- */
-const backNote = (step: StepSpec, run: Run) => {
-  const back = unfiledBack(step, run);
-  return back.length ? `or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : '';
-};
 
 /**
  * What `nemia ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a

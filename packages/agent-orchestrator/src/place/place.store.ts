@@ -8,7 +8,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Context, Effect, Layer, Schedule, Schema, SchemaTransformation } from 'effect';
 import type { Inventory, PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb, Standing } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import type { RepositoryRun } from '../record/record.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 
 const Count = Schema.NullOr(Schema.Int);
 
@@ -259,3 +259,12 @@ export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number
     child.stderr.destroy();
     return killed;
   });
+
+/**
+ * The commands `place` gives the briefs of `run`'s steps (its `say`): none for a folder run.
+ * @param run The run's record.
+ * @param place The run's place, whose declared commands are read.
+ */
+export function placeSay(run: Run, place: Place) {
+  return isRepositoryRun(run) ? place.declared.say : undefined;
+}

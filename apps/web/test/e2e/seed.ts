@@ -493,27 +493,22 @@ export const REGATED = {
 } as const;
 
 /**
- * A seventh run, whose workflow's ending is a step of its own: `implement → review → ship`, with `ship` in the repository's own checkout
- * (`workspace: base`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
- * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
+ * A seventh run whose last step is gated: `implement → review`, with `review` gated. implement and review signed off; review waits at its
+ * gate for a person's word, so it reads `awaiting approval` and nothing of the run moves. So it is finished, and it stays on the Factory's
+ * floor all the same: nobody has decided it.
  *
- * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate panel has a standing and its counts to show, and
- * `review`'s files directory holds the file it named. The `decide` page reads the banner and the panel, and sends the work back — to
- * review, which the send-back at an ending's gate names, and never to ship — then takes that back.
+ * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate has a standing and its counts to show, and
+ * `review`'s files directory holds the file it named.
  */
 export const ENDING = {
   id: 'ship-it-or-send-it-back-e2e12',
   title: 'Ship it, or send it back',
-  steps: ['implement', 'review', 'ship'],
-  /** The step that ends the run, at its gate: `workspace: base`, gated, and not filed. */
-  ending: 'ship',
-  /** The step a send-back at that gate goes to: the work it would act on, not the step at the gate (`sendBackTo`). */
+  steps: ['implement', 'review'],
+  /** The step at its gate, which a send-back asks again. */
+  ending: 'review',
+  /** The step a send-back at that gate goes to: the gated step itself (`sendBackTo`). */
   back: 'review',
-  /**
-   * What ship's prose says first, which is the whole of what a person is deciding: `wf ls`'s `→ to decide:` line is this and the command.
-   */
-  says: 'Merge this run onto the base branch, or abort on any failure.',
-  /** Its result branch, which review worked on and ship would merge. */
+  /** Its result branch, which review worked on. */
   branch: 'wf/ship-it-or-send-it-back-e2e12/implement',
   /** Where that branch stands against the base, and how much it changed, as `wf decide` prints them under the run. */
   standing: 'wf/ship-it-or-send-it-back-e2e12/implement is ahead of main by 2 commits',
@@ -522,24 +517,22 @@ export const ENDING = {
   review: { heading: 'What I found', items: ['The cap is read on every pass', 'One finding left: the queue has no test'] },
   /** The file review named in its closeout, in its files directory, which the api serves. */
   artifact: 'REVIEW.md',
-  /** What the `decide` page sends the work back with. */
+  /** What the gate's send-back is sent with. */
   objection: 'Say in the README that the cap is read on every pass.',
 } as const;
 
 /**
- * An eighth run, the same workflow with its ending approved and run: ship was approved with no words, filed in the repository's own
- * checkout, and merged the run's branch onto main. Every step is done and its branch is on the base, so there is nothing left to decide —
- * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished. It froze `review` with
- * another note than ENDING, the run of its folder before it, did: the store's one change mark (`changed`).
+ * An eighth run, the same workflow with its gate approved and its branch merged onto main by a person. Every step is done and its branch is
+ * on the base, so there is nothing left to decide, and its card is off the Factory's floor with the rest of the finished. It froze `review`
+ * with another note than ENDING, the run of its folder before it, did: the store's one change mark (`changed`).
  */
 export const LANDED = {
   id: 'it-landed-itself-e2e13',
   title: 'It landed itself',
-  steps: ['implement', 'review', 'ship'],
-  ending: 'ship',
+  steps: ['implement', 'review'],
+  /** The step whose gate was approved. */
+  ending: 'review',
   branch: 'wf/it-landed-itself-e2e13/implement',
-  /** What ship said it did, which is the account a person reads under the step. */
-  merged: 'Merged it onto main with --no-ff, and the check passed.',
   /** What `wf prune` freed once it landed: the one worktree its implement and review worked in, as a `node_modules` makes one. */
   prunedBytes: 1.5 * 1024 ** 3,
   /** And what `--artifacts` freed with it: its files directory, whose screenshot review named. */
@@ -1904,16 +1897,16 @@ function seedRepo(repo: string, branch: string) {
 
 /**
  * Write the three runs whose result is a decision into the store at `root`, and their branches into FAKE's repository at `repo`, cut from
- * `base` on main: ENDING at its ending's gate, LANDED with that ending approved and merged, and UNMERGED with a branch nobody took.
+ * `base` on main: ENDING at its gate, LANDED with that gate approved and its branch merged, and UNMERGED with a branch nobody took.
  *
  * Real commits, because what the board says about each is read out of git on every request: where the branch stands against the base, and
  * how much it changed. ENDING's two commits are three files, fourteen lines added and one removed against the base — `stat` — with
  * `CLAUDE.md` among them, so its radius has a lesson line too: eight lines of source, then five of docs and CLAUDE.md's line rewritten.
- * LANDED's branch is merged into main with `--no-ff`, as its ending step would have merged it, which is what makes the run read as landed
+ * LANDED's branch is merged into main with `--no-ff`, as a person would have merged it, which is what makes the run read as landed
  * with nothing left to decide.
  *
- * ENDING and LANDED are started from one folder: implement, review, then the ending in the repository's own checkout. LANDED's ship
- * was approved with no words, as `wf approve` writes an approval, filed in the checkout, and merged; then pruned, as `wf prune --artifacts`
+ * ENDING and LANDED are started from one folder: implement, then review, gated. LANDED's review was approved with no words, as
+ * `wf approve` writes an approval, and its branch merged; then pruned, as `wf prune --artifacts`
  * marks a run: its record and branch kept, the worktree and its files gone. UNMERGED's folder says nothing about shipping, so git is what
  * ends it: one step, signed off, and a branch nobody took.
  */
@@ -1967,7 +1960,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
   commit(
     LANDED.branch,
     'Say what shipping is',
-    [['workflows/dev/ship.md', '---\nworkspace: base\ngate: true\n---\nMerge it onto the base branch.\n']],
+    [['workflows/dev/ship.md', '---\ngate: true\n---\nMerge it onto the base branch.\n']],
     true,
   );
   git('merge', '-q', '--no-ff', '-m', `Merge ${LANDED.id}`, LANDED.branch);
@@ -1993,13 +1986,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
 
   const shipDir = path.join(root, 'workflow-ship');
   write(path.join(shipDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement what was asked.\n');
-  write(path.join(shipDir, 'review.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nReview the change.\n');
-  const shipBody = `${ENDING.says}\n\nLook at the checkout first: it is a person's, and this step is the run doing what they would do by hand.`;
-  write(path.join(shipDir, 'ship.md'), `---\nplace: git\nharness: claude\nafter: review\nworkspace: base\ngate: true\n---\n${shipBody}\n`);
+  write(path.join(shipDir, 'review.md'), '---\nplace: git\nharness: claude\nafter: implement\ngate: true\n---\nReview the change.\n');
   const shipWorkflow = [
     { name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' },
-    { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'claude' },
-    { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'base', gate: true },
+    { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'claude', gate: true },
   ];
 
   const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object, workflow = shipWorkflow) =>
@@ -2045,18 +2035,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
       path.join(files, ENDING.artifact),
     ]),
   );
-  shipRun(
-    ENDING.id,
-    ENDING.title,
-    'implement and review signed off, and the ending step waits at its gate for your word.',
-    ENDING.branch,
-    0.9,
-    {
-      implement: { taskId: `${ENDING.id}-implement`, workspace: lane, branch: ENDING.branch },
-      review: { taskId: `${ENDING.id}-review`, workspace: lane, branch: ENDING.branch },
-      ship: { taskId: null },
-    },
-  );
+  shipRun(ENDING.id, ENDING.title, 'implement and review signed off, and review waits at its gate for your word.', ENDING.branch, 0.9, {
+    implement: { taskId: `${ENDING.id}-implement`, workspace: lane, branch: ENDING.branch },
+    review: { taskId: `${ENDING.id}-review`, workspace: lane, branch: ENDING.branch },
+  });
 
   const landedLane = path.join(root, 'worktrees', LANDED.id, 'implement');
   signedOff(`${LANDED.id}-implement`, landedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
@@ -2068,8 +2050,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
     0.4,
     done('One reading of it, and nothing to change.', [path.join(root, 'runs', LANDED.id, 'artifacts', 'review', LANDED.shot)]),
   );
-  signedOff(`${LANDED.id}-ship`, repo, shipBody, 0.3, 0.2, done(LANDED.merged));
-  write(path.join(root, 'runs', `${LANDED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
+  write(
+    path.join(root, 'runs', `${LANDED.id}.asks`, 'approve-review-1'),
+    JSON.stringify({ step: 'review', try: 1, at: ago(0.35) }, null, 2),
+  );
   const prunedAt = ago(0.1);
   write(
     path.join(root, 'runs', `${LANDED.id}.pruned`),
@@ -2086,13 +2070,12 @@ function seedDecisions(root: string, repo: string, base: string, now: number) {
   shipRun(
     LANDED.id,
     LANDED.title,
-    'its ending step was approved, ran in the checkout and merged the branch: nothing left to decide.',
+    'its gate was approved and its branch merged: nothing left to decide.',
     LANDED.branch,
     0.8,
     {
       implement: { taskId: `${LANDED.id}-implement`, workspace: landedLane, branch: LANDED.branch },
       review: { taskId: `${LANDED.id}-review`, workspace: landedLane, branch: LANDED.branch },
-      ship: { taskId: `${LANDED.id}-ship`, workspace: repo },
     },
     shipWorkflow.map((step) => (step.name === LANDED.changed.name ? { ...step, body: LANDED.review } : step)),
   );

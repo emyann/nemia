@@ -12,7 +12,6 @@ import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
-import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS } from './layout.ts';
 import { checkFailurePolicyOf, checksOf, checksWritten } from '../check/index.ts';
@@ -74,7 +73,7 @@ export type Draft = { files: DraftFile[]; from: Array<{ part: string; from: stri
 const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 
 /** The step keys copied as they are, as strings. */
-const WORDS = ['place', 'workspace', 'check', 'run', 'checkMemory', 'loop', 'memory', 'memoryRequest'] as const;
+const WORDS = ['place', 'check', 'run', 'checkMemory', 'loop', 'memory', 'memoryRequest'] as const;
 
 /**
  * The step keys of a route read as lists: a condition's routes and those it ends on, the routes a node runs on, and a backlog node's
@@ -143,18 +142,18 @@ function blockOf(file: string, keys: Readonly<Record<string, string | undefined>
 const unplaced = (step: StepSource) => Object.keys(step.keys).filter((key) => !PLACED.has(key));
 
 /**
- * The wiring of `step` of `workflow`, typed, in the template's order: a former `workspace: main` written as `base` (`baseSpelled`), and its
+ * The wiring of `step` of `workflow`, typed, in the template's order: and its
  * own `output:`, a file of the workflow's folder, named from the template's root.
  */
 function wiringOf(workflow: string, step: StepSource) {
-  const keys = baseSpelled(step.keys);
+  const keys = step.keys;
   const wired: Record<string, unknown> = {};
   if (keys.after !== undefined) wired.after = listOf(keys.after);
   if (keys.input !== undefined) wired.input = listOf(keys.input);
-  for (const key of WORDS.slice(0, 2)) if (keys[key] !== undefined) wired[key] = keys[key];
+  for (const key of WORDS.slice(0, 1)) if (keys[key] !== undefined) wired[key] = keys[key];
   if (gateOf(step.file, keys.gate)) wired.gate = true;
   if (keys.budget !== undefined) wired.budget = budgetOf(step.file, keys.budget);
-  for (const key of WORDS.slice(2)) if (keys[key] !== undefined) wired[key] = keys[key];
+  for (const key of WORDS.slice(1)) if (keys[key] !== undefined) wired[key] = keys[key];
   for (const key of COUNTED) if (keys[key] !== undefined) wired[key] = countOf(step.file, key, keys[key]);
   return { ...wired, ...routingOf(keys), ...closeoutOf(workflow, step.file, keys) };
 }

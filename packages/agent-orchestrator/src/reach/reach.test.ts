@@ -20,12 +20,12 @@ import {
 } from '../auto/index.ts';
 import { type GateSite, gateRows, missWords, NEVER_WORDS, ruleReaches, unmetWords } from './index.ts';
 
-/** An ending approved before it runs, with a check. */
-const ENDING: GateSite = { workflow: 'ship', step: 'merge', approvedFirst: true, hasCheck: true };
+/** A step run before its gate, with no check: the merge. */
+const MERGE: GateSite = { workflow: 'ship', step: 'merge', hasCheck: false };
 /** A step run before its gate, with no check. */
-const NO_CHECK: GateSite = { workflow: 'ship', step: 'draft', approvedFirst: false, hasCheck: false };
+const NO_CHECK: GateSite = { workflow: 'ship', step: 'draft', hasCheck: false };
 /** A step run before its gate, with a check: every condition can hold there. */
-const CHECKED: GateSite = { workflow: 'ship', step: 'build', approvedFirst: false, hasCheck: true };
+const CHECKED: GateSite = { workflow: 'ship', step: 'build', hasCheck: true };
 
 /** Every word a person reads in a table: each miss, each suggestion's own words, and what keeps a rule now. */
 const wordsOf = (table: ReturnType<typeof gateRows>) =>
@@ -38,18 +38,6 @@ const readsAsCode = (words: string) => {
 };
 
 describe('`gateRows`: what each rule in force reaches, why it misses, and the rule that would reach a gate', () => {
-  test('REFUSED: the default misses an ending approved before it runs, on the agent recommending it', () => {
-    const { rows } = gateRows([DEFAULT_POLICY], [], [ENDING]);
-    const row = rows.at(0);
-    assert.deepEqual(row?.reachedBy, []);
-    assert.equal(row?.misses.length, 1);
-    assert.deepEqual(
-      { ...row?.misses.at(0), words: undefined },
-      { rule: 'default', why: 'never-holds', condition: 'recommends', because: 'approved-before-it-runs', words: undefined },
-    );
-    assert.match(row?.misses.at(0)?.words ?? '', new RegExp(CONDITION_WORDS.recommends));
-    assert.match(row?.misses.at(0)?.words ?? '', new RegExp(NEVER_WORDS['approved-before-it-runs']));
-  });
   test('REFUSED: the default misses a step with no check, on its check', () => {
     const miss = gateRows([DEFAULT_POLICY], [], [NO_CHECK]).rows.at(0)?.misses.at(0);
     assert.deepEqual(
@@ -74,10 +62,10 @@ describe('`gateRows`: what each rule in force reaches, why it misses, and the ru
     assert.match(missWords({ rule: 'elsewhere', why: 'other-steps' }), /covers other steps/);
   });
   test('the rule suggested for each miss reaches it, is a rule, and is proposed as it is', () => {
-    const { suggested } = gateRows([DEFAULT_POLICY], [], [ENDING, NO_CHECK]);
+    const { suggested } = gateRows([DEFAULT_POLICY], [], [MERGE, NO_CHECK]);
     assert.equal(suggested.length, 2);
     for (const [rule, site] of [
-      [suggested.at(0), ENDING],
+      [suggested.at(0), MERGE],
       [suggested.at(1), NO_CHECK],
     ] as const) {
       assert.ok(rule && ruleReaches(rule, site), `${rule?.id} reaches ${site.step}`);
@@ -92,7 +80,7 @@ describe('`gateRows`: what each rule in force reaches, why it misses, and the ru
       { id: 'again', answer: 'retry', when: [] },
       { id: 'capped', answer: 'approve', when: ['accepted', 'withinBudget', 'nothingOpen'], under: 5 },
     ];
-    const table = gateRows(rules, [], [ENDING, NO_CHECK, CHECKED], () => NO_FACTS);
+    const table = gateRows(rules, [], [MERGE, NO_CHECK, CHECKED], () => NO_FACTS);
     const words = [
       ...wordsOf(table),
       ...Object.values(NEVER_WORDS),
@@ -110,8 +98,8 @@ describe('`gateRows`: what each rule in force reaches, why it misses, and the ru
     assert.ok(rule && ruleReaches(rule, NO_CHECK) && ruleReaches(rule, twin));
   });
   test('the reach of a list: none, some, all', () => {
-    assert.equal(gateRows([DEFAULT_POLICY], [], [ENDING, NO_CHECK]).reach, 'none');
-    assert.equal(gateRows([DEFAULT_POLICY], [], [ENDING, CHECKED]).reach, 'some');
+    assert.equal(gateRows([DEFAULT_POLICY], [], [MERGE, NO_CHECK]).reach, 'none');
+    assert.equal(gateRows([DEFAULT_POLICY], [], [MERGE, CHECKED]).reach, 'some');
     assert.equal(gateRows([DEFAULT_POLICY], [], [CHECKED]).reach, 'all');
     assert.equal(gateRows([DEFAULT_POLICY], [], []).reach, 'all', 'no gate is missed');
     assert.deepEqual(gateRows([DEFAULT_POLICY], [], [CHECKED]).suggested, [], 'nothing to suggest');
@@ -133,8 +121,8 @@ describe('`gateRows`: what each rule in force reaches, why it misses, and the ru
   test('a proposed rule that would reach a gate is named, and one already in force is not', () => {
     const proposed: PolicyRule = { id: 'approve-merge', answer: 'approve', steps: ['merge'], when: ['accepted'] };
     const inForce: PolicyRule = { id: 'approve-merge', answer: 'approve', steps: ['merge'], when: ['accepted'] };
-    assert.deepEqual(gateRows([DEFAULT_POLICY], [proposed], [ENDING]).rows.at(0)?.proposedBy, ['approve-merge']);
-    assert.deepEqual(gateRows([inForce], [proposed], [ENDING]).rows.at(0)?.proposedBy, []);
-    assert.deepEqual(gateRows([inForce], [proposed], [ENDING]).rows.at(0)?.reachedBy, ['approve-merge']);
+    assert.deepEqual(gateRows([DEFAULT_POLICY], [proposed], [MERGE]).rows.at(0)?.proposedBy, ['approve-merge']);
+    assert.deepEqual(gateRows([inForce], [proposed], [MERGE]).rows.at(0)?.proposedBy, []);
+    assert.deepEqual(gateRows([inForce], [proposed], [MERGE]).rows.at(0)?.reachedBy, ['approve-merge']);
   });
 });

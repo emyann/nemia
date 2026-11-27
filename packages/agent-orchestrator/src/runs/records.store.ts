@@ -138,7 +138,6 @@ const MergeAskSchema = Schema.StructWithRest(
     onto: Schema.NonEmptyString,
     sha: Schema.NonEmptyString,
     at: When,
-    landing: Schema.optional(Schema.Struct({ step: Schema.NonEmptyString, check: Schema.NonEmptyString })),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -159,10 +158,8 @@ function mergeAskIn(text: string, step: string, n: number) {
     return (read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia refresh --base wrote') satisfies
       | RoundAsk
       | string;
-  const { loop, round, onto, sha, at, landing } = read.read;
-  return { step: loop, round, at, merge: { target: step, try: n, onto, sha, ...(landing ? { landing: { ...landing } } : {}) } } satisfies
-    | RoundAsk
-    | string;
+  const { loop, round, onto, sha, at } = read.read;
+  return { step: loop, round, at, merge: { target: step, try: n, onto, sha } } satisfies RoundAsk | string;
 }
 
 /** The asks waiting among a run's (`asksIn`), a person's merges among its rounds. */
@@ -185,7 +182,7 @@ function allAsksIn(asks: readonly AskEntry[]) {
 function askHeld(person: PersonRequest) {
   if (person.of !== 'base') return person.ask;
   const { step, round, at, merge } = person.ask;
-  return { loop: step, round, onto: merge.onto, sha: merge.sha, at, ...(merge.landing ? { landing: merge.landing } : {}) };
+  return { loop: step, round, onto: merge.onto, sha: merge.sha, at };
 }
 
 /** Each kind of ask's reader: what it holds read as that ask, or why it is not one. */

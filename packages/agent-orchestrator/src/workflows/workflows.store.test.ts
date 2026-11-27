@@ -65,10 +65,10 @@ test('a former spelling the files still hold is read, and its hint names the fix
   const { root, side } = store();
   const dir = path.join(root, 'workflows', 'old');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'only.md'), '---\nplace: git\nworkspace: main\n---\nDo it.\n');
+  fs.writeFileSync(path.join(dir, 'only.md'), '---\nworkspace: folder\n---\nDo it.\n');
   assert.deepEqual(
-    done(side.door.workflows.read(yoursOn(side, 'old'))).map((s) => [s.name, s.workspace]),
-    [['only', 'base']],
+    done(side.door.workflows.read(yoursOn(side, 'old'))).map((s) => [s.name, s.place]),
+    [['only', 'folder']],
   );
   const hints = done(side.door.workflows.hints(yoursOn(side, 'old')));
   assert.equal(hints.length, 1);

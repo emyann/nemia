@@ -61,7 +61,7 @@ type CheckOnRecord = { readonly taskId: string; readonly tasks?: Readonly<Record
  * The phase a step's checks stand in together, read as one check's task phase is: the one task's own phase for a step with one check, and
  * for several, off `checksDue`'s verdict on them — `succeeded` once every one passed, `failed` once one refused and none still runs
  * (`stopped` where none of those that stopped exited with a code), `running` until then. What every reader of a step's check verdict
- * reads (`onItsCheck`, `refusedCheck`'s callers), so a step judged by several checks is judged as one judged by one. Pure.
+ * reads (`refusedCheck`'s callers), so a step judged by several checks is judged as one judged by one. Pure.
  * @param check The check on the step's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
  */

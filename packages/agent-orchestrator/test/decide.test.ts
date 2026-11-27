@@ -9,7 +9,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
-import { keysUnder, listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
+import { listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
 import { createFactoryAt, rewriteRun } from '../testing.ts';
 import { inRadiusFactory, RADIUS } from './radius.fixture.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
@@ -143,15 +143,6 @@ const folder = (implementKeys = '') => {
   return dir;
 };
 
-/** A folder of `implement`, then `last`, its ending, gated and on the base branch, its body `body`, led by `agent` where one is named. */
-const ending = (last: string, body: string, agent?: string, under = ROOT) => {
-  const dir = fs.mkdtempSync(path.join(under, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const keys = ['after: implement', 'place: git', 'workspace: base', 'gate: true', ...(agent ? [`agent: ${agent}`] : [])];
-  fs.writeFileSync(path.join(dir, `${last}.md`), `---\n${keys.join('\n')}\n---\n${body}`);
-  return dir;
-};
-
 /**
  * A run waiting on you: implement verified, with usage; review unverified, with none. Its implement weakened a test, added to a source
  * file and wrote a lesson in CLAUDE.md, committed in its own workspace, on the branch the place cut for it.
@@ -174,9 +165,6 @@ const awaiting = async (implementKeys = '') => {
   const record = runRecord(ROOT, run.id);
   return { run: repositoryRun(record), repo, branch: record.steps.review.branch! };
 };
-
-/** The ending's own words, as the folder writes them: what `nemia decide` echoes as what approving it does. */
-const SHIP_IT = "Ship it: trial merge this run's result branch onto main, run the check, and commit.";
 
 /** The run's own verdicts, as its reading judged them: refused where the run awaits no person. */
 type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
@@ -478,49 +466,12 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     },
   );
   s.test(
-    "a folder whose last step is an ending: the decision, once a pass has read where its branch stands, says what that step would do in the folder's words, and the word that runs it — and offers no command of the branch, since the step is the one that merges",
-    async () => {
-      const run = await stage.runPlaced(
-        startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('ship', `${SHIP_IT}\n\nAbort on any failure.\n`) }),
-      );
-      await tick(run.id);
-      const work = runRecord(ROOT, run.id).steps.implement;
-      commitIn(work.workspace!, { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` }, 'add sub');
-      settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
-      await tick(run.id);
-      assert.equal(runRecord(ROOT, run.id).steps.ship.taskId, null, 'nothing of the ending is filed without a person');
-
-      await aPass();
-      const { d, decided } = await decidable(run.id);
-      assert.deepEqual(awaitingOf(decided).awaitingApproval, ['ship'], 'the ending, at its gate: nothing of it has run');
-      const standing = d.standings.find((x) => x.branch === work.branch);
-      assert.deepEqual([standing?.where, standing?.said], ['ahead', `${work.branch} is ahead of main by 1 commit`]);
-      assert.deepEqual(decided.toDecide, { kind: 'approve', step: 'ship', says: SHIP_IT, filed: false });
-      assert.deepEqual(
-        d.commands.filter((x) => x.label === 'approve' || x.label === 'send back').map((x) => x.command),
-        [`nemia approve ${run.id} ship`, `nemia retry ${run.id} implement --message "<objection>"`],
-      );
-      assert.ok(
-        !d.commands.some((x) => x.label === 'merge it' || x.label === 'drop it'),
-        'the folder says what landing is, so nobody is told to type it',
-      );
-
-      const said = await listed(run.id);
-      assert.equal(decideSaid(said), `${SHIP_IT} — nemia approve ${run.id} ship`);
-      assert.deepEqual(
-        [onYouWords(said.listing).filter((w) => w !== 'approve ship'), said.listing.waiting],
-        [[], []],
-        '`nemia ls` says it in one line, where it says who the run waits on: the ending is not said twice',
-      );
-      assert.match(stepRow(said.listing, 'ship').message, /^awaiting approval/);
-    },
-  );
-  s.test(
-    "at an ending's gate, the decision, after a pass, says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none",
+    'the decision of a run at its result says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none',
     async () => {
       const repo = aRepo();
-      const dir = ending('ship', 'Ship it.\n');
       const add = 'packages/x/src/add.ts';
+      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+      fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
       const working = async (file: string, text: string, settled: boolean) => {
         const run = await started({ brief: `write ${file}`, repo, workflowDir: dir });
         await tick(run.id);
@@ -557,56 +508,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
 
       const running = await stage.runWith(stage.board().e, decideRun(theirs.id));
       assert.equal(running.decision.kind, 'running');
-      assert.equal(running.collisions, undefined, 'a run still running is at no ending, and no trial merge is asked for it');
-    },
-  );
-  s.test(
-    "REFUSED: an ending led by an agent that says `You are …` — the decision and `nemia ls` say the step's own note, or with none, that approving runs it, and never quote the agent",
-    async () => {
-      const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
-      fs.mkdirSync(path.join(team, 'agents'));
-      fs.writeFileSync(
-        path.join(team, 'agents', 'otto.md'),
-        "---\nmodel: opus\n---\nYou are Otto, a release engineer. You land a run's result in the repository's own checkout.\n\nNever push.\n",
-      );
-      const LANDS = "Land this run's result on main: stage the merge of its branch, and sign off with the commit message.";
-      const atGate = async (note: string) => {
-        const run = await started({ brief: 'add sub', repo: aRepo(), workflowDir: ending('land', note, 'otto', team) });
-        await tick(run.id);
-        commitIn(
-          runRecord(ROOT, run.id).steps.implement.workspace!,
-          { 'packages/x/src/add.ts': 'export const sub = (a, b) => a - b;\n' },
-          'add sub',
-        );
-        settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
-        await tick(run.id);
-        const { d, decided } = await decidable(run.id);
-        return { id: run.id, d, toDecide: decided.toDecide, said: await listed(run.id) };
-      };
-      const approving = (d: Decidable) => d.commands.filter((x) => x.label === 'approve').map((x) => x.command);
-
-      const noted = await atGate(`${LANDS}\n\nAbort on a conflict.\n`);
-      assert.deepEqual(
-        noted.toDecide,
-        { kind: 'approve', step: 'land', says: LANDS, filed: false },
-        "the step's own note, its first paragraph",
-      );
-      assert.deepEqual(approving(noted.d), [`nemia approve ${noted.id} land`]);
-      assert.equal(decideSaid(noted.said), `${LANDS} — nemia approve ${noted.id} land`);
-
-      const bare = await atGate('');
-      assert.deepEqual(bare.toDecide, { kind: 'approve', step: 'land', says: null, filed: false }, 'with none, nothing is quoted');
-      assert.deepEqual(approving(bare.d), [`nemia approve ${bare.id} land`]);
-      assert.equal(decideSaid(bare.said), `land has not run: approving runs it — nemia approve ${bare.id} land`);
-
-      for (const shown of [
-        JSON.stringify([noted.d, noted.toDecide]),
-        lsSaid(noted.said),
-        JSON.stringify([bare.d, bare.toDecide]),
-        lsSaid(bare.said),
-      ]) {
-        assert.ok(!shown.includes('You are'), shown);
-      }
+      assert.equal(running.collisions, undefined, 'a run still running is at no result, and no trial merge is asked for it');
     },
   );
   s.test(
@@ -628,11 +530,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
       const branch = runRecord(ROOT, run.id).steps.review.branch!;
 
       const held = await decidable(run.id);
-      assert.deepEqual(
-        held.decided.toDecide,
-        { kind: 'approve', step: 'review', says: null, filed: true },
-        'signed off, waiting for your word',
-      );
+      assert.deepEqual(held.decided.toDecide, { kind: 'approve', step: 'review' }, 'signed off, waiting for your word');
       assert.ok(
         held.d.commands.some((x) => x.label === 'approve' && x.command === `nemia approve ${run.id} review`),
         JSON.stringify(held.d),
@@ -671,89 +569,13 @@ describe('a run waiting on you, read and landed: its screens, and what approving
 
       const { d, decided } = await decidable(run.id);
       assert.deepEqual(d.awaiting, { branches: ['main'], direct: true }, 'it worked directly on main: nothing to merge');
-      assert.deepEqual(decided.toDecide, { kind: 'approve', step: 'review', says: null, filed: true }, 'and still what to decide');
+      assert.deepEqual(decided.toDecide, { kind: 'approve', step: 'review' }, 'and still what to decide');
       assert.ok(
         d.commands.some((x) => x.label === 'approve' && x.command === `nemia approve ${run.id} review`),
         JSON.stringify(d),
       );
       assert.deepEqual(d.standings, [], 'no standing: it would read `main is on main`');
       assert.ok(!d.commands.some((x) => x.label === 'merge it' || x.label === 'drop it'), 'nor a merge of the branch it is already on');
-    },
-  );
-  s.test(
-    "a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it",
-    async () => {
-      const repo = aRepo();
-      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-      fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: base\nslot: none\n---\nWatch the runs.\n');
-      const run = await started({ brief: 'supervise this repository', repo, workflowDir: dir });
-      await tick(run.id);
-      settle(`${run.id}-supervise`, 'succeeded', { closeout: blocked('Merge add-sub, or hold it?', 'add-sub is ready to merge.') });
-      await tick(run.id);
-      assert.equal(
-        runRecord(ROOT, run.id).steps.supervise?.branch,
-        'main',
-        "the step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's",
-      );
-
-      stage.place().world.branch(repo, 'main', {
-        'packages/x/test/add.test.ts': "import assert from 'node:assert';\nassert.ok(true);\n",
-        'CLAUDE.md': 'a lesson somebody else wrote\n',
-      });
-      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(runRecord(ROOT, run.id)), ['main'], RADIUS);
-      assert.ok(
-        !('error' in moved) && moved.changes.length === 2,
-        `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
-      );
-
-      const { d, decided } = await decidable(run.id);
-      assert.deepEqual(d.touched, [], 'no branch to read');
-      assert.notEqual(d.lesson.state, 'written', 'nor a lesson credited to it for what another run merged');
-      assert.deepEqual(d.sensitive, [], 'nor every check-affecting file merged since, above the question');
-      const closeout = decided.closeouts.supervise;
-      assert.ok(closeout && !('error' in closeout), JSON.stringify(closeout));
-      assert.deepEqual(
-        [closeout.summary, closeout.needs],
-        ['add-sub is ready to merge.', 'Merge add-sub, or hold it?'],
-        'what the person came for: the summary, and the question',
-      );
-      assert.equal(decided.answering.supervise, `to answer it:  nemia retry ${run.id} supervise --message "<answer>"`);
-
-      const direct = await started({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
-      stage.place().world.branch(repo, 'main', { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` });
-      await tick(direct.id);
-      settle(`${direct.id}-implement`, 'failed');
-      const { d: worked } = await decidable(direct.id);
-      assert.equal(
-        runRecord(ROOT, direct.id).steps.review?.branch,
-        undefined,
-        'the terminal step has no branch: the fallback is what answers',
-      );
-      const groups = worked.touched.map((x) => ({ branch: x.branch, groups: 'error' in x.radius ? null : x.radius.groups }));
-      assert.deepEqual(
-        groups.map((x) => [x.branch, x.groups?.map((g) => [g.name, g.files, g.added, g.removed])]),
-        [['main', [['packages/x', 1, 1, 0]]]],
-        'a run that worked on main itself (--no-worktree) reads every branch a step worked on, main, where its work is',
-      );
-    },
-  );
-  s.test(
-    'REFUSED at `nemia start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch',
-    async () => {
-      const repo = aRepo();
-      const dir = ending('ship', 'Ship it.\n');
-      const before = keysUnder(ROOT, '/registry/runs/').length;
-      await assert.rejects(
-        stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
-        (err: Error & { exitCode?: number; _tag?: string }) => {
-          assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
-          assert.match(err.message, /workspace: base/);
-          assert.match(err.message, /--no-worktree/, 'and names the flag to drop');
-          return true;
-        },
-      );
-      assert.equal(keysUnder(ROOT, '/registry/runs/').length, before, 'nothing written');
-      assert.ok(await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir })), 'with worktrees, it starts');
     },
   );
 });

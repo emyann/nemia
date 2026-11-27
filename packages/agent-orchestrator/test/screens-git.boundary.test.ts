@@ -636,7 +636,7 @@ const waiting = (run: RepositoryRun, branch: string, inFull: unknown[]) => ({
   run: ['run not measured', '36s', '14m24s', '25m00s'],
   results: [[branch, '4 files: +4 −1, 1 binary', ['CLAUDE.md']]],
   standings: [`${branch} is ahead of main by 1 commit`],
-  collisions: null,
+  collisions: [['merges cleanly onto main'], 'no other run is in flight on main'],
   commands: [
     ['merge it', `git -C ${run.repo} merge --no-ff ${branch}`],
     ['drop it', `git -C ${run.repo} branch -D ${branch}`],
@@ -922,7 +922,7 @@ describe('the whole decisions of a run through its tries and on two branches', (
           [implementBranch, '1 file: +1 −0', []],
         ],
         standings: [`${runBranch} is ahead of main by 1 commit`, `${implementBranch} is ahead of main by 1 commit`],
-        collisions: null,
+        collisions: [['merges cleanly onto main', 'merges cleanly onto main'], 'no other run is in flight on main'],
         commands: [
           ['merge it', `git -C ${run.repo} merge --no-ff ${runBranch}`],
           ['drop it', `git -C ${run.repo} branch -D ${runBranch} ${implementBranch}`],

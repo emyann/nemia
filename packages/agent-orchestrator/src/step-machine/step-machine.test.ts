@@ -6,7 +6,7 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { roundFiled, sentBack, type CloseoutAsked, type Run, type StepStatus, type TaskPhase, type TaskSpend } from '../run.ts';
+import { roundFiled, type CloseoutAsked, type Run, type StepStatus, type TaskPhase, type TaskSpend } from '../run.ts';
 import { nextTry, type RetryMode } from '../retry/retry-ask.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
@@ -163,19 +163,6 @@ const round = (looping: string, target: string, n: number, taskId: string, by: '
       verdict: {},
     }),
   ] satisfies Move;
-/** The work sent back from an ending that stopped (`Retry.back`): the work tried again, and the ending's try moved behind (`sentBack`). */
-const sendBack = (work: string, n: number, taskId: string, ending: string) =>
-  [
-    `${work} tried again, ${ending} sent back with it`,
-    (w) => {
-      const tried = retry(work, n, 'continue', taskId)[1](w);
-      return {
-        ...withRecord(tried, ending, sentBack(recordOf(tried, ending))),
-        said: { ...tried.said, [ending]: undefined },
-        verdict: { ...tried.verdict, [ending]: undefined },
-      };
-    },
-  ] satisfies Move;
 /** A person names a condition's route for a try (`nemia route`), as `runRecord` composes their file onto its record. */
 const routeNamed = (name: string, route: string, n: number) =>
   [
@@ -185,11 +172,6 @@ const routeNamed = (name: string, route: string, n: number) =>
 /** A workflow node's card filed (`StepRecord.sent`). */
 const cardSent = (name: string) =>
   [`${name}'s card filed`, (w) => withRecord(w, name, { ...recordOf(w, name), sent: { card: `r-1-${name}`, at: AT } })] satisfies Move;
-const landed = (name: string, how: { commit: string } | { aborted: string }) =>
-  [
-    `${name}'s landing ${'commit' in how ? 'committed' : 'aborted'}`,
-    (w) => withRecord(w, name, { ...recordOf(w, name), landed: how }),
-  ] satisfies Move;
 
 const spent = (usd: number) => ({ usd, measured: 1, unmeasured: 0, budgetEnded: false }) satisfies TaskSpend;
 const done = (output?: Record<string, unknown>) =>
@@ -231,8 +213,6 @@ const LOOP_THROUGH_TEST: StepSpec[] = [
 ];
 /** A loop whose looping step has a budget of its own. */
 const BUDGETED_LOOP: StepSpec[] = [step('implement'), { ...loop(3)[1], budget: 1 }];
-/** An ending approved before it is filed: on the base branch, gated, landing on its check. */
-const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true, check: 'landing receipt' }];
 
 /** One step's work to a sign-off: filed, signed, and its session settled. */
 const works = (name: string, taskId: string, said: Closeout = done()) =>
@@ -508,32 +488,6 @@ const WALKS: Walk[] = [
     settle('r1', 'succeeded', { spend: { usd: 2 } }),
     round('review', 'implement', 2, 'i2', 'ask'),
   ),
-  walk(
-    'an ending approved before it is filed, landed',
-    'land',
-    ENDING,
-    ...works('implement', 'i1'),
-    approve('land', 1),
-    file('land', 'l1'),
-    sign('land', done()),
-    settle('l1', 'succeeded'),
-    landed('land', { commit: 'abc' }),
-  ),
-  walk(
-    'an ending whose landing aborted, sent back with its work',
-    'land',
-    ENDING,
-    ...works('implement', 'i1'),
-    approve('land', 1),
-    ...works('land', 'l1'),
-    fileCheck('land', 'c1'),
-    checkEnds('land', 'c1', 'failed', 1),
-    landed('land', { aborted: 'a conflict' }),
-    sendBack('implement', 2, 'i2', 'land'),
-    sign('implement', done()),
-    settle('i2', 'succeeded'),
-  ),
-  walk("an ending's work sent back from its gate", 'land', ENDING, ...works('implement', 'i1'), retry('implement', 2, 'continue', 'i2')),
 ];
 
 /** Each walk's words, and the move that made each. */

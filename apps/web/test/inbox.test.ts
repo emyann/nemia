@@ -14,7 +14,6 @@ import {
   cardQuery,
   dropCard,
   fileCard,
-  cardCountQuery,
   chainsQuery,
   factoryInboxQuery,
   inboxPageQuery,
@@ -687,18 +686,18 @@ describe('inboxSearch, inboxAskedOf, chainsPulled: what the Inbox page keeps in 
     assert.equal(inboxAskedOf({ state: 'working' }).fieldSelector, 'status.phase=working', 'a state is one flat page of that phase');
     assert.equal(inboxAskedOf({ cards: 'closed' }).fieldSelector, 'status.inPlay=false');
   });
-  test("a page is one read of the api, with its counts and the labels in use, and the counts of a factory's cards are a page of one", async (t) => {
+  test("a page is one read of the api, with its counts and the labels in use, and the floor's read carries the counts the pane says", async (t) => {
     const sent = sending(t, () => answered(200, cardList()));
     const asked = inboxAskedOf({ q: 'reads' });
     const page = await (inboxPageQuery(asked, 'pair').queryFn as unknown as () => Promise<{ entries: unknown[]; next: string | null }>)();
     assert.deepEqual([page.entries, page.next], [[], null]);
-    const counts = await (cardCountQuery('pair').queryFn as unknown as () => Promise<Record<string, number>>)();
-    assert.equal(counts.notStarted, 0);
+    const floor = await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<{ counts: Record<string, number> }>)();
+    assert.equal(floor.counts.notStarted, 0);
     const [first, second] = sent.map((r) => new URL(r.url, 'http://board'));
     assert.equal(first?.pathname, '/api/namespaces/pair/cards');
     assert.equal(first?.searchParams.get('search'), 'reads');
     assert.equal(first?.searchParams.get('limit'), String(INBOX_PAGE));
-    assert.equal(second?.searchParams.get('limit'), '1');
+    assert.equal(second?.searchParams.get('fieldSelector'), 'status.inPlay=true', 'the floor is the one read of the pane');
     assert.equal(sent.length, 2, 'one read each: no page past the first');
     assert.equal(inboxPageQuery(asked).queryKey[0], 'inbox');
     assert.notDeepEqual(inboxPageQuery(asked).queryKey, inboxPageQuery(asked, 'pair').queryKey, 'each factory its own key');

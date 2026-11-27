@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import type { InboxEntry } from '@/lib/api/inbox';
 import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
@@ -125,7 +125,7 @@ export const Stuck: Story = {
   play: async ({ canvasElement, userEvent }) => {
     await expect(canvasElement.querySelector('[data-card-state="stuck"]')).not.toBeNull();
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Edit' }));
-    await expect(await within(document.body).findByRole('dialog', { name: 'Run third-slice after' })).toBeVisible();
+    await waitFor(() => expect(within(document.body).getByRole('dialog', { name: 'Run third-slice after' })).toBeVisible());
   },
 };
 

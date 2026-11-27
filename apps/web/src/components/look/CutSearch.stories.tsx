@@ -61,8 +61,8 @@ export const WithChips: Story = {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Take off “reads”' }));
     await expect(args.onRemove).toHaveBeenCalledWith('q');
     await userEvent.click(within(canvasElement).getByRole('combobox', { name: 'Search the cards' }));
+    await expect(within(canvasElement).getByRole('button', { name: 'Take off area: board' })).toBeVisible();
     await userEvent.keyboard('{Backspace}');
     await expect(args.onRemove).toHaveBeenCalledWith('area=board');
-    await userEvent.keyboard('{Escape}');
   },
 };

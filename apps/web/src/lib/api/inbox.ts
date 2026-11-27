@@ -154,9 +154,10 @@ const inPlaySelected = async (selector: string | undefined) => {
 const INBOX_FRESH_MS = 10_000;
 
 /**
- * A factory's cards still in play, as the api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each
- * not yet started, and each whose run is pending, running or waiting — a card whose run ended is left out (`inboxPageQuery` lists it) —
- * each with its place in the queue of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
+ * A factory's cards still in play and how many cards each phase holds (the list's counts, which the pane's Inbox line reads), as the
+ * api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each not yet started, and each whose run
+ * is pending, running or waiting — a card whose run ended is left out (`inboxPageQuery` lists it) — each with its place in the queue
+ * of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
  * person files, drops or starts a card, here or at the command line. Read again on each visit once `INBOX_FRESH_MS` has passed since the
  * last read, and on a run's event on the workflow feed, which a queued card started is, and a run ending too. One key for every reader
  * of a factory's page (the factory pane's line, the floor's queue), so the page asks it once: the route's loader starts it, never
@@ -166,7 +167,10 @@ const INBOX_FRESH_MS = 10_000;
 export const factoryInboxQuery = (factory: string) =>
   queryOptions({
     queryKey: ['inbox', { factory }],
-    queryFn: async () => entriesOf(await cards.list(namespaceOf(factory), { fieldSelector: IN_PLAY })),
+    queryFn: async () => {
+      const list = await cards.list(namespaceOf(factory), { fieldSelector: IN_PLAY });
+      return { entries: entriesOf(list), counts: list.metadata.counts };
+    },
     staleTime: INBOX_FRESH_MS,
   });
 
@@ -245,18 +249,6 @@ export const chainsQuery = (factory?: string) =>
       const query = { fieldSelector: CHAINED_IN_PLAY };
       return entriesOf(await (factory === undefined ? cards.listAll(query) : cards.list(namespaceOf(factory), query)));
     },
-  });
-
-/**
- * How many cards each phase holds in `factory` (every factory's for none): a page of one card, whose counts are the answer. The rail's
- * Inbox badge and a factory's line read the `notStarted` of it.
- * @param factory The factory counted, by its name; undefined for every factory's.
- */
-export const cardCountQuery = (factory?: string) =>
-  queryOptions({
-    queryKey: ['inbox', { counts: true, factory }],
-    queryFn: async () => (await cards.page(factory === undefined ? undefined : namespaceOf(factory), { limit: 1 })).metadata.counts,
-    staleTime: INBOX_FRESH_MS,
   });
 
 /**

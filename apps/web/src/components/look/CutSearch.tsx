@@ -104,7 +104,7 @@ export function CutSearch({
             aria-label={label}
             allowsCustomValue
             allowsEmptyCollection
-            menuTrigger="focus"
+            menuTrigger="input"
             inputValue={text}
             onInputChange={onText}
             selectedKey={null}

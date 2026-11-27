@@ -22,7 +22,10 @@ const drawn = (
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(FACTORY)]],
-      [factoryInboxQuery(args.factory.name).queryKey, cards],
+      [
+        factoryInboxQuery(args.factory.name).queryKey,
+        { entries: cards, counts: { notStarted: cards.length, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 } },
+      ],
       [undecidedRunsQuery(args.factory.name).queryKey, []],
       ...read.map((four) => [runObjectQuery(TARGET_RUNS[four].metadata.name).queryKey, TARGET_RUNS[four]] as const),
     ])}

@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor, within } from 'storybook/test';
 import { DEFAULT_NAMESPACE, type Proposal } from 'objects';
 import { factoriesQuery, factoryPlacesQuery } from '@/lib/api/factories';
-import { cardCountQuery } from '@/lib/api/inbox';
+import { factoryInboxQuery } from '@/lib/api/inbox';
 import { type ProposalRow, waitingProposalsQuery } from '@/lib/api/proposals';
 import { frameRunsQuery } from '../nav/nav';
 import { FactoryPane } from './FactoryPane';
@@ -41,7 +41,10 @@ const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0]
           { name: FACTORY, default: false },
         ],
       ],
-      [cardCountQuery(factory).queryKey, { notStarted: reads.cards, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 }],
+      [
+        factoryInboxQuery(factory).queryKey,
+        { entries: [], counts: { notStarted: reads.cards, blocked: 0, waiting: 0, working: 0, done: 0, failed: 0, cancelled: 0 } },
+      ],
       [frameRunsQuery(path).queryKey, openRuns(reads.runs)],
       [waitingProposalsQuery(factory).queryKey, reads.waiting.map(rowOf)],
     ])}

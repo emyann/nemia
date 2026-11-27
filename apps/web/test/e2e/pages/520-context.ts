@@ -213,7 +213,8 @@ async function onTheCard(page: Page, what: string) {
   await shoot(page, sheet, `card-${what}`);
   await Promise.all([answered(page, 'PUT', pathname), row.click()]);
   await expectCount(sheet.locator('section[data-concluded]'), 0, 'taken back off, the card reads no run again');
-  await page.keyboard.press('Escape');
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expectCount(page.getByRole('dialog'), 0, 'its Close button closes the sheet, and no overlay is left over the page');
 }
 
 /**

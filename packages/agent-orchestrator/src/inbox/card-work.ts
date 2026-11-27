@@ -2,30 +2,30 @@
  * The runs a card's work went through (`cardWork`, proved by contracts/card-work.contract.ts): the runs started from the card, then each
  * run a workflow node of one of them started, carrying no card of its own, in the order they were made. Pure.
  */
-import type { CardWorkOf, WorkRun } from '../../contracts/card-work.contract.ts';
+import type { ReachOf, WorkRun } from '../../contracts/card-work.contract.ts';
 
 /**
- * Whether `run` belongs to the work of `card`: started from it, or, carrying no card of its own, started by a run that does. Walks up at
- * most `runs.length` runs, so a loop of `startedBy` a hand-edited record makes ends, read as belonging to no card.
+ * One step of the work of `card` (proved by contracts/card-work.contract.ts): the runs of `runs` started from it, and those, carrying no
+ * card of their own, started by a run of `found`, in the order `runs` lists them.
+ * @param card The card's name.
+ * @param runs Every run the store lists, in the order they were made.
+ * @param found The ids of the runs the work is already known to have.
+ * @public
  */
-const belongs = (run: WorkRun, runs: readonly WorkRun[], card: string) => {
-  let at: WorkRun | undefined = run;
-  for (let i = 0; i <= runs.length && at !== undefined; i++) {
-    if (at.card === card) return true;
-    if (at.card !== null || at.startedBy === null) return false;
-    const parent: string = at.startedBy;
-    at = runs.find((r) => r.id === parent);
-  }
-  return false;
-};
+export const reach: ReachOf = (card, runs, found) =>
+  runs.filter((r) => r.card === card || (r.card === null && r.startedBy !== null && found.includes(r.startedBy))).map((r) => r.id);
 
 /**
  * The ids of the runs of `runs` that belong to the work of `card`, in the order `runs` lists them, which is the order they were made
- * (`byCreated`).
+ * (`byCreated`): the runs started from it, then, up to eight runs deep, those a run already found started, carrying no card of their
+ * own. A loop of `startedBy` a hand-edited record makes, reaching no run started from the card, belongs to no card.
  * @param card The card's name.
  * @param runs Every run the store lists, as the walk reads them.
  */
-export const cardWork: CardWorkOf = (card, runs) => runs.filter((r) => belongs(r, runs, card)).map((r) => r.id);
+export const cardWork = (card: string, runs: readonly WorkRun[]) => {
+  const next = (found: readonly string[]) => reach(card, runs, found);
+  return next(next(next(next(next(next(next(next([]))))))));
+};
 
 /**
  * The runs in the order they were made, those made at the same instant by id: what `cardWork` is asked over. Not proved: it sorts by a

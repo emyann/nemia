@@ -1,5 +1,5 @@
 /**
- * The runs a card's work went through (agent-orchestrator, src/inbox/card-work.ts, `cardWork`): the run started from the card, then
+ * One step of the runs a card's work went through (agent-orchestrator, src/inbox/card-work.ts, `reach`, which `cardWork` repeats): the run started from the card, then
  * each run a workflow node of one of them started (`startedBy`), and so on, in the order they were started. What a card's state, its
  * served `runs`, its waiters' release and `nemia inbox resend` read, worked out on every read and stored nowhere. Pure.
  */
@@ -16,62 +16,36 @@ export type WorkRun = {
   readonly created: number;
 };
 
-/**
- * Whether `run` belongs to the work of `card`: started from it, or started, carrying no card of its own, by a run that belongs to it.
- * Walks up at most `runs.length` runs, so a loop of `startedBy` a hand-edited record makes ends, read as belonging to no card.
- */
-const belongs = (run: WorkRun, runs: readonly WorkRun[], card: string) => {
-  let at: WorkRun | undefined = run;
-  for (let i = 0; i <= runs.length && at !== undefined; i++) {
-    if (at.card === card) return true;
-    if (at.card !== null || at.startedBy === null) return false;
-    const parent: string = at.startedBy;
-    at = runs.find((r) => r.id === parent);
-  }
-  return false;
-};
-
-const cardWorkSpec = spec<(card: string, runs: readonly WorkRun[]) => readonly string[]>({
-  requires: ({ input: [, runs] }) =>
-    runs.every((r, i) => !runs.slice(0, i).some((o) => o.id === r.id) && (i === 0 || (runs[i - 1]?.created ?? 0) <= r.created)),
+const reachSpec = spec<(card: string, runs: readonly WorkRun[], found: readonly string[]) => readonly string[]>({
+  requires: ({ input: [, runs] }) => runs.every((r, i) => !runs.slice(0, i).some((o) => o.id === r.id)),
   ensures: {
     eachIsARun: {
-      description: 'Every run of the work is a run the store lists',
+      description: 'Every run reached is a run the store lists',
       condition: ({ input: [, runs], output }) => output.every((id) => runs.some((r) => r.id === id)),
     },
     startedFromTheCard: {
-      description: 'Every run started from the card is part of its work',
+      description: 'Every run started from the card is reached',
       condition: ({ input: [card, runs], output }) => runs.every((r) => r.card !== card || output.includes(r.id)),
     },
     childrenFollow: {
-      description: 'A run a node of the work started, carrying no card of its own, is part of the work',
-      condition: ({ input: [, runs], output }) =>
-        runs.every((r) => r.card !== null || r.startedBy === null || !output.includes(r.startedBy) || output.includes(r.id)),
+      description: 'A run started by a run already found, carrying no card of its own, is reached',
+      condition: ({ input: [, runs, found], output }) =>
+        runs.every((r) => r.card !== null || r.startedBy === null || !found.includes(r.startedBy) || output.includes(r.id)),
     },
     onlyItsOwn: {
-      description: "No run is part of a card's work that was not started from it or, through nodes, by a run started from it",
-      condition: ({ input: [card, runs], output }) =>
+      description: 'No run is reached that was not started from the card or, carrying no card, by a run already found',
+      condition: ({ input: [card, runs, found], output }) =>
         output.every((id) => {
           const run = runs.find((r) => r.id === id);
-          return run !== undefined && belongs(run, runs, card);
+          return run !== undefined && (run.card === card || (run.card === null && run.startedBy !== null && found.includes(run.startedBy)));
         }),
     },
     eachOnce: {
       description: 'Each run is listed once',
       condition: ({ output }) => output.every((id, i) => !output.slice(0, i).includes(id)),
     },
-    inStartOrder: {
-      description: 'The runs are listed in the order they were made, those made at the same instant in the order the store lists them',
-      condition: ({ input: [, runs], output }) =>
-        output.every((id, i) => {
-          const next = output[i + 1];
-          const a = runs.find((r) => r.id === id);
-          const b = next === undefined ? undefined : runs.find((r) => r.id === next);
-          return a === undefined || b === undefined || a.created <= b.created;
-        }),
-    },
   },
 });
 
-/** `cardWork`'s type, which `src/inbox/card-work.ts` takes: the ids of the runs the work of `card` went through, in start order. */
-export type CardWorkOf = Implementation<typeof cardWorkSpec>;
+/** `reach`'s type, which `src/inbox/card-work.ts` takes: the runs one more step of the card's work reaches, given those already found. */
+export type ReachOf = Implementation<typeof reachSpec>;

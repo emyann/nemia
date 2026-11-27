@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { EngineIo, HarnessSpec, Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
+import { detachedOps } from '../src/harness/detached/detached.ts';
+import type { RunnerOps } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner, type AsyncSighting } from './promise-runner.ts';
@@ -453,4 +455,58 @@ test("REFUSED: io() inside `tallied` counts the program's own work alone: a feed
     { bytesRead: own.bytesRead + beside.bytesRead, reads: own.reads + beside.reads, observes: own.observes + beside.observes },
     "the process's totals are the program's and the reads beside it, each counted once",
   );
+});
+
+/**
+ * An engine whose one harness reads its run files as the detached runner does, from a folder planted with `finished` sessions' run
+ * files, its own spawn planting the run file of a session that works; `say`, `interrupt` and `answer` reach it and are counted.
+ * @param finished How many finished sessions' run files the harness folder holds beside the one in flight.
+ */
+const plantedHarness = async (finished: number) => {
+  const dir = scratch('ae-io-planted-');
+  const spec: HarnessSpec = { name: 'planted', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+  const runs = path.join(dir, 'runs', spec.name);
+  fs.mkdirSync(runs, { recursive: true });
+  const plant = (name: string, run: object) =>
+    fs.writeFileSync(
+      path.join(runs, `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`),
+      JSON.stringify({ name, pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString(), ...run }),
+    );
+  for (let i = 0; i < finished; i++) plant(`ae/old-${i}/1`, { state: 'done', exitCode: 0 });
+  const reached: string[] = [];
+  const detached = detachedOps(spec, dir);
+  const harness: RunnerOps = {
+    ...detached,
+    spawn: (r) => Effect.sync(() => plant(r.name, { state: 'working' })),
+    say: (session) => Effect.sync(() => void reached.push(`say ${session.name}`)),
+    interrupt: (session) => Effect.sync(() => void reached.push(`interrupt ${session.name}`)),
+    answer: (session) => Effect.sync(() => void reached.push(`answer ${session.name}`)),
+  };
+  const engine = builtEngine(Engine.layer({ root: scratch('ae-io-root-'), harnesses: { planted: harness }, defaultHarness: 'planted' }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: dir }));
+  await Effect.runPromise(engine.tick());
+  return { engine, id, reached };
+};
+
+describe('a verb written to a session reads that session alone, however many sessions its harness has run: `observeFor` with its one name', () => {
+  type Verb = (e: ReturnType<typeof builtEngine>, id: string) => Effect.Effect<unknown, unknown>;
+  const verbs: readonly (readonly [string, Verb])[] = [
+    ['say', (e, id) => e.say(id, 'look again')],
+    ['interrupt', (e, id) => e.interrupt(id)],
+    ['answerAsk', (e, id) => e.answerAsk(id, { id: 'ask-1', answers: {} })],
+  ];
+  const readsOf = async (finished: number, verb: Verb) => {
+    const { engine, id, reached } = await plantedHarness(finished);
+    const before = Effect.runSync(engine.io()).reads;
+    await Effect.runPromise(Effect.exit(verb(engine, id)));
+    return { reads: Effect.runSync(engine.io()).reads - before, reached };
+  };
+  for (const [name, verb] of verbs)
+    test(`${name}: the reads of one call over 300 finished sessions are those over none`, async () => {
+      const none = await readsOf(0, verb);
+      const many = await readsOf(300, verb);
+      assert.ok(none.reads > 0, `the call read its session: ${none.reads}`);
+      assert.equal(many.reads, none.reads, `over 300 finished sessions it read ${many.reads}, over none ${none.reads}`);
+      if (name === 'say') assert.equal(many.reached.length, 1, `the words reached the session: ${many.reached.join(', ')}`);
+    });
 });

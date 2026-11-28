@@ -135,7 +135,7 @@ const inTree = (dir: string, tree: string | undefined) =>
 
 /**
  * Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them, and for the repository's where there
- * is no repository.
+ * is no repository. Nemia's builtin skills and the skill of its builtin place (`isBuiltinPlace`, the git place's) are both `builtin`.
  * @param dir The skill's folder.
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder, whose library is one of the places.
@@ -143,23 +143,24 @@ const inTree = (dir: string, tree: string | undefined) =>
 export function sourceOf(dir: string, repo: string | undefined, home: string) {
   const parent = path.dirname(path.resolve(dir));
   if (parent === librarySkills(home)) return 'user';
-  if (parent === BUILTIN_SKILLS) return 'builtin';
+  if (parent === BUILTIN_SKILLS || isBuiltinPlace(dir)) return 'builtin';
   if (repo === undefined) return null;
   if (parent === repoSkillsDir(repo) || parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)) return 'repo';
   return null;
 }
 
 /**
- * Where a skill with no page of the board's was found, as its folder's path from the repository's root, `/` between its parts: a skill
- * named with its folder, read from that folder's own skills, or any other found beneath `repo` in a place the board lists nothing for.
- * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, for a folder outside it, and where there is
- * no repository.
+ * Where the repository has a skill, as its folder's path from the repository's root, `/` between its parts: one of its own places
+ * for skills, a skill named with its folder, read from that folder's own skills, or any other found beneath `repo`.
+ * Null for a skill of your library or of Nemia's (`sourceOf`), for the repository's own folder, for a folder outside it, and where there
+ * is no repository.
  * @param dir The skill's folder.
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder.
  */
 export function foundInOf(dir: string, repo: string | undefined, home: string) {
-  if (repo === undefined || sourceOf(dir, repo, home) !== null) return null;
+  const source = sourceOf(dir, repo, home);
+  if (repo === undefined || source === 'user' || source === 'builtin') return null;
   const parts = path.relative(path.resolve(repo), path.resolve(dir)).split(path.sep);
   return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
 }
@@ -260,7 +261,7 @@ export async function listSkills(
   const places: SkillPlace[] = inRepo === undefined ? [yours] : [yours, inRepo];
   const placed = (from: 'user' | 'repo') => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
   const sorted = [...found.all]
-    .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
+    .filter(([, at]) => typeof at !== 'string' || sourceOf(at, repo, home) !== 'builtin')
     .sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError
@@ -298,8 +299,8 @@ export async function listSkills(
 
 /**
  * A skill an agent gives, as its page lists it, named as its line writes it: where it is found, and what it costs a turn — or why none
- * is found. `from` is the place whose page it has; where it is null, `foundIn` is where the repository has it (`foundInOf`), or null too
- * for a skill found nowhere or outside the repository.
+ * is found. `from` is the place whose page it has, or null; `foundIn` is the folder the repository has it in (`foundInOf`), or null for a
+ * skill found nowhere, outside the repository, in your library or Nemia's, or in the factory's tree.
  */
 export type GivenSkill = {
   name: string;
@@ -313,9 +314,9 @@ export type GivenSkill = {
 
 /**
  * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, as the package's `agentSkillsFound`
- * finds them). A skill no place has is a row with the refusal the card says; one found in the repository where the board pages nothing,
- * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`. One found in the `skills/` of the factory's tree
- * `tree`, where an agent of that tree finds it first, is the factory's.
+ * finds them). A skill no place has is a row with the refusal the card says; one found in the repository says its folder in `foundIn`,
+ * and where the board pages nothing there, as a skill named with its folder is, reads `from: null`. One found in the `skills/` of the
+ * factory's tree `tree`, where an agent of that tree finds it first, is the factory's.
  * @param skills The skills the agent gives, in its order.
  * @param found Where a start finds each.
  * @param repo The repository's folder, or undefined where there is none.

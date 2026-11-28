@@ -1,7 +1,7 @@
 /**
- * The factory agent page's reads for its stories (`Pages/Agent, a factory's`): Reviewer, the reviewer of the factory `acme`, read only,
+ * The factory agent page's reads for its stories (`Pages/Factory agent`): Reviewer, the code reviewer of the factory `acme`, read only,
  * hired into the review step of two workflows, with its key form, models, steps, skills and marks, and the runs not finished that
- * hold none, one or four of its sessions at work. Each is typed by the board's own reads of `objects`.
+ * hold none, one or four of its sessions at work, as its board (B5) draws it. Each is typed by the board's own reads of `objects`.
  */
 import type { HarnessModels, WorkflowStepPage } from 'objects';
 import type { AgentListing } from '../../src/lib/api/agents';
@@ -14,47 +14,22 @@ import { atWorkSince, givenAgent, listed, summary } from '../../test/run.fixture
 export const FACTORY = 'acme';
 
 /** The agent's name. */
-export const REVIEWER = 'reviewer';
+export const AGENT = 'reviewer';
 
-/** Instructions as a file hard-wraps them: a paragraph's lines break where the file's do. */
-const BODY = `## Your role
+/** Its instructions, as its file writes them. */
+const BODY = "You are Reviewer, a code reviewer. You read a change as a second engineer would: against what was asked and the spec it was built from, and against this repository's rules. You read and run; you never write into the workspace.\n\nTo count or search, ask one question per call: the Grep tool (its `count` or `files_with_matches` mode, a `path` and a `glob`), or `git grep -c`, `-l` or `-n` over the folders you name. A `git grep` line holding a capital `O` anywhere is refused, since the fence cannot tell git's pager option `-O` from a pattern, so search such a word (`AUTO_PROPOSE`) with the Grep tool, or with `git grep -i` and the word in lower case. Your fence refuses plain `grep`, `cd`, a shell loop, a function, an assignment (`P=…`) and a pipe into anything outside your read-only set. A path with a `$` in its name (a route file such as `runs.$runId.tsx`) is refused to `git diff` and `git grep` however it is quoted, since `$` reads as a variable: the `git` skill, *Read what changed*, says the spelling that passes. Where the run's change is judged on GitHub, you read its pull request through the GitHub server, `mcp__github__pull_request_read` with `get`, `get_status` and `get_check_runs`, by the number its address ends on, and you hold no `gh` of your own. A subagent you start reads none of this and inherits your fence, so put these lines in its prompt.\n\nLoad your skill `review-a-change` with the Skill tool and follow it. Sign off `done` with your findings, and with `again` true only when a finding is worth another round of work; false when the change is done as far as a review can tell. A finding you raised in an earlier round, which the engineer answered, and which you would raise again, is no other round: sign off `blocked`, as your skill's last step says. What happens once you pass is the workflow's, never yours to name: a person approves the landing, or — where the workflow puts your pass before an ungated ending — the run files it. Where nobody reads the change after you, your step says so.\n\nWhere a claim of the spec or of the change rests on a page outside the repository, check it against the passage the steps before you handed for it, not against what you remember of the page. A passage that contradicts the claim, or says less than the change takes from it, is a finding. A claim you cannot check — no passage handed, and your fence refuses the page — goes at the top of your sign-off: the summary says how many, and the body opens with each, its page and what the change takes from it. Where nobody reads the change after you, your step says what to do instead.\n\nAnthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read both and cite them, never an interface from memory.";
 
-You read a change against its plan, and you pass it or ask for another
-round. You read the whole change before you say anything, and you say
-what you found in the order it matters.
-
-## What you refuse
-
-- A test that was weakened to make the suite pass.
-- A change that leaves dead code behind it.
-- A name the rest of the code does not use.
-
-## How you answer
-
-Say each finding once, where it is and what to do about it. A finding
-you cannot name a fix for is a question, and you ask it as one.
-
-## What you read
-
-Start from the plan, then the diff, then the tests the diff touched.
-Read a file whole before you judge a line of it, and read the
-documentation of a tool before you judge how it is called.
-
-## When you are unsure
-
-Say so, and say what would settle it. A review that hides its doubt
-sends the doubt to the person who lands the change.
-
-## Your last word
-
-Pass the change only when you would land it yourself.
-`;
-
-/** One skill of the factory's own tree, as the picker lists it. */
-const skill = (name: string, description: string, from: SkillPlace['from'] = 'factory') => ({
+/**
+ * One skill of the factory's list, as the picker lists it, in its place.
+ * @param name The skill's name.
+ * @param description What it is for.
+ * @param from Its place.
+ * @param dir Its folder.
+ */
+const skill = (name: string, description: string, from: SkillPlace['from'], dir: string) => ({
   name,
   from,
-  dir: `/factories/acme/skills/${name}`,
+  dir,
   entry: { id: name, name, description, tags: [] },
   error: null,
   preload: false,
@@ -63,51 +38,103 @@ const skill = (name: string, description: string, from: SkillPlace['from'] = 'fa
   found: null,
 });
 
+/** The repository's own skills its review step adds, each with what it is for. */
+const ROOT_SKILLS = [
+  [
+    'shadcn',
+    'Add, search, fix and compose shadcn components.'
+  ],
+  [
+    'look',
+    'Look at the web app as a person would, in light and dark, and name what is off.'
+  ],
+  [
+    'react-aria',
+    'Accessible parts with React Aria Components.'
+  ],
+  [
+    'see-a-dashboard',
+    'Render a Grafana dashboard with fake data before it lands, and read it.'
+  ],
+  [
+    'tsverify',
+    'Prove TypeScript functions: a spec’s laws first, then the verifier’s verdicts.'
+  ]
+] as const;
+
+/** The folder of skills of the repository's root, and the one of the app whose skills are named with its folder. */
+export const ROOT_FOLDER = '.claude/skills';
+export const APP_FOLDER = 'apps/web/.claude/skills';
+
+/** The board's skills, named with their folder, its review step adds, each with what it is for; the factory lists none of them. */
+const NESTED_SKILLS = [
+  ['ds-build', 'Build or review any UI of the design system: its role utilities, type primitives and state layers.'],
+  ['ds-theme', 'Change the look of the design system: a colour, a font, corners, motion or dark mode.'],
+  ['ds-spec', 'Read what Material Design 3 says about a size, a state or a colour role.'],
+] as const;
+const NESTED = NESTED_SKILLS.map(([name]) => name);
+
+/** What review-a-change is for. */
+const REVIEW_A_CHANGE = 'Review a change as a second engineer would: against its intent and spec, with findings that name the file and the line.';
+
 /** The skills of the factory, by place: each says what it is for. */
 export const skillPlaces: SkillPlace[] = [
   {
     from: 'factory',
-    dir: '/factories/acme/skills',
-    skills: [
-      skill('code-review', 'Reads a change along its standards and its spec.'),
-      skill('look', 'Looks at a page as a person would, in both themes.'),
-      skill('tsverify', 'Proves a function by the laws of its contract.'),
-    ],
+    dir: '/factories/acme/tree/workflows/skills',
+    skills: [skill('review-a-change', REVIEW_A_CHANGE, 'factory', '/factories/acme/tree/workflows/skills/review-a-change')],
+  },
+  {
+    from: 'repo',
+    dir: '/src/acme/.claude/skills',
+    skills: ROOT_SKILLS.map(([name, description]) => skill(name, description, 'repo', `/src/acme/.claude/skills/${name}`)),
   },
 ];
 
-/** Reviewer, the factory's reviewer: read only, hired into the review step of two workflows. */
+/** A count of rules, each its own line of the file. */
+const rules = (count: number, verb: string) => Array.from({ length: count }, (_, i) => `Bash(${verb} ${i} *)`).join(', ');
+
+/** Reviewer, the factory's code reviewer: read only, hired into the review step of two workflows. */
 export const reviewer: AgentListing & { factories: string[] } = {
-  name: REVIEWER,
+  name: AGENT,
   from: 'factory',
-  dir: '/factories/acme/workflows/agents',
-  file: '/factories/acme/workflows/agents/reviewer.md',
+  dir: '/factories/acme/tree/workflows/agents',
+  file: '/factories/acme/tree/workflows/agents/reviewer.md',
   role: 'Code reviewer',
-  description: 'Use this when a change has been built and needs reading before it lands.',
+  description: 'Reviews a change as a second engineer would, against its intent and spec, and sends it back for another round while a finding is worth it.',
   keys: {
     harness: 'claude',
     model: 'claude-opus-5-5',
     effort: 'high',
     permissionMode: 'dontAsk',
-    context: '200k',
-    tools: 'Read, Grep, Glob, Bash',
-    allowedTools: 'Bash(git diff *), Bash(git log *)',
-    disallowedTools: 'Bash(git push *)',
+    context: '400k',
+    tools: 'Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch',
+    allowedTools: rules(154, 'git log'),
+    disallowedTools: rules(33, 'git push'),
     output: 'reviewer.schema.json',
   },
   body: BODY,
   schema: null,
   card: null,
   cardError: null,
-  skills: 'code-review',
+  skills: 'review-a-change, git',
   harnessPrompt: null,
-  mcp: 'playwright',
+  mcp: null,
   given: [
     {
-      name: 'code-review',
+      name: 'review-a-change',
       from: 'factory',
-      foundIn: '/factories/acme/skills/code-review',
-      entry: { id: 'code-review', name: 'code-review', description: 'Reads a change along its standards and its spec.', tags: [] },
+      foundIn: null,
+      entry: { id: 'review-a-change', name: 'review-a-change', description: REVIEW_A_CHANGE, tags: [] },
+      error: null,
+      preload: false,
+      cost: null,
+    },
+    {
+      name: 'git',
+      from: 'builtin',
+      foundIn: null,
+      entry: { id: 'git', name: 'git', description: 'The git place: each step works in a worktree on a branch of its own. How to keep work in it and read what changed.', tags: [] },
       error: null,
       preload: false,
       cost: null,
@@ -117,8 +144,8 @@ export const reviewer: AgentListing & { factories: string[] } = {
   version: 'reviewer-1',
   usedBy: [],
   fills: [
-    { from: 'factory', workflow: 'build', step: 'review', hired: false },
-    { from: 'factory', workflow: 'quick', step: 'review', hired: false },
+    { from: 'factory', workflow: 'build', step: 'review', hired: true },
+    { from: 'factory', workflow: 'quick', step: 'review', hired: true },
   ],
   error: null,
   untried: null,
@@ -130,7 +157,7 @@ export const keyForm: KeyForm = {
   keys: [
     { key: 'harness', meaning: 'Which harness runs the session.', kind: 'choice', choices: ['claude', 'codex'], byHarness: null },
     { key: 'model', meaning: 'Which model answers.', kind: 'text', choices: null, byHarness: null },
-    { key: 'effort', meaning: 'How hard the model thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'medium', 'high', 'xhigh'] } },
+    { key: 'effort', meaning: 'How hard the model thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'medium', 'high', 'xhigh', 'max'] } },
     { key: 'permissionMode', meaning: 'How the session asks before it acts.', kind: 'harness-word', choices: null, byHarness: null },
     { key: 'context', meaning: 'How many tokens it may hold.', kind: 'tokens', choices: null, byHarness: null },
   ],
@@ -141,13 +168,13 @@ export const keyForm: KeyForm = {
   remote: { prefix: 'a2a:', refuses: [] },
 };
 
-/** The models the claude harness lists. */
+/** The models the claude harness lists, by the names Claude Code gives them, which say no version. */
 export const models: HarnessModels = {
   harnesses: [
     {
       harness: 'claude',
       at: '2026-11-27T10:00:00.000Z',
-      models: [{ id: 'claude-opus-5-5', aliases: ['opus'], name: 'Opus 5.5', keepsAuto: true, efforts: ['low', 'medium', 'high', 'xhigh'] }],
+      models: [{ id: 'claude-opus-5-5', aliases: ['opus'], name: 'Opus', keepsAuto: true, efforts: ['low', 'medium', 'high', 'xhigh', 'max'] }],
     },
   ],
 };
@@ -159,12 +186,12 @@ export const models: HarnessModels = {
 export const reviewStep = (workflow: 'build' | 'quick') => ({
   workflow,
   from: 'repo',
-  dir: `/factories/acme/workflows/${workflow}`,
+  dir: `/factories/acme/tree/workflows/${workflow}`,
   step: 'review',
-  body: 'Read the change against its plan, and pass it or ask for another round.',
-  source: '---\nagent: reviewer\n---\nRead the change against its plan.\n',
+  body: 'Read the change against what was asked, and pass it or ask for another round.',
+  source: '---\nmcp: playwright\n---\nRead the change against what was asked.\n',
   keys: [
-    { key: 'agent', value: 'reviewer', meaning: 'what is attached to this node to do its work' },
+    { key: 'agent', value: AGENT, meaning: 'what is attached to this node to do its work' },
     { key: 'mcp', value: 'playwright', meaning: 'the MCP servers its sessions load' },
   ],
   agentSkills: null,
@@ -174,9 +201,9 @@ export const reviewStep = (workflow: 'build' | 'quick') => ({
     instructions: null,
     custom: null,
     factory: null,
-    agentSkills: ['code-review'],
-    policy: 'Read the change against its plan.',
-    addedSkills: ['look', 'tsverify'],
+    agentSkills: ['review-a-change', 'git'],
+    policy: 'Read the change against what was asked.',
+    addedSkills: [...ROOT_SKILLS.map(([name]) => name), ...NESTED.map((name) => `apps/web:${name}`)],
     fence: [],
     folderFiles: false,
     task: null,
@@ -186,18 +213,47 @@ export const reviewStep = (workflow: 'build' | 'quick') => ({
   hiredIn: [],
   hiring: { refused: null, agents: [] },
   skillsFrom: [
-    { name: 'look', from: 'repo', foundIn: '/factories/acme/skills/look' },
-    { name: 'tsverify', from: 'builtin', foundIn: null },
+    { name: 'review-a-change', from: null, foundIn: null, description: null },
+    { name: 'git', from: 'builtin', foundIn: null, description: null },
+    ...ROOT_SKILLS.map(([name, description]) => ({ name, from: 'repo' as const, foundIn: `${ROOT_FOLDER}/${name}`, description })),
+    ...NESTED_SKILLS.map(([name, description]) => ({
+      name: `apps/web:${name}`,
+      from: null,
+      foundIn: `${APP_FOLDER}/${name}`,
+      description,
+    })),
   ],
   recentRuns: [],
 }) satisfies WorkflowStepPage;
 
-/** The change marks of the stats: the file, a step and a skill edited, one of them marked twice on a day. */
+/** The change marks of the stats: its file, its step and its skills edited over a fortnight, 25 sentences, one mark twice on a day. */
 export const marks = [
   { day: '2026-11-27', kind: 'step', name: 'review' },
   { day: '2026-11-27', kind: 'step', name: 'review' },
   { day: '2026-11-27', kind: 'skill', name: 'git' },
-  { day: '2026-11-26', kind: 'agent', name: REVIEWER },
+  { day: '2026-11-26', kind: 'skill', name: 'git' },
+  { day: '2026-11-26', kind: 'skill', name: 'review-a-change' },
+  { day: '2026-11-26', kind: 'step', name: 'review' },
+  { day: '2026-11-26', kind: 'agent', name: AGENT },
+  { day: '2026-11-25', kind: 'skill', name: 'git' },
+  { day: '2026-11-22', kind: 'step', name: 'review' },
+  { day: '2026-11-22', kind: 'skill', name: 'git' },
+  { day: '2026-11-21', kind: 'skill', name: 'git' },
+  { day: '2026-11-21', kind: 'step', name: 'review' },
+  { day: '2026-11-20', kind: 'skill', name: 'git' },
+  { day: '2026-11-20', kind: 'step', name: 'review' },
+  { day: '2026-11-19', kind: 'step', name: 'review' },
+  { day: '2026-11-19', kind: 'skill', name: 'git' },
+  { day: '2026-11-19', kind: 'skill', name: 'review-a-change' },
+  { day: '2026-11-18', kind: 'skill', name: 'git' },
+  { day: '2026-11-18', kind: 'step', name: 'review' },
+  { day: '2026-11-17', kind: 'step', name: 'review' },
+  { day: '2026-11-16', kind: 'step', name: 'review' },
+  { day: '2026-11-14', kind: 'step', name: 'review' },
+  { day: '2026-11-13', kind: 'agent', name: AGENT },
+  { day: '2026-11-13', kind: 'skill', name: 'review-a-change' },
+  { day: '2026-11-13', kind: 'step', name: 'review' },
+  { day: '2026-11-12', kind: 'skill', name: 'git' },
 ] as const;
 
 /** An instant `minutes` ago, half a minute over, so the page's whole minutes say `minutes` until the story has run for thirty seconds. */
@@ -219,7 +275,7 @@ const atWork = (id: string, title: string, minutes: number, workflow: 'build' | 
     steps: [
       {
         ...review,
-        spec: givenAgent(REVIEWER),
+        spec: givenAgent(AGENT),
         timeline: atWorkSince(ago(minutes)),
         current: { try: 1, round, phase: 'running', reason: 'Running', outcome: null, verdict: null },
       },
@@ -238,14 +294,14 @@ export const open = (runs: OpenRuns['inFlight']) =>
 export const idle = open([]);
 
 /** One session of Reviewer at work, on the review of a card. */
-export const one = open([atWork('r-7k2m-quick', 'board: The approve modal uses the step’s card', 2, 'quick')]);
+export const one = open([atWork('board-two-tests-that-fail-ma-1xu6', 'board: Two tests that fail main’s ci by chance hold steady', 2, 'quick')]);
 
-/** Four sessions at work, the second of its third review round, in no order of their minutes. */
+/** Four sessions at work, the second of its second review round, in no order of their minutes. */
 export const four = open([
-  atWork('r-1a2b-9c3d', 'runtime: Sessions park on pause', 6),
-  atWork('r-4e5f-p7q8', 'board: A card shows its cost', 14, 'build', 2),
-  atWork('r-9g0h-w1x2', 'docs: The glossary says retired words', 3, 'quick'),
-  atWork('r-3i4j-y5z6', 'api: Stats answer by factory', 31),
+  atWork('board-two-tests-that-fail-ma-1xu6', 'board: Two tests that fail main’s ci by chance hold steady', 2, 'quick'),
+  atWork('runtime-a-long-session-keeps-yrfr', 'runtime: A long session keeps its GitHub sign-in', 7, 'build', 2),
+  atWork('board-a-factory-s-agents-pag-izma', 'board: A factory’s Agents page lists the factory’s agents', 5, 'quick'),
+  atWork('run-core-a-card-is-parsed-on-dlkf', 'run-core: A card is parsed once per change, not once per pass', 14),
 ]);
 
 /** The first page of the finished runs, the last of which had a session of Reviewer end 51 minutes ago. */
@@ -260,7 +316,7 @@ export const finished: FinishedPage = {
       const [open] = atWorkSince(at);
       return {
         ...run,
-        steps: [{ ...review, spec: givenAgent(REVIEWER), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] }],
+        steps: [{ ...review, spec: givenAgent(AGENT), timeline: [{ ...open, session: { ...open.session, endedAt: at } }] }],
         wallMs: 0,
         finishedAt: at,
         outcome: 'succeeded' as const,

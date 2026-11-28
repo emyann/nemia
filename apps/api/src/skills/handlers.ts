@@ -21,6 +21,7 @@ import {
   definitionJudged,
   definitionRevisionNow,
   definitionRevisionsNow,
+  isBuiltinPlace,
   SkillDoor,
   type SkillDoorShape,
   skillRemoved,
@@ -111,6 +112,24 @@ async function heldIn(s: Served) {
     ...folded.map((dir) => ({ name: path.basename(dir), origin: 'repo' as const, item: { dir, ...readAt(foldedReads, dir) } })),
     ...places.flatMap((place) => place.skills.map((row) => ({ name: row.name, origin: place.from, item: row }))),
   ] satisfies Held<Row>[] as Held<Row>[];
+}
+
+/**
+ * Every skill the namespace holds (`heldIn`), and the skill of each of Nemia's builtin places an agent of yours finds (`isBuiltinPlace`,
+ * the git place's), held at `builtin`: the page a step's page links to, which the picker never offers to copy.
+ * @param s The request's services, its caller and the place it is answered in.
+ */
+async function pagesHeld(s: Served) {
+  const { found } = await s.inRequest(yourSkillsRead(repoLayer(s), s.home));
+  const inPlace = [...found.all].flatMap(([name, at]) => (typeof at === 'string' && isBuiltinPlace(at) ? [[name, at] as const] : []));
+  const reads = inPlace.length
+    ? await readsOf(
+        s,
+        inPlace.map(([, dir]) => dir),
+      )
+    : {};
+  const places = inPlace.map(([name, dir]) => ({ name, origin: 'builtin' as const, item: { dir, ...readAt(reads, dir) } }));
+  return [...(await heldIn(s)), ...places] satisfies Held<Row>[];
 }
 
 /**
@@ -249,7 +268,7 @@ async function copied(s: Served, name: string) {
 async function skillAt(s: Served, namespace: string, name: string, asked?: Origin) {
   const [one] = await skillObjectsOf(
     s,
-    [servedNamed(addsGated(s.home, namespace, 'skills', await heldIn(s)), name, asked, listPath(namespace))],
+    [servedNamed(addsGated(s.home, namespace, 'skills', await pagesHeld(s)), name, asked, listPath(namespace))],
     namespace,
   );
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
@@ -403,7 +422,7 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
     .handle('files', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, async (s) => ({
         paths: filesUnder(
-          servedNamed(addsGated(s.home, namespace, 'skills', await heldIn(s)), name, originIn(s, query.origin), listPath(namespace)).item
+          servedNamed(addsGated(s.home, namespace, 'skills', await pagesHeld(s)), name, originIn(s, query.origin), listPath(namespace)).item
             .dir,
         ),
       })),

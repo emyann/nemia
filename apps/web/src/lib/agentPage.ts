@@ -3,7 +3,7 @@
  * change marks, the skills and servers it gives by where each comes from, and the page's small counts. Pure.
  */
 import type { HarnessModels } from 'objects';
-import type { AgentListing, AgentRoleKey } from './api/agents.ts';
+import type { AgentListing } from './api/agents.ts';
 import type { KeyForm } from './api/builder.ts';
 import type { RunView } from './api/judged.ts';
 import type { SkillPlace } from './api/skills.ts';
@@ -15,7 +15,7 @@ import { dateParts } from './runWords.ts';
 /** One change the stats marked: the UTC day it was marked on (`YYYY-MM-DD`), what changed and its name. */
 export type Mark = { day: string; kind: 'step' | 'agent' | 'skill'; name: string };
 
-/** One row of the spec plate: its label, its value, a note under the value, and for the effort its pips. */
+/** One row of the spec plate: its label, its value, a note of one short line under the value, and for the effort its pips. */
 export type PlateRow = {
   label: string;
   value: string;
@@ -48,29 +48,46 @@ const levelsOf = (keyForm: KeyForm | undefined, listed: { efforts: readonly stri
 };
 
 /**
- * The spec plate's rows: Harness, Model, Effort, Mode and Context. The model is its display name where the harness lists it, with the
- * exact id as its note; the effort is its word with a pip for each level the model takes, those up to its own filled.
+ * A model's name as the plate says it: the harness's name for it with the version its id ends on (`Opus 5.5` for an id ending
+ * `-opus-5-5`), where the name is one word and says no version; the name alone where it says more; the id where the harness lists none.
+ * @param id The model's id, as the agent's file writes it.
+ * @param name The harness's name for it, where it lists it.
+ */
+export function modelWords(id: string, name: string | undefined) {
+  if (name === undefined) return id;
+  const version = /-(\d+)-(\d+)(?:-\d{8})?$/.exec(id);
+  return version && /^[A-Za-z]+$/.test(name) ? `${name} ${version[1]}.${version[2]}` : name;
+}
+
+/**
+ * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one.
+ * The model is its name with its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its
+ * word with a pip for each level the model takes, those up to its own filled.
  * @param keys The agent's role keys, as its file writes them.
  * @param keyForm The step form's keys, which say what each key means; undefined while they load.
  * @param models The models each harness lists; undefined while they load.
  */
 export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined, models: HarnessModels | undefined) {
-  const meaning = (key: AgentRoleKey) => keyForm?.keys.find((k) => k.key === key)?.meaning ?? null;
   const harness = keys.harness ?? keyForm?.defaultHarness ?? UNSET;
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
   const levels = levelsOf(keyForm, listed, harness);
   const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
   return [
-    { label: 'Harness', value: harness, note: meaning('harness'), pips: null },
-    { label: 'Model', value: listed?.name ?? keys.model ?? UNSET, note: listed ? listed.id : meaning('model'), pips: null },
+    { label: 'Harness', value: harness, note: null, pips: null },
+    {
+      label: 'Model',
+      value: keys.model === undefined ? UNSET : modelWords(keys.model, listed?.name),
+      note: listed?.id ?? keys.model ?? null,
+      pips: null,
+    },
     {
       label: 'Effort',
       value: keys.effort ?? UNSET,
-      note: meaning('effort'),
+      note: 'How hard it thinks per turn',
       pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
-    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: keyForm?.keys.find((k) => MODE.test(k.key))?.meaning ?? null, pips: null },
-    { label: 'Context', value: keys.context ?? UNSET, note: meaning('context'), pips: null },
+    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: null, pips: null },
+    { label: 'Context', value: keys.context ?? UNSET, note: 'Its context window, in tokens', pips: null },
   ] satisfies PlateRow[];
 }
 
@@ -138,42 +155,70 @@ export const editedDayOf = (marks: readonly Mark[]) => {
 export type StepGives = {
   step: string;
   added: readonly string[];
-  skillsFrom: readonly { name: string; from: SkillSource | null; foundIn: string | null }[];
+  skillsFrom: readonly { name: string; from: SkillSource | null; foundIn: string | null; description: string | null }[];
   mcp: readonly string[];
 };
 
 /** One skill as its tile says it: its name, what it is for, and where it comes from. */
-type SkillTile = { name: string; description: string | null; where: string; foundIn: string | null };
+type SkillTile = { name: string; description: string | null; where: string };
 
-/** One group of tiles under its caption. */
-export type TileGroup<T> = { title: string; tiles: T[] };
+/** One group of tiles under its caption, which counts them. */
+type TileGroup<T> = { title: string; tiles: T[] };
 
-/** Where a skill comes from, as a tile says it. */
-const WHERE: Readonly<Record<SkillSource, string>> = {
-  factory: 'From the factory',
+/** Where a skill comes from, as a tile says it, by the place a start finds it in. */
+const WHERE: Readonly<Record<Exclude<SkillSource, 'factory'>, string>> = {
   user: 'From your library',
   repo: 'From the repository',
   builtin: 'Built into Nemia',
 };
 
 /**
+ * Where a skill comes from, as its tile says it: the factory's by its name, the repository's with the folder of skills it is in (`From
+ * the repository, apps/site/skills`), your library, Nemia, or nowhere.
+ * @param from The place a start finds it in; null where none the board pages has it.
+ * @param foundIn The folder the repository has it in, from its root; null where it has none.
+ * @param factory The factory the agent is read in.
+ */
+export function whereOf(from: SkillSource | null, foundIn: string | null, factory: string) {
+  if (from === 'factory') return `Factory ${factory}`;
+  if (foundIn !== null) {
+    const folder = foundIn.split('/').slice(0, -1).join('/');
+    return folder === '' ? WHERE.repo : `${WHERE.repo}, ${folder}`;
+  }
+  return from === null ? 'Not found' : WHERE[from];
+}
+
+/**
+ * A skill's name as its tile says it: a skill named with its folder (`apps/web:ds-build`) by its own name (`ds-build`), since the tile
+ * says the folder where it says where the skill comes from.
+ * @param name The skill's name, as its line writes it.
+ * @param foundIn The folder the repository has it in; null where it has none.
+ */
+const tileName = (name: string, foundIn: string | null) => (foundIn === null ? name : name.slice(name.lastIndexOf(':') + 1));
+
+/**
  * The skills it gives by where they come from: those in its file, then those each step it is hired into adds that its file does not
- * give, one group for each step name across workflows.
+ * give, one group for each step name across workflows, each group's caption counting its tiles.
  * @param given The skills its file gives.
  * @param steps What each step it fills adds, by its page.
  * @param places The factory's skills by place, whose entries say what each is for.
+ * @param factory The factory the agent is read in.
  */
-export function skillGroupsOf(given: readonly AgentListing['given'][number][], steps: readonly StepGives[], places: readonly SkillPlace[]) {
+export function skillGroupsOf(
+  given: readonly AgentListing['given'][number][],
+  steps: readonly StepGives[],
+  places: readonly SkillPlace[],
+  factory: string,
+) {
   const listed = places.flatMap((place) => place.skills);
   const inFile = new Set(given.map((skill) => skill.name));
   const groups: TileGroup<SkillTile>[] = [
     {
       title: 'In its file',
       tiles: given.map((skill) => ({
-        name: skill.name,
+        name: tileName(skill.name, skill.foundIn),
         description: skill.entry?.description ?? null,
-        where: skill.from ? WHERE[skill.from] : 'Not found',
-        foundIn: skill.foundIn,
+        where: whereOf(skill.from, skill.foundIn, factory),
       })),
     },
   ];
@@ -187,37 +232,36 @@ export function skillGroupsOf(given: readonly AgentListing['given'][number][], s
       tiles: added.map((skill) => {
         const from = found.find((f) => f.name === skill);
         const row = listed.find((s) => s.name === skill);
-        const origin = from?.from ?? row?.from ?? null;
+        const foundIn = from?.foundIn ?? null;
         return {
-          name: skill,
-          description: row?.entry?.description ?? null,
-          where: origin ? WHERE[origin] : 'Not found',
-          foundIn: from?.foundIn ?? null,
+          name: tileName(skill, foundIn),
+          description: row?.entry?.description ?? from?.description ?? null,
+          where: whereOf(from?.from ?? row?.from ?? null, foundIn, factory),
         };
       }),
     });
   }
-  return groups.filter((group) => group.tiles.length > 0);
+  return groups.filter((group) => group.tiles.length > 0).map((group) => ({ ...group, title: `${group.title} · ${group.tiles.length}` }));
 }
 
-/** One MCP server as its tile says it. */
-type ServerTile = { name: string };
+/** One MCP server as its tile says it: its name, and where it comes from. */
+type ServerTile = { name: string; where: string };
 
 /**
- * The MCP servers it loads by where they come from: those its file names, then those each step adds, one group for each step name.
+ * The MCP servers it loads, each with where it comes from: those its file names, then those each step adds that its file does not.
  * @param mcp The `mcp:` line of its file; null for none.
  * @param steps What each step it fills adds, by its page.
  */
-export function serverGroupsOf(mcp: string | null, steps: readonly StepGives[]) {
+export function serversOf(mcp: string | null, steps: readonly StepGives[]) {
   const inFile = skillList(mcp ?? '');
-  const groups: TileGroup<ServerTile>[] = [{ title: 'In its file', tiles: inFile.map((name) => ({ name })) }];
+  const tiles: ServerTile[] = inFile.map((name) => ({ name, where: 'In its file' }));
   for (const name of new Set(steps.map((step) => step.step))) {
     const added = [...new Set(steps.filter((step) => step.step === name).flatMap((step) => step.mcp))].filter(
-      (server) => !inFile.includes(server),
+      (server) => !tiles.some((tile) => tile.name === server),
     );
-    groups.push({ title: `From its ${name} step`, tiles: added.map((server) => ({ name: server })) });
+    tiles.push(...added.map((server) => ({ name: server, where: `From its ${name} step` })));
   }
-  return groups.filter((group) => group.tiles.length > 0);
+  return tiles;
 }
 
 /**
@@ -225,6 +269,17 @@ export function serverGroupsOf(mcp: string | null, steps: readonly StepGives[]) 
  * @param body The instructions as written.
  */
 export const wordsOf = (body: string) => body.split(/\s+/).filter(Boolean).length;
+
+/**
+ * The label selector of the runs of the workflows the agent is in (`workflow in (build,quick)`), named by a node or filled in the factory,
+ * so the finished runs read for when its last session ended are of those, never crowded out by the runs of workflows it has no step in;
+ * undefined where it is in none.
+ * @param agent The nodes that name the agent and the steps it fills.
+ */
+export const workflowsSelector = (agent: Pick<AgentListing, 'usedBy' | 'fills'>) => {
+  const workflows = [...new Set([...agent.usedBy, ...agent.fills].map((node) => node.workflow))].sort();
+  return workflows.length === 0 ? undefined : `workflow in (${workflows.join(',')})`;
+};
 
 /**
  * When its last session ended, in epoch ms: the latest end of a session of a step given to the agent in `runs`; null where none ended.

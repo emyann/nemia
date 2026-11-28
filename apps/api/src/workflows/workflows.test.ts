@@ -449,7 +449,7 @@ describe("a person reads the workflows on the board, opens a step's page, and is
       assert.equal(attached.layers.instructions, 'Write it down.', "what a run would be told first: the agent's instructions, read now");
       assert.deepEqual(
         attached.skillsFrom,
-        [{ name: 'take-notes', from: 'user', foundIn: null }],
+        [{ name: 'take-notes', from: 'user', foundIn: null, description: 'Writes down what was decided.' }],
         "each skill of its layers, with where it is found: in your library, so its page is yours'",
       );
       write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');

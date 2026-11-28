@@ -2980,8 +2980,8 @@ const hiredPage = async (extra: Record<string, unknown> = {}) => {
     layers: { ...LAYERS, task: null },
     hired: 'writer',
     skillsFrom: [
-      { name: 'alpha', from: 'user', foundIn: null },
-      { name: 'gamma', from: null, foundIn: null },
+      { name: 'alpha', from: 'user', foundIn: null, description: null },
+      { name: 'gamma', from: null, foundIn: null, description: null },
     ],
     ...extra,
   });
@@ -2992,9 +2992,9 @@ test("on a step's page, a skill named with its folder is drawn as written, the r
   const page = await hiredPage({
     layers: { ...LAYERS, task: null, addedSkills: ['apps/site:set-type', 'gamma'] },
     skillsFrom: [
-      { name: 'alpha', from: 'user', foundIn: null },
-      { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
-      { name: 'gamma', from: null, foundIn: null },
+      { name: 'alpha', from: 'user', foundIn: null, description: null },
+      { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type', description: null },
+      { name: 'gamma', from: null, foundIn: null, description: null },
     ],
   });
   const html = await routedWith(createElement(StepTold, { page, place: { factory: 'hiring' } }));

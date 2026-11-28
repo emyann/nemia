@@ -57,8 +57,8 @@ export type SkillCost = { preload: boolean; listed: number; body: number; perTur
 
 /**
  * A skill an agent gives, as its Agent object's `status.given` says it: named as its line writes it, where a start finds it and what it
- * costs — or why none is found. `from` is the place whose page it has; where it is null, `foundIn` is where this repository has it, as a
- * skill named with its folder, and null too for one found nowhere.
+ * costs — or why none is found. `from` is the place whose page it has; `foundIn` is the folder this repository has it in, for any skill
+ * the repository holds, its own root's included, and null for one found elsewhere or nowhere.
  */
 export type GivenSkill = {
   name: string;

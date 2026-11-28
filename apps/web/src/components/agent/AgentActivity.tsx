@@ -50,7 +50,7 @@ function WorkingTag() {
 export function ActivityLine({ activity, endedAgo }: { activity: Activity; endedAgo: string | null }) {
   if (activity.kind === 'none')
     return (
-      <Body size="large" data-activity="none" className="text-on-surface-variant">
+      <Body size="small" data-activity="none">
         Not working now.{endedAgo !== null && ` Its last session ended ${endedAgo}.`}
       </Body>
     );
@@ -59,7 +59,7 @@ export function ActivityLine({ activity, endedAgo }: { activity: Activity; ended
     return (
       <div data-activity="one" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <WorkingTag />
-        <Body size="large" component="span">
+        <Body size="medium" component="span">
           Working on{' '}
           <TextLink to="/runs/$runId" params={{ runId: row.run }} data-activity-run={row.run}>
             {row.title}
@@ -74,10 +74,10 @@ export function ActivityLine({ activity, endedAgo }: { activity: Activity; ended
   return (
     <div data-activity="many" className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <WorkingTag />
-      <Body size="large" component="span">
+      <Body size="medium" component="span">
         {activity.rows.length} sessions at once
       </Body>
-      <Body size="large" component="span" className="text-on-surface-variant">
+      <Body size="small" component="span" className="text-on-surface-variant">
         Each one is listed under Working.
       </Body>
     </div>

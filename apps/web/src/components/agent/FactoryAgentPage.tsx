@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { NetworkIcon } from 'lucide-react';
 import { useQueries, useQuery, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
-import { Body, Label, Skeleton, Tag, Title } from '@/components/ui/ds';
+import { Body, Button, Label, Skeleton, Tag, Title } from '@/components/ui/ds';
 import { CopyId, CutFrame, CutTag, Reading, SectionHead, Sticker } from '@/components/look';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 import { agentQuery, readAgent } from '@/lib/api/agents';
@@ -17,12 +18,12 @@ import {
   historyOf,
   lastEndedOf,
   permissionsOf,
+  workflowsSelector,
   plateOf,
-  serverGroupsOf,
+  serversOf,
   skillGroupsOf,
   type PlateRow,
   type StepGives,
-  type TileGroup,
 } from '@/lib/agentPage';
 import { agoWords } from '@/lib/runWords';
 import { skillList } from '@/lib/agents';
@@ -31,7 +32,9 @@ import { useNow } from '@/lib/useNow';
 import type { Activity } from '@/lib/atWork';
 import { ActivityLine, useAgentActivity, WorkingSection } from './AgentActivity';
 import { AgentInstructions } from './AgentInstructions';
-import { AgentFace, NodeLink, nodesOf } from './AgentParts';
+import { AgentFace, nodesOf, RouteLink } from './AgentParts';
+import { usePagePlace } from '../nav/useSeat';
+import { workflowLink } from '@/lib/factoryAddress';
 import { readGone } from '@/lib/api/gone';
 import { Hovered } from './Hovered';
 
@@ -50,8 +53,20 @@ export const loadFactoryAgent = (client: QueryClient, name: string, factory: str
     client.prefetchQuery(openRunsQuery(factory)),
   ]);
 
-/** The room a column of tiles gives each tile. */
-const TILES = 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))]';
+/** The grid of tiles: as many columns as fit, each 200 pixels at least, 8 apart. */
+const TILES = 'grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]';
+
+/** The one height of a tile, whatever its words: its name, three lines of what it is for and two of where it comes from. */
+const TILE_HEIGHT = 'h-[150px]';
+
+/** The label face's numeral, as wide as the board draws it. */
+const WIDE: CSSProperties = { fontStretch: '125%' };
+
+/** How many rows of its history the page shows before Show all. */
+const NEWEST = 6;
+
+/** A link drawn as the board underlines one. */
+const LINK = 'text-on-surface underline decoration-outline underline-offset-[3px] hover:decoration-on-surface';
 
 /** A part of the page still being read, in the shape of what is coming. */
 const Waiting = ({ label }: { label: string }) => (
@@ -75,31 +90,27 @@ function Ring({ name, working }: { name: string; working: boolean }) {
   );
 }
 
-/** One row of the spec plate: its label, its value with its note under it, and for the effort its pips. */
+/** One row of the spec plate: its label and its value in the plate's numerals, and under them its pips, where it has them, and its note. */
 function Row({ row }: { row: PlateRow }) {
   return (
-    <div data-plate-row={row.label} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 py-2.5">
-      <Label size="medium" component="dt" className="uppercase opacity-70">
-        {row.label}
-      </Label>
-      <dd className="m-0 min-w-0">
-        <div className="flex items-center gap-2">
-          <Body size="large" component="span" className="font-medium break-words">
-            {row.value}
-          </Body>
-          {row.pips && (
-            <span aria-hidden="true" data-pips={row.pips.filled} className="inline-flex gap-1">
-              {Array.from({ length: row.pips.total }, (_, i) => (
-                <span
-                  key={i}
-                  className={cn('size-2 border border-inverse-on-surface', i < (row.pips?.filled ?? 0) && 'bg-inverse-on-surface')}
-                />
-              ))}
-            </span>
-          )}
-        </div>
+    <div data-plate-row={row.label} className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 border-b border-current/35 pt-[7px] pb-2">
+      <dt className="flex flex-col justify-between gap-[3px] pt-1">
+        <Label size="small" component="span" className="uppercase">
+          {row.label}
+        </Label>
+        <span aria-hidden="true" data-pips={row.pips?.filled} className="flex h-[18px] items-center gap-0.5">
+          {row.pips &&
+            Array.from({ length: row.pips.total }, (_, i) => (
+              <span key={i} className={cn('h-[5px] flex-1', i < (row.pips?.filled ?? 0) ? 'bg-current' : 'bg-current/22')} />
+            ))}
+        </span>
+      </dt>
+      <dd className="m-0 flex min-w-0 flex-col gap-[3px]">
+        <span data-plate-value className="truncate font-label text-[17px] leading-[22px] font-extrabold uppercase" style={WIDE}>
+          {row.value}
+        </span>
         {row.note && (
-          <Body size="medium" component="div" className={cn('opacity-70', row.label === 'Model' && 'font-mono')}>
+          <Body size="small" component="span" data-plate-note className="truncate" title={row.note}>
             {row.note}
           </Body>
         )}
@@ -108,25 +119,53 @@ function Row({ row }: { row: PlateRow }) {
   );
 }
 
-/** A group of tiles under its caption, each tile a cut frame drawn by `tile`. */
-function Groups<T extends { name: string }>({ groups, tile }: { groups: readonly TileGroup<T>[]; tile: (one: T) => ReactNode }) {
+/** A group's caption: a small quiet label that counts its tiles. */
+function GroupHead({ title }: { title: string }) {
   return (
-    <div className="space-y-4">
-      {groups.map((group) => (
-        <div key={group.title} data-tile-group={group.title} className="space-y-2">
-          <Label size="large" component="h3" className="uppercase text-on-surface-variant">
-            {group.title}
-          </Label>
-          <div className={TILES}>
-            {group.tiles.map((one) => (
-              <CutFrame key={one.name} size={10}>
-                <div className="space-y-1 p-3">{tile(one)}</div>
-              </CutFrame>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
+    <Label size="small" component="h3" className="m-0 text-on-surface-variant uppercase">
+      {title}
+    </Label>
+  );
+}
+
+/**
+ * A tile in the grid: its name, what it is for cut to the lines it has room for, the whole of it said on hover, and where it comes from
+ * at its foot; of one height where `even` (a skill's), as tall as its words where not (a server's, which says no more than its name).
+ */
+function Tile({
+  name,
+  what,
+  where,
+  icon,
+  even = true,
+  data,
+}: {
+  name: string;
+  what: string | null;
+  where: string;
+  icon?: boolean;
+  even?: boolean;
+  data: Record<string, string>;
+}) {
+  return (
+    <CutFrame size={10} fill className={cn('w-full', even && TILE_HEIGHT)}>
+      <div {...data} className="flex h-full min-h-0 flex-col gap-1.5 px-3 pt-2.5 pb-3">
+        <span className="flex min-w-0 items-center gap-2">
+          {icon && <NetworkIcon aria-hidden="true" className="size-[18px] shrink-0" />}
+          <Body size="medium" component="span" className="truncate font-mono" title={name}>
+            {name}
+          </Body>
+        </span>
+        {(even || what !== null) && (
+          <Body size="small" component="p" data-tile-what className="m-0 line-clamp-3 min-h-0" title={what ?? undefined}>
+            {what}
+          </Body>
+        )}
+        <Body size="small" component="p" data-tile-where className="m-0 mt-auto line-clamp-2 text-on-surface-variant">
+          {where}
+        </Body>
+      </div>
+    </CutFrame>
   );
 }
 
@@ -149,7 +188,7 @@ function useAgentReads(agent: Listing, factory: string, idle: boolean) {
   const skills = useQuery(factorySkillsQuery(factory));
   const marks = useQuery(agentMarksQuery(agent.name, factory));
   const open = useQuery(openRunsQuery(factory));
-  const finished = useQuery({ ...finishedRunsQuery(factory, []), enabled: idle });
+  const finished = useQuery({ ...finishedRunsQuery(factory, [], workflowsSelector(agent)), enabled: idle });
   const runs = [...(open.data ? [...open.data.waiting, ...open.data.inFlight].filter(judged) : []), ...(finished.data?.runs ?? [])];
   const gives = pages.flatMap((page) =>
     page.data
@@ -193,9 +232,9 @@ function Who({
   return (
     <header className="flex flex-wrap items-center gap-6">
       <Ring name={name} working={activity.kind !== 'none'} />
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Title size="medium" component="p" data-agent-role className="m-0">
+      <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+          <Title size="large" component="p" data-agent-role className="m-0 font-sans font-semibold">
             {agent.role ?? 'No role yet'}
           </Title>
           <Hovered said={`${personOf(name)} belongs to factory ${factory}, so it can't be edited here.`}>
@@ -209,141 +248,199 @@ function Who({
           </Hovered>
         </div>
         {agent.description && (
-          <Body size="large" component="p" className="m-0">
+          <Body size="large" component="p" className="m-0 max-w-[72ch]">
             {agent.description}
           </Body>
         )}
         <ActivityLine activity={activity} endedAgo={endedAgo} />
-        <Body size="medium" component="div" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-on-surface-variant">
+        <Body
+          size="small"
+          component="div"
+          data-agent-meta
+          className="flex flex-wrap items-center gap-x-[18px] gap-y-1 text-on-surface-variant"
+        >
           <span className="inline-flex items-center gap-1.5">
             File <CopyId id={`agents/${name}.md`} of="file" />
           </span>
-          {agent.keys.output && <span>Reports in {agent.keys.output}</span>}
-          {edited && <span>Edited {edited}</span>}
+          {agent.keys.output && (
+            <span>
+              Reports in <span className="font-mono text-on-surface">{agent.keys.output}</span>
+            </span>
+          )}
+          {edited && <span data-edited>Edited {edited}</span>}
         </Body>
       </div>
     </header>
   );
 }
 
-/** Its spec on the plate, and under it the three counts of what it may use, each said on hover. */
+/** Its spec on the plate, under the plate's head that names its file, and at the plate's foot the three counts of what it may use. */
 function Spec({ agent }: { agent: Listing }) {
   const { data: keyForm } = useQuery(keyFormQuery);
   const { data: models } = useQuery(modelsQuery);
   return (
-    <section aria-label="Spec" className="space-y-4">
-      <CutFrame size={16} ground="bg-inverse-surface" className="text-inverse-on-surface">
-        <dl data-plate className="m-0 divide-y divide-inverse-on-surface/15 px-4 py-1">
-          {plateOf(agent.keys, keyForm, models).map((row) => (
-            <Row key={row.label} row={row} />
-          ))}
-        </dl>
-      </CutFrame>
-      <div data-permissions className="space-y-2">
-        <Label size="large" component="h3" className="uppercase text-on-surface-variant">
-          Permissions
-        </Label>
-        <div className="flex flex-wrap gap-3">
-          {permissionsOf(agent.keys).map((one) => (
-            <Hovered key={one.label} said={one.said}>
-              <Sticker hue="ink" label={one.label}>
-                {one.count}
-              </Sticker>
-            </Hovered>
-          ))}
+    <section aria-label="Spec">
+      <CutFrame size={16} ground="bg-inverse-surface" className="w-full text-inverse-on-surface">
+        <div className="flex flex-col px-3.5 py-3">
+          <div data-plate-head className="flex items-baseline justify-between gap-2 border-b-2 border-current pb-1.5">
+            <Label size="medium" component="h2" className="m-0 uppercase">
+              Spec
+            </Label>
+            <Body size="small" component="span" className="truncate font-mono">
+              agents/{agent.name}.md
+            </Body>
+          </div>
+          <dl data-plate className="m-0">
+            {plateOf(agent.keys, keyForm, models).map((row) => (
+              <Row key={row.label} row={row} />
+            ))}
+          </dl>
+          <div data-permissions className="flex flex-col gap-2 pt-2.5 pb-0.5">
+            <Label size="small" component="h3" className="m-0 uppercase">
+              Permissions
+            </Label>
+            <div className="flex flex-wrap gap-1.5">
+              {permissionsOf(agent.keys).map((one) => (
+                <Hovered key={one.label} said={one.said}>
+                  <Sticker hue="ink" label={one.label}>
+                    {one.count}
+                  </Sticker>
+                </Hovered>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </CutFrame>
     </section>
   );
 }
 
-/** The steps it is hired into, each a link to its page, and the factory they are in. */
+/** The steps it is hired into, a row each, its link over a divider, and the factory they are in under them. */
 function Steps({ agent, factory }: { agent: Listing; factory: string }) {
+  const here = usePagePlace();
   const nodes = nodesOf(agent);
   const where = nodes.length === 1 ? 'In' : nodes.length === 2 ? 'Both in' : 'All in';
   return (
-    <section aria-label="Steps" className="space-y-3">
+    <section aria-label="Steps" className="flex flex-col gap-3">
       <SectionHead count={nodes.length} word="Steps" tone="rest" />
-      <Body size="medium" data-used-by className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        {nodes.length === 0 ? (
-          <span className="text-on-surface-variant">No step names it yet.</span>
-        ) : (
-          <>
+      {nodes.length === 0 ? (
+        <Body size="small" className="text-on-surface-variant">
+          No step names it yet.
+        </Body>
+      ) : (
+        <>
+          <ul data-used-by className="m-0 flex list-none flex-col p-0">
             {nodes.map((node) => (
-              <NodeLink key={`${node.workflow}/${node.step}`} user={node} />
+              <li key={`${node.workflow}/${node.step}`} data-step-row className="border-b border-outline-variant py-2">
+                <RouteLink
+                  {...workflowLink(
+                    node.from === 'user' && !('hired' in node && node.hired) ? {} : here,
+                    node.from,
+                    node.workflow,
+                    node.step,
+                  )}
+                  data-node={`${node.workflow}/${node.step}`}
+                  className={LINK}
+                >
+                  <Body size="medium" component="span">
+                    {node.workflow} › {node.step}
+                  </Body>
+                </RouteLink>
+              </li>
             ))}
-            <span className="text-on-surface-variant">
-              {where} factory {factory}.
-            </span>
-          </>
-        )}
-      </Body>
+          </ul>
+          <Body size="small">
+            {where} factory {factory}.
+          </Body>
+        </>
+      )}
     </section>
   );
 }
 
-/** What changed in the agent, its steps and its skills, a sentence a day, the newest first; nothing is drawn while there is none. */
+/** The history's head: a plain label, as the plate's are. */
+const HistoryHead = () => (
+  <Label size="medium" component="h2" className="m-0 uppercase">
+    History
+  </Label>
+);
+
+/**
+ * What changed in the agent, its steps and its skills, a sentence a day, the newest first: the newest six, and Show all for the rest,
+ * listed in place; nothing is drawn while there is none.
+ */
 function History({ reads }: { reads: ReturnType<typeof useAgentReads> }) {
+  const [all, setAll] = useState(false);
   const history = historyOf(reads.marks);
   if (reads.marksPending)
     return (
-      <section aria-label="History" className="space-y-3">
-        <SectionHead count={0} word="History" tone="rest" />
+      <section aria-label="History" className="flex flex-col gap-2.5">
+        <HistoryHead />
         <Waiting label="Reading its history…" />
       </section>
     );
   if (reads.marksFailed)
     return (
-      <section aria-label="History" className="space-y-3">
-        <SectionHead count={0} word="History" tone="rest" />
+      <section aria-label="History" className="flex flex-col gap-2.5">
+        <HistoryHead />
         <ReadTrouble what="its history" error={reads.marksFailed} size="small" />
       </section>
     );
   if (history.length === 0) return null;
+  const shown = all ? history : history.slice(0, NEWEST);
   return (
-    <section aria-label="History" className="space-y-3">
-      <SectionHead count={history.length} word="History" tone="rest" />
-      <ul data-history className="m-0 list-none space-y-1.5 p-0">
-        {history.map((one) => (
-          <Body key={one.key} size="medium" component="li">
-            <span className="font-mono text-on-surface-variant">{one.day}</span> · {one.sentence}
-          </Body>
+    <section aria-label="History" className="flex flex-col gap-2.5">
+      <HistoryHead />
+      <ul data-history className="m-0 flex list-none flex-col p-0">
+        {shown.map((one) => (
+          <li key={one.key} data-history-row className="flex gap-3 border-b border-outline-variant py-[7px]">
+            <Body size="small" component="span" className="w-[52px] shrink-0 font-mono text-on-surface-variant">
+              {one.day}
+            </Body>
+            <Body size="small" component="span">
+              {one.sentence}
+            </Body>
+          </li>
         ))}
       </ul>
+      {!all && history.length > NEWEST && (
+        <div>
+          <Button variant="outlined" size="small" onPress={() => setAll(true)}>
+            Show all {history.length}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
 
-/** The skills it is given, by where each comes from, in a tile with what it is for. */
-function Skills({ agent, reads }: { agent: Listing; reads: ReturnType<typeof useAgentReads> }) {
+/** The skills it is given, by where each comes from, each in a tile of one height with what it is for and where it comes from. */
+function Skills({ agent, factory, reads }: { agent: Listing; factory: string; reads: ReturnType<typeof useAgentReads> }) {
   const { gives, skills, stepsRead, stepsFailed } = reads;
-  const groups = skills.data ? skillGroupsOf(agent.given, gives, skills.data) : [];
+  const groups = skills.data ? skillGroupsOf(agent.given, gives, skills.data, factory) : [];
   return (
-    <section aria-label="Skills" className="space-y-3">
-      <SectionHead count={groups.reduce((n, group) => n + group.tiles.length, 0)} word="Skills" tone="rest" />
+    <section aria-label="Skills" className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <SectionHead count={groups.reduce((n, group) => n + group.tiles.length, 0)} word="Skills" tone="rest" />
+        <Body size="small" className="text-on-surface-variant">
+          {personOf(agent.name)} loads a skill when its work needs it.
+        </Body>
+      </div>
       {!stepsRead || skills.isPending ? (
         <Waiting label="Reading its skills…" />
       ) : stepsFailed || skills.error ? (
         <ReadTrouble what="its skills" error={stepsFailed ?? skills.error} size="small" />
       ) : (
-        <Groups
-          groups={groups}
-          tile={(one) => (
-            <>
-              <Body size="medium" component="p" className="m-0 font-mono font-medium break-all" data-skill-tile={one.name}>
-                {one.name}
-              </Body>
-              {one.description && (
-                <Body size="medium" component="p" className="m-0 text-on-surface-variant">
-                  {one.description}
-                </Body>
-              )}
-              <Body size="medium" component="p" className="m-0 text-on-surface-variant" title={one.foundIn ?? undefined}>
-                {one.where}
-              </Body>
-            </>
-          )}
-        />
+        groups.map((group) => (
+          <div key={group.title} data-tile-group={group.title} className="flex flex-col gap-2">
+            <GroupHead title={group.title} />
+            <div className={TILES}>
+              {group.tiles.map((one) => (
+                <Tile key={one.name} name={one.name} what={one.description} where={one.where} data={{ 'data-skill-tile': one.name }} />
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </section>
   );
@@ -371,16 +468,16 @@ export function FactoryAgentPage({ name, factory }: { name: string; factory: str
           {agent.error}
         </Body>
       )}
-      <div className="grid gap-8 @5xl/page:grid-cols-[340px_minmax(0,1fr)]">
-        <div data-column="left" className="min-w-0 space-y-8">
+      <div className="grid items-start gap-8 @5xl/page:grid-cols-[340px_minmax(0,1fr)]">
+        <div data-column="left" className="flex min-w-0 flex-col gap-7">
           <Spec agent={agent} />
           <Steps agent={agent} factory={factory} />
           <AgentInstructions name={name} file={`agents/${name}.md`} body={agent.body} />
           <History reads={reads} />
         </div>
-        <div data-column="right" className="min-w-0 space-y-8">
+        <div data-column="right" className="flex min-w-0 flex-col gap-9">
           <WorkingSection activity={activity} />
-          <Skills agent={agent} reads={reads} />
+          <Skills agent={agent} factory={factory} reads={reads} />
           <ServersSection mcp={agent.mcp} gives={reads.gives} read={reads.stepsRead} />
         </div>
       </div>
@@ -388,22 +485,19 @@ export function FactoryAgentPage({ name, factory }: { name: string; factory: str
   );
 }
 
-/** The MCP servers section: those its file names and those its steps add, each by where it comes from; none drawn where there are none. */
+/** The MCP servers section: those its file names and its steps add, each a tile saying where it comes from; none drawn with none. */
 function ServersSection({ mcp, gives, read }: { mcp: string | null; gives: readonly StepGives[]; read: boolean }) {
-  const groups = serverGroupsOf(mcp, gives);
-  if (read && groups.length === 0) return null;
+  const servers = serversOf(mcp, gives);
+  if (read && servers.length === 0) return null;
   return (
-    <section aria-label="MCP servers" className="space-y-3">
-      <SectionHead count={groups.reduce((n, group) => n + group.tiles.length, 0)} word="MCP servers" tone="rest" />
+    <section aria-label="MCP servers" className="flex flex-col gap-3.5">
+      <SectionHead count={servers.length} word={servers.length === 1 ? 'MCP server' : 'MCP servers'} tone="rest" />
       {read ? (
-        <Groups
-          groups={groups}
-          tile={(one) => (
-            <Body size="medium" component="p" className="m-0 font-mono font-medium break-all" data-server-tile={one.name}>
-              {one.name}
-            </Body>
-          )}
-        />
+        <div className={TILES}>
+          {servers.map((one) => (
+            <Tile key={one.name} name={one.name} what={null} where={one.where} icon even={false} data={{ 'data-server-tile': one.name }} />
+          ))}
+        </div>
       ) : (
         <Waiting label="Reading its servers…" />
       )}

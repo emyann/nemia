@@ -726,6 +726,7 @@ export const WorkflowStepPage = Schema.Struct({
         description: 'Where the skill is found: the user library, the repository or a builtin; null where none is found.',
       }),
       foundIn: Text.annotate({ description: 'The folder it is found in; null where none is found.' }),
+      description: Text.annotate({ description: 'What the skill is for, as its SKILL.md says; null where none reads.' }),
     }),
   ).annotate({
     description:

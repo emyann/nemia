@@ -18,6 +18,7 @@ import {
   listedAt,
   Missing,
   SkillDoor,
+  givenSkills as givenRead,
   WORKFLOWS_STEP,
   workedOn,
 } from 'agent-orchestrator';
@@ -42,9 +43,10 @@ type WorkflowPageAddress = { from: WorkflowSource; workflow: string; factory: st
 
 /**
  * A skill a step's layers give, named as its line writes it, and where it is found: `from`, yours, the repository's or builtin, null
- * where no place the board pages has it; and then `foundIn`, where the repository has it (`foundInOf`), null for one found nowhere.
+ * where no place the board pages has it; and then `foundIn`, the folder the repository has it in (`foundInOf`), null for one found nowhere
+ * or outside the repository; and `description`, what its SKILL.md says it is for, null where none reads.
  */
-type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null };
+type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null; description: string | null };
 
 /** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
 const factoryNamed = (factory: string | null | undefined) => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
@@ -186,17 +188,21 @@ export async function hiringOf(
 }
 
 /**
- * Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`).
+ * Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`), and
+ * what its SKILL.md there says it is for.
  * @param layers The skills the agent and the step give.
  * @param found Where a start finds each skill.
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder.
  */
 export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string | undefined, home: string) {
-  return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
+  const names = [...new Set([...layers.agentSkills, ...layers.addedSkills])];
+  const read = givenRead(names, found);
+  return names.map((name, i) => {
     const at = found.at.get(name);
-    if (typeof at !== 'string') return { name, from: null, foundIn: null };
-    return { name, from: sourceOf(at, repo, home), foundIn: foundInOf(at, repo, home) };
+    if (typeof at !== 'string') return { name, from: null, foundIn: null, description: null };
+    const description = read[i]?.entry?.description ?? null;
+    return { name, from: sourceOf(at, repo, home), foundIn: foundInOf(at, repo, home), description };
   }) satisfies SkillFrom[];
 }
 

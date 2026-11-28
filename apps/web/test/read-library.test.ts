@@ -91,9 +91,9 @@ describe("a step's page and a list of workflows are read in the place named, und
         ],
       },
       skillsFrom: [
-        { name: 'alpha', from: 'user', foundIn: null },
-        { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
-        { name: 'gamma', from: null, foundIn: null },
+        { name: 'alpha', from: 'user', foundIn: null, description: null },
+        { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type', description: null },
+        { name: 'gamma', from: null, foundIn: null, description: null },
       ],
       recentRuns: [{ id: 'r-1', brief: 'Do it', createdAt: '2026-10-01T00:00:00Z', factory: 'f', filed: false }],
     });

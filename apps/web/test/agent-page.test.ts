@@ -82,21 +82,11 @@ describe("an agent page's plate and permissions", () => {
     assert.equal(modelWords('unlisted', undefined), 'unlisted');
   });
 
-  test('each note is one short line in plain words, the mode saying what it does', () => {
-    const rows = plateOf(
-      { harness: 'claude', model: 'claude-opus-5-5', effort: 'high', permissionMode: 'dontAsk', context: '400k' },
-      keyForm,
-      models,
-    );
+  test('each note the board has is one short line in plain words', () => {
+    const rows = plateOf({ model: 'claude-opus-5-5', effort: 'high', context: '400k' }, keyForm, models);
     assert.deepEqual(
       rows.map((r) => r.note),
-      [
-        'Claude Code, on the Agent SDK',
-        'claude-opus-5-5',
-        'How hard it thinks per turn',
-        'Acts without asking first',
-        'Its context window, in tokens',
-      ],
+      [null, 'claude-opus-5-5', 'How hard it thinks per turn', null, 'Its context window, in tokens'],
     );
   });
 

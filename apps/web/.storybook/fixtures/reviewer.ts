@@ -1,5 +1,5 @@
 /**
- * The factory agent page's reads for its stories (`Pages/Factory agent`): Agora, the code reviewer of the factory `nemia`, read only,
+ * The factory agent page's reads for its stories (`Pages/Factory agent`): Reviewer, the code reviewer of the factory `acme`, read only,
  * hired into the review step of two workflows, with its key form, models, steps, skills and marks, and the runs not finished that
  * hold none, one or four of its sessions at work, as its board (B5) draws it. Each is typed by the board's own reads of `objects`.
  */
@@ -11,13 +11,13 @@ import type { SkillPlace } from '../../src/lib/api/skills';
 import { atWorkSince, givenAgent, listed, summary } from '../../test/run.fixture';
 
 /** The factory the stories read in. */
-export const FACTORY = 'nemia';
+export const FACTORY = 'acme';
 
 /** The agent's name. */
-export const AGENT = 'agora';
+export const AGENT = 'reviewer';
 
 /** Its instructions, as its file writes them. */
-const BODY = "You are Agora, a code reviewer. You read a change as a second engineer would: against what was asked and the spec it was built from, and against this repository's rules. You read and run; you never write into the workspace.\n\nTo count or search, ask one question per call: the Grep tool (its `count` or `files_with_matches` mode, a `path` and a `glob`), or `git grep -c`, `-l` or `-n` over the folders you name. A `git grep` line holding a capital `O` anywhere is refused, since the fence cannot tell git's pager option `-O` from a pattern, so search such a word (`AUTO_PROPOSE`) with the Grep tool, or with `git grep -i` and the word in lower case. Your fence refuses plain `grep`, `cd`, a shell loop, a function, an assignment (`P=…`) and a pipe into anything outside your read-only set. A path with a `$` in its name (a route file such as `runs.$runId.tsx`) is refused to `git diff` and `git grep` however it is quoted, since `$` reads as a variable: the `git` skill, *Read what changed*, says the spelling that passes. Where the run's change is judged on GitHub, you read its pull request through the GitHub server, `mcp__github__pull_request_read` with `get`, `get_status` and `get_check_runs`, by the number its address ends on, and you hold no `gh` of your own. A subagent you start reads none of this and inherits your fence, so put these lines in its prompt.\n\nLoad your skill `review-a-change` with the Skill tool and follow it. Sign off `done` with your findings, and with `again` true only when a finding is worth another round of work; false when the change is done as far as a review can tell. A finding you raised in an earlier round, which the engineer answered, and which you would raise again, is no other round: sign off `blocked`, as your skill's last step says. What happens once you pass is the workflow's, never yours to name: a person approves the landing, or — where the workflow puts your pass before an ungated ending — the run files it. Where nobody reads the change after you, your step says so.\n\nWhere a claim of the spec or of the change rests on a page outside the repository, check it against the passage the steps before you handed for it, not against what you remember of the page. A passage that contradicts the claim, or says less than the change takes from it, is a finding. A claim you cannot check — no passage handed, and your fence refuses the page — goes at the top of your sign-off: the summary says how many, and the body opens with each, its page and what the change takes from it. Where nobody reads the change after you, your step says what to do instead.\n\nAnthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read both and cite them, never an interface from memory.";
+const BODY = "You are Reviewer, a code reviewer. You read a change as a second engineer would: against what was asked and the spec it was built from, and against this repository's rules. You read and run; you never write into the workspace.\n\nTo count or search, ask one question per call: the Grep tool (its `count` or `files_with_matches` mode, a `path` and a `glob`), or `git grep -c`, `-l` or `-n` over the folders you name. A `git grep` line holding a capital `O` anywhere is refused, since the fence cannot tell git's pager option `-O` from a pattern, so search such a word (`AUTO_PROPOSE`) with the Grep tool, or with `git grep -i` and the word in lower case. Your fence refuses plain `grep`, `cd`, a shell loop, a function, an assignment (`P=…`) and a pipe into anything outside your read-only set. A path with a `$` in its name (a route file such as `runs.$runId.tsx`) is refused to `git diff` and `git grep` however it is quoted, since `$` reads as a variable: the `git` skill, *Read what changed*, says the spelling that passes. Where the run's change is judged on GitHub, you read its pull request through the GitHub server, `mcp__github__pull_request_read` with `get`, `get_status` and `get_check_runs`, by the number its address ends on, and you hold no `gh` of your own. A subagent you start reads none of this and inherits your fence, so put these lines in its prompt.\n\nLoad your skill `review-a-change` with the Skill tool and follow it. Sign off `done` with your findings, and with `again` true only when a finding is worth another round of work; false when the change is done as far as a review can tell. A finding you raised in an earlier round, which the engineer answered, and which you would raise again, is no other round: sign off `blocked`, as your skill's last step says. What happens once you pass is the workflow's, never yours to name: a person approves the landing, or — where the workflow puts your pass before an ungated ending — the run files it. Where nobody reads the change after you, your step says so.\n\nWhere a claim of the spec or of the change rests on a page outside the repository, check it against the passage the steps before you handed for it, not against what you remember of the page. A passage that contradicts the claim, or says less than the change takes from it, is a finding. A claim you cannot check — no passage handed, and your fence refuses the page — goes at the top of your sign-off: the summary says how many, and the body opens with each, its page and what the change takes from it. Where nobody reads the change after you, your step says what to do instead.\n\nAnthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read both and cite them, never an interface from memory.";
 
 /**
  * One skill of the factory's list, as the picker lists it, in its place.
@@ -62,6 +62,10 @@ const ROOT_SKILLS = [
   ]
 ] as const;
 
+/** The folder of skills of the repository's root, and the one of the app whose skills are named with its folder. */
+export const ROOT_FOLDER = '.claude/skills';
+export const APP_FOLDER = 'apps/web/.claude/skills';
+
 /** The board's skills, named with their folder, its review step adds; the factory lists none of them. */
 const NESTED = ['ds-build', 'ds-theme', 'ds-spec'] as const;
 
@@ -72,25 +76,25 @@ const REVIEW_A_CHANGE = 'Review a change as a second engineer would: against its
 export const skillPlaces: SkillPlace[] = [
   {
     from: 'factory',
-    dir: '/factories/nemia/tree/workflows/skills',
-    skills: [skill('review-a-change', REVIEW_A_CHANGE, 'factory', '/factories/nemia/tree/workflows/skills/review-a-change')],
+    dir: '/factories/acme/tree/workflows/skills',
+    skills: [skill('review-a-change', REVIEW_A_CHANGE, 'factory', '/factories/acme/tree/workflows/skills/review-a-change')],
   },
   {
     from: 'repo',
-    dir: '/src/nemia/.claude/skills',
-    skills: ROOT_SKILLS.map(([name, description]) => skill(name, description, 'repo', `/src/nemia/.claude/skills/${name}`)),
+    dir: '/src/acme/.claude/skills',
+    skills: ROOT_SKILLS.map(([name, description]) => skill(name, description, 'repo', `/src/acme/.claude/skills/${name}`)),
   },
 ];
 
 /** A count of rules, each its own line of the file. */
 const rules = (count: number, verb: string) => Array.from({ length: count }, (_, i) => `Bash(${verb} ${i} *)`).join(', ');
 
-/** Agora, the factory's code reviewer: read only, hired into the review step of two workflows. */
-export const agora: AgentListing & { factories: string[] } = {
+/** Reviewer, the factory's code reviewer: read only, hired into the review step of two workflows. */
+export const reviewer: AgentListing & { factories: string[] } = {
   name: AGENT,
   from: 'factory',
-  dir: '/factories/nemia/tree/workflows/agents',
-  file: '/factories/nemia/tree/workflows/agents/agora.md',
+  dir: '/factories/acme/tree/workflows/agents',
+  file: '/factories/acme/tree/workflows/agents/reviewer.md',
   role: 'Code reviewer',
   description: 'Reviews a change as a second engineer would, against its intent and spec, and sends it back for another round while a finding is worth it.',
   keys: {
@@ -102,7 +106,7 @@ export const agora: AgentListing & { factories: string[] } = {
     tools: 'Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch',
     allowedTools: rules(154, 'git log'),
     disallowedTools: rules(33, 'git push'),
-    output: 'agora.schema.json',
+    output: 'reviewer.schema.json',
   },
   body: BODY,
   schema: null,
@@ -131,8 +135,8 @@ export const agora: AgentListing & { factories: string[] } = {
       cost: null,
     },
   ],
-  source: `---\nname: agora\n---\n${BODY}`,
-  version: 'agora-1',
+  source: `---\nname: reviewer\n---\n${BODY}`,
+  version: 'reviewer-1',
   usedBy: [],
   fills: [
     { from: 'factory', workflow: 'build', step: 'review', hired: true },
@@ -177,7 +181,7 @@ export const models: HarnessModels = {
 export const reviewStep = (workflow: 'build' | 'quick') => ({
   workflow,
   from: 'repo',
-  dir: `/factories/nemia/tree/workflows/${workflow}`,
+  dir: `/factories/acme/tree/workflows/${workflow}`,
   step: 'review',
   body: 'Read the change against what was asked, and pass it or ask for another round.',
   source: '---\nmcp: playwright\n---\nRead the change against what was asked.\n',
@@ -206,8 +210,8 @@ export const reviewStep = (workflow: 'build' | 'quick') => ({
   skillsFrom: [
     { name: 'review-a-change', from: null, foundIn: null },
     { name: 'git', from: 'builtin', foundIn: null },
-    ...ROOT_SKILLS.map(([name]) => ({ name, from: 'repo' as const, foundIn: `.claude/skills/${name}` })),
-    ...NESTED.map((name) => ({ name: `apps/web:${name}`, from: null, foundIn: `apps/web/.claude/skills/${name}` })),
+    ...ROOT_SKILLS.map(([name]) => ({ name, from: 'repo' as const, foundIn: `${ROOT_FOLDER}/${name}` })),
+    ...NESTED.map((name) => ({ name: `apps/web:${name}`, from: null, foundIn: `${APP_FOLDER}/${name}` })),
   ],
   recentRuns: [],
 }) satisfies WorkflowStepPage;
@@ -246,7 +250,7 @@ export const marks = [
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000 - 30_000).toISOString();
 
 /**
- * A run in flight whose review step is at work by Agora, since `minutes` ago.
+ * A run in flight whose review step is at work by Reviewer, since `minutes` ago.
  * @param id The run's id.
  * @param title The run's title, the first line of its brief.
  * @param minutes How long the session has been at work.
@@ -276,10 +280,10 @@ const atWork = (id: string, title: string, minutes: number, workflow: 'build' | 
 export const open = (runs: OpenRuns['inFlight']) =>
   ({ asOf: '2026-11-27T10:00:00.000Z', counts: { waiting: 0, inFlight: runs.length, finished: 0 }, waiting: [], inFlight: runs }) satisfies OpenRuns;
 
-/** None of Agora's sessions at work. */
+/** None of Reviewer's sessions at work. */
 export const idle = open([]);
 
-/** One session of Agora at work, on the review of a card. */
+/** One session of Reviewer at work, on the review of a card. */
 export const one = open([atWork('board-two-tests-that-fail-ma-1xu6', 'board: Two tests that fail main’s ci by chance hold steady', 2, 'quick')]);
 
 /** Four sessions at work, the second of its second review round, in no order of their minutes. */
@@ -290,7 +294,7 @@ export const four = open([
   atWork('run-core-a-card-is-parsed-on-dlkf', 'run-core: A card is parsed once per change, not once per pass', 14),
 ]);
 
-/** The first page of the finished runs, the last of which had a session of Agora end 51 minutes ago. */
+/** The first page of the finished runs, the last of which had a session of Reviewer end 51 minutes ago. */
 export const finished: FinishedPage = {
   asOf: '2026-11-27T10:00:00.000Z',
   total: 1,

@@ -151,7 +151,7 @@ export function sourceOf(dir: string, repo: string | undefined, home: string) {
 
 /**
  * Where the repository has a skill, as its folder's path from the repository's root, `/` between its parts: one of its own places
- * (`.claude/skills/<name>`), a skill named with its folder, read from that folder's own skills, or any other found beneath `repo`.
+ * for skills, a skill named with its folder, read from that folder's own skills, or any other found beneath `repo`.
  * Null for a skill of your library or of Nemia's (`sourceOf`), for the repository's own folder, for a folder outside it, and where there
  * is no repository.
  * @param dir The skill's folder.

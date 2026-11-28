@@ -62,7 +62,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
  * step of yours a factory hires it into, in the factory and repository the page is in, the default factory reading no repository.
  * @param props.user The node, by its origin, workflow and step.
  */
-export function NodeLink({ user }: { user: AgentUser | AgentFill }) {
+function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePagePlace();
   return (
     <RouteLink

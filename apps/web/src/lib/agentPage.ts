@@ -36,20 +36,6 @@ const valueOf = (keys: AgentListing['keys'], key: RegExp) => Object.entries(keys
 /** What the plate says where a key is unset. */
 const UNSET = 'Not set';
 
-/** What each harness is, in a short line under its name; none for a harness not named here. */
-const HARNESS_NOTE: Readonly<Record<string, string>> = { claude: 'Claude Code, on the Agent SDK' };
-
-/** What each permission mode does, in a short line under its name; none for a mode not named here. */
-const MODE_NOTE: Readonly<Record<string, string>> = {
-  plan: 'Plans, and changes nothing',
-  dontAsk: 'Acts without asking first',
-  default: 'Asks before a call no rule allows',
-  manual: 'Asks before a call no rule allows',
-  acceptEdits: 'Edits its files without asking',
-  auto: 'Allows what a classifier judges safe',
-  bypassPermissions: 'Asks about nothing',
-};
-
 /**
  * The effort levels the model takes, as the harness lists them for it, else those the effort key's words allow the harness.
  * @param keyForm The step form's keys; undefined while they load.
@@ -62,8 +48,8 @@ const levelsOf = (keyForm: KeyForm | undefined, listed: { efforts: readonly stri
 };
 
 /**
- * A model's name as the plate says it: the harness's name for it with the version its id ends on (`Opus 5.5` for `claude-opus-5-5`),
- * where the name is one word and says no version; the name alone where it says more; the id where the harness lists none.
+ * A model's name as the plate says it: the harness's name for it with the version its id ends on (`Opus 5.5` for an id ending
+ * `-opus-5-5`), where the name is one word and says no version; the name alone where it says more; the id where the harness lists none.
  * @param id The model's id, as the agent's file writes it.
  * @param name The harness's name for it, where it lists it.
  */
@@ -74,7 +60,7 @@ export function modelWords(id: string, name: string | undefined) {
 }
 
 /**
- * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with one short line under it. The model is its name with
+ * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one. The model is its name with
  * its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its word with a pip for each level
  * the model takes, those up to its own filled.
  * @param keys The agent's role keys, as its file writes them.
@@ -86,9 +72,8 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
   const levels = levelsOf(keyForm, listed, harness);
   const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
-  const mode = valueOf(keys, MODE);
   return [
-    { label: 'Harness', value: harness, note: HARNESS_NOTE[harness] ?? null, pips: null },
+    { label: 'Harness', value: harness, note: null, pips: null },
     {
       label: 'Model',
       value: keys.model === undefined ? UNSET : modelWords(keys.model, listed?.name),
@@ -101,7 +86,7 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
       note: 'How hard it thinks per turn',
       pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
-    { label: 'Mode', value: mode ?? UNSET, note: mode === undefined ? null : (MODE_NOTE[mode] ?? null), pips: null },
+    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: null, pips: null },
     { label: 'Context', value: keys.context ?? UNSET, note: 'Its context window, in tokens', pips: null },
   ] satisfies PlateRow[];
 }
@@ -178,7 +163,7 @@ export type StepGives = {
 type SkillTile = { name: string; description: string | null; where: string };
 
 /** One group of tiles under its caption, which counts them. */
-export type TileGroup<T> = { title: string; tiles: T[] };
+type TileGroup<T> = { title: string; tiles: T[] };
 
 /** Where a skill comes from, as a tile says it, by the place a start finds it in. */
 const WHERE: Readonly<Record<Exclude<SkillSource, 'factory'>, string>> = {
@@ -189,7 +174,7 @@ const WHERE: Readonly<Record<Exclude<SkillSource, 'factory'>, string>> = {
 
 /**
  * Where a skill comes from, as its tile says it: the factory's by its name, the repository's with the folder of skills it is in (`From
- * the repository, apps/web/.claude/skills`), your library, Nemia, or nowhere.
+ * the repository, apps/site/skills`), your library, Nemia, or nowhere.
  * @param from The place a start finds it in; null where none the board pages has it.
  * @param foundIn The folder the repository has it in, from its root; null where it has none.
  * @param factory The factory the agent is read in.

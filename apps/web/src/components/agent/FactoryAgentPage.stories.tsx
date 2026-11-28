@@ -11,8 +11,9 @@ import { agentMarksQuery } from '@/lib/api/stats';
 import { stepQuery } from '@/lib/api/workflows';
 import { FactoryAgentPage } from './FactoryAgentPage';
 import {
-  agora,
+  reviewer,
   AGENT,
+  APP_FOLDER,
   FACTORY,
   finished,
   four,
@@ -21,9 +22,10 @@ import {
   marks,
   models,
   one,
+  ROOT_FOLDER,
   reviewStep,
   skillPlaces,
-} from '../../../.storybook/fixtures/agora';
+} from '../../../.storybook/fixtures/reviewer';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /** The page with its reads seeded, the runs not finished being what the story is about. */
@@ -32,7 +34,7 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
   const page = (
     <QueryClientProvider
       client={seeded([
-        [agentQuery('factory', AGENT, place).queryKey, agora],
+        [agentQuery('factory', AGENT, place).queryKey, reviewer],
         [keyFormQuery.queryKey, keyForm],
         [modelsQuery.queryKey, models],
         [openRunsQuery(FACTORY).queryKey, runs],
@@ -60,7 +62,7 @@ function Seeded({ runs, width }: { runs: OpenRuns; width?: number }) {
 /**
  * A factory's agent, read only (B5): who it is in a ring that shows whether it is at work, its spec and permissions on the plate, the
  * steps it is hired into, its instructions with Show all, its history, and its skills and servers in tiles of one height, each saying
- * where it comes from. Agora of the factory nemia, its reads seeded.
+ * where it comes from. The reviewer of a factory, its reads seeded.
  */
 const meta: Meta<typeof Seeded> = {
   title: 'Pages/Factory agent',
@@ -87,9 +89,9 @@ export const Idle: Story = {
     await expect(Math.abs((left?.top ?? 0) - (right?.top ?? 1))).toBeLessThan(2);
     await expect(canvasElement.querySelector('[data-edited]')?.textContent).toBe('Edited 26 Nov');
     await waitFor(() => expect(canvasElement.querySelector('[data-plate-head]')).not.toBeNull());
-    await expect(canvasElement.querySelector('[data-plate-head]')?.textContent).toBe('Specagents/agora.md');
+    await expect(canvasElement.querySelector('[data-plate-head]')?.textContent).toBe(`Specagents/${AGENT}.md`);
     await expect(page.getByText('Opus 5.5')).toBeVisible();
-    await expect(page.getByText('Acts without asking first')).toHaveAttribute('title', 'Acts without asking first');
+    await expect(page.getByText('How hard it thinks per turn')).toHaveAttribute('title', 'How hard it thinks per turn');
     await expect(canvasElement.querySelector('[data-plate-row="Effort"] [data-pips]')?.getAttribute('data-pips')).toBe('3');
     await waitFor(() => expect(canvasElement.querySelector('[data-skill-tile="ds-build"]')).not.toBeNull());
     const frameOf = (name: string) => canvasElement.querySelector(`[data-skill-tile="${name}"]`)?.closest('[data-cut-frame]');
@@ -97,9 +99,9 @@ export const Idle: Story = {
     await expect(heights[0]).toBeGreaterThan(0);
     await expect(new Set(heights).size).toBe(1);
     await expect(frameOf('git')?.textContent).toContain('Built into Nemia');
-    await expect(frameOf('ds-build')?.textContent).toContain('From the repository, apps/web/.claude/skills');
-    await expect(frameOf('shadcn')?.textContent).toContain('From the repository, .claude/skills');
-    await expect(frameOf('review-a-change')?.textContent).toContain('Factory nemia');
+    await expect(frameOf('ds-build')?.textContent).toContain(`From the repository, ${APP_FOLDER}`);
+    await expect(frameOf('shadcn')?.textContent).toContain(`From the repository, ${ROOT_FOLDER}`);
+    await expect(frameOf('review-a-change')?.textContent).toContain(`Factory ${FACTORY}`);
     await expect(canvasElement.querySelector('[data-server-tile="playwright"]')?.textContent).toContain('From its review step');
   },
 };
@@ -166,8 +168,8 @@ export const Instructions: Story = {
     const page = within(canvasElement);
     const show = await page.findByRole('button', { name: 'Show all' });
     await userEvent.click(show);
-    const dialog = await within(document.body).findByRole('dialog', { name: "Agora's instructions" });
-    await waitFor(() => expect(within(dialog).getByText(/agents\/agora\.md · \d+ words/)).toBeVisible());
+    const dialog = await within(document.body).findByRole('dialog', { name: "Reviewer's instructions" });
+    await waitFor(() => expect(within(dialog).getByText(/agents\/reviewer\.md · \d+ words/)).toBeVisible());
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     await userEvent.tab();
     await userEvent.tab();

@@ -637,17 +637,39 @@ export const KeyField = Schema.Struct({
 });
 export type KeyField = typeof KeyField.Type;
 
+/** One word of a harness's fence, a permission mode or a sandbox: what it means and its rank, 1 the most guarded. */
+const FenceWord = Schema.Struct({
+  word: Schema.String.annotate({ description: 'The word, as a step writes it.' }),
+  meaning: Schema.String.annotate({ description: 'What it means, in one line a person reads.' }),
+  rank: Schema.Int.annotate({
+    description: "Its rank among the fence's words, from 1, the most guarded, rising by one to the least; two names of one mode share one.",
+  }),
+});
+
+/** What a harness a step may run on is, in one line a person reads, and the words of its fence, most guarded first. */
+const HarnessNote = Schema.Struct({
+  harness: Schema.String.annotate({ description: "The harness's name." }),
+  note: Schema.String.annotate({ description: 'What it is, in one line a person reads.' }),
+  key: Schema.NullOr(Schema.Literals(STEP_KEYS)).annotate({ description: 'The key a step sets its fence by; null where it has none.' }),
+  fence: Schema.Array(FenceWord).annotate({
+    description: 'Each word of its fence, most guarded first, with what it means and its rank; none for a harness with no fence.',
+  }),
+});
+
 /**
  * What the builder's form is drawn from (`GET /api/workflow-keys`): every key a step may set, in the package's order, the default
- * harness, the keys an agent may set (`roleKeys`) and those a step's file sets as its policy over its agent (`policyKeys`), the role values
- * each agent of the person's library gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it
- * may not set.
+ * harness, what each harness is and what each word of its fence means (`harnesses`), the keys an agent may set (`roleKeys`) and
+ * those a step's file sets as its policy over its agent (`policyKeys`), the role values each agent of the person's library gives a
+ * step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it may not set.
  */
 export const KeyForm = Schema.Struct({
   keys: Schema.Array(KeyField).annotate({
     description: "Every key a step may set, in the package's order: what it means, how it is set and the words it may take.",
   }),
   defaultHarness: Schema.String.annotate({ description: 'The harness a step runs on where it names none.' }),
+  harnesses: Schema.Array(HarnessNote).annotate({
+    description: 'What each harness a step may run on is, in one line, and what each word of its fence means, most guarded first.',
+  }),
   roleKeys: Schema.Array(Schema.Literals(STEP_KEYS)).annotate({ description: 'The keys an agent may set.' }),
   policyKeys: Schema.Array(Schema.Literals(STEP_KEYS)).annotate({
     description: "The keys a step's file sets as its policy over its agent.",

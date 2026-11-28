@@ -9,6 +9,7 @@ import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
 import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { codex } from '../src/harness/codex/codex.ts';
+import { HARNESS_DECLARATIONS } from '../src/harness/declaration.ts';
 
 /** The harness names that run Claude Code; `claude-detached`, the `claude -p` road, is no longer one, and reaches nothing. */
 const CLAUDES = ['claude'];
@@ -46,6 +47,38 @@ describe("fenceReach: each harness's ranks, the word a task naming none runs in,
   });
   test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
     for (const harness of ['command', 'a2a:x', 'nope', '', 'claude-detached']) assert.equal(fenceReach(harness), undefined, harness);
+  });
+});
+
+describe("guarded: each harness's fence words, most guarded first, each with what it means", () => {
+  test('a harness that runs a brief says what it is in one line, and each word of its fence once, never falling in rank', () => {
+    for (const [harness, declaration] of Object.entries(HARNESS_DECLARATIONS).filter(([, d]) => d.runsBrief === true)) {
+      assert.ok(declaration.note !== undefined && declaration.note.length > 0 && !declaration.note.includes('\n'), harness);
+      const guarded = declaration.guarded ?? [];
+      assert.deepEqual(guarded.map((g) => g.word).sort(), [...declaration.knobs!.fence.words].sort(), harness);
+      const reach = guarded.map((g) => fenceReach(harness)!.rank[g.word]);
+      assert.deepEqual(
+        reach,
+        [...reach].sort((a, b) => a - b),
+        harness,
+      );
+      guarded.forEach((g, i) => {
+        assert.ok(g.meaning.length > 0 && !g.meaning.includes('\n'), `${harness} ${g.word}`);
+        const before = i === 0 ? undefined : guarded[i - 1];
+        if (before === undefined) assert.equal(g.rank, 1, harness);
+        else if (g.rank === before.rank) assert.equal(g.meaning, before.meaning, `${harness}: ${g.word} shares a rank, so a meaning`);
+        else assert.equal(g.rank, before.rank + 1, `${harness} ${g.word}`);
+      });
+    }
+  });
+  test("Claude Code's held mode is the second most guarded, after the mode that changes nothing; `manual` is `default` by another name", () => {
+    const guarded = HARNESS_DECLARATIONS.claude.guarded!;
+    assert.deepEqual(
+      guarded.slice(0, 2).map((g) => g.word),
+      ['plan', fenceReach('claude')!.held],
+    );
+    const [manual, given] = ['manual', 'default'].map((word) => guarded.find((g) => g.word === word));
+    assert.deepEqual([manual?.rank, manual?.meaning], [given?.rank, given?.meaning]);
   });
 });
 

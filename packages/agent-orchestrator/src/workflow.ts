@@ -69,6 +69,7 @@ export type { Frontmatter, FrontmatterEntry, FrontmatterPair, FrontmatterValue }
 export {
   CLAUDE_RULES,
   DEFAULT_HARNESS,
+  HARNESS_NOTES,
   HARNESSES,
   isRemoteHarness,
   REMOTE_NAME,

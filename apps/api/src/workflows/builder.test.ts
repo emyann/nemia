@@ -273,6 +273,42 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         '`denials:` says one word or nothing, as `slot:` does: `fail`, which the parser reads and nothing else',
       );
       assert.equal(kindOf.skills, 'list', "a step's `skills:` is a plain list of the skills it adds to its agent's");
+      assert.deepEqual(
+        form.harnesses.map((h) => [h.harness, h.note]),
+        [
+          ['claude', 'Claude Code, on the Agent SDK'],
+          ['codex', 'Codex, through its command line'],
+        ],
+        'each harness a step may run on says what it is in one line, the default first',
+      );
+      const modes = form.harnesses.find((h) => h.harness === 'claude')?.fence ?? [];
+      assert.deepEqual(
+        modes.map((m) => [m.rank, m.word]),
+        [
+          [1, 'plan'],
+          [2, 'dontAsk'],
+          [3, 'default'],
+          [3, 'manual'],
+          [4, 'acceptEdits'],
+          [5, 'auto'],
+          [6, 'bypassPermissions'],
+        ],
+        'each permission mode is served once, with its rank from the most guarded to the least; manual is default by another name',
+      );
+      assert.equal(modes.find((m) => m.word === 'dontAsk')?.meaning, 'Acts without asking first');
+      assert.deepEqual(
+        form.harnesses.map((h) => [h.harness, h.key]),
+        [
+          ['claude', 'permissionMode'],
+          ['codex', 'sandbox'],
+        ],
+        'each harness says the key a step sets its fence by',
+      );
+      assert.deepEqual(
+        form.harnesses.find((h) => h.harness === 'codex')?.fence.map((m) => m.word),
+        HARNESS_CHOICES.sandbox.codex,
+        "codex's fence words are its sandboxes, narrowest first",
+      );
       write(
         path.join(STORE, 'agents', 'picked.md'),
         '---\nmodel: opus\ncontext: 200k\ntools: Read, Grep\noutput: picked.schema.json\n---\nPick me.\n',

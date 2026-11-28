@@ -15,7 +15,7 @@ import { dateParts } from './runWords.ts';
 /** One change the stats marked: the UTC day it was marked on (`YYYY-MM-DD`), what changed and its name. */
 export type Mark = { day: string; kind: 'step' | 'agent' | 'skill'; name: string };
 
-/** One row of the spec plate: its label, its value, a note of one short line under the value, and for the effort its pips. */
+/** One row of the spec plate: its label, its value, a note of one short line under the value, and for the effort and the mode its pips. */
 export type PlateRow = {
   label: string;
   value: string;
@@ -23,15 +23,13 @@ export type PlateRow = {
   pips: { total: number; filled: number } | null;
 };
 
-/** The key of the agent's file that says how its session asks before it acts, by the start of its name. */
-const MODE = /^permission/;
-
 /**
- * The value of the key of `keys` whose name matches `key`, as the file writes it; undefined where none is set.
+ * The value of the key of `keys` that `key` names, as the file writes it; undefined where none is set or no key is named.
  * @param keys The agent's role keys.
- * @param key The pattern the key's name matches.
+ * @param key The key's name, as the api serves it, or a pattern its name matches; null or undefined where none is named.
  */
-const valueOf = (keys: AgentListing['keys'], key: RegExp) => Object.entries(keys).find(([name]) => key.test(name))?.[1];
+const valueOf = (keys: AgentListing['keys'], key: RegExp | string | null | undefined) =>
+  Object.entries(keys).find(([name]) => (typeof key === 'string' ? name === key : key?.test(name) === true))?.[1];
 
 /** What the plate says where a key is unset. */
 const UNSET = 'Not set';
@@ -60,9 +58,30 @@ export function modelWords(id: string, name: string | undefined) {
 }
 
 /**
+ * The plate's Mode row: the mode's word, the meaning the api serves of it, and a pip for each rank of the harness's fence, those up to
+ * its own filled (two names of one mode share a rank, so a pip); no pips where the api serves no fence for the harness.
+ * @param keys The agent's role keys, as its file writes them.
+ * @param served What the api serves of the agent's harness: the key its fence is set by and the fence's words, most guarded first;
+ *   undefined where it serves nothing of it.
+ */
+function modeRow(keys: AgentListing['keys'], served: KeyForm['harnesses'][number] | undefined) {
+  const mode = valueOf(keys, served?.key);
+  const fence = served?.fence ?? [];
+  const word = fence.find((w) => w.word === mode);
+  return {
+    label: 'Mode',
+    value: mode ?? UNSET,
+    note: word?.meaning ?? null,
+    pips: fence.length > 0 ? { total: Math.max(...fence.map((w) => w.rank)), filled: word?.rank ?? 0 } : null,
+  } satisfies PlateRow;
+}
+
+/**
  * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one.
- * The model is its name with its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its
- * word with a pip for each level the model takes, those up to its own filled.
+ * The harness's note is the line the api serves of it; the model is its name with its version where the harness lists it
+ * (`modelWords`), with the exact id as its note; the effort is its word with a pip for each level the model takes, those up to its own
+ * filled; the mode is the value of the key the api says the harness's fence is set by, with the meaning the api serves of it, and a
+ * pip for each rank of the fence, those up to its own filled (`modeRow`).
  * @param keys The agent's role keys, as its file writes them.
  * @param keyForm The step form's keys, which say what each key means; undefined while they load.
  * @param models The models each harness lists; undefined while they load.
@@ -72,8 +91,9 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
   const levels = levelsOf(keyForm, listed, harness);
   const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
+  const served = keyForm?.harnesses.find((h) => h.harness === harness);
   return [
-    { label: 'Harness', value: harness, note: null, pips: null },
+    { label: 'Harness', value: harness, note: served?.note ?? null, pips: null },
     {
       label: 'Model',
       value: keys.model === undefined ? UNSET : modelWords(keys.model, listed?.name),
@@ -86,7 +106,7 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
       note: 'How hard it thinks per turn',
       pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
-    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: null, pips: null },
+    modeRow(keys, served),
     { label: 'Context', value: keys.context ?? UNSET, note: 'Its context window, in tokens', pips: null },
   ] satisfies PlateRow[];
 }

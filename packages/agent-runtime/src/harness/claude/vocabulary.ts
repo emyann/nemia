@@ -3,7 +3,7 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
-import type { FenceReach, HarnessDeclaration, HarnessNeeds } from '../declaration.ts';
+import type { FenceReach, FenceWordMeaning, HarnessDeclaration, HarnessNeeds } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_RULES } from './rules.ts';
 
@@ -374,6 +374,23 @@ const claudeReach = () =>
   }) satisfies FenceReach;
 
 /**
+ * Claude Code's permission modes, most guarded first, each with what it means to a person and its rank: `plan` changes nothing,
+ * `dontAsk` runs what its rules allow and denies the rest without asking, `default` asks before most actions, then the three that act
+ * unasked, wider each. `manual` is the CLI's other name for `default` ("The CLI accepts `manual` as an alias for `default`", Claude
+ * Code's permission modes page), so it says the same and shares its rank. Ties in `CLAUDE_MODE_RANK` between different modes are
+ * ordered by how little each leaves to a person's answer.
+ */
+const CLAUDE_MODE_MEANINGS = [
+  { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
+  { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
+  { word: 'default', meaning: 'Asks before most actions', rank: 3 },
+  { word: 'manual', meaning: 'Asks before most actions', rank: 3 },
+  { word: 'acceptEdits', meaning: 'Edits files without asking', rank: 4 },
+  { word: 'auto', meaning: 'A classifier approves safe actions', rank: 5 },
+  { word: 'bypassPermissions', meaning: 'Skips every permission check', rank: 6 },
+] satisfies readonly FenceWordMeaning[];
+
+/**
  * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config
  * but Codex's and a command's, a session kept open and a call held for a person (attached, in the holder), and every Engine verb that is
  * not a task's. Its job's `HarnessSpec` declares the same `can` (`claudeJobSpec`, held equal by `test/declaration.test.ts`).
@@ -416,4 +433,6 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
   recordsDenials: true,
   rules: CLAUDE_RULES,
   needs: claudeNeeds(),
+  note: 'Claude Code, on the Agent SDK',
+  guarded: CLAUDE_MODE_MEANINGS,
 };

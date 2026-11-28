@@ -136,7 +136,10 @@ export type HarnessNeeds = {
  * - `recordsDenials`: a job of it records the calls its fence denied;
  * - `rules`: how its permission rules are matched and the tool sets measured on it (`ClaudeRules`), for a caller that shows a reach;
  * - `needs`: what it needs on a machine, installed and signed in (`HarnessNeeds`): a harness a person activates, as a command or a
- *   remote agent, which need nothing of their own, is not.
+ *   remote agent, which need nothing of their own, is not;
+ * - `note`: what it is, in one line a person reads, where it runs a brief;
+ * - `guarded`: each word of its fence once, most guarded first and never falling in `reach`'s rank, with what it means in one line a
+ *   person reads and its rank among them (`FenceWordMeaning`), where it has a fence.
  */
 export type HarnessDeclaration = {
   readonly can: readonly Capability[];
@@ -150,7 +153,15 @@ export type HarnessDeclaration = {
   readonly recordsDenials?: true;
   readonly rules?: ClaudeRules;
   readonly needs?: HarnessNeeds;
+  readonly note?: string;
+  readonly guarded?: readonly FenceWordMeaning[];
 };
+
+/**
+ * One word of a harness's fence, a permission mode or a sandbox, what it means in one line a person reads, and its rank: from 1, the
+ * most guarded, rising by one to the least, two names of one mode sharing one rank and one meaning.
+ */
+export type FenceWordMeaning = { readonly word: string; readonly meaning: string; readonly rank: number };
 
 /**
  * The declarations of the harnesses the runtime ships, by the name each is configured under by default (`DEFAULT_HARNESSES`), the

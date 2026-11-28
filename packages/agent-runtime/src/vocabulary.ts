@@ -30,6 +30,7 @@ export {
   takersOf,
   verbHarnessOf,
   type Capability,
+  type FenceWordMeaning,
   type HarnessDeclaration,
   type HarnessDeclared,
   type HarnessNeeds,

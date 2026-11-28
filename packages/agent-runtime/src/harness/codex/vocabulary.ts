@@ -87,4 +87,10 @@ export const CODEX_DECLARATION: HarnessDeclaration = {
   asks: { trustRepository: (repo) => ({ codex: { trustFrom: repo } }) },
   runsBrief: true,
   needs: CODEX_NEEDS,
+  note: 'Codex, through its command line',
+  guarded: [
+    { word: 'read-only', meaning: 'Reads, and writes nothing', rank: 1 },
+    { word: 'workspace-write', meaning: 'Writes in its workspace only', rank: 2 },
+    { word: 'danger-full-access', meaning: 'Writes anywhere, with no sandbox', rank: 3 },
+  ],
 };

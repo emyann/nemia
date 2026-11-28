@@ -13,6 +13,7 @@ const FORM: KeyForm = {
     { key: 'retries', meaning: 'How many times it is tried again after a refusal.', kind: 'count', choices: null, byHarness: null },
   ],
   defaultHarness: 'local',
+  harnesses: [],
   roleKeys: [],
   policyKeys: [],
   agents: {},

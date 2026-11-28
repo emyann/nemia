@@ -56,7 +56,7 @@ describe("guarded: each harness's fence words, most guarded first, each with wha
       assert.ok(declaration.note !== undefined && declaration.note.length > 0 && !declaration.note.includes('\n'), harness);
       const words = declaration.guarded?.map((g) => g.word) ?? [];
       assert.deepEqual([...words].sort(), [...declaration.knobs!.fence.words].sort(), harness);
-      const ranks = words.map((word) => fenceReach(harness)!.rank[word]!);
+      const ranks = words.map((word) => fenceReach(harness)!.rank[word]);
       assert.deepEqual(
         ranks,
         [...ranks].sort((a, b) => a - b),
@@ -67,7 +67,7 @@ describe("guarded: each harness's fence words, most guarded first, each with wha
   });
   test("Claude Code's held mode is the second most guarded, after the mode that changes nothing", () => {
     assert.deepEqual(
-      HARNESS_DECLARATIONS.claude!.guarded!.slice(0, 2).map((g) => g.word),
+      HARNESS_DECLARATIONS.claude.guarded!.slice(0, 2).map((g) => g.word),
       ['plan', fenceReach('claude')!.held],
     );
   });

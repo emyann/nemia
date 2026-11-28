@@ -60,9 +60,9 @@ export function modelWords(id: string, name: string | undefined) {
 }
 
 /**
- * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one. The model is its name with
- * its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its word with a pip for each level
- * the model takes, those up to its own filled.
+ * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one.
+ * The model is its name with its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its
+ * word with a pip for each level the model takes, those up to its own filled.
  * @param keys The agent's role keys, as its file writes them.
  * @param keyForm The step form's keys, which say what each key means; undefined while they load.
  * @param models The models each harness lists; undefined while they load.

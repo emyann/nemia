@@ -201,8 +201,8 @@ test("the skills are listed by place — yours, the repository's, then what is b
   );
   assert.deepEqual(
     places[2].skills.map((s) => s.name),
-    [...builtin, 'git'].sort(),
-    "Nemia's builtin skills and its git place's",
+    builtin,
+    "Nemia's builtin skills, and not its git place's, which nobody copies",
   );
   assert.ok(builtin.length > 0, 'Nemia ships builtin skills');
   assert.equal(rowOf(places, 'user', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
@@ -518,7 +518,7 @@ test("a builtin skill's page is its object at ?origin=builtin, and an origin non
   assert.equal((await pageOf('builtin', 'no-such')).status, 404, '`builtin` is an origin a page is read from');
   const git = await pageOf('builtin', 'git');
   assert.equal(git.status, 200, "the git place's skill, which a step's page says is builtin, has its page there");
-  assert.ok(rowOf(await listed(), 'builtin', 'git'), "and is listed among Nemia's builtin skills");
+  assert.equal(rowOf(await listed(), 'builtin', 'git'), undefined, 'though the picker offers it nowhere');
   assert.equal((await pageOf('nope', 'mine')).status, 422, 'an origin that is none of the four is refused');
 });
 

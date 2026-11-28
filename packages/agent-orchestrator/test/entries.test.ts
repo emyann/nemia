@@ -1041,6 +1041,7 @@ const PINNED: Record<string, string[]> = {
     'DENIALS',
     'FORMER_KEYS',
     'HARNESSES',
+    'HARNESS_NOTES',
     'HARNESS_PROMPTS',
     'LIST_KEYS',
     'LOOP_REPLIES',

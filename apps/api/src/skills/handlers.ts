@@ -129,7 +129,7 @@ async function pagesHeld(s: Served) {
       )
     : {};
   const places = inPlace.map(([name, dir]) => ({ name, origin: 'builtin' as const, item: { dir, ...readAt(reads, dir) } }));
-  return [...(await heldIn(s)), ...places] satisfies Held<Row>[] as Held<Row>[];
+  return [...(await heldIn(s)), ...places] satisfies Held<Row>[];
 }
 
 /**

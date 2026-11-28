@@ -152,7 +152,7 @@ export const reviewer: AgentListing & { factories: string[] } = {
   factories: [FACTORY],
 };
 
-/** The step form's keys: what each role key means, and the words the effort takes. */
+/** The step form's keys: what each role key means, the words the effort takes, and what each harness and permission mode is. */
 export const keyForm: KeyForm = {
   keys: [
     { key: 'harness', meaning: 'Which harness runs the session.', kind: 'choice', choices: ['claude', 'codex'], byHarness: null },
@@ -162,6 +162,30 @@ export const keyForm: KeyForm = {
     { key: 'context', meaning: 'How many tokens it may hold.', kind: 'tokens', choices: null, byHarness: null },
   ],
   defaultHarness: 'claude',
+  harnesses: [
+    {
+      harness: 'claude',
+      note: 'Claude Code, on the Agent SDK',
+      fence: [
+        { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
+        { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
+        { word: 'manual', meaning: 'Asks before every action', rank: 3 },
+        { word: 'default', meaning: 'Asks before a risky action', rank: 4 },
+        { word: 'acceptEdits', meaning: 'Edits files without asking', rank: 5 },
+        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 6 },
+        { word: 'bypassPermissions', meaning: 'Skips every permission check', rank: 7 },
+      ],
+    },
+    {
+      harness: 'codex',
+      note: 'Codex, through its command line',
+      fence: [
+        { word: 'read-only', meaning: 'Reads, and writes nothing', rank: 1 },
+        { word: 'workspace-write', meaning: 'Writes in its workspace only', rank: 2 },
+        { word: 'danger-full-access', meaning: 'Writes anywhere, with no sandbox', rank: 3 },
+      ],
+    },
+  ],
   roleKeys: ['harness', 'model', 'effort', 'permissionMode', 'context'],
   policyKeys: [],
   agents: {},

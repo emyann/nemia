@@ -57,7 +57,11 @@ describe("guarded: each harness's fence words, most guarded first, each with wha
       const words = declaration.guarded?.map((g) => g.word) ?? [];
       assert.deepEqual([...words].sort(), [...declaration.knobs!.fence.words].sort(), harness);
       const ranks = words.map((word) => fenceReach(harness)!.rank[word]!);
-      assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), harness);
+      assert.deepEqual(
+        ranks,
+        [...ranks].sort((a, b) => a - b),
+        harness,
+      );
       for (const { meaning } of declaration.guarded!) assert.ok(meaning.length > 0 && !meaning.includes('\n'), harness);
     }
   });

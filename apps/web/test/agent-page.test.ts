@@ -39,6 +39,17 @@ const keyForm = {
     field('context', 'How much it holds.'),
   ],
   defaultHarness: 'claude',
+  harnesses: [
+    {
+      harness: 'claude',
+      note: 'Claude Code, on the Agent SDK',
+      fence: [
+        { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
+        { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
+        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 3 },
+      ],
+    },
+  ],
   roleKeys: [],
   policyKeys: [],
   agents: {},
@@ -86,8 +97,15 @@ describe("an agent page's plate and permissions", () => {
     const rows = plateOf({ model: 'claude-opus-5-5', effort: 'high', context: '400k' }, keyForm, models);
     assert.deepEqual(
       rows.map((r) => r.note),
-      [null, 'claude-opus-5-5', 'How hard it thinks per turn', null, 'Its context window, in tokens'],
+      ['Claude Code, on the Agent SDK', 'claude-opus-5-5', 'How hard it thinks per turn', null, 'Its context window, in tokens'],
     );
+  });
+
+  test('the mode says the meaning the api serves of it, and fills its pips up to its rank among the fence words', () => {
+    const [, , , mode] = plateOf({ permissionMode: 'dontAsk' }, keyForm, models);
+    assert.deepEqual([mode?.value, mode?.note, mode?.pips], ['dontAsk', 'Acts without asking first', { total: 3, filled: 2 }]);
+    const [harness, , , unserved] = plateOf({ harness: 'elsewhere', permissionMode: 'dontAsk' }, keyForm, models);
+    assert.deepEqual([harness?.note, unserved?.note, unserved?.pips], [null, null, null], 'a harness the api says nothing of has no note');
   });
 
   test("a model the harness does not list reads as its id, and the effort key's choices give the pips where the model lists none", () => {

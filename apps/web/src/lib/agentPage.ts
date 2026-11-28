@@ -15,7 +15,7 @@ import { dateParts } from './runWords.ts';
 /** One change the stats marked: the UTC day it was marked on (`YYYY-MM-DD`), what changed and its name. */
 export type Mark = { day: string; kind: 'step' | 'agent' | 'skill'; name: string };
 
-/** One row of the spec plate: its label, its value, a note of one short line under the value, and for the effort its pips. */
+/** One row of the spec plate: its label, its value, a note of one short line under the value, and for the effort and the mode its pips. */
 export type PlateRow = {
   label: string;
   value: string;
@@ -60,9 +60,27 @@ export function modelWords(id: string, name: string | undefined) {
 }
 
 /**
+ * The plate's Mode row: the mode's word, the meaning the api serves of it, and a pip for each word of the harness's fence, those up to
+ * its rank filled; no pips where the api serves no fence for the harness.
+ * @param mode The mode the agent's file writes; undefined where none is set.
+ * @param fence The words of the harness's fence, most guarded first, as the api serves them.
+ */
+function modeRow(mode: string | undefined, fence: KeyForm['harnesses'][number]['fence']) {
+  const word = fence.find((w) => w.word === mode);
+  return {
+    label: 'Mode',
+    value: mode ?? UNSET,
+    note: word?.meaning ?? null,
+    pips: fence.length > 0 ? { total: fence.length, filled: word?.rank ?? 0 } : null,
+  } satisfies PlateRow;
+}
+
+/**
  * The spec plate's rows: Harness, Model, Effort, Mode and Context, each value with a short line under it where the board has one.
- * The model is its name with its version where the harness lists it (`modelWords`), with the exact id as its note; the effort is its
- * word with a pip for each level the model takes, those up to its own filled.
+ * The harness's note is the line the api serves of it; the model is its name with its version where the harness lists it
+ * (`modelWords`), with the exact id as its note; the effort is its word with a pip for each level the model takes, those up to its own
+ * filled; the mode is its word with the meaning the api serves of it, and a pip for each word of the harness's fence, those up to its
+ * rank filled, the most guarded first.
  * @param keys The agent's role keys, as its file writes them.
  * @param keyForm The step form's keys, which say what each key means; undefined while they load.
  * @param models The models each harness lists; undefined while they load.
@@ -72,8 +90,9 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
   const listed = models?.harnesses.find((h) => h.harness === harness)?.models.find((m) => m.id === keys.model);
   const levels = levelsOf(keyForm, listed, harness);
   const filled = keys.effort === undefined ? 0 : levels.indexOf(keys.effort) + 1;
+  const served = keyForm?.harnesses.find((h) => h.harness === harness);
   return [
-    { label: 'Harness', value: harness, note: null, pips: null },
+    { label: 'Harness', value: harness, note: served?.note ?? null, pips: null },
     {
       label: 'Model',
       value: keys.model === undefined ? UNSET : modelWords(keys.model, listed?.name),
@@ -86,7 +105,7 @@ export function plateOf(keys: AgentListing['keys'], keyForm: KeyForm | undefined
       note: 'How hard it thinks per turn',
       pips: levels.length > 0 ? { total: levels.length, filled } : null,
     },
-    { label: 'Mode', value: valueOf(keys, MODE) ?? UNSET, note: null, pips: null },
+    modeRow(valueOf(keys, MODE), served?.fence ?? []),
     { label: 'Context', value: keys.context ?? UNSET, note: 'Its context window, in tokens', pips: null },
   ] satisfies PlateRow[];
 }

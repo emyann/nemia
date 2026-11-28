@@ -93,6 +93,10 @@ export const Idle: Story = {
     await expect(page.getByText('Opus 5.5')).toBeVisible();
     await expect(page.getByText('How hard it thinks per turn')).toHaveAttribute('title', 'How hard it thinks per turn');
     await expect(canvasElement.querySelector('[data-plate-row="Effort"] [data-pips]')?.getAttribute('data-pips')).toBe('3');
+    await expect(page.getByText('Claude Code, on the Agent SDK')).toBeVisible();
+    await expect(page.getByText('Acts without asking first')).toBeVisible();
+    const modePips = canvasElement.querySelector('[data-plate-row="Mode"] [data-pips]');
+    await expect([modePips?.getAttribute('data-pips'), modePips?.children.length]).toEqual(['2', 7]);
     await waitFor(() => expect(canvasElement.querySelector('[data-skill-tile="ds-build"]')).not.toBeNull());
     const frameOf = (name: string) => canvasElement.querySelector(`[data-skill-tile="${name}"]`)?.closest('[data-cut-frame]');
     const heights = ['review-a-change', 'react-aria', 'ds-build'].map((name) => frameOf(name)?.getBoundingClientRect().height);

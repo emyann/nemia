@@ -655,9 +655,9 @@ const HarnessNote = Schema.Struct({
 
 /**
  * What the builder's form is drawn from (`GET /api/workflow-keys`): every key a step may set, in the package's order, the default
- * harness, what each harness is and what each word of its fence means (`harnesses`), the keys an agent may set (`roleKeys`) and those a step's file sets as its policy over its agent (`policyKeys`), the role values
- * each agent of the person's library gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it
- * may not set.
+ * harness, what each harness is and what each word of its fence means (`harnesses`), the keys an agent may set (`roleKeys`) and
+ * those a step's file sets as its policy over its agent (`policyKeys`), the role values each agent of the person's library gives a
+ * step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it may not set.
  */
 export const KeyForm = Schema.Struct({
   keys: Schema.Array(KeyField).annotate({

@@ -225,6 +225,7 @@ export const keyForm = (extra: Partial<KeyForm> = {}) =>
       { key: 'effort', meaning: 'How hard it thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'high'] } },
     ],
     defaultHarness: 'claude',
+    harnesses: [],
     roleKeys: ['harness', 'model', 'output'],
     policyKeys: ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
     agents: { otto: { harness: 'claude', gate: true, tools: ['Read'] }, bare: {} },

@@ -287,15 +287,23 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
         [
           [1, 'plan'],
           [2, 'dontAsk'],
+          [3, 'default'],
           [3, 'manual'],
-          [4, 'default'],
-          [5, 'acceptEdits'],
-          [6, 'auto'],
-          [7, 'bypassPermissions'],
+          [4, 'acceptEdits'],
+          [5, 'auto'],
+          [6, 'bypassPermissions'],
         ],
-        'each permission mode is served once, with its rank from the most guarded to the least',
+        'each permission mode is served once, with its rank from the most guarded to the least; manual is default by another name',
       );
       assert.equal(modes.find((m) => m.word === 'dontAsk')?.meaning, 'Acts without asking first');
+      assert.deepEqual(
+        form.harnesses.map((h) => [h.harness, h.key]),
+        [
+          ['claude', 'permissionMode'],
+          ['codex', 'sandbox'],
+        ],
+        'each harness says the key a step sets its fence by',
+      );
       assert.deepEqual(
         form.harnesses.find((h) => h.harness === 'codex')?.fence.map((m) => m.word),
         HARNESS_CHOICES.sandbox.codex,

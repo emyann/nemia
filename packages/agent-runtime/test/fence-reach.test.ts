@@ -54,22 +54,31 @@ describe("guarded: each harness's fence words, most guarded first, each with wha
   test('a harness that runs a brief says what it is in one line, and each word of its fence once, never falling in rank', () => {
     for (const [harness, declaration] of Object.entries(HARNESS_DECLARATIONS).filter(([, d]) => d.runsBrief === true)) {
       assert.ok(declaration.note !== undefined && declaration.note.length > 0 && !declaration.note.includes('\n'), harness);
-      const words = declaration.guarded?.map((g) => g.word) ?? [];
-      assert.deepEqual([...words].sort(), [...declaration.knobs!.fence.words].sort(), harness);
-      const ranks = words.map((word) => fenceReach(harness)!.rank[word]);
+      const guarded = declaration.guarded ?? [];
+      assert.deepEqual(guarded.map((g) => g.word).sort(), [...declaration.knobs!.fence.words].sort(), harness);
+      const reach = guarded.map((g) => fenceReach(harness)!.rank[g.word]);
       assert.deepEqual(
-        ranks,
-        [...ranks].sort((a, b) => a - b),
+        reach,
+        [...reach].sort((a, b) => a - b),
         harness,
       );
-      for (const { meaning } of declaration.guarded!) assert.ok(meaning.length > 0 && !meaning.includes('\n'), harness);
+      guarded.forEach((g, i) => {
+        assert.ok(g.meaning.length > 0 && !g.meaning.includes('\n'), `${harness} ${g.word}`);
+        const before = i === 0 ? undefined : guarded[i - 1];
+        if (before === undefined) assert.equal(g.rank, 1, harness);
+        else if (g.rank === before.rank) assert.equal(g.meaning, before.meaning, `${harness}: ${g.word} shares a rank, so a meaning`);
+        else assert.equal(g.rank, before.rank + 1, `${harness} ${g.word}`);
+      });
     }
   });
-  test("Claude Code's held mode is the second most guarded, after the mode that changes nothing", () => {
+  test("Claude Code's held mode is the second most guarded, after the mode that changes nothing; `manual` is `default` by another name", () => {
+    const guarded = HARNESS_DECLARATIONS.claude.guarded!;
     assert.deepEqual(
-      HARNESS_DECLARATIONS.claude.guarded!.slice(0, 2).map((g) => g.word),
+      guarded.slice(0, 2).map((g) => g.word),
       ['plan', fenceReach('claude')!.held],
     );
+    const [manual, given] = ['manual', 'default'].map((word) => guarded.find((g) => g.word === word));
+    assert.deepEqual([manual?.rank, manual?.meaning], [given?.rank, given?.meaning]);
   });
 });
 

@@ -139,7 +139,7 @@ export type HarnessNeeds = {
  *   remote agent, which need nothing of their own, is not;
  * - `note`: what it is, in one line a person reads, where it runs a brief;
  * - `guarded`: each word of its fence once, most guarded first and never falling in `reach`'s rank, with what it means in one line a
- *   person reads (`FenceWordMeaning`), where it has a fence.
+ *   person reads and its rank among them (`FenceWordMeaning`), where it has a fence.
  */
 export type HarnessDeclaration = {
   readonly can: readonly Capability[];
@@ -157,8 +157,11 @@ export type HarnessDeclaration = {
   readonly guarded?: readonly FenceWordMeaning[];
 };
 
-/** One word of a harness's fence, a permission mode or a sandbox, and what it means in one line a person reads. */
-export type FenceWordMeaning = { readonly word: string; readonly meaning: string };
+/**
+ * One word of a harness's fence, a permission mode or a sandbox, what it means in one line a person reads, and its rank: from 1, the
+ * most guarded, rising by one to the least, two names of one mode sharing one rank and one meaning.
+ */
+export type FenceWordMeaning = { readonly word: string; readonly meaning: string; readonly rank: number };
 
 /**
  * The declarations of the harnesses the runtime ships, by the name each is configured under by default (`DEFAULT_HARNESSES`), the

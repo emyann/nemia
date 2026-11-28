@@ -374,18 +374,20 @@ const claudeReach = () =>
   }) satisfies FenceReach;
 
 /**
- * Claude Code's permission modes, most guarded first, each with what it means to a person: `plan` changes nothing, `dontAsk` runs what
- * its rules allow and denies the rest without asking, `manual` asks before every action and `default` before a risky one, then the
- * three that act unasked, wider each. Ties in `CLAUDE_MODE_RANK` are ordered by how little each leaves to a person's answer.
+ * Claude Code's permission modes, most guarded first, each with what it means to a person and its rank: `plan` changes nothing,
+ * `dontAsk` runs what its rules allow and denies the rest without asking, `default` asks before most actions, then the three that act
+ * unasked, wider each. `manual` is the CLI's other name for `default` ("The CLI accepts `manual` as an alias for `default`", Claude
+ * Code's permission modes page), so it says the same and shares its rank. Ties in `CLAUDE_MODE_RANK` between different modes are
+ * ordered by how little each leaves to a person's answer.
  */
 const CLAUDE_MODE_MEANINGS = [
-  { word: 'plan', meaning: 'Plans, and changes nothing' },
-  { word: 'dontAsk', meaning: 'Acts without asking first' },
-  { word: 'manual', meaning: 'Asks before every action' },
-  { word: 'default', meaning: 'Asks before a risky action' },
-  { word: 'acceptEdits', meaning: 'Edits files without asking' },
-  { word: 'auto', meaning: 'A classifier approves safe actions' },
-  { word: 'bypassPermissions', meaning: 'Skips every permission check' },
+  { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
+  { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
+  { word: 'default', meaning: 'Asks before most actions', rank: 3 },
+  { word: 'manual', meaning: 'Asks before most actions', rank: 3 },
+  { word: 'acceptEdits', meaning: 'Edits files without asking', rank: 4 },
+  { word: 'auto', meaning: 'A classifier approves safe actions', rank: 5 },
+  { word: 'bypassPermissions', meaning: 'Skips every permission check', rank: 6 },
 ] satisfies readonly FenceWordMeaning[];
 
 /**

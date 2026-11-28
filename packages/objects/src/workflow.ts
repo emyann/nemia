@@ -641,13 +641,16 @@ export type KeyField = typeof KeyField.Type;
 const FenceWord = Schema.Struct({
   word: Schema.String.annotate({ description: 'The word, as a step writes it.' }),
   meaning: Schema.String.annotate({ description: 'What it means, in one line a person reads.' }),
-  rank: Schema.Int.annotate({ description: "Its rank among the fence's words, from 1, the most guarded, to their count, the least." }),
+  rank: Schema.Int.annotate({
+    description: "Its rank among the fence's words, from 1, the most guarded, rising by one to the least; two names of one mode share one.",
+  }),
 });
 
 /** What a harness a step may run on is, in one line a person reads, and the words of its fence, most guarded first. */
 const HarnessNote = Schema.Struct({
   harness: Schema.String.annotate({ description: "The harness's name." }),
   note: Schema.String.annotate({ description: 'What it is, in one line a person reads.' }),
+  key: Schema.NullOr(Schema.Literals(STEP_KEYS)).annotate({ description: 'The key a step sets its fence by; null where it has none.' }),
   fence: Schema.Array(FenceWord).annotate({
     description: 'Each word of its fence, most guarded first, with what it means and its rank; none for a harness with no fence.',
   }),

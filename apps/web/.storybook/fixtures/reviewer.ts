@@ -166,19 +166,21 @@ export const keyForm: KeyForm = {
     {
       harness: 'claude',
       note: 'Claude Code, on the Agent SDK',
+      key: 'permissionMode',
       fence: [
         { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
         { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
-        { word: 'manual', meaning: 'Asks before every action', rank: 3 },
-        { word: 'default', meaning: 'Asks before a risky action', rank: 4 },
-        { word: 'acceptEdits', meaning: 'Edits files without asking', rank: 5 },
-        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 6 },
-        { word: 'bypassPermissions', meaning: 'Skips every permission check', rank: 7 },
+        { word: 'default', meaning: 'Asks before most actions', rank: 3 },
+        { word: 'manual', meaning: 'Asks before most actions', rank: 3 },
+        { word: 'acceptEdits', meaning: 'Edits files without asking', rank: 4 },
+        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 5 },
+        { word: 'bypassPermissions', meaning: 'Skips every permission check', rank: 6 },
       ],
     },
     {
       harness: 'codex',
       note: 'Codex, through its command line',
+      key: 'sandbox',
       fence: [
         { word: 'read-only', meaning: 'Reads, and writes nothing', rank: 1 },
         { word: 'workspace-write', meaning: 'Writes in its workspace only', rank: 2 },

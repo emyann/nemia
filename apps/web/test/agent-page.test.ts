@@ -43,10 +43,23 @@ const keyForm = {
     {
       harness: 'claude',
       note: 'Claude Code, on the Agent SDK',
+      key: 'permissionMode',
       fence: [
         { word: 'plan', meaning: 'Plans, and changes nothing', rank: 1 },
         { word: 'dontAsk', meaning: 'Acts without asking first', rank: 2 },
-        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 3 },
+        { word: 'default', meaning: 'Asks before most actions', rank: 3 },
+        { word: 'manual', meaning: 'Asks before most actions', rank: 3 },
+        { word: 'auto', meaning: 'A classifier approves safe actions', rank: 4 },
+      ],
+    },
+    {
+      harness: 'codex',
+      note: 'Codex, through its command line',
+      key: 'sandbox',
+      fence: [
+        { word: 'read-only', meaning: 'Reads, and writes nothing', rank: 1 },
+        { word: 'workspace-write', meaning: 'Writes in its workspace only', rank: 2 },
+        { word: 'danger-full-access', meaning: 'Writes anywhere, with no sandbox', rank: 3 },
       ],
     },
   ],
@@ -103,7 +116,16 @@ describe("an agent page's plate and permissions", () => {
 
   test('the mode says the meaning the api serves of it, and fills its pips up to its rank among the fence words', () => {
     const [, , , mode] = plateOf({ permissionMode: 'dontAsk' }, keyForm, models);
-    assert.deepEqual([mode?.value, mode?.note, mode?.pips], ['dontAsk', 'Acts without asking first', { total: 3, filled: 2 }]);
+    assert.deepEqual([mode?.value, mode?.note, mode?.pips], ['dontAsk', 'Acts without asking first', { total: 4, filled: 2 }]);
+    const [, , , manual] = plateOf({ permissionMode: 'manual' }, keyForm, models);
+    const [, , , given] = plateOf({ permissionMode: 'default' }, keyForm, models);
+    assert.deepEqual([manual?.note, manual?.pips], [given?.note, given?.pips], 'two names of one mode say the same');
+    const [, , , sandbox] = plateOf({ harness: 'codex', sandbox: 'workspace-write' }, keyForm, models);
+    assert.deepEqual(
+      [sandbox?.value, sandbox?.note, sandbox?.pips],
+      ['workspace-write', 'Writes in its workspace only', { total: 3, filled: 2 }],
+      'a harness fenced by another key reads its mode from that key',
+    );
     const [harness, , , unserved] = plateOf({ harness: 'elsewhere', permissionMode: 'dontAsk' }, keyForm, models);
     assert.deepEqual([harness?.note, unserved?.note, unserved?.pips], [null, null, null], 'a harness the api says nothing of has no note');
   });

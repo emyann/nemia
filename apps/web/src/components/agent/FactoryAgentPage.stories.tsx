@@ -98,7 +98,7 @@ export const Idle: Story = {
     await expect(harnessNote).not.toBe('');
     await expect(page.getByText('Acts without asking first')).toBeVisible();
     const modePips = canvasElement.querySelector('[data-plate-row="Mode"] [data-pips]');
-    await expect([modePips?.getAttribute('data-pips'), modePips?.children.length]).toEqual(['2', 7]);
+    await expect([modePips?.getAttribute('data-pips'), modePips?.children.length]).toEqual(['2', 6]);
     await waitFor(() => expect(canvasElement.querySelector('[data-skill-tile="ds-build"]')).not.toBeNull());
     const frameOf = (name: string) => canvasElement.querySelector(`[data-skill-tile="${name}"]`)?.closest('[data-cut-frame]');
     const heights = ['review-a-change', 'react-aria', 'ds-build'].map((name) => frameOf(name)?.getBoundingClientRect().height);

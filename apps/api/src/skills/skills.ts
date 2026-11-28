@@ -234,12 +234,12 @@ function yourAgentsSkills(agents: Agents) {
 /**
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
  * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name, and listing the
- * agents of yours that give it where none does. The package's builtin place skill (`isBuiltinPlace`) and its builtin skills, which an
- * agent finds where no place has the name, are in neither of the first two. With no repository (the default factory with no `?repo=`),
- * no place of the repository's is listed. A name both
- * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
- * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
- * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
+ * agents of yours that give it where none does. The package's builtin place skill (`isBuiltinPlace`, the git place's) and its builtin
+ * skills, which an agent finds where no place has the name, are in neither of the first two: both are listed as Nemia's builtin. With no
+ * repository (the default factory with no `?repo=`), no place of the repository's is listed. A name both of one repository's places for
+ * skills have, which happens only when the store is in that repository and nothing says which is given, is listed in yours with the
+ * package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules that do not read — is
+ * listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
  * Each folder is read by `readSkills` (`readsOf`, on a request).
  * @param readSkills What reads the skill folders it is given, by folder.
  * @param repo The repository's folder, or undefined where the request reads none.
@@ -267,7 +267,11 @@ export async function listSkills(
     at instanceof WorkflowError
       ? (skillDirIn(inRepo === undefined ? [yours.dir] : [yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name))
       : at;
-  const reads = await readSkills([...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
+  const inPlace = [...found.all].flatMap(([name, at]) =>
+    typeof at === 'string' && isBuiltinPlace(at) && !builtinNames.includes(name) ? [[name, at] as const] : [],
+  );
+  const builtins = [...builtinNames.map((name) => [name, path.join(builtin, name)] as const), ...inPlace];
+  const reads = await readSkills([...sorted.map(dirOf), ...builtins.map(([, dir]) => dir)]);
   const where = new Map<string, Extract<SkillSource, 'user' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
@@ -288,8 +292,7 @@ export async function listSkills(
   places.push({
     from: 'builtin',
     dir: builtin,
-    skills: builtinNames.map((name) => {
-      const dir = path.join(builtin, name);
+    skills: builtins.map(([name, dir]) => {
       const shadowed = where.get(name) ?? null;
       return skillRow(name, dir, 'builtin', readAt(reads, dir), shadowed === null ? usedBy(name) : [], shadowed);
     }),

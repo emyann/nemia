@@ -66,8 +66,13 @@ const ROOT_SKILLS = [
 export const ROOT_FOLDER = '.claude/skills';
 export const APP_FOLDER = 'apps/web/.claude/skills';
 
-/** The board's skills, named with their folder, its review step adds; the factory lists none of them. */
-const NESTED = ['ds-build', 'ds-theme', 'ds-spec'] as const;
+/** The board's skills, named with their folder, its review step adds, each with what it is for; the factory lists none of them. */
+const NESTED_SKILLS = [
+  ['ds-build', 'Build or review any UI of the design system: its role utilities, type primitives and state layers.'],
+  ['ds-theme', 'Change the look of the design system: a colour, a font, corners, motion or dark mode.'],
+  ['ds-spec', 'Read what Material Design 3 says about a size, a state or a colour role.'],
+] as const;
+const NESTED = NESTED_SKILLS.map(([name]) => name);
 
 /** What review-a-change is for. */
 const REVIEW_A_CHANGE = 'Review a change as a second engineer would: against its intent and spec, with findings that name the file and the line.';
@@ -208,10 +213,15 @@ export const reviewStep = (workflow: 'build' | 'quick') => ({
   hiredIn: [],
   hiring: { refused: null, agents: [] },
   skillsFrom: [
-    { name: 'review-a-change', from: null, foundIn: null },
-    { name: 'git', from: 'builtin', foundIn: null },
-    ...ROOT_SKILLS.map(([name]) => ({ name, from: 'repo' as const, foundIn: `${ROOT_FOLDER}/${name}` })),
-    ...NESTED.map((name) => ({ name: `apps/web:${name}`, from: null, foundIn: `${APP_FOLDER}/${name}` })),
+    { name: 'review-a-change', from: null, foundIn: null, description: null },
+    { name: 'git', from: 'builtin', foundIn: null, description: null },
+    ...ROOT_SKILLS.map(([name, description]) => ({ name, from: 'repo' as const, foundIn: `${ROOT_FOLDER}/${name}`, description })),
+    ...NESTED_SKILLS.map(([name, description]) => ({
+      name: `apps/web:${name}`,
+      from: null,
+      foundIn: `${APP_FOLDER}/${name}`,
+      description,
+    })),
   ],
   recentRuns: [],
 }) satisfies WorkflowStepPage;

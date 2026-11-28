@@ -142,7 +142,12 @@ describe("an agent page's skills and servers", () => {
     },
   ] satisfies Parameters<typeof skillGroupsOf>[0];
   const steps: StepGives[] = [
-    { step: 'review', added: ['git', 'look'], skillsFrom: [{ name: 'look', from: 'user', foundIn: '/skills/look' }], mcp: ['playwright'] },
+    {
+      step: 'review',
+      added: ['git', 'look'],
+      skillsFrom: [{ name: 'look', from: 'user', foundIn: '/skills/look', description: null }],
+      mcp: ['playwright'],
+    },
     { step: 'review', added: ['look'], skillsFrom: [], mcp: ['playwright'] },
   ];
   const places: SkillPlace[] = [
@@ -221,8 +226,8 @@ describe('where a skill on an agent page comes from', () => {
       step: 'review',
       added: ['apps/web:ds-spec', 'gone'],
       skillsFrom: [
-        { name: 'apps/web:ds-spec', from: null, foundIn: 'apps/web/.claude/skills/ds-spec' },
-        { name: 'gone', from: null, foundIn: null },
+        { name: 'apps/web:ds-spec', from: null, foundIn: 'apps/web/.claude/skills/ds-spec', description: 'Reads the spec.' },
+        { name: 'gone', from: null, foundIn: null, description: null },
       ],
       mcp: [],
     };
@@ -232,6 +237,11 @@ describe('where a skill on an agent page comes from', () => {
         ['ds-spec', 'From the repository, apps/web/.claude/skills'],
         ['gone', 'Not found'],
       ],
+    );
+    assert.deepEqual(
+      skillGroupsOf([], [step], [], 'nemia').flatMap((g) => g.tiles.map((t) => t.description)),
+      ['Reads the spec.', null],
+      'a skill no library lists says what it is for as the step page serves it',
     );
     assert.equal(whereOf('user', null, 'nemia'), 'From your library');
   });

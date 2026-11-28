@@ -155,7 +155,7 @@ export const editedDayOf = (marks: readonly Mark[]) => {
 export type StepGives = {
   step: string;
   added: readonly string[];
-  skillsFrom: readonly { name: string; from: SkillSource | null; foundIn: string | null }[];
+  skillsFrom: readonly { name: string; from: SkillSource | null; foundIn: string | null; description: string | null }[];
   mcp: readonly string[];
 };
 
@@ -235,7 +235,7 @@ export function skillGroupsOf(
         const foundIn = from?.foundIn ?? null;
         return {
           name: tileName(skill, foundIn),
-          description: row?.entry?.description ?? null,
+          description: row?.entry?.description ?? from?.description ?? null,
           where: whereOf(from?.from ?? row?.from ?? null, foundIn, factory),
         };
       }),

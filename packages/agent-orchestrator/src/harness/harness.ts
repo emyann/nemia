@@ -161,6 +161,18 @@ export const HARNESSES: readonly string[] = Object.entries(HARNESS_DECLARATIONS)
   .map(([name]) => name);
 
 /**
+ * What each harness a step may run on is, in a line a person reads, and each word of its fence, most guarded first, with what it means
+ * and its rank, 1 the most guarded: the runtime's declarations (`note`, `guarded`), for the api, which imports no runtime. A harness
+ * that says no line of itself is left out, and one with no fence has no words.
+ */
+export const HARNESS_NOTES = HARNESSES.flatMap((harness) => {
+  const declaration = declarationOf(harness);
+  if (declaration?.note === undefined) return [];
+  const fence = (declaration.guarded ?? []).map(({ word, meaning }, i) => ({ word, meaning, rank: i + 1 }));
+  return [{ harness, note: declaration.note, fence }];
+});
+
+/**
  * The fence keys of every harness: each one's own key and its tool lists. One list for the package, read by the template and by the
  * markdown readers, which take a harness's fence under its block (`<harness>: { fence: … }`, `fenceKeysOf`).
  */

@@ -35,6 +35,7 @@ import {
   AGENT_OWN_KEYS,
   AGENTS_FOLDER,
   DEFAULT_HARNESS,
+  HARNESS_NOTES,
   HARNESSES,
   parseFolder,
   parseWorkflow,
@@ -120,7 +121,8 @@ function harnessChoices(home: string) {
 
 /**
  * What the builder's form is drawn from (`GET /api/workflows/keys`, objects' `KeyForm`): every key a step may set, in the package's order,
- * and the default harness. `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with
+ * the default harness, and what each harness is and what each word of its fence means, most guarded first (`harnesses`, the
+ * package's `HARNESS_NOTES`). `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with
  * an agent takes from it unless its file sets them itself: the form shows those as the agent's until one is changed. `policyKeys` are those
  * a step's file sets as its policy over its agent (the package's `OVERRIDE_KEYS`): the fence keys, which only tighten the agent's, and the
  * skills and MCP servers it adds.
@@ -143,6 +145,7 @@ export const keyForm = (yours: YourAgents, home: string) => ({
     byHarness: key === 'effort' || key === 'permissionMode' || key === 'sandbox' ? HARNESS_CHOICES[key] : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
+  harnesses: HARNESS_NOTES,
   roleKeys: [...ROLE_KEYS],
   policyKeys: [...OVERRIDE_KEYS],
   agents: agentValues(yours.agents),

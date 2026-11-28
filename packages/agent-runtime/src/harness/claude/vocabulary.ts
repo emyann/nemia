@@ -3,7 +3,7 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
-import type { FenceReach, HarnessDeclaration, HarnessNeeds } from '../declaration.ts';
+import type { FenceReach, FenceWordMeaning, HarnessDeclaration, HarnessNeeds } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_RULES } from './rules.ts';
 
@@ -374,6 +374,21 @@ const claudeReach = () =>
   }) satisfies FenceReach;
 
 /**
+ * Claude Code's permission modes, most guarded first, each with what it means to a person: `plan` changes nothing, `dontAsk` runs what
+ * its rules allow and denies the rest without asking, `manual` asks before every action and `default` before a risky one, then the
+ * three that act unasked, wider each. Ties in `CLAUDE_MODE_RANK` are ordered by how little each leaves to a person's answer.
+ */
+const CLAUDE_MODE_MEANINGS = [
+  { word: 'plan', meaning: 'Plans, and changes nothing' },
+  { word: 'dontAsk', meaning: 'Acts without asking first' },
+  { word: 'manual', meaning: 'Asks before every action' },
+  { word: 'default', meaning: 'Asks before a risky action' },
+  { word: 'acceptEdits', meaning: 'Edits files without asking' },
+  { word: 'auto', meaning: 'A classifier approves safe actions' },
+  { word: 'bypassPermissions', meaning: 'Skips every permission check' },
+] satisfies readonly FenceWordMeaning[];
+
+/**
  * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config
  * but Codex's and a command's, a session kept open and a call held for a person (attached, in the holder), and every Engine verb that is
  * not a task's. Its job's `HarnessSpec` declares the same `can` (`claudeJobSpec`, held equal by `test/declaration.test.ts`).
@@ -416,4 +431,6 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
   recordsDenials: true,
   rules: CLAUDE_RULES,
   needs: claudeNeeds(),
+  note: 'Claude Code, on the Agent SDK',
+  guarded: CLAUDE_MODE_MEANINGS,
 };

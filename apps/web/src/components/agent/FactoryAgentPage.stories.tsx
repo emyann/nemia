@@ -93,7 +93,9 @@ export const Idle: Story = {
     await expect(page.getByText('Opus 5.5')).toBeVisible();
     await expect(page.getByText('How hard it thinks per turn')).toHaveAttribute('title', 'How hard it thinks per turn');
     await expect(canvasElement.querySelector('[data-plate-row="Effort"] [data-pips]')?.getAttribute('data-pips')).toBe('3');
-    await expect(page.getByText('Claude Code, on the Agent SDK')).toBeVisible();
+    const harnessNote = keyForm.harnesses.find((h) => h.harness === keyForm.defaultHarness)?.note ?? '';
+    await expect(canvasElement.querySelector('[data-plate-row="Harness"] [data-plate-note]')?.textContent).toBe(harnessNote);
+    await expect(harnessNote).not.toBe('');
     await expect(page.getByText('Acts without asking first')).toBeVisible();
     const modePips = canvasElement.querySelector('[data-plate-row="Mode"] [data-pips]');
     await expect([modePips?.getAttribute('data-pips'), modePips?.children.length]).toEqual(['2', 7]);
